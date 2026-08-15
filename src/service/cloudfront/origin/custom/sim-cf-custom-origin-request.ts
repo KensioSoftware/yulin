@@ -1,4 +1,5 @@
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
+import { stripSimAwsControlHeaders } from "../../../iam/request/sim-aws-control-headers.js";
 
 interface SimCfCustomOriginRequestProperties {
   readonly domainName: string;
@@ -37,6 +38,13 @@ export function simCfCustomOriginRequest(
 
   const headers = new Headers(request.headers);
   headers.set("host", originUrl.host);
+
+  // Who the Origin request is from is the Origin's business, not the viewer's,
+  // so a viewer's own control headers are dropped before the Origin's are
+  // applied. A viewer reaching a Distribution through the HTTP boundary has
+  // had them stripped already; one reaching a controller in process has not,
+  // and either way an unsigned Origin should state nothing.
+  stripSimAwsControlHeaders(headers);
 
   const signingHeaders = Object.entries(properties.signingHeaders ?? {});
 

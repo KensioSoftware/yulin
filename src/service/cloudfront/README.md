@@ -277,6 +277,12 @@ what an `AWS_IAM` Function URL evaluates its `lambda:InvokeFunctionUrl` permissi
 being admitted anyway. The headers are stripped at the boundary, so the function's event shows the
 request its viewer sent.
 
+A viewer's own control headers are dropped from the Origin request before the Origin's are applied,
+so who the Origin request is from is the Origin's decision and never the viewer's. The HTTP boundary
+has already stripped them from a request that arrived that way, and a request handed straight to the
+controller in process has not, so `simCfCustomOriginRequest` strips them rather than relying on
+where the request came from.
+
 That resolution is per request rather than per Origin because an Origin does not know its
 Distribution until one fetches through it. Deciding it earlier would be wrong anyway: in a CDK stack
 the Bucket policy is created after the Distribution, since it names the Distribution's ARN.

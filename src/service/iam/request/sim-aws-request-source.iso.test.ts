@@ -43,7 +43,28 @@ describe("SimAwsRequestSource", () => {
       }),
     );
 
-    assertUndefined(source?.accountId);
+    // Then there is a source, carrying the one thing it was told.
+    assertNonNullable(source);
+    assertIdentical(
+      source.arn,
+      "arn:aws:cloudfront::888888888888:distribution/E1EXAMPLE12345",
+    );
+    assertUndefined(source.accountId);
+  });
+
+  it("reads an empty header as no source at all", () => {
+    // Given a request carrying the headers with nothing in them, which is not
+    // a resource anything could be granted for.
+    const source = SimAwsRequestSource.fromHeaders(
+      new Headers({
+        [simAwsSourceArnHeaderName]: "",
+        [simAwsSourceAccountHeaderName]: "  ",
+      }),
+    );
+
+    // Then it is the same as saying nothing, rather than a source whose ARN
+    // is the empty string.
+    assertUndefined(source);
   });
 
   it("is nothing at all when the request stated no source", () => {

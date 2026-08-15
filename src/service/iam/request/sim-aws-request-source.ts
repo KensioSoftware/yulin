@@ -42,11 +42,13 @@ export class SimAwsRequestSource {
    *
    * A request carrying neither header has no source rather than an empty one,
    * so a policy conditioned on either fails to match instead of matching an
-   * empty string.
+   * empty string. A header present but empty is the same thing said a
+   * different way, and is read the same, since no AWS service names a resource
+   * by sending nothing.
    */
   static fromHeaders(headers: Headers): SimAwsRequestSource | undefined {
-    const arn = headers.get(simAwsSourceArnHeaderName) ?? undefined;
-    const accountId = headers.get(simAwsSourceAccountHeaderName) ?? undefined;
+    const arn = stated(headers.get(simAwsSourceArnHeaderName));
+    const accountId = stated(headers.get(simAwsSourceAccountHeaderName));
 
     if (arn === undefined && accountId === undefined) {
       return undefined;
@@ -54,4 +56,15 @@ export class SimAwsRequestSource {
 
     return new SimAwsRequestSource({ arn, accountId });
   }
+}
+
+/**
+ * One header value, or nothing when the request did not really state it.
+ */
+function stated(value: string | null): string | undefined {
+  if (value === null || value.trim().length === 0) {
+    return undefined;
+  }
+
+  return value;
 }
