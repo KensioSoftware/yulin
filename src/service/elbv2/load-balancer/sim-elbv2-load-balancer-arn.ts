@@ -1,5 +1,4 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimElbV2LoadBalancerScheme } from "./sim-elbv2-load-balancer-scheme.js";
 
 /**
  * The ARN of one simulated Application Load Balancer.
@@ -19,26 +18,6 @@ export function simElbV2LoadBalancerArn(
     `arn:aws:elasticloadbalancing:${scope.regionName}:${scope.accountId}:` +
     `loadbalancer/app/${name}/${id}`
   );
-}
-
-/**
- * The DNS name real ELB issues for a load balancer.
- *
- * This is the whole point of creating one here: a Route53 alias or a CloudFront
- * origin needs a host name of the right shape to point at, and it is the only
- * name by which anything reaches a load balancer on real AWS. An internal load
- * balancer's name carries the `internal-` prefix real ELB gives it, which is
- * why that prefix is refused in a load balancer's own name.
- */
-export function simElbV2LoadBalancerDnsName(
-  name: string,
-  suffix: string,
-  scheme: SimElbV2LoadBalancerScheme,
-  scope: SimAwsAccountRegionScope,
-): string {
-  const prefix = scheme === "internal" ? "internal-" : "";
-
-  return `${prefix}${name}-${suffix}.${scope.regionName}.elb.amazonaws.com`;
 }
 
 /**

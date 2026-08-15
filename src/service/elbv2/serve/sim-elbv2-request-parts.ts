@@ -1,7 +1,7 @@
+import { simAwsRequestHostname } from "../../../serve/http/url/sim-aws-request-hostname.js";
+
 interface SimElbV2ProxiedRequest {
   readonly request: Request;
-  /** The DNS name of the load balancer the request reached. */
-  readonly dnsName: string;
   /** The port the listener taking the request answers on. */
   readonly port: number;
   /** The protocol that listener speaks, lowercased for the header. */
@@ -37,9 +37,10 @@ export class SimElbV2RequestParts {
       headers.set(name, value);
     });
 
-    // The load balancer's own DNS name, not the localhost one the request
-    // arrived at, because that is the host name the request named on real AWS.
-    headers.set("host", proxied.dnsName);
+    // The host name the request named on real AWS, which is the load balancer's
+    // own DNS name or whatever Route53 name resolved to it, rather than the
+    // localhost one a served request arrived at.
+    headers.set("host", simAwsRequestHostname(proxied.request));
     headers.set("x-amzn-trace-id", proxied.traceId);
     headers.set("x-forwarded-for", this.forwardedFor(headers, proxied));
     headers.set("x-forwarded-port", String(proxied.port));

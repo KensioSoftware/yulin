@@ -328,6 +328,14 @@ Built-in targets currently include:
 - S3 static website hostnames, resolved to service `"s3"` with bucket/resource name and region
 - CloudFront distribution hostnames, resolved to service `"cloudFront"` with distribution/resource
   ID
+- ELBv2 load balancer hostnames, resolved to service `"elbV2"` with the DNS name as the resource
+  name, which is what the ELBv2 registry routes by
+
+`SimRoute53S3ServiceTargets` and `SimRoute53RegionalServiceTargets` hold the shapes with something in
+common: S3's two endpoints and two hostname styles, and the SDK endpoints whose last label is a
+Region because the local URL rewriting dropped the AWS domain. A load balancer's hostname keeps its
+domain, since nothing rewrites it on the way in, and its shape is read by
+`readSimElbV2LoadBalancerHost` so that writing the name and reading it back are one file's answer.
 
 If the incoming hostname is already a built-in simulated service hostname, the resolver returns the
 target directly. Otherwise, it looks for a `CNAME` record matching the logical name and follows the

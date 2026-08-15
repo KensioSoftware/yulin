@@ -1,6 +1,5 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimElbV2Listener } from "../listener/sim-elbv2-listener.js";
-import type { SimElbV2LoadBalancer } from "../load-balancer/sim-elbv2-load-balancer.js";
 import type { SimElbV2TargetGroup } from "../target-group/sim-elbv2-target-group.js";
 import { SimElbV2ErrorResponse } from "./sim-elbv2-error-response.js";
 import { SimElbV2EventBuilder } from "./sim-elbv2-event-builder.js";
@@ -23,7 +22,6 @@ interface SimElbV2LambdaTargetInvocationProperties {
 }
 
 interface SimElbV2LambdaTargetInvocationInput {
-  readonly loadBalancer: SimElbV2LoadBalancer;
   readonly listener: SimElbV2Listener;
   readonly targetGroup: SimElbV2TargetGroup;
   readonly request: Request;
@@ -90,7 +88,7 @@ export class SimElbV2LambdaTargetInvocation {
     input: SimElbV2LambdaTargetInvocationInput,
     target: SimElbV2FunctionTarget,
   ): Promise<Response> {
-    const { loadBalancer, listener, targetGroup, request } = input;
+    const { listener, targetGroup, request } = input;
 
     try {
       const bytes = new Uint8Array(await request.arrayBuffer());
@@ -103,7 +101,6 @@ export class SimElbV2LambdaTargetInvocation {
         request,
         bytes,
         targetGroupArn: targetGroup.arn,
-        dnsName: loadBalancer.dnsName,
         port: listener.port,
         protocol: listener.protocol,
       });

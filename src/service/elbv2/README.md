@@ -29,7 +29,9 @@ ELB does, since a replacement load balancer's listeners forward to the same grou
 
 `SimElbV2LoadBalancer` is the DNS name above all. That is the only way anything reaches a load
 balancer on real AWS, and it is what a Route53 alias or a CloudFront origin points at.
-`sim-elbv2-load-balancer-arn.ts` builds both it and the ARN, and owns the `internal-` prefix an
+`sim-elbv2-load-balancer-arn.ts` builds the ARN, and `sim-elbv2-load-balancer-host.ts` both writes
+the DNS name and reads one back. Writing and reading it are in one file because they have to agree:
+what `DNSName` reports is what Route53 resolution recognises. It also owns the `internal-` prefix an
 internal load balancer's host name carries, which is why that prefix is refused in a load balancer's
 own name.
 
@@ -96,15 +98,17 @@ is refused at runtime with an explanation rather than by the type checker with n
 `serve/` is where a request becomes a response, and it is a chain of one decision each:
 
 - `sim-elbv2-fetch.ts` turns a URL into a service request, taking the load balancer's DNS name from
-  the host name. It exists because nothing resolves that name to a load balancer yet, and it is what
-  the DNS and local serving work will sit on top of rather than replace.
+  the host name. It is the in-process way in, alongside the served one: a request arriving at the
+  local server is resolved by simulated Route53 and reaches the same controller.
 - `sim-elbv2-router.ts` gets from a DNS name to the load balancer answering on it, and from a target
   group to the function registered in it. Neither hop is local: a DNS name says nothing about the
   Account, which is what `registry/sim-elbv2-registry.ts` answers, and a function is looked for in
   the target group's own Account and Region, which is where real ELB requires a Lambda target to be.
 - `sim-elbv2-controller.ts` and `sim-elbv2-listener-match.ts` match the port to a listener. A port no
   listener holds throws rather than answering, because on real AWS the connection is refused and
-  there is no status to send.
+  there is no status to send. `sim-elbv2-request-port.ts` is what decides which port that is: a
+  request served under the Yulin-local suffix carries the local server's port rather than one a
+  client chose, so the scheme's own port is used for it.
 - `sim-elbv2-rule-evaluation.ts` picks the action answering the request. Rules are evaluated in
   priority order and the first match wins, and a request no rule claims falls through to the
   listener's default action. What comes out carries the rule or listener it came from, so a refusal
@@ -128,8 +132,12 @@ is refused at runtime with an explanation rather than by the type checker with n
   function, supplying the target group as the source ARN. Who may invoke a function is Lambda's rule,
   so the decision is made there and only the ELB-shaped part of the question is here.
 
-`SimElbV2ServiceController` implements `SimAwsServiceController`, so the localhost serving layer can
-route to it once a load balancer's DNS name is resolved. Nothing resolves one yet.
+`SimElbV2ServiceController` implements `SimAwsServiceController`, and simulated Route53 resolves a
+load balancer's DNS name to it, so a Route53 record pointing at that name is served over localhost
+like any other simulated host. What the load balancer sees as the request's host name is the
+AWS-facing one, which `simAwsRequestHostname` reads: that is the name a `host-header` condition is
+matched against and the `host` header an invocation event carries, so routing by name and the event
+agree with what a client asked for.
 
 ## Authorization
 
@@ -169,10 +177,11 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
 - Only `host-header` and `path-pattern` conditions exist here. The other four fields real ELB has are
   refused when the rule is written, since a stored condition nothing matches would leave a rule that
   looks configured and never claims a request.
-- A rule is matched against the request's own Host header, falling back to the host name in the URL.
-  On real AWS those are the same thing, because DNS is what brought the request to the load balancer.
-  Here a request reaches one at its own DNS name, so sending a Host header is how a test says which
-  name the client asked for.
+- A rule is matched against the request's own Host header, falling back to the host name in the URL,
+  with the Yulin-local suffix and the local server's port taken off. On real AWS the header and the
+  URL are the same thing, because DNS is what brought the request to the load balancer. Here a
+  request reaches one at its own DNS name or at a Route53 name pointing at it, and sending a Host
+  header is how an in-process test says which name the client asked for.
 - What a request carries in is copied when it is stored, so a caller mutating the command input it
   sent cannot change a listener or rule afterwards. Real ELB reads the request off the wire and is
   immune to that by construction.

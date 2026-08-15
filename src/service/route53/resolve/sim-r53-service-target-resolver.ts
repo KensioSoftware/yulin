@@ -1,13 +1,12 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
-import { executeApiHostLabel } from "../../apigatewayv2/api/sim-http-api-host.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
-import { lambdaFunctionUrlHostLabel } from "../../lambda/function/url/sim-lambda-function-url-host.js";
+import { readSimElbV2LoadBalancerHost } from "../../elbv2/load-balancer/sim-elbv2-load-balancer-host.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
 import { simRoute53DnsHostName } from "../serve/sim-route53-dns-host.js";
+import { SimRoute53RegionalServiceTargets } from "./sim-r53-regional-service-target.js";
 import { SimRoute53S3ServiceTargets } from "./sim-r53-s3-service-target.js";
 
 const cloudFrontServiceLabel = "cloudfront";
-const cognitoIdpServiceLabel = "cognito-idp";
 
 /**
  * Maps Yulin-local service hostnames to simulated AWS service targets.
@@ -25,6 +24,7 @@ const cognitoIdpServiceLabel = "cognito-idp";
  */
 export class SimRoute53ServiceTargetResolver {
   private readonly s3Targets = new SimRoute53S3ServiceTargets();
+  private readonly regionalTargets = new SimRoute53RegionalServiceTargets();
 
   /**
    * Convert a Yulin-local hostname into a simulated service target.
@@ -44,9 +44,8 @@ export class SimRoute53ServiceTargetResolver {
       this.route53DnsServiceTarget(logicalName) ??
       this.s3Targets.resolve(logicalName) ??
       this.cloudFrontServiceTarget(logicalName) ??
-      this.lambdaFunctionUrlServiceTarget(logicalName) ??
-      this.httpApiServiceTarget(logicalName) ??
-      this.cognitoIdpServiceTarget(logicalName)
+      this.loadBalancerServiceTarget(logicalName) ??
+      this.regionalTargets.resolve(logicalName)
     );
   }
 
@@ -107,117 +106,34 @@ export class SimRoute53ServiceTargetResolver {
   }
 
   /**
-   * Resolve Lambda Function URL hostnames.
+   * Resolve Application Load Balancer hostnames.
    *
-   * Simulated Function URL hostnames use:
+   * Simulated load balancer hostnames use the name real ELB issues, whole:
    *
-   *   <url-id>.lambda-url.<region>
+   *   <name>-<id>.<region>.elb.amazonaws.com
    *
-   * The real AWS endpoint ends `.on.aws`, which the local URL rewriting drops
-   * in the same way it drops `.amazonaws.com` from S3 endpoints. The URL id is
-   * one DNS label, so the label count here is exact.
+   * The AWS domain is kept rather than dropped, unlike the SDK endpoints,
+   * because nothing rewrites this name on its way in: `DNSName` is what a
+   * Route53 alias points at and what a client asks for, so it is also what is
+   * recognised here.
+   *
+   * The name says only that a load balancer would answer on it. Whether one
+   * still does is answered when the request is routed, so a name pointing at a
+   * deleted load balancer says that rather than resolving to nothing at all.
    */
-  private lambdaFunctionUrlServiceTarget(
+  private loadBalancerServiceTarget(
     logicalName: string,
   ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
+    const host = readSimElbV2LoadBalancerHost(logicalName);
 
-    if (labels.length !== 3) {
-      return undefined;
-    }
-
-    const [urlId, service, regionName] = labels;
-
-    if (service !== lambdaFunctionUrlHostLabel || regionName === undefined) {
-      return undefined;
-    }
-
-    /* v8 ignore if -- defensive check */
-    if (urlId === undefined || urlId.length === 0) {
+    if (host === undefined) {
       return undefined;
     }
 
     return {
-      service: "lambda",
-      resourceName: urlId,
-      regionName: regionName as AwsRegionName,
-    };
-  }
-
-  /**
-   * Resolve API Gateway HTTP API endpoint hostnames.
-   *
-   * Simulated HTTP API hostnames use:
-   *
-   *   <api-id>.execute-api.<region>
-   *
-   * The real AWS endpoint ends `.amazonaws.com`, which the local URL rewriting
-   * drops in the same way it drops it from S3 endpoints. The API id is one DNS
-   * label, so the label count here is exact.
-   */
-  private httpApiServiceTarget(
-    logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length !== 3) {
-      return undefined;
-    }
-
-    const [apiId, service, regionName] = labels;
-
-    if (service !== executeApiHostLabel || regionName === undefined) {
-      return undefined;
-    }
-
-    /* v8 ignore if -- defensive check */
-    if (apiId === undefined || apiId.length === 0) {
-      return undefined;
-    }
-
-    return {
-      service: "apiGatewayV2",
-      resourceName: apiId,
-      regionName: regionName as AwsRegionName,
-    };
-  }
-
-  /**
-   * Resolve Cognito user pool endpoint hostnames.
-   *
-   * Simulated Cognito hostnames use:
-   *
-   *   cognito-idp.<region>
-   *
-   * The hostname names the regional Cognito endpoint rather than one pool, as
-   * the real `cognito-idp.<region>.amazonaws.com` does, and the pool id is the
-   * first path segment. The resource name is therefore empty, in the same way
-   * it is for the path-style S3 endpoint.
-   */
-  private cognitoIdpServiceTarget(
-    logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length !== 2) {
-      return undefined;
-    }
-
-    const [service, regionName] = labels;
-
-    if (service !== cognitoIdpServiceLabel || regionName === undefined) {
-      return undefined;
-    }
-
-    /* v8 ignore if -- empty labels are rejected before resolution */
-    if (regionName.length === 0) {
-      return undefined;
-    }
-
-    return {
-      service: "cognitoIdentityProvider",
-      resourceName: "",
-      regionName: regionName as AwsRegionName,
+      service: "elbV2",
+      resourceName: host.dnsName,
+      regionName: host.regionName as AwsRegionName,
     };
   }
 }

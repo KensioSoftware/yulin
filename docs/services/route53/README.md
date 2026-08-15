@@ -270,8 +270,9 @@ await simAws.backgroundTasksComplete();
 ## Alias records
 
 Alias records store the alias target DNS name as the simulated record value. This is useful when a
-Route53 record should point to another simulated service hostname, such as a CloudFront
-distribution.
+Route53 record should point to another simulated service hostname, such as a CloudFront distribution
+or a load balancer. See [What a name can resolve to](#what-a-name-can-resolve-to) for the hostnames a
+record can point at.
 
 ```typescript sim-route53-alias-record
 /**
@@ -944,6 +945,122 @@ try {
 You can also call `srv.localUrl(...)` with a URL that contains the simulated hostname when you want
 the server to adapt it to the selected local port.
 
+### What a name can resolve to
+
+A record chain ends when it reaches a hostname a simulated service owns. Those are recognised by
+their shape, so the value to point a record at is whatever the service reported:
+
+| Hostname                                 | What it reaches                               |
+| ---------------------------------------- | --------------------------------------------- |
+| `<distribution-id>.cloudfront.net`       | a [CloudFront](../cloudfront/) distribution   |
+| `<name>-<id>.<region>.elb.amazonaws.com` | an [ELBv2](../elbv2/) load balancer           |
+| `<bucket>.s3-website.<region>`           | an [S3](../s3/) bucket website                |
+| `<bucket>.s3.<region>`                   | the S3 REST endpoint                          |
+| `<url-id>.lambda-url.<region>`           | a [Lambda](../lambda/) Function URL           |
+| `<api-id>.execute-api.<region>`          | an [API Gateway](../apigatewayv2/) HTTP API   |
+| `cognito-idp.<region>`                   | the [Cognito](../cognito/) user pool endpoint |
+
+The hostnames the AWS SDK talks to are written without their `.amazonaws.com` or `.on.aws` tail,
+which is the same rewriting Yulin applies to an SDK endpoint. A load balancer's name keeps its whole
+domain, because nothing rewrites it: `DNSName` is what a record points at and what a client asks for.
+
+A name pointing at a load balancer resolves to it, so a request to that name reaches the load
+balancer's listeners and rules, and a `host-header` condition on a rule sees the name the request was
+made to rather than the load balancer's own:
+
+```typescript sim-route53-elbv2-alias
+/**
+ * Resolving a name to a simulated load balancer, over HTTP and over DNS.
+ */
+
+import { Resolver } from "node:dns/promises";
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const elbV2 = simAws.elbV2();
+
+const created = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+
+await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: created.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [
+      {
+        Type: "fixed-response",
+        FixedResponseConfig: {
+          StatusCode: "200",
+          ContentType: "text/plain",
+          MessageBody: "orders",
+        },
+      },
+    ],
+  }),
+);
+
+const zone = await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "shop-zone",
+  }),
+);
+
+// A CNAME below the apex reaches a load balancer as an alias record does.
+await simAws.route53().changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: zone.HostedZone?.Id,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "api.example.test",
+            Type: "CNAME",
+            TTL: 300,
+            ResourceRecords: [{ Value: created.LoadBalancers?.[0]?.DNSName }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const response = await fetch(srv.localUrl("http://api.example.test/orders"));
+
+  console.log(await response.text()); // "orders"
+
+  const resolver = new Resolver({ timeout: 1000, tries: 1 });
+  resolver.setServers([`127.0.0.1:${srv.dnsPort}`]);
+
+  console.log(await resolver.resolve4("api.example.test")); // [ '127.0.0.1' ]
+} finally {
+  await srv.close();
+}
+```
+
+A request served under the suffix reaches the listener on port 80, since the port such a request
+carries is the local server's rather than one a client chose. See
+[Simulated Elastic Load Balancing](../elbv2/) for what happens once the request is there.
+
 ## DNSSEC
 
 A Hosted Zone can be signed. Signing needs a key-signing key, and a key-signing key needs a KMS
@@ -1430,6 +1547,9 @@ Sim Route53 currently supports:
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution, with or without the `sim-aws.localhost` suffix on the requested hostname
+- Names resolving to simulated S3 websites and buckets, CloudFront distributions, ELBv2 load
+  balancers, Lambda Function URLs, HTTP APIs and the Cognito user pool endpoint, listed under
+  [What a name can resolve to](#what-a-name-can-resolve-to)
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
 - DNS answers over UDP for `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`, so those records can be
   queried with `dig` or any DNS client

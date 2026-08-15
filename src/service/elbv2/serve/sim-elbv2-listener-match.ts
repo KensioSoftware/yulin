@@ -14,7 +14,7 @@ export function requireSimElbV2Listener(
   request: Request,
 ): SimElbV2Listener {
   const { loadBalancer, elbV2 } = route;
-  const port = simElbV2RequestPort(new URL(request.url));
+  const port = simElbV2RequestPort(request);
   const listener = elbV2.findListenerOnPort(loadBalancer.arn, port);
 
   if (listener === undefined) {
