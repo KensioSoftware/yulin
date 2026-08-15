@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-ecs";
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -144,13 +145,13 @@ describe("Registering a simulated ECS service with a target group", () => {
     );
 
     // Then neither the task that started nor the tasks that stopped had
-    // anywhere to be registered, and nothing failed over it.
-    assertIdentical(
+    // anywhere to be registered, and neither the scale nor the delete failed
+    // over it.
+    assertFalse(
       simAws
         .ecs()
         .service(servedServiceNames.service, servedServiceNames.cluster)
-        .desiredCount,
-      0,
+        .isActive(),
     );
   });
 });
