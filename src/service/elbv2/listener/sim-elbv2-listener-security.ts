@@ -31,28 +31,51 @@ export function simElbV2ListenerSslPolicy(
 }
 
 /**
+ * What a request names about a listener's default certificate, and what the
+ * listener already held.
+ */
+export interface SimElbV2ListenerCertificateChoice {
+  readonly protocol: string;
+  /** The certificate this request named, if it named one. */
+  readonly requested: string | undefined;
+  /** The certificate the listener already had, on a modify. */
+  readonly held?: string | undefined;
+}
+
+/**
  * The default certificate a listener holds, which is none unless it is HTTPS.
  *
  * An HTTPS listener with no certificate could not complete a handshake, so real
- * ELB refuses to create one and so does this. A listener that is not HTTPS
- * holds no certificate, so moving one to HTTP drops the certificates it was
- * carrying rather than keeping ones nothing would present.
+ * ELB refuses to create one and so does this. A request naming a certificate
+ * for a listener that speaks no TLS is refused for the other half of the same
+ * reason.
+ *
+ * What the request named and what the listener already had are separate,
+ * because the two lead to different answers on the same protocol: a listener
+ * moved to HTTP drops the certificate it was carrying, where a request that
+ * moves it to HTTP and names a certificate in the same breath contradicts
+ * itself and is refused.
  */
 export function simElbV2ListenerCertificate(
-  protocol: string,
-  defaultCertificateArn: string | undefined,
+  choice: SimElbV2ListenerCertificateChoice,
 ): string | undefined {
-  if (protocol !== "HTTPS") {
+  if (choice.requested !== undefined) {
+    requireSimElbV2CertificateProtocol(choice.protocol);
+  }
+
+  if (choice.protocol !== "HTTPS") {
     return undefined;
   }
 
-  if (defaultCertificateArn === undefined) {
+  const certificateArn = choice.requested ?? choice.held;
+
+  if (certificateArn === undefined) {
     throw new SimElbV2InvalidConfigurationRequestException(
       "An HTTPS listener requires at least one certificate",
     );
   }
 
-  return defaultCertificateArn;
+  return certificateArn;
 }
 
 /**

@@ -78,10 +78,10 @@ export class SimElbV2Listener {
     this.currentDefaultActions = properties.defaultActions;
 
     this.holdCertificate(
-      simElbV2ListenerCertificate(
-        properties.protocol,
-        properties.certificateArn,
-      ),
+      simElbV2ListenerCertificate({
+        protocol: properties.protocol,
+        requested: properties.certificateArn,
+      }),
     );
   }
 
@@ -120,10 +120,11 @@ export class SimElbV2Listener {
    */
   modify(changes: SimElbV2ListenerChanges): void {
     const protocol = changes.protocol ?? this.currentProtocol;
-    const certificateArn = simElbV2ListenerCertificate(
+    const certificateArn = simElbV2ListenerCertificate({
       protocol,
-      changes.certificateArn ?? this.certificateList.defaultArn,
-    );
+      requested: changes.certificateArn,
+      held: this.certificateList.defaultArn,
+    });
 
     this.currentPort = changes.port ?? this.currentPort;
     this.currentProtocol = protocol;

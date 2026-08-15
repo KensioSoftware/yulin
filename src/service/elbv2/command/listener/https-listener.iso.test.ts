@@ -113,24 +113,66 @@ describe("An HTTPS listener's certificate", () => {
     assertStringIncludes(error.message, "not ISSUED");
   });
 
-  it("refuses a certificate from another Region", async () => {
-    // Given an issued certificate in a Region the load balancer is not in.
+  it("refuses a certificate from another Region or Account", async () => {
+    // Given issued certificates in a Region and an Account the load balancer
+    // is not in.
     const simAws = new SimAws();
-    const certificateArn = await createFixtureCertificate(
+    const elsewhere = await createFixtureCertificate(
       simAws,
       simAws.region("eu-west-2").acm(),
     );
+    const otherAccount = await createFixtureCertificate(
+      simAws,
+      simAws.account("555555555555").region("us-east-1").acm(),
+    );
 
-    // When an HTTPS listener in the default Region names it.
+    // When HTTPS listeners in the default scope name them.
+    const region = await assertThrowsErrorAsync(async () => {
+      await createHttpsListener(simAws, [elsewhere]);
+    });
+
+    assertInstanceOf(region, SimElbV2InvalidConfigurationRequestException);
+
+    const account = await assertThrowsErrorAsync(async () => {
+      await createHttpsListener(simAws, [otherAccount], "other-alb");
+    });
+
+    assertInstanceOf(account, SimElbV2InvalidConfigurationRequestException);
+
+    // Then both are refused, as real ELB refuses a certificate from elsewhere.
+    assertStringIncludes(region.message, "eu-west-2");
+    assertStringIncludes(region.message, "own Account and Region");
+    assertStringIncludes(account.message, "555555555555");
+    assertStringIncludes(account.message, "own Account and Region");
+  });
+
+  it("refuses a listener that names a certificate and speaks no TLS", async () => {
+    // Given an issued certificate.
+    const simAws = new SimAws();
+    const certificateArn = await createFixtureCertificate(simAws);
+    const elbV2 = simAws.elbV2();
+    const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
+    const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+
+    // When an HTTP listener names it.
     const error = await assertThrowsErrorAsync(async () => {
-      await createHttpsListener(simAws, [certificateArn]);
+      await elbV2.createListener(
+        new CreateListenerCommand({
+          LoadBalancerArn: loadBalancerArn,
+          Protocol: "HTTP",
+          Port: 80,
+          Certificates: [{ CertificateArn: certificateArn }],
+          DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+        }),
+      );
     });
 
     assertInstanceOf(error, SimElbV2InvalidConfigurationRequestException);
 
-    // Then it is refused, as real ELB refuses a certificate from elsewhere.
-    assertStringIncludes(error.message, "eu-west-2");
-    assertStringIncludes(error.message, "own Account and Region");
+    // Then it is refused rather than created with the certificate quietly
+    // dropped, which would leave a listener looking configured for HTTPS and
+    // answering plain HTTP.
+    assertStringIncludes(error.message, "HTTPS listener");
   });
 
   it("refuses a listener naming more than one certificate", async () => {

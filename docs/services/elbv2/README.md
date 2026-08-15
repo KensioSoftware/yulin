@@ -361,8 +361,10 @@ A certificate that is still `PENDING_VALIDATION` is refused the same way, since 
 one could serve nothing. That is what makes a test of the whole issuance path worth writing: the
 certificate has to have been validated for the listener that uses it to be created.
 
-An HTTPS listener with no certificate at all is refused, and a listener that is not HTTPS holds none,
-so moving one to HTTP drops its certificates rather than carrying certificates nothing would present.
+An HTTPS listener with no certificate at all is refused, and so is a listener that names a
+certificate and speaks something other than HTTPS, which would otherwise look configured for HTTPS
+while answering plain HTTP. Moving a listener to HTTP without naming a certificate drops the ones it
+was carrying, since nothing would present them.
 
 ### The certificate list
 
