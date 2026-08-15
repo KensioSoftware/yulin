@@ -4,6 +4,7 @@ import {
   SimAwsServiceRequest,
   type SimAwsServiceTarget,
 } from "../../controller/sim-service-controller.js";
+import { SimAwsRequestSource } from "../../../service/iam/request/sim-aws-request-source.js";
 import { SimAwsReceivedRequest } from "./sim-aws-received-request.js";
 
 interface SimAwsRequestAuthenticatorProperties {
@@ -17,6 +18,10 @@ interface SimAwsRequestAuthenticatorProperties {
  * once, the principal is resolved by IAM, and the result is the request a
  * controller is given. Controllers therefore never see an unattributed
  * request, and never have to decide for themselves what an unsigned one means.
+ *
+ * A request that states the resource it is being made on behalf of carries that
+ * through as well, since a resource policy granting a service principal is
+ * usually conditioned on it.
  */
 export class SimAwsRequestAuthenticator {
   private readonly simAws: SimAws;
@@ -50,10 +55,13 @@ export class SimAwsRequestAuthenticator {
       },
     });
 
+    const source = SimAwsRequestSource.fromHeaders(request.headers);
+
     return new SimAwsServiceRequest({
       target,
       request: received.forService(),
       caller,
+      ...(source !== undefined && { source }),
       body: received.body,
     });
   }

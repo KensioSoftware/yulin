@@ -247,23 +247,35 @@ it.
 
 `origin-access-control/` holds the model and its registry, laid out the same way as the response
 headers policies above. A `SimCloudFrontOriginAccessControl` is a name, an ID, an optional
-description and a signing behaviour. The origin type and signing protocol are fixed at `s3` and
-`sigv4`, because `cfn/origin-access-control/` refuses any other value by name rather than storing
-one the simulator would then treat as an S3 origin access control. There is no
+description, an origin type and a signing behaviour. The origin type is `s3` or `lambda`, the two
+CloudFront signs for that are modelled here; MediaStore and MediaPackage V2 are refused by name in
+`cfn/origin-access-control/` rather than stored as something the simulator would then treat like one
+of the two. The signing protocol is fixed at `sigv4`, the only one CloudFront offers. There is no
 CreateOriginAccessControl command, so a template is the only thing that makes one.
 
 `SimCloudFrontOriginConfigurator` resolves an Origin's `OriginAccessControlId` through the registry
-when the Distribution is created, and stores the result on the `SimCloudFrontS3Origin`. An ID
-nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refuses the whole
-CreateDistribution. `SimCloudFrontBehaviorConfigurator` resolves a Behavior's
-`ResponseHeadersPolicyId` the same eager way, for the same reason: CloudFront checks both at creation
-rather than when a request arrives.
+when the Distribution is created, and stores the result on the `SimCloudFrontS3Origin` or
+`SimCloudFrontCustomOrigin`. An ID nothing created is `SimCloudFrontInvalidOriginAccessControl`, as
+CloudFront refuses the whole CreateDistribution, and so is an origin type that does not match the
+Origin it was named on: `assertSimCfOacOriginType` checks that in both directions, since an origin
+access control for a Bucket signs nothing a Function URL will admit.
+`SimCloudFrontBehaviorConfigurator` resolves a Behavior's `ResponseHeadersPolicyId` the same eager
+way, for the same reason: CloudFront checks both at creation rather than when a request arrives.
 
 `SimCfS3OriginSigner` reads the stored origin access control on every Origin fetch. One whose
 `signs` getter is true makes the read a request from the `cloudfront.amazonaws.com` service
 principal, carrying the Distribution's ARN as `aws:SourceArn` and its Account as
 `aws:SourceAccount`, which is the pair a Bucket policy written for an origin access control is
 conditioned on. A `never` signing behaviour reads anonymously, as an Origin with none does.
+
+`SimCfCustomOriginSigner` is the same idea for a custom Origin, and says the same three things a
+different way. A custom Origin request leaves CloudFront over the simulated HTTP boundary, so it
+carries them as the `x-sim-aws-caller` and `x-sim-aws-source-arn`/`x-sim-aws-source-account` control
+headers, which is how anything else calling into simulated AWS in process states who it is. That is
+what an `AWS_IAM` Function URL evaluates its `lambda:InvokeFunctionUrl` permission for
+`cloudfront.amazonaws.com` against, so a template omitting the permission answers 403 rather than
+being admitted anyway. The headers are stripped at the boundary, so the function's event shows the
+request its viewer sent.
 
 That resolution is per request rather than per Origin because an Origin does not know its
 Distribution until one fetches through it. Deciding it earlier would be wrong anyway: in a CDK stack

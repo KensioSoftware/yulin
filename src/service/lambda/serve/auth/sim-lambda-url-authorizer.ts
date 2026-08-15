@@ -4,7 +4,12 @@ import type {
   SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simLambdaResourcePolicies } from "../../command/authorize/sim-lambda-resource-policies.js";
-import { simLambdaFunctionUrlAuthTypeConditionKey } from "../../function/policy/sim-lambda-permission.js";
+import {
+  simLambdaFunctionUrlAuthTypeConditionKey,
+  simLambdaSourceAccountConditionKey,
+  simLambdaSourceArnConditionKey,
+} from "../../function/policy/sim-lambda-permission.js";
+import type { SimAwsRequestSource } from "../../../iam/request/sim-aws-request-source.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionUrl } from "../../function/url/sim-lambda-function-url.js";
 
@@ -26,6 +31,11 @@ interface SimLambdaUrlAuthorizationInput {
   readonly simFunction: SimLambdaFunction;
   readonly functionUrl: SimLambdaFunctionUrl;
   readonly caller: SimAwsCaller;
+  /**
+   * The resource the request said it was made on behalf of, such as the
+   * CloudFront Distribution reaching a Function URL Origin.
+   */
+  readonly source?: SimAwsRequestSource | undefined;
 }
 
 /**
@@ -52,10 +62,18 @@ export class SimLambdaUrlAuthorizer {
    * The URL's auth type is supplied as `lambda:FunctionUrlAuthType`, which is
    * what a grant conditions on in practice: a permission granted for `AWS_IAM`
    * should not also open a URL later switched to `NONE`.
+   *
+   * A request made on behalf of a resource supplies `AWS:SourceArn` and
+   * `AWS:SourceAccount` with it, which is what the permission granting
+   * `cloudfront.amazonaws.com` names its Distribution in. A request that states
+   * no source supplies neither, so a permission conditioned on one does not
+   * match rather than matching anything.
    */
   authorize(
     input: SimLambdaUrlAuthorizationInput,
   ): SimIamAuthorizationDecision {
+    const { source } = input;
+
     return this.iam.authorize({
       action: simLambdaInvokeFunctionUrlAction,
       resource: input.simFunction.arn,
@@ -63,6 +81,12 @@ export class SimLambdaUrlAuthorizer {
       resourcePolicies: simLambdaResourcePolicies(input.simFunction),
       conditionContext: {
         [simLambdaFunctionUrlAuthTypeConditionKey]: input.functionUrl.authType,
+        ...(source?.arn !== undefined && {
+          [simLambdaSourceArnConditionKey]: source.arn,
+        }),
+        ...(source?.accountId !== undefined && {
+          [simLambdaSourceAccountConditionKey]: source.accountId,
+        }),
       },
     });
   }

@@ -22,6 +22,11 @@ export {
   SimAwsRequestCaller,
 } from "./request/sim-aws-request-caller.js";
 export {
+  SimAwsRequestSource,
+  simAwsSourceAccountHeaderName,
+  simAwsSourceArnHeaderName,
+} from "./request/sim-aws-request-source.js";
+export {
   isSimAwsRequestAuthFailure,
   SimAwsInvalidCallerHeader,
   type SimAwsRequestAuthFailure,

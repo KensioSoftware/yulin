@@ -571,8 +571,10 @@ A few things follow from the request never leaving the process:
   domain, rather than a real request being made to it. External HTTP Origins are not supported.
 - The settings inside `CustomOriginConfig` describe how CloudFront connects over the network, so
   the protocol policy, ports, SSL protocols and timeouts are accepted and ignored.
-- The Origin is reached anonymously, as CloudFront reaches an Origin with no Origin Access Control.
-  A Function URL or an HTTP API route authorizing with `AWS_IAM` therefore refuses the request.
+- The Origin is reached anonymously unless it has an origin access control, as CloudFront reaches an
+  Origin it has nothing to sign for. A Function URL or an HTTP API route authorizing with `AWS_IAM`
+  therefore refuses the request. [Origin access controls](#origin-access-controls) covers the
+  Function URL that admits the Distribution and nothing else.
 
 ## Viewer certificates
 
@@ -1132,11 +1134,17 @@ Behavior.
 
 ## Origin access controls
 
-An origin access control is how a Distribution authenticates to a private S3 Bucket. Declare one as
+An origin access control is how a Distribution authenticates to a private Origin, so that the Origin
+admits the Distribution and nothing else. Declare one as
 `AWS::CloudFront::OriginAccessControl` and point an Origin's `OriginAccessControlId` at it with a
 `Ref`, which is what CDK's `S3BucketOrigin.withOriginAccessControl` synthesizes.
 
-An Origin whose origin access control signs reads its Bucket as the `cloudfront.amazonaws.com`
+An `OriginAccessControlOriginType` of `s3` signs for an S3 Bucket Origin, and one of `lambda` signs
+for a Lambda Function URL Origin. The origin type has to match the Origin it is attached to: an `s3`
+origin access control on a custom Origin, or a `lambda` one on an S3 Origin, fails the Stack when
+the Distribution is created, as CloudFront refuses it.
+
+An S3 Origin whose origin access control signs reads its Bucket as the `cloudfront.amazonaws.com`
 service principal, carrying the Distribution's ARN as `aws:SourceArn`. The Bucket policy is then the
 whole decision, so the Bucket needs a statement granting `s3:GetObject` to that principal,
 conditioned on the Distribution allowed to read it. That is the policy CDK writes. A condition
@@ -1265,19 +1273,159 @@ inside `Fn::Join` is the dependency CloudFormation orders the Stack by. Nothing 
 settled when the Distribution is created, because the policy deciding it does not exist yet. The
 Origin works out who it is reading as per request instead.
 
+### A Lambda Function URL Origin
+
+A Function URL with `AuthType: AWS_IAM` admits only a caller allowed `lambda:InvokeFunctionUrl` on
+the function, so putting one behind a Distribution takes three things: the origin access control
+with `OriginAccessControlOriginType: lambda`, a custom Origin naming it whose `DomainName` is the
+Function URL's hostname, and an `AWS::Lambda::Permission` granting `lambda:InvokeFunctionUrl` to
+`cloudfront.amazonaws.com` for that Distribution. That is what CDK's
+`FunctionUrlOrigin.withOriginAccessControl` synthesizes, and it is the only way to serve a Function
+URL through CloudFront without leaving the Function URL open to anyone who finds its endpoint.
+
+The Origin request is made as the `cloudfront.amazonaws.com` service principal carrying the
+Distribution's ARN, the same pair an S3 Origin read carries, and the function's resource policy is
+the whole decision. A Stack without the permission, or with one naming a different Distribution,
+deploys and then answers 403 through the Distribution, which is what the real deployment does.
+
+```typescript sim-cloudfront-function-url-origin-access-control
+/**
+ * Serving a private Lambda Function URL through an origin access control.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const stack = await simAws.cloudFormation().deployTemplate({
+    stackName: "greeter-stack",
+    template: {
+      Resources: {
+        GreeterFunction: {
+          Type: "AWS::Lambda::Function",
+          Properties: {
+            FunctionName: "greeter",
+            Role: "arn:aws:iam::888888888888:role/GreeterRole",
+            Handler: "index.handler",
+            Runtime: "nodejs22.x",
+            Code: {
+              ZipFile:
+                "exports.handler = async () => " +
+                "({ statusCode: 200, body: 'Hello from behind CloudFront' });",
+            },
+          },
+        },
+        GreeterUrl: {
+          Type: "AWS::Lambda::Url",
+          Properties: {
+            TargetFunctionArn: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+            AuthType: "AWS_IAM",
+          },
+        },
+        GreeterOac: {
+          Type: "AWS::CloudFront::OriginAccessControl",
+          Properties: {
+            OriginAccessControlConfig: {
+              Name: "greeter-oac",
+              OriginAccessControlOriginType: "lambda",
+              SigningBehavior: "always",
+              SigningProtocol: "sigv4",
+            },
+          },
+        },
+        GreeterDistribution: {
+          Type: "AWS::CloudFront::Distribution",
+          Properties: {
+            DistributionConfig: {
+              Enabled: true,
+              Origins: [
+                {
+                  Id: "GreeterOrigin",
+                  // An Origin takes a domain name, and the Function URL
+                  // attribute is a URL, so the host comes out of it.
+                  DomainName: {
+                    "Fn::Select": [
+                      2,
+                      {
+                        "Fn::Split": [
+                          "/",
+                          { "Fn::GetAtt": ["GreeterUrl", "FunctionUrl"] },
+                        ],
+                      },
+                    ],
+                  },
+                  CustomOriginConfig: { OriginProtocolPolicy: "https-only" },
+                  OriginAccessControlId: { Ref: "GreeterOac" },
+                },
+              ],
+              DefaultCacheBehavior: {
+                TargetOriginId: "GreeterOrigin",
+                ViewerProtocolPolicy: "allow-all",
+              },
+            },
+          },
+        },
+        // Nothing but this Distribution may invoke the Function URL, which is
+        // what the condition on the Distribution's ARN says.
+        InvokeFromCloudFront: {
+          Type: "AWS::Lambda::Permission",
+          Properties: {
+            FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+            Action: "lambda:InvokeFunctionUrl",
+            Principal: "cloudfront.amazonaws.com",
+            SourceArn: {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:cloudfront::",
+                  { Ref: "AWS::AccountId" },
+                  ":distribution/",
+                  { Ref: "GreeterDistribution" },
+                ],
+              ],
+            },
+          },
+        },
+      },
+      Outputs: {
+        SiteHostname: {
+          Value: { "Fn::GetAtt": ["GreeterDistribution", "DomainName"] },
+        },
+      },
+    },
+  });
+
+  await stack.waitForDeployComplete();
+
+  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const greeting = await fetch(srv.localUrl(`http://${siteHostname}/greeting`));
+
+  console.log(await greeting.text()); // Hello from behind CloudFront
+} finally {
+  await srv.close();
+}
+```
+
+The Function URL is reachable directly as well, on its own endpoint, and it refuses a request that
+arrives there without the permission the Distribution has. That is the point of the auth type: the
+endpoint exists, and only the Distribution may use it.
+
 `SigningBehavior` takes any of `always`, `never` and `no-override`. `always` and `no-override` both
 sign, since nothing here sends a pre-signed viewer request to an Origin for `no-override` to pass
-through. `never` turns the origin access control off without removing it, so the Origin reads
-anonymously and needs a Bucket policy allowing that, as an Origin with no origin access control
-does.
+through. `never` turns the origin access control off without removing it, so the Origin is reached
+anonymously, as an Origin with no origin access control is. An S3 Origin then needs a Bucket policy
+allowing that, and an `AWS_IAM` Function URL refuses the request outright.
 
 `Ref` and `Fn::GetAtt` on `Id` both return the ID, so either resolves an Origin's
 `OriginAccessControlId`. An Origin naming an ID no origin access control holds is refused with
 `InvalidOriginAccessControl` when the Distribution is created, rather than created without one.
 Tearing the Stack down removes the origin access control, and its name is free again.
 
-`OriginAccessControlOriginType` must be `s3` and `SigningProtocol` must be `sigv4`. Any other value
-fails the Stack by name.
+`OriginAccessControlOriginType` must be `s3` or `lambda`, and `SigningProtocol` must be `sigv4`. Any
+other value fails the Stack by name.
 
 There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
 to make one.
@@ -1547,15 +1695,17 @@ Where sim CloudFront knowingly behaves differently from AWS:
   the Origin request as a CloudFront canonical user nothing here models, so a Bucket policy written
   for one would deny the read and say nothing about why.
 - **A signed Origin request is not really signed.** An Origin whose origin access control signs
-  reads the Bucket as the `cloudfront.amazonaws.com` service principal carrying the Distribution's
-  ARN, which is what the Bucket policy is evaluated against, but no SigV4 signature is computed or
-  checked. Nothing else here signs a simulated request either, so a test cannot assert anything
-  about the signature itself.
-- **An origin access control is only accepted for an S3 Origin with SigV4.** CloudFront also signs for
-  MediaStore, MediaPackage V2 and Lambda Function URL Origins, and none of those is modelled. An
-  `OriginAccessControlOriginType` other than `s3`, or a `SigningProtocol` other than `sigv4`, fails
-  the Stack by naming the value, rather than deploying and behaving like an S3 one. For the same
-  reason, a custom Origin naming an origin access control is refused.
+  reaches the Origin as the `cloudfront.amazonaws.com` service principal carrying the Distribution's
+  ARN, which is what the Bucket policy or the function's resource policy is evaluated against, but
+  no SigV4 signature is computed or checked. A Function URL Origin is told who the request is from
+  at the simulated HTTP boundary instead, the same way anything else calling into simulated AWS in
+  process says who it is. Nothing else here signs a simulated request either, so a test cannot
+  assert anything about the signature itself.
+- **An origin access control signs for an S3 or Lambda Function URL Origin only.** CloudFront also
+  signs for MediaStore and MediaPackage V2 Origins, and neither is modelled. An
+  `OriginAccessControlOriginType` other than `s3` or `lambda`, or a `SigningProtocol` other than
+  `sigv4`, fails the Stack by naming the value rather than deploying and behaving like one of the
+  two.
 - **An origin access control name is unique, but nothing else about it is checked.** A second one
   claiming a name is refused with `OriginAccessControlAlreadyExists`, as CloudFront refuses one.
 - **There is no command surface for an origin access control.** `CreateOriginAccessControl` and its

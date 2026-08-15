@@ -1116,6 +1116,13 @@ header naming a principal directly. A request that offers neither is anonymous, 
 is refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how
 that resolution works and how to sign a served request.
 
+A grant conditioned on `AWS:SourceArn` or `AWS:SourceAccount` is evaluated against what the request
+says it is being made for, which is how a permission granting `cloudfront.amazonaws.com` names one
+Distribution. Sim CloudFront states that itself when it reaches a Function URL Origin through an
+origin access control, so a Function URL behind a Distribution runs for that Distribution and
+refuses everything else. See
+[origin access controls](../cloudfront/README.md#origin-access-controls) in the CloudFront docs.
+
 An `AWS_IAM` invocation carries its caller into the event as
 `requestContext.authorizer.iam`, which is the part a handler reads. The `authorizer` block is absent
 for a `NONE` invocation, as it is on real AWS, and `requestContext.accountId` is the caller's Account

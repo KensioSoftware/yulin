@@ -4,6 +4,11 @@ interface SimCfCustomOriginRequestProperties {
   readonly domainName: string;
   readonly originPath: string;
   readonly request: Request;
+  /**
+   * Headers stating who the Origin request is from, which an Origin whose
+   * origin access control signs carries and an anonymous one does not.
+   */
+  readonly signingHeaders?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -32,6 +37,12 @@ export function simCfCustomOriginRequest(
 
   const headers = new Headers(request.headers);
   headers.set("host", originUrl.host);
+
+  const signingHeaders = Object.entries(properties.signingHeaders ?? {});
+
+  for (const [name, value] of signingHeaders) {
+    headers.set(name, value);
+  }
 
   const isBodyAllowed = !/^(?:get|head)$/iu.test(request.method);
 

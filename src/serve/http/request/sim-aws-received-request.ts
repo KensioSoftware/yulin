@@ -1,10 +1,18 @@
 import { simAwsCallerHeaderName } from "../../../service/iam/request/sim-aws-caller-header.js";
+import {
+  simAwsSourceAccountHeaderName,
+  simAwsSourceArnHeaderName,
+} from "../../../service/iam/request/sim-aws-request-source.js";
 
 /**
  * Header names that are instructions to the simulator rather than part of the
  * request being simulated.
  */
-const controlHeaderNames = [simAwsCallerHeaderName];
+const controlHeaderNames = [
+  simAwsCallerHeaderName,
+  simAwsSourceArnHeaderName,
+  simAwsSourceAccountHeaderName,
+];
 
 /**
  * An HTTP request as it arrived at the simulated AWS boundary.

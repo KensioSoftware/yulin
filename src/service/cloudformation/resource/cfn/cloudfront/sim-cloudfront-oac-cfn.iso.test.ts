@@ -8,6 +8,7 @@ import { SimCloudFrontOriginAccessControlCfn } from "./sim-cloudfront-oac-cfn.js
 describe("SimCloudFrontOriginAccessControlCfn", () => {
   const originAccessControl = new SimCloudFrontOriginAccessControl({
     name: "site-oac",
+    originType: "s3",
     signingBehavior: "always",
   });
   const adapter = new SimCloudFrontOriginAccessControlCfn({

@@ -9,6 +9,10 @@ import { createSigner } from "../../../test/sigv4/sim-signer.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../service/lambda/function/code/lambda-zip-file-input.js";
 import { simAwsCallerHeaderName } from "../../service/iam/request/sim-aws-caller-header.js";
+import {
+  simAwsSourceAccountHeaderName,
+  simAwsSourceArnHeaderName,
+} from "../../service/iam/request/sim-aws-request-source.js";
 import type { SimLambdaFunctionUrlEvent } from "../../service/lambda/serve/event/sim-lambda-url-event.type.js";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import {
@@ -92,15 +96,19 @@ describe("The caller of a served simulated AWS request", () => {
     );
   });
 
-  it("hides the caller header from the simulated service", async () => {
+  it("hides the control headers from the simulated service", async () => {
     // Given a Function URL whose handler echoes the headers it receives
     const simAws = new SimAws();
     const url = await serveHeaderEcho(simAws);
 
-    // When it is requested with a caller header
+    // When it is requested with a caller header, and with the resource the
+    // call is being made on behalf of
     const response = await new SimAwsHttp({ simAws }).fetch(url, {
       headers: {
         [simAwsCallerHeaderName]: "arn:aws:iam::111111111111:role/Reporter",
+        [simAwsSourceArnHeaderName]:
+          "arn:aws:cloudfront::111111111111:distribution/E1EXAMPLE12345",
+        [simAwsSourceAccountHeaderName]: "111111111111",
         "x-application": "kept",
       },
     });
@@ -111,6 +119,8 @@ describe("The caller of a served simulated AWS request", () => {
       Object.entries((await response.json()) as Record<string, string>),
     );
     expect(seen.has(simAwsCallerHeaderName)).toBe(false);
+    expect(seen.has(simAwsSourceArnHeaderName)).toBe(false);
+    expect(seen.has(simAwsSourceAccountHeaderName)).toBe(false);
     expect(seen.get("x-application")).toBe("kept");
   });
 

@@ -1,6 +1,7 @@
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
+import type { SimAwsRequestSource } from "../../service/iam/request/sim-aws-request-source.js";
 
 /**
  * Which of a service's endpoints a hostname named.
@@ -34,6 +35,7 @@ interface SimAwsServiceRequestProperties {
   readonly target: SimAwsServiceTarget;
   readonly request: Request;
   readonly caller?: SimAwsRequestCaller | undefined;
+  readonly source?: SimAwsRequestSource | undefined;
   readonly body?: Uint8Array | undefined;
 }
 
@@ -53,6 +55,12 @@ export class SimAwsServiceRequest {
   public readonly target: SimAwsServiceTarget;
   public readonly request: Request;
   public readonly caller: SimAwsRequestCaller;
+  /**
+   * The resource the caller is making this request on behalf of, when it said
+   * it was making one for anything. This is what a service principal's grant is
+   * conditioned on, and most requests state none.
+   */
+  public readonly source: SimAwsRequestSource | undefined;
   public readonly body?: Uint8Array | undefined;
 
   constructor(properties: SimAwsServiceRequestProperties) {
@@ -60,6 +68,7 @@ export class SimAwsServiceRequest {
     this.request = properties.request;
     // An unattributed request is anonymous, never the Account root.
     this.caller = properties.caller ?? SimAwsRequestCaller.anonymous();
+    this.source = properties.source;
     this.body = properties.body;
   }
 }
