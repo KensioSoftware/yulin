@@ -135,6 +135,25 @@ override and the Region variables, and applies them through `simProcessEnvironme
 process global: two of them would each install a getter, and the second would capture whatever the
 first was reporting as its host environment.
 
+## Event and schedule targets
+
+`target/` holds what an EventBridge rule target or a Scheduler schedule target says about the task it
+runs. It lives here rather than in either of those services because both say the same things in the
+same words: `EcsParameters` names the task definition and how many tasks, and the target's `Input` is
+the task's overrides, since a task has nowhere to receive a payload. Two copies of that would be two
+answers to what a target may ask ECS for.
+
+`SimEcsTargetParameters` refuses a parameter it does not model rather than dropping it, and takes the
+four that describe placement and networking without doing anything with them: a target written for
+real AWS carries them, and refusing one would make an otherwise workable target unusable, where
+dropping a `Group` or a `PropagateTags` would leave a target looking configured and behaving as
+though it is not.
+
+`SimEcsTargetRun` runs the task through the `RunTask` command rather than through the task runner
+behind it, so a task a rule started is the same task as one a caller started: the same lookups, the
+same refusals, and the same IAM decision against `ecs:RunTask` for the role the target carries. What
+neither service holds is a second answer to whether that role may run the task.
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, one directory per operation, so the

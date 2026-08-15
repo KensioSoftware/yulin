@@ -1,5 +1,9 @@
 import { SimEventBridgeValidationException } from "../error/sim-event-bridge.error.js";
 import { SimEventTargetArn } from "./sim-event-target-arn.js";
+import {
+  SimEventTargetEcs,
+  type SimEventTargetTaskProperties,
+} from "./sim-event-target-ecs.js";
 
 /**
  * Real EventBridge allows alphanumerics, full stops, hyphens and underscores,
@@ -11,6 +15,7 @@ interface SimEventTargetProperties {
   readonly id: string;
   readonly arn: SimEventTargetArn;
   readonly input: string | undefined;
+  readonly ecs: SimEventTargetEcs | undefined;
 }
 
 /**
@@ -36,24 +41,38 @@ export class SimEventTarget {
    */
   public readonly input: string | undefined;
 
+  /**
+   * What this target says about the ECS task it runs, where it runs one.
+   *
+   * An ECS target is the one target type here whose `Input` is not what the
+   * target receives: a task has nowhere to receive a payload, so the `Input`
+   * is what the task overrides instead.
+   */
+  public readonly ecs: SimEventTargetEcs | undefined;
+
   private constructor(properties: SimEventTargetProperties) {
     this.id = properties.id;
     this.arn = properties.arn;
     this.input = properties.input;
+    this.ecs = properties.ecs;
   }
 
   /**
    * Read a target from request input.
    */
-  static of(properties: {
-    readonly Id?: string | undefined;
-    readonly Arn?: string | undefined;
-    readonly Input?: string | undefined;
-  }): SimEventTarget {
+  static of(
+    properties: SimEventTargetTaskProperties & {
+      readonly Id?: string | undefined;
+      readonly Arn?: string | undefined;
+    },
+  ): SimEventTarget {
+    const arn = SimEventTargetArn.of(properties.Arn);
+
     return new this({
       id: this.requiredId(properties.Id),
-      arn: SimEventTargetArn.of(properties.Arn),
+      arn,
       input: this.readInput(properties.Input),
+      ecs: SimEventTargetEcs.of(arn, properties),
     });
   }
 

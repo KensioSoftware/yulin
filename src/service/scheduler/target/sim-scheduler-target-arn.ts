@@ -5,7 +5,12 @@ import { SimSchedulerValidationException } from "../error/sim-scheduler.error.js
 /**
  * The services a simulated schedule can invoke.
  */
-export const simSchedulerTargetServices = ["lambda", "sqs", "sns"] as const;
+export const simSchedulerTargetServices = [
+  "lambda",
+  "sqs",
+  "sns",
+  "ecs",
+] as const;
 
 export type SimSchedulerTargetService =
   (typeof simSchedulerTargetServices)[number];
@@ -33,9 +38,10 @@ interface SimSchedulerTargetArnProperties {
  * The ARN of whatever a schedule invokes.
  *
  * This reads target ARNs itself rather than deferring to `parseSimArn`, for the
- * same reason simulated EventBridge does: the three services it invokes write
- * their resource part three ways, with a queue and a topic putting the name
- * straight after the Account and a function writing `function:<name>`.
+ * same reason simulated EventBridge does: the services it invokes write their
+ * resource part several ways, with a queue and a topic putting the name
+ * straight after the Account, a function writing `function:<name>` and a
+ * cluster writing `cluster/<name>`.
  *
  * It is deliberately not shared with EventBridge's reader. The two look alike
  * today and are answering different questions: EventBridge refuses an ARN its
@@ -112,15 +118,36 @@ export class SimSchedulerTargetArn {
       resource,
     });
 
+    this.refuseUnnamedResource(arn);
+
+    return arn;
+  }
+
+  /**
+   * Refuse an ARN of the right service that names nothing in it.
+   *
+   * Both services whose resource part carries a type are checked, because both
+   * write more than one kind of resource: `arn:aws:lambda:...:layer:shared` and
+   * `arn:aws:ecs:...:task-definition/orders:3` are well formed ARNs of a
+   * service this invokes, and neither names anything a schedule can reach.
+   */
+  private static refuseUnnamedResource(arn: SimSchedulerTargetArn): void {
     if (arn.service === "lambda" && arn.functionName === "") {
       throw new SimSchedulerValidationException(
-        `Invalid parameter: Target Arn Reason: ${value} names no function. ` +
-          `A function ARN is ` +
+        `Invalid parameter: Target Arn Reason: ${arn.value} names no ` +
+          `function. A function ARN is ` +
           `arn:aws:lambda:<region>:<account-id>:function:<function-name>`,
       );
     }
 
-    return arn;
+    if (arn.service === "ecs" && arn.clusterName === "") {
+      throw new SimSchedulerValidationException(
+        `Invalid parameter: Target Arn Reason: ${arn.value} names no ` +
+          `cluster. An ECS target names the cluster the task runs in, as ` +
+          `arn:aws:ecs:<region>:<account-id>:cluster/<cluster-name>, and ` +
+          `names its task definition in EcsParameters.`,
+      );
+    }
   }
 
   /**
@@ -136,5 +163,21 @@ export class SimSchedulerTargetArn {
     const [resourceType, name = ""] = this.resource.split(":", 2);
 
     return resourceType === "function" ? name : "";
+  }
+
+  /**
+   * The name of the ECS cluster this ARN names, or nothing when it names
+   * something else in ECS.
+   *
+   * A cluster ARN's resource is `cluster/<name>`, with a slash rather than the
+   * colon Lambda uses. The resource type is checked rather than assumed for the
+   * same reason: a task definition is `task-definition/<family>:<revision>` and
+   * a task is `task/<cluster>/<id>`, and taking the part after the slash would
+   * read either as a cluster that is not there.
+   */
+  get clusterName(): string {
+    const [resourceType, name = ""] = this.resource.split("/", 2);
+
+    return resourceType === "cluster" ? name : "";
   }
 }

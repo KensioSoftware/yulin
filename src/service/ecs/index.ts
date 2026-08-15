@@ -89,6 +89,14 @@ export {
   type SimEcsContainerOverrideType,
   type SimEcsTaskOverrideType,
 } from "./task/run/sim-ecs-task-overrides.js";
+export {
+  SimEcsTargetParameters,
+  type SimEcsTargetParametersType,
+} from "./target/sim-ecs-target-parameters.js";
+export {
+  SimEcsTargetTask,
+  type SimEcsTargetTaskProperties,
+} from "./target/sim-ecs-target-task.js";
 export type * from "./command/sim-ecs-command.types.js";
 export {
   SimEcsAccessDeniedException,

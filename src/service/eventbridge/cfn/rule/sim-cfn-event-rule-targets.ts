@@ -20,12 +20,20 @@ export interface SimCfnEventRuleTarget {
 const unsimulatedTargetProperties: readonly (readonly [string, string])[] = [
   ["InputPath", "a target receives the whole event or its fixed Input"],
   ["InputTransformer", "a target receives the whole event or its fixed Input"],
-  ["RoleArn", "a rule reaches its target as the EventBridge service principal"],
+  [
+    "RoleArn",
+    "a rule reaches its target as the EventBridge service principal, and an " +
+      "ECS target, which does carry a role, is written with PutTargets",
+  ],
   ["DeadLetterConfig", "a failed delivery is recorded rather than sent on"],
   ["RetryPolicy", "a delivery is attempted once"],
   ["SqsParameters", "a FIFO queue target is not simulated"],
   ["KinesisParameters", "Kinesis is not a simulated target"],
-  ["EcsParameters", "ECS is not a simulated target"],
+  [
+    "EcsParameters",
+    "an ECS target is simulated and is written with PutTargets rather than " +
+      "from a template",
+  ],
   ["BatchParameters", "Batch is not a simulated target"],
   ["HttpParameters", "an API destination is not a simulated target"],
   ["RunCommandParameters", "Run Command is not a simulated target"],

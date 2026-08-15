@@ -118,15 +118,30 @@ a rule that matches events and sends them nowhere, which real EventBridge lets y
 them apart is what keeps that from looking like a broken rule.
 
 `SimEventTargetArn` reads target ARNs itself rather than deferring to `parseSimArn`, because the
-three services it delivers to write their resource part three ways: a queue and a topic put the name
-straight after the Account, and a function writes `function:<name>`. An ARN naming any other service
-is refused when the target is added, so a rule that cannot work says so at the point it was written.
+services it delivers to write their resource part several ways: a queue and a topic put the name
+straight after the Account, a function writes `function:<name>` and a cluster writes
+`cluster/<name>`. An ARN naming any other service is refused when the target is added, so a rule
+that cannot work says so at the point it was written. The two services whose resource part carries
+a type are checked for naming something in it, because a layer ARN and a task definition ARN are
+both well formed ARNs of a service this delivers to, and neither names anything a rule can reach.
 
 Delivery has one class per destination service, and each asks that service's own authorizer:
 `SimSqsServiceSendAuthorizer`, `SimSnsServicePublishAuthorizer` and
 `SimLambdaServiceInvokeAuthorizer`. Those already existed for simulated SNS's own fan-out, and they
 answer the same question here with a different service principal, so nothing about who may reach a
 queue lives in this service.
+
+`SimEventBridgeDeliveryTask` is the exception, and it is the one target type that is not a delivery.
+There is no resource policy on a task definition for a rule to be admitted by, so a rule runs a task
+as a role of the account instead: `SimEventTargetEcs` is where the target's `RoleArn` and
+`EcsParameters` are read, `sim-event-bridge-target-role.ts` assumes that role, and the task itself is
+run through simulated ECS's own `RunTask`. Nothing about which containers run, or whether the role
+may run them, lives in this service either.
+
+That target's `Input` is the task's overrides rather than what the target receives, since a task has
+nowhere to receive a payload. Reading it, and reading `EcsParameters`, is the same job for a
+Scheduler schedule target, so both are in `src/service/ecs/target/` and neither service holds a
+second answer to what a target may ask ECS for.
 
 `SimAwsEventBridgeDeliveryTargets` is the SimAws-level dispatcher, and a `SimEventBridge` built on
 its own gets `SimEventBridgeNoDeliveryTargets` instead, which records every delivery as a failure
