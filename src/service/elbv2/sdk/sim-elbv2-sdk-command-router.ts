@@ -131,6 +131,30 @@ export class SimElbV2SdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "AddListenerCertificatesCommand",
+        async (command, context): Promise<unknown> =>
+          await simElbV2.addListenerCertificates(
+            command as elbV2.SimAddListenerCertificatesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "RemoveListenerCertificatesCommand",
+        async (command, context): Promise<unknown> =>
+          await simElbV2.removeListenerCertificates(
+            command as elbV2.SimRemoveListenerCertificatesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeListenerCertificatesCommand",
+        async (command, context): Promise<unknown> =>
+          await simElbV2.describeListenerCertificates(
+            command as elbV2.SimDescribeListenerCertificatesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "CreateRuleCommand",
         async (command, context): Promise<unknown> =>
           await simElbV2.createRule(

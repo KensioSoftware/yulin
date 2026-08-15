@@ -8,27 +8,31 @@ import {
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimElbV2DuplicateListenerException } from "../../error/sim-elbv2.error.js";
 import {
+  SimElbV2DuplicateListenerException,
+  SimElbV2InvalidConfigurationRequestException,
+} from "../../error/sim-elbv2.error.js";
+import {
+  createFixtureCertificate,
+  createFixtureHttpsListener,
   createFixtureLambdaTargetGroup,
   createFixtureListener,
   createFixtureLoadBalancer,
 } from "../../sim-elbv2.fixture.js";
 
-const certificateArn =
-  "arn:aws:acm:eu-west-1:888888888888:certificate/00000001";
-
 describe("ELBv2 ModifyListenerCommand", () => {
   it("changes only what a modify names", async () => {
-    // Given an HTTP listener on port 80.
+    // Given an HTTP listener on port 80, and an issued certificate.
     const simAws = new SimAws();
     const elbV2 = simAws.elbV2();
     const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
     const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
     const listenerArn = await createFixtureListener(
       elbV2,
       loadBalancerArn,
@@ -51,12 +55,15 @@ describe("ELBv2 ModifyListenerCommand", () => {
       }),
     );
 
-    // Then the change took, and its default actions came with it.
+    // Then the change took, and its default actions and certificate came with
+    // it.
     assertArrayLength(output.Listeners, 1);
 
     const listener = output.Listeners[0];
     assertIdentical(listener.Protocol, "HTTPS");
     assertIdentical(listener.Port, 443);
+    assertArrayLength(listener.Certificates, 1);
+    assertIdentical(listener.Certificates[0].CertificateArn, certificateArn);
     assertArrayLength(listener.DefaultActions, 1);
     assertIdentical(listener.DefaultActions[0].Type, "fixed-response");
   });
@@ -67,6 +74,7 @@ describe("ELBv2 ModifyListenerCommand", () => {
     const elbV2 = simAws.elbV2();
     const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
     const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
     const created = await elbV2.createListener(
       new CreateListenerCommand({
         LoadBalancerArn: loadBalancerArn,
@@ -97,8 +105,58 @@ describe("ELBv2 ModifyListenerCommand", () => {
     );
     assertIdentical(output.Listeners[0].Port, 443);
     assertIdentical(output.Listeners[0].Protocol, "HTTPS");
+    assertArrayLength(output.Listeners[0].Certificates, 1);
+    assertIdentical(
+      output.Listeners[0].Certificates[0].CertificateArn,
+      certificateArn,
+    );
     assertArrayLength(output.Listeners[0].DefaultActions, 1);
     assertIdentical(output.Listeners[0].DefaultActions[0].Type, "forward");
+  });
+
+  it("drops a listener's certificates when it leaves HTTPS", async () => {
+    // Given an HTTPS listener with a certificate.
+    const simAws = new SimAws();
+    const elbV2 = simAws.elbV2();
+    const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
+    const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
+    const listenerArn = await createFixtureHttpsListener(
+      elbV2,
+      loadBalancerArn,
+      targetGroupArn,
+      certificateArn,
+    );
+
+    // When it is moved to HTTP, and when a modify names a certificate and HTTP
+    // in the same request.
+    const output = await elbV2.modifyListener(
+      new ModifyListenerCommand({
+        ListenerArn: listenerArn,
+        Protocol: "HTTP",
+        Port: 80,
+      }),
+    );
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await elbV2.modifyListener(
+        new ModifyListenerCommand({
+          ListenerArn: listenerArn,
+          Protocol: "HTTP",
+          Certificates: [{ CertificateArn: certificateArn }],
+        }),
+      );
+    });
+
+    assertInstanceOf(error, SimElbV2InvalidConfigurationRequestException);
+
+    // Then the move left it carrying nothing and no security policy, and the
+    // request contradicting itself was refused.
+    assertArrayLength(output.Listeners, 1);
+    assertIdentical(output.Listeners[0].Protocol, "HTTP");
+    assertArrayLength(output.Listeners[0].Certificates, 0);
+    assertUndefined(output.Listeners[0].SslPolicy);
+    assertStringIncludes(error.message, "HTTPS listener");
   });
 
   it("refuses a modify onto a port another listener holds", async () => {

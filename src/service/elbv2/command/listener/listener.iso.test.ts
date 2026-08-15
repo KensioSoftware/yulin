@@ -24,14 +24,12 @@ import {
   SimElbV2ValidationError,
 } from "../../error/sim-elbv2.error.js";
 import {
+  createFixtureCertificate,
   createFixtureLambdaTargetGroup,
   createFixtureListener,
   createFixtureLoadBalancer,
   createFixtureRule,
 } from "../../sim-elbv2.fixture.js";
-
-const certificateArn =
-  "arn:aws:acm:eu-west-1:888888888888:certificate/00000001";
 
 describe("ELBv2 listeners", () => {
   it("creates an HTTP listener whose ARN is built from its load balancer's", async () => {
@@ -67,11 +65,12 @@ describe("ELBv2 listeners", () => {
   });
 
   it("gives an HTTPS listener a security policy, and refuses one with no certificate", async () => {
-    // Given a load balancer and a target group.
+    // Given a load balancer, a target group and an issued certificate.
     const simAws = new SimAws();
     const elbV2 = simAws.elbV2();
     const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
     const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
 
     // When an HTTPS listener is created with and without a certificate.
     const output = await elbV2.createListener(
@@ -100,6 +99,11 @@ describe("ELBv2 listeners", () => {
     // Then the one with a certificate got a policy and the other was refused.
     assertArrayLength(output.Listeners, 1);
     assertIdentical(output.Listeners[0].SslPolicy, "ELBSecurityPolicy-2016-08");
+    assertArrayLength(output.Listeners[0].Certificates, 1);
+    assertIdentical(
+      output.Listeners[0].Certificates[0].CertificateArn,
+      certificateArn,
+    );
     assertStringIncludes(error.message, "at least one certificate");
   });
 

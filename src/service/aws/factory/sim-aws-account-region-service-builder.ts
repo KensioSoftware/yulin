@@ -185,13 +185,13 @@ export class SimAwsAccountRegionServiceBuilder {
   /**
    * Create simulated Elastic Load Balancing v2 for an Account Region scope.
    *
-   * The registry is what gets a request from a load balancer's DNS name to the
-   * scope holding it, since a host name names neither an Account nor a Region.
+   * The registries are the hops from a name to a scope: a load balancer's DNS
+   * name to the Account holding it, and a listener's certificate ARN to ACM.
    */
   createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    const registry = this.registries.elbV2;
+    const { elbV2: registry, acm: acmRegistry } = this.registries;
 
-    return new SimElbV2({ ...this.scoped(scope), registry });
+    return new SimElbV2({ ...this.scoped(scope), registry, acmRegistry });
   }
 
   /**

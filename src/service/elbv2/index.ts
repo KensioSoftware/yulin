@@ -48,6 +48,7 @@ export {
 } from "./serve/sim-elbv2-serving-target-group.factory.js";
 export {
   SimElbV2AccessDeniedException,
+  SimElbV2CertificateNotFoundException,
   SimElbV2ConnectionRefusedError,
   SimElbV2DuplicateListenerException,
   SimElbV2DuplicateLoadBalancerNameException,
@@ -57,6 +58,7 @@ export {
   SimElbV2InvalidTargetException,
   SimElbV2ListenerNotFoundException,
   SimElbV2LoadBalancerNotFoundException,
+  SimElbV2OperationNotPermittedException,
   SimElbV2PriorityInUseException,
   SimElbV2ResourceInUseException,
   SimElbV2RuleNotFoundException,

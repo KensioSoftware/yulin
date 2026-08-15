@@ -1,4 +1,6 @@
 import { assertDefined } from "../../util/type-guard/defined.js";
+import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimAws } from "../aws/sim-aws.js";
 import type { SimElbV2 } from "./sim-elbv2.js";
 
 /**
@@ -92,6 +94,57 @@ export async function createFixtureListener(
 
   const arn = output.Listeners?.[0]?.ListenerArn;
   assertDefined(arn, `Sim ELBv2 created no listener on port ${String(port)}`);
+
+  return arn;
+}
+
+/**
+ * Request a certificate from simulated ACM and answer with its ARN once it is
+ * issued.
+ *
+ * A certificate whose domain no hosted zone covers issues on its own, so this
+ * is an issued certificate: a test wanting one still pending validation asks
+ * ACM to require it instead.
+ */
+export async function createFixtureCertificate(
+  simAws: SimAws,
+  acm: SimAcm = simAws.acm(),
+  domainName = "shop.example.com",
+): Promise<string> {
+  const output = await acm.requestCertificate({
+    input: { DomainName: domainName },
+  });
+
+  await simAws.backgroundTasksComplete();
+
+  const arn = output.CertificateArn;
+  assertDefined(arn, `Sim ACM issued no certificate for ${domainName}`);
+
+  return arn;
+}
+
+/**
+ * Create an HTTPS listener on port 443 with a certificate, and answer with its
+ * ARN.
+ */
+export async function createFixtureHttpsListener(
+  elbV2: SimElbV2,
+  loadBalancerArn: string,
+  targetGroupArn: string,
+  certificateArn: string,
+): Promise<string> {
+  const output = await elbV2.createListener({
+    input: {
+      LoadBalancerArn: loadBalancerArn,
+      Protocol: "HTTPS",
+      Port: 443,
+      Certificates: [{ CertificateArn: certificateArn }],
+      DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+    },
+  });
+
+  const arn = output.Listeners?.[0]?.ListenerArn;
+  assertDefined(arn, "Sim ELBv2 created no HTTPS listener on port 443");
 
   return arn;
 }

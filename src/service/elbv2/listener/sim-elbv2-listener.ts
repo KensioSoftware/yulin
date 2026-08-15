@@ -3,8 +3,10 @@ import type {
   SimElbV2ActionView,
   SimElbV2Certificate,
 } from "../command/sim-elbv2-shared.command.js";
+import { SimElbV2CertificateList } from "./certificate/sim-elbv2-certificate-list.js";
 import {
-  requireSimElbV2ListenerCertificate,
+  requireSimElbV2CertificateProtocol,
+  simElbV2ListenerCertificate,
   simElbV2ListenerSslPolicy,
 } from "./sim-elbv2-listener-security.js";
 
@@ -14,7 +16,8 @@ interface SimElbV2ListenerProperties {
   readonly port: number;
   readonly protocol: string;
   readonly sslPolicy: string | undefined;
-  readonly certificates: readonly SimElbV2Certificate[];
+  /** The ARN of the certificate an HTTPS listener would present by default. */
+  readonly certificateArn: string | undefined;
   readonly defaultActions: readonly SimElbV2Action[];
 }
 
@@ -25,7 +28,7 @@ export interface SimElbV2ListenerChanges {
   readonly port?: number | undefined;
   readonly protocol?: string | undefined;
   readonly sslPolicy?: string | undefined;
-  readonly certificates?: readonly SimElbV2Certificate[] | undefined;
+  readonly certificateArn?: string | undefined;
   readonly defaultActions?: readonly SimElbV2Action[] | undefined;
 }
 
@@ -54,10 +57,10 @@ export class SimElbV2Listener {
   public readonly arn: string;
   public readonly loadBalancerArn: string;
 
+  private readonly certificateList = new SimElbV2CertificateList();
   private currentPort: number;
   private currentProtocol: string;
   private currentSslPolicy: string | undefined;
-  private currentCertificates: readonly SimElbV2Certificate[];
   private currentDefaultActions: readonly SimElbV2Action[];
 
   constructor(properties: SimElbV2ListenerProperties) {
@@ -72,12 +75,14 @@ export class SimElbV2Listener {
       properties.protocol,
       properties.sslPolicy,
     );
-    // Copied for the same reason an action's input is: what a listener
-    // presents cannot change because a caller reused the array it sent.
-    this.currentCertificates = structuredClone(properties.certificates);
     this.currentDefaultActions = properties.defaultActions;
 
-    requireSimElbV2ListenerCertificate(properties.protocol, this.certificates);
+    this.holdCertificate(
+      simElbV2ListenerCertificate({
+        protocol: properties.protocol,
+        requested: properties.certificateArn,
+      }),
+    );
   }
 
   /** The port this listener answers on. */
@@ -90,9 +95,14 @@ export class SimElbV2Listener {
     return this.currentProtocol;
   }
 
-  /** The certificates an HTTPS listener presents. */
+  /**
+   * Every certificate this listener carries, the default one first.
+   *
+   * This is what `DescribeListenerCertificates` reports, where a described
+   * listener reports its default certificate alone.
+   */
   get certificates(): readonly SimElbV2Certificate[] {
-    return this.currentCertificates;
+    return this.certificateList.list();
   }
 
   /** What this listener does with a request no rule claims. */
@@ -110,19 +120,41 @@ export class SimElbV2Listener {
    */
   modify(changes: SimElbV2ListenerChanges): void {
     const protocol = changes.protocol ?? this.currentProtocol;
-    const certificates = changes.certificates ?? this.currentCertificates;
-
-    requireSimElbV2ListenerCertificate(protocol, certificates);
+    const certificateArn = simElbV2ListenerCertificate({
+      protocol,
+      requested: changes.certificateArn,
+      held: this.certificateList.defaultArn,
+    });
 
     this.currentPort = changes.port ?? this.currentPort;
     this.currentProtocol = protocol;
-    this.currentCertificates = structuredClone(certificates);
     this.currentSslPolicy = simElbV2ListenerSslPolicy(
       protocol,
       changes.sslPolicy ?? this.currentSslPolicy,
     );
     this.currentDefaultActions =
       changes.defaultActions ?? this.currentDefaultActions;
+
+    this.holdCertificate(certificateArn);
+  }
+
+  /**
+   * Carry more certificates beyond the default one.
+   *
+   * These are the certificates a real listener would choose between by the host
+   * name a client asked for. Nothing selects one here, since no handshake
+   * happens, so what a test can prove is that the listener carries them.
+   */
+  addCertificates(certificateArns: readonly string[]): void {
+    requireSimElbV2CertificateProtocol(this.currentProtocol);
+    this.certificateList.add(certificateArns);
+  }
+
+  /**
+   * Stop carrying certificates, refusing to take away the default one.
+   */
+  removeCertificates(certificateArns: readonly string[]): void {
+    this.certificateList.remove(certificateArns);
   }
 
   /**
@@ -135,8 +167,25 @@ export class SimElbV2Listener {
       Port: this.port,
       Protocol: this.protocol,
       SslPolicy: this.currentSslPolicy,
-      Certificates: this.certificates,
+      Certificates: this.certificateList.defaultOnly(),
       DefaultActions: this.defaultActions.map((action) => action.view()),
     };
+  }
+
+  /**
+   * Hold the default certificate, or none at all where the protocol has no use
+   * for one.
+   *
+   * A listener left with no certificate drops its whole certificate list rather
+   * than carrying certificates it would never present, which is what real ELB
+   * leaves behind after the same change.
+   */
+  private holdCertificate(certificateArn: string | undefined): void {
+    if (certificateArn === undefined) {
+      this.certificateList.clear();
+      return;
+    }
+
+    this.certificateList.setDefault(certificateArn);
   }
 }

@@ -1,14 +1,7 @@
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
+import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type * as elbV2 from "./command/sim-elbv2-command.types.js";
 import { SimElbV2Commands } from "./command/sim-elbv2-commands.js";
 import type { SimElbV2RequestOptions } from "./command/sim-elbv2-request-options.js";
@@ -18,18 +11,8 @@ import type { SimElbV2LoadBalancer } from "./load-balancer/sim-elbv2-load-balanc
 import { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
 import { SimElbV2SdkCommandRouter } from "./sdk/sim-elbv2-sdk-command-router.js";
 import { SimElbV2Stores } from "./sim-elbv2-stores.js";
+import type { SimElbV2Properties } from "./sim-elbv2.types.js";
 import type { SimElbV2TargetGroup } from "./target-group/sim-elbv2-target-group.js";
-
-interface SimElbV2Properties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-  /**
-   * Cross-scope index of load balancer DNS names, which is how a request
-   * arriving at one finds the Account that owns it.
-   */
-  readonly registry?: SimElbV2Registry;
-}
 
 /**
  * Simulated Elastic Load Balancing v2. Handles SDK commands. Emulates AWS
@@ -66,6 +49,7 @@ export class SimElbV2 {
       iam,
       background,
       accountRegionScope,
+      acmRegistry: properties.acmRegistry,
     });
   }
 
@@ -226,6 +210,36 @@ export class SimElbV2 {
     options?: SimElbV2RequestOptions,
   ): Promise<elbV2.SimDeleteListenerCommandOutput> {
     return await this.commands.deleteListener.handle(command, options);
+  }
+
+  /** Handle an AddListenerCertificates Command from the SDK. */
+  async addListenerCertificates(
+    command: elbV2.SimAddListenerCertificatesCommand,
+    options?: SimElbV2RequestOptions,
+  ): Promise<elbV2.SimAddListenerCertificatesCommandOutput> {
+    return await this.commands.addListenerCertificates.handle(command, options);
+  }
+
+  /** Handle a RemoveListenerCertificates Command from the SDK. */
+  async removeListenerCertificates(
+    command: elbV2.SimRemoveListenerCertificatesCommand,
+    options?: SimElbV2RequestOptions,
+  ): Promise<elbV2.SimRemoveListenerCertificatesCommandOutput> {
+    return await this.commands.removeListenerCertificates.handle(
+      command,
+      options,
+    );
+  }
+
+  /** Handle a DescribeListenerCertificates Command from the SDK. */
+  async describeListenerCertificates(
+    command: elbV2.SimDescribeListenerCertificatesCommand,
+    options?: SimElbV2RequestOptions,
+  ): Promise<elbV2.SimDescribeListenerCertificatesCommandOutput> {
+    return await this.commands.describeListenerCertificates.handle(
+      command,
+      options,
+    );
   }
 
   /** Handle a CreateRule Command from the SDK. */

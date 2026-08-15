@@ -1,4 +1,5 @@
 import {
+  AddListenerCertificatesCommand,
   CreateListenerCommand,
   CreateLoadBalancerCommand,
   CreateRuleCommand,
@@ -8,6 +9,7 @@ import {
   DeleteRuleCommand,
   DeleteTargetGroupCommand,
   DeregisterTargetsCommand,
+  DescribeListenerCertificatesCommand,
   DescribeListenersCommand,
   DescribeLoadBalancersCommand,
   DescribeRulesCommand,
@@ -18,6 +20,7 @@ import {
   ModifyRuleCommand,
   ModifyTargetGroupCommand,
   RegisterTargetsCommand,
+  RemoveListenerCertificatesCommand,
   SetRulePrioritiesCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
@@ -30,6 +33,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimSdk } from "../../../sdk/index.js";
+import { createFixtureCertificate } from "../sim-elbv2.fixture.js";
 
 const functionArn = "arn:aws:lambda:eu-west-2:888888888888:function:checkout";
 
@@ -65,6 +69,16 @@ describe("ELBv2 SDK interception", () => {
     simSdk.intercept(ElasticLoadBalancingV2Client);
 
     const client = new ElasticLoadBalancingV2Client({ region: "eu-west-2" });
+    const acm = simSdk.simAws.region("eu-west-2").acm();
+    const shopCertificateArn = await createFixtureCertificate(
+      simSdk.simAws,
+      acm,
+    );
+    const adminCertificateArn = await createFixtureCertificate(
+      simSdk.simAws,
+      acm,
+      "admin.example.com",
+    );
 
     const loadBalancer = await client.send(
       new CreateLoadBalancerCommand({ Name: "shop-alb" }),
@@ -161,6 +175,41 @@ describe("ELBv2 SDK interception", () => {
       new DescribeRulesCommand({ ListenerArn: listenerArn }),
     );
 
+    const https = await client.send(
+      new CreateListenerCommand({
+        LoadBalancerArn: loadBalancerArn,
+        Protocol: "HTTPS",
+        Port: 443,
+        Certificates: [{ CertificateArn: shopCertificateArn }],
+        DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+      }),
+    );
+    assertArrayLength(https.Listeners, 1);
+
+    const httpsListenerArn = https.Listeners[0].ListenerArn;
+    assertNonNullable(httpsListenerArn);
+
+    await client.send(
+      new AddListenerCertificatesCommand({
+        ListenerArn: httpsListenerArn,
+        Certificates: [{ CertificateArn: adminCertificateArn }],
+      }),
+    );
+    const certificates = await client.send(
+      new DescribeListenerCertificatesCommand({
+        ListenerArn: httpsListenerArn,
+      }),
+    );
+    await client.send(
+      new RemoveListenerCertificatesCommand({
+        ListenerArn: httpsListenerArn,
+        Certificates: [{ CertificateArn: adminCertificateArn }],
+      }),
+    );
+    await client.send(
+      new DeleteListenerCommand({ ListenerArn: httpsListenerArn }),
+    );
+
     await client.send(new DeleteRuleCommand({ RuleArn: ruleArn }));
     await client.send(new DeleteListenerCommand({ ListenerArn: listenerArn }));
     await client.send(
@@ -175,11 +224,12 @@ describe("ELBv2 SDK interception", () => {
     // Then every command simulated ELBv2 knows about was one of them.
     assertArrayLength(
       new SimAws().elbV2().sdkCommandRouter().supportedCommandNames(),
-      19,
+      22,
     );
 
     // Then each one reached the simulation and the stack was torn down.
     assertArrayLength(health.TargetHealthDescriptions, 1);
+    assertArrayLength(certificates.Certificates, 2);
     assertArrayLength(rules.Rules, 2);
     assertIdentical(rules.Rules[0].Priority, "20");
     assertArrayLength(remaining.LoadBalancers, 0);
