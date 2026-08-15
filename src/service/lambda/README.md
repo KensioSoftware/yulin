@@ -129,6 +129,16 @@ Import and handler problems surface as invocation errors with the real runtime e
 `Runtime.ImportModuleError`, `Runtime.HandlerNotFound`, `Runtime.UserCodeSyntaxError`,
 `Runtime.MalformedHandlerName` — rather than failing creation.
 
+The sandbox has writable standard streams (`SimLambdaVmOutputStream`), and its `console` is built
+over them as the real runtime's is. Both matter: a library that builds its own console over
+`process.stdout` and `process.stderr` rather than using the global one, as AWS Lambda Powertools'
+logger does at module scope, throws `ERR_CONSOLE_WRITABLE_STREAM` at import without the streams and
+never runs. What is written is forwarded to the matching host stream, the sandbox's standard output
+to the host's standard output and its standard error to the host's standard error, so a handler's
+output arrives there whether it printed through the console or wrote to the stream itself, and a
+test reads it by capturing that host stream. Powertools' metrics print their EMF document to
+standard output, so that is how a test reads the metrics a handler emitted.
+
 `SimLambdaVmModules` provides a CommonJS module system over the archive: relative requires between
 archived files, Node.js built-ins from the host (as the real runtime provides them), and a minimal
 `node_modules` lookup for dependencies bundled into the archive. The `Handler` string selects the
