@@ -1192,9 +1192,10 @@ that finishes with a service running leaves nothing behind it.
 
 ## Deploying ECS from CloudFormation
 
-`AWS::ECS::Cluster` creates a simulated cluster, and `AWS::ECS::TaskDefinition` registers a
-simulated task definition revision, so a test can start from the stack the application is actually
-defined in rather than from `RegisterTaskDefinition` calls written for the test.
+`AWS::ECS::Cluster` creates a simulated cluster, `AWS::ECS::TaskDefinition` registers a simulated
+task definition revision, and `AWS::ECS::Service` creates a simulated service running it, so a test
+can start from the stack the application is actually defined in rather than from
+`RegisterTaskDefinition` and `CreateService` calls written for the test.
 
 `Ref` on a cluster returns the cluster name and `Fn::GetAtt` `Arn` returns its ARN. `Ref` on a task
 definition returns the task definition ARN, revision and all, which is also what `Fn::GetAtt`
@@ -1364,11 +1365,119 @@ A task definition's `TaskRoleArn` and `ExecutionRoleArn` resolve whether the tem
 or a `Ref` to an `AWS::IAM::Role` of the same stack, so a container's AWS calls are authorized as
 the role the stack deploys.
 
-Everything else the two Resource types declare is stored as declared, or recorded as ignored where
+### Deploying a service
+
+`AWS::ECS::Service` creates a service in its cluster, keeping `DesiredCount` tasks of the task
+definition it names running. `Cluster` takes a `Ref` to a cluster of the same stack or a cluster
+ARN, and `TaskDefinition` takes a `Ref` to a task definition of the same stack, which pins the
+revision the deployment registered, or an ARN, or a family. A container bound at deploy time is
+running once the stack has deployed, because the service names the task definition and is created
+after it.
+
+`Ref` on a service returns the service ARN, which is also what `Fn::GetAtt` `ServiceArn` returns,
+and `Fn::GetAtt` `Name` returns the service name. `simAws.ecs().service(name, cluster)` reads the
+simulated service itself, by name in a cluster or by its full ARN.
+
+```typescript sim-ecs-cloudformation-service
+/**
+ * Deploying an ECS service and reading what it is keeping running.
+ */
+
+import { ListTasksCommand } from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      OrdersCluster: {
+        Type: "AWS::ECS::Cluster",
+        Properties: { ClusterName: "orders" },
+      },
+      WorkerTaskDefinition: {
+        Type: "AWS::ECS::TaskDefinition",
+        Properties: {
+          Family: "orders-worker",
+          ContainerDefinitions: [
+            {
+              Name: "app",
+              Image: "example.dkr.ecr.eu-west-2.amazonaws.com/orders-worker:1",
+            },
+          ],
+        },
+      },
+      WorkerService: {
+        Type: "AWS::ECS::Service",
+        Properties: {
+          ServiceName: "orders-worker",
+          Cluster: { Ref: "OrdersCluster" },
+          TaskDefinition: { Ref: "WorkerTaskDefinition" },
+          DesiredCount: 2,
+          LaunchType: "FARGATE",
+        },
+      },
+    },
+    Outputs: {
+      Service: { Value: { Ref: "WorkerService" } },
+      ServiceName: { Value: { "Fn::GetAtt": ["WorkerService", "Name"] } },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "WorkerTaskDefinition",
+      run: (): void => {
+        // Whatever the worker container does when something reaches it.
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+console.log(stack.outputs.get("Service")?.value);
+// "arn:aws:ecs:us-east-1:888888888888:service/orders/orders-worker"
+console.log(stack.outputs.get("ServiceName")?.value); // "orders-worker"
+
+const service = simAws.ecs().service("orders-worker", "orders");
+
+console.log(service.desiredCount); // 2
+
+const listed = await simAws
+  .ecs()
+  .listTasks(
+    new ListTasksCommand({ cluster: "orders", serviceName: "orders-worker" }),
+  );
+
+console.log(listed.taskArns?.length); // 2
+```
+
+A service the template does not name is named after the stack and the logical ID, as a cluster and a
+family are, and a service declaring no `DesiredCount` keeps one task running, which is what real
+CloudFormation gives a new service.
+
+Updating the stack moves the service: a changed `DesiredCount` scales it, and a changed task
+definition moves it onto the revision the update registered, replacing the tasks it was keeping.
+Tearing the stack down deletes the service, stopping its tasks and leaving it `INACTIVE`, whatever
+it was scaled to.
+
+`LoadBalancers` is recorded on the service rather than acted on, since nothing here sends a service
+container a request yet. What the template declared is readable, which is what a target group needs
+to find the service and container that answer for it:
+
+```typescript
+console.log(simAws.ecs().service("orders-worker", "orders").loadBalancers);
+```
+
+Everything else the three Resource types declare is stored as declared, or recorded as ignored where
 this simulation has nothing to act on it with. `CapacityProviders`,
-`DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster, and
-`InferenceAccelerators` and `EnableFaultInjection` on a task definition, are read and ignored rather
-than failing the stack, and each one is reported on the Resource:
+`DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster, `InferenceAccelerators`
+and `EnableFaultInjection` on a task definition, and a service's `NetworkConfiguration`,
+`CapacityProviderStrategy`, `DeploymentConfiguration` and `ServiceRegistries` among the rest, are
+read and ignored rather than failing the stack, and each one is reported on the Resource:
 
 ```typescript
 console.log(stack.resources.get("OrdersCluster")?.ignoredProperties);
@@ -1543,6 +1652,12 @@ console.log(described.taskDefinition?.revision); // 1
   the simulated clock while the service is running
 - `AWS::ECS::Cluster`, answering `Ref` with the cluster name and `Fn::GetAtt` with `Arn`
 - `AWS::ECS::TaskDefinition`, registering a revision and answering `Ref` with its ARN
+- `AWS::ECS::Service`, running the task definition it names at the desired count it declares, and
+  answering `Ref` with the service ARN and `Fn::GetAtt` with `Name` and `ServiceArn`
+- A stack update that scales a service or moves it onto a new revision, and a teardown that deletes
+  it
+- `LoadBalancers` on a service, recorded as declared and readable on the simulated service
+- `simAws.ecs().service()`, reading a simulated service by name in a cluster or by its ARN
 - Deploy-time container bindings, targeting a container by family and container name, by the task
   definition's logical ID or CDK construct ID, or by its image repository, and declaring `run` or
   `consumes` as a directly bound container does
@@ -1637,9 +1752,15 @@ Current documented limitations:
 - A service whose tasks fail to start does not start replacements for them. Real ECS keeps trying,
   which would be an endless retry in a test rather than a result to assert on, so the service
   reports the running count it actually has.
-- `CreateService` refuses `loadBalancers`, `serviceRegistries`, `networkConfiguration`,
-  `deploymentConfiguration`, `capacityProviderStrategy` and the rest of what it takes. There is no
-  network here, and nothing serves a service container yet.
+- `CreateService` takes `loadBalancers` and records them without acting on them, since nothing here
+  sends a service container a request yet. The declaration is reported back and readable on the
+  simulated service, which is what a load balancer target group has to read to find the service that
+  answers for it.
+- `CreateService` refuses `serviceRegistries`, `networkConfiguration`, `deploymentConfiguration`,
+  `capacityProviderStrategy` and the rest of what it takes. There is no network here, and nothing
+  serves a service container yet.
+- `UpdateService` changes the desired count and the task definition and nothing else, so a load
+  balancer a service was created with stays as it was declared.
 - `CreateService` refuses a `schedulingStrategy` of `DAEMON`, which places one task on each container
   instance. There are no container instances here to place one on each of.
 - `CreateService` needs a `desiredCount`, as a replica service does on real ECS, and it can be zero.
@@ -1678,25 +1799,33 @@ Current documented limitations:
   `DescribeServices` and `ListTasks` are what report those.
 - Task definition and cluster tags are stored and reported, but `TagResource`,
   `UntagResource` and `ListTagsForResource` are not simulated.
-- `AWS::ECS::Service` is not deployed yet. A template declaring one is reported as unsupported and
-  skipped rather than failing the stack.
-- A cluster or task definition the template does not name gets a name composed from the stack name
-  and the logical ID, without the random part real CloudFormation adds, so a test can predict it. A
-  stack deployed twice under different names therefore gets two different families.
+- A cluster, task definition or service the template does not name gets a name composed from the
+  stack name and the logical ID, without the random part real CloudFormation adds, so a test can
+  predict it. A stack deployed twice under different names therefore gets two different families.
+- A service that declares no `DesiredCount` keeps one task running, which is the default real
+  CloudFormation documents for a new service. A `DesiredCount` written as the text of a number is
+  taken as that number, since a String Parameter resolves to text, and anything else is refused.
 - An update replaces a task definition Resource rather than updating it in place, so it registers a
   new revision and deregisters the one it replaced. The family accumulates revisions with only the
   newest one `ACTIVE`, where real CloudFormation leaves the earlier revisions active.
-- A stack teardown deletes its cluster, leaving it `INACTIVE`, and deregisters the revision it
-  registered, leaving that `INACTIVE`. Neither is removed, and revision numbers are not freed.
+- An update replaces a service Resource as well, so a scaled or redeployed service is deleted and
+  created again rather than updated. Its tasks stop and new ones start, and its ARN is unchanged as
+  long as its name is, since a service ARN is its cluster and its name.
+- A stack teardown deletes its cluster, leaving it `INACTIVE`, deregisters the revision it
+  registered, leaving that `INACTIVE`, and deletes its service, leaving that `INACTIVE` too. None of
+  them is removed, and revision numbers are not freed. The service is deleted with force, because
+  real CloudFormation scales one to zero on its way out and nothing here needs the time that takes.
 - CloudFormation property names are translated to the API's by lowering the first letter of each of
   them, all the way down, apart from `EFSVolumeConfiguration`,
   `FSxWindowsFileServerVolumeConfiguration` and `ProxyConfigurationProperties`, which the API spells
   differently. `DockerLabels`, `Options`, `DriverOpts` and `Labels` hold keys the template wrote, so
   those are left alone. A name outside all of that is stored under the name lowering gives it.
 - `CapacityProviders`, `DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster,
-  and `InferenceAccelerators` and `EnableFaultInjection` on a task definition, are read and recorded
-  as ignored rather than refused, where the equivalent SDK request is refused. A stack that will not
-  deploy is worth less to a test than a Resource without a property nothing here acts on.
+  `InferenceAccelerators` and `EnableFaultInjection` on a task definition, and everything a service
+  declares beyond its cluster, task definition, count, launch type, scheduling strategy and load
+  balancers, are read and recorded as ignored rather than refused, where the equivalent SDK request
+  is refused. A stack that will not deploy is worth less to a test than a Resource without a
+  property nothing here acts on.
 - A deploy-time binding is checked against the template as the stack is built, so a family, a
   container name or an image repository built from another Resource's attribute rather than written
   as a string resolves to nothing and fails the deployment.

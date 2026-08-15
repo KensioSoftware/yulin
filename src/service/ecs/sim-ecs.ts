@@ -6,6 +6,7 @@ import type { SimEcsCluster } from "./cluster/sim-ecs-cluster.js";
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
+import type { SimEcsService } from "./service/sim-ecs-service.js";
 import { SimEcsCommands } from "./sim-ecs-commands.js";
 import type { SimEcsProperties } from "./sim-ecs-properties.js";
 import type { SimEcsTaskDefinition } from "./task-definition/sim-ecs-task-definition.js";
@@ -214,12 +215,9 @@ export class SimEcs {
    *
    * A service is the one thing simulated ECS keeps running rather than runs and
    * finishes, so this is what a simulated environment being finished with comes
-   * down to here: every service's tasks stop, and nothing is left scheduled.
-   * The services themselves stay as they were, describable with the desired
-   * count they had.
-   *
-   * Closing again does nothing again, since the second time round there is
-   * nothing running to stop.
+   * down to: every service's tasks stop and nothing is left scheduled, while
+   * the services stay describable with the desired count they had. Closing
+   * again does nothing again, since there is then nothing running to stop.
    */
   close(): void {
     this.commands.closeServices();
@@ -261,8 +259,9 @@ export class SimEcs {
    * The cluster of this name, whether it is active or deleted.
    *
    * A lookup rather than an operation, for a test or a CloudFormation Resource
-   * that needs the cluster itself rather than a description of it. A name
-   * nothing holds is refused, since the caller asked for a cluster.
+   * that needs the thing itself rather than a description of it. An identifier
+   * nothing holds is refused, here and in the two lookups below, since the
+   * caller asked for the thing rather than for whether there is one.
    */
   cluster(clusterName: string): SimEcsCluster {
     return this.commands.lookup.cluster(clusterName);
@@ -279,15 +278,22 @@ export class SimEcs {
   }
 
   /**
-   * Get this service's CloudFormation Resource factory.
+   * The service a name in a cluster, or a full service ARN, names, whether it
+   * is active or deleted.
+   *
+   * A name given without a cluster is looked for in the `default` one, as an
+   * ECS request naming no cluster means that one.
    */
+  service(identifier: string, clusterName?: string): SimEcsService {
+    return this.commands.lookup.service(identifier, clusterName);
+  }
+
+  /** Get this service's CloudFormation Resource factory. */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return new SimEcsCfnResourceFactory({ ecs: this });
   }
 
-  /**
-   * Get this service's SDK Command router for SDK client interception.
-   */
+  /** Get this service's SDK Command router for SDK client interception. */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
   }

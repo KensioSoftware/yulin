@@ -100,6 +100,7 @@ export {
 } from "./service/sim-ecs-service.js";
 export type {
   SimEcsServiceDetail,
+  SimEcsServiceLoadBalancer,
   SimEcsServiceStatus,
 } from "./service/sim-ecs-service-detail.js";
 export { SimEcsServiceTaskSet } from "./service/sim-ecs-service-task-set.js";

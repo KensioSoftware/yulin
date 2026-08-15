@@ -1,6 +1,7 @@
 import type { SimArn } from "../../aws/arn.js";
 import type {
   SimEcsServiceDetail,
+  SimEcsServiceLoadBalancer,
   SimEcsServiceStatus,
 } from "./sim-ecs-service-detail.js";
 import {
@@ -58,6 +59,11 @@ export class SimEcsService {
     return this.identity.serviceName;
   }
 
+  /** The ARN this service is named by anywhere outside its cluster. */
+  get serviceArn(): SimArn {
+    return this.identity.serviceArn;
+  }
+
   /** The cluster this service runs in. */
   get clusterName(): string {
     return this.identity.clusterName;
@@ -66,6 +72,17 @@ export class SimEcsService {
   /** The launch type this service was created with, where one was given. */
   get launchType(): string | undefined {
     return this.identity.launchType;
+  }
+
+  /**
+   * The load balancers this service was created with.
+   *
+   * Held as they were declared and not acted on: nothing here sends a service
+   * container a request yet, so this is what a target group reads to find the
+   * service that is meant to answer for it.
+   */
+  get loadBalancers(): readonly SimEcsServiceLoadBalancer[] {
+    return this.identity.loadBalancers;
   }
 
   /** The revision this service is currently running. */

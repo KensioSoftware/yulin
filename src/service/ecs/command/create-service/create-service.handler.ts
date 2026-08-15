@@ -25,6 +25,7 @@ const acceptedInput: readonly string[] = [
   "desiredCount",
   "launchType",
   "schedulingStrategy",
+  "loadBalancers",
 ];
 
 /**
@@ -60,6 +61,11 @@ export class CreateServiceCommandHandler
    * The service is answered with the counts it has as the request is answered,
    * which is a desired count and nothing running yet, as real ECS answers one.
    * Its tasks reach `RUNNING` on the simulator's background work.
+   *
+   * A load balancer the request declares is recorded on the service and not
+   * acted on. Nothing here sends a service container a request yet, so the
+   * declaration is what a target group has to read to find the service that
+   * answers for it.
    */
   async handle(
     command: SimCreateServiceCommand,
@@ -100,6 +106,7 @@ export class CreateServiceCommandHandler
       createdAt: this.background.now(),
       launchType: command.input.launchType,
       createdBy: caller.arn,
+      loadBalancers: command.input.loadBalancers,
     });
 
     this.services.put(service);

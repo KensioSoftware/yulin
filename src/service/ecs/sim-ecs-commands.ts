@@ -93,12 +93,6 @@ export class SimEcsCommands {
       consumerQueues = new SimEcsUnreachableConsumerQueues(),
     } = properties;
 
-    this.lookup = new SimEcsLookup({
-      accountRegionScope,
-      clusters: this.clusters,
-      taskDefinitions: this.taskDefinitions,
-    });
-
     const contexts = new SimEcsCommandContexts({
       accountRegionScope,
       authorizer: new SimEcsAuthorizer({ iam }),
@@ -115,6 +109,13 @@ export class SimEcsCommands {
     const { cluster, taskDefinition, task, service } = contexts;
 
     this.serviceTasks = service.serviceTasks;
+    this.lookup = new SimEcsLookup({
+      accountRegionScope,
+      clusters: this.clusters,
+      taskDefinitions: this.taskDefinitions,
+      services: this.services,
+      serviceArn: service.serviceArn,
+    });
 
     this.createCluster = new CreateClusterCommandHandler(cluster);
     this.describeClusters = new DescribeClustersCommandHandler(cluster);

@@ -1,5 +1,8 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimEcsServiceDetail } from "../../service/sim-ecs-service-detail.js";
+import type {
+  SimEcsServiceDetail,
+  SimEcsServiceLoadBalancer,
+} from "../../service/sim-ecs-service-detail.js";
 
 /**
  * Minimal structural sim ECS CreateService command.
@@ -20,6 +23,7 @@ export interface SimCreateServiceCommandInput {
   readonly desiredCount?: number | undefined;
   readonly launchType?: string | undefined;
   readonly schedulingStrategy?: string | undefined;
+  readonly loadBalancers?: readonly SimEcsServiceLoadBalancer[] | undefined;
 }
 
 /**

@@ -50,6 +50,31 @@ export class SimCfnEcsPropertyReader {
   }
 
   /**
+   * A property that is a whole number, where the template declared one.
+   *
+   * A template may write a count as a number or as the text of one, since a
+   * String Parameter resolves to text whatever it holds, and CloudFormation
+   * takes either. Anything else is refused rather than counted as zero.
+   */
+  wholeNumber(name: string): number | undefined {
+    const value = this.declared(name);
+
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value === "number") {
+      return value;
+    }
+
+    if (typeof value === "string" && /^-?\d+$/u.test(value)) {
+      return Number(value);
+    }
+
+    throw this.refuse(`${name} is a whole number`);
+  }
+
+  /**
    * A property that is a list of strings, where the template declared one.
    */
   textList(name: string): readonly string[] | undefined {

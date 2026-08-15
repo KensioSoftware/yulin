@@ -5,9 +5,11 @@ import type {
   SimCloudFormationResourceCreateContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimEcsCluster } from "../cluster/sim-ecs-cluster.js";
+import type { SimEcsService } from "../service/sim-ecs-service.js";
 import type { SimEcsTaskDefinition } from "../task-definition/sim-ecs-task-definition.js";
 import type { SimEcs } from "../sim-ecs.js";
 import { SimCfnEcsClusterCreator } from "./cluster/sim-cfn-ecs-cluster-creator.js";
+import { SimCfnEcsServiceCreator } from "./service/sim-cfn-ecs-service-creator.js";
 import { SimCfnEcsTaskDefinitionCreator } from "./task-definition/sim-cfn-ecs-task-definition-creator.js";
 
 interface SimEcsCfnResourceFactoryProperties {
@@ -17,21 +19,23 @@ interface SimEcsCfnResourceFactoryProperties {
 /**
  * CloudFormation Resource factory for simulated ECS resources.
  *
- * `AWS::ECS::Cluster` and `AWS::ECS::TaskDefinition` are the two Resource
- * types a stack has to have before anything else about ECS can be deployed:
- * one is where tasks run, and the other is what they run. `AWS::ECS::Service`
- * follows separately, and until it does a template declaring one deploys with
- * the service recorded as unsupported.
+ * The three Resource types are the three things ECS is made of: a cluster is
+ * where tasks run, a task definition is what they run, and a service is what
+ * keeps them running. A stack declaring all three deploys into a simulated
+ * service running the revision it registered, which is what an application
+ * defined in CloudFormation comes down to.
  */
 export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly clusterCreator: SimCfnEcsClusterCreator;
   private readonly taskDefinitionCreator: SimCfnEcsTaskDefinitionCreator;
+  private readonly serviceCreator: SimCfnEcsServiceCreator;
 
   constructor(properties: SimEcsCfnResourceFactoryProperties) {
     this.clusterCreator = new SimCfnEcsClusterCreator({ ecs: properties.ecs });
     this.taskDefinitionCreator = new SimCfnEcsTaskDefinitionCreator({
       ecs: properties.ecs,
     });
+    this.serviceCreator = new SimCfnEcsServiceCreator({ ecs: properties.ecs });
   }
 
   /**
@@ -54,6 +58,9 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
           properties,
           context.bindings,
         );
+      }
+      case "Service": {
+        return await this.serviceCreator.create(resource, properties);
       }
       default: {
         throw new Error(
@@ -84,6 +91,13 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
             resource,
             "task definition",
           ),
+        );
+
+        return;
+      }
+      case "Service": {
+        await this.serviceCreator.delete(
+          simCfnEcsCreatedResource<SimEcsService>(resource, "service"),
         );
 
         return;
