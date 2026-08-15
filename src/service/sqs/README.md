@@ -32,7 +32,9 @@ rather than anything with a `queue/` in it. That is also why `parseSimArn` retur
 and why `SimSqsQueueUrl` does the URL parsing this service needs. The URL format itself is
 `sqsQueueUrl`, which anything holding a queue ARN builds through rather than writing the format out
 again: an event source mapping polling a queue and a simulated service notifying one both mean the
-same URL.
+same URL. `sqsQueueUrlOf` and `sqsQueueArnOf` are the two directions of that conversion for callers
+holding only a string, which is how a consumer given a queue URL by a user reaches a queue everything
+else names by ARN.
 
 `SimSqsQueueUrl` reads a queue URL into its region, account and name. All three matter: a URL naming
 another account or region reaches nothing here rather than having its name read out and looked up
@@ -59,6 +61,45 @@ to keep.
 `SimSqsDeletedQueueNames` holds a deleted queue's name for 60 seconds, as real SQS holds it. The hold
 is measured on the simulation's clock, so advancing simulated time frees the name. That is the
 failure a redeployed stack actually hits.
+
+## Polling model
+
+What a simulated consumer of a queue does with one lives under `poll/`. It is here rather than with
+any one consumer because two services consume a queue the same way: a Lambda event source mapping and
+a long-running ECS container bound to consume one. Writing the loop twice would be two answers to
+when a poll happens and what a batch coming back means.
+
+`SimSqsQueuePoller` is that loop. Real consumers poll continuously and nothing in this simulation
+runs continuously: an endless loop in a single Node.js process would never yield to the test running
+it. So the queue says when there is something to poll for, through `SimSqsQueueActivity`, and a poll
+is scheduled in response on the simulation's own clock through `PollSchedule`. A message that is
+receivable now schedules a background task; one sent with a delay is scheduled for the instant it
+becomes receivable; and a batch that came back is scheduled for the end of its visibility timeout,
+so advancing simulated time is what redelivers it. Scheduling a returned batch on the clock even for
+a zero visibility timeout is deliberate: a poll that ran straight back round would spin on a batch
+the consumer keeps failing.
+
+An announcement only reaches a consumer that was already watching, so a poll that finds nothing asks
+the queue when its earliest hidden message comes back and schedules itself for then. That is what
+delivers the messages a consumer was created alongside, rather than stranding a queue whose messages
+were all in flight when it started.
+
+`SimSqsPollConsumer` is everything the loop needs from whatever is consuming, which is one method: a
+`SimSqsPollSession` per poll, or nothing when there is nothing to poll for at the moment. The session
+carries the caller each request is made as, the batch size, and what to do with a batch. That is what
+differs between the two consumers, and it is asked for per poll rather than held because a consumer
+can change either while it is running.
+
+Stopping a poller unwatches the queue and cancels whatever turn was waiting on the clock, through
+`BackgroundScheduler.cancelScheduled`. Both halves matter: a poller stopped with a turn still queued
+would leave work waiting for a simulation nothing consumes any more.
+
+`SimSqsPollQueues` is the narrow slice of SQS the loop uses, so a consumer depends on what it does
+with a queue rather than on the service object. `SimSqsCommandPollQueues` implements it over the
+ordinary SQS commands, as the consumer's own role, so simulated IAM authorizes each poll the way real
+IAM does. `SimSqsUnreachablePollQueues` is what a service built outside a SimAws instance gets: it
+refuses and leaves the wording to the consuming service, since only that service can say how to give
+itself a queue.
 
 ## Message model
 

@@ -3,6 +3,7 @@ import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
+import { SimEcsUnreachableConsumerQueues } from "./service/consume/sim-ecs-consumer-queues.js";
 import { SimEcsClusterStore } from "./cluster/sim-ecs-cluster-store.js";
 import { SimEcsAuthorizer } from "./command/authorize/sim-ecs-authorizer.js";
 import { SimEcsCommandContexts } from "./command/sim-ecs-command-contexts.js";
@@ -89,6 +90,7 @@ export class SimEcsCommands {
       background = new BackgroundTasks(),
       runAsOwner,
       secretStores = new SimEcsUnreachableSecretStores(),
+      consumerQueues = new SimEcsUnreachableConsumerQueues(),
     } = properties;
 
     this.lookup = new SimEcsLookup({
@@ -108,6 +110,7 @@ export class SimEcsCommands {
       services: this.services,
       bindings: this.bindings,
       secretStores,
+      consumerQueues,
     });
     const { cluster, taskDefinition, task, service } = contexts;
 

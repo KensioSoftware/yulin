@@ -3,6 +3,7 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
+import type { SimSqsPollQueues } from "../sqs/poll/sim-sqs-poll-queues.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import {
@@ -14,10 +15,7 @@ import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-functio
 import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
 import { SimLambdaPermissionCommands } from "./command/permission/sim-lambda-permission-commands.js";
 import { SimLambdaEventSourcePollers } from "./event-source/sim-lambda-event-source-pollers.js";
-import {
-  type SimLambdaEventSourceQueues,
-  SimLambdaNoEventSourceQueues,
-} from "./event-source/queue/sim-lambda-event-source-queues.js";
+import { SimLambdaNoEventSourceQueues } from "./event-source/queue/sim-lambda-no-event-source-queues.js";
 import {
   type SimLambdaEventSourceStreams,
   SimLambdaNoEventSourceStreams,
@@ -46,7 +44,7 @@ export interface SimLambdaProperties {
   readonly containerImages?: SimLambdaContainerImages;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
   readonly urlRegistry?: SimLambdaUrlRegistry;
-  readonly eventSourceQueues?: SimLambdaEventSourceQueues;
+  readonly eventSourceQueues?: SimSqsPollQueues;
   readonly eventSourceStreams?: SimLambdaEventSourceStreams;
 }
 

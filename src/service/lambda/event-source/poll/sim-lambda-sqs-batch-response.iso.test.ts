@@ -1,10 +1,10 @@
 import { assertArrayLength, assertFalse } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollMessage } from "../../../sqs/poll/sim-sqs-poll-message.js";
 import { SimLambdaSqsBatchResponse } from "./sim-lambda-sqs-batch-response.js";
 
-const messages: readonly SimLambdaEventSourceMessage[] = [
+const messages: readonly SimSqsPollMessage[] = [
   {
     MessageId: "message-1",
     ReceiptHandle: "handle-1",

@@ -86,11 +86,22 @@ against without it being what was asked for.
 Executable bindings live under `bind/`.
 
 `SimEcsContainerBinding` is the shape a user writes. It targets a container either by family and
-container name or by image repository, and carries either a `run` handler or an `http` one. The HTTP
-shape is settled here even though nothing serves a container yet, so that a service container behind
-a load balancer does not have to renegotiate it: it is fetch-style, matching what
-`SimAwsServiceController` already answers a served request with. Binding one is refused rather than
-held, since a binding that is never called is worse than one that says so.
+container name or by image repository, and carries one of three things: a `run` handler, a `consumes`
+declaration, or an `http` handler. The HTTP shape is settled here even though nothing serves a
+container yet, so that a service container behind a load balancer does not have to renegotiate it: it
+is fetch-style, matching what `SimAwsServiceController` already answers a served request with.
+Binding one is refused rather than held, since a binding that is never called is worse than one that
+says so.
+
+`SimEcsBoundContainerWork` is what the binding says the container does, read once as it is made.
+`SimEcsBoundQueueConsumer` is the `consumes` half: the queue URL turned into the ARN everything else
+names a queue by, a batch size SQS would actually hand out, and the handler. All three are settled at
+binding time because binding is what a test does while setting up, and a consuming container that
+could never poll would otherwise poll for the whole test and deliver nothing.
+
+A consuming binding has no `run` handler, which is why `SimEcsBoundContainer.runHandler` refuses
+rather than answering with nothing: what a consuming binding supplies is the body of a loop, and a
+run task has nothing to do with a loop.
 
 `SimEcsBoundContainer` reads a binding once, as it is made, and refuses one that could never match.
 Binding is something a test does while setting up, so the mistake is worth reporting there rather
@@ -213,9 +224,44 @@ scheduler, so a task is listed as soon as the request is answered and a service 
 brings nothing up. Stopping is immediate, because there is nothing here to drain.
 
 `SimEcsServiceContainers` brings one task's containers up, which is where a service container differs
-from a task container: no handler is called. A bound container is marked running and left available
-for whatever reaches it, and an unbound one records the same not-simulated reason a run task's
-container does, so the wording is shared with `SimEcsContainerRunner` rather than repeated.
+from a task container: no handler is run to completion. A bound container is marked running and left
+available for whatever reaches it, and an unbound one records the same not-simulated reason a run
+task's container does, from the shared `sim-ecs-container-reason.ts` rather than a second copy of the
+wording. `SimEcsServiceConsumption` is the one thing a service container starts of its own, which is
+the polling behind a `consumes` binding. It runs here because this is where the task's secrets have
+just been resolved, so a consuming container's handler reads the same environment a run task's
+container would.
+
+## Consuming a queue
+
+What a container bound to consume a queue does lives under `service/consume/`.
+
+The loop itself is not here. `SimSqsQueuePoller`, in sim SQS, is the receive-hand-over-delete loop
+every simulated consumer of a queue uses, and the same one a Lambda event source mapping polls
+through; the divergence it exists for is stated in the usage docs. A real worker image writes that
+loop itself, and a bound handler cannot: an endless loop in a single Node.js process never yields to
+the test running it. So Yulin drives the loop and the binding supplies its body.
+
+`SimEcsContainerConsumer` is that body. It answers each poll with the caller to make it as, which is
+the task Role, the batch size the binding declared, and what to do with a batch: run the handler
+under the task Role and the container's environment, delete the batch when it returns, and leave the
+whole batch on the queue when it throws. Receiving and deleting carry the task Role explicitly rather
+than relying on the ambient caller, so a task Role without `sqs:DeleteMessage` behaves the way the
+deployed container would.
+
+`SimEcsServiceConsumers` holds one poller per service and container, not per task. That follows the
+decision the desired count already rests on: three tasks are state rather than three copies of a
+handler, so a handler is called once per poll however many tasks are reported running. Three real
+containers would each run their own loop and share the queue between them, which comes to the same
+messages being handled once.
+
+Polling starts when a service's first task comes up and stops when the service is deleted, scaled to
+nothing, or the simulated environment is closed, all of which reach `SimEcsServiceTasks`. A stopped
+poller leaves nothing watching the queue and no turn waiting on the clock, so a test finishing with a
+consuming service leaves nothing behind it.
+
+`SimEcsUnreachableConsumerQueues` is what a simulated ECS built on its own gets, so a consuming
+container there says what is missing rather than polling nothing.
 
 `SimEcsServiceStore` keys services by cluster and name together, because a service name is unique
 within a cluster on real ECS rather than across an Account.
@@ -307,8 +353,13 @@ under `cloudformation/resource/cfn/ecs/`, as the CloudFormation engine's own des
 - A task with no bound container stops with `TaskFailedToStart` rather than
   `EssentialContainerExited`. Nothing started, and saying so is what makes a binding that matches
   nothing visible.
-- A service's desired count is state rather than concurrency, and nothing calls a service container's
-  handler yet. The container is treated as running and left available for whatever reaches it.
+- A service's desired count is state rather than concurrency. A consuming container is polled for
+  once per service rather than once per task, and nothing serves a service container a request yet.
+- A consuming container's loop is Yulin's rather than the container's, so the binding supplies what
+  happens to a batch and nothing tries to run a loop written inside the user's own code. A container
+  can consume only a simulated SQS queue, in its own Account and Region.
+- A consuming container of a `RunTask` task records a not-simulated reason rather than running. It
+  has no handler that ends, and a run task has to end.
 - `CreateService` refuses a name an active service of the cluster already has, which is the opposite
   of what `CreateCluster` does with a name already taken. Real ECS refuses each of them that way.
 - `DeleteService` refuses a service still scaled above zero unless the request forces it, as real ECS

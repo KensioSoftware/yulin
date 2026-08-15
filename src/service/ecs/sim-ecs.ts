@@ -243,6 +243,27 @@ export class SimEcs {
    * });
    * ```
    *
+   * A container that consumes a queue declares that instead of a run handler.
+   * Yulin drives the polling loop while a service is running the container, and
+   * the binding supplies its body: a batch is received, handed over, and
+   * deleted when the handler returns.
+   *
+   * ```typescript
+   * simAws.ecs().bindContainer({
+   *   family: "orders-worker",
+   *   containerName: "app",
+   *   consumes: {
+   *     queueUrl: ordersQueueUrl,
+   *     batchSize: 10,
+   *     handler: async (messages) => {
+   *       for (const message of messages) {
+   *         await processOrder(JSON.parse(message.Body));
+   *       }
+   *     },
+   *   },
+   * });
+   * ```
+   *
    * Bindings belong to the Account and Region they were made in, as the task
    * definitions they target do, and can be made before or after the task
    * definition is registered.

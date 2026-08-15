@@ -35,6 +35,16 @@ export interface BackgroundScheduler extends SimClock {
    * happens on the simulation's timeline rather than the host's.
    */
   scheduleAt(dueTime: Date, task: BackgroundTask): void;
+
+  /**
+   * Give up on a task scheduled to happen once simulated time reaches an
+   * instant.
+   *
+   * Something that polls schedules its next turn on the clock, so whatever
+   * stops it takes that turn back off. A task that was never scheduled, or has
+   * already run, is nothing to give up on.
+   */
+  cancelScheduled(task: BackgroundTask): void;
 }
 
 interface BackgroundTasksProperties {
@@ -126,6 +136,13 @@ export class BackgroundTasks
    */
   scheduleAt(dueTime: Date, task: BackgroundTask): void {
     this.dueTasks.add(dueTime, task);
+  }
+
+  /**
+   * Give up on a task scheduled to happen at a simulated instant.
+   */
+  cancelScheduled(task: BackgroundTask): void {
+    this.dueTasks.cancel(task);
   }
 
   /**

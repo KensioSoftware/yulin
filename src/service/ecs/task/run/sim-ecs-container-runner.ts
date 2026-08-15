@@ -1,22 +1,16 @@
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsRunAsOwner } from "../../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsRunAsContext } from "../../../aws/caller/sim-aws-run-as-context.js";
 import type { SimEcsContainerBindings } from "../../bind/sim-ecs-container-bindings.js";
 import type { SimEcsContainerDefinition } from "../../task-definition/container/sim-ecs-container-definition.js";
 import type { SimEcsTask } from "../sim-ecs-task.js";
-import { SimEcsContainerEnvironment } from "./sim-ecs-container-environment.js";
+import { SimEcsContainerEnvironments } from "./sim-ecs-container-environments.js";
+import {
+  simEcsConsumingContainerReason,
+  simEcsContainerFailureReason,
+  simEcsNotSimulatedContainerReason,
+} from "./sim-ecs-container-reason.js";
 import type { SimEcsTaskOverrides } from "./sim-ecs-task-overrides.js";
-
-/**
- * What a container with no executable binding records instead of running.
- *
- * It is shared with the containers a service keeps running, because it is the
- * same thing happening to them: nothing here matches the container, so nothing
- * here runs it.
- */
-export const simEcsNotSimulatedContainerReason =
-  "Not simulated: no executable binding matches this container, so Yulin " +
-  "did not run it.";
+import { simEcsTaskPrincipal } from "./sim-ecs-task-principal.js";
 
 interface SimEcsContainerRunnerProperties {
   readonly bindings: SimEcsContainerBindings;
@@ -52,28 +46,15 @@ interface SimEcsContainerRunnerProperties {
  */
 export class SimEcsContainerRunner {
   private readonly bindings: SimEcsContainerBindings;
-  private readonly overrides: SimEcsTaskOverrides;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly taskRoleArn: string | undefined;
-  private readonly regionName: string;
+  private readonly environments: SimEcsContainerEnvironments;
 
   constructor(properties: SimEcsContainerRunnerProperties) {
     this.bindings = properties.bindings;
-    this.overrides = properties.overrides;
     this.runAsOwner = properties.runAsOwner;
     this.taskRoleArn = properties.taskRoleArn;
-    this.regionName = properties.regionName;
-  }
-
-  /**
-   * What a container reports as the reason it stopped.
-   */
-  private static reasonFor(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return String(error);
+    this.environments = new SimEcsContainerEnvironments(properties);
   }
 
   /**
@@ -92,50 +73,38 @@ export class SimEcsContainerRunner {
       return;
     }
 
+    if (bound.consumes !== undefined) {
+      container.neverStarted(simEcsConsumingContainerReason);
+      return;
+    }
+
     container.start();
 
     try {
       await this.asTaskRole(async () => {
-        await this.environmentFor(declared, secrets).runWith(async () => {
+        await this.environments.for(declared, secrets).runWith(async () => {
           await bound.runHandler();
         });
       });
       container.exited();
     } catch (error) {
-      container.failedWith(SimEcsContainerRunner.reasonFor(error));
+      container.failedWith(simEcsContainerFailureReason(error));
     }
-  }
-
-  private environmentFor(
-    declared: SimEcsContainerDefinition,
-    secrets: Record<string, string>,
-  ): SimEcsContainerEnvironment {
-    return new SimEcsContainerEnvironment({
-      regionName: this.regionName,
-      declared: declared.environment,
-      secrets,
-      overridden: this.overrides.environmentFor(declared.name),
-    });
   }
 
   /**
-   * The principal a container's AWS calls are attributed to.
+   * Run a container's handler as the task Role.
    *
-   * A task definition with no task Role runs anonymously rather than as
-   * whoever called `RunTask`. The caller's ambient principal is still set
-   * while the background work that runs the containers happens, and inheriting
-   * it would let a container do whatever the caller could: a test would pass
-   * on permissions the deployed task has no credentials for.
+   * The `RunTask` caller's ambient principal is still set while the background
+   * work that runs the containers happens, so a task definition with no task
+   * Role runs anonymously rather than inheriting it: a test would otherwise
+   * pass on permissions the deployed task has no credentials for.
    */
-  private principal(): SimAwsPrincipal {
-    if (this.taskRoleArn === undefined) {
-      return { kind: "anonymous" };
-    }
-
-    return { kind: "arn", arn: this.taskRoleArn };
-  }
-
   private async asTaskRole<T>(run: () => Promise<T>): Promise<T> {
-    return await simAwsRunAsContext.run(this.runAsOwner, this.principal(), run);
+    return await simAwsRunAsContext.run(
+      this.runAsOwner,
+      simEcsTaskPrincipal(this.taskRoleArn),
+      run,
+    );
   }
 }

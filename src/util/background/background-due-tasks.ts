@@ -60,6 +60,20 @@ export class BackgroundDueTasks {
   }
 
   /**
+   * Give up on every queued turn of a task.
+   *
+   * Something that polls schedules its next turn on the clock, so stopping it
+   * has to take that turn off the queue as well: leaving it there would leave a
+   * discarded simulation with work still waiting to happen.
+   */
+  cancel(task: BackgroundTask): void {
+    const remaining = this.queued.filter((queued) => queued.task !== task);
+
+    this.queued.length = 0;
+    this.queued.push(...remaining);
+  }
+
+  /**
    * See how many tasks are waiting for simulated time to reach them.
    */
   get size(): number {

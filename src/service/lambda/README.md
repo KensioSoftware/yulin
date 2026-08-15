@@ -268,31 +268,28 @@ whether the source has a starting position at all
 also the one place that decides which sources a mapping may name, so a refusal anywhere lists the
 same supported set.
 
-Real Lambda polls a queue continuously, and nothing in this simulation runs continuously, so the
-queue says when there is something to poll for. `SimSqsQueueActivity` (in sim SQS) holds the
-watchers on a queue, `SimSqsQueue.add` tells them a message has arrived, and
-`SimLambdaSqsEventSourcePoller` schedules a poll in response. A message moved to a dead-letter queue
-arrives the same way, so a mapping on a dead-letter queue is polled too.
+Polling a queue is not Lambda's own. `SimSqsQueuePoller`, in sim SQS under `poll/`, is the whole
+receive-hand-over-delete loop, and a mapping is one of the things that consumes a queue through it;
+a long-running ECS container is the other. `SimLambdaSqsEventSourceConsumer` is the Lambda half:
+it answers each poll with the session it runs in, which is the function to deliver to, the execution
+role to poll as, and the batch size the mapping was created with. A mapping still being created, a
+disabled one, and one whose function has gone all answer with no session, so the poll does nothing
+and the next one picks up where it left off. `SimLambdaEventSourcePollerFactory` is what wires the
+two together, so a mapping still hands `SimLambdaEventSourcePollers` something with `watch`,
+`pollNow` and `stop` on it, whichever kind of source it names.
 
-`SimLambdaEventSourcePollSchedule` decides when that poll happens. A message that is receivable now
-schedules a background task; one sent with a delay is scheduled for the instant it becomes
-receivable; and a batch that came back is scheduled for the end of its visibility timeout, on the
-clock, so advancing simulated time is what redelivers it. Scheduling a failed batch's retry on the
-clock even for a zero visibility timeout is deliberate: a poll that ran straight back round would
-spin on a batch the function keeps failing.
+What the shared poller does with a queue, and when, is described in
+[the sim SQS README](../sqs/README.md). What is worth knowing here is that a message moved to a
+dead-letter queue announces itself the same way an ordinary send does, so a mapping on a dead-letter
+queue is polled too.
 
-An announcement only reaches a mapping that was already watching, so a poll that finds nothing asks
-the queue when its earliest hidden message comes back and schedules itself for then. That is what
-delivers the messages a mapping was created alongside, rather than stranding a queue whose messages
-were all in flight when the mapping was made.
-
-`queue/` is the port onto SQS. `SimLambdaEventSourceQueues` is what polling needs from a queue, and
-`SimSqsEventSourceQueues` implements it over the ordinary SQS commands, as the function's execution
-role, so simulated IAM authorizes each poll the way real IAM does. A standalone `SimLambda` has no
-sim SQS, and `SimLambdaNoEventSourceQueues` refuses with guidance rather than silently delivering
-nothing. `SimLambdaSqsEventSourceArn` is the SQS member of the event source ARN union: it reads a
-queue ARN into the URL requests name it by and the Region event records report, and carries the
-queue's own polling permissions and batch size rules.
+`queue/` is what is left of the port onto SQS. `SimSqsEventSourceQueues` extends the shared
+`SimSqsCommandPollQueues` with the one thing that is Lambda's: real Lambda reads the source when a
+mapping is created, and reports a queue it cannot find as an invalid event source rather than as an
+SQS error. A standalone `SimLambda` has no sim SQS, and `SimLambdaNoEventSourceQueues` refuses with
+guidance rather than silently delivering nothing. `SimLambdaSqsEventSourceArn` is the SQS member of
+the event source ARN union: it reads a queue ARN into the URL requests name it by and the Region
+event records report, and carries the queue's own polling permissions and batch size rules.
 
 Creating a mapping checks what real Lambda checks before it will make one: that the event source
 exists, and that the execution role may perform the operations polling it takes
@@ -347,8 +344,8 @@ its guard tests are in
 Two polls must never overlap, which a queue mapping does not have to care about: a received message
 is hidden and a read record is not, so a second poll from the same checkpoint would deliver the same
 records twice. `SimLambdaEventSourcePollTurn` is the one-at-a-time guard, and it reschedules from
-its `finally` block rather than dropping a poll that was asked for mid-turn, because
-`SimLambdaEventSourcePollSchedule` clears its own flag when the task starts.
+its `finally` block rather than dropping a poll that was asked for mid-turn, because `PollSchedule`
+clears its own flag when the task starts.
 
 `SimLambdaStreamCascadeGuard` is what stops a function writing back into the table whose stream
 invoked it. The delivery runs inside an asynchronous context

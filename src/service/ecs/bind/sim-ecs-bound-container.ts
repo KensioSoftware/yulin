@@ -1,9 +1,9 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimCfnImageRepositoryTarget } from "../../cloudformation/bind/validate/sim-cfn-image-repository-target.js";
 import type { SimEcsContainerDefinition } from "../task-definition/container/sim-ecs-container-definition.js";
-import type {
-  SimEcsContainerBinding,
-  SimEcsContainerRunHandler,
-} from "./sim-ecs-container-binding.type.js";
+import { SimEcsBoundContainerWork } from "./sim-ecs-bound-container-work.js";
+import type { SimEcsBoundQueueConsumer } from "./sim-ecs-bound-queue-consumer.js";
+import type { SimEcsContainerBinding } from "./sim-ecs-container-binding.type.js";
 
 /**
  * One executable binding, read once and ready to be matched against.
@@ -22,7 +22,7 @@ export class SimEcsBoundContainer {
   public readonly containerName: string | undefined;
   public readonly imageRepository: string | undefined;
 
-  private readonly run: SimEcsContainerRunHandler;
+  private readonly work: SimEcsBoundContainerWork;
   private readonly repositoryTarget: SimCfnImageRepositoryTarget | undefined;
 
   constructor(binding: SimEcsContainerBinding) {
@@ -32,7 +32,7 @@ export class SimEcsBoundContainer {
     this.repositoryTarget = SimEcsBoundContainer.targetFor(
       binding.imageRepository,
     );
-    this.run = SimEcsBoundContainer.runHandler(binding);
+    this.work = new SimEcsBoundContainerWork(binding);
 
     this.refuseTargetlessBinding();
   }
@@ -48,32 +48,14 @@ export class SimEcsBoundContainer {
   }
 
   /**
-   * The run handler this binding supplied.
+   * The queue this binding consumes, where it consumes one.
    *
-   * An HTTP binding is refused rather than held. The shape it takes is
-   * settled, so a service container behind a load balancer will not have to
-   * renegotiate it, but nothing serves one yet and a binding that is never
-   * called is worse than one that says so.
+   * A consuming container is the one thing a service runs and a run task does
+   * not: it has no handler that ends, so there is nothing for `RunTask` to run
+   * to completion.
    */
-  private static runHandler(
-    binding: SimEcsContainerBinding,
-  ): SimEcsContainerRunHandler {
-    if (binding.http !== undefined) {
-      throw new Error(
-        "Invalid sim ECS container binding: an http handler is not simulated " +
-          "yet, since nothing serves a container. Bind a run handler and run " +
-          "the task with RunTask.",
-      );
-    }
-
-    if (typeof binding.run !== "function") {
-      throw new TypeError(
-        "Invalid sim ECS container binding: a binding needs a run handler, " +
-          "which is the function the container runs.",
-      );
-    }
-
-    return binding.run;
+  get consumes(): SimEcsBoundQueueConsumer | undefined {
+    return this.work.consumes;
   }
 
   /**
@@ -103,9 +85,21 @@ export class SimEcsBoundContainer {
 
   /**
    * Run this binding's handler.
+   *
+   * A consuming binding has none: what it supplies is the body of a loop
+   * something else drives, so there is nothing here for a task to run.
    */
   async runHandler(): Promise<void> {
-    await this.run();
+    const { run } = this.work;
+
+    assertDefined(
+      run,
+      "This sim ECS container binding consumes a queue, so it has no run " +
+        "handler. Create a service from the task definition to have Yulin " +
+        "poll the queue.",
+    );
+
+    await run();
   }
 
   private refuseTargetlessBinding(): void {

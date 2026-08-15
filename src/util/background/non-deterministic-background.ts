@@ -79,6 +79,13 @@ export class NonDeterministicBackgroundTasks
   }
 
   /**
+   * Give up on a task scheduled to happen at a simulated instant.
+   */
+  cancelScheduled(task: BackgroundTask): void {
+    this.dueTasks.cancel(task);
+  }
+
+  /**
    * Take the next task due at or before an instant, earliest first.
    */
   takeNextDueBy(instant: Date): BackgroundDueTask | undefined {

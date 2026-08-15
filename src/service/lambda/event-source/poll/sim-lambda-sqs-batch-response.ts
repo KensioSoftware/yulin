@@ -1,4 +1,4 @@
-import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollMessage } from "../../../sqs/poll/sim-sqs-poll-message.js";
 import { SimLambdaBatchItemFailures } from "./sim-lambda-batch-item-failures.js";
 import {
   SimLambdaEventSourceBatchOutcome,
@@ -27,7 +27,7 @@ export class SimLambdaSqsBatchResponse implements SimLambdaEventSourceBatchRespo
    * What became of a batch the function returned from.
    */
   handled(
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
     result: unknown,
   ): SimLambdaEventSourceBatchOutcome {
     const failedIds = this.batchItemFailures.idsIn(result);
@@ -50,14 +50,14 @@ export class SimLambdaSqsBatchResponse implements SimLambdaEventSourceBatchRespo
    * What becomes of a batch the function threw on: the whole of it goes back.
    */
   failed(
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
   ): SimLambdaEventSourceBatchOutcome {
     return new SimLambdaEventSourceBatchOutcome([], messages);
   }
 
   private namesBatchMessages(
     failedIds: readonly string[],
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
   ): boolean {
     return failedIds.every((failedId) =>
       messages.some((message) => message.MessageId === failedId),

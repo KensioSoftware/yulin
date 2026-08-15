@@ -1,30 +1,32 @@
-import type {
-  BackgroundScheduler,
-  BackgroundTask,
-} from "../../../../util/background/background.js";
+import type { BackgroundScheduler, BackgroundTask } from "./background.js";
 
 const millisecondsPerSecond = 1000;
 
-interface SimLambdaEventSourcePollScheduleProperties {
+interface PollScheduleProperties {
   readonly background: BackgroundScheduler;
   readonly poll: BackgroundTask;
 }
 
 /**
- * When one event source mapping polls next.
+ * When one simulated consumer polls next.
  *
- * Real Lambda polls its queue continuously, and nothing in this simulation runs
- * continuously, so every poll is scheduled in response to something: a message
- * arriving, a batch coming back, or a batch that filled the request suggesting
- * there is more waiting.
+ * A real consumer polls its source continuously, and nothing in this simulation
+ * runs continuously, so every poll is scheduled in response to something: a
+ * message arriving, a batch coming back, or a batch that filled the request
+ * suggesting there is more waiting.
+ *
+ * It lives here rather than with any one consumer because a queue poller, a
+ * stream poller and a container consuming a queue all want the same three
+ * answers to when to look again, and all three get them from the simulation's
+ * background scheduler rather than from a timer.
  */
-export class SimLambdaEventSourcePollSchedule {
+export class PollSchedule {
   private readonly background: BackgroundScheduler;
   private readonly poll: BackgroundTask;
 
   private scheduled = false;
 
-  constructor(properties: SimLambdaEventSourcePollScheduleProperties) {
+  constructor(properties: PollScheduleProperties) {
     this.background = properties.background;
     this.poll = properties.poll;
   }
@@ -66,7 +68,7 @@ export class SimLambdaEventSourcePollSchedule {
    *
    * Advancing time is what brings a returned batch back, so this is scheduled
    * on the clock even for a timeout of zero. A poll that ran straight back
-   * round would spin on a batch the function keeps failing.
+   * round would spin on a batch the consumer keeps failing.
    */
   afterSeconds(seconds: number): void {
     this.background.scheduleAt(
@@ -75,5 +77,16 @@ export class SimLambdaEventSourcePollSchedule {
       ),
       this.poll,
     );
+  }
+
+  /**
+   * Give up whatever turn was waiting on the clock.
+   *
+   * A poller stopped while a turn was scheduled would otherwise leave that turn
+   * queued for a simulation nothing is consuming any more, so a test asking
+   * what a discarded environment left behind would find work waiting.
+   */
+  stop(): void {
+    this.background.cancelScheduled(this.poll);
   }
 }

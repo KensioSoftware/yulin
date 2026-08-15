@@ -2,7 +2,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimLambdaEventSourceQueues } from "../../event-source/queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollQueues } from "../../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceStreams } from "../../event-source/stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaEventSourceMapping } from "../../event-source/sim-lambda-event-source-mapping.js";
 import { SimLambdaEventSourceMappingStore } from "../../event-source/sim-lambda-event-source-mapping-store.js";
@@ -28,7 +28,7 @@ import type {
 interface SimLambdaEventSourceMappingCommandsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly pollers: SimLambdaEventSourcePollers;
-  readonly queues: SimLambdaEventSourceQueues;
+  readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
   readonly functions: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
