@@ -291,8 +291,8 @@ describe("ECS CloudFormation property reading", () => {
     );
   });
 
-  it("skips an ECS Resource type nothing creates yet", async () => {
-    // Given a template declaring a service, which follows separately.
+  it("skips an ECS Resource type nothing creates", async () => {
+    // Given a template declaring capacity, which there is none of here.
     const simAws = new SimAws();
 
     // When it is deployed.
@@ -300,9 +300,9 @@ describe("ECS CloudFormation property reading", () => {
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersService: {
-            Type: "AWS::ECS::Service",
-            Properties: { ServiceName: "orders" },
+          OrdersCapacity: {
+            Type: "AWS::ECS::CapacityProvider",
+            Properties: { Name: "orders" },
           },
         },
       },
@@ -314,14 +314,14 @@ describe("ECS CloudFormation property reading", () => {
     // teardown steps over it.
     assertArrayLength(stack.skippedResources, 1);
     assertStringIncludes(
-      stack.resources.get("OrdersService")?.skippedReason ?? "",
-      "Unsupported sim ECS CloudFormation Resource Service",
+      stack.resources.get("OrdersCapacity")?.skippedReason ?? "",
+      "Unsupported sim ECS CloudFormation Resource CapacityProvider",
     );
 
     await stack.teardown();
 
     assertIdentical(
-      stack.resources.get("OrdersService")?.status,
+      stack.resources.get("OrdersCapacity")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -331,8 +331,8 @@ describe("ECS CloudFormation property reading", () => {
     // would have skipped rather than created.
     const simAws = new SimAws();
     const resource = new SimCfnResource({
-      logicalId: "OrdersService",
-      template: { Type: "AWS::ECS::Service" },
+      logicalId: "OrdersCapacity",
+      template: { Type: "AWS::ECS::CapacityProvider" },
     });
 
     // When its deletion is asked for directly, then it is refused, which is
@@ -341,12 +341,12 @@ describe("ECS CloudFormation property reading", () => {
       await simAws
         .ecs()
         .cfnResourceFactory()
-        .delete("Service", resource, { simAws, resources: new Map() });
+        .delete("CapacityProvider", resource, { simAws, resources: new Map() });
     });
 
     assertStringIncludes(
       error.message,
-      "Unsupported sim ECS CloudFormation Resource Service deletion",
+      "Unsupported sim ECS CloudFormation Resource CapacityProvider deletion",
     );
   });
 

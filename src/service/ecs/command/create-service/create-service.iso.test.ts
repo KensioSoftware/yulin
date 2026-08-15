@@ -233,6 +233,45 @@ describe("ECS CreateServiceCommand", () => {
     assertArrayLength(listed.taskArns, 1);
   });
 
+  it("records the load balancers the service was created with", async () => {
+    // Given a registered task definition.
+    const simAws = new SimAws();
+    const ecs = simAws.ecs();
+    await simEcsClusterFactory.make({}, simAws);
+    await ecs.registerTaskDefinition(
+      new RegisterTaskDefinitionCommand({
+        family: "checkout",
+        containerDefinitions: [{ name: "app", image: "checkout:1" }],
+      }),
+    );
+
+    // When a service is created behind a load balancer target group.
+    const targetGroupArn =
+      "arn:aws:elasticloadbalancing:us-east-1:888888888888:targetgroup/checkout/73e2d6bc";
+    const created = await ecs.createService(
+      new CreateServiceCommand({
+        serviceName: "checkout",
+        taskDefinition: "checkout",
+        desiredCount: 1,
+        loadBalancers: [
+          { targetGroupArn, containerName: "app", containerPort: 8080 },
+        ],
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the declaration is reported back and held on the service, since
+    // nothing here sends a service container a request yet.
+    assertIdentical(
+      created.service?.loadBalancers?.[0]?.targetGroupArn,
+      targetGroupArn,
+    );
+    assertIdentical(
+      ecs.service("checkout").loadBalancers[0]?.containerPort,
+      8080,
+    );
+  });
+
   it("names the service by the cluster it was created in", async () => {
     // Given a registered task definition and two clusters.
     const simAws = new SimAws();

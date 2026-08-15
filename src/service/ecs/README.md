@@ -303,11 +303,11 @@ command instances.
 
 ## CloudFormation
 
-`cfn/` holds what deploys `AWS::ECS::Cluster` and `AWS::ECS::TaskDefinition`, under the rule the
-CloudFormation engine works by: CloudFormation orchestrates and the service creates. Both go through
-the ordinary `CreateCluster` and `RegisterTaskDefinition` commands rather than constructing state
-directly, so a Resource a template deployed is the same thing an SDK caller would have got, refusals
-included.
+`cfn/` holds what deploys `AWS::ECS::Cluster`, `AWS::ECS::TaskDefinition` and `AWS::ECS::Service`,
+under the rule the CloudFormation engine works by: CloudFormation orchestrates and the service
+creates. All three go through the ordinary `CreateCluster`, `RegisterTaskDefinition` and
+`CreateService` commands rather than constructing state directly, so a Resource a template deployed
+is the same thing an SDK caller would have got, refusals included.
 
 `property/sim-cfn-ecs-api-shape.ts` is the piece with the most in it. CloudFormation writes an ECS
 declaration in the API's own shape with the first letter of every name upper cased, so translating
@@ -327,8 +327,16 @@ naming the task definition Resource is turned into the family the registration m
 ID means nothing to ECS. Only bindings that target this Resource are applied, so a stack declaring
 several task definitions does not bind one handler to all of them.
 
-The two Resource types' `Ref` and `Fn::GetAtt` answers live with the other services' value adapters,
-under `cloudformation/resource/cfn/ecs/`, as the CloudFormation engine's own design has them.
+`service/` deploys `AWS::ECS::Service`. A service is mostly the two things it names, and both arrive
+already resolved: a `Ref` to a cluster is its name and a `Ref` to a task definition is the ARN of the
+revision the deployment registered, which is why the service pins that revision rather than following
+the family. `LoadBalancers` is read and held on the service without being acted on, since nothing
+serves a service container a request yet, and the rest of what a real service declares is recorded as
+ignored rather than failing the stack.
+
+The three Resource types' `Ref` and `Fn::GetAtt` answers live with the other services' value
+adapters, under `cloudformation/resource/cfn/ecs/`, as the CloudFormation engine's own design has
+them.
 
 ## Divergences worth knowing
 

@@ -10,6 +10,22 @@ import type { SimArn } from "../../aws/arn.js";
 export type SimEcsServiceStatus = "ACTIVE" | "INACTIVE";
 
 /**
+ * One load balancer a service declared it is registered with.
+ *
+ * Nothing here sends a service a request yet, so this is held as it was
+ * declared rather than acted on: it is what a load balancer target group has
+ * to read to find the service that answers for it.
+ *
+ * https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LoadBalancer.html
+ */
+export interface SimEcsServiceLoadBalancer {
+  readonly targetGroupArn?: string | undefined;
+  readonly loadBalancerName?: string | undefined;
+  readonly containerName?: string | undefined;
+  readonly containerPort?: number | undefined;
+}
+
+/**
  * Minimal structural sim ECS described service.
  *
  * https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html
@@ -25,7 +41,7 @@ export interface SimEcsServiceDetail {
   readonly taskDefinition?: SimArn | undefined;
   readonly launchType?: string | undefined;
   readonly schedulingStrategy?: string | undefined;
-  readonly loadBalancers?: readonly object[] | undefined;
+  readonly loadBalancers?: readonly SimEcsServiceLoadBalancer[] | undefined;
   readonly serviceRegistries?: readonly object[] | undefined;
   readonly createdAt?: Date | undefined;
   readonly createdBy?: string | undefined;
