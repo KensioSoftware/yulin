@@ -24,7 +24,8 @@ interface SimEcsAuthorizerProperties {
  *
  * ECS splits its operations by the resource type each action takes.
  * `DescribeClusters` and `DeleteCluster` take a cluster, `RunTask` takes the
- * task definition it runs, and `DescribeTasks` and `StopTask` take the task.
+ * task definition it runs, `DescribeTasks` and `StopTask` take the task, and
+ * the service operations take the service.
  * The operations that read or write a task definition, along with
  * `CreateCluster`, `ListClusters` and `ListTasks`, have no resource type at
  * all, so they authorize against `*`.
@@ -67,6 +68,21 @@ export class SimEcsAuthorizer {
     options?: SimEcsRequestOptions,
   ): SimAwsResolvedCaller {
     return this.authorizeResource(action, taskArn, options);
+  }
+
+  /**
+   * Ensure the caller may perform an action on a service, named by its ARN.
+   *
+   * The service need not exist, as the cluster need not for a cluster action.
+   * `CreateService` authorizes against the ARN the service is about to have,
+   * which is what real ECS does with it.
+   */
+  authorizeService(
+    action: string,
+    serviceArn: string,
+    options?: SimEcsRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, serviceArn, options);
   }
 
   /**

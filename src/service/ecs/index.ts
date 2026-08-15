@@ -85,6 +85,22 @@ export {
   type SimEcsTaskListing,
 } from "./task/sim-ecs-task-store.js";
 export {
+  simEcsReplicaSchedulingStrategy,
+  SimEcsService,
+} from "./service/sim-ecs-service.js";
+export type {
+  SimEcsServiceDetail,
+  SimEcsServiceStatus,
+} from "./service/sim-ecs-service-detail.js";
+export { SimEcsServiceTaskSet } from "./service/sim-ecs-service-task-set.js";
+export {
+  SimEcsServiceArn,
+  type SimEcsNamedService,
+} from "./service/sim-ecs-service-arn.js";
+export { SimEcsServiceStore } from "./service/sim-ecs-service-store.js";
+export { SimEcsServiceTasks } from "./service/run/sim-ecs-service-tasks.js";
+export type { SimEcsServiceDeployment } from "./service/run/sim-ecs-service-deployment.js";
+export {
   SimEcsTaskOverrides,
   type SimEcsContainerOverrideType,
   type SimEcsTaskOverrideType,
@@ -104,4 +120,5 @@ export {
   SimEcsClusterNotFoundException,
   SimEcsError,
   SimEcsInvalidParameterException,
+  SimEcsServiceNotFoundException,
 } from "./error/sim-ecs.error.js";

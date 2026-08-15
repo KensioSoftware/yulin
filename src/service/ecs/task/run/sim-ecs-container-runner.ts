@@ -9,8 +9,12 @@ import type { SimEcsTaskOverrides } from "./sim-ecs-task-overrides.js";
 
 /**
  * What a container with no executable binding records instead of running.
+ *
+ * It is shared with the containers a service keeps running, because it is the
+ * same thing happening to them: nothing here matches the container, so nothing
+ * here runs it.
  */
-const notSimulatedReason =
+export const simEcsNotSimulatedContainerReason =
   "Not simulated: no executable binding matches this container, so Yulin " +
   "did not run it.";
 
@@ -84,7 +88,7 @@ export class SimEcsContainerRunner {
     const bound = this.bindings.find(task.family, declared);
 
     if (bound === undefined) {
-      container.neverStarted(notSimulatedReason);
+      container.neverStarted(simEcsNotSimulatedContainerReason);
       return;
     }
 

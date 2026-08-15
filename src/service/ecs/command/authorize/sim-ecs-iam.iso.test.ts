@@ -1,6 +1,8 @@
 import {
   CreateClusterCommand,
+  CreateServiceCommand,
   DeleteClusterCommand,
+  DeleteServiceCommand,
   DescribeClustersCommand,
   DescribeTaskDefinitionCommand,
   ListTaskDefinitionsCommand,
@@ -16,7 +18,9 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
+import { simEcsClusterFactory } from "../../cluster/sim-ecs-cluster.factory.js";
 import { SimEcsAccessDeniedException } from "../../error/sim-ecs.error.js";
+import { simEcsRegisteredTaskDefinitionFactory } from "../../task-definition/sim-ecs-registered-task-definition.factory.js";
 
 describe("Authorizing simulated ECS requests", () => {
   it("allows a caller whose policy permits the registration", async () => {
@@ -171,6 +175,75 @@ describe("Authorizing simulated ECS requests", () => {
 
     assertInstanceOf(error, SimEcsAccessDeniedException);
     assertStringIncludes(error.message, "cluster/batch");
+  });
+
+  it("authorizes a service operation against the service ARN", async () => {
+    // Given a Role allowed to create one named service.
+    const simAws = new SimAws();
+    const serviceArn = `arn:aws:ecs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:service/default/checkout`;
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "Deployer",
+        actions: ["ecs:CreateService"],
+        resource: serviceArn,
+      },
+      simAws,
+    );
+    await simEcsClusterFactory.make({}, simAws);
+    await simEcsRegisteredTaskDefinitionFactory.make({}, simAws);
+
+    // When it creates that service.
+    const created = await simAws.ecs().createService(
+      new CreateServiceCommand({
+        serviceName: "checkout",
+        taskDefinition: "checkout",
+        desiredCount: 1,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
+    );
+
+    // Then it is allowed, and the service records who created it.
+    assertIdentical(created.service?.createdBy, role.Arn);
+
+    // And a service its policy does not name is refused.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.ecs().createService(
+        new CreateServiceCommand({
+          serviceName: "orders",
+          taskDefinition: "checkout",
+          desiredCount: 1,
+        }),
+        { caller: { kind: "arn", arn: role.Arn } },
+      ),
+    );
+
+    assertInstanceOf(error, SimEcsAccessDeniedException);
+    assertStringIncludes(error.message, "service/default/orders");
+
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("refuses a service deletion before finding out if it is there", async () => {
+    // Given a Role allowed nothing in ECS.
+    const simAws = new SimAws();
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Nobody", actions: ["s3:GetObject"] },
+      simAws,
+    );
+
+    // When it deletes a service that does not exist.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .ecs()
+        .deleteService(new DeleteServiceCommand({ service: "checkout" }), {
+          caller: { kind: "arn", arn: role.Arn },
+        }),
+    );
+
+    // Then the answer is the access denial, so nothing is learned about what
+    // the cluster holds.
+    assertInstanceOf(error, SimEcsAccessDeniedException);
+    assertStringIncludes(error.message, "ecs:DeleteService");
   });
 
   it("refuses a cluster deletion before finding out if it is there", async () => {

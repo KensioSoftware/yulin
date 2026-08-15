@@ -14,6 +14,7 @@ export interface SimEcsTaskListing {
   readonly family?: string | undefined;
   readonly startedBy?: string | undefined;
   readonly launchType?: string | undefined;
+  readonly serviceName?: string | undefined;
 }
 
 /**
@@ -36,7 +37,8 @@ export class SimEcsTaskStore {
       task.desiredStatus === listing.desiredStatus &&
       this.matchesOptional(task.family, listing.family) &&
       this.matchesOptional(task.startedBy, listing.startedBy) &&
-      this.matchesOptional(task.launchType, listing.launchType)
+      this.matchesOptional(task.launchType, listing.launchType) &&
+      this.matchesOptional(task.serviceName, listing.serviceName)
     );
   }
 

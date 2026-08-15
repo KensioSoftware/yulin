@@ -118,6 +118,38 @@ export class SimEcsSdkCommandRouter implements SimSdkCommandRouter {
             simSdkCallerOptions(context),
           ),
       ],
+      [
+        "CreateServiceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEcs.createService(
+            command as simEcsCommands.SimCreateServiceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateServiceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEcs.updateService(
+            command as simEcsCommands.SimUpdateServiceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeServicesCommand",
+        async (command, context): Promise<unknown> =>
+          await simEcs.describeServices(
+            command as simEcsCommands.SimDescribeServicesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteServiceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEcs.deleteService(
+            command as simEcsCommands.SimDeleteServiceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
     ]);
   }
 

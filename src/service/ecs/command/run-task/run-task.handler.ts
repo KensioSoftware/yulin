@@ -1,11 +1,11 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimEcsCluster } from "../../cluster/sim-ecs-cluster.js";
-import { SimEcsClientException } from "../../error/sim-ecs.error.js";
 import { SimEcsTaskRunner } from "../../task/run/sim-ecs-task-runner.js";
 import { SimEcsTaskFactory } from "../../task/sim-ecs-task-factory.js";
 import type { SimEcsTaskStore } from "../../task/sim-ecs-task-store.js";
 import type { SimEcsTask } from "../../task/sim-ecs-task.js";
+import { requiredRunnableTaskDefinition } from "../../task-definition/sim-ecs-runnable-task-definition.js";
 import type { SimEcsTaskDefinitionStore } from "../../task-definition/sim-ecs-task-definition-store.js";
 import type { SimEcsTaskDefinition } from "../../task-definition/sim-ecs-task-definition.js";
 import type { SimEcsRunTaskCommandContext } from "../sim-ecs-command-context.js";
@@ -95,7 +95,7 @@ export class RunTaskCommandHandler
     await this.sequence();
 
     const cluster = this.requestedCluster.active(command.input.cluster);
-    const taskDefinition = this.runnable(
+    const taskDefinition = requiredRunnableTaskDefinition(
       this.taskDefinitions.resolve(request.taskDefinitionId),
     );
     request.overrides.refuseUnknownContainers(taskDefinition.containers);
@@ -138,24 +138,5 @@ export class RunTaskCommandHandler
     });
 
     return task;
-  }
-
-  /**
-   * The revision to run, which has to be one that is still registered.
-   *
-   * Real ECS refuses to run a revision that has been deregistered, and it is
-   * worth refusing here: a deregistered revision is one nothing is meant to
-   * start from any more.
-   */
-  private runnable(taskDefinition: SimEcsTaskDefinition): SimEcsTaskDefinition {
-    if (!taskDefinition.isActive()) {
-      throw new SimEcsClientException(
-        `Task definition ${taskDefinition.family}:` +
-          `${String(taskDefinition.revision)} is INACTIVE, so no task can be ` +
-          `run from it.`,
-      );
-    }
-
-    return taskDefinition;
   }
 }

@@ -67,3 +67,23 @@ export type {
   SimStopTaskCommandInput,
   SimStopTaskCommandOutput,
 } from "./stop-task/stop-task.command.js";
+export type {
+  SimCreateServiceCommand,
+  SimCreateServiceCommandInput,
+  SimCreateServiceCommandOutput,
+} from "./create-service/create-service.command.js";
+export type {
+  SimUpdateServiceCommand,
+  SimUpdateServiceCommandInput,
+  SimUpdateServiceCommandOutput,
+} from "./update-service/update-service.command.js";
+export type {
+  SimDescribeServicesCommand,
+  SimDescribeServicesCommandInput,
+  SimDescribeServicesCommandOutput,
+} from "./describe-services/describe-services.command.js";
+export type {
+  SimDeleteServiceCommand,
+  SimDeleteServiceCommandInput,
+  SimDeleteServiceCommandOutput,
+} from "./delete-service/delete-service.command.js";

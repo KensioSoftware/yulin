@@ -4,6 +4,9 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import type { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import type { SimEcsServiceTasks } from "../service/run/sim-ecs-service-tasks.js";
+import type { SimEcsServiceArn } from "../service/sim-ecs-service-arn.js";
+import type { SimEcsServiceStore } from "../service/sim-ecs-service-store.js";
 import type { SimEcsSecretStores } from "../task/run/secret/sim-ecs-secret-stores.js";
 import type { SimEcsTaskArn } from "../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../task/sim-ecs-task-store.js";
@@ -67,4 +70,21 @@ export interface SimEcsRunTaskCommandContext extends SimEcsTaskCommandContext {
   readonly bindings: SimEcsContainerBindings;
   readonly runAsOwner: SimAwsRunAsOwner;
   readonly secretStores: SimEcsSecretStores;
+}
+
+/**
+ * What a simulated ECS service command handler is built with.
+ *
+ * A service operation reaches the task state a task operation does, because a
+ * service is a number of tasks kept running, and the task definitions because
+ * that is what it keeps running. What starts and stops those tasks is built
+ * once and shared, since the service that is closed holds the same tasks the
+ * one that was updated does.
+ */
+export interface SimEcsServiceCommandContext extends SimEcsTaskCommandContext {
+  readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly taskDefinitions: SimEcsTaskDefinitionStore;
+  readonly services: SimEcsServiceStore;
+  readonly serviceArn: SimEcsServiceArn;
+  readonly serviceTasks: SimEcsServiceTasks;
 }

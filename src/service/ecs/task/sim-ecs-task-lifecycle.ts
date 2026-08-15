@@ -50,6 +50,13 @@ export class SimEcsTaskLifecycle {
   }
 
   /**
+   * Where the task has actually got to.
+   */
+  get lastStatus(): SimEcsTaskStatus {
+    return this.#lastStatus;
+  }
+
+  /**
    * Whether the task has already finished.
    */
   get isStopped(): boolean {
