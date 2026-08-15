@@ -23,7 +23,8 @@ exactly as declared.
 
 Where this does not work is a sidecar the application depends on, such as a Redis or a database in
 the same task. Yulin does not simulate that. The connection details are ordinary environment
-variables, so point them at a real one you run yourself.
+variables, so point them at a real one you run yourself. See
+[non-AWS dependencies](../../non-aws-dependencies/README.md) for how that fits together.
 
 ## Registering a task definition
 
