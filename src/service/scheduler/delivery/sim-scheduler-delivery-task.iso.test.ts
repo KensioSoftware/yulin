@@ -328,22 +328,33 @@ describe("Scheduler ECS target", () => {
   });
 
   it("refuses an ECS ARN that names no cluster", async () => {
-    const simAws = await simulationAllowedToRunTasks();
+    // Given a task definition ARN and a task ARN, which are both well formed
+    // ECS ARNs and neither of which names a cluster. The second reads as one
+    // for as long as nothing looks past the name, since a task's resource
+    // starts `task/<cluster>/`.
+    const arns = [
+      "arn:aws:ecs:us-east-1:888888888888:task-definition/x:1",
+      "arn:aws:ecs:us-east-1:888888888888:task/default/2f1c",
+    ];
 
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.scheduler().createSchedule(
-        new CreateScheduleCommand({
-          Name: "nightly-import",
-          ScheduleExpression: "rate(1 day)",
-          FlexibleTimeWindow: { Mode: "OFF" },
-          Target: importTarget({
-            Arn: "arn:aws:ecs:us-east-1:888888888888:task-definition/x:1",
+    for (const Arn of arns) {
+      // oxlint-disable-next-line no-await-in-loop
+      const simAws = await simulationAllowedToRunTasks();
+      // oxlint-disable-next-line no-await-in-loop
+      const error = await assertThrowsErrorAsync(async () => {
+        await simAws.scheduler().createSchedule(
+          new CreateScheduleCommand({
+            Name: "nightly-import",
+            ScheduleExpression: "rate(1 day)",
+            FlexibleTimeWindow: { Mode: "OFF" },
+            Target: importTarget({ Arn }),
           }),
-        }),
-      );
-    });
+        );
+      });
 
-    assertInstanceOf(error, SimSchedulerValidationException);
-    assertStringIncludes(error.message, "names no cluster");
+      // Then each is refused when the schedule is created.
+      assertInstanceOf(error, SimSchedulerValidationException);
+      assertStringIncludes(error.message, "names no cluster");
+    }
   });
 });

@@ -8,7 +8,9 @@ corner of it. The two look similar from a distance and differ in every detail th
 separate SDK client, an ARN carrying a schedule group, `CreateSchedule` conflicting where `PutRule`
 replaces, a listing shaped differently from a describe, and an execution model built on an IAM role
 instead of a resource policy. Code sharing between them is therefore deliberate and narrow: the
-schedule expression parser, and nothing else.
+schedule expression parser, assuming a service role, and reading what a target says about an ECS
+task. The last two arrived with ECS targets, which both services reach the same way because ECS is
+the same service on the other side of them.
 
 ## Entry points
 

@@ -972,7 +972,7 @@ no permission for.
 - An ECS target's `Input` is read as the task's overrides rather than as something the target
   receives, so a `containerOverrides` list is how a rule sets a container's environment. A target
   with no `Input` runs the task with no overrides, and the matched event is not passed on in its
-  place. Real EventBridge does pass the event, which fails there for the same reason.
+  place.
 - A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
   for each of them, in this process and one after another.
 - An ECS target is refused in a CloudFormation template. `AWS::Events::Rule` still refuses a target

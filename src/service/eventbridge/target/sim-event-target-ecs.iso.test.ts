@@ -84,6 +84,37 @@ describe("EventBridge ECS target validation", () => {
     assertStringIncludes(error.message, "names no cluster");
   });
 
+  it("refuses a cluster ARN carrying more than the cluster name", async () => {
+    // Given a task ARN, whose resource starts `task/<cluster>/` and so reads
+    // as a cluster for as long as nothing looks past the name.
+    const error = await refusedTarget({
+      Id: "import",
+      Arn: "arn:aws:ecs:us-east-1:888888888888:task/orders/2f1c",
+      RoleArn: roleArn,
+      EcsParameters: { TaskDefinitionArn: "nightly" },
+    });
+
+    // Then it is refused rather than run against the cluster it names.
+    assertInstanceOf(error, SimEventBridgeValidationException);
+    assertStringIncludes(error.message, "names no cluster");
+  });
+
+  it("refuses a TaskDefinitionArn that is not a string", async () => {
+    // Given a target built somewhere the types are not checked, which is any
+    // template or plain JavaScript.
+    const error = await refusedTarget({
+      ...ecsTarget({ TaskDefinitionArn: "nightly" }),
+      EcsParameters: {
+        TaskDefinitionArn: 3,
+      } as unknown as Target["EcsParameters"],
+    });
+
+    // Then it is refused where it was written, rather than reaching the task
+    // definition reader as a type error a long way from its cause.
+    assertInstanceOf(error, SimEventBridgeValidationException);
+    assertStringIncludes(error.message, "TaskDefinitionArn is required");
+  });
+
   it("refuses an ECS target with no role to run the task as", async () => {
     const error = await refusedTarget({
       Id: "import",

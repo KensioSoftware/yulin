@@ -93,12 +93,15 @@ export class SimEcsTargetParameters {
 
     this.refuseUnaccepted(parameters, refuse);
 
-    const declared = parameters as SimEcsTargetParametersType;
+    // Copied rather than held by reference, the way a `RunTask` override is,
+    // since the caller owns what it passed in and this is read again every
+    // time the target runs and every time it is reported back.
+    const declared = structuredClone(parameters);
 
     return new this(
       declared,
-      this.taskDefinitionArnIn(declared.TaskDefinitionArn, refuse),
-      this.taskCountIn(declared.TaskCount, refuse),
+      this.taskDefinitionArnIn(declared["TaskDefinitionArn"], refuse),
+      this.taskCountIn(declared["TaskCount"], refuse),
     );
   }
 
@@ -124,14 +127,23 @@ export class SimEcsTargetParameters {
     }
   }
 
+  /**
+   * The task definition the target runs, which has to be named as a string.
+   *
+   * The type is checked as well as the value because these arrive as `unknown`:
+   * a target written in a template, or in JavaScript, can carry a number or a
+   * null here, and one of those reaching the task definition reader is a type
+   * error a long way from the target that caused it.
+   */
   private static taskDefinitionArnIn(
-    value: string | undefined,
+    value: unknown,
     refuse: (reason: string) => Error,
   ): string {
-    if (value === undefined || value === "") {
+    if (typeof value !== "string" || value === "") {
       throw refuse(
-        "EcsParameters TaskDefinitionArn is required: a target that runs a " +
-          "task says which task definition it runs",
+        "EcsParameters TaskDefinitionArn is required, as a family, a " +
+          "family:revision or an ARN: a target that runs a task says which " +
+          "task definition it runs",
       );
     }
 
@@ -139,14 +151,19 @@ export class SimEcsTargetParameters {
   }
 
   private static taskCountIn(
-    value: number | undefined,
+    value: unknown,
     refuse: (reason: string) => Error,
   ): number {
     if (value === undefined) {
       return defaultTaskCount;
     }
 
-    if (!Number.isSafeInteger(value) || value < 1 || value > maximumTaskCount) {
+    if (
+      typeof value !== "number" ||
+      !Number.isSafeInteger(value) ||
+      value < 1 ||
+      value > maximumTaskCount
+    ) {
       throw refuse(
         `EcsParameters TaskCount is a whole number from 1 to ${String(
           maximumTaskCount,

@@ -603,8 +603,11 @@ and both then run a task here when the rule matches an event or the schedule fal
 usual shape of a nightly batch job or an import kicked off by something happening.
 
 Both go through `RunTask`, so a task started that way is the same task as one started by a caller:
-the same cluster and revision lookups, the same refusals, the same IAM decision against
-`ecs:RunTask`, and the same task state afterwards. The difference is who runs it. A rule or a
+the same cluster and revision lookups, the same IAM decision against `ecs:RunTask`, and the same
+task state afterwards. What a target may ask for is not the same, though. `EcsParameters` takes and
+ignores the launch type, platform version, network configuration and capacity provider strategy that
+`RunTask` refuses, since a target written for real AWS carries them and refusing one would make an
+otherwise workable target unusable. The other difference is who runs it. A rule or a
 schedule runs the task as the role on its target, so that role needs `ecs:RunTask` on the revision,
 and the task role inside the task definition is still what the containers' own AWS calls are
 attributed to.

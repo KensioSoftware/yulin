@@ -169,15 +169,21 @@ export class SimSchedulerTargetArn {
    * The name of the ECS cluster this ARN names, or nothing when it names
    * something else in ECS.
    *
-   * A cluster ARN's resource is `cluster/<name>`, with a slash rather than the
-   * colon Lambda uses. The resource type is checked rather than assumed for the
-   * same reason: a task definition is `task-definition/<family>:<revision>` and
-   * a task is `task/<cluster>/<id>`, and taking the part after the slash would
-   * read either as a cluster that is not there.
+   * A cluster ARN's resource is `cluster/<name>` exactly, with a slash rather
+   * than the colon Lambda uses. Both the resource type and there being nothing
+   * after the name are checked rather than assumed, because ECS writes more
+   * than clusters this way: a task definition is
+   * `task-definition/<family>:<revision>` and a task is `task/<cluster>/<id>`,
+   * and reading the first two segments alone would take a task ARN for the
+   * cluster it runs in.
    */
   get clusterName(): string {
-    const [resourceType, name = ""] = this.resource.split("/", 2);
+    const [resourceType, name = "", beyond] = this.resource.split("/", 3);
 
-    return resourceType === "cluster" ? name : "";
+    if (resourceType !== "cluster" || beyond !== undefined) {
+      return "";
+    }
+
+    return name;
   }
 }
