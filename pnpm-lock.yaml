@@ -21,6 +21,12 @@ importers:
       '@aws-crypto/sha256-js':
         specifier: ^5.2.0
         version: 5.2.0
+      '@aws-lambda-powertools/logger':
+        specifier: ^2.34.0
+        version: 2.34.0
+      '@aws-lambda-powertools/metrics':
+        specifier: ^2.34.0
+        version: 2.34.0
       '@aws-sdk/client-acm':
         specifier: ^3.1101.0
         version: 3.1105.0
@@ -144,6 +150,9 @@ importers:
       conventional-changelog-conventionalcommits:
         specifier: 9.3.1
         version: 9.3.1
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       eslint:
         specifier: ^10.8.0
         version: 10.8.1(jiti@2.7.0)(supports-color@7.2.0)
@@ -223,6 +232,28 @@ packages:
 
   '@aws-crypto/util@5.2.0':
     resolution: {integrity: sha512-4RkU9EsI6ZpBve5fseQlGNUWKMa1RLPQ1dnjnQoe07ldfIzcsGb5hC5W0Dm7u423KWzawlrpbjXBrXCEv9zazQ==}
+
+  '@aws-lambda-powertools/commons@2.34.0':
+    resolution: {integrity: sha512-ga89L3UznCwkApsrVAYGywifAh9PpccXZAVE053B6IdKvZrwjv+L+ja1WyzU9sy9UR3wPEdh0LFiUCRZRhTfvQ==}
+
+  '@aws-lambda-powertools/logger@2.34.0':
+    resolution: {integrity: sha512-FIWQcdX/dqfKE+4H8N9w7y7/3/ANmDpKDgMlMc+yPNx2XDpKK6Ou1zLFYoNt5mV6dOZunFQcKbRWUy6zIDdE0w==}
+    peerDependencies:
+      '@aws-lambda-powertools/jmespath': 2.34.0
+      '@middy/core': 4.x || 5.x || 6.x || 7.x
+    peerDependenciesMeta:
+      '@aws-lambda-powertools/jmespath':
+        optional: true
+      '@middy/core':
+        optional: true
+
+  '@aws-lambda-powertools/metrics@2.34.0':
+    resolution: {integrity: sha512-nY2ZdyoZVV5jsa9boeDhDn18pff0K/RBsj6mpb44jiA3IRCTMx5va6AY1SMskjFS1GzF9FIOV4NprQP9YsFL2g==}
+    peerDependencies:
+      '@middy/core': 4.x || 5.x || 6.x || 7.x
+    peerDependenciesMeta:
+      '@middy/core':
+        optional: true
 
   '@aws-sdk/checksums@3.1000.27':
     resolution: {integrity: sha512-insWOqKKNUrbN/dohEG7BJ0U5GkyqhjbMb/NHNaLUtq+7my2M8C4EnZZZoxMmXRqCC+P9dEr+KyJA2JGGzoKLg==}
@@ -3394,6 +3425,20 @@ snapshots:
       '@aws-sdk/types': 3.974.2
       '@smithy/util-utf8': 2.3.0
       tslib: 2.8.1
+
+  '@aws-lambda-powertools/commons@2.34.0':
+    dependencies:
+      '@aws/lambda-invoke-store': 0.3.0
+
+  '@aws-lambda-powertools/logger@2.34.0':
+    dependencies:
+      '@aws-lambda-powertools/commons': 2.34.0
+      '@aws/lambda-invoke-store': 0.3.0
+
+  '@aws-lambda-powertools/metrics@2.34.0':
+    dependencies:
+      '@aws-lambda-powertools/commons': 2.34.0
+      '@aws/lambda-invoke-store': 0.3.0
 
   '@aws-sdk/checksums@3.1000.27':
     dependencies:
