@@ -55,6 +55,40 @@ export type {
   SimEcsSecret,
   SimEcsUlimit,
 } from "./task-definition/container/sim-ecs-container-parts.js";
+export type {
+  SimEcsContainerBinding,
+  SimEcsContainerBindingHandler,
+  SimEcsContainerBindingTarget,
+  SimEcsContainerHttpHandler,
+  SimEcsContainerRunHandler,
+} from "./bind/sim-ecs-container-binding.type.js";
+export { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
+export { SimEcsBoundContainer } from "./bind/sim-ecs-bound-container.js";
+export { SimEcsTask } from "./task/sim-ecs-task.js";
+export type {
+  SimEcsTaskDesiredStatus,
+  SimEcsTaskDetail,
+  SimEcsTaskStatus,
+  SimEcsTaskStopCode,
+} from "./task/sim-ecs-task-detail.js";
+export {
+  SimEcsTaskContainer,
+  type SimEcsTaskContainerDetail,
+  type SimEcsTaskContainerStatus,
+} from "./task/sim-ecs-task-container.js";
+export {
+  SimEcsTaskArn,
+  type SimEcsNamedTask,
+} from "./task/sim-ecs-task-arn.js";
+export {
+  SimEcsTaskStore,
+  type SimEcsTaskListing,
+} from "./task/sim-ecs-task-store.js";
+export {
+  SimEcsTaskOverrides,
+  type SimEcsContainerOverrideType,
+  type SimEcsTaskOverrideType,
+} from "./task/run/sim-ecs-task-overrides.js";
 export type * from "./command/sim-ecs-command.types.js";
 export {
   SimEcsAccessDeniedException,

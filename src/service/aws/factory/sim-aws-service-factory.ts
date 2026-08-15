@@ -179,7 +179,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated ECS for an Account Region scope. */
   createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
-    return this.selfContainedServices.createEcs(scope);
+    return this.accountRegionServices.createEcs(scope);
   }
 
   /** Create simulated EventBridge for an Account Region scope. */

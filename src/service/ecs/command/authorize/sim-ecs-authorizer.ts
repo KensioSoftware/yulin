@@ -22,10 +22,12 @@ interface SimEcsAuthorizerProperties {
 /**
  * Applies simulated IAM authorization to ECS requests.
  *
- * ECS splits its operations two ways. `DescribeClusters` and `DeleteCluster`
- * authorize against the cluster's ARN, so a policy can name one cluster. Every
- * operation here that names a task definition, and both operations that name
- * no cluster, authorize against `*` instead.
+ * ECS splits its operations by the resource type each action takes.
+ * `DescribeClusters` and `DeleteCluster` take a cluster, `RunTask` takes the
+ * task definition it runs, and `DescribeTasks` and `StopTask` take the task.
+ * The operations that read or write a task definition, along with
+ * `CreateCluster`, `ListClusters` and `ListTasks`, have no resource type at
+ * all, so they authorize against `*`.
  *
  * A denial is reported as ECS's own AccessDeniedException rather than the
  * shared IAM error, because that is the error a real ECS caller would have to
@@ -52,6 +54,35 @@ export class SimEcsAuthorizer {
     options?: SimEcsRequestOptions,
   ): SimAwsResolvedCaller {
     return this.authorizeResource(action, clusterArn, options);
+  }
+
+  /**
+   * Ensure the caller may perform an action on a task, named by its ARN.
+   *
+   * The task need not exist, as the cluster need not for a cluster action.
+   */
+  authorizeTask(
+    action: string,
+    taskArn: string,
+    options?: SimEcsRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, taskArn, options);
+  }
+
+  /**
+   * Ensure the caller may perform an action on a task definition revision.
+   *
+   * `RunTask` is the one operation here whose resource is a task definition.
+   * The revision it authorizes against is the one the request resolved to, so
+   * a request naming a family alone is authorized against the revision it
+   * would run.
+   */
+  authorizeTaskDefinition(
+    action: string,
+    taskDefinitionArn: string,
+    options?: SimEcsRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, taskDefinitionArn, options);
   }
 
   /**

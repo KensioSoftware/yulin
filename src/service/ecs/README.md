@@ -2,8 +2,8 @@
 
 This directory contains the simulated ECS service implementation.
 
-Nothing runs here. This is the state ECS holds: clusters, and task definitions with their container
-definitions and revisions. Running a task reads from it and comes separately.
+It holds the state ECS holds, which is clusters and task definitions with their container
+definitions and revisions, and it runs tasks from the handlers bound to those containers.
 
 ## The container model
 
@@ -15,11 +15,10 @@ or anything else, and the only thing Yulin can run is JavaScript or TypeScript i
 An image URI is therefore only ever an identifier, used to match a container against an executable
 binding, exactly as it is for a container image Lambda function.
 
-That gives one rule, which running a task will follow when it arrives: a container with a binding
-will run the bound handler, and a container without one will not run and will be recorded as not
-simulated rather than failing anything. Nothing here runs anything yet. A realistic task definition
-holds an application container plus a log router plus an observability agent, and only the first of
-those is something Yulin could ever run.
+That gives one rule, which running a task follows: a container with a binding runs the bound
+handler, and a container without one does not run and is recorded as not simulated rather than
+failing anything. A realistic task definition holds an application container plus a log router plus
+an observability agent, and only the first of those is something Yulin could ever run.
 
 Where this genuinely does not work is a sidecar the application depends on, such as a Redis or a
 database in the same task. That is not simulated and should not be. The application's connection
@@ -35,10 +34,12 @@ the only two fields it looks at are `name`, which is how everything else refers 
 - `sim-ecs.ts` is the main in-memory service object for one account/region scope.
 - `index.ts` exports the public ECS simulator API for `@kensio/yulin/ecs`.
 
-A `SimEcs` instance owns a `SimEcsClusterStore` and a `SimEcsTaskDefinitionStore`. Both are scoped
-to an account and region because ECS scopes them that way: a cluster ARN and a task definition ARN
-both name their region, and a cluster name is unique within one account and region rather than
-globally.
+A `SimEcs` instance owns a `SimEcsClusterStore`, a `SimEcsTaskDefinitionStore`, a `SimEcsTaskStore`
+and the `SimEcsContainerBindings` for its scope. All of them are scoped to an account and region
+because ECS scopes them that way: a cluster ARN, a task definition ARN and a task ARN all name their
+region, and a cluster name is unique within one account and region rather than globally. Bindings
+follow the task definitions they target, so a binding made in one scope reaches no container in
+another.
 
 ## Cluster model
 
@@ -79,6 +80,61 @@ refused at the command rather than dropped, through `SimEcsUnsimulatedInput`: a 
 declaration, and a declaration silently missing from the revision it made is state a test could pass
 against without it being what was asked for.
 
+## Binding model
+
+Executable bindings live under `bind/`.
+
+`SimEcsContainerBinding` is the shape a user writes. It targets a container either by family and
+container name or by image repository, and carries either a `run` handler or an `http` one. The HTTP
+shape is settled here even though nothing serves a container yet, so that a service container behind
+a load balancer does not have to renegotiate it: it is fetch-style, matching what
+`SimAwsServiceController` already answers a served request with. Binding one is refused rather than
+held, since a binding that is never called is worse than one that says so.
+
+`SimEcsBoundContainer` reads a binding once, as it is made, and refuses one that could never match.
+Binding is something a test does while setting up, so the mistake is worth reporting there rather
+than at the end of a task run that quietly did nothing. Image repository matching reuses
+`SimCfnImageRepositoryTarget` rather than repeating it, so a repository means the same thing to a
+container as it does to a container image Lambda function.
+
+`SimEcsContainerBindings` owns the order two matching bindings are resolved in: a binding naming the
+container beats one naming a repository, and the most recent of equally specific bindings wins, so
+binding the same container again replaces what it runs.
+
+## Task model
+
+Task state lives under `task/`, and what runs one lives under `task/run/`.
+
+`SimEcsTask` splits into `SimEcsTaskIdentity` and `SimEcsTaskLifecycle`, because only the second of
+them ever changes: a task is named by its cluster and the revision it came from, and what moves is
+where it has got to. The lifecycle records a stop once, so a task that `StopTask` asked to stop keeps
+that reason rather than having the run's reason written over it.
+
+`SimEcsTaskContainer` is a task's record of one declared container. A container that ran carries an
+exit code and one that did not carries a reason instead, which is the difference between a container
+that exited zero and one Yulin left alone.
+
+`SimEcsTaskRunner` schedules a task's containers on the simulator's background scheduler, so
+`RunTask` answers with a task that has not started, as real ECS does. Containers run one after
+another in declaration order. Real ones run alongside each other and `dependsOn` is what orders them
+there, but nothing in this process gains from overlapping in-process handlers, and running them in
+order keeps what a test sees deterministic. The runner checks the task's desired status before each
+container, which is what makes `StopTask` stop a run part way through.
+
+`SimEcsContainerRunner` runs one container: it finds the binding, applies the environment, and runs
+the handler as the task Role. The task Role is applied through `simAwsRunAsContext`, exactly as a sim
+Lambda function applies its execution Role, so a container's AWS calls are authorized the way the
+deployed one's would be. A definition with no task Role runs its containers anonymously, which is
+the one thing the ambient caller must not be left alone for: the background work that runs the
+containers keeps the `RunTask` caller's context, so leaving it would attribute a container's calls
+to whoever started the task.
+
+`SimEcsContainerEnvironment` merges the container definition's `environment` with any `RunTask`
+override and the Region variables, and applies them through `simProcessEnvironment`, the shared
+`process.env` patch under `util/process/`. It is shared with simulated Lambda because it patches a
+process global: two of them would each install a getter, and the second would capture whatever the
+first was reporting as its host environment.
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, one directory per operation, so the
@@ -97,13 +153,18 @@ command instances.
 
 ## Authorization
 
-`SimEcsAuthorizer` splits requests two ways, as real ECS does:
+`SimEcsAuthorizer` splits requests by the resource type each action takes, as real ECS does:
 
 - `DescribeClusters` and `DeleteCluster` authorize against the cluster's ARN, so a policy can name
   one cluster;
+- `RunTask` authorizes against the task definition revision it would run, which is why the revision
+  is resolved before the caller is authorized: a family named on its own does not say which revision
+  that is;
+- `DescribeTasks` and `StopTask` authorize against the task's ARN, and `DescribeTasks` authorizes
+  each task it was given separately, so a policy can name one task;
 - everything else authorizes against `*`, because real ECS gives the task definition operations no
-  resource type at all, and gives `CreateCluster` and `ListClusters` none either. A policy naming a
-  task definition ARN grants nothing, here as on AWS.
+  resource type at all, and gives `CreateCluster`, `ListClusters` and `ListTasks` none either. A
+  policy naming a task definition ARN grants none of those, here as on AWS.
 
 ## Divergences worth knowing
 
@@ -117,7 +178,14 @@ command instances.
 - `CreateCluster` refuses capacity providers and Service Connect defaults, and
   `RegisterTaskDefinition` refuses any setting it does not model.
 - `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts, because
-  nothing deletes a task definition here for one to describe.
+  nothing deletes a task definition here for one to describe. `ListTasks` refuses a `desiredStatus`
+  of `PENDING` for the same reason: a simulated task is wanted either running or stopped.
+- `RunTask` refuses everything about networking, capacity and placement, and refuses an override
+  naming a container the task definition does not declare. The last one is the refusal worth having:
+  the usual cause is a container renamed in the definition and not in the test.
+- A task with no bound container stops with `TaskFailedToStart` rather than
+  `EssentialContainerExited`. Nothing started, and saying so is what makes a binding that matches
+  nothing visible.
 - `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
   `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
   structural types. A field it does not name is stored and reported back all the same.

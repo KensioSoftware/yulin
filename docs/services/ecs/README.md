@@ -1,9 +1,8 @@
 # Simulated ECS
 
 Yulin includes a simulated Amazon ECS for tests and local development. It holds clusters and task
-definitions in memory, and every operation is authorized by simulated IAM.
-
-Nothing runs yet. Registering a task definition and describing it back is what this covers.
+definitions in memory, runs tasks from handlers you bind to their containers, and authorizes every
+operation with simulated IAM.
 
 ECS-specific types are imported from the `@kensio/yulin/ecs` subpath.
 
@@ -13,10 +12,10 @@ Yulin never looks inside a container image. It cannot: an image may hold a Go bi
 anything else, and the only thing Yulin can run is JavaScript or TypeScript in its own process.
 
 So an image URI is only ever an identifier. Nothing here reads it, pulls it, or runs anything from
-it. It is stored as declared, and it is what a container will be matched on once running a task
-arrives, in the same way an image URI identifies a container image Lambda function. The rule that
-will follow from it is that a container matched to a handler will run that handler, and a container
-with no match will be recorded as not simulated rather than failing anything.
+it. It is stored as declared, and it is what a container is matched on when a task runs, in the same
+way an image URI identifies a container image Lambda function. The rule that follows from it is that
+a container matched to a handler runs that handler, and a container with no match is recorded as not
+simulated rather than failing anything.
 
 A realistic task definition holds an application container, a log router and an observability agent.
 Only the first of those is something Yulin could ever run, and all three are stored and reported back
@@ -289,14 +288,335 @@ A cluster is named either by its short name or by its full ARN, and the two are 
 ARN belonging to another account or region names a different cluster, so `DescribeClusters` reports
 it as a `MISSING` failure and `DeleteCluster` refuses it.
 
+A cluster has to exist before a task can run in it, including the `default` one. Yulin creates no
+cluster on its own, so create the one the tasks run in.
+
+## Running a task
+
+`bindContainer` says what a container runs. `RunTask` then starts a task in a cluster, and the bound
+handlers run in this process.
+
+```typescript sim-ecs-run-task
+/**
+ * Running a simulated ECS task from a bound container handler.
+ */
+
+import {
+  CreateClusterCommand,
+  DescribeTasksCommand,
+  RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+
+const processed: string[] = [];
+
+ecs.bindContainer({
+  family: "orders-worker",
+  containerName: "app",
+  run: async () => {
+    await Promise.resolve();
+    processed.push("outstanding orders");
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    containerDefinitions: [
+      { name: "app", image: "orders-worker:1" },
+      { name: "log-router", image: "aws-for-fluent-bit:latest" },
+    ],
+  }),
+);
+
+const run = await ecs.runTask(
+  new RunTaskCommand({ cluster: "orders", taskDefinition: "orders-worker" }),
+);
+
+console.log(run.tasks?.[0]?.lastStatus); // "PROVISIONING"
+
+// The containers run in the background, as they do on real ECS.
+await simAws.backgroundTasksComplete();
+
+console.log(processed); // ["outstanding orders"]
+
+const described = await ecs.describeTasks(
+  new DescribeTasksCommand({
+    cluster: "orders",
+    tasks: [run.tasks?.[0]?.taskArn ?? ""],
+  }),
+);
+
+console.log(described.tasks?.[0]?.lastStatus); // "STOPPED"
+console.log(described.tasks?.[0]?.containers?.[0]?.exitCode); // 0
+console.log(described.tasks?.[0]?.containers?.[1]?.reason);
+// "Not simulated: no executable binding matches this container, ..."
+```
+
+`RunTask` answers before the containers have run, with the task in `PROVISIONING`, which is what real
+ECS answers with. Waiting for the simulator's background work is what runs them.
+
+The log router in that task definition has no binding, so it never starts and says why. That is the
+ordinary shape of a real task definition: an application container Yulin can run, next to containers
+it never could.
+
+A handler that throws stops its container with an exit code of 1 and the error message as its
+reason. The `RunTask` call itself does not fail, because nothing is watching one by the time a real
+container fails either. A task definition where nothing at all is bound still creates the task, which
+stops with a `stopCode` of `TaskFailedToStart` saying that nothing ran.
+
+### Binding by image repository
+
+A container built by CDK or by a pipeline has an image tag that changes with every build, so naming
+the container by hand is the wrong way round. A binding can name the repository instead, and the tag
+is ignored on both sides.
+
+```typescript sim-ecs-bind-image-repository
+/**
+ * Binding a simulated ECS container by the repository its image comes from.
+ */
+
+import {
+  CreateClusterCommand,
+  RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({}));
+
+const started: string[] = [];
+
+ecs.bindContainer({
+  imageRepository: "111111111111.dkr.ecr.eu-west-2.amazonaws.com/orders",
+  run: () => {
+    started.push("app");
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    containerDefinitions: [
+      {
+        name: "app",
+        image: "111111111111.dkr.ecr.eu-west-2.amazonaws.com/orders:8f2c1a9b",
+      },
+    ],
+  }),
+);
+
+await ecs.runTask(new RunTaskCommand({ taskDefinition: "orders-worker" }));
+await simAws.backgroundTasksComplete();
+
+console.log(started); // ["app"]
+```
+
+The registry host is part of the repository, so a same-named repository in another account or region
+does not match. A binding naming the family and the container name beats one naming a repository
+where both would match, and binding the same container again replaces what it runs.
+
+The other shape a binding can take is `http`, a fetch-style
+`(request: Request) => Response | Promise<Response>` for a service container behind a load balancer.
+The shape is settled, but nothing serves a container yet, so binding one is refused rather than
+accepted and never called.
+
+## What a container sees while it runs
+
+The container definition's `environment` is visible through `process.env` for the length of the run,
+along with any `RunTask` container override and the region variables a real task agent sets. This
+works the same way it does for a sim Lambda function handler, through Node.js asynchronous context
+tracking, so a container that declares nothing reads the host environment untouched.
+
+```typescript sim-ecs-run-task-environment
+/**
+ * The environment variables a simulated ECS container runs with.
+ */
+
+import {
+  CreateClusterCommand,
+  RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({}));
+
+const batchSizes: (string | undefined)[] = [];
+
+ecs.bindContainer({
+  family: "orders-worker",
+  containerName: "app",
+  run: () => {
+    batchSizes.push(process.env["BATCH_SIZE"]);
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    containerDefinitions: [
+      {
+        name: "app",
+        image: "orders-worker:1",
+        environment: [{ name: "BATCH_SIZE", value: "100" }],
+      },
+    ],
+  }),
+);
+
+await ecs.runTask(
+  new RunTaskCommand({
+    taskDefinition: "orders-worker",
+    overrides: {
+      containerOverrides: [
+        { name: "app", environment: [{ name: "BATCH_SIZE", value: "10" }] },
+      ],
+    },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+console.log(batchSizes); // ["10"]
+```
+
+A variable read at module scope, as in `const size = process.env.BATCH_SIZE` at the top of a file, is
+read when the test imports that file rather than when the container runs, so it sees the host value.
+Read inside the handler to get the container's own.
+
+## The task role
+
+While a container runs, its AWS calls are attributed to the task definition's `taskRoleArn`, in the
+same way a sim Lambda function's are to its execution role. Calls made through an SDK client
+intercepted by `SimSdk` pick this up without the code under test knowing.
+
+```typescript sim-ecs-task-role
+/**
+ * Authorizing what a simulated ECS container does as the task Role.
+ */
+
+import {
+  CreateClusterCommand,
+  RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+} from "@aws-sdk/client-ecs";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { PutParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+const { simAws } = simSdk;
+const ecs = simAws.ecs();
+const accountId = simAws.defaultAccountId;
+
+const taskRole = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersTaskRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "ecs-tasks.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersTaskRole",
+    PolicyName: "WriteLastRun",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "ssm:PutParameter",
+        Resource: `arn:aws:ssm:${simAws.defaultRegionName}:${accountId}:parameter/orders/last-run`,
+      },
+    }),
+  }),
+);
+
+await ecs.createCluster(new CreateClusterCommand({}));
+
+simSdk.intercept(SSMClient);
+
+ecs.bindContainer({
+  family: "orders-worker",
+  containerName: "app",
+  run: async () => {
+    await new SSMClient({}).send(
+      new PutParameterCommand({
+        Name: "/orders/last-run",
+        Value: "done",
+        Type: "String",
+      }),
+    );
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    taskRoleArn: taskRole.Role.Arn,
+    containerDefinitions: [{ name: "app", image: "orders-worker:1" }],
+  }),
+);
+
+await ecs.runTask(new RunTaskCommand({ taskDefinition: "orders-worker" }));
+await simAws.backgroundTasksComplete();
+```
+
+Take the policy away and the same run stops the container with an exit code of 1, carrying the IAM
+denial as its reason. That is the test worth writing: a task role missing a permission fails in the
+test rather than in the deployment.
+
+A `RunTask` request can override the role with `overrides.taskRoleArn`. A task definition declaring
+no task role runs its containers as nobody, so their AWS calls are denied: a real task without one
+has no credentials of its own, and taking the identity of whoever called `RunTask` would let a test
+pass on permissions the deployed task has not got. The execution role is stored but does nothing
+here, because there is no image to pull and no log driver to write to.
+
+## Describing, listing and stopping tasks
+
+`DescribeTasks` reports a task by its id or its full ARN, with its containers, which of them ran and
+their exit codes. A task it cannot find is a `MISSING` failure entry rather than an error.
+
+`ListTasks` filters on a desired status of `RUNNING` when a request says nothing, as real ECS does,
+so a task that has finished is only listed by asking for the stopped ones with
+`desiredStatus: "STOPPED"`. It also filters by `family`, `startedBy` and `launchType`.
+
+`StopTask` sets the desired status to `STOPPED` and records the reason. A task whose containers have
+not started yet runs none of them, and one stopped part way through runs no more, so a test can stop
+a task between `RunTask` and the background work that runs it. A task that has already stopped is
+reported as it stands, keeping the reason it stopped for.
+
 ## Authorization
 
 Every operation is authorized by simulated IAM against the real ECS action.
 
-Real ECS gives the task definition operations no resource type at all, and gives `CreateCluster` and
-`ListClusters` none either, so all of those authorize against `*`. A policy naming a task definition
-ARN grants nothing, here as on AWS. `DescribeClusters` and `DeleteCluster` are the two that do take
-a resource, which is the cluster's ARN.
+Real ECS gives the task definition operations no resource type at all, and gives `CreateCluster`,
+`ListClusters` and `ListTasks` none either, so all of those authorize against `*`. A policy naming a
+task definition ARN grants none of them, here as on AWS. The operations that do take a resource are
+`DescribeClusters` and `DeleteCluster`, which take the cluster's ARN, `RunTask`, which takes the
+task definition revision it would run, and `DescribeTasks` and `StopTask`, which take the task's ARN.
 
 ```typescript sim-ecs-iam-policy
 /**
@@ -441,11 +761,17 @@ console.log(described.taskDefinition?.revision); // 1
 - `ListTaskDefinitionsCommand` and `ListTaskDefinitionFamiliesCommand`, with prefix, status and
   paging
 - `CreateClusterCommand`, `DescribeClustersCommand`, `ListClustersCommand` and `DeleteClusterCommand`
+- `RunTaskCommand`, running the handlers bound to a task definition's containers, up to a `count` of
+  ten tasks at a time
+- `DescribeTasksCommand`, `ListTasksCommand` and `StopTaskCommand`
+- `bindContainer`, targeting a container by family and container name or by image repository
+- Container environment variables and `RunTask` container overrides, through `process.env`
+- Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
 - Container definitions stored and reported as declared, whatever their image
 - Task definition tags, reported under `include: ["TAGS"]`
 - Cluster settings, configuration and tags, reported under their matching `include` values
 - Authorization of every operation by simulated IAM, against the real IAM action and resource
-- Clusters and task definitions scoped by account and region
+- Clusters, task definitions and tasks scoped by account and region
 - ECS SDK clients intercepted by `SimSdk`
 
 ## Limitations
@@ -462,8 +788,32 @@ Current documented limitations:
 - `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts. Nothing
   deletes a task definition here, so the answer would always be an empty listing, and refusing says
   so rather than looking like a result.
-- Nothing runs. `RunTask`, `StartTask`, `StopTask`, `DescribeTasks`, `ListTasks` and the whole of the
-  service API (`CreateService`, `UpdateService`, `DescribeServices`) are not simulated.
+- Yulin creates no cluster on its own, including the `default` one, so a `RunTask` request naming no
+  cluster needs one to have been created. An AWS account often has a `default` cluster already,
+  created the first time ECS was used from the console.
+- A container of a task definition with no `taskRoleArn` is denied every AWS call, rather than
+  running with whatever credentials a container instance role might have supplied.
+- Only a bound container runs. A container with no binding never starts and is reported with a reason
+  saying so, and a task where nothing is bound stops with `TaskFailedToStart`.
+- Containers run one after another in the order the task definition declares them, rather than
+  alongside each other. `dependsOn`, `essential`, health checks and `startTimeout` are stored and
+  ignored.
+- `RunTask` refuses `networkConfiguration`, `capacityProviderStrategy`, `platformVersion`, `tags`,
+  `placementConstraints`, `placementStrategy` and the rest of what it takes. There is no network and
+  no capacity here for any of them to apply to.
+- A `RunTask` override may name `taskRoleArn` and a container's `environment`. A `command`, `cpu` or
+  `memory` override is refused, since Yulin never runs an image and nothing here has capacity.
+- The execution role is stored and does nothing. There is no image to pull and no log driver to write
+  to, and container `secrets` are not resolved.
+- `StartTask` and the whole of the service API (`CreateService`, `UpdateService`,
+  `DescribeServices`) are not simulated.
+- `DescribeTasks` refuses `include`, and a task carries no tags, so `RunTask` refuses `tags` too.
+- `ListTasks` refuses a `desiredStatus` of `PENDING`, which real ECS accepts. A simulated task is
+  wanted either running or stopped, so the answer would always be an empty listing.
+- A stopped task is kept for as long as the simulation lasts. Real ECS stops reporting one about an
+  hour after it stops.
+- A task reports no `cpu`, `memory`, `connectivity`, `attachments` or `availabilityZone`. There is no
+  capacity and no network here to report.
 - A described task definition reports neither `compatibilities` nor `requiresAttributes`. Real ECS
   works both out from what the definition declares, which would mean reading a container
   definition's meaning.
@@ -474,8 +824,8 @@ Current documented limitations:
 - `CreateCluster` refuses `capacityProviders`, `defaultCapacityProviderStrategy` and
   `serviceConnectDefaults`. There is no capacity and no service discovery here to attach them to.
 - `DescribeClusters` refuses `include` values of `ATTACHMENTS` and `STATISTICS`, and always reports
-  zero for every count. A simulated task runs in this process rather than on an instance, so there
-  is nothing to count.
+  zero for every count, tasks in the cluster included. `ListTasks` is what reports the tasks a
+  cluster holds.
 - `ListClusters` leaves out a deleted cluster, which is still describable by name or ARN as
   `INACTIVE`.
 - `CreateCluster` with a name an active cluster already has hands that cluster back rather than

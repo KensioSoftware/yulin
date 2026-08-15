@@ -82,7 +82,7 @@ closure with no sandbox, so `simCffCloudFrontGlobal` holds its module in an `Asy
 for the length of the invocation and a global `cf` accessor resolves to it. The store follows the
 invocation across await points, which matters because reading a key value store is awaited, and it
 is what keeps two concurrently running Functions reading their own stores. This mirrors
-`SimLambdaProcessEnvironment`, which does the same thing for a Lambda handler's `process.env`.
+`SimProcessEnvironment`, which does the same thing for a Lambda or ECS handler's `process.env`.
 
 Reading a store is asynchronous, so `SimCloudFrontFunction.handleViewerRequest` and
 `handleViewerResponse` return promises and `SimCffApplicator` awaits them. A synchronous handler

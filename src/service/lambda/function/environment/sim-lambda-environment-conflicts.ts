@@ -1,5 +1,5 @@
 import type { SimLambdaEnvironment } from "./sim-lambda-environment.js";
-import { simLambdaProcessEnvironment } from "./sim-lambda-process-environment.js";
+import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
 
 const moveTheReadAdvice =
   "A read of process.env at module scope happens when the module is " +
@@ -54,7 +54,7 @@ export class SimLambdaEnvironmentConflicts {
   ): void {
     // Read-only lookup of a name the function itself declared.
     // oxlint-disable-next-line security/detect-object-injection
-    const hostValue = simLambdaProcessEnvironment.hostVariables()[name];
+    const hostValue = simProcessEnvironment.hostVariables()[name];
     if (hostValue === undefined || hostValue === value) {
       return;
     }
