@@ -1156,6 +1156,11 @@ origin access control, so a Function URL behind a Distribution runs for that Dis
 refuses everything else. See
 [origin access controls](../cloudfront/README.md#origin-access-controls) in the CloudFront docs.
 
+CloudFront is the exception to the two actions being separate. A request from
+`cloudfront.amazonaws.com` is authorized against `lambda:InvokeFunctionUrl` and
+`lambda:InvokeFunction`, and needs a grant for both, which is what real Lambda asks an origin access
+control for. A caller signing its own request still needs only `lambda:InvokeFunctionUrl`.
+
 An `AWS_IAM` invocation carries its caller into the event as
 `requestContext.authorizer.iam`, which is the part a handler reads. The `authorizer` block is absent
 for a `NONE` invocation, as it is on real AWS, and `requestContext.accountId` is the caller's Account
@@ -1948,7 +1953,8 @@ Sim Lambda currently supports:
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
-  resolved from the request
+  resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
+  control
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
 - SQS and DynamoDB stream event source mappings, created with `CreateEventSourceMappingCommand` and

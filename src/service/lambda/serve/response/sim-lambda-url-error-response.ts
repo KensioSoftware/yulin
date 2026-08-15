@@ -1,4 +1,15 @@
 /**
+ * What real Lambda says when it refuses a Function URL request.
+ *
+ * A refused request never reaches the handler and writes no log stream, so
+ * this body is the only thing a deployment has to go on. The wording is real
+ * Lambda's, down to the link, because that is what someone will be reading.
+ */
+export const simLambdaUrlForbiddenMessage =
+  "Forbidden. For troubleshooting Function URL authorization issues, see: " +
+  "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html";
+
+/**
  * The error responses a Function URL endpoint returns itself, before or
  * instead of the function producing one.
  *
@@ -15,10 +26,10 @@ export class SimLambdaUrlErrorResponse {
   }
 
   /**
-   * The Function URL requires authentication the simulator cannot verify.
+   * The caller is not allowed to invoke this Function URL.
    */
   forbidden(): Response {
-    return this.jsonResponse(403, "Forbidden");
+    return this.jsonResponse(403, simLambdaUrlForbiddenMessage);
   }
 
   /**

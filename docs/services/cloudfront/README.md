@@ -1275,18 +1275,38 @@ Origin works out who it is reading as per request instead.
 
 ### A Lambda Function URL Origin
 
-A Function URL with `AuthType: AWS_IAM` admits only a caller allowed `lambda:InvokeFunctionUrl` on
-the function, so putting one behind a Distribution takes three things: the origin access control
-with `OriginAccessControlOriginType: lambda`, a custom Origin naming it whose `DomainName` is the
-Function URL's hostname, and an `AWS::Lambda::Permission` granting `lambda:InvokeFunctionUrl` to
-`cloudfront.amazonaws.com` for that Distribution. That is what CDK's
-`FunctionUrlOrigin.withOriginAccessControl` synthesizes, and it is the only way to serve a Function
-URL through CloudFront without leaving the Function URL open to anyone who finds its endpoint.
+Putting a Function URL with `AuthType: AWS_IAM` behind a Distribution takes the origin access
+control with `OriginAccessControlOriginType: lambda`, a custom Origin naming it whose `DomainName`
+is the Function URL's hostname, and two `AWS::Lambda::Permission` Resources granting
+`cloudfront.amazonaws.com` for that Distribution. It is the only way to serve a Function URL through
+CloudFront without leaving the Function URL open to anyone who finds its endpoint.
+
+Both permissions are needed. One grants `lambda:InvokeFunctionUrl` and the other
+`lambda:InvokeFunction`, to the same principal with the same `SourceArn`, as
+[Restrict access to an AWS Lambda function URL origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html)
+sets out. CDK's `FunctionUrlOrigin.withOriginAccessControl` writes only the first, so a CDK app has
+to add the second itself:
+
+```typescript
+greeterFunction.addPermission("InvokeFunctionFromCloudFront", {
+  principal: new iam.ServicePrincipal("cloudfront.amazonaws.com"),
+  action: "lambda:InvokeFunction",
+  sourceArn: cdk.Fn.join("", [
+    "arn:",
+    cdk.Aws.PARTITION,
+    ":cloudfront::",
+    cdk.Aws.ACCOUNT_ID,
+    ":distribution/",
+    distribution.distributionId,
+  ]),
+});
+```
 
 The Origin request is made as the `cloudfront.amazonaws.com` service principal carrying the
 Distribution's ARN, the same pair an S3 Origin read carries, and the function's resource policy is
-the whole decision. A Stack without the permission, or with one naming a different Distribution,
-deploys and then answers 403 through the Distribution, which is what the real deployment does.
+the whole decision. A Stack missing either permission, or with one naming a different Distribution,
+deploys and then answers 403 through the Distribution, which is what the real deployment does. The
+function is never invoked, so it writes no logs to look at either.
 
 ```typescript sim-cloudfront-function-url-origin-access-control
 /**
@@ -1369,12 +1389,32 @@ try {
           },
         },
         // Nothing but this Distribution may invoke the Function URL, which is
-        // what the condition on the Distribution's ARN says.
-        InvokeFromCloudFront: {
+        // what the condition on the Distribution's ARN says. Reaching the URL
+        // takes both actions, so leaving either one out is a 403.
+        InvokeFunctionUrlFromCloudFront: {
           Type: "AWS::Lambda::Permission",
           Properties: {
             FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
             Action: "lambda:InvokeFunctionUrl",
+            Principal: "cloudfront.amazonaws.com",
+            SourceArn: {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:cloudfront::",
+                  { Ref: "AWS::AccountId" },
+                  ":distribution/",
+                  { Ref: "GreeterDistribution" },
+                ],
+              ],
+            },
+          },
+        },
+        InvokeFunctionFromCloudFront: {
+          Type: "AWS::Lambda::Permission",
+          Properties: {
+            FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+            Action: "lambda:InvokeFunction",
             Principal: "cloudfront.amazonaws.com",
             SourceArn: {
               "Fn::Join": [

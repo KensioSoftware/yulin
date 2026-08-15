@@ -427,6 +427,14 @@ Invoke command uses, as it is on AWS. The caller is passed to IAM as a `resolved
 assumed-role session is judged against the Role behind it; a request that carried no identity is
 anonymous, owns no policies, and is denied by the same evaluation.
 
+`sim-lambda-url-invoke-actions.ts` holds the one exception to that split.
+`cloudfront.amazonaws.com`, which is how a CloudFront origin access control reaches a Function URL
+Origin, has to be allowed `lambda:InvokeFunction` on top of the URL action, and is refused without
+it. That is real Lambda's rule, and CDK's `FunctionUrlOrigin.withOriginAccessControl` does not write
+the second grant, so a CDK app that has not added it deploys clean and then answers 403 with no log
+stream to look at. The refusal body is real Lambda's wording, since it is the only diagnostic such a
+deployment gets.
+
 Authorization is evaluated by the IAM of the Account that owns the function, against two policy
 sources: identity policies belonging to the caller, and the function's own resource policy, passed
 in by `command/authorize/sim-lambda-resource-policies.ts`. For a caller from another Account, IAM
@@ -441,7 +449,8 @@ puts `requestContext.authorizer.iam` there and leaves it out for `NONE`
 Role: who invoked it and what it runs as are separate questions.
 
 The endpoint's own error responses (403 for a denied caller, 404 for an unknown or deleted URL, 502
-for a handler error) are AWS-shaped JSON documents, though the exact wording is an approximation.
+for a handler error) are AWS-shaped JSON documents. The 403 body is real Lambda's wording; the other
+two are approximations.
 
 ### CloudFormation
 

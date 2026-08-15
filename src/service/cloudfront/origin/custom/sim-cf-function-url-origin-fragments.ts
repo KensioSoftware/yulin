@@ -4,10 +4,10 @@ import type {
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
- * What a test asks for when it wants the template CDK synthesizes for
- * `origins.FunctionUrlOrigin.withOriginAccessControl()`.
+ * What a test asks for when it wants a working version of the template
+ * `origins.FunctionUrlOrigin.withOriginAccessControl()` synthesizes.
  *
- * Five Resources stand between a test and a Function URL served through a
+ * Six Resources stand between a test and a Function URL served through a
  * Distribution, and each test about that shape is about one of them being
  * wrong, so each field here is one thing a template can get wrong on its own.
  */
@@ -20,10 +20,16 @@ export interface SimCfFunctionUrlOriginTemplateInput {
    */
   readonly originAccessControl: boolean;
   /**
-   * Whether the template grants CloudFront the Function URL, which CDK always
-   * does alongside the Distribution.
+   * Whether the template grants CloudFront the Function URL at all.
    */
   readonly permitted: boolean;
+  /**
+   * The actions the grant covers.
+   *
+   * Reaching a Function URL through an origin access control takes both of
+   * them, so a template granting one is one that deploys and then answers 403.
+   */
+  readonly permittedActions: readonly string[];
   /** The Distribution the permission is granted for. */
   readonly permissionSourceArn: SimCfnTemplateValue;
 }
@@ -31,10 +37,10 @@ export interface SimCfFunctionUrlOriginTemplateInput {
 /**
  * The parts of the template a template can leave out.
  *
- * Each is a Resource, or a property of one, that CDK always writes and that a
- * hand-written template can forget. The origin access control contributes two,
- * which are both there or both absent, since an Origin naming one nothing
- * created would be refused rather than reached.
+ * Each is a Resource, or a property of one, that a template can forget. The
+ * origin access control contributes two, which are both there or both absent,
+ * since an Origin naming one nothing created would be refused rather than
+ * reached. The permission contributes one Resource per action it grants.
  */
 export interface SimCfFunctionUrlOriginParts {
   readonly originAccessControl: SimCfnTemplateValueRecord;
@@ -65,20 +71,36 @@ export function simCfFunctionUrlOriginParts(
     originAccessControlId: included(input.originAccessControl, {
       OriginAccessControlId: { Ref: "SiteOac" },
     }),
-    // The permission CDK writes beside the Distribution, letting CloudFront
-    // invoke the Function URL for that Distribution alone.
-    invokePermission: included(input.permitted, {
-      InvokeFromCloudFront: {
+    // The permissions letting CloudFront invoke the Function URL for this
+    // Distribution alone. AWS takes one per action, and both of them.
+    invokePermission: included(input.permitted, invokePermissions(input)),
+  };
+}
+
+/**
+ * One `AWS::Lambda::Permission` per granted action.
+ *
+ * The statement id is derived from the action, so a template granting both
+ * carries two Resources rather than one overwriting the other, which is how
+ * the two `aws lambda add-permission` calls in the AWS documentation land.
+ */
+function invokePermissions(
+  input: SimCfFunctionUrlOriginTemplateInput,
+): SimCfnTemplateValueRecord {
+  return Object.fromEntries(
+    input.permittedActions.map((action) => [
+      `${action.replace("lambda:", "")}FromCloudFront`,
+      {
         Type: "AWS::Lambda::Permission",
         Properties: {
           FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
-          Action: "lambda:InvokeFunctionUrl",
+          Action: action,
           Principal: "cloudfront.amazonaws.com",
           SourceArn: input.permissionSourceArn,
         },
       },
-    }),
-  };
+    ]),
+  );
 }
 
 /**

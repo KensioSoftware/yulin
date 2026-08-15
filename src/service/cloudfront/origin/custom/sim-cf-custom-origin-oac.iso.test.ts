@@ -1,5 +1,6 @@
 import {
   assertIdentical,
+  assertObjectEquals,
   assertResponseStatus,
   assertTypeString,
   describeResponse,
@@ -64,8 +65,8 @@ async function fetchThroughDistribution(
 
 describe("Simulated CloudFront custom Origin with an origin access control", () => {
   it("reaches an AWS_IAM Function URL as the CloudFront service principal", async () => {
-    // Given the Stack CDK synthesizes for a Function URL Origin behind an
-    // origin access control.
+    // Given a Stack putting a Function URL behind an origin access control,
+    // granting CloudFront both of the actions that takes.
     const response = await fetchThroughDistribution(
       simCfFunctionUrlOriginTemplateFactory.make({}),
     );
@@ -74,6 +75,39 @@ describe("Simulated CloudFront custom Origin with an origin access control", () 
     // get past the auth type to do.
     assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "Hello from behind CloudFront");
+  });
+
+  it("is refused when only the Function URL action is granted", async () => {
+    // Given a permission granting `lambda:InvokeFunctionUrl` and nothing else,
+    // which is what CDK writes and what reads as correctly configured
+    // everywhere a deployment can be inspected.
+    const response = await fetchThroughDistribution(
+      simCfFunctionUrlOriginTemplateFactory.make({
+        permittedActions: ["lambda:InvokeFunctionUrl"],
+      }),
+    );
+
+    // Then the Function URL refuses the Origin request, as real Lambda does
+    // without `lambda:InvokeFunction` as well, and says so in the body that is
+    // the only diagnostic a refused request leaves behind.
+    assertResponseStatus(response, 403, await describeResponse(response));
+    assertObjectEquals(await response.json(), {
+      Message:
+        "Forbidden. For troubleshooting Function URL authorization issues, " +
+        "see: https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html",
+    });
+  });
+
+  it("is refused when only the Invoke action is granted", async () => {
+    // Given the other half of the pair on its own.
+    const response = await fetchThroughDistribution(
+      simCfFunctionUrlOriginTemplateFactory.make({
+        permittedActions: ["lambda:InvokeFunction"],
+      }),
+    );
+
+    // Then the Function URL refuses it too: reaching the URL takes both.
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("is refused when nothing granted CloudFront the Function URL", async () => {

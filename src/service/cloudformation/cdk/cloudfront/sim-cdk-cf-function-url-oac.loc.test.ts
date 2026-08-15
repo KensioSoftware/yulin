@@ -23,23 +23,36 @@ exports.handler = async () => ({
 `;
 
 /**
- * Slower local integration test. Calls the real CDK CLI to synth the output
- * template file and deploys the synthesized Function URL, origin access control,
- * Distribution and Lambda permission through sim CloudFormation.
+ * The grant CDK does not write.
  *
- * This is the shape `origins.FunctionUrlOrigin.withOriginAccessControl()` has,
- * and the only way to put a Function URL behind a Distribution without leaving
- * the Function URL open to anyone who finds its endpoint.
+ * `FunctionUrlOrigin.withOriginAccessControl()` writes one `CfnPermission`,
+ * for `lambda:InvokeFunctionUrl`. Reaching the URL also takes
+ * `lambda:InvokeFunction` for the same principal and the same Distribution, so
+ * a CDK app has to add this itself.
  */
-describe("Sim CDK CloudFront Function URL origin access control local integration", () => {
-  it("serves an AWS_IAM Function URL through a Distribution CDK gave an origin access control", async () => {
-    // Given a CDK stack whose Distribution reaches a private Function URL with
-    // an origin access control, which writes the invoke permission granting
-    // CloudFront.
-    const cdkProject = new TestCdkProject();
+const invokeFunctionGrantSource = `
+greeterFunction.addPermission("InvokeFunctionFromCloudFront", {
+  principal: new iam.ServicePrincipal("cloudfront.amazonaws.com"),
+  action: "lambda:InvokeFunction",
+  sourceArn: cdk.Fn.join("", [
+    "arn:",
+    cdk.Aws.PARTITION,
+    ":cloudfront::",
+    cdk.Aws.ACCOUNT_ID,
+    ":distribution/",
+    distribution.distributionId,
+  ]),
+});
+`;
 
-    await cdkProject.writeCdkAppFile(`
+/**
+ * A CDK app putting a private Function URL behind a Distribution, with
+ * whatever the test adds after the Distribution exists.
+ */
+function cdkAppSource(afterDistribution: string): string {
+  return `
 import * as cdk from "aws-cdk-lib";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
@@ -66,38 +79,71 @@ const distribution = new cloudfront.Distribution(stack, "SiteDistribution", {
   },
 });
 
+${afterDistribution}
+
 new cdk.CfnOutput(stack, "DistributionId", {
   value: distribution.distributionId,
 });
 
 app.synth();
-`);
+`;
+}
 
-    // And the CDK app is synthesized to a CloudFormation template.
-    const cdkOutDirectory = await cdkProject.synth();
+/**
+ * Synth the app, deploy it through sim CloudFormation and fetch a path through
+ * the Distribution it created.
+ */
+async function fetchThroughCdkDistribution(
+  afterDistribution: string,
+): Promise<Response> {
+  const cdkProject = new TestCdkProject();
+  await cdkProject.writeCdkAppFile(cdkAppSource(afterDistribution));
+  const cdkOutDirectory = await cdkProject.synth();
 
-    // When the synthesized template is deployed through sim CloudFormation.
-    const simAws = new SimAws();
-    const stack = await simAws
-      .cloudFormation()
-      .deployTemplateFile(
-        path.join(cdkOutDirectory, "TestStack.template.json"),
-      );
+  const simAws = new SimAws();
+  const stack = await simAws
+    .cloudFormation()
+    .deployTemplateFile(path.join(cdkOutDirectory, "TestStack.template.json"));
 
-    await stack.waitForDeployComplete();
+  await stack.waitForDeployComplete();
 
-    const distributionId = stack.outputs.get("DistributionId")?.value;
-    assertNonNullable(distributionId);
+  const distributionId = stack.outputs.get("DistributionId")?.value;
+  assertNonNullable(distributionId);
 
-    const response = await simCfSiteRequest(
-      simAws,
-      distributionId as string,
-      "/greeting",
+  return await simCfSiteRequest(simAws, distributionId as string, "/greeting");
+}
+
+/**
+ * Slower local integration test. Calls the real CDK CLI to synth the output
+ * template file and deploys the synthesized Function URL, origin access control,
+ * Distribution and Lambda permission through sim CloudFormation.
+ *
+ * This is the shape `origins.FunctionUrlOrigin.withOriginAccessControl()` has,
+ * and the only way to put a Function URL behind a Distribution without leaving
+ * the Function URL open to anyone who finds its endpoint.
+ */
+describe("Sim CDK CloudFront Function URL origin access control local integration", () => {
+  it("serves an AWS_IAM Function URL through a Distribution once both grants are written", async () => {
+    // Given the CDK stack for a Function URL Origin with an origin access
+    // control, plus the `lambda:InvokeFunction` grant CDK leaves out.
+    const response = await fetchThroughCdkDistribution(
+      invokeFunctionGrantSource,
     );
 
-    // Then the permission CDK wrote admits the Origin request and the handler
-    // runs, with nothing but the Distribution able to invoke the URL.
+    // Then the Origin request is admitted and the handler runs, with nothing
+    // but the Distribution able to invoke the URL.
     assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "Hello from behind CloudFront");
+  });
+
+  it("is refused when only the permission CDK writes is deployed", async () => {
+    // Given the same stack with nothing added, so the only permission is the
+    // `lambda:InvokeFunctionUrl` one CDK writes beside the Distribution.
+    const response = await fetchThroughCdkDistribution("");
+
+    // Then real Lambda refuses the Origin request, and so does this: the
+    // Stack deploys clean and the site answers 403 with no log stream to show
+    // for it, which is what makes the mistake so slow to find.
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 });

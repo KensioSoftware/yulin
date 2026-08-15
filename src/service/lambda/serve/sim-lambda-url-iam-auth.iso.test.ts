@@ -15,6 +15,7 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { simLambdaUrlForbiddenMessage } from "./response/sim-lambda-url-error-response.js";
 import type { SimPayload2RequestContext } from "../../../serve/payload-2/sim-payload-2-event.type.js";
 import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.type.js";
 
@@ -137,7 +138,9 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
     // Then a sound signature is not enough: the request is authenticated but
     // not authorized
     expect(response.status).toBe(403);
-    expect(await response.json()).toStrictEqual({ Message: "Forbidden" });
+    expect(await response.json()).toStrictEqual({
+      Message: simLambdaUrlForbiddenMessage,
+    });
   });
 
   it("does not accept lambda:InvokeFunction as permission for the URL", async () => {

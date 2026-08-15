@@ -272,10 +272,11 @@ conditioned on. A `never` signing behaviour reads anonymously, as an Origin with
 different way. A custom Origin request leaves CloudFront over the simulated HTTP boundary, so it
 carries them as the `x-sim-aws-caller` and `x-sim-aws-source-arn`/`x-sim-aws-source-account` control
 headers, which is how anything else calling into simulated AWS in process states who it is. That is
-what an `AWS_IAM` Function URL evaluates its `lambda:InvokeFunctionUrl` permission for
-`cloudfront.amazonaws.com` against, so a template omitting the permission answers 403 rather than
-being admitted anyway. The headers are stripped at the boundary, so the function's event shows the
-request its viewer sent.
+what an `AWS_IAM` Function URL evaluates its permissions for `cloudfront.amazonaws.com` against, so
+a template omitting one answers 403 rather than being admitted anyway. An origin access control
+takes two of them, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, which is what real Lambda
+asks for and what `SimLambdaUrlAuthorizer` requires of this principal. The headers are stripped at
+the boundary, so the function's event shows the request its viewer sent.
 
 A viewer's own control headers are dropped from the Origin request before the Origin's are applied,
 so who the Origin request is from is the Origin's decision and never the viewer's. The HTTP boundary
