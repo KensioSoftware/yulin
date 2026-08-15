@@ -163,6 +163,8 @@
   "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
   "devDependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-lambda-powertools/logger": "^2.34.0",
+    "@aws-lambda-powertools/metrics": "^2.34.0",
     "@aws-sdk/client-acm": "^3.1101.0",
     "@aws-sdk/client-apigatewayv2": "^3.1101.0",
     "@aws-sdk/client-cloudformation": "^3.1101.0",
@@ -204,6 +206,7 @@
     "aws-sdk-client-mock": "^4.1.0",
     "constructs": "^10.8.0",
     "conventional-changelog-conventionalcommits": "9.3.1",
+    "esbuild": "^0.28.2",
     "eslint": "^10.8.0",
     "eslint-plugin-jsdoc": "^63.3.2",
     "eslint-plugin-no-secrets": "^2.3.3",

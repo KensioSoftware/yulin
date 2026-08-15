@@ -147,6 +147,8 @@ The vm runtime models the real Node.js runtime closely:
   modules, and use dependencies bundled under the archive's `node_modules/`.
 - The sandbox provides an AWS-like `process.env` with the standard runtime variables
   (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, `AWS_LAMBDA_FUNCTION_MEMORY_SIZE`, ...).
+- The sandbox provides writable `process.stdout` and `process.stderr`, with its `console` built
+  over them, as the real runtime does. See [What a handler prints](#what-a-handler-prints).
 - Import and handler problems surface as invocation errors rather than failing creation, with the
   real runtime error types (`Runtime.ImportModuleError`, `Runtime.HandlerNotFound`,
   `Runtime.UserCodeSyntaxError`, `Runtime.MalformedHandlerName`).
@@ -159,6 +161,34 @@ not a real zip archive are rejected at creation with the AWS-like
 The archives are real zip files, so they interoperate with real tooling in both directions: a zip
 built by any other tool works as `Code.ZipFile` input, and `makeLambdaCodeZip` output can be
 unzipped normally.
+
+### What a handler prints
+
+The sandbox has writable standard streams, so `process.stdout.write(...)` and
+`process.stderr.write(...)` work inside a handler, and its `console` is built over them as the real
+runtime's is. A logging library that builds its own console rather than using the global one works
+too:
+
+```javascript
+const { Console } = require("node:console");
+const logger = new Console({ stdout: process.stdout, stderr: process.stderr });
+```
+
+That is what AWS Lambda Powertools' `Logger` does, at module scope, so a bundled Powertools handler
+runs here. Its `Metrics` writes its embedded metric format document to standard output, so the
+metrics a handler emitted can be read back the same way its log lines can.
+
+Everything a handler prints reaches the host process's standard output or standard error, which is
+where a test or a `pnpm run dev` session already sees output. A test that wants to assert on it
+captures the host stream:
+
+```typescript
+const written: string[] = [];
+vi.spyOn(process.stdout, "write").mockImplementation((chunk): boolean => {
+  written.push(String(chunk));
+  return true;
+});
+```
 
 ## Function code from S3
 
@@ -1931,7 +1961,9 @@ Sim Lambda currently supports:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
   - a zip object stored in sim S3 via `Code.S3Bucket`/`S3Key`
-- A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations
+- A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations, and
+  writable standard streams for handler output, including a bundled AWS Lambda Powertools logger's
+  own console
 - Per-function environment variables with `Environment.Variables`
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment
@@ -1976,6 +2008,9 @@ Current documented limitations:
 - Function versions, aliases, and qualifiers are not simulated (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
+- Handler output goes to the host process's standard output and error. There is no simulated
+  CloudWatch Logs, so nothing holds a function's output for a test to read back per function or per
+  invocation. See [What a handler prints](#what-a-handler-prints).
 - Container image functions are not run. Yulin never reads a container image, and stays Docker-free.
   A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
   in-process handler stands in for its image: one bound to it, or one registered in the
