@@ -218,6 +218,27 @@ describe("AWS::ECS::Service properties", () => {
     await simAws.backgroundTasksComplete();
   });
 
+  it("refuses a fraction of a task", async () => {
+    // Given a template asking for half a task more than it can have.
+    const simAws = new SimAws();
+
+    // When it is deployed, then the deployment fails naming the property,
+    // rather than rounding to a count nothing asked for.
+    const error = await assertThrowsErrorAsync(async () => {
+      return await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: serviceTemplate({
+          ServiceName: "orders-worker",
+          DesiredCount: 1.5,
+        }),
+      });
+    });
+
+    assertStringIncludes(error.message, "DesiredCount is a whole number");
+
+    await simAws.backgroundTasksComplete();
+  });
+
   it("refuses an attribute a service does not have", async () => {
     // Given a template reading an attribute AWS::ECS::Service has no answer
     // for.

@@ -1804,7 +1804,8 @@ Current documented limitations:
   predict it. A stack deployed twice under different names therefore gets two different families.
 - A service that declares no `DesiredCount` keeps one task running, which is the default real
   CloudFormation documents for a new service. A `DesiredCount` written as the text of a number is
-  taken as that number, since a String Parameter resolves to text, and anything else is refused.
+  taken as that number, since a String Parameter resolves to text, and anything else is refused
+  naming the Resource and the property, a fraction of a task included.
 - An update replaces a task definition Resource rather than updating it in place, so it registers a
   new revision and deregisters the one it replaced. The family accumulates revisions with only the
   newest one `ACTIVE`, where real CloudFormation leaves the earlier revisions active.

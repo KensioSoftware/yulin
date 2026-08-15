@@ -54,7 +54,9 @@ export class SimCfnEcsPropertyReader {
    *
    * A template may write a count as a number or as the text of one, since a
    * String Parameter resolves to text whatever it holds, and CloudFormation
-   * takes either. Anything else is refused rather than counted as zero.
+   * takes either. Anything else is refused rather than counted as zero, a
+   * fraction included: what these properties count is tasks, and there is no
+   * half of one to keep running.
    */
   wholeNumber(name: string): number | undefined {
     const value = this.declared(name);
@@ -63,15 +65,13 @@ export class SimCfnEcsPropertyReader {
       return undefined;
     }
 
-    if (typeof value === "number") {
-      return value;
+    const declared = simCfnEcsWholeNumber(value);
+
+    if (declared === undefined) {
+      throw this.refuse(`${name} is a whole number`);
     }
 
-    if (typeof value === "string" && /^-?\d+$/u.test(value)) {
-      return Number(value);
-    }
-
-    throw this.refuse(`${name} is a whole number`);
+    return declared;
   }
 
   /**
@@ -152,4 +152,42 @@ export class SimCfnEcsPropertyReader {
     // oxlint-disable-next-line security/detect-object-injection -- fixed property names.
     return this.properties[name];
   }
+}
+
+/**
+ * A declared value read as a whole number, or nothing where it is not one.
+ *
+ * The text of a number counts, since a String Parameter resolves to text
+ * whatever it holds. A fraction does not, and neither does a whole number too
+ * large to be held exactly, which would count something other than what the
+ * template wrote.
+ */
+function simCfnEcsWholeNumber(value: SimCfnTemplateValue): number | undefined {
+  const declared = simCfnEcsDeclaredNumber(value);
+
+  if (declared === undefined || !Number.isSafeInteger(declared)) {
+    return undefined;
+  }
+
+  return declared;
+}
+
+/**
+ * A declared value read as a number, however the template wrote it.
+ *
+ * Text is read only where it is digits, so an empty string and a hexadecimal
+ * literal are not numbers here, whatever `Number` would make of them.
+ */
+function simCfnEcsDeclaredNumber(
+  value: SimCfnTemplateValue,
+): number | undefined {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string" && /^-?\d+$/u.test(value)) {
+    return Number(value);
+  }
+
+  return undefined;
 }
