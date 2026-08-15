@@ -10,6 +10,7 @@ import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-cus
 import { SimCloudFrontCustomOrigin } from "../../origin/custom/sim-cloudfront-custom-origin.js";
 import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
+import { assertSimCfOacOriginType } from "../../origin-access-control/sim-cf-oac-origin-type.js";
 import { SimCloudFrontInvalidOriginAccessControl } from "../../error/sim-cloudfront.error.js";
 
 /**
@@ -46,6 +47,7 @@ export class SimCloudFrontOriginConfigurator {
 
     if (origin.S3OriginConfig !== undefined) {
       assertNoSimCfS3OriginAccessIdentity(origin.Id, origin.S3OriginConfig);
+      assertSimCfOacOriginType(origin.Id, "s3", originAccessControl);
 
       const originBucket = this.s3OriginResolver(origin.DomainName);
 
@@ -66,7 +68,9 @@ export class SimCloudFrontOriginConfigurator {
     }
 
     if (origin.CustomOriginConfig !== undefined) {
-      this.assertNoOriginAccessControl(origin.Id, originAccessControl);
+      // A custom Origin is reached over HTTP, so the only origin access control
+      // that can sign for one is the Lambda Function URL type.
+      assertSimCfOacOriginType(origin.Id, "lambda", originAccessControl);
 
       assertDefined(
         this.customOriginDispatcher,
@@ -80,6 +84,7 @@ export class SimCloudFrontOriginConfigurator {
           domainName: origin.DomainName,
           originPath: origin.OriginPath,
           dispatcher: this.customOriginDispatcher,
+          ...(originAccessControl !== undefined && { originAccessControl }),
         }),
       );
       return;
@@ -123,26 +128,5 @@ export class SimCloudFrontOriginConfigurator {
     }
 
     return originAccessControl;
-  }
-
-  /**
-   * Refuse an origin access control on a custom Origin.
-   *
-   * Every origin access control here signs for an S3 Origin, and CloudFront
-   * refuses one whose origin type does not match the Origin it is attached to.
-   */
-  private assertNoOriginAccessControl(
-    originId: string,
-    originAccessControl: SimCloudFrontOriginAccessControl | undefined,
-  ): void {
-    if (originAccessControl === undefined) {
-      return;
-    }
-
-    throw new SimCloudFrontInvalidOriginAccessControl(
-      `Sim CloudFront custom Origin ${originId} names origin access control ` +
-        `${originAccessControl.name}, which signs for an ` +
-        `${originAccessControl.originType} Origin`,
-    );
   }
 }

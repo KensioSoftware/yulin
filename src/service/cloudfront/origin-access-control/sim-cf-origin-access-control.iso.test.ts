@@ -18,6 +18,7 @@ describe("SimCloudFrontOriginAccessControl", () => {
     // Given an origin access control created without an ID.
     const originAccessControl = new SimCloudFrontOriginAccessControl({
       name: "site-oac",
+      originType: "s3",
       signingBehavior: "always",
     });
 
@@ -31,6 +32,7 @@ describe("SimCloudFrontOriginAccessControl", () => {
     const originAccessControl = new SimCloudFrontOriginAccessControl({
       id: "E1EXAMPLE12345" as SimCloudFrontOriginAccessControlId,
       name: "site-oac",
+      originType: "s3",
       signingBehavior: "always",
     });
 
@@ -38,16 +40,33 @@ describe("SimCloudFrontOriginAccessControl", () => {
     assertIdentical(originAccessControl.id, "E1EXAMPLE12345");
   });
 
-  it("only signs for an S3 Origin with SigV4", () => {
-    // Given an origin access control.
-    const originAccessControl = new SimCloudFrontOriginAccessControl({
+  it("keeps the origin type it signs for", () => {
+    // Given origin access controls for each kind of Origin modelled.
+    const bucketOac = new SimCloudFrontOriginAccessControl({
       name: "site-oac",
+      originType: "s3",
+      signingBehavior: "always",
+    });
+    const functionUrlOac = new SimCloudFrontOriginAccessControl({
+      name: "api-oac",
+      originType: "lambda",
       signingBehavior: "always",
     });
 
-    // Then the origin type and signing protocol are the only ones modelled,
-    // rather than whatever the template happened to ask for.
-    assertIdentical(originAccessControl.originType, "s3");
+    // Then each says which Origin it signs for, which is what decides the
+    // Origin it may be attached to.
+    assertIdentical(bucketOac.originType, "s3");
+    assertIdentical(functionUrlOac.originType, "lambda");
+  });
+
+  it("signs with SigV4, the only protocol CloudFront offers", () => {
+    // Given an origin access control.
+    const originAccessControl = new SimCloudFrontOriginAccessControl({
+      name: "site-oac",
+      originType: "s3",
+      signingBehavior: "always",
+    });
+
     assertIdentical(originAccessControl.signingProtocol, "sigv4");
   });
 
@@ -55,6 +74,7 @@ describe("SimCloudFrontOriginAccessControl", () => {
     // Given an origin access control created without a description.
     const originAccessControl = new SimCloudFrontOriginAccessControl({
       name: "site-oac",
+      originType: "s3",
       signingBehavior: "always",
     });
 
@@ -65,6 +85,7 @@ describe("SimCloudFrontOriginAccessControl", () => {
     // Given an origin access control created with a description.
     const originAccessControl = new SimCloudFrontOriginAccessControl({
       name: "site-oac",
+      originType: "s3",
       description: "Signs reads of the site bucket",
       signingBehavior: "always",
     });
@@ -79,14 +100,17 @@ describe("SimCloudFrontOriginAccessControl", () => {
     // Given the three signing behaviours CloudFront offers.
     const always = new SimCloudFrontOriginAccessControl({
       name: "always-oac",
+      originType: "s3",
       signingBehavior: "always",
     });
     const noOverride = new SimCloudFrontOriginAccessControl({
       name: "no-override-oac",
+      originType: "s3",
       signingBehavior: "no-override",
     });
     const never = new SimCloudFrontOriginAccessControl({
       name: "never-oac",
+      originType: "s3",
       signingBehavior: "never",
     });
 

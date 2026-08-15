@@ -524,6 +524,33 @@ try {
 }
 ```
 
+### Naming what the request is for
+
+When one AWS service calls another it says which of your resources it is calling for, and IAM
+supplies that as `aws:SourceArn` and `aws:SourceAccount`. A resource policy granting a service
+principal is usually conditioned on them, so that a Bucket policy or a function's resource policy
+admits one Distribution rather than every CloudFront customer. Two more headers say the same thing
+over HTTP:
+
+| Header                     | Condition key       |
+| -------------------------- | ------------------- |
+| `x-sim-aws-source-arn`     | `aws:SourceArn`     |
+| `x-sim-aws-source-account` | `aws:SourceAccount` |
+
+```bash
+curl -H 'x-sim-aws-caller: service:cloudfront.amazonaws.com' \
+  -H 'x-sim-aws-source-arn: arn:aws:cloudfront::111111111111:distribution/E1EXAMPLE12345' \
+  http://abc123.lambda-url.us-east-1.sim-aws.localhost:4566/
+```
+
+A request that states neither has no source at all, rather than an empty one, so a statement
+conditioned on either key does not match instead of matching an empty string. Both headers are
+stripped before the request reaches the simulated service, as the caller header is.
+
+Sim CloudFront sends these itself when a Distribution reaches a custom Origin through an origin
+access control, which is what an `AWS_IAM` Lambda Function URL behind CloudFront is admitted by.
+Simulated Lambda Function URLs are the only endpoint evaluating them so far.
+
 ### Signed requests
 
 A request signed with credentials from `CreateAccessKeyCommand` or from an STS `AssumeRoleCommand`
@@ -920,7 +947,8 @@ Sim IAM currently supports:
   service-supplied resource policies, and policy conditions with explicit-deny precedence
 - IAM authorization at simulated service boundaries, such as Route53 actions
 - Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
-  signature, defaulting to anonymous
+  signature, defaulting to anonymous, and the resource it is made on behalf of from
+  `x-sim-aws-source-arn` and `x-sim-aws-source-account`
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
 - The `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources

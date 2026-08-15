@@ -64,9 +64,9 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
     assertStringIncludes(error.message, "does not exist");
   });
 
-  it("refuses an origin access control on a custom Origin", async () => {
-    // Given a custom Origin naming an origin access control, which every one
-    // here signs for an S3 Origin rather than a custom one.
+  it("refuses an S3 origin access control on a custom Origin", async () => {
+    // Given an origin access control signing for an S3 Origin, which is not
+    // the kind of Origin a custom Origin is.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "oac-stack",
@@ -127,6 +127,64 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
     // Then it is refused rather than attached to an Origin it cannot sign for.
     assertStringIncludes(error.message, "custom Origin SiteOrigin");
     assertStringIncludes(error.message, "site-oac");
+    assertStringIncludes(error.message, "origin type is s3 rather than lambda");
+  });
+
+  it("refuses a Function URL origin access control on an S3 Origin", async () => {
+    // Given an origin access control signing for a Lambda Function URL.
+    const simAws = new SimAws();
+
+    // When a Distribution attaches it to an S3 Origin.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "site-stack",
+        template: {
+          Resources: {
+            SiteBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "site-bucket" },
+            },
+            SiteOac: {
+              Type: "AWS::CloudFront::OriginAccessControl",
+              Properties: {
+                OriginAccessControlConfig: {
+                  Name: "site-oac",
+                  OriginAccessControlOriginType: "lambda",
+                  SigningBehavior: "always",
+                  SigningProtocol: "sigv4",
+                },
+              },
+            },
+            SiteDistribution: {
+              Type: "AWS::CloudFront::Distribution",
+              DependsOn: ["SiteBucket", "SiteOac"],
+              Properties: {
+                DistributionConfig: {
+                  Enabled: true,
+                  Origins: [
+                    {
+                      Id: "SiteOrigin",
+                      DomainName: "site-bucket.s3.amazonaws.com",
+                      S3OriginConfig: {},
+                      OriginAccessControlId: { Ref: "SiteOac" },
+                    },
+                  ],
+                  DefaultCacheBehavior: {
+                    TargetOriginId: "SiteOrigin",
+                    ViewerProtocolPolicy: "redirect-to-https",
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then it is refused in that direction too, as CloudFront refuses either
+    // mismatch rather than only one.
+    assertStringIncludes(error.message, "S3 Origin SiteOrigin");
+    assertStringIncludes(error.message, "origin type is lambda rather than s3");
   });
 
   it("refuses a second origin access control claiming a name", async () => {
@@ -171,7 +229,7 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
   });
 
   it("refuses an origin type it does not sign for", async () => {
-    // Given a template asking for a Lambda Function URL origin access control.
+    // Given a template asking for a MediaStore origin access control.
     const simAws = new SimAws();
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -184,7 +242,7 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
               Properties: {
                 OriginAccessControlConfig: {
                   Name: "api-oac",
-                  OriginAccessControlOriginType: "lambda",
+                  OriginAccessControlOriginType: "mediastore",
                   SigningBehavior: "always",
                   SigningProtocol: "sigv4",
                 },
@@ -201,6 +259,9 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
       error.message,
       "Invalid AWS::CloudFront::OriginAccessControl ApiOac",
     );
-    assertStringIncludes(error.message, "OriginAccessControlOriginType lambda");
+    assertStringIncludes(
+      error.message,
+      "OriginAccessControlOriginType mediastore",
+    );
   });
 });

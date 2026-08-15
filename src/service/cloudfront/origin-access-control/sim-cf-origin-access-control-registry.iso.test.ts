@@ -15,6 +15,7 @@ describe("SimCloudFrontOriginAccessControlRegistry", () => {
   ): SimCloudFrontOriginAccessControl {
     return new SimCloudFrontOriginAccessControl({
       name,
+      originType: "s3",
       signingBehavior: "always",
     });
   }

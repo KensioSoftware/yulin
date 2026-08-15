@@ -73,6 +73,10 @@ export class SimLambdaServiceController implements SimAwsServiceController {
    * named principal, and is anonymous when the request offered neither.
    * Anonymous owns no policies, so an unsigned request is refused by the same
    * evaluation that admits a permitted one, rather than by a special case.
+   *
+   * What the request is being made on behalf of travels with it, so a
+   * CloudFront Distribution reaching this URL through an origin access control
+   * is judged against the Distribution the permission names.
    */
   private async invokeAuthenticated(
     route: SimLambdaFunctionUrlRoute,
@@ -83,6 +87,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
       simFunction: route.simFunction,
       functionUrl: route.functionUrl,
       caller: caller.toCaller(),
+      source: serviceRequest.source,
     });
 
     if (decision.isDenied) {

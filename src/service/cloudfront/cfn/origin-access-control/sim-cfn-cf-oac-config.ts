@@ -3,21 +3,25 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import {
   SimCloudFrontOriginAccessControl,
+  type SimCloudFrontOriginAccessControlOriginType,
   type SimCloudFrontOriginAccessControlSigningBehavior,
 } from "../../origin-access-control/sim-cf-origin-access-control.js";
 
 /**
- * The config values a simulated origin access control is fixed to.
+ * The values a simulated origin access control accepts for each field of the
+ * config that names one of a fixed set.
  *
- * CloudFront also signs for MediaStore, MediaPackage V2 and Lambda Function URL
- * Origins, and none of those is modelled. SigV4 is the only protocol CloudFront
- * offers. Anything else is refused by name rather than stored and treated as
- * though it behaved like these.
+ * CloudFront also signs for MediaStore and MediaPackage V2 Origins, and neither
+ * is modelled, so neither is an origin type here. SigV4 is the only protocol
+ * CloudFront offers. Anything else is refused by name rather than stored and
+ * treated as though it behaved like one of these.
  */
-const fixedValues = {
-  OriginAccessControlOriginType: "s3",
-  SigningProtocol: "sigv4",
-};
+const originTypes: readonly SimCloudFrontOriginAccessControlOriginType[] = [
+  "s3",
+  "lambda",
+];
+
+const signingProtocols = ["sigv4"] as const;
 
 const signingBehaviors: readonly SimCloudFrontOriginAccessControlSigningBehavior[] =
   ["always", "never", "no-override"];
@@ -48,7 +52,10 @@ export class SimCfnCfOriginAccessControlConfig {
   build(): SimCloudFrontOriginAccessControl {
     const config = this.originAccessControlConfig();
 
-    this.assertFixedValues(config);
+    // The protocol is checked and then dropped: SigV4 is the only one
+    // CloudFront offers, so there is nothing for the origin access control to
+    // remember about it.
+    this.oneOf(config, "SigningProtocol", signingProtocols);
 
     const description = this.text(config, "Description");
 
@@ -56,7 +63,12 @@ export class SimCfnCfOriginAccessControlConfig {
       name:
         this.text(config, "Name") ??
         this.refuse("OriginAccessControlConfig Name must be a string"),
-      signingBehavior: this.signingBehavior(config),
+      originType: this.oneOf(
+        config,
+        "OriginAccessControlOriginType",
+        originTypes,
+      ),
+      signingBehavior: this.oneOf(config, "SigningBehavior", signingBehaviors),
       ...(description !== undefined && { description }),
     });
   }
@@ -72,21 +84,27 @@ export class SimCfnCfOriginAccessControlConfig {
   }
 
   /**
-   * Refuse a config asking for anything but the one origin type and protocol a
-   * simulated origin access control signs.
+   * One field of the config naming a value from a fixed set.
+   *
+   * A value outside the set is refused by name, along with the set it should
+   * have come from, rather than stored and treated as one of them.
    */
-  private assertFixedValues(config: Record<string, unknown>): void {
-    for (const [key, fixed] of Object.entries(fixedValues)) {
-      // oxlint-disable-next-line security/detect-object-injection
-      const value = config[key];
+  private oneOf<Value extends string>(
+    config: Record<string, unknown>,
+    key: string,
+    values: readonly Value[],
+  ): Value {
+    // oxlint-disable-next-line security/detect-object-injection
+    const value = config[key];
 
-      if (value !== fixed) {
-        this.refuse(
-          `${key} ${String(value)} is not modelled by simulated origin ` +
-            `access controls, which only sign an ${fixedValues.OriginAccessControlOriginType} Origin with ${fixedValues.SigningProtocol}`,
-        );
-      }
+    if (!values.includes(value as Value)) {
+      this.refuse(
+        `${key} ${String(value)} is not modelled by simulated origin access ` +
+          `controls, which accept ${values.join(", ")}`,
+      );
     }
+
+    return value as Value;
   }
 
   /**
@@ -110,22 +128,6 @@ export class SimCfnCfOriginAccessControlConfig {
     return value;
   }
 
-  private signingBehavior(
-    config: Record<string, unknown>,
-  ): SimCloudFrontOriginAccessControlSigningBehavior {
-    const value = config["SigningBehavior"];
-
-    if (!isSigningBehavior(value)) {
-      this.refuse(
-        `SigningBehavior ${String(value)} is not one of ${signingBehaviors.join(
-          ", ",
-        )}`,
-      );
-    }
-
-    return value;
-  }
-
   /**
    * Refuse this Resource, saying which part of it could not be read.
    */
@@ -134,12 +136,4 @@ export class SimCfnCfOriginAccessControlConfig {
       `Invalid AWS::CloudFront::OriginAccessControl ${this.resource.logicalId}: ${detail}`,
     );
   }
-}
-
-function isSigningBehavior(
-  value: unknown,
-): value is SimCloudFrontOriginAccessControlSigningBehavior {
-  return signingBehaviors.includes(
-    value as SimCloudFrontOriginAccessControlSigningBehavior,
-  );
 }

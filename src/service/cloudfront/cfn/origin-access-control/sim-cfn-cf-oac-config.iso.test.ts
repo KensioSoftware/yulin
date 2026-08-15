@@ -72,11 +72,23 @@ describe("SimCfnCfOriginAccessControlConfig", () => {
     }
   });
 
-  it("refuses an origin type it does not sign for", () => {
-    // Given a config for a Lambda Function URL Origin, which CloudFront signs
-    // for and this simulation does not.
-    const message = refusalFrom({
+  it("reads the config CDK synthesizes for a Function URL origin", () => {
+    // Given the config CDK emits for
+    // FunctionUrlOrigin.withOriginAccessControl.
+    const originAccessControl = originAccessControlFrom({
       OriginAccessControlOriginType: "lambda",
+    });
+
+    // Then it signs for a Lambda Function URL rather than for a Bucket.
+    assertIdentical(originAccessControl.originType, "lambda");
+    assertIdentical(originAccessControl.signingBehavior, "always");
+  });
+
+  it("refuses an origin type it does not sign for", () => {
+    // Given a config for a MediaStore Origin, which CloudFront signs for and
+    // this simulation does not.
+    const message = refusalFrom({
+      OriginAccessControlOriginType: "mediastore",
     });
 
     // Then it is refused by name, rather than stored and treated as an S3
@@ -85,7 +97,8 @@ describe("SimCfnCfOriginAccessControlConfig", () => {
       message,
       "Invalid AWS::CloudFront::OriginAccessControl SiteOac",
     );
-    assertStringIncludes(message, "OriginAccessControlOriginType lambda");
+    assertStringIncludes(message, "OriginAccessControlOriginType mediastore");
+    assertStringIncludes(message, "s3, lambda");
   });
 
   it("refuses a missing origin type", () => {

@@ -19,10 +19,19 @@ export type SimCloudFrontOriginAccessControlSigningBehavior =
   | "never"
   | "no-override";
 
+/**
+ * The kind of Origin an origin access control signs for.
+ *
+ * CloudFront also signs for MediaStore and MediaPackage V2 Origins, neither of
+ * which is modelled, so neither is a value here.
+ */
+export type SimCloudFrontOriginAccessControlOriginType = "s3" | "lambda";
+
 interface SimCloudFrontOriginAccessControlProperties {
   readonly id?: SimCloudFrontOriginAccessControlId;
   readonly name: string;
   readonly description?: string;
+  readonly originType: SimCloudFrontOriginAccessControlOriginType;
   readonly signingBehavior: SimCloudFrontOriginAccessControlSigningBehavior;
 }
 
@@ -30,14 +39,14 @@ interface SimCloudFrontOriginAccessControlProperties {
  * Simulated CloudFront origin access control.
  *
  * An origin access control is attached to an Origin, and it is how a
- * Distribution authenticates to a private S3 Bucket: CloudFront signs the
- * Origin request with SigV4 as the CloudFront service principal, and the Bucket
- * policy grants that principal on the Distribution's ARN.
+ * Distribution authenticates to a private Origin: CloudFront signs the Origin
+ * request with SigV4 as the CloudFront service principal, and the Origin's own
+ * policy grants that principal on the Distribution's ARN. For an S3 Origin that
+ * policy is the Bucket policy, and for a Lambda Function URL it is the
+ * function's resource policy.
  *
- * Only an `s3` origin type signed with `sigv4` is modelled, so those are fixed
- * here rather than stored. Anything else is refused where the origin access
- * control is read, rather than kept and treated as though it behaved like the
- * supported values.
+ * `sigv4` is the only protocol CloudFront offers, so it is fixed here rather
+ * than stored.
  *
  * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html
  */
@@ -49,8 +58,12 @@ export class SimCloudFrontOriginAccessControl {
 
   /**
    * The kind of Origin this origin access control signs for.
+   *
+   * CloudFront refuses an origin access control attached to an Origin its
+   * origin type does not match, so this is checked where an Origin names one
+   * rather than only described here.
    */
-  public readonly originType = "s3";
+  public readonly originType: SimCloudFrontOriginAccessControlOriginType;
 
   /**
    * The protocol CloudFront signs the Origin request with.
@@ -61,6 +74,7 @@ export class SimCloudFrontOriginAccessControl {
     this.id = properties.id ?? makeOriginAccessControlId();
     this.name = properties.name;
     this.description = properties.description;
+    this.originType = properties.originType;
     this.signingBehavior = properties.signingBehavior;
   }
 
