@@ -82,7 +82,7 @@ describe("ECS UpdateServiceCommand", () => {
     assertArrayLength(after.taskArns, 1);
     assertIdentical(after.taskArns[0], before.taskArns?.[0]);
 
-    // And the two that were stopped say why.
+    // And the last of the two that were stopped says why.
     const stopped = await ecs.describeTasks(
       new DescribeTasksCommand({ tasks: [before.taskArns?.[2] ?? ""] }),
     );

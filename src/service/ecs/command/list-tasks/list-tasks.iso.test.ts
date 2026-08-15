@@ -67,8 +67,11 @@ describe("ECS ListTasksCommand", () => {
     await simEcsClusterFactory.make({}, simAws);
     await simEcsRegisteredTaskDefinitionFactory.make({}, simAws);
     await simEcsServiceFactory.make({ desiredCount: 2 }, simAws);
-    await ecs.runTask(new RunTaskCommand({ taskDefinition: "checkout" }));
     await simAws.backgroundTasksComplete();
+
+    // And the one run on its own still wanted running, so that a listing that
+    // ignored the service would answer with all three.
+    await ecs.runTask(new RunTaskCommand({ taskDefinition: "checkout" }));
 
     // When the tasks of the service are listed.
     const ofService = await ecs.listTasks(
@@ -78,10 +81,12 @@ describe("ECS ListTasksCommand", () => {
       new ListTasksCommand({ family: "checkout" }),
     );
 
-    // Then only the ones it is keeping running are listed, while the family
-    // holds those two and no more, since the one run on its own has stopped.
+    // Then only the two the service is keeping are listed, out of the three
+    // the family has running.
     assertArrayLength(ofService.taskArns, 2);
-    assertArrayLength(ofFamily.taskArns, 2);
+    assertArrayLength(ofFamily.taskArns, 3);
+
+    await simAws.backgroundTasksComplete();
   });
 
   it("filters by family and by what started the task", async () => {
