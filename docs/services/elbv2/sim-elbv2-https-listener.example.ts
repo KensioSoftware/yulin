@@ -1,5 +1,8 @@
 /**
- * An HTTPS listener presenting a certificate simulated ACM issued.
+ * An HTTPS listener holding a certificate simulated ACM issued.
+ *
+ * No TLS is performed: the certificate is checked and held, and nothing is
+ * encrypted or presented to a client.
  */
 
 import { RequestCertificateCommand } from "@aws-sdk/client-acm";

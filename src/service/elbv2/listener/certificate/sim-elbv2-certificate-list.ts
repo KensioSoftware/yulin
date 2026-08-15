@@ -18,7 +18,7 @@ export class SimElbV2CertificateList {
   #defaultArn: string | undefined;
   readonly #additional = new Set<string>();
 
-  /** The ARN of the certificate this listener presents by default. */
+  /** The ARN of the certificate this listener would present by default. */
   get defaultArn(): string | undefined {
     return this.#defaultArn;
   }

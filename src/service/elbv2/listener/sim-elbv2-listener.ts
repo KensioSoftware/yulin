@@ -16,7 +16,7 @@ interface SimElbV2ListenerProperties {
   readonly port: number;
   readonly protocol: string;
   readonly sslPolicy: string | undefined;
-  /** The ARN of the certificate an HTTPS listener presents by default. */
+  /** The ARN of the certificate an HTTPS listener would present by default. */
   readonly certificateArn: string | undefined;
   readonly defaultActions: readonly SimElbV2Action[];
 }

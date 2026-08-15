@@ -16,6 +16,11 @@ Only the application load balancer is simulated. A network or gateway load balan
 HTTP, which nothing here speaks, so `Type: "network"` is refused rather than created as an
 application load balancer in disguise.
 
+No TLS is performed anywhere in this. An HTTPS listener holds a certificate and is checked against
+simulated ACM, and nothing is ever encrypted or handshaken. See
+[HTTPS listeners and certificates](#https-listeners-and-certificates) for what that leaves a test
+able to conclude.
+
 ## Creating a load balancer
 
 ```typescript sim-elbv2-create-load-balancer
@@ -283,7 +288,10 @@ certificate, and the protocol a request is treated as having arrived on.
 
 ```typescript sim-elbv2-https-listener
 /**
- * An HTTPS listener presenting a certificate simulated ACM issued.
+ * An HTTPS listener holding a certificate simulated ACM issued.
+ *
+ * No TLS is performed: the certificate is checked and held, and nothing is
+ * encrypted or presented to a client.
  */
 
 import { RequestCertificateCommand } from "@aws-sdk/client-acm";
