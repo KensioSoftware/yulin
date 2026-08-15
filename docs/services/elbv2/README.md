@@ -7,8 +7,8 @@ subpath.
 
 A load balancer created here has a DNS name of the shape real ELB issues, so a
 [Route53](../route53/) alias or a [CloudFront](../cloudfront/) origin has something of the right form
-to point at. It also carries a request: a request is matched to a listener by port, and the
-listener's default `forward` action sends it to a target group, where a registered
+to point at. It also carries a request: a request is matched to a listener by port and then to one of
+that listener's rules, and a `forward` action sends it to a target group, where a registered
 [Lambda](../lambda/) function is invoked with the request and its response becomes the HTTP
 response.
 
@@ -187,9 +187,6 @@ on one listener cannot hold the same priority.
 ```typescript sim-elbv2-listener-rules
 /**
  * A listener and a rule sending one host name to a different target group.
- *
- * The rule is stored rather than applied: nothing matches a request against it
- * yet.
  */
 
 import {
@@ -259,10 +256,12 @@ const rules = await elbV2.describeRules(
 console.log(rules.Rules?.map((rule) => rule.Priority)); // ["10", "default"]
 ```
 
-Conditions are held rather than matched, so a request is not routed by them yet. What is checked when
-a rule is written is that it could match something: the field has to be one an Application Load
-Balancer understands, and it has to have values to compare against. A forward action naming a target
-group that was never created is refused for the same reason.
+Conditions are `host-header` and `path-pattern`. What is checked when a rule is written is that it
+could match something: the field has to be one of those two, and it has to have values to compare
+against. A forward action naming a target group that was never created is refused for the same
+reason. The other four condition fields real ELB has are refused, rather than stored and then never
+matched. [Matching a request against the rules](#matching-a-request-against-the-rules) covers how the
+values are compared.
 
 `ModifyRule` changes a rule's conditions and actions but not its priority, as on real ELB. Moving
 rules about is `SetRulePriorities`, which reorders a whole listener, and which judges a request
@@ -275,8 +274,9 @@ places in one request.
 without a socket. The port in the URL is the listener's, so `http://<dns-name>/orders` reaches the
 listener on port 80.
 
-The listener's default action decides what happens next. A `forward` action sends the request to its
-target group, and a `lambda` target group invokes the function registered in it.
+The listener then evaluates its rules, and the first one to claim the request says what happens to
+it. A request no rule claims is answered by the listener's default action. A `forward` action sends
+the request to its target group, and a `lambda` target group invokes the function registered in it.
 
 ```typescript sim-elbv2-serve-lambda-target
 /**
@@ -367,6 +367,230 @@ console.log(response.status); // 200
 console.log(response.statusText); // "OK"
 console.log(await response.json()); // { path: "/orders", method: "GET" }
 ```
+
+### Matching a request against the rules
+
+Rules are evaluated in priority order, lowest number first, and the first one whose conditions all
+hold claims the request. A rule later in the order that would also have matched never sees it. A
+request no rule claims falls through to the listener's default action.
+
+A rule with more than one condition claims a request only when every one of them holds. Within one
+condition, a list of values is satisfied when any one of them matches.
+
+Both fields support the two wildcards real ELB has, `*` for zero or more characters and `?` for
+exactly one, and both compare the pattern against the whole value rather than looking for it inside
+one. That last part is the one worth knowing, because a pattern can read as though it covers
+something it does not:
+
+- `/api/*` claims `/api/orders` and `/api/v1/orders`, and does not claim `/api`. The pattern has a
+  slash the bare path does not. Real ELB behaves the same way, which is why a rule meant to cover
+  both is written as `["/api", "/api/*"]`.
+- `*.example.com` claims `admin.example.com` and `a.b.example.com`, and does not claim
+  `example.com`, for the same reason.
+- `*` covers slashes and dots, so `/api/*` claims paths any number of segments deep.
+
+A path pattern is compared with regard to case and a host name without, as on real ELB. A path
+pattern is compared against the path alone, so a query string is not part of it.
+
+```typescript sim-elbv2-serve-listener-rules
+/**
+ * An application split across two services by path, with the rules matched
+ * when a request arrives.
+ */
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateRuleCommand,
+  CreateTargetGroupCommand,
+  RegisterTargetsCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimElbV2Result } from "@kensio/yulin/elbv2";
+import { simElbV2Fetch, simElbV2ServicePrincipal } from "@kensio/yulin/elbv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const elbV2 = simAws.elbV2();
+const lambda = simAws.lambda();
+
+/**
+ * Create a function answering with its own name, a target group holding it,
+ * and the permission the load balancer needs to invoke it.
+ */
+async function makeTargetGroup(name: string): Promise<string> {
+  const created = await lambda.createFunction(
+    new CreateFunctionCommand({
+      FunctionName: name,
+      Role: `arn:aws:iam::888888888888:role/${name}-role`,
+      Code: {
+        ZipFile: makeLambdaZipFileInput((): SimElbV2Result => ({
+          statusCode: 200,
+          body: name,
+        })),
+      },
+    }),
+  );
+
+  const group = await elbV2.createTargetGroup(
+    new CreateTargetGroupCommand({ Name: `${name}-tg`, TargetType: "lambda" }),
+  );
+  const groupArn = group.TargetGroups?.[0]?.TargetGroupArn;
+
+  await lambda.addPermission(
+    new AddPermissionCommand({
+      FunctionName: name,
+      StatementId: "elb-invoke",
+      Action: "lambda:InvokeFunction",
+      Principal: simElbV2ServicePrincipal,
+      SourceArn: groupArn,
+    }),
+  );
+  await elbV2.registerTargets(
+    new RegisterTargetsCommand({
+      TargetGroupArn: groupArn,
+      Targets: [{ Id: created.FunctionArn }],
+    }),
+  );
+
+  return groupArn ?? "";
+}
+
+const web = await makeTargetGroup("web");
+const api = await makeTargetGroup("api");
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+const listener = await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [{ Type: "forward", TargetGroupArn: web }],
+  }),
+);
+
+await elbV2.createRule(
+  new CreateRuleCommand({
+    ListenerArn: listener.Listeners?.[0]?.ListenerArn,
+    Priority: 10,
+    Conditions: [{ Field: "path-pattern", Values: ["/api/*"] }],
+    Actions: [{ Type: "forward", TargetGroupArn: api }],
+  }),
+);
+
+const dnsName = loadBalancer.LoadBalancers?.[0]?.DNSName ?? "";
+
+const toApi = await simElbV2Fetch(simAws, `http://${dnsName}/api/orders`);
+console.log(await toApi.text()); // "api"
+
+// The pattern has a slash the bare path does not, so this request is not one
+// the rule claims, and the listener's default action answers it.
+const toWeb = await simElbV2Fetch(simAws, `http://${dnsName}/api`);
+console.log(await toWeb.text()); // "web"
+```
+
+A `host-header` condition is matched against the request's Host header, falling back to the host name
+in the URL when the request carries none. On real AWS those are the same thing, since DNS is what
+brought the request to the load balancer. Here a request reaches one at its own DNS name, so sending
+a Host header is how a test says which name the client asked for. Any port in the header is left out
+of the comparison, since a condition value cannot carry one.
+
+### Answering without a target
+
+A `fixed-response` action answers with the status, content type and body it holds, and a `redirect`
+action answers with a status and a `Location`. Neither touches a target group, so a listener holding
+one serves with nothing registered behind it.
+
+```typescript sim-elbv2-serve-fixed-response
+/**
+ * A health endpoint and an HTTP to HTTPS redirect, neither of which needs a
+ * target group.
+ */
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateRuleCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+
+import { SimAws } from "@kensio/yulin";
+import { simElbV2Fetch } from "@kensio/yulin/elbv2";
+
+const simAws = new SimAws();
+const elbV2 = simAws.elbV2();
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+
+// Nothing is registered behind this listener, and nothing needs to be: both
+// actions are answered by the load balancer itself.
+const listener = await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [
+      {
+        Type: "redirect",
+        RedirectConfig: {
+          Protocol: "HTTPS",
+          Port: "443",
+          StatusCode: "HTTP_301",
+        },
+      },
+    ],
+  }),
+);
+
+await elbV2.createRule(
+  new CreateRuleCommand({
+    ListenerArn: listener.Listeners?.[0]?.ListenerArn,
+    Priority: 10,
+    Conditions: [{ Field: "path-pattern", Values: ["/health"] }],
+    Actions: [
+      {
+        Type: "fixed-response",
+        FixedResponseConfig: {
+          StatusCode: "200",
+          ContentType: "application/json",
+          MessageBody: '{"ok":true}',
+        },
+      },
+    ],
+  }),
+);
+
+const dnsName = loadBalancer.LoadBalancers?.[0]?.DNSName ?? "";
+
+const health = await simElbV2Fetch(simAws, `http://${dnsName}/health`);
+console.log(health.status); // 200
+console.log(await health.text()); // '{"ok":true}'
+
+const redirected = await simElbV2Fetch(simAws, `http://${dnsName}/orders`, {
+  headers: { host: "shop.example.com" },
+});
+console.log(redirected.status); // 301
+console.log(redirected.headers.get("location"));
+// "https://shop.example.com:443/orders"
+```
+
+A redirect keeps the components it does not name, and the five reserved keywords put a component back
+where one is named: `#{protocol}`, `#{host}`, `#{port}`, `#{path}` and `#{query}`. `#{path}` comes
+without its leading slash, which is why a redirect keeping the path writes it as `/#{path}`, and
+`#{query}` comes without its leading question mark, which the load balancer adds. A redirect that
+changes none of the protocol, host, port or path is refused when it is written, since it would
+redirect to the request's own URI.
+
+The port is always in the `Location`, including when it is the protocol's own. A redirect to HTTPS on
+443 therefore answers with a `Location` ending `:443`, which is what real ELB sends.
 
 ### The event and the response
 
@@ -716,12 +940,16 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - `CreateListener`, `DescribeListeners`, `ModifyListener` and `DeleteListener`, on HTTP and HTTPS.
 - `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule` and `SetRulePriorities`, with priorities
   unique within a listener and the listener's default rule reported last.
-- `forward`, `fixed-response` and `redirect` actions, and `host-header`, `path-pattern`,
-  `http-header`, `http-request-method`, `query-string` and `source-ip` conditions. A condition is
-  read through its own field's configuration, so one carrying another field's is refused.
+- `forward`, `fixed-response` and `redirect` actions, and `host-header` and `path-pattern`
+  conditions. A condition is read through its own field's configuration, so one carrying another
+  field's is refused.
 - Paged describes with `PageSize` and `Marker`.
-- Carrying a request through `simElbV2Fetch`: a listener matched by port, its default `forward`
-  action, and a `lambda` target group invoking its function with an ALB-shaped event.
+- Carrying a request through `simElbV2Fetch`: a listener matched by port, its rules evaluated in
+  priority order with the first match winning, and a fall through to the default action.
+- `host-header` and `path-pattern` matching with ELB's own wildcard semantics, and a rule claiming a
+  request only when all of its conditions hold.
+- `forward` to a `lambda` target group, which invokes its function with an ALB-shaped event, and the
+  `fixed-response` and `redirect` actions, which the load balancer answers itself.
 - The load balancer's own 503, 502 and 413, and the invoke permission the function's resource policy
   has to grant `elasticloadbalancing.amazonaws.com`.
 - IAM authorization against the ARN of whatever an operation names.
@@ -729,11 +957,22 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 
 ## Limitations
 
-- Only a listener's default action carries a request. Listener rules are stored and are not matched
-  against a request, so every request a listener takes is answered by its default action.
-- Only a `forward` action to a `lambda` target group is performed. A `fixed-response` or `redirect`
-  default action, an `ip` target group, and a `ForwardConfig` naming several target groups by weight
-  are each refused when the request arrives rather than answered with something else.
+- Only `host-header` and `path-pattern` conditions exist. The `http-header`, `http-request-method`,
+  `query-string` and `source-ip` fields real ELB has are refused when the rule is written, rather
+  than stored and then never matching, which would leave a rule that looks configured and claims
+  nothing. Regular expression condition values, which real ELB takes in `RegexValues`, are not
+  matched either.
+- A `host-header` condition is matched against the request's Host header, falling back to the host
+  name in the URL. On real AWS those are the same thing, because DNS is what brought the request to
+  the load balancer, and here a request reaches one at its own DNS name.
+- A `forward` action is carried out only to a `lambda` target group. An `ip` target group and a
+  `ForwardConfig` naming several target groups by weight are each refused when the request arrives
+  rather than answered with something else.
+- A redirect is not checked against the listener it is on, so redirecting HTTPS to HTTP is accepted
+  where real ELB refuses it. Nothing here performs TLS, so the listener's protocol is not something a
+  request can be trusted to have arrived over.
+- The length limits real ELB puts on a condition value, a fixed response's message body and a
+  redirect's components are not enforced.
 - A request only reaches a load balancer through `simElbV2Fetch`. Nothing resolves a load balancer's
   DNS name yet, so `serveSimAws` does not serve one and a Route53 alias to one does not answer.
 - No TLS is performed. `simElbV2Fetch` reads only the port out of a URL, so an `https:` URL reaches

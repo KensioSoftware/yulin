@@ -46,10 +46,18 @@ configured and route nowhere. A request naming no type at all is refused too, be
 defaults it to `instance`.
 
 `SimElbV2Action` and `SimElbV2RuleCondition` hold what a listener or rule would do and what it would
-match, and neither performs it. What they own is that what is stored is something a real load
-balancer would have accepted: a forward action names a target group that exists, a fixed-response
-action has a status code, and a condition is on a field with something to compare against. Each is
-checked when the rule is written rather than when a request arrives.
+match. What they own is that what is stored is something a real load balancer would have accepted: a
+forward action names a target group that exists, a fixed-response action has a status code, and a
+condition is on a field with something to compare against. Each is checked when the rule is written
+rather than when a request arrives.
+
+A condition is read once, when the rule is written, and what comes out of it is a
+`SimElbV2ConditionMatcher` under `listener/rule/match/`, one implementation per field. That is why
+nothing branches on which field a condition was written on once the rule exists, and why a field this
+does not match on is refused there rather than stored: a rule that looks configured and never claims
+a request is the worst of the three outcomes. `SimElbV2WildcardPattern` is the whole of ELB's pattern
+language, which is `*` and `?` compared against the whole value, and keeping it in one class is what
+makes the case sensitivity the only difference between a host name and a path.
 
 `SimElbV2ListenerRuleStore` owns priority uniqueness, because it is a property of a listener's whole
 set of rules rather than of any one rule. `SetRulePriorities` judges a request against the order it
@@ -94,12 +102,21 @@ is refused at runtime with an explanation rather than by the type checker with n
   group to the function registered in it. Neither hop is local: a DNS name says nothing about the
   Account, which is what `registry/sim-elbv2-registry.ts` answers, and a function is looked for in
   the target group's own Account and Region, which is where real ELB requires a Lambda target to be.
-- `sim-elbv2-controller.ts` matches the port to a listener. A port no listener holds throws rather
-  than answering, because on real AWS the connection is refused and there is no status to send.
-- `sim-elbv2-forward-target.ts` performs the listener's default action, which so far means a
-  `forward` to a `lambda` target group. Everything else it could hold is refused here rather than
-  answered with something else, because a load balancer that forwards a request its configuration
-  said to redirect is worse than one that says it cannot.
+- `sim-elbv2-controller.ts` and `sim-elbv2-listener-match.ts` match the port to a listener. A port no
+  listener holds throws rather than answering, because on real AWS the connection is refused and
+  there is no status to send.
+- `sim-elbv2-rule-evaluation.ts` picks the action answering the request. Rules are evaluated in
+  priority order and the first match wins, and a request no rule claims falls through to the
+  listener's default action. What comes out carries the rule or listener it came from, so a refusal
+  can name the thing a reader has to go and change.
+- `sim-elbv2-action-performer.ts` carries that action out. A fixed response and a redirect need no
+  target and are written by the load balancer itself, which is why a listener holding one serves with
+  nothing registered behind it. `sim-elbv2-redirect-location.ts` is separate because building the URI
+  is where the reserved keywords and the components a redirect leaves alone live.
+- `sim-elbv2-forward-target.ts` gets from a `forward` action to the target group it names, which so
+  far has to be a `lambda` one. What it cannot carry out is refused here rather than answered with
+  something else, because a load balancer that quietly sends a request somewhere its configuration
+  did not say is worse than one that says it cannot.
 - `sim-elbv2-lambda-target-invocation.ts` owns what the load balancer answers itself. An empty target
   group is a 503 and everything after that is a 502, which is the same collapse real ELB makes: the
   difference between a missing permission, a missing function and a thrown handler is only in the
@@ -149,6 +166,13 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
 - A listener or rule takes exactly one action. Real ELB takes one routing action with an optional
   authentication action before it, and neither authentication action is simulated, so a longer list
   is refused rather than half honoured.
+- Only `host-header` and `path-pattern` conditions exist here. The other four fields real ELB has are
+  refused when the rule is written, since a stored condition nothing matches would leave a rule that
+  looks configured and never claims a request.
+- A rule is matched against the request's own Host header, falling back to the host name in the URL.
+  On real AWS those are the same thing, because DNS is what brought the request to the load balancer.
+  Here a request reaches one at its own DNS name, so sending a Host header is how a test says which
+  name the client asked for.
 - What a request carries in is copied when it is stored, so a caller mutating the command input it
   sent cannot change a listener or rule afterwards. Real ELB reads the request off the wire and is
   immune to that by construction.

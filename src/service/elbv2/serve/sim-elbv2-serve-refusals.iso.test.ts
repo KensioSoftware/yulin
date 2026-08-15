@@ -5,38 +5,6 @@ import { simElbV2Fetch } from "./sim-elbv2-fetch.js";
 import { simElbV2LambdaTargetFactory } from "./sim-elbv2-lambda-target.factory.js";
 
 describe("What a sim ELBv2 load balancer will not carry a request through", () => {
-  it("refuses a listener whose default action is a fixed response", async () => {
-    // Given a load balancer with a listener
-    const simAws = new SimAws();
-    const loadBalancer = await simElbV2LambdaTargetFactory.make({}, simAws);
-    const elbV2 = simAws.elbV2();
-
-    // And that listener answering with a fixed response rather than forwarding
-    await elbV2.modifyListener({
-      input: {
-        ListenerArn: elbV2.findListenerOnPort(loadBalancer.arn, 80)?.arn,
-        DefaultActions: [
-          {
-            Type: "fixed-response",
-            FixedResponseConfig: { StatusCode: "404" },
-          },
-        ],
-      },
-    });
-
-    // When a request reaches it
-    const request = simElbV2Fetch(
-      simAws,
-      `http://${loadBalancer.dnsName}/orders`,
-    );
-
-    // Then the action is stored and not performed, and saying so beats
-    // forwarding a request the configuration said to answer
-    await expect(request).rejects.toThrow(
-      "answers a request with a 'fixed-response' action",
-    );
-  });
-
   it("refuses a listener forwarding to an ip target group", async () => {
     // Given a load balancer with a listener
     const simAws = new SimAws();
@@ -118,6 +86,55 @@ describe("What a sim ELBv2 load balancer will not carry a request through", () =
     // here reads them
     await expect(request).rejects.toThrow(
       "Weighted forwarding is not simulated",
+    );
+  });
+
+  it("names the rule holding a forward it cannot carry out", async () => {
+    // Given a load balancer with a second target group
+    const simAws = new SimAws();
+    const loadBalancer = await simElbV2LambdaTargetFactory.make({}, simAws);
+    const elbV2 = simAws.elbV2();
+    const checkout = await elbV2.describeTargetGroups({ input: {} });
+    const refunds = await elbV2.createTargetGroup({
+      input: { Name: "refunds-tg", TargetType: "lambda" },
+    });
+
+    // And a rule forwarding to both of them by weight
+    const created = await elbV2.createRule({
+      input: {
+        ListenerArn: elbV2.findListenerOnPort(loadBalancer.arn, 80)?.arn,
+        Priority: 10,
+        Conditions: [{ Field: "path-pattern", Values: ["/web/*"] }],
+        Actions: [
+          {
+            Type: "forward",
+            ForwardConfig: {
+              TargetGroups: [
+                {
+                  TargetGroupArn: checkout.TargetGroups?.[0]?.TargetGroupArn,
+                  Weight: 1,
+                },
+                {
+                  TargetGroupArn: refunds.TargetGroups?.[0]?.TargetGroupArn,
+                  Weight: 1,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    // When a request the rule claims reaches it
+    const request = simElbV2Fetch(
+      simAws,
+      `http://${loadBalancer.dnsName}/web/index.html`,
+    );
+
+    // Then the refusal names the rule holding the action, which is what a
+    // reader has to go and change, rather than only the listener it is on
+    await expect(request).rejects.toThrow(
+      `Rule ${created.Rules?.[0]?.RuleArn ?? ""} forwards to 2 target groups`,
     );
   });
 });

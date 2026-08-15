@@ -167,4 +167,130 @@ describe("sim ELBv2 actions", () => {
     assertStringIncludes(fixedResponse.message, "2XX, 4XX or 5XX");
     assertStringIncludes(redirect.message, "HTTP_301 or HTTP_302");
   });
+
+  it("refuses a content type a fixed response will not be sent as", () => {
+    // Given a fixed response naming a content type ELB does not send.
+    const error = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "fixed-response",
+          FixedResponseConfig: {
+            StatusCode: "200",
+            ContentType: "image/png",
+          },
+        },
+        "Actions",
+      );
+    });
+
+    // Then it is refused: the action is for a short answer the load balancer
+    // writes itself, and the list of types ELB will send is short with it.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "image/png");
+  });
+
+  it("refuses a redirect component ELB would not take", () => {
+    // Given redirects naming a protocol, port and path outside what ELB takes.
+    const protocol = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "redirect",
+          RedirectConfig: { StatusCode: "HTTP_301", Protocol: "FTP" },
+        },
+        "Actions",
+      );
+    });
+
+    assertInstanceOf(protocol, SimElbV2ValidationError);
+
+    const port = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "redirect",
+          RedirectConfig: { StatusCode: "HTTP_301", Port: "99999" },
+        },
+        "Actions",
+      );
+    });
+
+    assertInstanceOf(port, SimElbV2ValidationError);
+
+    const path = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "redirect",
+          RedirectConfig: { StatusCode: "HTTP_301", Path: "moved/#{path}" },
+        },
+        "Actions",
+      );
+    });
+
+    assertInstanceOf(path, SimElbV2ValidationError);
+
+    // Then each is refused when the rule is written.
+    assertStringIncludes(protocol.message, "HTTP, HTTPS or #{protocol}");
+    assertStringIncludes(port.message, "1 to 65535");
+    assertStringIncludes(path.message, "must start with a '/'");
+  });
+
+  it("takes the keywords a redirect reuses the request's own parts with", () => {
+    // Given a redirect keeping every component but the host.
+    const action = SimElbV2Action.read(
+      {
+        Type: "redirect",
+        RedirectConfig: {
+          StatusCode: "HTTP_302",
+          Protocol: "#{protocol}",
+          Host: "new.#{host}",
+          Port: "#{port}",
+          Path: "/#{path}",
+          Query: "#{query}",
+        },
+      },
+      "Actions",
+    );
+
+    // Then it is accepted, since the host is a change and the rest of the URI
+    // being kept is what the keywords are for.
+    assertIdentical(action.redirect?.Host, "new.#{host}");
+  });
+
+  it("refuses a redirect that changes no part of the request URI", () => {
+    // Given a redirect naming only the query string, and one naming every
+    // other component as the request's own.
+    const queryOnly = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "redirect",
+          RedirectConfig: { StatusCode: "HTTP_301", Query: "moved=1" },
+        },
+        "Actions",
+      );
+    });
+
+    assertInstanceOf(queryOnly, SimElbV2ValidationError);
+
+    const unchanged = assertThrowsError(() => {
+      SimElbV2Action.read(
+        {
+          Type: "redirect",
+          RedirectConfig: {
+            StatusCode: "HTTP_301",
+            Protocol: "#{protocol}",
+            Host: "#{host}",
+            Port: "#{port}",
+            Path: "/#{path}",
+          },
+        },
+        "Actions",
+      );
+    });
+
+    assertInstanceOf(unchanged, SimElbV2ValidationError);
+
+    // Then both are refused, because a redirect to the request's own URI is a
+    // loop, and real ELB requires the protocol, host, port or path to change.
+    assertStringIncludes(queryOnly.message, "redirects to itself");
+    assertStringIncludes(unchanged.message, "redirects to itself");
+  });
 });

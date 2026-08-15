@@ -17,6 +17,8 @@ export { SimElbV2Listener } from "./listener/sim-elbv2-listener.js";
 export type { SimElbV2ListenerView } from "./listener/sim-elbv2-listener.js";
 export { SimElbV2ListenerRule } from "./listener/rule/sim-elbv2-listener-rule.js";
 export type { SimElbV2ListenerRuleView } from "./listener/rule/sim-elbv2-listener-rule.js";
+export { SimElbV2RuleCondition } from "./listener/rule/sim-elbv2-rule-condition.js";
+export type { SimElbV2MatchableRequest } from "./listener/rule/match/sim-elbv2-matchable-request.js";
 export { SimElbV2Action } from "./action/sim-elbv2-action.js";
 export { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
 export { SimElbV2ServiceController } from "./serve/sim-elbv2-controller.js";
@@ -36,6 +38,10 @@ export {
   simElbV2LambdaTargetFactory,
   type SimElbV2LambdaTargetInput,
 } from "./serve/sim-elbv2-lambda-target.factory.js";
+export {
+  simElbV2ServingTargetGroupFactory,
+  type SimElbV2ServingTargetGroupInput,
+} from "./serve/sim-elbv2-serving-target-group.factory.js";
 export {
   SimElbV2AccessDeniedException,
   SimElbV2ConnectionRefusedError,

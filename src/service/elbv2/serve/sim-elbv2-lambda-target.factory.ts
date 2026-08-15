@@ -2,15 +2,17 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
 import type { SimElbV2LoadBalancer } from "../load-balancer/sim-elbv2-load-balancer.js";
 import {
-  createFixtureLambdaTargetGroup,
   createFixtureListener,
   createFixtureLoadBalancer,
 } from "../sim-elbv2.fixture.js";
-import type { SimElbV2Event, SimElbV2Result } from "./sim-elbv2-event.type.js";
-import { simElbV2ServicePrincipal } from "./sim-elbv2-invoke-authorizer.js";
+import type { SimElbV2Event } from "./sim-elbv2-event.type.js";
+import {
+  simElbV2CheckoutHandler,
+  simElbV2InvokeStatementId,
+  simElbV2ServingTargetGroupFactory,
+} from "./sim-elbv2-serving-target-group.factory.js";
 
 /**
  * The load balancer, target group and function this builds.
@@ -23,7 +25,7 @@ export const simElbV2LambdaTargetNames = {
   targetGroup: "checkout-tg",
   function: "checkout",
   /** The statement id the invoke permission is granted under. */
-  invokeStatement: "elb-invoke",
+  invokeStatement: simElbV2InvokeStatementId,
 } as const;
 
 /**
@@ -65,49 +67,24 @@ export const simElbV2LambdaTargetFactory = new AsyncMappedFactory<
   SimElbV2LoadBalancer,
   SimAws
 >(
-  () => ({
-    handler: (): SimElbV2Result => ({ statusCode: 200, body: "checkout" }),
-    listenerPort: 80,
-  }),
+  () => ({ handler: simElbV2CheckoutHandler, listenerPort: 80 }),
   async (input, simAws) => {
     const names = simElbV2LambdaTargetNames;
-    const simLambda = simAws.lambda();
-    const { FunctionArn } = await simLambda.createFunction({
-      input: {
-        FunctionName: names.function,
-        Role: "arn:aws:iam::888888888888:role/CheckoutRole",
-        Code: { ZipFile: makeLambdaZipFileInput(input.handler) },
-      },
-    });
+    const targetGroup = await simElbV2ServingTargetGroupFactory.make(
+      { name: names.function, handler: input.handler },
+      simAws,
+    );
 
     const elbV2 = simAws.elbV2();
     const balancerArn = await createFixtureLoadBalancer(
       elbV2,
       names.loadBalancer,
     );
-    const groupArn = await createFixtureLambdaTargetGroup(
-      elbV2,
-      names.targetGroup,
-    );
-
-    await simLambda.addPermission({
-      input: {
-        FunctionName: names.function,
-        StatementId: names.invokeStatement,
-        Action: "lambda:InvokeFunction",
-        Principal: simElbV2ServicePrincipal,
-        SourceArn: groupArn,
-      },
-    });
-
-    await elbV2.registerTargets({
-      input: { TargetGroupArn: groupArn, Targets: [{ Id: FunctionArn }] },
-    });
 
     await createFixtureListener(
       elbV2,
       balancerArn,
-      groupArn,
+      targetGroup.arn,
       input.listenerPort,
     );
 

@@ -180,7 +180,7 @@ describe("ELBv2 listener rules", () => {
     const output = await elbV2.modifyRule(
       new ModifyRuleCommand({
         RuleArn: ruleArn,
-        Conditions: [{ Field: "http-request-method", Values: ["POST"] }],
+        Conditions: [{ Field: "path-pattern", Values: ["/orders"] }],
         Actions: [
           {
             Type: "redirect",
@@ -197,7 +197,7 @@ describe("ELBv2 listener rules", () => {
     assertIdentical(rule.Priority, "10");
     assertArrayLength(rule.Conditions, 1);
     assertArrayLength(rule.Actions, 1);
-    assertIdentical(rule.Conditions[0].Field, "http-request-method");
+    assertIdentical(rule.Conditions[0].Field, "path-pattern");
     assertIdentical(rule.Actions[0].Type, "redirect");
   });
 

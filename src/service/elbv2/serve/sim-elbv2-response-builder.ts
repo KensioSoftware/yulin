@@ -1,6 +1,7 @@
 import { SimElbV2BodyEncoding } from "./sim-elbv2-body-encoding.js";
 import { SimElbV2ErrorResponse } from "./sim-elbv2-error-response.js";
 import type { SimElbV2Result } from "./sim-elbv2-event.type.js";
+import { simElbV2NullBodyStatuses } from "./sim-elbv2-null-body-statuses.js";
 
 /**
  * The largest response real ELB takes from a Lambda target.
@@ -9,11 +10,6 @@ import type { SimElbV2Result } from "./sim-elbv2-event.type.js";
  * so a base64 body counts at its encoded size and the headers count too.
  */
 const maximumResponseBytes = 1024 * 1024;
-
-/**
- * The statuses that cannot carry a body, whatever a handler returns with them.
- */
-const nullBodyStatuses: ReadonlySet<number> = new Set([204, 205, 304]);
 
 /**
  * The response headers a load balancer writes itself rather than passing on.
@@ -113,7 +109,7 @@ export class SimElbV2ResponseBuilder {
     statusCode: number,
     body: Uint8Array | string,
   ): Uint8Array | string | null {
-    if (nullBodyStatuses.has(statusCode) || body.length === 0) {
+    if (simElbV2NullBodyStatuses.has(statusCode) || body.length === 0) {
       return null;
     }
 
