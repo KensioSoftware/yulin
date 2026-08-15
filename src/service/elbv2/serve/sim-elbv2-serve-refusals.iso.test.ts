@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { simElbV2Fetch } from "./sim-elbv2-fetch.js";
 import { simElbV2LambdaTargetFactory } from "./sim-elbv2-lambda-target.factory.js";
@@ -133,8 +134,11 @@ describe("What a sim ELBv2 load balancer will not carry a request through", () =
 
     // Then the refusal names the rule holding the action, which is what a
     // reader has to go and change, rather than only the listener it is on
+    const ruleArn = created.Rules?.[0]?.RuleArn;
+    assertDefined(ruleArn, "CreateRule reported no rule ARN");
+
     await expect(request).rejects.toThrow(
-      `Rule ${created.Rules?.[0]?.RuleArn ?? ""} forwards to 2 target groups`,
+      `Rule ${ruleArn} forwards to 2 target groups`,
     );
   });
 });

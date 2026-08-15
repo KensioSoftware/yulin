@@ -971,8 +971,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - A redirect is not checked against the listener it is on, so redirecting HTTPS to HTTP is accepted
   where real ELB refuses it. Nothing here performs TLS, so the listener's protocol is not something a
   request can be trusted to have arrived over.
-- The length limits real ELB puts on a condition value, a fixed response's message body and a
-  redirect's components are not enforced.
+- The length limits real ELB puts on a fixed response's message body and a redirect's components are
+  not enforced. A condition value is held to ELB's own 128 characters.
 - A request only reaches a load balancer through `simElbV2Fetch`. Nothing resolves a load balancer's
   DNS name yet, so `serveSimAws` does not serve one and a Route53 alias to one does not answer.
 - No TLS is performed. `simElbV2Fetch` reads only the port out of a URL, so an `https:` URL reaches

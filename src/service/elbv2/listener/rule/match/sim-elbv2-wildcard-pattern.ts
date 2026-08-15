@@ -32,9 +32,11 @@ export class SimElbV2WildcardPattern {
      * The pattern is not read as an expression: every character with a meaning
      * of its own is escaped above, and only the two ELB wildcards become
      * syntax. A pattern holding many of them compiles to as many `.*` runs and
-     * can take a backtracking engine a while to settle on a long near miss,
-     * which is left alone: a condition value is written by whoever wrote the
-     * rule and is never carried on a request.
+     * can take a backtracking engine a while to settle on a long near miss.
+     * The value is bounded to ELB's own 128 characters before it gets here,
+     * and beyond that this is left alone: a condition value is written by
+     * whoever wrote the rule and is never carried on a request, so the only
+     * run a pathological one can hold up is that author's own.
      */
     // oxlint-disable-next-line security/detect-non-literal-regexp
     this.expression = new RegExp(`^${source}$`, flags);

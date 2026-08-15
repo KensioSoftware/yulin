@@ -2,6 +2,7 @@ import type { SimElbV2RuleConditionInput } from "../../command/rule/rule-conditi
 import { SimElbV2ValidationError } from "../../error/sim-elbv2.error.js";
 import { requireSimElbV2ConditionField } from "./match/sim-elbv2-condition-fields.js";
 import type { SimElbV2ConditionMatcher } from "./match/sim-elbv2-condition-matcher.js";
+import { requireSimElbV2ConditionValues } from "./match/sim-elbv2-condition-values.js";
 import type { SimElbV2MatchableRequest } from "./match/sim-elbv2-matchable-request.js";
 
 /**
@@ -57,13 +58,10 @@ export class SimElbV2RuleCondition {
     }
 
     const definition = requireSimElbV2ConditionField(field);
-    const values = definition.values(input);
-
-    if (values.length === 0) {
-      throw new SimElbV2ValidationError(
-        `A '${field}' condition requires at least one value`,
-      );
-    }
+    const values = requireSimElbV2ConditionValues(
+      definition.values(input),
+      field,
+    );
 
     return new SimElbV2RuleCondition(input, field, definition.matcher(values));
   }

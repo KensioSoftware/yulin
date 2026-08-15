@@ -135,4 +135,26 @@ describe("sim ELBv2 rule conditions", () => {
     assertStringIncludes(hostHeader.message, "at least one value");
     assertStringIncludes(pathPattern.message, "at least one value");
   });
+
+  it("refuses a value longer than ELB takes", () => {
+    // Given a path pattern at the limit, and one character past it.
+    const atLimit = SimElbV2RuleCondition.read({
+      Field: "path-pattern",
+      Values: [`/${"a".repeat(127)}`],
+    });
+
+    assertIdentical(atLimit.field, "path-pattern");
+
+    const error = assertThrowsError(() => {
+      SimElbV2RuleCondition.read({
+        Field: "path-pattern",
+        Values: [`/${"a".repeat(128)}`],
+      });
+    });
+
+    // Then the longer one is refused here rather than by AWS after a passing
+    // test, which is the divergence worth avoiding.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "at most 128");
+  });
 });
