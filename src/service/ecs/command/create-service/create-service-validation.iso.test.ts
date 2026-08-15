@@ -25,22 +25,22 @@ describe("Refusing a simulated ECS CreateService request", () => {
     await simEcsClusterFactory.make({}, simAws);
     await simEcsRegisteredTaskDefinitionFactory.make({}, simAws);
 
-    // When a service is created behind a load balancer.
+    // When a service is created registered with service discovery.
     const error = await assertThrowsErrorAsync(async () =>
       simAws.ecs().createService(
         new CreateServiceCommand({
           serviceName: "checkout",
           taskDefinition: "checkout",
           desiredCount: 1,
-          loadBalancers: [{ containerName: "app", containerPort: 8080 }],
+          serviceRegistries: [{ containerName: "app", containerPort: 8080 }],
         }),
       ),
     );
 
-    // Then it is refused rather than dropped, since nothing here would send it
-    // a request.
+    // Then it is refused rather than dropped, since nothing here resolves a
+    // service by name.
     assertInstanceOf(error, SimEcsClientException);
-    assertStringIncludes(error.message, "loadBalancers");
+    assertStringIncludes(error.message, "serviceRegistries");
     assertStringIncludes(error.message, "not simulated");
   });
 

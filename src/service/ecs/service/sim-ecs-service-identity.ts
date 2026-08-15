@@ -1,5 +1,8 @@
 import type { SimArn } from "../../aws/arn.js";
-import type { SimEcsServiceDetail } from "./sim-ecs-service-detail.js";
+import type {
+  SimEcsServiceDetail,
+  SimEcsServiceLoadBalancer,
+} from "./sim-ecs-service-detail.js";
 
 /**
  * What a service is, as opposed to what it is being kept at.
@@ -12,6 +15,7 @@ export interface SimEcsServiceIdentityProperties {
   readonly createdAt: Date;
   readonly launchType?: string | undefined;
   readonly createdBy?: string | undefined;
+  readonly loadBalancers?: readonly SimEcsServiceLoadBalancer[] | undefined;
 }
 
 /**
@@ -35,6 +39,7 @@ export class SimEcsServiceIdentity {
   public readonly clusterArn: SimArn;
   public readonly clusterName: string;
   public readonly launchType: string | undefined;
+  public readonly loadBalancers: readonly SimEcsServiceLoadBalancer[];
 
   private readonly declared: SimEcsServiceIdentityProperties;
 
@@ -45,14 +50,17 @@ export class SimEcsServiceIdentity {
     this.clusterArn = declared.clusterArn;
     this.clusterName = declared.clusterName;
     this.launchType = declared.launchType;
+    this.loadBalancers = declared.loadBalancers ?? [];
   }
 
   /**
    * This part of the service as `DescribeServices` reports it.
    *
-   * The load balancers and service registries are honestly empty rather than
-   * left out: a service registers with neither here, and reporting nothing at
-   * all would read as a service that had not been asked about them.
+   * The load balancers are the ones the service was created with, held as they
+   * were declared, because nothing here sends a service a request yet. The
+   * service registries are honestly empty rather than left out: a service
+   * registers with none here, and reporting nothing at all would read as a
+   * service that had not been asked about them.
    */
   toOutput(): SimEcsServiceIdentityDetail {
     const { serviceArn, serviceName, clusterArn, createdAt } = this.declared;
@@ -62,7 +70,7 @@ export class SimEcsServiceIdentity {
       serviceName,
       clusterArn,
       createdAt,
-      loadBalancers: [],
+      loadBalancers: this.loadBalancers,
       serviceRegistries: [],
       ...(this.launchType !== undefined && { launchType: this.launchType }),
       ...(this.declared.createdBy !== undefined && {
