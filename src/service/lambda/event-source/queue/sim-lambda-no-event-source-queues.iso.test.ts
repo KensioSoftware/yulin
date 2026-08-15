@@ -5,7 +5,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimLambdaNoEventSourceQueues } from "./sim-lambda-event-source-queues.js";
+import { SimLambdaNoEventSourceQueues } from "./sim-lambda-no-event-source-queues.js";
 
 const queueArn = "arn:aws:sqs:eu-west-2:111111111111:orders";
 const request = {

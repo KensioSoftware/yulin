@@ -2,14 +2,14 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { SimLambdaFunctionLookup } from "../function/url/sim-lambda-function-lookup.js";
 import { makeSimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-poller-factory.js";
 import type { SimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-poller.js";
-import type { SimLambdaEventSourceQueues } from "./queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "./sim-lambda-event-source-mapping.js";
 import type { SimLambdaEventSourceStreams } from "./stream/sim-lambda-event-source-streams.js";
 
 interface SimLambdaEventSourcePollersProperties {
   readonly functions: SimLambdaFunctionLookup;
-  readonly queues: SimLambdaEventSourceQueues;
+  readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
   readonly background: BackgroundScheduler;
 }

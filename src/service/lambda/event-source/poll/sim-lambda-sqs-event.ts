@@ -1,7 +1,7 @@
 import type {
-  SimLambdaEventSourceMessage,
-  SimLambdaEventSourceMessageAttribute,
-} from "../queue/sim-lambda-event-source-queues.js";
+  SimSqsPollMessage,
+  SimSqsPollMessageAttribute,
+} from "../../../sqs/poll/sim-sqs-poll-message.js";
 import type { SimLambdaSqsEventSourceArn } from "../queue/sim-lambda-sqs-event-source-arn.js";
 
 /**
@@ -60,13 +60,11 @@ export class SimLambdaSqsEventBuilder {
   /**
    * The event for a batch of messages.
    */
-  of(messages: readonly SimLambdaEventSourceMessage[]): SimLambdaSqsEvent {
+  of(messages: readonly SimSqsPollMessage[]): SimLambdaSqsEvent {
     return { Records: messages.map((message) => this.record(message)) };
   }
 
-  private record(
-    message: SimLambdaEventSourceMessage,
-  ): SimLambdaSqsEventRecord {
+  private record(message: SimSqsPollMessage): SimLambdaSqsEventRecord {
     return {
       messageId: message.MessageId,
       receiptHandle: message.ReceiptHandle,
@@ -81,7 +79,7 @@ export class SimLambdaSqsEventBuilder {
   }
 
   private messageAttributes(
-    message: SimLambdaEventSourceMessage,
+    message: SimSqsPollMessage,
   ): Record<string, SimLambdaSqsEventMessageAttribute> {
     return Object.fromEntries(
       Object.entries(message.MessageAttributes ?? {}).map(([name, value]) => [
@@ -93,7 +91,7 @@ export class SimLambdaSqsEventBuilder {
 }
 
 function eventMessageAttribute(
-  attribute: SimLambdaEventSourceMessageAttribute,
+  attribute: SimSqsPollMessageAttribute,
 ): SimLambdaSqsEventMessageAttribute {
   return {
     stringValue: attribute.StringValue,

@@ -8,7 +8,7 @@ import type {
   SimLambdaEventSourceStreamBatch,
   SimLambdaEventSourceStreamPosition,
 } from "../stream/sim-lambda-event-source-streams.js";
-import { SimLambdaEventSourcePollSchedule } from "./sim-lambda-event-source-poll-schedule.js";
+import { PollSchedule } from "../../../../util/background/poll-schedule.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamCheckpoint } from "./sim-lambda-stream-checkpoint.js";
 import { SimLambdaStreamRetryBackoff } from "./sim-lambda-stream-retry-backoff.js";
@@ -33,7 +33,7 @@ interface SimLambdaStreamProgressProperties {
 export class SimLambdaStreamProgress {
   private readonly checkpoint: SimLambdaStreamCheckpoint;
   private readonly backoff = new SimLambdaStreamRetryBackoff();
-  private readonly schedule: SimLambdaEventSourcePollSchedule;
+  private readonly schedule: PollSchedule;
 
   constructor(properties: SimLambdaStreamProgressProperties) {
     // A stream mapping is refused at creation unless it names a starting
@@ -43,7 +43,7 @@ export class SimLambdaStreamProgress {
     assertDefined(startingPosition, "DynamoDB stream mapping start position");
 
     this.checkpoint = new SimLambdaStreamCheckpoint(startingPosition);
-    this.schedule = new SimLambdaEventSourcePollSchedule(properties);
+    this.schedule = new PollSchedule(properties);
   }
 
   /**

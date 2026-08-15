@@ -2,6 +2,7 @@ import type { BackgroundScheduler } from "../../util/background/background.js";
 import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimSqsPollQueues } from "../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimEcsSecretStores } from "./task/run/secret/sim-ecs-secret-stores.js";
 
 /**
@@ -36,4 +37,13 @@ export interface SimEcsProperties {
    * than running without it.
    */
   readonly secretStores?: SimEcsSecretStores;
+
+  /**
+   * The queues a container bound to consume one polls.
+   *
+   * This is the surrounding simulation's SQS when ECS was built through a
+   * SimAws instance. Simulated ECS built on its own reaches none, so a
+   * consuming container says so rather than polling nothing forever.
+   */
+  readonly consumerQueues?: SimSqsPollQueues;
 }

@@ -4,6 +4,7 @@ import type { SimEcsSecretStores } from "../../task/run/secret/sim-ecs-secret-st
 import type { SimEcsTaskArn } from "../../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../../task/sim-ecs-task-store.js";
 import type { SimEcsTask } from "../../task/sim-ecs-task.js";
+import type { SimEcsServiceConsumers } from "../consume/sim-ecs-service-consumers.js";
 import type { SimEcsService } from "../sim-ecs-service.js";
 import type { SimEcsServiceDeployment } from "./sim-ecs-service-deployment.js";
 import { SimEcsServiceTaskStarter } from "./sim-ecs-service-task-starter.js";
@@ -13,6 +14,8 @@ interface SimEcsServiceTasksProperties {
   readonly taskArn: SimEcsTaskArn;
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
+  readonly consumers: SimEcsServiceConsumers;
+  readonly regionName: string;
   readonly background: BackgroundScheduler;
 }
 
@@ -42,14 +45,20 @@ const stoppedReasons = {
 export class SimEcsServiceTasks {
   private readonly background: BackgroundScheduler;
   private readonly starter: SimEcsServiceTaskStarter;
+  private readonly consumers: SimEcsServiceConsumers;
 
   constructor(properties: SimEcsServiceTasksProperties) {
     this.background = properties.background;
     this.starter = new SimEcsServiceTaskStarter(properties);
+    this.consumers = properties.consumers;
   }
 
   /**
    * Bring a service's tasks to the count it wants, starting or stopping them.
+   *
+   * A service scaled to nothing stops consuming as well, since there is no
+   * container left to be doing it. Scaling back out starts it again, because
+   * the task that comes up asks for polling as any first task does.
    */
   reconcile(deployment: SimEcsServiceDeployment): void {
     const { service } = deployment;
@@ -64,6 +73,10 @@ export class SimEcsServiceTasks {
       service.tasks.takeNewest(-shortfall),
       stoppedReasons.scaledIn,
     );
+
+    if (service.tasks.count === 0) {
+      this.consumers.stop(service);
+    }
   }
 
   /**
@@ -80,8 +93,14 @@ export class SimEcsServiceTasks {
 
   /**
    * Stop every task a service is running, and give up holding them.
+   *
+   * The queue polling its containers were doing stops with them. A redeploy
+   * comes back through here and then starts again from the revision the
+   * service moved to, so a container that stopped consuming, or started, in the
+   * new revision is polled for accordingly.
    */
   stopAll(service: SimEcsService, reason: string): void {
+    this.consumers.stop(service);
     this.stopEach(service.tasks.takeAll(), reason);
   }
 

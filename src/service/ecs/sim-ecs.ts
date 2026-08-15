@@ -243,6 +243,12 @@ export class SimEcs {
    * });
    * ```
    *
+   * A container that consumes a queue declares `consumes` instead of `run`,
+   * with a `queueUrl` and a `handler` for a batch of messages. Yulin drives the
+   * polling loop while a service is running the container and the binding
+   * supplies its body, so the batch is deleted when the handler returns and
+   * left on the queue when it throws. Polling is done as the task Role.
+   *
    * Bindings belong to the Account and Region they were made in, as the task
    * definitions they target do, and can be made before or after the task
    * definition is registered.

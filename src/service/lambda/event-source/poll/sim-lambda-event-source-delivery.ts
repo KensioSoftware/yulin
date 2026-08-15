@@ -1,5 +1,5 @@
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
-import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollMessage } from "../../../sqs/poll/sim-sqs-poll-message.js";
 import type {
   SimLambdaEventSourceBatchOutcome,
   SimLambdaEventSourceBatchResponse,
@@ -30,9 +30,7 @@ export interface SimLambdaEventSourceEvent {
  * decides which builder it gets.
  */
 export interface SimLambdaEventSourceEventBuilder {
-  of(
-    messages: readonly SimLambdaEventSourceMessage[],
-  ): SimLambdaEventSourceEvent;
+  of(messages: readonly SimSqsPollMessage[]): SimLambdaEventSourceEvent;
 }
 
 interface SimLambdaEventSourceDeliveryProperties {
@@ -64,7 +62,7 @@ export class SimLambdaEventSourceDelivery {
    */
   async to(
     simFunction: SimLambdaFunction,
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
   ): Promise<SimLambdaEventSourceBatchOutcome> {
     try {
       return this.batchResponse.handled(

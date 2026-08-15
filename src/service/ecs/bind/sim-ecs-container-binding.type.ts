@@ -1,3 +1,38 @@
+import type { SimSqsPollMessage } from "../../sqs/poll/sim-sqs-poll-message.js";
+
+/**
+ * One message as a consuming container is handed it.
+ *
+ * These are the queue's own field names, which is what a container reading a
+ * queue with the SDK gets back from `ReceiveMessage`.
+ */
+export type SimEcsQueueMessage = SimSqsPollMessage;
+
+/**
+ * What a bound container does with a batch of messages from its queue.
+ *
+ * This is the body of the loop a real worker container writes, rather than the
+ * loop: returning means the batch was handled and can be deleted, and throwing
+ * means it was not, which leaves it to come back after the visibility timeout.
+ */
+export type SimEcsContainerConsumeHandler = (
+  messages: readonly SimEcsQueueMessage[],
+) => void | Promise<void>;
+
+/**
+ * The queue a bound container consumes, and how.
+ *
+ * The queue is named by its URL, since that is what `CreateQueue` answers with
+ * and what a container's own environment usually carries. A batch size is how
+ * many messages the handler is given at once, up to the ten SQS will hand out
+ * in one receive.
+ */
+export interface SimEcsContainerQueueConsumer {
+  readonly queueUrl: string;
+  readonly batchSize?: number;
+  readonly handler: SimEcsContainerConsumeHandler;
+}
+
 /**
  * What a bound container does when a task runs it.
  *
@@ -43,11 +78,30 @@ export type SimEcsContainerBindingTarget =
     };
 
 /**
- * What a bound container runs, which is one shape or the other.
+ * What a bound container runs, which is one shape or another.
+ *
+ * A `run` handler is a job container, which does its work and exits. A
+ * `consumes` declaration is a worker container, which a real image would put in
+ * an endless receive-handle-delete loop. Yulin runs that loop and the binding
+ * supplies its body, because an endless loop in a single Node.js process would
+ * never yield to the test running it.
  */
 export type SimEcsContainerBindingHandler =
-  | { readonly run: SimEcsContainerRunHandler; readonly http?: never }
-  | { readonly http: SimEcsContainerHttpHandler; readonly run?: never };
+  | {
+      readonly run: SimEcsContainerRunHandler;
+      readonly http?: never;
+      readonly consumes?: never;
+    }
+  | {
+      readonly http: SimEcsContainerHttpHandler;
+      readonly run?: never;
+      readonly consumes?: never;
+    }
+  | {
+      readonly consumes: SimEcsContainerQueueConsumer;
+      readonly run?: never;
+      readonly http?: never;
+    };
 
 /**
  * A real in-process handler bound to a container a task definition declares.

@@ -847,9 +847,202 @@ for its state — how many tasks it keeps, which revision they run — rather th
 running three things at once. A test that needs concurrency is a test about your own code, not about
 ECS.
 
-Nothing calls a service container's handler yet. A container of a service that has come up is
-treated as running from that point, and what will call it is whatever reaches it: a load balancer
-sending it a request, or a queue it polls. Both follow separately.
+A container of a service that has come up is treated as running from that point, and what calls it
+is whatever reaches it: a queue it consumes, or a load balancer sending it a request. Consuming a
+queue is covered below; being served a request follows separately.
+
+### Consuming a queue
+
+A worker container reads an SQS queue in a loop: receive a batch, handle it, delete it, go round
+again. A binding cannot do that. An endless loop in a single Node.js process blocks everything and
+never yields to the test running it, so nothing would ever get to assert on what the loop did.
+
+So Yulin runs the loop and the binding supplies its body. A container declares `consumes` instead of
+`run`, naming the queue and a handler for a batch of messages, and Yulin receives, hands the batch
+over, and deletes it when the handler returns. The bound thing is the body of the loop rather than
+the loop itself, which is the one divergence worth keeping in mind here.
+
+```typescript sim-ecs-consume-queue
+/**
+ * A simulated ECS service whose container consumes an SQS queue.
+ */
+
+import {
+  CreateClusterCommand,
+  CreateServiceCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+const sqs = simAws.sqs();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const queue = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "orders" }),
+);
+const queueUrl = queue.QueueUrl ?? "";
+
+const taskRole = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersWorkerTaskRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "ecs-tasks.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersWorkerTaskRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const handled: string[] = [];
+
+ecs.bindContainer({
+  family: "orders-worker",
+  containerName: "app",
+  consumes: {
+    queueUrl,
+    batchSize: 10,
+    handler: (messages) => {
+      handled.push(...messages.map((message) => message.Body));
+    },
+  },
+});
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    taskRoleArn: taskRole.Role.Arn,
+    containerDefinitions: [{ name: "app", image: "orders-worker:1" }],
+  }),
+);
+await ecs.createService(
+  new CreateServiceCommand({
+    cluster: "orders",
+    serviceName: "orders-worker",
+    taskDefinition: "orders-worker",
+    desiredCount: 1,
+  }),
+);
+
+await sqs.sendMessage(
+  new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
+);
+await simAws.backgroundTasksComplete();
+
+console.log(handled); // ["order-1"]
+```
+
+The queue is named by the URL `CreateQueue` answered with, and it has to be in the same account and
+region as the service, as a real task's own queue is. A `batchSize` is how many messages the handler
+is given at once, up to the ten one SQS receive hands out; it defaults to ten. The handler may be
+async, and is awaited. A container that declares `consumes` declares no `run` handler, and binding
+one that declares both is refused.
+
+The task role is not optional here, which is the part worth noticing before writing the first one.
+Polling is done as the task role, so a task definition with no `taskRoleArn` polls as nobody and its
+very first poll is denied. That is what a real worker container with no credentials would hit.
+
+#### Polling runs on the simulated clock
+
+Yulin never polls in the background of a test. A message that can be received now is delivered as
+soon as the simulation settles, so `await simAws.backgroundTasksComplete()` is enough for an
+ordinary send. Anything that has to wait — a message sent with `DelaySeconds`, or a batch coming back
+after its visibility timeout — waits on the simulated clock, so freezing time holds it and advancing
+time delivers it.
+
+```typescript sim-ecs-consume-queue-clock
+/**
+ * Driving a simulated ECS container's polling with the simulated clock.
+ */
+
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const queueUrl: string;
+declare const handled: string[];
+
+simAws.clock().freeze();
+
+await simAws.sqs().sendMessage(
+  new SendMessageCommand({
+    QueueUrl: queueUrl,
+    MessageBody: "order-1",
+    DelaySeconds: 60,
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+console.log(handled.length); // 0, the message is not receivable yet
+
+await simAws.clock().advanceBy({ seconds: 60 });
+
+console.log(handled.length); // 1, the clock got there and the poll happened
+```
+
+#### What the handler returning and throwing mean
+
+A handler that returns has handled the batch, so Yulin deletes it. A handler that throws has not, so
+the whole batch is left on the queue: it stays hidden for the queue's visibility timeout and is
+handed over again when that runs out, which is what a real worker crashing part way through a batch
+does. A redrive policy therefore gives up on a message the handler keeps throwing on, exactly as it
+would for the deployed container.
+
+The error goes no further than the container. What the sender sees is the message coming back.
+
+#### Polling is authorized as the task role
+
+Receiving, deleting and reading the queue's visibility timeout are all made as the task definition's
+`taskRoleArn`, and so is anything the handler itself does. A task role without `sqs:ReceiveMessage`,
+`sqs:DeleteMessage` or `sqs:GetQueueAttributes` on the queue is refused, which surfaces from
+`backgroundTasksComplete()` rather than being quietly allowed. That is the point of it: a policy that
+would break the deployed worker breaks the test.
+
+A task definition with no `taskRoleArn` polls anonymously and is denied at its very first poll, as a
+real task with no credentials of its own would be.
+
+#### Polling starts and stops with the service
+
+Polling starts when the service's first task comes up and stops when the service is deleted, scaled
+to zero, or its `SimAws` is closed. A stopped poller leaves nothing watching the queue and nothing
+waiting on the clock, so a test that finishes with a consuming service leaves nothing behind it.
+
+There is one poller per service and container, not one per task. A desired count of three is three
+simulated tasks reported as running, and the handler is still called once per poll, which is the same
+divergence the desired count already rests on. Three real containers would each run their own loop
+and share the queue between them, which comes to the same messages being handled once.
+
+A consuming container is the one kind a `RunTask` task cannot run. It has no handler that ends, and a
+task has to end, so a task started from the same definition records the container as not simulated
+with a reason saying to create a service instead.
 
 ### Updating and deleting a service
 
@@ -1346,10 +1539,13 @@ console.log(described.taskDefinition?.revision); // 1
 - `DescribeServicesCommand` and `DeleteServiceCommand`, with the `force` a scaled-up service needs
 - `ListTasks` filtering by `serviceName`, so a service's tasks can be listed on their own
 - `bindContainer`, targeting a container by family and container name or by image repository
+- A container binding that `consumes` a simulated SQS queue, with Yulin driving the polling loop on
+  the simulated clock while the service is running
 - `AWS::ECS::Cluster`, answering `Ref` with the cluster name and `Fn::GetAtt` with `Arn`
 - `AWS::ECS::TaskDefinition`, registering a revision and answering `Ref` with its ARN
 - Deploy-time container bindings, targeting a container by family and container name, by the task
-  definition's logical ID or CDK construct ID, or by its image repository
+  definition's logical ID or CDK construct ID, or by its image repository, and declaring `run` or
+  `consumes` as a directly bound container does
 - Task and execution roles resolved from a `Ref` to a same-stack role or from an ARN
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
@@ -1416,11 +1612,25 @@ Current documented limitations:
 - A service's desired count is simulated as state rather than as concurrency. Three tasks exist and
   are reported as running, and the handler bound to a container is called once per request or per
   poll rather than once per task. Yulin runs in one Node.js process, so there is nothing to copy.
-- Nothing calls a service container's handler yet. A bound container of a service is treated as
-  running and stays available until the service is deleted or its `SimAws` is closed, but a load
-  balancer sending it a request and a queue it polls both follow separately. Its container secrets
-  are resolved as the task comes up, so a secret that cannot be read stops the task, but the values
-  reach a container's environment only when something calls its handler.
+- Nothing serves a service container a request yet. A bound container of a service is treated as
+  running and stays available until the service is deleted or its `SimAws` is closed; consuming a
+  queue is what calls its handler so far, and a load balancer sending it a request follows
+  separately.
+- A consuming container's loop is Yulin's rather than the container's. A binding supplies what
+  happens to a batch, and nothing tries to run a polling loop written inside your own container code,
+  because an endless loop in a single Node.js process never yields to the test running it.
+- A container can only consume a simulated SQS queue, in the same account and region as the service.
+  Nothing else is a source, and a queue URL naming another scope reaches no queue.
+- Yulin polls once per service and container rather than once per task, so a desired count above one
+  does not hand a batch over more than once. It also polls in response to something rather than
+  continuously: a message arriving, a batch coming back, or a full batch suggesting there is more
+  waiting.
+- Long polling is not simulated. A `WaitTimeSeconds` has nothing to mean when the queue says when
+  there is something to poll for, so there is nothing to set.
+- A consuming container handles a batch all or nothing. There is no partial batch response, which is
+  a Lambda event source feature rather than something a worker container has.
+- A consuming container of a task started by `RunTask` records the same not-simulated reason an
+  unbound container does, since it has no handler that ends and a run task has to end.
 - A service's tasks come up all at once and are replaced all at once. There are no deployments,
   deployment controllers, circuit breakers or rolling replacement, so `DescribeServices` reports no
   `deployments` and no `events`, and `UpdateService` refuses `forceNewDeployment`.

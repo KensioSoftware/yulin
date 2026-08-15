@@ -4,9 +4,11 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import { SimEcsServiceConsumers } from "../service/consume/sim-ecs-service-consumers.js";
 import { SimEcsServiceTasks } from "../service/run/sim-ecs-service-tasks.js";
 import { SimEcsServiceArn } from "../service/sim-ecs-service-arn.js";
 import type { SimEcsServiceStore } from "../service/sim-ecs-service-store.js";
+import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimEcsSecretStores } from "../task/run/secret/sim-ecs-secret-stores.js";
 import { SimEcsTaskArn } from "../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../task/sim-ecs-task-store.js";
@@ -32,6 +34,7 @@ interface SimEcsCommandContextsProperties {
   readonly services: SimEcsServiceStore;
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
+  readonly consumerQueues: SimSqsPollQueues;
 }
 
 /**
@@ -90,6 +93,12 @@ export class SimEcsCommandContexts {
         taskArn: this.task.taskArn,
         bindings: properties.bindings,
         secretStores: properties.secretStores,
+        regionName: accountRegionScope.regionName,
+        consumers: new SimEcsServiceConsumers({
+          queues: properties.consumerQueues,
+          runAsOwner: properties.runAsOwner,
+          background,
+        }),
         background,
       }),
     };

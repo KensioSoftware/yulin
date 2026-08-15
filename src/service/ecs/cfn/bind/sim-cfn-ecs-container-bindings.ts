@@ -6,6 +6,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimEcs } from "../../sim-ecs.js";
 import { simCfnEcsPropertyError } from "../property/sim-cfn-ecs-property-error.js";
 import { SimCfnEcsDeclaredTaskDefinition } from "../task-definition/sim-cfn-ecs-declared-task-definition.js";
+import { simCfnEcsBindingWork } from "./sim-cfn-ecs-binding-work.js";
 import { simCfnEcsBindingTargets } from "./sim-cfn-ecs-container-binding-matcher.js";
 import type { SimCfnEcsContainerBinding } from "./sim-cfn-ecs-container-binding.type.js";
 
@@ -84,24 +85,21 @@ export class SimCfnEcsContainerBindings {
 
   /**
    * Bind a Resource-targeted binding to the container it means.
+   *
+   * Only the target is rewritten. What the binding does, whichever of the
+   * shapes it is, is carried over as it was written, so a handler simulated
+   * ECS refuses is refused there rather than being sorted into shapes twice.
    */
   private bindNamedContainer(
     ecs: SimEcs,
     binding: SimCfnEcsContainerBinding,
     registration: SimCfnEcsRegistration,
   ): void {
-    const target = {
+    ecs.bindContainer({
       family: registration.family,
       containerName: this.containerName(binding, registration),
-    };
-
-    if (binding.run !== undefined) {
-      ecs.bindContainer({ ...target, run: binding.run });
-
-      return;
-    }
-
-    ecs.bindContainer({ ...target, http: binding.http });
+      ...simCfnEcsBindingWork(binding),
+    });
   }
 
   /**

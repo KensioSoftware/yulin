@@ -4,6 +4,7 @@ import type { SimEcsSecretStores } from "../../task/run/secret/sim-ecs-secret-st
 import type { SimEcsTaskArn } from "../../task/sim-ecs-task-arn.js";
 import { SimEcsTaskFactory } from "../../task/sim-ecs-task-factory.js";
 import type { SimEcsTaskStore } from "../../task/sim-ecs-task-store.js";
+import type { SimEcsServiceConsumers } from "../consume/sim-ecs-service-consumers.js";
 import { SimEcsServiceContainers } from "./sim-ecs-service-containers.js";
 import type { SimEcsServiceDeployment } from "./sim-ecs-service-deployment.js";
 
@@ -12,6 +13,8 @@ interface SimEcsServiceTaskStarterProperties {
   readonly taskArn: SimEcsTaskArn;
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
+  readonly consumers: SimEcsServiceConsumers;
+  readonly regionName: string;
   readonly background: BackgroundScheduler;
 }
 
@@ -64,7 +67,7 @@ export class SimEcsServiceTaskStarter {
     this.tasks.put(task);
     service.tasks.add(task);
     this.background.schedule(async () => {
-      await this.containers.start(task, taskDefinition);
+      await this.containers.start(task, deployment);
     });
   }
 }

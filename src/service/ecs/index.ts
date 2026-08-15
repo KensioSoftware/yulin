@@ -59,11 +59,15 @@ export type {
   SimEcsContainerBinding,
   SimEcsContainerBindingHandler,
   SimEcsContainerBindingTarget,
+  SimEcsContainerConsumeHandler,
   SimEcsContainerHttpHandler,
+  SimEcsContainerQueueConsumer,
   SimEcsContainerRunHandler,
+  SimEcsQueueMessage,
 } from "./bind/sim-ecs-container-binding.type.js";
 export { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 export { SimEcsBoundContainer } from "./bind/sim-ecs-bound-container.js";
+export { SimEcsBoundQueueConsumer } from "./bind/sim-ecs-bound-queue-consumer.js";
 export type {
   SimCfnEcsContainerBinding,
   SimCfnEcsContainerBindingTarget,
@@ -105,6 +109,7 @@ export {
 } from "./service/sim-ecs-service-arn.js";
 export { SimEcsServiceStore } from "./service/sim-ecs-service-store.js";
 export { SimEcsServiceTasks } from "./service/run/sim-ecs-service-tasks.js";
+export { SimEcsServiceConsumers } from "./service/consume/sim-ecs-service-consumers.js";
 export type { SimEcsServiceDeployment } from "./service/run/sim-ecs-service-deployment.js";
 export {
   SimEcsTaskOverrides,

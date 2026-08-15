@@ -1,9 +1,9 @@
-import type { SimLambdaEventSourceQueues } from "./queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceStreams } from "./stream/sim-lambda-event-source-streams.js";
 
 interface SimLambdaEventSourceReachableProperties {
-  readonly queues: SimLambdaEventSourceQueues;
+  readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
 }
 
@@ -17,7 +17,7 @@ interface SimLambdaEventSourceReachableProperties {
  * missing, or the role may not read it.
  */
 export class SimLambdaEventSourceReachable {
-  private readonly queues: SimLambdaEventSourceQueues;
+  private readonly queues: SimSqsPollQueues;
   private readonly streams: SimLambdaEventSourceStreams;
 
   constructor(properties: SimLambdaEventSourceReachableProperties) {

@@ -1,4 +1,4 @@
-import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-source-queues.js";
+import type { SimSqsPollMessage } from "../../../sqs/poll/sim-sqs-poll-message.js";
 
 /**
  * What became of one batch handed to a function.
@@ -8,12 +8,12 @@ import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-sour
  * pair of lists rather than a yes or no.
  */
 export class SimLambdaEventSourceBatchOutcome {
-  public readonly handled: readonly SimLambdaEventSourceMessage[];
-  public readonly returned: readonly SimLambdaEventSourceMessage[];
+  public readonly handled: readonly SimSqsPollMessage[];
+  public readonly returned: readonly SimSqsPollMessage[];
 
   constructor(
-    handled: readonly SimLambdaEventSourceMessage[],
-    returned: readonly SimLambdaEventSourceMessage[],
+    handled: readonly SimSqsPollMessage[],
+    returned: readonly SimSqsPollMessage[],
   ) {
     this.handled = handled;
     this.returned = returned;
@@ -46,7 +46,7 @@ export interface SimLambdaEventSourceBatchResponse {
    * What became of a batch the function returned from.
    */
   handled(
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
     result: unknown,
   ): SimLambdaEventSourceBatchOutcome;
 
@@ -54,6 +54,6 @@ export interface SimLambdaEventSourceBatchResponse {
    * What becomes of a batch the function threw on.
    */
   failed(
-    messages: readonly SimLambdaEventSourceMessage[],
+    messages: readonly SimSqsPollMessage[],
   ): SimLambdaEventSourceBatchOutcome;
 }
