@@ -12,14 +12,22 @@ import {
 import type * as elbV2 from "./command/sim-elbv2-command.types.js";
 import { SimElbV2Commands } from "./command/sim-elbv2-commands.js";
 import type { SimElbV2RequestOptions } from "./command/sim-elbv2-request-options.js";
+import type { SimElbV2Listener } from "./listener/sim-elbv2-listener.js";
 import type { SimElbV2LoadBalancer } from "./load-balancer/sim-elbv2-load-balancer.js";
+import { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
 import { SimElbV2SdkCommandRouter } from "./sdk/sim-elbv2-sdk-command-router.js";
 import { SimElbV2Stores } from "./sim-elbv2-stores.js";
+import type { SimElbV2TargetGroup } from "./target-group/sim-elbv2-target-group.js";
 
 interface SimElbV2Properties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  /**
+   * Cross-scope index of load balancer DNS names, which is how a request
+   * arriving at one finds the Account that owns it.
+   */
+  readonly registry?: SimElbV2Registry;
 }
 
 /**
@@ -39,7 +47,7 @@ interface SimElbV2Properties {
  * a name is unique within one of those scopes and an ARN names the region.
  */
 export class SimElbV2 {
-  private readonly stores = new SimElbV2Stores();
+  private readonly stores: SimElbV2Stores;
   private readonly commands: SimElbV2Commands;
   private readonly sdkRouter = new SimElbV2SdkCommandRouter(this);
 
@@ -48,8 +56,10 @@ export class SimElbV2 {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      registry = new SimElbV2Registry(),
     } = properties;
 
+    this.stores = new SimElbV2Stores({ registry });
     this.commands = new SimElbV2Commands({
       stores: this.stores,
       iam,
@@ -66,6 +76,33 @@ export class SimElbV2 {
    */
   findLoadBalancerByName(name: string): SimElbV2LoadBalancer | undefined {
     return this.stores.loadBalancers.findByName(name);
+  }
+
+  /**
+   * Find the load balancer answering on a DNS name.
+   *
+   * This is what a request reaching a load balancer starts from, since the DNS
+   * name is the only thing it carries that names one.
+   */
+  findLoadBalancerByDnsName(dnsName: string): SimElbV2LoadBalancer | undefined {
+    return this.stores.loadBalancers.findByDnsName(dnsName);
+  }
+
+  /**
+   * Find the listener answering on one port of a load balancer.
+   */
+  findListenerOnPort(
+    loadBalancerArn: string,
+    port: number,
+  ): SimElbV2Listener | undefined {
+    return this.stores.listeners.findOnPort(loadBalancerArn, port);
+  }
+
+  /**
+   * Find a target group by ARN.
+   */
+  findTargetGroupByArn(arn: string): SimElbV2TargetGroup | undefined {
+    return this.stores.targetGroups.findByArn(arn);
   }
 
   /** Handle a CreateLoadBalancer Command from the SDK. */

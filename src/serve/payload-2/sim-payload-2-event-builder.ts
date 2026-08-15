@@ -1,9 +1,9 @@
 import { type SimClock, SimRealClock } from "../../util/clock/sim-clock.js";
-import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
 import {
-  simPayload2SourceIp,
-  simPayload2TraceId,
-} from "./sim-payload-2-connection.js";
+  simAwsProxiedSourceIp,
+  simAwsProxiedTraceId,
+} from "../http/sim-aws-proxied-connection.js";
+import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
 import type { SimPayload2Event } from "./sim-payload-2-event.type.js";
 import {
@@ -68,8 +68,8 @@ export class SimPayload2EventBuilder {
       headers: this.requestParts.headers({
         request,
         domainName: endpoint.domainName,
-        traceId: simPayload2TraceId(at),
-        sourceIp: simPayload2SourceIp,
+        traceId: simAwsProxiedTraceId(at),
+        sourceIp: simAwsProxiedSourceIp,
       }),
       requestContext: this.requestContext.build({
         request,

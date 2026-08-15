@@ -1,5 +1,4 @@
-import { assertArrayLength } from "@kensio/smartass";
-
+import { assertDefined } from "../../util/type-guard/defined.js";
 import type { SimElbV2 } from "./sim-elbv2.js";
 
 /**
@@ -29,9 +28,10 @@ export async function createFixtureLoadBalancer(
 ): Promise<string> {
   const output = await elbV2.createLoadBalancer({ input: { Name: name } });
 
-  assertArrayLength(output.LoadBalancers, 1);
+  const arn = output.LoadBalancers?.[0]?.LoadBalancerArn;
+  assertDefined(arn, `Sim ELBv2 created no load balancer named ${name}`);
 
-  return output.LoadBalancers[0].LoadBalancerArn;
+  return arn;
 }
 
 /**
@@ -48,9 +48,10 @@ export async function createFixtureLambdaTargetGroup(
     input: { Name: name, TargetType: "lambda" },
   });
 
-  assertArrayLength(output.TargetGroups, 1);
+  const arn = output.TargetGroups?.[0]?.TargetGroupArn;
+  assertDefined(arn, `Sim ELBv2 created no target group named ${name}`);
 
-  return output.TargetGroups[0].TargetGroupArn;
+  return arn;
 }
 
 /**
@@ -64,9 +65,10 @@ export async function createFixtureIpTargetGroup(
     input: { Name: name, TargetType: "ip", Protocol: "HTTP", Port: 8080 },
   });
 
-  assertArrayLength(output.TargetGroups, 1);
+  const arn = output.TargetGroups?.[0]?.TargetGroupArn;
+  assertDefined(arn, `Sim ELBv2 created no target group named ${name}`);
 
-  return output.TargetGroups[0].TargetGroupArn;
+  return arn;
 }
 
 /**
@@ -88,9 +90,10 @@ export async function createFixtureListener(
     },
   });
 
-  assertArrayLength(output.Listeners, 1);
+  const arn = output.Listeners?.[0]?.ListenerArn;
+  assertDefined(arn, `Sim ELBv2 created no listener on port ${String(port)}`);
 
-  return output.Listeners[0].ListenerArn;
+  return arn;
 }
 
 /**
@@ -112,7 +115,11 @@ export async function createFixtureRule(
     },
   });
 
-  assertArrayLength(output.Rules, 1);
+  const arn = output.Rules?.[0]?.RuleArn;
+  assertDefined(
+    arn,
+    `Sim ELBv2 created no rule at priority ${String(priority)}`,
+  );
 
-  return output.Rules[0].RuleArn;
+  return arn;
 }

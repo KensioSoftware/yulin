@@ -22,7 +22,8 @@ export interface SimAwsServiceTarget {
     | "lambda"
     | "route53"
     | "cognitoIdentityProvider"
-    | "apiGatewayV2";
+    | "apiGatewayV2"
+    | "elbV2";
   readonly resourceName: string;
   // regionName is used for validation, not look-up
   readonly regionName?: AwsRegionName;

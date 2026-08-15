@@ -32,5 +32,11 @@ export function simAwsServiceSigningName(
       // apigateway control plane that created the API.
       return "execute-api";
     }
+    case "elbV2": {
+      // Nothing signs a request to a load balancer: what it serves is an
+      // ordinary application rather than an AWS API. The name is here so the
+      // mapping stays complete.
+      return "elasticloadbalancing";
+    }
   }
 }

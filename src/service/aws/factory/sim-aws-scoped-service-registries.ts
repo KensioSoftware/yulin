@@ -1,7 +1,9 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
+import { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
 import { SimEcrRegistry } from "../../ecr/registry/sim-ecr-registry.js";
+import { SimElbV2Registry } from "../../elbv2/registry/sim-elbv2-registry.js";
 import { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
@@ -43,6 +45,22 @@ export class SimAwsScopedServiceRegistries {
    * the repository that URI names, whichever Account and Region it is in.
    */
   public readonly ecr = new SimEcrRegistry();
+
+  /**
+   * Indexes the load balancers created in any Account and Region of one SimAws
+   * instance by the DNS name they answer on. A request reaching one carries
+   * that name and no Account, so this is the hop from a host name to the scope
+   * holding the load balancer.
+   */
+  public readonly elbV2 = new SimElbV2Registry();
+
+  /**
+   * Indexes the API ids allocated in any Account and Region of one SimAws
+   * instance. A served request carries its Region in the host name and no
+   * Account, so this is what gets the serving layer from an API id to the
+   * scope that owns it.
+   */
+  public readonly httpApi = new SimHttpApiRegistry();
 
   /**
    * Indexes the account/region-scoped KMS facades created for one SimAws
