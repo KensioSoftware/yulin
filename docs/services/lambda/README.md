@@ -1384,6 +1384,9 @@ The same applies to zip-packaged code in the vm runtime and to functions deploye
 `AWS::Lambda::Function` template with an `Environment` property, including ones backed by an
 [executable binding](#executable-bindings).
 
+This is also how a function reaches something Yulin does not simulate, such as a Redis or a
+Postgres. See [non-AWS dependencies](../../non-aws-dependencies/README.md).
+
 Variable names are validated as on real AWS. A name must match the Lambda name pattern
 `[a-zA-Z]([a-zA-Z0-9_])+`, meaning it starts with a letter, is at least two characters, and otherwise
 holds letters, digits and underscores. A name that does not match is rejected with
