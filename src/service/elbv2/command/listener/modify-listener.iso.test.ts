@@ -14,21 +14,20 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimElbV2DuplicateListenerException } from "../../error/sim-elbv2.error.js";
 import {
+  createFixtureCertificate,
   createFixtureLambdaTargetGroup,
   createFixtureListener,
   createFixtureLoadBalancer,
 } from "../../sim-elbv2.fixture.js";
 
-const certificateArn =
-  "arn:aws:acm:eu-west-1:888888888888:certificate/00000001";
-
 describe("ELBv2 ModifyListenerCommand", () => {
   it("changes only what a modify names", async () => {
-    // Given an HTTP listener on port 80.
+    // Given an HTTP listener on port 80, and an issued certificate.
     const simAws = new SimAws();
     const elbV2 = simAws.elbV2();
     const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
     const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
     const listenerArn = await createFixtureListener(
       elbV2,
       loadBalancerArn,
@@ -51,12 +50,15 @@ describe("ELBv2 ModifyListenerCommand", () => {
       }),
     );
 
-    // Then the change took, and its default actions came with it.
+    // Then the change took, and its default actions and certificate came with
+    // it.
     assertArrayLength(output.Listeners, 1);
 
     const listener = output.Listeners[0];
     assertIdentical(listener.Protocol, "HTTPS");
     assertIdentical(listener.Port, 443);
+    assertArrayLength(listener.Certificates, 1);
+    assertIdentical(listener.Certificates[0].CertificateArn, certificateArn);
     assertArrayLength(listener.DefaultActions, 1);
     assertIdentical(listener.DefaultActions[0].Type, "fixed-response");
   });
@@ -67,6 +69,7 @@ describe("ELBv2 ModifyListenerCommand", () => {
     const elbV2 = simAws.elbV2();
     const loadBalancerArn = await createFixtureLoadBalancer(elbV2);
     const targetGroupArn = await createFixtureLambdaTargetGroup(elbV2);
+    const certificateArn = await createFixtureCertificate(simAws);
     const created = await elbV2.createListener(
       new CreateListenerCommand({
         LoadBalancerArn: loadBalancerArn,
@@ -97,6 +100,7 @@ describe("ELBv2 ModifyListenerCommand", () => {
     );
     assertIdentical(output.Listeners[0].Port, 443);
     assertIdentical(output.Listeners[0].Protocol, "HTTPS");
+    assertArrayLength(output.Listeners[0].Certificates, 1);
     assertArrayLength(output.Listeners[0].DefaultActions, 1);
     assertIdentical(output.Listeners[0].DefaultActions[0].Type, "forward");
   });

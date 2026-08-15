@@ -61,6 +61,20 @@ a request is the worst of the three outcomes. `SimElbV2WildcardPattern` is the w
 language, which is `*` and `?` compared against the whole value, and keeping it in one class is what
 makes the case sensitivity the only difference between a host name and a path.
 
+A listener's certificates are a `SimElbV2CertificateList` under `listener/certificate/` rather than
+the list a request sent. Everything that can be asked about a certificate depends on whether it is
+the default one, which is the certificate a described listener reports, the one `ModifyListener`
+replaces and the one `RemoveListenerCertificates` will not take away, so the default and the rest are
+held apart rather than told apart by a flag on each.
+
+`SimElbV2CertificateResolver` is the hop from a certificate ARN to the certificate it names, through
+`SimAcmRegistry`, which is the same route simulated CloudFront takes to check a viewer certificate. A
+certificate that does not exist, that is not `ISSUED`, or that is outside the load balancer's own
+Account and Region is refused when the listener is written, because that refusal is the thing worth
+having: nothing here performs TLS, so the configuration relationship is the whole of what a test can
+be written about. With no ACM registry, as in a standalone `SimElbV2`, there is no simulated ACM to
+ask and nothing is checked.
+
 `SimElbV2ListenerRuleStore` owns priority uniqueness, because it is a property of a listener's whole
 set of rules rather than of any one rule. `SetRulePriorities` judges a request against the order it
 would leave behind rather than the one it started from, which is what lets two rules swap places in
@@ -80,6 +94,8 @@ handler per operation, so the `SimElbV2` facade stays a list of delegations:
 - `command/target-group/` — the target group create, describe, modify and delete
 - `command/target/` — `RegisterTargets`, `DeregisterTargets`, `DescribeTargetHealth`
 - `command/listener/` — the listener create, describe, modify and delete
+- `command/listener-certificate/` — `AddListenerCertificates`, `RemoveListenerCertificates` and
+  `DescribeListenerCertificates`
 - `command/rule/` — the rule create, describe, modify and delete, and `SetRulePriorities`
 - `command/authorize/` — the shared IAM authorizer
 - `command/sim-elbv2-command-handler.ts` — the collaborators every handler holds
@@ -171,6 +187,13 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
   did not capture. The shape is the real one either way. The ARN id counts within one scope, because
   an ARN already names the Account; the DNS name counts across the whole simulation, because a host
   name names nothing but itself and two Accounts issued the same one could not both answer on it.
+- No TLS is performed on an HTTPS listener. Nothing is encrypted and no certificate is presented, so
+  what is simulated is the configuration relationship and the protocol a request is treated as
+  arriving on. The listener's protocol is what the forwarding headers report, the URL scheme is not
+  checked against it, and nothing selects between the certificates a listener carries, since there is
+  no handshake to select in.
+- A security policy is held and reported and nothing acts on it. A listener that names none gets the
+  one real ELB defaults to, so a test reading it back sees the real value.
 - A listener or rule takes exactly one action. Real ELB takes one routing action with an optional
   authentication action before it, and neither authentication action is simulated, so a longer list
   is refused rather than half honoured.

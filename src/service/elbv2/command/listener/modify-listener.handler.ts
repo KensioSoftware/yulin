@@ -2,6 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import { SimElbV2Action } from "../../action/sim-elbv2-action.js";
 import type { SimElbV2ActionTargets } from "../../action/sim-elbv2-action-targets.js";
 import { SimElbV2ValidationError } from "../../error/sim-elbv2.error.js";
+import type { SimElbV2CertificateResolver } from "../../listener/certificate/sim-elbv2-certificate-resolver.js";
 import type { SimElbV2ListenerChanges } from "../../listener/sim-elbv2-listener.js";
 import { simElbV2Port, simElbV2Protocol } from "../../sim-elbv2-protocol.js";
 import {
@@ -17,6 +18,7 @@ import type {
 
 interface ModifyListenerCommandHandlerProperties extends SimElbV2CommandHandlerProperties {
   readonly actionTargets: SimElbV2ActionTargets;
+  readonly certificates: SimElbV2CertificateResolver;
 }
 
 /**
@@ -30,10 +32,12 @@ export class ModifyListenerCommandHandler
     CommandHandler<SimModifyListenerCommand, SimModifyListenerCommandOutput>
 {
   private readonly actionTargets: SimElbV2ActionTargets;
+  private readonly certificates: SimElbV2CertificateResolver;
 
   constructor(properties: ModifyListenerCommandHandlerProperties) {
     super(properties);
     this.actionTargets = properties.actionTargets;
+    this.certificates = properties.certificates;
   }
 
   private static readChanges(
@@ -47,7 +51,6 @@ export class ModifyListenerCommandHandler
           ? undefined
           : simElbV2Protocol("Protocol", input.Protocol),
       sslPolicy: input.SslPolicy,
-      certificates: input.Certificates,
       defaultActions:
         input.DefaultActions === undefined
           ? undefined
@@ -61,6 +64,9 @@ export class ModifyListenerCommandHandler
    * The port is checked against the other listeners on the same load balancer
    * before anything changes, so a request moving a listener onto a port
    * another one holds leaves both where they were.
+   *
+   * This is also how a listener's default certificate is replaced, which is
+   * what real ELB has for it: `AddListenerCertificates` carries the rest.
    */
   async handle(
     command: SimModifyListenerCommand,
@@ -91,7 +97,13 @@ export class ModifyListenerCommandHandler
       );
     }
 
-    listener.modify(changes);
+    listener.modify({
+      ...changes,
+      certificateArn: this.certificates.resolveDefault(
+        input.Certificates,
+        "Certificates",
+      ),
+    });
 
     return { $metadata: {}, Listeners: [listener.view()] };
   }

@@ -269,6 +269,203 @@ rules about is `SetRulePriorities`, which reorders a whole listener, and which j
 against the order it would leave behind rather than the one it started from, so two rules can swap
 places in one request.
 
+## HTTPS listeners and certificates
+
+A listener on `HTTPS` carries a certificate from simulated ACM. The certificate has to be one that
+exists and has been issued, and one in the load balancer's own account and region, or the listener is
+refused with the reason. That refusal is the point of connecting the two simulations: a test can
+prove that a stack's certificate and its listener line up, rather than the stack finding out at
+deploy time.
+
+**No TLS is performed here.** Nothing is encrypted, no handshake happens, and no certificate is
+presented to anything. What is simulated is the configuration relationship between a listener and a
+certificate, and the protocol a request is treated as having arrived on.
+
+```typescript sim-elbv2-https-listener
+/**
+ * An HTTPS listener presenting a certificate simulated ACM issued.
+ */
+
+import { RequestCertificateCommand } from "@aws-sdk/client-acm";
+import {
+  type Action,
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateTargetGroupCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const elbV2 = simAws.elbV2();
+
+const certificate = await simAws
+  .acm()
+  .requestCertificate(
+    new RequestCertificateCommand({ DomainName: "shop.example.com" }),
+  );
+
+// A certificate no hosted zone covers issues on its own, once the simulation's
+// background work has run.
+await simAws.backgroundTasksComplete();
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+const targetGroup = await elbV2.createTargetGroup(
+  new CreateTargetGroupCommand({ Name: "checkout-tg", TargetType: "lambda" }),
+);
+
+const loadBalancerArn = loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn;
+const forward: Action = {
+  Type: "forward",
+  TargetGroupArn: targetGroup.TargetGroups?.[0]?.TargetGroupArn,
+};
+
+const listener = await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancerArn,
+    Protocol: "HTTPS",
+    Port: 443,
+    Certificates: [{ CertificateArn: certificate.CertificateArn }],
+    DefaultActions: [forward],
+  }),
+);
+
+// A listener that named no security policy gets the one real ELB gives it.
+console.log(listener.Listeners?.[0]?.SslPolicy); // "ELBSecurityPolicy-2016-08"
+
+try {
+  await elbV2.createListener(
+    new CreateListenerCommand({
+      LoadBalancerArn: loadBalancerArn,
+      Protocol: "HTTPS",
+      Port: 8443,
+      Certificates: [
+        {
+          CertificateArn:
+            "arn:aws:acm:us-east-1:888888888888:certificate/00000009",
+        },
+      ],
+      DefaultActions: [forward],
+    }),
+  );
+} catch (error) {
+  // Certificate arn:aws:acm:us-east-1:888888888888:certificate/00000009 was
+  // not found in simulated ACM
+  console.log((error as Error).message);
+}
+```
+
+A certificate that is still `PENDING_VALIDATION` is refused the same way, since a listener presenting
+one could serve nothing. That is what makes a test of the whole issuance path worth writing: the
+certificate has to have been validated for the listener that uses it to be created.
+
+An HTTPS listener with no certificate at all is refused, and a listener that is not HTTPS holds none,
+so moving one to HTTP drops its certificates rather than carrying certificates nothing would present.
+
+### The certificate list
+
+A listener's default certificate is the one `CreateListener` and `ModifyListener` name, and it is the
+one a described listener reports. The rest of the list is `AddListenerCertificates`,
+`RemoveListenerCertificates` and `DescribeListenerCertificates`, which are the certificates a real
+listener would choose between by the host name a client asked for.
+
+```typescript sim-elbv2-listener-certificates
+/**
+ * The certificates a listener carries beyond its default one.
+ */
+
+import { RequestCertificateCommand } from "@aws-sdk/client-acm";
+import {
+  AddListenerCertificatesCommand,
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateTargetGroupCommand,
+  DescribeListenerCertificatesCommand,
+  RemoveListenerCertificatesCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const acm = simAws.acm();
+const elbV2 = simAws.elbV2();
+
+async function issuedCertificateArn(domainName: string): Promise<string> {
+  const requested = await acm.requestCertificate(
+    new RequestCertificateCommand({ DomainName: domainName }),
+  );
+
+  await simAws.backgroundTasksComplete();
+
+  return requested.CertificateArn ?? "";
+}
+
+const shop = await issuedCertificateArn("shop.example.com");
+const admin = await issuedCertificateArn("admin.example.com");
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+const targetGroup = await elbV2.createTargetGroup(
+  new CreateTargetGroupCommand({ Name: "checkout-tg", TargetType: "lambda" }),
+);
+
+const listener = await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTPS",
+    Port: 443,
+    Certificates: [{ CertificateArn: shop }],
+    DefaultActions: [
+      {
+        Type: "forward",
+        TargetGroupArn: targetGroup.TargetGroups?.[0]?.TargetGroupArn,
+      },
+    ],
+  }),
+);
+
+const listenerArn = listener.Listeners?.[0]?.ListenerArn;
+
+await elbV2.addListenerCertificates(
+  new AddListenerCertificatesCommand({
+    ListenerArn: listenerArn,
+    Certificates: [{ CertificateArn: admin }],
+  }),
+);
+
+const carried = await elbV2.describeListenerCertificates(
+  new DescribeListenerCertificatesCommand({ ListenerArn: listenerArn }),
+);
+
+// The default certificate comes first and is the only one flagged as such.
+console.log(carried.Certificates?.map((each) => each.IsDefault)); // [true, false]
+
+await elbV2.removeListenerCertificates(
+  new RemoveListenerCertificatesCommand({
+    ListenerArn: listenerArn,
+    Certificates: [{ CertificateArn: admin }],
+  }),
+);
+```
+
+The default certificate cannot be removed this way. Replacing it is `ModifyListener`, as on real ELB,
+and trying to remove it is refused with that named.
+
+### Serving a request over HTTPS
+
+A request to `https://<dns-name>/orders` reaches the listener on port 443, and from there it is the
+same request as any other: the same rules are evaluated in the same order, and the same target groups
+answer. The listener's protocol is what the target is told the request arrived on, so a function
+behind an HTTPS listener sees `x-forwarded-proto: https` and `x-forwarded-port: 443`.
+
+Because no TLS happens, the URL scheme is not checked against the listener it reaches. What decides
+the listener is the port, and what decides the protocol in the event is the listener. A test can
+therefore conclude that a request treated as arriving over HTTPS is routed and forwarded the way the
+configuration says, and cannot conclude anything about certificates, ciphers or a handshake.
+
 ## Carrying a request to a Lambda function
 
 `simElbV2Fetch` sends a request to whichever load balancer its host name names, in process and
@@ -1074,6 +1271,10 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   `lambda` and `ip` target types.
 - `RegisterTargets`, `DeregisterTargets` and `DescribeTargetHealth`.
 - `CreateListener`, `DescribeListeners`, `ModifyListener` and `DeleteListener`, on HTTP and HTTPS.
+- An HTTPS listener's default certificate resolved against simulated ACM, refusing one that does not
+  exist, one that is not `ISSUED`, and one outside the load balancer's own account and region.
+- `AddListenerCertificates`, `RemoveListenerCertificates` and `DescribeListenerCertificates`, with
+  the default certificate reported first and refused removal.
 - `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule` and `SetRulePriorities`, with priorities
   unique within a listener and the listener's default rule reported last.
 - `forward`, `fixed-response` and `redirect` actions, and `host-header` and `path-pattern`
@@ -1113,6 +1314,26 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - A redirect is not checked against the listener it is on, so redirecting HTTPS to HTTP is accepted
   where real ELB refuses it. Nothing here performs TLS, so the listener's protocol is not something a
   request can be trusted to have arrived over.
+- No TLS is performed on an HTTPS listener. Nothing is encrypted, no handshake happens, and no
+  certificate is presented to a client. What a test can conclude is that a listener's certificate
+  exists, was issued, and is in the load balancer's account and region, and that a request treated as
+  arriving over HTTPS is routed and forwarded the way the configuration says. What it cannot conclude
+  is anything about a client trusting the certificate, about expiry, about protocol versions or
+  ciphers, or about a request having really arrived over a secure connection.
+- The URL scheme a request is written with is not checked against the listener it reaches. The port
+  decides the listener, and the listener decides the protocol the event and the forwarding headers
+  report, so `http://<dns-name>:443/` reaching an HTTPS listener is served as an HTTPS request rather
+  than refused as a failed handshake.
+- SNI certificate selection by host name is not simulated. The certificates beyond the default are
+  held and reported, and nothing chooses between them when a request arrives, since there is no
+  handshake to choose in. The default certificate is the one every request is served under.
+- Security policies and cipher suites are accepted and ignored. A listener that names no `SslPolicy`
+  is given the one real ELB defaults to, the value is reported back, and nothing acts on it.
+- `IsDefault` is ignored on `AddListenerCertificates`, as real ELB documents that it should not be
+  set there. The default certificate is replaced with `ModifyListener`, which drops the certificate
+  that was the default rather than moving it into the rest of the list.
+- A certificate is only ever an ACM one. `ImportCertificate` and IAM server certificates are not
+  simulated, and neither is mutual TLS, so there is no trust store to give a listener.
 - The length limits real ELB puts on a fixed response's message body and a redirect's components are
   not enforced. A condition value is held to ELB's own 128 characters.
 - A request served under the Yulin-local suffix reaches the listener on port 80, or on 443 for an
@@ -1123,9 +1344,6 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - A DNS lookup for a name pointing at a load balancer that has been deleted still answers with the
   local server address, because a load balancer host name is recognised by its shape. The request
   that follows is the thing that fails, naming the host name nothing answers on.
-- No TLS is performed. `simElbV2Fetch` reads only the port out of a URL, so an `https:` URL reaches
-  the listener on 443 without a handshake and without being checked against that listener's
-  protocol. HTTPS listeners and their certificates follow separately.
 - The invoke permission is checked when the request arrives, where real ELB checks it when a Lambda
   target is registered and refuses `RegisterTargets` without it. A target naming a function in
   another Account or Region is registered here and then answers 502, where real ELB refuses the
@@ -1159,7 +1377,7 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   exchange, and treating one as a plain forward would quietly skip authentication. Since those are
   the only actions that may precede a routing action, a listener or rule takes exactly one action
   here and a longer list is refused.
-- Load balancer and target group attributes, access logs, listener certificates as a separate
-  resource, trust stores, and tags as a readable resource are not simulated.
+- Load balancer and target group attributes, access logs, and tags as a readable resource are not
+  simulated.
 - There is no CloudFormation support yet, so `AWS::ElasticLoadBalancingV2::*` resources in a template
   are not deployed.

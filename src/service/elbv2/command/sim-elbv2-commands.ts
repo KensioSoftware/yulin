@@ -1,10 +1,15 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimElbV2ActionTargets } from "../action/sim-elbv2-action-targets.js";
+import { SimElbV2CertificateResolver } from "../listener/certificate/sim-elbv2-certificate-resolver.js";
 import type { SimElbV2Stores } from "../sim-elbv2-stores.js";
 import { SimElbV2TargetGroupUsage } from "../target-group/sim-elbv2-target-group-usage.js";
 import { SimElbV2Authorizer } from "./authorize/sim-elbv2-authorizer.js";
+import { AddListenerCertificatesCommandHandler } from "./listener-certificate/add-listener-certificates.handler.js";
+import { DescribeListenerCertificatesCommandHandler } from "./listener-certificate/describe-listener-certificates.handler.js";
+import { RemoveListenerCertificatesCommandHandler } from "./listener-certificate/remove-listener-certificates.handler.js";
 import { CreateListenerCommandHandler } from "./listener/create-listener.handler.js";
 import { DeleteListenerCommandHandler } from "./listener/delete-listener.handler.js";
 import { DescribeListenersCommandHandler } from "./listener/describe-listeners.handler.js";
@@ -30,6 +35,7 @@ interface SimElbV2CommandsProperties {
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly acmRegistry?: SimAcmRegistry | undefined;
 }
 
 /**
@@ -59,14 +65,22 @@ export class SimElbV2Commands {
   public readonly modifyRule: ModifyRuleCommandHandler;
   public readonly deleteRule: DeleteRuleCommandHandler;
   public readonly setRulePriorities: SetRulePrioritiesCommandHandler;
+  public readonly addListenerCertificates: AddListenerCertificatesCommandHandler;
+  public readonly removeListenerCertificates: RemoveListenerCertificatesCommandHandler;
+  public readonly describeListenerCertificates: DescribeListenerCertificatesCommandHandler;
 
   constructor(properties: SimElbV2CommandsProperties) {
     const { stores, background, accountRegionScope } = properties;
     const authorizer = new SimElbV2Authorizer({ iam: properties.iam });
     const usage = new SimElbV2TargetGroupUsage(stores);
     const actionTargets = new SimElbV2ActionTargets(stores.targetGroups);
+    const certificates = new SimElbV2CertificateResolver({
+      accountRegionScope,
+      acmRegistry: properties.acmRegistry,
+    });
     const shared = { stores, authorizer, background };
-    const withTargets = { ...shared, actionTargets };
+    const withTargets = { ...shared, actionTargets, certificates };
+    const withCertificates = { ...shared, certificates };
     const withUsage = { ...shared, usage };
 
     this.createLoadBalancer = new CreateLoadBalancerCommandHandler({
@@ -98,5 +112,12 @@ export class SimElbV2Commands {
     this.modifyRule = new ModifyRuleCommandHandler(withTargets);
     this.deleteRule = new DeleteRuleCommandHandler(shared);
     this.setRulePriorities = new SetRulePrioritiesCommandHandler(shared);
+    this.addListenerCertificates = new AddListenerCertificatesCommandHandler(
+      withCertificates,
+    );
+    this.removeListenerCertificates =
+      new RemoveListenerCertificatesCommandHandler(shared);
+    this.describeListenerCertificates =
+      new DescribeListenerCertificatesCommandHandler(shared);
   }
 }

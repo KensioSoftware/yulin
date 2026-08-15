@@ -175,6 +175,35 @@ export class SimElbV2ResourceInUseException extends SimElbV2Error {
 }
 
 /**
+ * Simulated ELBv2 CertificateNotFoundException.
+ *
+ * A listener certificate ARN naming no certificate simulated ACM holds. That is
+ * the refusal a stack whose certificate and listener do not line up runs into
+ * on real AWS too.
+ */
+export class SimElbV2CertificateNotFoundException extends SimElbV2Error {
+  public override readonly name = "CertificateNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated ELBv2 OperationNotPermittedException.
+ *
+ * An operation on a resource that exists which ELB does not allow, such as
+ * removing the default certificate from a listener.
+ */
+export class SimElbV2OperationNotPermittedException extends SimElbV2Error {
+  public override readonly name = "OperationNotPermittedException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated ELBv2 InvalidConfigurationRequestException.
  *
  * A request whose parts contradict each other, such as a `lambda` target group

@@ -6,6 +6,7 @@
  * operation touches the area it belongs to rather than the top of the facade.
  */
 
+export type * from "./listener-certificate/listener-certificate.command.js";
 export type * from "./listener/listener.command.js";
 export type * from "./load-balancer/load-balancer.command.js";
 export type * from "./rule/rule.command.js";
