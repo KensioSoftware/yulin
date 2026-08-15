@@ -78,12 +78,32 @@ try {
           },
         },
         // Nothing but this Distribution may invoke the Function URL, which is
-        // what the condition on the Distribution's ARN says.
-        InvokeFromCloudFront: {
+        // what the condition on the Distribution's ARN says. Reaching the URL
+        // takes both actions, so leaving either one out is a 403.
+        InvokeFunctionUrlFromCloudFront: {
           Type: "AWS::Lambda::Permission",
           Properties: {
             FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
             Action: "lambda:InvokeFunctionUrl",
+            Principal: "cloudfront.amazonaws.com",
+            SourceArn: {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:cloudfront::",
+                  { Ref: "AWS::AccountId" },
+                  ":distribution/",
+                  { Ref: "GreeterDistribution" },
+                ],
+              ],
+            },
+          },
+        },
+        InvokeFunctionFromCloudFront: {
+          Type: "AWS::Lambda::Permission",
+          Properties: {
+            FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+            Action: "lambda:InvokeFunction",
             Principal: "cloudfront.amazonaws.com",
             SourceArn: {
               "Fn::Join": [

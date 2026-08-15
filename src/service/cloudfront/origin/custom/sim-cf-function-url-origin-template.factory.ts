@@ -56,6 +56,7 @@ export const simCfFunctionUrlOriginTemplateFactory = new MappedFactory<
     signingBehavior: "always",
     originAccessControl: true,
     permitted: true,
+    permittedActions: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
     permissionSourceArn: simCfDistributionArn,
   }),
   (input) => ({

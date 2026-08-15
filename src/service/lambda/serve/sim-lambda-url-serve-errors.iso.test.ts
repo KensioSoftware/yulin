@@ -10,6 +10,7 @@ import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { simLambdaUrlForbiddenMessage } from "./response/sim-lambda-url-error-response.js";
 
 function localUrl(functionUrl: string): string {
   return new SimAwsLocalUrl({ input: functionUrl }).toString();
@@ -125,7 +126,9 @@ describe("Serving sim Lambda Function URL failures", () => {
 
     // Then the request is forbidden, as an unsigned request is on AWS.
     assertIdentical(response.status, 403);
-    assertObjectEquals(await response.json(), { Message: "Forbidden" });
+    assertObjectEquals(await response.json(), {
+      Message: simLambdaUrlForbiddenMessage,
+    });
   });
 
   it("returns 502 when the handler throws", async () => {
