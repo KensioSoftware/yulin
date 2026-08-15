@@ -1,8 +1,9 @@
 /**
  * Creating a load balancer and reading the DNS name it is issued.
  *
- * That name is what a Route53 alias points at, and what a request reaching the
- * load balancer is addressed to.
+ * That name is what a Route53 record points at, and what a request addressed
+ * to the load balancer directly names. A request that a Route53 record brought
+ * here names the record instead.
  */
 
 import {
