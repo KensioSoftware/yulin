@@ -2,6 +2,7 @@ import type { SimElbV2Action } from "../../action/sim-elbv2-action.js";
 import type { SimElbV2ActionView } from "../../command/sim-elbv2-shared.command.js";
 import type { SimElbV2Listener } from "../sim-elbv2-listener.js";
 import type { SimElbV2RuleConditionInput } from "../../command/rule/rule-condition.command.js";
+import type { SimElbV2MatchableRequest } from "./match/sim-elbv2-matchable-request.js";
 import type { SimElbV2RuleCondition } from "./sim-elbv2-rule-condition.js";
 
 interface SimElbV2ListenerRuleProperties {
@@ -74,6 +75,17 @@ export class SimElbV2ListenerRule {
   /** What this rule does with a request it claims. */
   get actions(): readonly SimElbV2Action[] {
     return this.currentActions;
+  }
+
+  /**
+   * Whether this rule claims a request.
+   *
+   * Every condition has to be satisfied, which is what makes several
+   * conditions on one rule an and. A value list within one condition is an or,
+   * and that part belongs to the condition.
+   */
+  matches(request: SimElbV2MatchableRequest): boolean {
+    return this.conditions.every((condition) => condition.matches(request));
   }
 
   /**

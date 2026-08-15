@@ -1,11 +1,15 @@
 import type {
   SimElbV2ActionInput,
   SimElbV2ActionView,
+  SimElbV2FixedResponseActionConfig,
+  SimElbV2RedirectActionConfig,
 } from "../command/sim-elbv2-shared.command.js";
 import {
   SimElbV2UnsimulatedInputException,
   SimElbV2ValidationError,
 } from "../error/sim-elbv2.error.js";
+import { requireSimElbV2FixedResponseConfig } from "./sim-elbv2-fixed-response-config.js";
+import { requireSimElbV2RedirectConfig } from "./sim-elbv2-redirect-config.js";
 
 /**
  * The action types an Application Load Balancer listener or rule can hold
@@ -17,19 +21,6 @@ import {
  * than treated as a forward that quietly skips authentication.
  */
 const simulatedActionTypes = new Set(["forward", "fixed-response", "redirect"]);
-
-/**
- * The status codes real ELB takes on a redirect action.
- */
-const redirectStatusCodes = new Set(["HTTP_301", "HTTP_302"]);
-
-/**
- * The status codes real ELB takes on a fixed-response action.
- *
- * A 3XX is missing on purpose rather than by oversight: redirecting is the
- * redirect action's job, and real ELB refuses one here.
- */
-const fixedResponseStatusCodes = /^[245]\d\d$/u;
 
 /**
  * The target groups a forward action names, whichever form it names them in.
@@ -125,6 +116,16 @@ export class SimElbV2Action {
     return action;
   }
 
+  /** What a fixed-response action answers with. */
+  get fixedResponse(): SimElbV2FixedResponseActionConfig | undefined {
+    return this.input.FixedResponseConfig;
+  }
+
+  /** Where a redirect action sends the client. */
+  get redirect(): SimElbV2RedirectActionConfig | undefined {
+    return this.input.RedirectConfig;
+  }
+
   /**
    * Report this action in the shape the SDK reads it back in.
    */
@@ -146,11 +147,11 @@ export class SimElbV2Action {
     }
 
     if (this.type === "fixed-response") {
-      this.validateFixedResponse(field);
+      requireSimElbV2FixedResponseConfig(this.fixedResponse, field);
       return;
     }
 
-    this.validateRedirect(field);
+    requireSimElbV2RedirectConfig(this.redirect, field);
   }
 
   private validateForward(field: string): void {
@@ -158,30 +159,6 @@ export class SimElbV2Action {
       throw new SimElbV2ValidationError(
         `${field} forward action requires a TargetGroupArn or a ` +
           `ForwardConfig naming at least one target group`,
-      );
-    }
-  }
-
-  private validateFixedResponse(field: string): void {
-    const statusCode = this.input.FixedResponseConfig?.StatusCode;
-
-    if (
-      statusCode === undefined ||
-      !fixedResponseStatusCodes.test(statusCode)
-    ) {
-      throw new SimElbV2ValidationError(
-        `${field} fixed-response action requires a FixedResponseConfig ` +
-          `StatusCode of 2XX, 4XX or 5XX. A 3XX code is a redirect action.`,
-      );
-    }
-  }
-
-  private validateRedirect(field: string): void {
-    const statusCode = this.input.RedirectConfig?.StatusCode;
-
-    if (statusCode === undefined || !redirectStatusCodes.has(statusCode)) {
-      throw new SimElbV2ValidationError(
-        `${field} redirect action requires a RedirectConfig StatusCode of ${[...redirectStatusCodes].join(" or ")}`,
       );
     }
   }

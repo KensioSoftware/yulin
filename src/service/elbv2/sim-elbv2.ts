@@ -12,6 +12,7 @@ import {
 import type * as elbV2 from "./command/sim-elbv2-command.types.js";
 import { SimElbV2Commands } from "./command/sim-elbv2-commands.js";
 import type { SimElbV2RequestOptions } from "./command/sim-elbv2-request-options.js";
+import type { SimElbV2ListenerRule } from "./listener/rule/sim-elbv2-listener-rule.js";
 import type { SimElbV2Listener } from "./listener/sim-elbv2-listener.js";
 import type { SimElbV2LoadBalancer } from "./load-balancer/sim-elbv2-load-balancer.js";
 import { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
@@ -96,6 +97,16 @@ export class SimElbV2 {
     port: number,
   ): SimElbV2Listener | undefined {
     return this.stores.listeners.findOnPort(loadBalancerArn, port);
+  }
+
+  /**
+   * The rules on one listener, in the order that listener evaluates them.
+   *
+   * This is what a request arriving at a listener is matched against, before
+   * it falls through to the listener's own default action.
+   */
+  findRulesForListener(listenerArn: string): readonly SimElbV2ListenerRule[] {
+    return this.stores.rules.forListener(listenerArn);
   }
 
   /**

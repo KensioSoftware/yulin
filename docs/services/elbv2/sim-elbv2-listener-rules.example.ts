@@ -1,8 +1,5 @@
 /**
  * A listener and a rule sending one host name to a different target group.
- *
- * The rule is stored rather than applied: nothing matches a request against it
- * yet.
  */
 
 import {

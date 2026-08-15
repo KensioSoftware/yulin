@@ -4,13 +4,14 @@ import type {
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimElbV2ConnectionRefusedError } from "../error/sim-elbv2.error.js";
-import { SimElbV2ForwardTarget } from "./sim-elbv2-forward-target.js";
+import { SimElbV2ActionPerformer } from "./sim-elbv2-action-performer.js";
 import { SimElbV2LambdaTargetInvocation } from "./sim-elbv2-lambda-target-invocation.js";
-import { simElbV2RequestPort } from "./sim-elbv2-request-port.js";
+import { requireSimElbV2Listener } from "./sim-elbv2-listener-match.js";
 import {
   type SimElbV2LoadBalancerRoute,
   SimElbV2Router,
 } from "./sim-elbv2-router.js";
+import { SimElbV2RuleEvaluation } from "./sim-elbv2-rule-evaluation.js";
 
 interface SimElbV2ServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -21,26 +22,25 @@ interface SimElbV2ServiceControllerProperties {
  * HTTP controller for simulated Application Load Balancers.
  *
  * A request reaching a load balancer's DNS name is matched to a listener by the
- * port it arrived on, and the listener's default action decides what happens
- * next. A forward action sends it to a target group, and a lambda target group
- * invokes the function registered in it with an ALB event.
- *
- * Nothing here matches listener rules yet, so every request a listener takes is
- * answered by its default action.
+ * port it arrived on. That listener's rules are then evaluated in priority
+ * order, and the first one claiming the request says what happens to it. A
+ * request no rule claims is answered by the listener's default action.
  */
 export class SimElbV2ServiceController implements SimAwsServiceController {
   private readonly router: SimElbV2Router;
-  private readonly invocation: SimElbV2LambdaTargetInvocation;
+  private readonly actions: SimElbV2ActionPerformer;
 
   constructor(properties: SimElbV2ServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimElbV2Router({ simAws });
     // The clock is taken from the router rather than from properties, so a
     // supplied router and the event timestamps belong to the same simulation.
-    this.invocation = new SimElbV2LambdaTargetInvocation({
-      router: this.router,
-      clock: this.router.simAws,
-    });
+    this.actions = new SimElbV2ActionPerformer(
+      new SimElbV2LambdaTargetInvocation({
+        router: this.router,
+        clock: this.router.simAws,
+      }),
+    );
   }
 
   /**
@@ -56,29 +56,21 @@ export class SimElbV2ServiceController implements SimAwsServiceController {
       );
     }
 
-    return await this.forward(route, serviceRequest.request);
+    return await this.answer(route, serviceRequest.request);
   }
 
-  private async forward(
+  private async answer(
     route: SimElbV2LoadBalancerRoute,
     request: Request,
   ): Promise<Response> {
     const { loadBalancer, elbV2 } = route;
-    const port = simElbV2RequestPort(new URL(request.url));
-    const listener = elbV2.findListenerOnPort(loadBalancer.arn, port);
+    const listener = requireSimElbV2Listener(route, request);
 
-    if (listener === undefined) {
-      throw new SimElbV2ConnectionRefusedError(
-        `Load balancer '${loadBalancer.name}' has no listener on port ${String(
-          port,
-        )}`,
-      );
-    }
-
-    return await this.invocation.invoke({
+    return await this.actions.perform({
+      matched: new SimElbV2RuleEvaluation(elbV2).actionFor(listener, request),
       loadBalancer,
       listener,
-      targetGroup: new SimElbV2ForwardTarget(elbV2).resolve(listener),
+      elbV2,
       request,
     });
   }

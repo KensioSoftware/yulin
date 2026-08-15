@@ -31,27 +31,15 @@ describe("sim ELBv2 rule conditions", () => {
     assertIdentical(configured.view().Field, "host-header");
   });
 
-  it("takes the conditions an ALB rule can be written on", () => {
+  it("takes the conditions a rule here can be written on", () => {
     // Given one condition of each simulated field.
     const conditions = SimElbV2RuleCondition.readAll([
       { Field: "path-pattern", PathPatternConfig: { Values: ["/api/*"] } },
-      {
-        Field: "http-request-method",
-        HttpRequestMethodConfig: { Values: ["POST"] },
-      },
-      { Field: "source-ip", SourceIpConfig: { Values: ["10.0.0.0/8"] } },
-      {
-        Field: "http-header",
-        HttpHeaderConfig: { HttpHeaderName: "X-Tenant", Values: ["shop"] },
-      },
-      {
-        Field: "query-string",
-        QueryStringConfig: { Values: [{ Key: "version", Value: "2" }] },
-      },
+      { Field: "host-header", Values: ["shop.example.com"] },
     ]);
 
-    // Then all five are accepted.
-    assertArrayLength(conditions, 5);
+    // Then both are accepted.
+    assertArrayLength(conditions, 2);
   });
 
   it("refuses a condition list that is empty or absent", () => {
@@ -88,8 +76,27 @@ describe("sim ELBv2 rule conditions", () => {
     assertStringIncludes(error.message, "at least one value");
   });
 
-  it("refuses a field nothing here understands", () => {
-    // Given a condition with no field, and one on a field ELB does not have.
+  it("refuses a field real ELB has and nothing here matches on", () => {
+    // Given conditions on each of the fields ELB has and this does not.
+    for (const field of [
+      "http-header",
+      "http-request-method",
+      "query-string",
+      "source-ip",
+    ]) {
+      const error = assertThrowsError(() => {
+        SimElbV2RuleCondition.read({ Field: field, Values: ["anything"] });
+      });
+
+      // Then each is refused when the rule is written. Storing one would leave
+      // a rule that looks configured and never claims a request.
+      assertInstanceOf(error, SimElbV2UnsimulatedInputException);
+      assertStringIncludes(error.message, "is not simulated");
+    }
+  });
+
+  it("refuses a field ELB does not have at all", () => {
+    // Given a condition with no field, and one on a field ELB never had.
     const noField = assertThrowsError(() => {
       SimElbV2RuleCondition.read({});
     });
@@ -100,49 +107,54 @@ describe("sim ELBv2 rule conditions", () => {
       SimElbV2RuleCondition.read({ Field: "user-agent", Values: ["curl"] });
     });
 
-    assertInstanceOf(unknown, SimElbV2UnsimulatedInputException);
-
-    // Then both are refused rather than stored and never matched.
+    // Then both are a validation failure rather than something unsimulated,
+    // because the request is wrong rather than ahead of this simulation.
+    assertInstanceOf(unknown, SimElbV2ValidationError);
     assertStringIncludes(noField.message, "requires a Field");
-    assertStringIncludes(unknown.message, "not simulated");
+    assertStringIncludes(unknown.message, "is not a listener rule condition");
   });
 
   it("refuses a condition with nothing to compare against", () => {
-    // Given conditions of three fields, each missing its values.
+    // Given conditions of both simulated fields, each missing its values.
     const hostHeader = assertThrowsError(() => {
       SimElbV2RuleCondition.read({ Field: "host-header" });
     });
 
     assertInstanceOf(hostHeader, SimElbV2ValidationError);
 
-    const httpHeaderName = assertThrowsError(() => {
+    const pathPattern = assertThrowsError(() => {
       SimElbV2RuleCondition.read({
-        Field: "http-header",
-        HttpHeaderConfig: { Values: ["shop"] },
+        Field: "path-pattern",
+        PathPatternConfig: {},
       });
     });
 
-    assertInstanceOf(httpHeaderName, SimElbV2ValidationError);
-
-    const httpHeaderValues = assertThrowsError(() => {
-      SimElbV2RuleCondition.read({
-        Field: "http-header",
-        HttpHeaderConfig: { HttpHeaderName: "X-Tenant" },
-      });
-    });
-
-    assertInstanceOf(httpHeaderValues, SimElbV2ValidationError);
-
-    const queryString = assertThrowsError(() => {
-      SimElbV2RuleCondition.read({ Field: "query-string" });
-    });
-
-    assertInstanceOf(queryString, SimElbV2ValidationError);
+    assertInstanceOf(pathPattern, SimElbV2ValidationError);
 
     // Then each is refused.
     assertStringIncludes(hostHeader.message, "at least one value");
-    assertStringIncludes(httpHeaderName.message, "HttpHeaderName");
-    assertStringIncludes(httpHeaderValues.message, "at least one value");
-    assertStringIncludes(queryString.message, "key and value pair");
+    assertStringIncludes(pathPattern.message, "at least one value");
+  });
+
+  it("refuses a value longer than ELB takes", () => {
+    // Given a path pattern at the limit, and one character past it.
+    const atLimit = SimElbV2RuleCondition.read({
+      Field: "path-pattern",
+      Values: [`/${"a".repeat(127)}`],
+    });
+
+    assertIdentical(atLimit.field, "path-pattern");
+
+    const error = assertThrowsError(() => {
+      SimElbV2RuleCondition.read({
+        Field: "path-pattern",
+        Values: [`/${"a".repeat(128)}`],
+      });
+    });
+
+    // Then the longer one is refused here rather than by AWS after a passing
+    // test, which is the divergence worth avoiding.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "at most 128");
   });
 });
