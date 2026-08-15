@@ -9,6 +9,7 @@ import type {
   SimDynamoDb as SimDynamoDatabase,
   SimDynamoDbStreams,
 } from "../dynamodb/index.js";
+import type { SimEcr } from "../ecr/index.js";
 import type { SimEcs } from "../ecs/index.js";
 import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
@@ -79,6 +80,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated DynamoDB Streams in the default Account Region scope. */
   dynamoDbStreams(): SimDynamoDbStreams {
     return this.defaultAccountRegionScope().dynamoDbStreams();
+  }
+
+  /** Get simulated ECR in the default Account Region scope. */
+  ecr(): SimEcr {
+    return this.defaultAccountRegionScope().ecr();
   }
 
   /** Get simulated ECS in the default Account Region scope. */

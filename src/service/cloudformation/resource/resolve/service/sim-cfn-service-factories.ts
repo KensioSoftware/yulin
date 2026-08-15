@@ -60,6 +60,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.dynamoDb().cfnResourceFactory(),
   ],
   [
+    "ECR",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.ecr().cfnResourceFactory(),
+  ],
+  [
     "IAM",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.iam().cfnResourceFactory(),

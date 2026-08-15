@@ -1,6 +1,11 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
+import {
+  type SimLambdaContainerImages,
+  SimLambdaNoContainerImages,
+} from "./image/sim-lambda-container-images.js";
 import type { SimLambdaCodeSource } from "./lambda-code-source.js";
 import {
   type SimLambdaExecutableCode,
@@ -11,11 +16,16 @@ import {
   type SimLambdaCodeStore,
   SimLambdaNoCodeStore,
 } from "./store/sim-lambda-code-store.js";
+import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 
 interface SimLambdaCodeResolverProperties {
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  /**
+   * Where a container image URI is resolved to a real in-process handler.
+   */
+  readonly containerImages?: SimLambdaContainerImages | undefined;
   /**
    * Clock vm zip code reports as the current time. A handler reference needs
    * none: it runs in the host scope, where the invocation bridges the clock.
@@ -44,10 +54,13 @@ export interface SimLambdaCodeResolveContext {
  */
 export class SimLambdaCodeResolver {
   private readonly codeStore: SimLambdaCodeStore;
+  private readonly containerImages: SimLambdaContainerImages;
   private readonly vmZipCodeFactory: SimLambdaVmZipCodeFactory;
 
   constructor(properties: SimLambdaCodeResolverProperties) {
     this.codeStore = properties.codeStore ?? new SimLambdaNoCodeStore();
+    this.containerImages =
+      properties.containerImages ?? new SimLambdaNoContainerImages();
     this.vmZipCodeFactory = new SimLambdaVmZipCodeFactory({
       vmSdkModuleProvider: properties.vmSdkModuleProvider,
       clock: properties.clock,
@@ -76,6 +89,33 @@ export class SimLambdaCodeResolver {
         });
         return this.vmZipCodeFactory.make(zipBytes, context);
       }
+      case "container-image": {
+        return new SimLambdaHandlerReferenceCode(
+          this.containerImageHandler(source.imageUri),
+        );
+      }
     }
+  }
+
+  /**
+   * The handler standing in for a container image, refusing the function where
+   * nothing stands in for it.
+   *
+   * Real Lambda refuses a function whose image it cannot pull, so refusing
+   * here is the closest thing to that: an image URI is an identifier, and one
+   * naming nothing this simulation holds is a function with no code.
+   */
+  private containerImageHandler(imageUri: string): SimLambdaHandler {
+    const image = this.containerImages.image(imageUri);
+
+    if (image.handler === undefined) {
+      throw new SimLambdaInvalidParameterValueException(
+        `Source image ${imageUri} cannot be run: ` +
+          `${image.unsimulatedReason()}. Register a real in-process handler ` +
+          `as the image in a simulated ECR repository to simulate it.`,
+      );
+    }
+
+    return image.handler;
   }
 }

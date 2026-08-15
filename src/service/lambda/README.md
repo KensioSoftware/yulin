@@ -527,7 +527,9 @@ the CloudFormation engine with an "Unsupported" diagnostic.
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
-- container image functions (`Code.ImageUri`) — the simulator stays Docker-free
+- running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
+  in-process handler an executable binding or a simulated ECR repository stands in with, and is
+  skipped or refused where neither does
 - `UpdateFunctionCode`, `DeleteFunction`, function listing, versions, aliases and qualifiers
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment

@@ -1,5 +1,6 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCfnLambdaCdkAssetsSkip } from "./sim-cfn-lambda-cdk-assets-skip.js";
+import type { SimCfnLambdaCodeInput } from "./sim-cfn-lambda-code-input.js";
 import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-properties-parser.js";
 import { SimCfnLambdaImageSkip } from "./sim-cfn-lambda-image-skip.js";
 import { SimCfnLambdaRuntimeSkip } from "./sim-cfn-lambda-runtime-skip.js";
@@ -26,11 +27,11 @@ export class SimCfnLambdaCreationSkips {
   beforeCreate(
     resource: SimCfnResource,
     functionProperties: SimCfnLambdaFunctionProperties,
-    bound: boolean,
+    code: SimCfnLambdaCodeInput,
   ): Error | undefined {
     return (
-      this.imageSkip.findSkipError(resource, functionProperties, bound) ??
-      this.runtimeSkip.findSkipError(resource, functionProperties, bound)
+      this.imageSkip.findSkipError(resource, functionProperties, code) ??
+      this.runtimeSkip.findSkipError(resource, functionProperties, code.bound)
     );
   }
 

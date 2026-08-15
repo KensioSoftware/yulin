@@ -1572,10 +1572,19 @@ A function with `PackageType: Image` names a container image instead of code, wh
 is nothing for it to run. The Resource is skipped with a diagnostic naming the image, and the rest
 of the stack deploys.
 
-Bind a real in-process handler to the function to simulate it. The binding replaces the image, so
-the function is created and invoked like any other. This is the same mechanism as
-[executable bindings](#executable-bindings), and it is the only way to run an image-packaged
-function.
+There are two ways to give that function a real in-process handler to run instead, and they suit
+different shapes of test:
+
+- Bind one to the function for this deploy, which is the same mechanism as
+  [executable bindings](#executable-bindings) and is shown below.
+- Register one as the image in a
+  [simulated ECR repository](../ecr/ "Simulated ECR usage docs"), which is a standing statement
+  about what that image is, made once and good for every stack that runs it, and for a function
+  created directly through `CreateFunction`.
+
+Either way the handler replaces the image, so the function is created and invoked like any other. A
+binding is looked at first, because it is about one deploy where a repository is about the image
+everywhere.
 
 ```typescript sim-lambda-container-image-function
 /**
@@ -1650,6 +1659,10 @@ running in this process.
 A binding can also name the image repository instead of the function, which covers every function
 running that image without repeating the binding per stack. See
 [binding by container image repository](#binding-by-container-image-repository).
+
+The skip reason says what was looked for. An image whose repository no simulated ECR holds is
+reported apart from one whose repository holds no image, since those send you to different places:
+a repository name that does not agree with the template, or a handler that was never registered.
 
 ## Function URLs in templates
 
@@ -1877,11 +1890,17 @@ A function matched this way is created from the bound handler, so it never reach
 [container image skip](#container-image-functions). Functions in the same template running an image
 from another repository are skipped as usual.
 
+A binding like this and a handler registered in
+[simulated ECR](../ecr/ "Simulated ECR usage docs") match on the same thing, and the binding is what
+backs the function where both could. Reach for the binding when the handler belongs to one deploy,
+and for the repository when it belongs to the image.
+
 ## Available functionality
 
 Sim Lambda currently supports:
 
-- `CreateFunctionCommand` and `GetFunctionCommand`
+- `CreateFunctionCommand` and `GetFunctionCommand`, including a function created from the
+  [simulated ECR](../ecr/ "Simulated ECR usage docs") image its `Code.ImageUri` names
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
@@ -1948,8 +1967,10 @@ Current documented limitations:
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
 - Container image functions are not run. Yulin never reads a container image, and stays Docker-free.
-  A template function with `PackageType: Image` is skipped unless a real in-process handler is bound
-  to it. See [Container image functions](#container-image-functions).
+  A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
+  in-process handler stands in for its image: one bound to it, or one registered in the
+  [simulated ECR](../ecr/ "Simulated ECR usage docs") repository the image URI names. See
+  [Container image functions](#container-image-functions).
 - Lambda Layers are not simulated.
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value

@@ -1,4 +1,5 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnLambdaCodeInput } from "./sim-cfn-lambda-code-input.js";
 import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-properties-parser.js";
 
 /**
@@ -14,9 +15,10 @@ const imagePackageType = "Image";
  * CommonJS in a vm. So the image URI is only ever an identifier, and a
  * function packaged as an image has no code Yulin can run.
  *
- * A function with an executable binding is exempt, because the binding
- * replaces the code with a real in-process handler. That is how to simulate a
- * container image function, and the skip message says so.
+ * A function a real in-process handler backs is exempt, whether that handler
+ * came from an executable binding or from the simulated ECR repository the
+ * image URI names. Those are the two ways to simulate a container image
+ * function, and the skip message says so.
  *
  * This is separate from the runtime skip because a container image function
  * declares no Runtime at all, so there is nothing there for that gate to
@@ -33,17 +35,34 @@ export class SimCfnLambdaImageSkip {
   findSkipError(
     resource: SimCfnResource,
     functionProperties: SimCfnLambdaFunctionProperties,
-    bound: boolean,
+    code: SimCfnLambdaCodeInput,
   ): Error | undefined {
-    if (bound || !this.isImagePackaged(functionProperties)) {
+    if (code.bound || !this.isImagePackaged(functionProperties)) {
       return undefined;
     }
 
     return new Error(
       `Unsupported sim Lambda CloudFormation Resource ${resource.logicalId}: ` +
-        `${this.imageDescription(functionProperties)}. Bind a real ` +
-        `in-process handler to this function to simulate it.`,
+        `${this.imageDescription(functionProperties)}${this.unsimulatedImage(code)}` +
+        `. Bind a real in-process handler to this function, or register one ` +
+        `as the image in a simulated ECR repository, to simulate it.`,
     );
+  }
+
+  /**
+   * What simulated ECR had to say about the image, where the function names
+   * one.
+   *
+   * This is the difference between a repository nothing made and a repository
+   * holding no image, which is the difference between a name that is wrong and
+   * a handler that was never registered.
+   */
+  private unsimulatedImage(code: SimCfnLambdaCodeInput): string {
+    if (code.unsimulatedImageReason === undefined) {
+      return "";
+    }
+
+    return `, and ${code.unsimulatedImageReason}`;
   }
 
   /**

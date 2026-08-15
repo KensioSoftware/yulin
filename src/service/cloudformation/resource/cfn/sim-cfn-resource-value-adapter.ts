@@ -4,6 +4,7 @@ import { apiGatewayV2ValueAdapter } from "./apigatewayv2/sim-api-gateway-v2-cfn-
 import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
 import { cognitoValueAdapter } from "./cognito/sim-cognito-cfn-value-adapter.js";
 import { dynamoDbValueAdapter } from "./dynamodb/sim-dynamodb-cfn-value-adapter.js";
+import { ecrValueAdapter } from "./ecr/sim-ecr-cfn-value-adapter.js";
 import { eventBridgeValueAdapter } from "./events/sim-event-bridge-cfn-value-adapter.js";
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
@@ -56,6 +57,7 @@ export function simCfnResourceValueAdapter(
     cloudFrontValueAdapter(properties) ??
     cognitoValueAdapter(properties) ??
     dynamoDbValueAdapter(properties) ??
+    ecrValueAdapter(properties) ??
     eventBridgeValueAdapter(properties) ??
     iamValueAdapter(properties) ??
     kmsValueAdapter(properties) ??

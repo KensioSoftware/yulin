@@ -22,6 +22,10 @@ import {
   type SimLambdaEventSourceStreams,
   SimLambdaNoEventSourceStreams,
 } from "./event-source/stream/sim-lambda-event-source-streams.js";
+import {
+  type SimLambdaContainerImages,
+  SimLambdaNoContainerImages,
+} from "./function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
@@ -39,6 +43,7 @@ export interface SimLambdaProperties {
   readonly background?: BackgroundScheduler;
   readonly runAsOwner?: SimAwsRunAsOwner;
   readonly codeStore?: SimLambdaCodeStore;
+  readonly containerImages?: SimLambdaContainerImages;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
   readonly urlRegistry?: SimLambdaUrlRegistry;
   readonly eventSourceQueues?: SimLambdaEventSourceQueues;
@@ -59,6 +64,13 @@ interface SimLambdaCommandsProperties extends SimLambdaProperties {
  * through the area it belongs to.
  */
 export class SimLambdaCommands {
+  /**
+   * Where a container image function's image URI is resolved to a real
+   * in-process handler. Read by CloudFormation as well as by CreateFunction,
+   * since a template function names an image the same way an SDK caller does.
+   */
+  public readonly containerImages: SimLambdaContainerImages;
+
   public readonly functionUrlStore: SimLambdaFunctionUrlStore;
   public readonly functionLookup: SimLambdaFunctionLookup;
   public readonly functions: SimLambdaFunctionCommands;
@@ -82,7 +94,12 @@ export class SimLambdaCommands {
       // delivering.
       eventSourceQueues = new SimLambdaNoEventSourceQueues(),
       eventSourceStreams = new SimLambdaNoEventSourceStreams(),
+      // A standalone SimLambda has no simulated ECR beside it, so a container
+      // image function created on one has nothing to resolve its image in.
+      containerImages = new SimLambdaNoContainerImages(),
     } = properties;
+
+    this.containerImages = containerImages;
 
     this.functionLookup = new SimLambdaFunctionLookup({
       accountRegionScope,
@@ -129,6 +146,7 @@ export class SimLambdaCommands {
       // is only reported once for this simulated Lambda.
       environmentConflicts: new SimLambdaEnvironmentConflicts(),
       codeStore,
+      containerImages,
       vmSdkModuleProvider,
     });
   }

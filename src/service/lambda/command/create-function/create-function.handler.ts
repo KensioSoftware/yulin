@@ -13,6 +13,7 @@ import {
 import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
 import type { SimLambdaExecutableCode } from "../../function/code/sim-lambda-executable-code.js";
 import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resolver.js";
+import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
@@ -41,6 +42,7 @@ interface CreateFunctionCommandHandlerProperties {
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
   codeStore?: SimLambdaCodeStore | undefined;
+  containerImages?: SimLambdaContainerImages | undefined;
   vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
   environmentConflicts?: SimLambdaEnvironmentConflicts;
 }
@@ -74,6 +76,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       codeStore,
+      containerImages,
       vmSdkModuleProvider,
       environmentConflicts = new SimLambdaEnvironmentConflicts(),
     } = properties;
@@ -84,6 +87,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     this.background = background;
     this.codeResolver = new SimLambdaCodeResolver({
       codeStore,
+      containerImages,
       vmSdkModuleProvider,
       // The background scheduler is this simulation's clock, and the same one
       // the created function is given.

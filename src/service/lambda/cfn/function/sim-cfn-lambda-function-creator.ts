@@ -31,10 +31,11 @@ export class SimCfnLambdaFunctionCreator {
   /**
    * Create a simulated Lambda function from an AWS::Lambda::Function Resource.
    *
-   * When an executable binding targets this Resource, the binding's real
-   * in-process handler backs the function instead of the template code, so
-   * tests can step through their actual handler while still deploying it
-   * through CloudFormation.
+   * Where a real in-process handler backs this Resource, from an executable
+   * binding or from the simulated ECR repository its image URI names, that
+   * handler backs the function instead of the template code, so tests can step
+   * through their actual handler while still deploying it through
+   * CloudFormation.
    */
   async create(
     resource: SimCfnResource,
@@ -45,16 +46,17 @@ export class SimCfnLambdaFunctionCreator {
       resource,
       properties,
     );
-    const { code, bound } = simCfnLambdaCodeInput({
+    const codeInput = simCfnLambdaCodeInput({
       resource,
       functionProperties,
       bindings,
+      containerImages: this.lambda.containerImages(),
     });
 
     const skipError = this.skips.beforeCreate(
       resource,
       functionProperties,
-      bound,
+      codeInput,
     );
     if (skipError !== undefined) {
       throw skipError;
@@ -62,7 +64,10 @@ export class SimCfnLambdaFunctionCreator {
 
     try {
       await this.lambda.createFunction({
-        input: simCfnLambdaCreateFunctionInput(functionProperties, code),
+        input: simCfnLambdaCreateFunctionInput(
+          functionProperties,
+          codeInput.code,
+        ),
       });
     } catch (error) {
       const assetsSkipError = this.skips.fromCreateFailure(

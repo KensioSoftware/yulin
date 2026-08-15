@@ -3,6 +3,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsRunAsOwner } from "../../../aws/caller/sim-aws-run-as-context.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
@@ -38,6 +39,7 @@ interface SimLambdaFunctionCommandsProperties {
   readonly functionUrls: SimLambdaFunctionUrlStore;
   readonly environmentConflicts: SimLambdaEnvironmentConflicts;
   readonly codeStore?: SimLambdaCodeStore | undefined;
+  readonly containerImages?: SimLambdaContainerImages | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
 }
 

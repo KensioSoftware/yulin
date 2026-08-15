@@ -2046,6 +2046,7 @@ The resource types it creates are:
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`
 - `AWS::DynamoDB::Table` and `AWS::DynamoDB::GlobalTable`
+- `AWS::ECR::Repository`
 - `AWS::Events::EventBus` and `AWS::Events::Rule`, with the rule's inline `Targets`
 - `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`

@@ -12,6 +12,7 @@ import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import type { SimEcr } from "../../ecr/index.js";
 import type { SimEcs } from "../../ecs/index.js";
 import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
@@ -30,6 +31,7 @@ import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
 import type { SimSts } from "../../sts/sim-sts.js";
 import { SimAwsAccountRegionServiceBuilder } from "./sim-aws-account-region-service-builder.js";
+import { SimAwsSelfContainedServiceBuilder } from "./sim-aws-self-contained-service-builder.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAwsRequestAuthWiring } from "./sim-aws-request-auth-wiring.js";
 import { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
@@ -108,6 +110,7 @@ export class SimAwsServiceFactory {
 
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly accountRegionServices: SimAwsAccountRegionServiceBuilder;
+  private readonly selfContainedServices: SimAwsSelfContainedServiceBuilder;
 
   constructor(properties: SimAwsServiceFactoryProperties) {
     this.accountServices = new SimAwsAccountServiceCache({
@@ -130,6 +133,9 @@ export class SimAwsServiceFactory {
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
       httpApiRegistry: this.httpApiRegistry,
+      accountServices: this.accountServices,
+    });
+    this.selfContainedServices = new SimAwsSelfContainedServiceBuilder({
       accountServices: this.accountServices,
     });
   }
@@ -163,12 +169,17 @@ export class SimAwsServiceFactory {
 
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
-    return this.accountRegionServices.createDynamoDb(scope);
+    return this.selfContainedServices.createDynamoDb(scope);
+  }
+
+  /** Create simulated ECR for an Account Region scope. */
+  createEcr(scope: SimAwsAccountRegionContainer): SimEcr {
+    return this.accountRegionServices.createEcr(scope);
   }
 
   /** Create simulated ECS for an Account Region scope. */
   createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
-    return this.accountRegionServices.createEcs(scope);
+    return this.selfContainedServices.createEcs(scope);
   }
 
   /** Create simulated EventBridge for an Account Region scope. */
@@ -178,7 +189,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
   createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    return this.accountRegionServices.createElbV2(scope);
+    return this.selfContainedServices.createElbV2(scope);
   }
 
   /** Create or get simulated IAM for an Account scope. */
@@ -213,7 +224,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated Secrets Manager for an Account Region scope. */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
-    return this.accountRegionServices.createSecretsManager(scope);
+    return this.selfContainedServices.createSecretsManager(scope);
   }
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */
@@ -228,12 +239,12 @@ export class SimAwsServiceFactory {
 
   /** Create simulated SQS for an Account Region scope. */
   createSqs(scope: SimAwsAccountRegionContainer): SimSqs {
-    return this.accountRegionServices.createSqs(scope);
+    return this.selfContainedServices.createSqs(scope);
   }
 
   /** Create simulated SSM for an Account Region scope. */
   createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
-    return this.accountRegionServices.createSsm(scope);
+    return this.selfContainedServices.createSsm(scope);
   }
 
   /** Create simulated STS for an Account/Region scope. */

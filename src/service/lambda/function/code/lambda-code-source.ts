@@ -11,6 +11,7 @@ export interface SimLambdaCodeInput {
   S3Bucket?: string | undefined;
   S3Key?: string | undefined;
   S3ObjectVersion?: string | undefined;
+  ImageUri?: string | undefined;
 }
 
 /**
@@ -42,25 +43,42 @@ export interface SimLambdaS3LocationSource {
 }
 
 /**
+ * Function code given as a container image URI, as a function with
+ * PackageType Image names on real AWS.
+ *
+ * The URI is only ever an identifier here. What runs is whatever simulated ECR
+ * holds under the repository it names, which is resolved when the function is
+ * created, as real Lambda resolves the image then too.
+ */
+export interface SimLambdaContainerImageSource {
+  readonly kind: "container-image";
+  readonly imageUri: string;
+}
+
+/**
  * The validated source of a sim Lambda function's code.
  */
 export type SimLambdaCodeSource =
   | SimLambdaHandlerReferenceSource
   | SimLambdaZipBytesSource
-  | SimLambdaS3LocationSource;
+  | SimLambdaS3LocationSource
+  | SimLambdaContainerImageSource;
 
 /**
  * Validate CreateFunction code input into a sim Lambda code source.
  *
- * Exactly one of ZipFile or an S3 object location must be given, as on real
- * AWS. S3ObjectVersion is accepted but ignored, as sim S3 does not simulate
- * object versioning yet.
+ * Exactly one of ZipFile, an S3 object location or a container image URI must
+ * be given, as on real AWS. S3ObjectVersion is accepted but ignored, as sim S3
+ * does not simulate object versioning yet.
  */
 export function requireLambdaCodeSource(
   code: SimLambdaCodeInput | undefined,
 ): SimLambdaCodeSource {
   assertDefined(code, "CreateFunctionCommand.input.Code required");
 
+  if (code.ImageUri !== undefined) {
+    return containerImageSource(code.ImageUri, code);
+  }
   if (code.ZipFile !== undefined) {
     return zipFileSource(code.ZipFile, code);
   }
@@ -68,9 +86,31 @@ export function requireLambdaCodeSource(
     return s3LocationSource(code);
   }
   throw new SimLambdaInvalidParameterValueException(
-    "CreateFunctionCommand.input.Code requires either ZipFile bytes or an " +
-      "S3Bucket and S3Key object location",
+    "CreateFunctionCommand.input.Code requires either ZipFile bytes, an " +
+      "S3Bucket and S3Key object location, or an ImageUri",
   );
+}
+
+/**
+ * A container image function names its image and nothing else, as on real
+ * AWS, where an image function has no zip code to also name.
+ */
+function containerImageSource(
+  imageUri: string,
+  code: SimLambdaCodeInput,
+): SimLambdaContainerImageSource {
+  if (
+    code.ZipFile !== undefined ||
+    code.S3Bucket !== undefined ||
+    code.S3Key !== undefined
+  ) {
+    throw new SimLambdaInvalidParameterValueException(
+      "Please do not provide ZipFile bytes or an S3 object location when " +
+        "using Code.ImageUri",
+    );
+  }
+
+  return { kind: "container-image", imageUri };
 }
 
 function zipFileSource(

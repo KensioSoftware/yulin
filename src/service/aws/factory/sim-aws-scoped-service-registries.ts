@@ -1,6 +1,7 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
+import { SimEcrRegistry } from "../../ecr/registry/sim-ecr-registry.js";
 import { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
@@ -35,6 +36,13 @@ export class SimAwsScopedServiceRegistries {
    * where DNS resolution finds the pool a hosted request is for.
    */
   public readonly cognitoDomains = new SimCognitoDomainRegistry();
+
+  /**
+   * Indexes the repositories created in any Account and Region of one SimAws
+   * instance, so a container image function holding only an image URI finds
+   * the repository that URI names, whichever Account and Region it is in.
+   */
+  public readonly ecr = new SimEcrRegistry();
 
   /**
    * Indexes the account/region-scoped KMS facades created for one SimAws

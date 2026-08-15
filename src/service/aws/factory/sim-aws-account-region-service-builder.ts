@@ -15,10 +15,8 @@ import {
 } from "./sim-aws-cross-account-collaborators.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
+import { SimEcr } from "../../ecr/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
-import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
-import { SimEcs } from "../../ecs/index.js";
-import { SimElbV2 } from "../../elbv2/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
@@ -30,11 +28,8 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { SimScheduler } from "../../scheduler/index.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
-import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSns } from "../../sns/index.js";
 import { SimAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-delivery-endpoints.js";
-import { SimSqs } from "../../sqs/index.js";
-import { SimSsm } from "../../ssm/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
@@ -57,6 +52,10 @@ interface SimAwsAccountRegionServiceBuilderProperties {
  * belongs to. This class is the half of that split holding the services whose
  * AWS state is scoped to an account/region pair, as SimAwsAccountServiceCache
  * is the half holding the services scoped to a whole account.
+ *
+ * A service whose wiring says nothing but which scope it is in belongs in
+ * SimAwsSelfContainedServiceBuilder instead, so what is left here is the
+ * services that reach for something outside their own scope.
  *
  * Nothing is cached here, which is the point of the split: a service in this
  * class is built fresh for the scope that asks for it, because on real AWS its
@@ -139,14 +138,19 @@ export class SimAwsAccountRegionServiceBuilder {
     });
   }
 
-  /** Create simulated DynamoDB for an Account Region scope. */
-  createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
-    return new SimDynamoDatabase(this.scoped(scope));
-  }
-
-  /** Create simulated ECS for an Account Region scope. */
-  createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
-    return new SimEcs(this.scoped(scope));
+  /**
+   * Create simulated ECR for an Account Region scope.
+   *
+   * Repositories are Region-scoped on real AWS: a repository ARN names the
+   * Region, and the registry host in an image URI carries the Account and the
+   * Region both. It is registered because a container image function holds
+   * nothing but that URI, and the function need not be in this scope.
+   */
+  createEcr(scope: SimAwsAccountRegionContainer): SimEcr {
+    return new SimEcr({
+      accountRegionScope: scope.accountRegionScope,
+      registry: this.registries.ecr,
+    });
   }
 
   /**
@@ -160,11 +164,6 @@ export class SimAwsAccountRegionServiceBuilder {
       ...this.scoped(scope),
       deliveryTargets: simAwsEventBridgeDeliveryTargets(this.simAws),
     });
-  }
-
-  /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
-  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    return new SimElbV2(this.scoped(scope));
   }
 
   /**
@@ -188,6 +187,7 @@ export class SimAwsAccountRegionServiceBuilder {
         simAws: this.simAws,
         scope,
         urlRegistry: this.lambdaUrlRegistry,
+        registries: this.registries,
       }),
     });
   }
@@ -228,14 +228,6 @@ export class SimAwsAccountRegionServiceBuilder {
   }
 
   /**
-   * Create simulated Secrets Manager for an Account Region scope, whose secret
-   * values are encrypted through that same scope's simulated KMS.
-   */
-  createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
-    return new SimSecretsManager({ ...this.scoped(scope), kms: scope.kms() });
-  }
-
-  /**
    * Create simulated SNS for an Account Region scope.
    *
    * Topics are Region-scoped on real AWS: a topic ARN names the Region. Where a
@@ -247,27 +239,6 @@ export class SimAwsAccountRegionServiceBuilder {
     const endpoints = new SimAwsSnsDeliveryEndpoints({ simAws: this.simAws });
 
     return new SimSns({ ...this.scoped(scope), deliveryEndpoints: endpoints });
-  }
-
-  /**
-   * Create simulated SQS for an Account Region scope.
-   *
-   * Queues are Region-scoped on real AWS: a queue URL and ARN both name the
-   * Region, and a queue cannot be reached from another one.
-   */
-  createSqs(scope: SimAwsAccountRegionContainer): SimSqs {
-    return new SimSqs(this.scoped(scope));
-  }
-
-  /**
-   * Create simulated SSM for an Account Region scope.
-   *
-   * Parameters are Region-scoped on real AWS: a parameter name is unique
-   * within one Account and Region, and its ARN names the Region. SecureString
-   * values are encrypted through that same scope's simulated KMS.
-   */
-  createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
-    return new SimSsm({ ...this.scoped(scope), kms: scope.kms() });
   }
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */
