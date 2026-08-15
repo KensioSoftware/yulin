@@ -599,8 +599,8 @@ to.
 ## Container secrets
 
 A container definition's `secrets` are resolved when the task starts, from simulated Secrets Manager
-or simulated SSM Parameter Store according to the ARN each one names, and the values appear in the
-container's environment alongside its declared `environment`. A handler reads them through
+or simulated SSM Parameter Store according to what each `valueFrom` names, and the values appear in
+the container's environment alongside its declared `environment`. A handler reads them through
 `process.env` like anything else.
 
 They are read as the task definition's `executionRoleArn`, not its `taskRoleArn`, which is the
@@ -709,7 +709,7 @@ real task.
 A secret that cannot be resolved stops the task before any container runs, with a
 `ResourceInitializationError` reason naming the variable:
 
-```
+```text
 ResourceInitializationError: unable to pull secrets: DB_PASSWORD: User:
 arn:aws:iam::111111111111:role/OrdersExecutionRole is not authorized to perform:
 secretsmanager:GetSecretValue on resource: arn:aws:secretsmanager:...

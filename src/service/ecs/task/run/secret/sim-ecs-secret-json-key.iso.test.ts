@@ -33,6 +33,20 @@ describe("Selecting one key of a JSON container secret", () => {
     assertStringIncludes(error.message, "holds no password key");
   });
 
+  it("refuses a key the secret only inherits", () => {
+    // Given a key every object has on its prototype.
+    const key = new SimEcsSecretJsonKey("toString");
+
+    // When it is selected.
+    const error = assertThrowsError(() =>
+      key.valueIn(JSON.stringify({ user: "orders" })),
+    );
+
+    // Then the secret is reported as not holding it, rather than as holding
+    // whatever the prototype put there.
+    assertStringIncludes(error.message, "holds no toString key");
+  });
+
   it("refuses a secret that is not JSON", () => {
     // Given a secret holding a plain string.
     const key = new SimEcsSecretJsonKey("password");

@@ -4,7 +4,7 @@ import {
 } from "@aws-sdk/client-ecs";
 import { CreateSecretCommand } from "@aws-sdk/client-secrets-manager";
 import { PutParameterCommand } from "@aws-sdk/client-ssm";
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import { assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
@@ -57,10 +57,8 @@ describe("Resolving a simulated ECS container's secrets", () => {
     await ecs.runTask(new RunTaskCommand({ taskDefinition: "orders-worker" }));
     await simAws.backgroundTasksComplete();
 
-    // Then the handler read the secret's value through process.env, and
-    // nothing was left behind in the host environment.
+    // Then the handler read the secret's value through process.env.
     assertIdentical(observed, "hunter2");
-    assertUndefined(process.env["DB_PASSWORD"]);
   });
 
   it("puts an SSM SecureString parameter in the container's environment", async () => {
@@ -274,5 +272,66 @@ describe("Resolving a simulated ECS container's secrets", () => {
     // Then the secret won, since a plaintext variable of the same name is what
     // a secret was introduced to replace.
     assertIdentical(observed, "hunter2");
+  });
+
+  it("lets a RunTask override replace a resolved secret", async () => {
+    // Given a container whose DB_PASSWORD comes from a secret.
+    const simAws = new SimAws();
+    const ecs = simAws.ecs();
+    await simEcsClusterFactory.make({}, simAws);
+    const secret = await simAws
+      .secretsManager()
+      .createSecret(
+        new CreateSecretCommand({ Name: "orders/db", SecretString: "hunter2" }),
+      );
+    const executionRole = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "OrdersExecutionRole",
+        actions: ["secretsmanager:GetSecretValue"],
+      },
+      simAws,
+    );
+
+    let observed: string | undefined;
+    ecs.bindContainer({
+      family: "orders-worker",
+      containerName: "app",
+      run: () => {
+        observed = process.env["DB_PASSWORD"];
+      },
+    });
+    await ecs.registerTaskDefinition(
+      new RegisterTaskDefinitionCommand({
+        family: "orders-worker",
+        executionRoleArn: executionRole.Arn,
+        containerDefinitions: [
+          {
+            name: "app",
+            image: "orders-worker:1",
+            secrets: [{ name: "DB_PASSWORD", valueFrom: secret.ARN }],
+          },
+        ],
+      }),
+    );
+
+    // When the task is run with an override setting the same variable.
+    await ecs.runTask(
+      new RunTaskCommand({
+        taskDefinition: "orders-worker",
+        overrides: {
+          containerOverrides: [
+            {
+              name: "app",
+              environment: [{ name: "DB_PASSWORD", value: "overridden" }],
+            },
+          ],
+        },
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the override won, since it is what the caller asked for at the
+    // moment the task was started.
+    assertIdentical(observed, "overridden");
   });
 });

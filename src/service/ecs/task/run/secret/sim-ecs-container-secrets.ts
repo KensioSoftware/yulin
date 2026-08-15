@@ -118,7 +118,7 @@ export class SimEcsContainerSecrets {
    * thing, and forgetting the execution role is the ordinary way to get here.
    */
   private requiredExecutionRoleArn(): string {
-    if (this.executionRoleArn === undefined) {
+    if (this.executionRoleArn === undefined || this.executionRoleArn === "") {
       throw new SimEcsSecretResolutionError(
         "the task definition declares no executionRoleArn, so there is no " +
           "Role to read it as.",

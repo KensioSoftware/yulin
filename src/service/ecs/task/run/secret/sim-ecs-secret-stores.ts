@@ -35,7 +35,11 @@ export interface SimEcsSecretStores {
  * running without the variable it expects.
  */
 export class SimEcsUnreachableSecretStores implements SimEcsSecretStores {
-  read(request: SimEcsSecretRead): Promise<string> {
+  // Asynchronous so that it refuses the way the other implementation does,
+  // through a rejected promise rather than a throw the caller has to be
+  // holding a try around at the moment it calls.
+  // oxlint-disable-next-line require-await -- there is nothing here to await
+  async read(request: SimEcsSecretRead): Promise<string> {
     throw new SimEcsSecretResolutionError(
       `${request.reference.identifier} cannot be read, because this ` +
         `simulated ECS reaches no simulated Secrets Manager or SSM Parameter ` +

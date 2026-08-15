@@ -34,18 +34,22 @@ export class SimEcsSecretJsonKey {
    * The value this key holds in a secret stored as a JSON object.
    */
   valueIn(secretString: string): string {
-    const value = this.object(secretString)[this.key];
+    const object = this.object(secretString);
 
-    if (value === undefined) {
+    // An own property, so a key of `constructor` or `toString` is a key the
+    // secret has not got rather than something found on the prototype.
+    if (!Object.hasOwn(object, this.key)) {
       throw new SimEcsSecretResolutionError(
         `the secret holds no ${this.key} key.`,
       );
     }
 
+    const value = object[this.key];
+
     if (typeof value !== "string") {
       throw new SimEcsSecretResolutionError(
-        `the ${this.key} key holds a ${typeof value} rather than a string, ` +
-          `and an environment variable can only be text.`,
+        `the ${this.key} key holds a value of type ${typeof value} rather ` +
+          `than a string, and an environment variable can only be text.`,
       );
     }
 

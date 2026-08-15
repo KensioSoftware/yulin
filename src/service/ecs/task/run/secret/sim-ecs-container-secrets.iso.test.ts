@@ -48,6 +48,33 @@ describe("Resolving one container's declared secrets", () => {
     assertIdentical(resolved["API_KEY"], "value");
   });
 
+  it("takes an empty execution Role as no execution Role at all", async () => {
+    // Given a definition carrying an executionRoleArn of nothing, which names
+    // no Role just as declaring none does.
+    const declared = new SimEcsContainerDefinition({
+      name: "app",
+      image: "orders-worker:1",
+      secrets: [{ name: "DB_PASSWORD", valueFrom: "/orders/db" }],
+    });
+    const secrets = new SimEcsContainerSecrets({
+      stores: new SimEcsFixedSecretStore(() => "value"),
+      executionRoleArn: "",
+    });
+
+    // When the secrets are resolved.
+    let reason = "";
+
+    try {
+      await secrets.resolve(declared);
+    } catch (error) {
+      reason = error instanceof Error ? error.message : "";
+    }
+
+    // Then it says there is no Role to read the secret as, rather than reading
+    // it as a principal named by an empty ARN.
+    assertStringIncludes(reason, "declares no executionRoleArn");
+  });
+
   it("reports a store that threw something other than an Error", async () => {
     // Given a store whose failure is not an Error, as an unwrapped rejection
     // from anything reached across a service boundary may not be.
