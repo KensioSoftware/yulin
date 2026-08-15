@@ -1,5 +1,4 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
-import type { SimElbV2Listener } from "../listener/sim-elbv2-listener.js";
 import type { SimElbV2TargetGroup } from "../target-group/sim-elbv2-target-group.js";
 import { SimElbV2ErrorResponse } from "./sim-elbv2-error-response.js";
 import { SimElbV2EventBuilder } from "./sim-elbv2-event-builder.js";
@@ -9,6 +8,10 @@ import type {
   SimElbV2FunctionTarget,
   SimElbV2Router,
 } from "./sim-elbv2-router.js";
+import type {
+  SimElbV2TargetInvocation,
+  SimElbV2TargetInvocationInput,
+} from "./sim-elbv2-target-invocation.js";
 
 /**
  * The largest request body real ELB sends to a Lambda target.
@@ -19,12 +22,6 @@ interface SimElbV2LambdaTargetInvocationProperties {
   readonly router: SimElbV2Router;
   /** Clock the invocation event is stamped with. */
   readonly clock: SimClock;
-}
-
-interface SimElbV2LambdaTargetInvocationInput {
-  readonly listener: SimElbV2Listener;
-  readonly targetGroup: SimElbV2TargetGroup;
-  readonly request: Request;
 }
 
 /**
@@ -38,7 +35,7 @@ interface SimElbV2LambdaTargetInvocationInput {
  * too, and it is why the load balancer's own logs are the only place the
  * difference between them shows.
  */
-export class SimElbV2LambdaTargetInvocation {
+export class SimElbV2LambdaTargetInvocation implements SimElbV2TargetInvocation {
   private readonly router: SimElbV2Router;
   private readonly eventBuilder: SimElbV2EventBuilder;
   private readonly responseBuilder = new SimElbV2ResponseBuilder();
@@ -54,7 +51,7 @@ export class SimElbV2LambdaTargetInvocation {
   /**
    * Invoke the target group's function for one request.
    */
-  async invoke(input: SimElbV2LambdaTargetInvocationInput): Promise<Response> {
+  async invoke(input: SimElbV2TargetInvocationInput): Promise<Response> {
     const { targetGroup } = input;
 
     if (targetGroup.registeredTargets.length === 0) {
@@ -85,7 +82,7 @@ export class SimElbV2LambdaTargetInvocation {
   }
 
   private async run(
-    input: SimElbV2LambdaTargetInvocationInput,
+    input: SimElbV2TargetInvocationInput,
     target: SimElbV2FunctionTarget,
   ): Promise<Response> {
     const { listener, targetGroup, request } = input;

@@ -1,5 +1,8 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
+import type { SimAwsRunAsOwner } from "../../../aws/caller/sim-aws-run-as-context.js";
 import type { SimEcsContainerBindings } from "../../bind/sim-ecs-container-bindings.js";
+import type { SimEcsServiceServers } from "../serve/sim-ecs-service-servers.js";
+import { SimEcsServiceServing } from "../serve/sim-ecs-service-serving.js";
 import { simEcsNotSimulatedContainerReason } from "../../task/run/sim-ecs-container-reason.js";
 import type { SimEcsResolvedSecrets } from "../../task/run/secret/sim-ecs-resolved-secrets.js";
 import type { SimEcsSecretStores } from "../../task/run/secret/sim-ecs-secret-stores.js";
@@ -13,6 +16,8 @@ interface SimEcsServiceContainersProperties {
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
   readonly consumers: SimEcsServiceConsumers;
+  readonly servers: SimEcsServiceServers;
+  readonly runAsOwner: SimAwsRunAsOwner;
   readonly regionName: string;
   readonly background: BackgroundScheduler;
 }
@@ -38,12 +43,14 @@ export class SimEcsServiceContainers {
   private readonly background: BackgroundScheduler;
   private readonly secrets: SimEcsTaskSecrets;
   private readonly consumption: SimEcsServiceConsumption;
+  private readonly serving: SimEcsServiceServing;
 
   constructor(properties: SimEcsServiceContainersProperties) {
     this.bindings = properties.bindings;
     this.background = properties.background;
     this.secrets = new SimEcsTaskSecrets({ stores: properties.secretStores });
     this.consumption = new SimEcsServiceConsumption(properties);
+    this.serving = new SimEcsServiceServing(properties);
   }
 
   /**
@@ -87,6 +94,7 @@ export class SimEcsServiceContainers {
 
       container.start();
       this.consumption.begin({ deployment, declared, bound, secrets });
+      this.serving.begin({ deployment, declared, bound, secrets });
     }
   }
 }

@@ -50,8 +50,9 @@ export type SimEcsContainerRunHandler = () => void | Promise<void>;
  * answers a served request with, so a container and a Lambda function behind
  * the same listener answer in the same terms.
  *
- * The shape is settled here, but nothing runs it yet. Binding one is refused
- * rather than accepted and quietly never called.
+ * The handler is called once per request a load balancer routes to the
+ * container, with the container's environment and the task Role, rather than
+ * once per task the service is keeping running.
  */
 export type SimEcsContainerHttpHandler = (
   request: Request,
@@ -84,7 +85,8 @@ export type SimEcsContainerBindingTarget =
  * `consumes` declaration is a worker container, which a real image would put in
  * an endless receive-handle-delete loop. Yulin runs that loop and the binding
  * supplies its body, because an endless loop in a single Node.js process would
- * never yield to the test running it.
+ * never yield to the test running it. An `http` handler is a service container
+ * behind a load balancer, which answers the requests routed to it.
  */
 export type SimEcsContainerBindingHandler =
   | {

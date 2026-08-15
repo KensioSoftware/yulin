@@ -2,6 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimEcsCluster } from "../../cluster/sim-ecs-cluster.js";
 import { SimEcsInvalidParameterException } from "../../error/sim-ecs.error.js";
+import type { SimEcsServiceTargets } from "../../service/load-balancer/sim-ecs-service-targets.js";
 import type { SimEcsServiceTasks } from "../../service/run/sim-ecs-service-tasks.js";
 import type { SimEcsServiceArn } from "../../service/sim-ecs-service-arn.js";
 import type { SimEcsServiceStore } from "../../service/sim-ecs-service-store.js";
@@ -43,6 +44,7 @@ export class CreateServiceCommandHandler
   private readonly services: SimEcsServiceStore;
   private readonly serviceArn: SimEcsServiceArn;
   private readonly serviceTasks: SimEcsServiceTasks;
+  private readonly serviceTargets: SimEcsServiceTargets;
   private readonly requestedCluster: SimEcsRequestedCluster;
 
   constructor(context: SimEcsServiceCommandContext) {
@@ -52,6 +54,7 @@ export class CreateServiceCommandHandler
     this.services = context.services;
     this.serviceArn = context.serviceArn;
     this.serviceTasks = context.serviceTasks;
+    this.serviceTargets = context.serviceTargets;
     this.requestedCluster = new SimEcsRequestedCluster(context);
   }
 
@@ -62,10 +65,9 @@ export class CreateServiceCommandHandler
    * which is a desired count and nothing running yet, as real ECS answers one.
    * Its tasks reach `RUNNING` on the simulator's background work.
    *
-   * A load balancer the request declares is recorded on the service and not
-   * acted on. Nothing here sends a service container a request yet, so the
-   * declaration is what a target group has to read to find the service that
-   * answers for it.
+   * A load balancer the request declares is a registration: the target group
+   * has to be there and hold addresses, which is checked before the service is
+   * created, and each task the service starts is registered into it.
    */
   async handle(
     command: SimCreateServiceCommand,
@@ -95,6 +97,7 @@ export class CreateServiceCommandHandler
     );
 
     this.refuseExisting(cluster, request.serviceName);
+    this.serviceTargets.requireRegistrable(request.registrations);
 
     const service = new SimEcsService({
       serviceArn,
@@ -106,7 +109,7 @@ export class CreateServiceCommandHandler
       createdAt: this.background.now(),
       launchType: command.input.launchType,
       createdBy: caller.arn,
-      loadBalancers: command.input.loadBalancers,
+      registrations: request.registrations,
     });
 
     this.services.put(service);

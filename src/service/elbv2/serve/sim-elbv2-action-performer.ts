@@ -2,7 +2,7 @@ import type { SimElbV2Listener } from "../listener/sim-elbv2-listener.js";
 import type { SimElbV2 } from "../sim-elbv2.js";
 import { SimElbV2FixedResponse } from "./sim-elbv2-fixed-response.js";
 import { SimElbV2ForwardTarget } from "./sim-elbv2-forward-target.js";
-import type { SimElbV2LambdaTargetInvocation } from "./sim-elbv2-lambda-target-invocation.js";
+import type { SimElbV2TargetInvocations } from "./sim-elbv2-target-invocations.js";
 import { SimElbV2RedirectResponse } from "./sim-elbv2-redirect-response.js";
 import type { SimElbV2MatchedAction } from "./sim-elbv2-rule-evaluation.js";
 
@@ -25,7 +25,7 @@ export class SimElbV2ActionPerformer {
   private readonly fixedResponse = new SimElbV2FixedResponse();
   private readonly redirect = new SimElbV2RedirectResponse();
 
-  constructor(private readonly invocation: SimElbV2LambdaTargetInvocation) {}
+  constructor(private readonly invocations: SimElbV2TargetInvocations) {}
 
   /**
    * Answer one request with one matched action.
@@ -51,7 +51,7 @@ export class SimElbV2ActionPerformer {
   private async forward(
     input: SimElbV2PerformedActionInput,
   ): Promise<Response> {
-    return await this.invocation.invoke({
+    return await this.invocations.invoke({
       listener: input.listener,
       targetGroup: new SimElbV2ForwardTarget(input.elbV2).resolve(
         input.matched,

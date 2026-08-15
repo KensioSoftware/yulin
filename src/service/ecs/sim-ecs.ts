@@ -6,6 +6,7 @@ import type { SimEcsCluster } from "./cluster/sim-ecs-cluster.js";
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
+import type { SimEcsContainerServer } from "./service/serve/sim-ecs-container-server.js";
 import type { SimEcsService } from "./service/sim-ecs-service.js";
 import { SimEcsCommands } from "./sim-ecs-commands.js";
 import type { SimEcsProperties } from "./sim-ecs-properties.js";
@@ -215,9 +216,9 @@ export class SimEcs {
    *
    * A service is the one thing simulated ECS keeps running rather than runs and
    * finishes, so this is what a simulated environment being finished with comes
-   * down to: every service's tasks stop and nothing is left scheduled, while
-   * the services stay describable with the desired count they had. Closing
-   * again does nothing again, since there is then nothing running to stop.
+   * down to: every service's tasks stop, leaving the target groups they were
+   * registered into, and nothing is left scheduled, while the services stay
+   * describable with the desired count they had.
    */
   close(): void {
     this.commands.closeServices();
@@ -227,25 +228,15 @@ export class SimEcs {
    * Bind a real in-process handler to a container a task definition declares.
    *
    * The container is named either by its family and container name or by the
-   * repository its image comes from. A task run from that definition runs the
-   * bound handler in this process, with the container's environment variables
-   * and the task Role.
-   *
-   * ```typescript
-   * simAws.ecs().bindContainer({
-   *   family: "orders-worker",
-   *   containerName: "app",
-   *   run: async () => {
-   *     await processOutstandingOrders();
-   *   },
-   * });
-   * ```
+   * repository its image comes from, as `SimEcsContainerBinding` shows. A task
+   * run from that definition runs the bound handler in this process, with the
+   * container's environment variables and the task Role.
    *
    * A container that consumes a queue declares `consumes` instead of `run`,
-   * with a `queueUrl` and a `handler` for a batch of messages. Yulin drives the
-   * polling loop while a service is running the container and the binding
-   * supplies its body, so the batch is deleted when the handler returns and
-   * left on the queue when it throws. Polling is done as the task Role.
+   * with a `queueUrl` and a `handler` for a batch of messages: Yulin drives the
+   * polling loop and the binding supplies its body. One behind a load balancer
+   * declares `http` instead, and its handler answers each request routed to it.
+   * Both are called as the task Role while a service is running the container.
    *
    * Bindings belong to the Account and Region they were made in, as the task
    * definitions they target do, and can be made before or after the task
@@ -259,33 +250,40 @@ export class SimEcs {
    * The cluster of this name, whether it is active or deleted.
    *
    * A lookup rather than an operation, for a test or a CloudFormation Resource
-   * that needs the thing itself rather than a description of it. An identifier
-   * nothing holds is refused, here and in the two lookups below, since the
-   * caller asked for the thing rather than for whether there is one.
+   * that needs the thing itself. An identifier nothing holds is refused, here
+   * and in the two lookups below, since the caller asked for the thing rather
+   * than for whether there is one.
    */
   cluster(clusterName: string): SimEcsCluster {
     return this.commands.lookup.cluster(clusterName);
   }
 
   /**
-   * The task definition revision a family, `family:revision` or ARN names.
-   *
-   * A family on its own means its latest active revision, as it does
-   * everywhere else in ECS.
+   * The task definition revision a family, `family:revision` or ARN names. A
+   * family on its own means its latest active revision, as it does elsewhere.
    */
   taskDefinition(identifier: string): SimEcsTaskDefinition {
     return this.commands.lookup.taskDefinition(identifier);
   }
 
   /**
-   * The service a name in a cluster, or a full service ARN, names, whether it
-   * is active or deleted.
-   *
-   * A name given without a cluster is looked for in the `default` one, as an
-   * ECS request naming no cluster means that one.
+   * The service a name in a cluster, or a full service ARN, names, active or
+   * deleted. A name given without a cluster is looked for in the `default` one.
    */
   service(identifier: string, clusterName?: string): SimEcsService {
     return this.commands.lookup.service(identifier, clusterName);
+  }
+
+  /**
+   * The container of a running service that answers for a target group.
+   *
+   * This is how a request routed to a target group reaches the handler bound to
+   * a service's container. It answers with nothing where nothing can serve the
+   * request: no active service registered into the group, or one whose
+   * containers are none of them bound to an HTTP handler.
+   */
+  servingContainer(targetGroupArn: string): SimEcsContainerServer | undefined {
+    return this.commands.servingContainer(targetGroupArn);
   }
 
   /** Get this service's CloudFormation Resource factory. */

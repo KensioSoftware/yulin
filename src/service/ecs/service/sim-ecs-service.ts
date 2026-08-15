@@ -1,4 +1,5 @@
 import type { SimArn } from "../../aws/arn.js";
+import type { SimEcsServiceRegistration } from "./load-balancer/sim-ecs-service-registration.js";
 import type {
   SimEcsServiceDetail,
   SimEcsServiceLoadBalancer,
@@ -75,14 +76,22 @@ export class SimEcsService {
   }
 
   /**
-   * The load balancers this service was created with.
-   *
-   * Held as they were declared and not acted on: nothing here sends a service
-   * container a request yet, so this is what a target group reads to find the
-   * service that is meant to answer for it.
+   * The load balancers this service was created with, as it declared them.
    */
   get loadBalancers(): readonly SimEcsServiceLoadBalancer[] {
     return this.identity.loadBalancers;
+  }
+
+  /**
+   * The target groups this service registers its tasks into.
+   *
+   * This is the same declaration read once and checked, and it is what both
+   * ends of a served request go through: the tasks are registered into these
+   * target groups as they start, and a request routed to one of those groups
+   * finds this service by reading them back.
+   */
+  get registrations(): readonly SimEcsServiceRegistration[] {
+    return this.identity.registrations;
   }
 
   /** The revision this service is currently running. */

@@ -5,7 +5,11 @@ import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings
 import { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
 import { SimEcsServiceConsumers } from "../service/consume/sim-ecs-service-consumers.js";
+import { SimEcsServiceTargets } from "../service/load-balancer/sim-ecs-service-targets.js";
+import type { SimEcsTargetGroups } from "../service/load-balancer/sim-ecs-target-groups.js";
 import { SimEcsServiceTasks } from "../service/run/sim-ecs-service-tasks.js";
+import { SimEcsServiceServers } from "../service/serve/sim-ecs-service-servers.js";
+import { SimEcsTargetGroupContainers } from "../service/serve/sim-ecs-target-group-containers.js";
 import { SimEcsServiceArn } from "../service/sim-ecs-service-arn.js";
 import type { SimEcsServiceStore } from "../service/sim-ecs-service-store.js";
 import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
@@ -35,6 +39,7 @@ interface SimEcsCommandContextsProperties {
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
   readonly consumerQueues: SimSqsPollQueues;
+  readonly targetGroups: SimEcsTargetGroups;
 }
 
 /**
@@ -44,6 +49,11 @@ interface SimEcsCommandContextsProperties {
  * contexts overlap because the operations do: a task operation needs the
  * clusters a cluster operation needs, and running a task needs everything.
  * Building them in one place is what keeps the service facade a delegation.
+ *
+ * The containers a target group reaches are built here too, though no command
+ * handler takes them. They read the same services and the same running
+ * containers the service operations work on, and building them anywhere else
+ * would be a second set of both.
  */
 export class SimEcsCommandContexts {
   public readonly cluster: SimEcsClusterCommandContext;
@@ -51,10 +61,15 @@ export class SimEcsCommandContexts {
   public readonly task: SimEcsTaskCommandContext;
   public readonly runTask: SimEcsRunTaskCommandContext;
   public readonly service: SimEcsServiceCommandContext;
+  public readonly targetGroupContainers: SimEcsTargetGroupContainers;
 
   constructor(properties: SimEcsCommandContextsProperties) {
     const { accountRegionScope, authorizer, background } = properties;
     const shared = { authorizer, background };
+    const servers = new SimEcsServiceServers();
+    const serviceTargets = new SimEcsServiceTargets({
+      targetGroups: properties.targetGroups,
+    });
 
     this.cluster = {
       ...shared,
@@ -88,19 +103,27 @@ export class SimEcsCommandContexts {
       taskDefinitions: properties.taskDefinitions,
       services: properties.services,
       serviceArn: new SimEcsServiceArn(accountRegionScope),
+      serviceTargets,
       serviceTasks: new SimEcsServiceTasks({
         tasks: properties.tasks,
         taskArn: this.task.taskArn,
         bindings: properties.bindings,
         secretStores: properties.secretStores,
         regionName: accountRegionScope.regionName,
+        runAsOwner: properties.runAsOwner,
         consumers: new SimEcsServiceConsumers({
           queues: properties.consumerQueues,
           runAsOwner: properties.runAsOwner,
           background,
         }),
+        servers,
+        targets: serviceTargets,
         background,
       }),
     };
+    this.targetGroupContainers = new SimEcsTargetGroupContainers({
+      services: properties.services,
+      servers,
+    });
   }
 }

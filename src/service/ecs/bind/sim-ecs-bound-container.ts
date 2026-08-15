@@ -3,7 +3,10 @@ import { SimCfnImageRepositoryTarget } from "../../cloudformation/bind/validate/
 import type { SimEcsContainerDefinition } from "../task-definition/container/sim-ecs-container-definition.js";
 import { SimEcsBoundContainerWork } from "./sim-ecs-bound-container-work.js";
 import type { SimEcsBoundQueueConsumer } from "./sim-ecs-bound-queue-consumer.js";
-import type { SimEcsContainerBinding } from "./sim-ecs-container-binding.type.js";
+import type {
+  SimEcsContainerBinding,
+  SimEcsContainerHttpHandler,
+} from "./sim-ecs-container-binding.type.js";
 
 /**
  * One executable binding, read once and ready to be matched against.
@@ -59,6 +62,17 @@ export class SimEcsBoundContainer {
   }
 
   /**
+   * The handler this binding answers a request with, where it serves one.
+   *
+   * A serving container is the other thing a service runs and a run task does
+   * not: what it supplies is an answer to a request, and a run task has nothing
+   * to send it.
+   */
+  get serves(): SimEcsContainerHttpHandler | undefined {
+    return this.work.serves;
+  }
+
+  /**
    * Whether this binding targets a container declared by a family.
    *
    * A binding naming the family and the container name matches only that
@@ -86,17 +100,18 @@ export class SimEcsBoundContainer {
   /**
    * Run this binding's handler.
    *
-   * A consuming binding has none: what it supplies is the body of a loop
-   * something else drives, so there is nothing here for a task to run.
+   * A consuming or serving binding has none: what each supplies is the body of
+   * something else, a loop Yulin drives or a request something else brings, so
+   * there is nothing here for a task to run.
    */
   async runHandler(): Promise<void> {
     const { run } = this.work;
 
     assertDefined(
       run,
-      "This sim ECS container binding consumes a queue, so it has no run " +
-        "handler. Create a service from the task definition to have Yulin " +
-        "poll the queue.",
+      "This sim ECS container binding consumes a queue or serves requests, " +
+        "so it has no run handler. Create a service from the task definition " +
+        "to have Yulin poll the queue or send the container a request.",
     );
 
     await run();

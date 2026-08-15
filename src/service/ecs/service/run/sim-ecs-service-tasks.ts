@@ -1,23 +1,20 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimEcsContainerBindings } from "../../bind/sim-ecs-container-bindings.js";
-import type { SimEcsSecretStores } from "../../task/run/secret/sim-ecs-secret-stores.js";
-import type { SimEcsTaskArn } from "../../task/sim-ecs-task-arn.js";
-import type { SimEcsTaskStore } from "../../task/sim-ecs-task-store.js";
+import type { SimEcsServiceTargets } from "../load-balancer/sim-ecs-service-targets.js";
+import type { SimEcsServiceServers } from "../serve/sim-ecs-service-servers.js";
 import type { SimEcsTask } from "../../task/sim-ecs-task.js";
 import type { SimEcsServiceConsumers } from "../consume/sim-ecs-service-consumers.js";
 import type { SimEcsService } from "../sim-ecs-service.js";
 import type { SimEcsServiceDeployment } from "./sim-ecs-service-deployment.js";
-import { SimEcsServiceTaskStarter } from "./sim-ecs-service-task-starter.js";
+import {
+  SimEcsServiceTaskStarter,
+  type SimEcsServiceTaskStarterProperties,
+} from "./sim-ecs-service-task-starter.js";
 
-interface SimEcsServiceTasksProperties {
-  readonly tasks: SimEcsTaskStore;
-  readonly taskArn: SimEcsTaskArn;
-  readonly bindings: SimEcsContainerBindings;
-  readonly secretStores: SimEcsSecretStores;
-  readonly consumers: SimEcsServiceConsumers;
-  readonly regionName: string;
-  readonly background: BackgroundScheduler;
-}
+/**
+ * What keeping a service's tasks running takes, which is what starting one
+ * takes: everything here beyond the starter is done with the same things.
+ */
+type SimEcsServiceTasksProperties = SimEcsServiceTaskStarterProperties;
 
 /**
  * Why a task of a service stopped, in each of the ways one does.
@@ -46,19 +43,24 @@ export class SimEcsServiceTasks {
   private readonly background: BackgroundScheduler;
   private readonly starter: SimEcsServiceTaskStarter;
   private readonly consumers: SimEcsServiceConsumers;
+  private readonly servers: SimEcsServiceServers;
+  private readonly targets: SimEcsServiceTargets;
 
   constructor(properties: SimEcsServiceTasksProperties) {
     this.background = properties.background;
     this.starter = new SimEcsServiceTaskStarter(properties);
     this.consumers = properties.consumers;
+    this.servers = properties.servers;
+    this.targets = properties.targets;
   }
 
   /**
    * Bring a service's tasks to the count it wants, starting or stopping them.
    *
-   * A service scaled to nothing stops consuming as well, since there is no
-   * container left to be doing it. Scaling back out starts it again, because
-   * the task that comes up asks for polling as any first task does.
+   * A service scaled to nothing stops consuming and serving as well, since
+   * there is no container left to be doing either. Scaling back out starts them
+   * again, because the task that comes up brings its containers up as any first
+   * task does.
    */
   reconcile(deployment: SimEcsServiceDeployment): void {
     const { service } = deployment;
@@ -70,12 +72,13 @@ export class SimEcsServiceTasks {
     }
 
     this.stopEach(
+      service,
       service.tasks.takeNewest(-shortfall),
       stoppedReasons.scaledIn,
     );
 
     if (service.tasks.count === 0) {
-      this.consumers.stop(service);
+      this.stopContainers(service);
     }
   }
 
@@ -94,22 +97,35 @@ export class SimEcsServiceTasks {
   /**
    * Stop every task a service is running, and give up holding them.
    *
-   * The queue polling its containers were doing stops with them. A redeploy
-   * comes back through here and then starts again from the revision the
-   * service moved to, so a container that stopped consuming, or started, in the
-   * new revision is polled for accordingly.
+   * The queue polling its containers were doing stops with them, the containers
+   * that were answering requests stop answering, and the tasks leave the target
+   * groups they were registered into. A redeploy comes back through here and
+   * then starts again from the revision the service moved to, so a container
+   * that stopped consuming or serving, or started, in the new revision is
+   * treated accordingly.
    */
   stopAll(service: SimEcsService, reason: string): void {
-    this.consumers.stop(service);
-    this.stopEach(service.tasks.takeAll(), reason);
+    this.stopContainers(service);
+    this.stopEach(service, service.tasks.takeAll(), reason);
   }
 
-  private stopEach(tasks: readonly SimEcsTask[], reason: string): void {
+  private stopContainers(service: SimEcsService): void {
+    this.consumers.stop(service);
+    this.servers.stop(service);
+  }
+
+  private stopEach(
+    service: SimEcsService,
+    tasks: readonly SimEcsTask[],
+    reason: string,
+  ): void {
     const at = this.background.now();
 
     for (const task of tasks) {
       task.requestStop(reason);
       task.stop({ at, stopCode: "UserInitiated", reason });
     }
+
+    this.targets.deregisterAll(service, tasks);
   }
 }

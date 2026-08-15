@@ -1,4 +1,7 @@
-import { SimEcsClientException } from "../../error/sim-ecs.error.js";
+import {
+  requiredSimEcsContainerImage,
+  requiredSimEcsContainerName,
+} from "./sim-ecs-container-identity.js";
 import type {
   SimEcsContainerDependency,
   SimEcsHealthCheck,
@@ -9,6 +12,7 @@ import type {
   SimEcsSecret,
   SimEcsUlimit,
 } from "./sim-ecs-container-parts.js";
+import { simEcsContainerPorts } from "./sim-ecs-container-ports.js";
 
 /**
  * Minimal structural sim ECS container definition.
@@ -62,45 +66,11 @@ export class SimEcsContainerDefinition {
   private readonly declared: SimEcsContainerDefinitionType;
 
   constructor(declared: SimEcsContainerDefinitionType) {
-    this.name = SimEcsContainerDefinition.requiredName(declared);
-    this.image = SimEcsContainerDefinition.requiredImage(declared, this.name);
+    this.name = requiredSimEcsContainerName(declared.name);
+    this.image = requiredSimEcsContainerImage(declared.image, this.name);
     // Copied rather than held by reference, since the caller owns the object
     // it passed in and may reuse it for the next registration.
     this.declared = structuredClone(declared);
-  }
-
-  private static requiredName(declared: SimEcsContainerDefinitionType): string {
-    const { name } = declared;
-
-    if (name === undefined || name === "") {
-      throw new SimEcsClientException(
-        "Container.name should not be null or empty.",
-      );
-    }
-
-    return name;
-  }
-
-  /**
-   * The image URI the container declared.
-   *
-   * It is required here as it is on real ECS. Nothing pulls it or reads it,
-   * but it is the identifier a simulated task run matches an executable
-   * binding against, so a definition without one could never run.
-   */
-  private static requiredImage(
-    declared: SimEcsContainerDefinitionType,
-    name: string,
-  ): string {
-    const { image } = declared;
-
-    if (image === undefined || image === "") {
-      throw new SimEcsClientException(
-        `Container.image should not be null or empty for container ${name}.`,
-      );
-    }
-
-    return image;
   }
 
   /**
@@ -123,6 +93,17 @@ export class SimEcsContainerDefinition {
    */
   get secrets(): readonly SimEcsSecret[] {
     return this.declared.secrets ?? [];
+  }
+
+  /**
+   * The ports this container declared it listens on.
+   *
+   * This is the one part of a container definition beyond its name and image
+   * whose meaning anything here reads, and what reads it is a load balancer
+   * working out which container of a task its registration meant.
+   */
+  get containerPorts(): readonly number[] {
+    return simEcsContainerPorts(this.declared.portMappings);
   }
 
   /**

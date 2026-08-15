@@ -6,6 +6,7 @@ import {
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
+  assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -18,16 +19,23 @@ import type {
 
 const imageUri = "example.dkr.ecr.eu-west-2.amazonaws.com/orders-worker:1";
 
-const targetGroupArn =
-  "arn:aws:elasticloadbalancing:us-east-1:888888888888:targetgroup/orders/73e2d6bc";
-
 /**
- * The cluster and task definition a service needs before it is anything.
+ * The cluster, task definition and target group a service needs before it is
+ * anything.
  */
 const workerResources: Record<string, SimCfnTemplateValue> = {
   OrdersCluster: {
     Type: "AWS::ECS::Cluster",
     Properties: { ClusterName: "orders" },
+  },
+  WorkerTargetGroup: {
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup",
+    Properties: {
+      Name: "orders-tg",
+      TargetType: "ip",
+      Protocol: "HTTP",
+      Port: 8080,
+    },
   },
   WorkerTaskDefinition: {
     Type: "AWS::ECS::TaskDefinition",
@@ -56,6 +64,7 @@ function serviceTemplate(
         },
       },
     },
+    Outputs: { TargetGroup: { Value: { Ref: "WorkerTargetGroup" } } },
   };
 }
 
@@ -109,9 +118,8 @@ describe("AWS::ECS::Service properties", () => {
     );
   });
 
-  it("records the load balancers a service declares", async () => {
-    // Given a template whose service declares a load balancer target group,
-    // which nothing here routes to yet.
+  it("registers a service's tasks into the target group it declares", async () => {
+    // Given a template whose service declares a target group of the stack.
     const simAws = new SimAws();
 
     // When it is deployed.
@@ -119,10 +127,10 @@ describe("AWS::ECS::Service properties", () => {
       stackName: "orders-stack",
       template: serviceTemplate({
         ServiceName: "orders-worker",
-        DesiredCount: 1,
+        DesiredCount: 2,
         LoadBalancers: [
           {
-            TargetGroupArn: targetGroupArn,
+            TargetGroupArn: { Ref: "WorkerTargetGroup" },
             ContainerName: "app",
             ContainerPort: 8080,
           },
@@ -133,8 +141,11 @@ describe("AWS::ECS::Service properties", () => {
     await stack.waitForDeployComplete();
     await simAws.backgroundTasksComplete();
 
-    // Then the declaration is readable on the simulated service, so a target
-    // group can find the service and the container that answer for it.
+    // Then the declaration is readable on the simulated service, and each task
+    // it keeps running is registered in the target group on the declared port.
+    const targetGroupArn = stack.outputs.get("TargetGroup")?.value;
+
+    assertTypeString(targetGroupArn);
     const service = simAws.ecs().service("orders-worker", "orders");
 
     assertArrayLength(service.loadBalancers, 1);
@@ -142,7 +153,14 @@ describe("AWS::ECS::Service properties", () => {
     assertIdentical(service.loadBalancers[0].containerName, "app");
     assertIdentical(service.loadBalancers[0].containerPort, 8080);
 
-    // And DescribeServices reports it in the spelling the SDK uses.
+    const health = await simAws
+      .elbV2()
+      .describeTargetHealth({ input: { TargetGroupArn: targetGroupArn } });
+
+    assertArrayLength(health.TargetHealthDescriptions, 2);
+    assertIdentical(health.TargetHealthDescriptions[0].Target.Port, 8080);
+
+    // And DescribeServices reports the registration in the SDK's spelling.
     const described = await simAws.ecs().describeServices(
       new DescribeServicesCommand({
         cluster: "orders",

@@ -22,6 +22,20 @@ export const simEcsConsumingContainerReason =
   "polls for a running service. Create a service from this task definition.";
 
 /**
+ * What a container serving requests records instead of running in a task.
+ *
+ * A serving binding answers a request rather than doing something that ends,
+ * and a run task has neither a request to send it nor an end to wait for. A
+ * service is what puts the container behind a load balancer, so a task started
+ * from the same definition says so rather than calling the handler with
+ * nothing.
+ */
+export const simEcsServingContainerReason =
+  "Not simulated in a run task: this container answers HTTP requests, which " +
+  "reach it through a load balancer while a service is running it. Create a " +
+  "service from this task definition.";
+
+/**
  * What a container reports as the reason it stopped.
  */
 export function simEcsContainerFailureReason(error: unknown): string {

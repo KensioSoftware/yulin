@@ -1,5 +1,6 @@
 import {
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
   assertUndefined,
@@ -127,21 +128,41 @@ describe("Matching a simulated ECS container binding", () => {
 });
 
 describe("Refusing a simulated ECS container binding", () => {
-  it("refuses an http handler, which nothing serves yet", () => {
+  it("holds an http handler for a service container to answer with", () => {
     // Given the bindings for a scope.
     const bindings = new SimEcsContainerBindings();
 
     // When a container is bound to an HTTP handler.
+    bindings.add({
+      family: "checkout",
+      containerName: "app",
+      http: () => new Response("hello"),
+    });
+
+    // Then the binding serves rather than running, since what calls it is a
+    // request a load balancer routes to the container.
+    const found = bindings.find("checkout", appContainer);
+
+    assertNonNullable(found?.serves, "The binding serves requests");
+    assertUndefined(found.consumes);
+  });
+
+  it("refuses an http handler that is not a function", () => {
+    // Given the bindings for a scope.
+    const bindings = new SimEcsContainerBindings();
+
+    // When a container is bound to something that cannot answer a request.
     const error = assertThrowsError(() => {
       bindings.add({
         family: "checkout",
         containerName: "app",
-        http: () => new Response("hello"),
+        http: "hello" as unknown as () => Response,
       });
     });
 
-    // Then it says so rather than accepting a handler nothing would call.
-    assertStringIncludes(error.message, "http handler is not simulated");
+    // Then it is refused where the mistake is, rather than at the first
+    // request that reaches the container.
+    assertStringIncludes(error.message, "needs an http handler");
   });
 
   it("refuses a binding that targets nothing", () => {

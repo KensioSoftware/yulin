@@ -293,27 +293,4 @@ describe("ECS CloudFormation container bindings", () => {
     assertStringIncludes(error.message, "needs a containerName");
     assertStringIncludes(error.message, "declares 2 containers");
   });
-
-  it("refuses an http container binding, which nothing serves yet", async () => {
-    // Given a binding carrying the HTTP shape a service container will take.
-    const simAws = new SimAws();
-
-    // When the template is deployed, then the binding is refused rather than
-    // held and never called.
-    const error = await assertThrowsErrorAsync(async () => {
-      return await simAws.cloudFormation().deployTemplate({
-        stackName: "orders-stack",
-        template: workerTemplate([appContainer]),
-        bindings: [
-          {
-            family: "orders-worker",
-            containerName: "app",
-            http: () => new Response("ok"),
-          },
-        ],
-      });
-    });
-
-    assertStringIncludes(error.message, "an http handler is not simulated");
-  });
 });

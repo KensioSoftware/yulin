@@ -111,6 +111,18 @@ export {
 export { SimEcsServiceStore } from "./service/sim-ecs-service-store.js";
 export { SimEcsServiceTasks } from "./service/run/sim-ecs-service-tasks.js";
 export { SimEcsServiceConsumers } from "./service/consume/sim-ecs-service-consumers.js";
+export { SimEcsContainerServer } from "./service/serve/sim-ecs-container-server.js";
+export { SimEcsServiceServers } from "./service/serve/sim-ecs-service-servers.js";
+export { SimEcsTargetGroupContainers } from "./service/serve/sim-ecs-target-group-containers.js";
+export { SimEcsServiceRegistration } from "./service/load-balancer/sim-ecs-service-registration.js";
+export { SimEcsServiceTargets } from "./service/load-balancer/sim-ecs-service-targets.js";
+export {
+  SimEcsUnreachableTargetGroups,
+  type SimEcsRegistrableTargetGroup,
+  type SimEcsTargetGroups,
+  type SimEcsTaskTarget,
+} from "./service/load-balancer/sim-ecs-target-groups.js";
+export { SimAwsEcsTargetGroups } from "./service/load-balancer/sim-aws-ecs-target-groups.js";
 export type { SimEcsServiceDeployment } from "./service/run/sim-ecs-service-deployment.js";
 export {
   SimEcsTaskOverrides,

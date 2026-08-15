@@ -4,6 +4,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import type { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import type { SimEcsServiceTargets } from "../service/load-balancer/sim-ecs-service-targets.js";
 import type { SimEcsServiceTasks } from "../service/run/sim-ecs-service-tasks.js";
 import type { SimEcsServiceArn } from "../service/sim-ecs-service-arn.js";
 import type { SimEcsServiceStore } from "../service/sim-ecs-service-store.js";
@@ -87,4 +88,5 @@ export interface SimEcsServiceCommandContext extends SimEcsTaskCommandContext {
   readonly services: SimEcsServiceStore;
   readonly serviceArn: SimEcsServiceArn;
   readonly serviceTasks: SimEcsServiceTasks;
+  readonly serviceTargets: SimEcsServiceTargets;
 }

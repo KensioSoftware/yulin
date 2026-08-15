@@ -9,10 +9,12 @@ import type { SimElbV2MatchedAction } from "./sim-elbv2-rule-evaluation.js";
  *
  * The action is stored when the listener or rule is written and performed here,
  * and the two are not the same thing: a forward this simulation cannot carry
- * out is one that was accepted and cannot serve. Each of those is refused when
- * the request arrives rather than answered with something else, because a load
+ * out is one that was accepted and cannot serve. That is refused when the
+ * request arrives rather than answered with something else, because a load
  * balancer that quietly sends a request somewhere its configuration did not say
- * is worse than one that says it cannot.
+ * is worse than one that says it cannot. What the group holds is not one of
+ * those refusals: both simulated target types answer a request, in their own
+ * ways.
  */
 export class SimElbV2ForwardTarget {
   constructor(private readonly elbV2: SimElbV2) {}
@@ -21,23 +23,6 @@ export class SimElbV2ForwardTarget {
    * The target group a matched forward action sends a request to.
    */
   resolve(matched: SimElbV2MatchedAction): SimElbV2TargetGroup {
-    const targetGroup = this.forwardedTargetGroup(matched);
-
-    if (targetGroup.targetType.value !== "lambda") {
-      throw new SimElbV2UnsimulatedInputException(
-        `Target group '${targetGroup.name}' holds ${targetGroup.targetType.value} ` +
-          `targets, and only a lambda target group answers a request here. ` +
-          `Nothing listens on an address in this simulation for an ip target ` +
-          `to name.`,
-      );
-    }
-
-    return targetGroup;
-  }
-
-  private forwardedTargetGroup(
-    matched: SimElbV2MatchedAction,
-  ): SimElbV2TargetGroup {
     const { action, source } = matched;
 
     if (action.targetGroupArns.length > 1) {
