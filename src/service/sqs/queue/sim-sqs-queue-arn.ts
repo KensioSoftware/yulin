@@ -6,6 +6,10 @@ import { SimSqsQueueUrl } from "./sim-sqs-queue-url.js";
 /**
  * How a queue ARN is written: no resource type separator, so the queue's name
  * follows the account id directly.
+ *
+ * The name takes no dot, which rules out the `<name>.fifo` a FIFO queue is
+ * named by. That is deliberate rather than an omission: simulated SQS refuses
+ * a queue name ending in `.fifo`, so no queue here can ever have one.
  */
 const queueArnPattern =
   /^arn:aws:sqs:(?<regionName>[a-z\d-]+):(?<accountId>\d{12}):(?<name>[\w-]{1,80})$/u;
@@ -117,14 +121,19 @@ export function sqsQueueUrlOf(queueArn: string): string {
  */
 export function sqsQueueArnOf(queueUrl: string): string {
   const location = SimSqsQueueUrl.parse(queueUrl);
+  const queueArn = location === undefined ? "" : sqsQueueArn(location);
 
+  // Read back what was built, so a URL naming a queue simulated SQS could never
+  // hold, such as a FIFO one, is refused here rather than at the first use of
+  // the ARN. The two readers agree by construction that way.
   assertDefined(
-    location,
-    `${queueUrl} is not an SQS queue URL, which is written ` +
-      `https://sqs.<region>.amazonaws.com/<account-id>/<queue-name>`,
+    parseSqsQueueArn(queueArn),
+    `${queueUrl} does not name a queue simulated SQS can hold. A queue URL is ` +
+      `written https://sqs.<region>.amazonaws.com/<account-id>/<queue-name>, ` +
+      `and a FIFO queue is not simulated.`,
   );
 
-  return sqsQueueArn(location);
+  return queueArn;
 }
 
 interface SimSqsQueueArnProperties {

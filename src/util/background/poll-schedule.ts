@@ -25,6 +25,7 @@ export class PollSchedule {
   private readonly poll: BackgroundTask;
 
   private scheduled = false;
+  private stopped = false;
 
   constructor(properties: PollScheduleProperties) {
     this.background = properties.background;
@@ -36,7 +37,7 @@ export class PollSchedule {
    * waiting to happen.
    */
   now(): void {
-    if (this.scheduled) {
+    if (this.stopped || this.scheduled) {
       return;
     }
 
@@ -53,6 +54,10 @@ export class PollSchedule {
    * and later for one sent with a delay.
    */
   at(instant: Date): void {
+    if (this.stopped) {
+      return;
+    }
+
     if (instant.getTime() <= this.background.now().getTime()) {
       this.now();
 
@@ -71,6 +76,10 @@ export class PollSchedule {
    * round would spin on a batch the consumer keeps failing.
    */
   afterSeconds(seconds: number): void {
+    if (this.stopped) {
+      return;
+    }
+
     this.background.scheduleAt(
       new Date(
         this.background.now().getTime() + seconds * millisecondsPerSecond,
@@ -80,13 +89,15 @@ export class PollSchedule {
   }
 
   /**
-   * Give up whatever turn was waiting on the clock.
+   * Give up whatever turn was waiting on the clock, and take no more.
    *
-   * A poller stopped while a turn was scheduled would otherwise leave that turn
-   * queued for a simulation nothing is consuming any more, so a test asking
-   * what a discarded environment left behind would find work waiting.
+   * Both halves matter. A turn already queued would otherwise wait for a
+   * simulation nothing is consuming any more, and a poll that was part way
+   * through when this was called goes on to ask for its next turn, which would
+   * queue one after the queue had been emptied.
    */
   stop(): void {
+    this.stopped = true;
     this.background.cancelScheduled(this.poll);
   }
 }

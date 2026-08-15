@@ -43,4 +43,18 @@ describe("Naming a simulated queue by ARN and by URL", () => {
     // Then it says how a queue URL is written.
     assertStringIncludes(error.message, "https://sqs.<region>.amazonaws.com");
   });
+
+  it("refuses a URL naming a FIFO queue, which is not simulated", () => {
+    // Given the URL of a FIFO queue, which simulated SQS refuses to create.
+    // When it is read as an ARN.
+    const error = assertThrowsError(() => {
+      sqsQueueArnOf(
+        "https://sqs.eu-west-2.amazonaws.com/111111111111/orders.fifo",
+      );
+    });
+
+    // Then it is refused here, rather than at the first poll made with an ARN
+    // nothing can read back.
+    assertStringIncludes(error.message, "FIFO queue is not simulated");
+  });
 });

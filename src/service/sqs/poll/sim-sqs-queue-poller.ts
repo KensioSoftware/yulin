@@ -160,6 +160,14 @@ export class SimSqsQueuePoller implements SimSqsQueueWatcher {
 
     const outcome = await session.handle(messages);
 
+    if (this.stopped) {
+      // The consumer went away while it was handling the batch. Leaving the
+      // batch undeleted is what a real consumer killed part way through does:
+      // the messages come back when their visibility timeout runs out, which
+      // is the at-least-once delivery the sender is entitled to.
+      return;
+    }
+
     await this.queue.deleteMessages(caller, outcome.handledReceiptHandles);
 
     this.pollAgainAfter(outcome, messages.length, session.batchSize, timeout);

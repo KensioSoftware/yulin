@@ -51,6 +51,53 @@ describe("What a simulated ECS container's polling outlives", () => {
     assertArrayLength(batches, 1);
   });
 
+  it("leaves nothing scheduled when the service is deleted mid-batch", async () => {
+    // Given a consumer whose handler is holding on to a batch.
+    const background = new BackgroundTasks();
+    // Undefined rather than void, since a resolver's argument type is not a
+    // return position.
+    const holding = Promise.withResolvers<undefined>();
+    const starting = Promise.withResolvers<undefined>();
+
+    const { simAws, queueUrl, batches } = await simAwsWithConsumingService({
+      background,
+      onBatch: async (): Promise<void> => {
+        starting.resolve(undefined);
+        await holding.promise;
+
+        // Throwing is what asks for another turn, at the end of the batch's
+        // visibility timeout, so this is the case that would leave one queued.
+        throw new Error("The order service is down");
+      },
+    });
+
+    await simAws
+      .sqs()
+      .sendMessage(
+        new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
+      );
+
+    const settling = simAws.backgroundTasksComplete();
+
+    await starting.promise;
+
+    // When the service is deleted while that batch is still in the handler.
+    await simAws
+      .ecs()
+      .deleteService(
+        new DeleteServiceCommand({ service: "orders-worker", force: true }),
+      );
+
+    holding.resolve(undefined);
+    await settling;
+
+    // Then the poll that was in flight asks for no further turn, so nothing is
+    // left waiting on the clock for a service that has gone.
+    assertArrayLength(batches, 1);
+    assertIdentical(background.pendingTaskCount, 0);
+    assertIdentical(background.dueTaskCount, 0);
+  });
+
   it("stops polling when the simulated environment closes", async () => {
     // Given a running consumer.
     const background = new BackgroundTasks();
