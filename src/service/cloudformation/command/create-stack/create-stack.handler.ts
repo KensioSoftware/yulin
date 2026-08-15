@@ -22,7 +22,7 @@ import {
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
-import type { SimCfnExecutableResourceBinding } from "../../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
 
 interface CreateStackCommandHandlerProperties {
   readonly simAws: SimAws;
@@ -30,7 +30,7 @@ interface CreateStackCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }
 
 /**
@@ -47,9 +47,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
-  private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+  private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
 
   constructor(properties: CreateStackCommandHandlerProperties) {
     const {

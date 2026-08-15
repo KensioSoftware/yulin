@@ -64,6 +64,12 @@ export type {
 } from "./bind/sim-ecs-container-binding.type.js";
 export { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 export { SimEcsBoundContainer } from "./bind/sim-ecs-bound-container.js";
+export type {
+  SimCfnEcsContainerBinding,
+  SimCfnEcsContainerBindingTarget,
+  SimCfnEcsTaskDefinitionBindingTarget,
+} from "./cfn/bind/sim-cfn-ecs-container-binding.type.js";
+export { SimEcsCfnResourceFactory } from "./cfn/sim-ecs-cfn-resource-factory.js";
 export { SimEcsTask } from "./task/sim-ecs-task.js";
 export type {
   SimEcsTaskDesiredStatus,

@@ -1,4 +1,4 @@
-import type { SimCfnExecutableResourceBinding } from "../../../cloudformation/bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
 import { SimCfnExecBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.command.js";
@@ -11,7 +11,7 @@ import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-p
 interface SimCfnLambdaCodeInputProperties {
   readonly resource: SimCfnResource;
   readonly functionProperties: SimCfnLambdaFunctionProperties;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
   readonly containerImages: SimLambdaContainerImages;
 }
 

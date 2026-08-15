@@ -65,6 +65,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.ecr().cfnResourceFactory(),
   ],
   [
+    "ECS",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.ecs().cfnResourceFactory(),
+  ],
+  [
     "IAM",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.iam().cfnResourceFactory(),

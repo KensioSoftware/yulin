@@ -1,10 +1,14 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimEcsContainerBinding } from "./bind/sim-ecs-container-binding.type.js";
+import { SimEcsCfnResourceFactory } from "./cfn/sim-ecs-cfn-resource-factory.js";
+import type { SimEcsCluster } from "./cluster/sim-ecs-cluster.js";
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
 import { SimEcsCommands } from "./sim-ecs-commands.js";
 import type { SimEcsProperties } from "./sim-ecs-properties.js";
+import type { SimEcsTaskDefinition } from "./task-definition/sim-ecs-task-definition.js";
 
 /**
  * Simulated ECS. Handles SDK commands. Emulates AWS behaviour and state.
@@ -245,6 +249,34 @@ export class SimEcs {
    */
   bindContainer(binding: SimEcsContainerBinding): void {
     this.commands.bindings.add(binding);
+  }
+
+  /**
+   * The cluster of this name, whether it is active or deleted.
+   *
+   * A lookup rather than an operation, for a test or a CloudFormation Resource
+   * that needs the cluster itself rather than a description of it. A name
+   * nothing holds is refused, since the caller asked for a cluster.
+   */
+  cluster(clusterName: string): SimEcsCluster {
+    return this.commands.lookup.cluster(clusterName);
+  }
+
+  /**
+   * The task definition revision a family, `family:revision` or ARN names.
+   *
+   * A family on its own means its latest active revision, as it does
+   * everywhere else in ECS.
+   */
+  taskDefinition(identifier: string): SimEcsTaskDefinition {
+    return this.commands.lookup.taskDefinition(identifier);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return new SimEcsCfnResourceFactory({ ecs: this });
   }
 
   /**

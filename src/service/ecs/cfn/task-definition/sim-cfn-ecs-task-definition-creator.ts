@@ -75,8 +75,9 @@ export class SimCfnEcsTaskDefinitionCreator {
    *
    * Deregistering marks the revision `INACTIVE` rather than removing it, as
    * `DeregisterTaskDefinition` does, and the revision number it used is not
-   * freed. The revisions earlier deployments of the same stack registered are
-   * left where they are, since this Resource only ever made the last one.
+   * freed. Only the revision this Resource registered is deregistered, which
+   * is also what an update does with the revision it replaces, since sim
+   * CloudFormation replaces a changed Resource rather than updating it.
    */
   async delete(taskDefinition: SimEcsTaskDefinition): Promise<void> {
     await this.ecs.deregisterTaskDefinition({

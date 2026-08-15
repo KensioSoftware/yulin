@@ -1,9 +1,11 @@
+import { UpdateStackCommand } from "@aws-sdk/client-cloudformation";
 import {
   DescribeClustersCommand,
   DescribeTaskDefinitionCommand,
 } from "@aws-sdk/client-ecs";
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
@@ -346,6 +348,42 @@ describe("ECS CloudFormation property reading", () => {
       error.message,
       "Unsupported sim ECS CloudFormation Resource Service deletion",
     );
+  });
+
+  it("registers a new revision when the stack is updated", async () => {
+    // Given a deployed task definition.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: taskDefinitionTemplate({}),
+    });
+
+    await stack.waitForDeployComplete();
+
+    // When the stack is updated with a changed container image.
+    const updated = taskDefinitionTemplate({
+      ContainerDefinitions: [
+        {
+          Name: "app",
+          Image: "example.dkr.ecr.eu-west-2.amazonaws.com/orders-worker:2",
+        },
+      ],
+    });
+
+    await simAws.cloudFormation().updateStack(
+      new UpdateStackCommand({
+        StackName: "orders-stack",
+        TemplateBody: JSON.stringify(updated),
+      }),
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    // Then a second revision is registered, and the one it replaced is
+    // INACTIVE, because sim CloudFormation replaces a changed Resource rather
+    // than updating it in place.
+    assertIdentical(simAws.ecs().taskDefinition("orders-worker").revision, 2);
+    assertFalse(simAws.ecs().taskDefinition("orders-worker:1").isActive());
   });
 
   it("refuses a cluster name nothing holds", () => {

@@ -35,7 +35,7 @@ import {
   SimCloudFormationTemplateDeployer,
 } from "./deploy/sim-cfn-template-deployer.js";
 import type { SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
-import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "./bind/sim-cfn-deploy-binding.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
@@ -280,7 +280,7 @@ export class SimCloudFormation {
   private async createStackWithContext(
     command: SimCreateStackCommand,
     cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnExecutableResourceBinding[],
+    bindings?: readonly SimCfnDeployBinding[],
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,

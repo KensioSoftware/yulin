@@ -36,7 +36,8 @@ familiar CloudFormation/CDK outputs.
   `update/`.
 - `cdk/` contains CDK-specific integration support, including synthesized output context and custom
   resource implementations.
-- `bind/` contains executable resource binding types used by CDK/custom-resource simulation.
+- `bind/` contains the binding types a deployment supplies real in-process handlers through, and
+  what checks each one against the Stack it was given for.
 - `error/` contains CloudFormation-specific AWS-like errors.
 
 A `SimCloudFormation` instance owns a map of stacks for one account/region scope.
@@ -157,6 +158,18 @@ The deployer is also where extra deployment context can enter the stack creation
 - `SimCdkOutContext`, used by CDK-oriented resources that need access to synthesized output files.
 - executable resource bindings, used by custom-resource simulation that needs to connect a template
   resource to local executable behaviour.
+
+`SimCfnDeployBinding` is what one entry of that list may be, and there are two kinds because there
+are two kinds of thing a Stack declares that Yulin can run. An executable Resource, which is a Lambda
+function or a CloudFront Function, is one handler and carries it as `handler`. An ECS task definition
+declares containers, so its binding names a container and carries what that container does. They are
+one list because a Stack is deployed once and a realistic Stack holds both, and the handler is what
+tells them apart, since the two kinds share some of their target names.
+
+`validateSimCfnExecutableResourceBindings` checks every binding resolves to a Resource of the Stack
+before anything is created, sending each kind to its own matcher. The container matcher lives with
+simulated ECS, because deciding whether a binding names a container a task definition declares means
+reading an `AWS::ECS::TaskDefinition`, and no service's schema belongs in the engine.
 
 The important design point is that these helpers do not bypass stack/resource lifecycle. They feed
 additional context into the normal CloudFormation creation pipeline.
@@ -631,6 +644,7 @@ The resolver currently supports factories for:
 - `AWS::CloudFormation::*`
 - `AWS::S3::*`
 - `AWS::CloudFront::*`
+- `AWS::ECS::*`
 - selected `Custom::*` CDK-oriented resources
 
 Unsupported providers, services, custom resources, or resource types are skipped to improve
