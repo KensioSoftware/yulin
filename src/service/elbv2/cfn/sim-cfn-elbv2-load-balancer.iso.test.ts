@@ -27,6 +27,7 @@ const loadBalancerTemplate = {
   },
   Outputs: {
     Arn: { Value: { Ref: "ShopAlb" } },
+    AlsoArn: { Value: { "Fn::GetAtt": ["ShopAlb", "LoadBalancerArn"] } },
     DnsName: { Value: { "Fn::GetAtt": ["ShopAlb", "DNSName"] } },
     FullName: { Value: { "Fn::GetAtt": ["ShopAlb", "LoadBalancerFullName"] } },
     Name: { Value: { "Fn::GetAtt": ["ShopAlb", "LoadBalancerName"] } },
@@ -47,12 +48,14 @@ describe("AWS::ElasticLoadBalancingV2::LoadBalancer", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then simulated ELBv2 holds it, Ref answers with its ARN, and the
-    // attributes answer with what the load balancer reports.
+    // Then simulated ELBv2 holds it, Ref and the LoadBalancerArn attribute
+    // both answer with its ARN, and the rest answer with what the load
+    // balancer reports.
     const loadBalancer = simAws.elbV2().findLoadBalancerByName("shop-alb");
     assertNonNullable(loadBalancer);
 
     assertIdentical(simCfnElbV2Output(stack, "Arn"), loadBalancer.arn);
+    assertIdentical(simCfnElbV2Output(stack, "AlsoArn"), loadBalancer.arn);
     assertIdentical(simCfnElbV2Output(stack, "DnsName"), loadBalancer.dnsName);
     assertIdentical(stack.outputs.get("Name")?.value, "shop-alb");
     assertIdentical(stack.outputs.get("ZoneId")?.value, "Z0000000000000");

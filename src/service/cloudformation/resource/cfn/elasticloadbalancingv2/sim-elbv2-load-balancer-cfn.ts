@@ -34,6 +34,9 @@ export class SimElbV2LoadBalancerCfn implements SimCfnResourceValueAdapter {
    * CloudFront origin points at it, and here as on AWS that name is the only
    * way a request reaches the load balancer.
    *
+   * `LoadBalancerArn` answers with the same ARN Ref does, which is the pair
+   * real CloudFormation has for this Resource.
+   *
    * `SecurityGroups` is a real attribute this cannot answer, because nothing
    * places a simulated load balancer behind a security group. It is refused
    * rather than answered with an empty list, which would read as a load
@@ -43,6 +46,9 @@ export class SimElbV2LoadBalancerCfn implements SimCfnResourceValueAdapter {
     switch (attributeName) {
       case "DNSName": {
         return this.loadBalancer.dnsName;
+      }
+      case "LoadBalancerArn": {
+        return this.loadBalancer.arn;
       }
       case "LoadBalancerName": {
         return this.loadBalancer.name;

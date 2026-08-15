@@ -1178,8 +1178,8 @@ the deployment rather than deploying as something else.
 `Ref` returns the ARN of all four, which is what a listener's `LoadBalancerArn`, a rule's
 `ListenerArn` and a forward action's `TargetGroupArn` each take. `Fn::GetAtt` answers with:
 
-- `DNSName`, `LoadBalancerName`, `LoadBalancerFullName` and `CanonicalHostedZoneID` on a load
-  balancer
+- `DNSName`, `LoadBalancerArn`, `LoadBalancerName`, `LoadBalancerFullName` and
+  `CanonicalHostedZoneID` on a load balancer
 - `TargetGroupArn`, `TargetGroupName` and `TargetGroupFullName` on a target group
 - `ListenerArn` on a listener, and `RuleArn` and `IsDefault` on a rule
 
