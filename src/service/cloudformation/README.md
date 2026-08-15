@@ -645,6 +645,7 @@ The resolver currently supports factories for:
 - `AWS::S3::*`
 - `AWS::CloudFront::*`
 - `AWS::ECS::*`
+- `AWS::ElasticLoadBalancingV2::*`
 - selected `Custom::*` CDK-oriented resources
 
 Unsupported providers, services, custom resources, or resource types are skipped to improve

@@ -13,6 +13,7 @@ is the part that does it.
 
 - `sim-elbv2.ts` is the main in-memory service object for one account/region scope.
 - `serve/sim-elbv2-fetch.ts` is how a request reaches a load balancer.
+- `cfn/sim-elbv2-cfn-resource-factory.ts` is how a CloudFormation Stack creates one.
 - `index.ts` exports the public ELBv2 simulator API for `@kensio/yulin/elbv2`.
 
 A `SimElbV2` instance owns a `SimElbV2Stores` holding its four resources. The simulator is scoped to
@@ -154,6 +155,39 @@ like any other simulated host. What the load balancer sees as the request's host
 AWS-facing one, which `simAwsRequestHostname` reads: that is the name a `host-header` condition is
 matched against and the `host` header an invocation event carries, so routing by name and the event
 agree with what a client asked for.
+
+## Deploying from CloudFormation
+
+`cfn/` owns the four `AWS::ElasticLoadBalancingV2::*` Resource types, as the architecture requires:
+CloudFormation orchestrates and the service creates. Each Resource type has a creator that reads its
+properties and then calls the ordinary command, so a template's listener is the same listener an SDK
+caller would have created, refusals included. That is what makes a rule declared in a template match
+requests the way the same rule made by hand does: there is no second model of an action or a
+condition, only the one `SimElbV2Action` and `SimElbV2RuleCondition` read.
+
+CloudFormation spells every ELBv2 property the way the API spells it, so nothing translates names.
+`SimCfnElbV2PropertyReader` checks that a declared value is the shape the property takes and hands it
+on, which is why a declared `DefaultActions` list can go straight into `CreateListener` input.
+Numbers and booleans are read rather than passed through, because a template carries either as a
+string when it came from a Parameter. Targets are read entry by entry for the same reason: a target
+registered on the string `"80"` would be a different target from one registered on `80`.
+
+`SimCfnElbV2PropertyRules` is one class taking two lists per Resource type, since all four have the
+same shape of question and only the answers differ. What a Resource declares and this simulation has
+no network to apply is recorded and left out rather than failing the stack.
+
+`SimElbV2CfnResourceDeleter` is held apart from the factory because the two dispatch over the same
+four Resource types, and one file doing both scores higher on complexity than anything else in the
+service without saying anything either half does not. Nothing there cascades: the stack tears down in
+reverse dependency order, so a rule is gone before its listener and a target group after everything
+forwarding to it.
+
+The Ref and Fn::GetAtt answers live with simulated CloudFormation, under
+`resource/cfn/elasticloadbalancingv2/`, as every service's do. `LoadBalancerFullName` and
+`TargetGroupFullName` are read back off the ARN rather than stored, since the ARN is where they
+already are. `SecurityGroups` and `LoadBalancerArns` are refused rather than answered with an empty
+list, which would read as a load balancer that has no security groups rather than a simulation that
+has none.
 
 ## Authorization
 

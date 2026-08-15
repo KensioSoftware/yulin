@@ -70,6 +70,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.ecs().cfnResourceFactory(),
   ],
   [
+    "ElasticLoadBalancingV2",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.elbV2().cfnResourceFactory(),
+  ],
+  [
     "IAM",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.iam().cfnResourceFactory(),

@@ -1167,6 +1167,253 @@ try {
 }
 ```
 
+## Deploying a load balancer from CloudFormation
+
+`AWS::ElasticLoadBalancingV2::LoadBalancer`, `TargetGroup`, `Listener` and `ListenerRule` create
+their simulated counterparts, so a test can start from the stack the routing is actually defined in.
+Each one goes through the same command an SDK caller would use, so a template's listener rule matches
+requests the way the same rule created by hand does, and a declaration real ELB would refuse fails
+the deployment rather than deploying as something else.
+
+`Ref` returns the ARN of all four, which is what a listener's `LoadBalancerArn`, a rule's
+`ListenerArn` and a forward action's `TargetGroupArn` each take. `Fn::GetAtt` answers with:
+
+- `DNSName`, `LoadBalancerName`, `LoadBalancerFullName` and `CanonicalHostedZoneID` on a load
+  balancer
+- `TargetGroupArn`, `TargetGroupName` and `TargetGroupFullName` on a target group
+- `ListenerArn` on a listener, and `RuleArn` and `IsDefault` on a rule
+
+A load balancer or target group the template does not name is named after the stack and the logical
+ID, trimmed to the 32 characters ELB allows. A target group declaring `Targets` has them registered
+as part of creating it, so the group routes as soon as the stack has deployed.
+
+```typescript sim-elbv2-cloudformation
+/**
+ * Deploying a load balancer, target group, listener and rule from a template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import type { SimElbV2Event, SimElbV2Result } from "@kensio/yulin/elbv2";
+import { simElbV2Fetch } from "@kensio/yulin/elbv2";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "shop",
+  template: {
+    Resources: {
+      CheckoutFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "checkout",
+          Role: "arn:aws:iam::888888888888:role/CheckoutRole",
+        },
+      },
+      ShopAlb: {
+        Type: "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        Properties: {
+          Name: "shop-alb",
+          Scheme: "internet-facing",
+          // Accepted and left out: there is no VPC here to place one in.
+          Subnets: ["subnet-1111", "subnet-2222"],
+        },
+      },
+      CheckoutTargets: {
+        Type: "AWS::ElasticLoadBalancingV2::TargetGroup",
+        Properties: {
+          Name: "checkout-tg",
+          TargetType: "lambda",
+          // Registered at deploy time, so the group routes straight away.
+          Targets: [{ Id: { "Fn::GetAtt": ["CheckoutFunction", "Arn"] } }],
+        },
+      },
+      InvokePermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "CheckoutFunction" },
+          Action: "lambda:InvokeFunction",
+          Principal: "elasticloadbalancing.amazonaws.com",
+          SourceArn: { Ref: "CheckoutTargets" },
+        },
+      },
+      HttpListener: {
+        Type: "AWS::ElasticLoadBalancingV2::Listener",
+        Properties: {
+          LoadBalancerArn: { Ref: "ShopAlb" },
+          Protocol: "HTTP",
+          Port: 80,
+          DefaultActions: [
+            {
+              Type: "fixed-response",
+              FixedResponseConfig: {
+                StatusCode: "404",
+                ContentType: "text/plain",
+                MessageBody: "no such site",
+              },
+            },
+          ],
+        },
+      },
+      CheckoutRule: {
+        Type: "AWS::ElasticLoadBalancingV2::ListenerRule",
+        Properties: {
+          ListenerArn: { Ref: "HttpListener" },
+          Priority: 10,
+          Conditions: [{ Field: "path-pattern", Values: ["/checkout*"] }],
+          Actions: [
+            { Type: "forward", TargetGroupArn: { Ref: "CheckoutTargets" } },
+          ],
+        },
+      },
+    },
+    Outputs: {
+      DnsName: { Value: { "Fn::GetAtt": ["ShopAlb", "DNSName"] } },
+      FullName: {
+        Value: { "Fn::GetAtt": ["ShopAlb", "LoadBalancerFullName"] },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "CheckoutFunction",
+      handler: (event: SimElbV2Event): SimElbV2Result => ({
+        statusCode: 200,
+        statusDescription: "200 OK",
+        headers: { "content-type": "text/plain" },
+        body: `checkout ${event.path}`,
+        isBase64Encoded: false,
+      }),
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+const dnsName = stack.outputs.get("DnsName")?.value as string;
+
+console.log(dnsName); // "shop-alb-0000000001.us-east-1.elb.amazonaws.com"
+console.log(stack.outputs.get("FullName")?.value);
+// "app/shop-alb/0000000001"
+
+const claimed = await simElbV2Fetch(simAws, `http://${dnsName}/checkout/42`);
+
+console.log(claimed.status); // 200
+console.log(await claimed.text()); // "checkout /checkout/42"
+
+// A request no rule claims falls through to the listener's default action.
+const unclaimed = await simElbV2Fetch(simAws, `http://${dnsName}/other`);
+
+console.log(unclaimed.status); // 404
+```
+
+A listener's `Certificates` resolves against simulated [ACM](../acm/), so a stack that creates a
+certificate and attaches it to an HTTPS listener works end to end. A certificate that was never
+issued, or that belongs to another account or region, fails the deployment rather than leaving a
+listener that could not serve. A `Fn::GetAtt` on `DNSName` is a name a Route53 alias in the same
+stack can point at and reach.
+
+```typescript sim-elbv2-cloudformation-certificate
+/**
+ * An HTTPS listener holding a certificate the same stack created.
+ */
+
+import { DescribeListenersCommand } from "@aws-sdk/client-elastic-load-balancing-v2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "shop",
+  template: {
+    Resources: {
+      ShopZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: { Name: "example.test" },
+      },
+      SiteCertificate: {
+        Type: "AWS::CertificateManager::Certificate",
+        Properties: {
+          DomainName: "shop.example.test",
+          ValidationMethod: "DNS",
+        },
+      },
+      ShopAlb: {
+        Type: "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        Properties: { Name: "shop-alb" },
+      },
+      HttpsListener: {
+        Type: "AWS::ElasticLoadBalancingV2::Listener",
+        Properties: {
+          LoadBalancerArn: { Ref: "ShopAlb" },
+          Protocol: "HTTPS",
+          Port: 443,
+          Certificates: [{ CertificateArn: { Ref: "SiteCertificate" } }],
+          DefaultActions: [
+            {
+              Type: "fixed-response",
+              FixedResponseConfig: {
+                StatusCode: "200",
+                ContentType: "text/plain",
+                MessageBody: "shop",
+              },
+            },
+          ],
+        },
+      },
+      ShopRecord: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: { Ref: "ShopZone" },
+          Name: "shop.example.test",
+          Type: "A",
+          AliasTarget: {
+            DNSName: { "Fn::GetAtt": ["ShopAlb", "DNSName"] },
+            HostedZoneId: {
+              "Fn::GetAtt": ["ShopAlb", "CanonicalHostedZoneID"],
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      ListenerArn: { Value: { Ref: "HttpsListener" } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+const listenerArn = stack.outputs.get("ListenerArn")?.value as string;
+
+const described = await simAws
+  .elbV2()
+  .describeListeners(
+    new DescribeListenersCommand({ ListenerArns: [listenerArn] }),
+  );
+
+const listener = described.Listeners?.[0];
+
+console.log(listener?.Certificates[0]?.CertificateArn);
+// the ARN of the certificate the stack created
+
+console.log(listener?.SslPolicy); // "ELBSecurityPolicy-2016-08"
+```
+
+Properties Yulin has nothing to act on are read and left out rather than failing the stack. Subnets,
+security groups, load balancer and target group attributes, listener attributes, mutual
+authentication and health check configuration are all in that group, and each one is recorded on the
+Resource so a reader can see what the deployed load balancer is not doing:
+
+```typescript
+const ignored = stack.resources.get("ShopAlb")?.ignoredProperties;
+```
+
+Tearing the stack down removes all four in reverse dependency order, so a rule comes down before its
+listener, a listener before its load balancer, and a target group after everything forwarding to it.
+
 ## IAM authorization
 
 Every operation is authorized by simulated [IAM](../iam/) as the caller making it, against the
@@ -1304,6 +1551,11 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   `fixed-response` and `redirect` actions, which the load balancer answers itself.
 - The load balancer's own 503, 502 and 413, and the invoke permission the function's resource policy
   has to grant `elasticloadbalancing.amazonaws.com`.
+- Deploying `AWS::ElasticLoadBalancingV2::LoadBalancer`, `TargetGroup`, `Listener` and
+  `ListenerRule` from a CloudFormation template, with `Ref` returning ARNs, `Fn::GetAtt` answering
+  `DNSName`, `LoadBalancerFullName` and `TargetGroupFullName` among others, a listener's
+  `Certificates` resolved against simulated ACM, and a target group's `Targets` registered at deploy
+  time.
 - IAM authorization against the ARN of whatever an operation names.
 - SDK interception of `ElasticLoadBalancingV2Client`.
 
@@ -1389,5 +1641,14 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   here and a longer list is refused.
 - Load balancer and target group attributes, access logs, and tags as a readable resource are not
   simulated.
-- There is no CloudFormation support yet, so `AWS::ElasticLoadBalancingV2::*` resources in a template
-  are not deployed.
+- `AWS::ElasticLoadBalancingV2::TrustStore`, `TrustStoreRevocation` and `ListenerCertificate` are not
+  deployed, and a stack declaring one records it as unsupported and carries on. The first two have
+  nothing to attach to, since mutual TLS is not simulated, and a listener's additional certificates
+  are added with `AddListenerCertificates` instead.
+- `Fn::GetAtt` `SecurityGroups` on a load balancer and `LoadBalancerArns` on a target group are
+  refused rather than answered. Nothing places a simulated load balancer behind a security group, and
+  nothing records on a target group which load balancers forward to it, which `DescribeTargetGroups`
+  reads back out of the listeners instead.
+- Sim CloudFormation has no in-place resource update, so a changed load balancer, target group,
+  listener or rule is deleted and created again, and everything naming it is replaced too. A replaced
+  load balancer gets a new DNS name.

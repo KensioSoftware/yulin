@@ -6,6 +6,7 @@ import { cognitoValueAdapter } from "./cognito/sim-cognito-cfn-value-adapter.js"
 import { dynamoDbValueAdapter } from "./dynamodb/sim-dynamodb-cfn-value-adapter.js";
 import { ecrValueAdapter } from "./ecr/sim-ecr-cfn-value-adapter.js";
 import { ecsValueAdapter } from "./ecs/sim-ecs-cfn-value-adapter.js";
+import { elbV2ValueAdapter } from "./elasticloadbalancingv2/sim-elbv2-cfn-value-adapter.js";
 import { eventBridgeValueAdapter } from "./events/sim-event-bridge-cfn-value-adapter.js";
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
@@ -60,6 +61,7 @@ export function simCfnResourceValueAdapter(
     dynamoDbValueAdapter(properties) ??
     ecrValueAdapter(properties) ??
     ecsValueAdapter(properties) ??
+    elbV2ValueAdapter(properties) ??
     eventBridgeValueAdapter(properties) ??
     iamValueAdapter(properties) ??
     kmsValueAdapter(properties) ??

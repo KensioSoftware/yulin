@@ -1,7 +1,9 @@
 import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimElbV2CfnResourceFactory } from "./cfn/sim-elbv2-cfn-resource-factory.js";
 import type * as elbV2 from "./command/sim-elbv2-command.types.js";
 import { SimElbV2Commands } from "./command/sim-elbv2-commands.js";
 import type { SimElbV2RequestOptions } from "./command/sim-elbv2-request-options.js";
@@ -22,10 +24,10 @@ import type { SimElbV2TargetGroup } from "./target-group/sim-elbv2-target-group.
  * load balancers route below HTTP, which nothing in this simulation speaks, so
  * they are refused rather than created as something they are not.
  *
- * What a load balancer here is, so far, is state: it has a DNS name of the
- * shape real ELB issues, so a Route53 alias or a CloudFront origin has
- * something to point at, and it has listeners, rules and target groups that
- * say what it would do with a request. Answering one is separate work.
+ * A load balancer has a DNS name of the shape real ELB issues, so a Route53
+ * alias or a CloudFront origin has something to point at, and listeners, rules
+ * and target groups saying what it does with a request. `serve/` is the part
+ * that does it.
  *
  * Load balancers are scoped to an account and region, as they are on real AWS:
  * a name is unique within one of those scopes and an ARN names the region.
@@ -287,5 +289,12 @@ export class SimElbV2 {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return new SimElbV2CfnResourceFactory({ elbV2: this, stores: this.stores });
   }
 }
