@@ -1,6 +1,8 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimEcsInvalidParameterException } from "../../error/sim-ecs.error.js";
+import { SimEcsServiceRegistration } from "../../service/load-balancer/sim-ecs-service-registration.js";
 import { simEcsDesiredCount } from "../../service/sim-ecs-desired-count.js";
+import type { SimEcsServiceLoadBalancer } from "../../service/sim-ecs-service-detail.js";
 import { simEcsReplicaSchedulingStrategy } from "../../service/sim-ecs-service.js";
 import { requiredSimEcsName } from "../../sim-ecs-name.js";
 import { SimEcsTaskDefinitionId } from "../../task-definition/sim-ecs-task-definition-id.js";
@@ -10,14 +12,18 @@ import type { SimCreateServiceCommandInput } from "./create-service.command.js";
  * What one `CreateService` request asked for.
  *
  * This is the part of the request that can be read before anything is looked
- * up: what the service is called, which task definition it runs and how many
- * tasks of it to keep. A malformed request is malformed whoever made it and
- * whatever state there is, so it is read first and refused first.
+ * up: what the service is called, which task definition it runs, how many tasks
+ * of it to keep and which target groups those tasks are registered into. A
+ * malformed request is malformed whoever made it and whatever state there is,
+ * so it is read first and refused first. Whether the target groups it names are
+ * there is a different question, answered once there is state to answer it
+ * from.
  */
 export class SimEcsCreateServiceRequest {
   public readonly serviceName: string;
   public readonly taskDefinitionId: SimEcsTaskDefinitionId;
   public readonly desiredCount: number;
+  public readonly registrations: readonly SimEcsServiceRegistration[];
 
   constructor(
     input: SimCreateServiceCommandInput,
@@ -31,6 +37,23 @@ export class SimEcsCreateServiceRequest {
     );
     this.desiredCount = simEcsDesiredCount(
       SimEcsCreateServiceRequest.requiredCount(input.desiredCount),
+    );
+    this.registrations = SimEcsCreateServiceRequest.registrationsOf(
+      input.loadBalancers ?? [],
+      accountRegionScope,
+    );
+  }
+
+  /**
+   * The load balancer registrations the request declared.
+   */
+  private static registrationsOf(
+    declared: readonly SimEcsServiceLoadBalancer[],
+    accountRegionScope: SimAwsAccountRegionScope,
+  ): readonly SimEcsServiceRegistration[] {
+    return declared.map(
+      (loadBalancer) =>
+        new SimEcsServiceRegistration(loadBalancer, accountRegionScope),
     );
   }
 

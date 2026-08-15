@@ -430,8 +430,8 @@ where both would match, and binding the same container again replaces what it ru
 
 The other shape a binding can take is `http`, a fetch-style
 `(request: Request) => Response | Promise<Response>` for a service container behind a load balancer.
-The shape is settled, but nothing serves a container yet, so binding one is refused rather than
-accepted and never called.
+It is called once for each request routed to the container, and is covered under
+[serving requests behind a load balancer](#serving-requests-behind-a-load-balancer).
 
 ## What a container sees while it runs
 
@@ -848,8 +848,8 @@ running three things at once. A test that needs concurrency is a test about your
 ECS.
 
 A container of a service that has come up is treated as running from that point, and what calls it
-is whatever reaches it: a queue it consumes, or a load balancer sending it a request. Consuming a
-queue is covered below; being served a request follows separately.
+is whatever reaches it: a queue it consumes, or a load balancer sending it a request. Both are
+covered below.
 
 ### Consuming a queue
 
@@ -1043,6 +1043,151 @@ and share the queue between them, which comes to the same messages being handled
 A consuming container is the one kind a `RunTask` task cannot run. It has no handler that ends, and a
 task has to end, so a task started from the same definition records the container as not simulated
 with a reason saying to create a service instead.
+
+### Serving requests behind a load balancer
+
+A service container that answers HTTP requests declares `http` instead of `run` or `consumes`. The
+handler is fetch-style: it is given a `Request` and answers with a `Response`, which is the same
+shape a simulated load balancer already answers a served request with.
+
+What reaches it is a request routed through simulated [Elastic Load Balancing](../elbv2/). A service
+declares `loadBalancers` naming a target group, a container and a container port; creating the
+service registers each of its tasks into that target group, and a request the load balancer forwards
+there reaches the bound container's handler.
+
+```typescript sim-ecs-serve-load-balancer
+/**
+ * A simulated ECS service answering requests behind a load balancer.
+ */
+
+import {
+  CreateClusterCommand,
+  CreateServiceCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateTargetGroupCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+
+import { SimAws } from "@kensio/yulin";
+import { simElbV2Fetch } from "@kensio/yulin/elbv2";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+const elbV2 = simAws.elbV2();
+
+const targetGroup = await elbV2.createTargetGroup(
+  new CreateTargetGroupCommand({
+    Name: "orders-tg",
+    TargetType: "ip",
+    Protocol: "HTTP",
+    Port: 8080,
+  }),
+);
+
+const targetGroupArn = targetGroup.TargetGroups?.[0]?.TargetGroupArn;
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "orders-alb" }),
+);
+
+await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+  }),
+);
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+
+ecs.bindContainer({
+  family: "orders-api",
+  containerName: "app",
+  http: (request) => {
+    const { pathname } = new URL(request.url);
+
+    return Response.json({ path: pathname }, { status: 200 });
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-api",
+    containerDefinitions: [
+      {
+        name: "app",
+        image: "orders-api:1",
+        portMappings: [{ containerPort: 8080 }],
+      },
+    ],
+  }),
+);
+
+await ecs.createService(
+  new CreateServiceCommand({
+    cluster: "orders",
+    serviceName: "orders-api",
+    taskDefinition: "orders-api",
+    desiredCount: 2,
+    loadBalancers: [
+      { targetGroupArn, containerName: "app", containerPort: 8080 },
+    ],
+  }),
+);
+
+// The tasks come up in the background, as they do on real ECS, and each of
+// them is registered in the target group as it starts.
+await simAws.backgroundTasksComplete();
+
+const dnsName = loadBalancer.LoadBalancers?.[0]?.DNSName;
+const response = await simElbV2Fetch(simAws, `http://${dnsName}/orders/42`);
+
+console.log(response.status); // 200
+console.log(await response.json()); // { path: "/orders/42" }
+```
+
+The handler runs as the task role, with the container's environment applied, exactly as a container
+consuming a queue or one run by `RunTask` does. So application code inside it builds an SDK client
+from `process.env` and is authorized by simulated IAM against the role the task definition declared.
+
+The container sees the request the client made, with the headers a load balancer writes in front of
+a target: the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`, `x-forwarded-port`
+and `x-amzn-trace-id`. The URL is the AWS-facing one, so `new URL(request.url)` reads the name the
+client asked for rather than a localhost one.
+
+#### Which container of a task answers
+
+Real ECS sends the request to the container the registration names, on the port it names. Yulin
+diverges from that on purpose, and it is worth knowing why.
+
+A great many deployed services put a proxy container, usually nginx, on the port the service
+registers, with the application listening behind it. Yulin has nothing to run in place of that proxy:
+there is no image to run and nothing a test could bind to it. Routing strictly by name and port would
+therefore send every request to a container that does not exist here, and the service would answer
+nothing however carefully it was set up.
+
+So the request goes to a container that is bound:
+
+- the container the registration names, when that container is bound;
+- otherwise the bound container that declared the registration's `containerPort`, which is what
+  chooses between two containers that both answer;
+- otherwise the first bound container of the task.
+
+```typescript
+// A registration naming the proxy still reaches the application behind it.
+loadBalancers: [{ targetGroupArn, containerName: "nginx", containerPort: 80 }];
+```
+
+A target group whose service has no bound container at all is answered with a 503 by the load
+balancer, which is the honest answer: the tasks are registered and there is nothing behind them.
+
+`RunTask` cannot run a serving container, for the same reason it cannot run a consuming one. It has
+no handler that ends and no request to send it, so a task started from the same definition records
+the container as not simulated with a reason saying to create a service instead.
 
 ### Updating and deleting a service
 
@@ -1464,9 +1609,10 @@ definition moves it onto the revision the update registered, replacing the tasks
 Tearing the stack down deletes the service, stopping its tasks and leaving it `INACTIVE`, whatever
 it was scaled to.
 
-`LoadBalancers` is recorded on the service rather than acted on, since nothing here sends a service
-container a request yet. What the template declared is readable, which is what a target group needs
-to find the service and container that answer for it:
+`LoadBalancers` registers the service's tasks into the target group it names, so a template that
+declares a load balancer, a target group and a service deploys something that answers. The target
+group has to exist and hold addresses, or the deployment fails naming it, and what the template
+declared is readable on the simulated service:
 
 ```typescript
 console.log(simAws.ecs().service("orders-worker", "orders").loadBalancers);
@@ -1656,7 +1802,11 @@ console.log(described.taskDefinition?.revision); // 1
   answering `Ref` with the service ARN and `Fn::GetAtt` with `Name` and `ServiceArn`
 - A stack update that scales a service or moves it onto a new revision, and a teardown that deletes
   it
-- `LoadBalancers` on a service, recorded as declared and readable on the simulated service
+- A container binding that answers `http` requests, called once per request a load balancer routes
+  to the container
+- `loadBalancers` on a service, registering each of its tasks into the target group it names and
+  deregistering them as they stop
+- `LoadBalancers` on an `AWS::ECS::Service`, deploying into the same registration
 - `simAws.ecs().service()`, reading a simulated service by name in a cluster or by its ARN
 - Deploy-time container bindings, targeting a container by family and container name, by the task
   definition's logical ID or CDK construct ID, or by its image repository, and declaring `run` or
@@ -1727,10 +1877,9 @@ Current documented limitations:
 - A service's desired count is simulated as state rather than as concurrency. Three tasks exist and
   are reported as running, and the handler bound to a container is called once per request or per
   poll rather than once per task. Yulin runs in one Node.js process, so there is nothing to copy.
-- Nothing serves a service container a request yet. A bound container of a service is treated as
-  running and stays available until the service is deleted or its `SimAws` is closed; consuming a
-  queue is what calls its handler so far, and a load balancer sending it a request follows
-  separately.
+- A bound container of a service is treated as running and stays available until the service is
+  deleted or its `SimAws` is closed. What calls its handler is whatever reaches it: a queue it
+  consumes, or a request a load balancer routes to it.
 - A consuming container's loop is Yulin's rather than the container's. A binding supplies what
   happens to a batch, and nothing tries to run a polling loop written inside your own container code,
   because an endless loop in a single Node.js process never yields to the test running it.
@@ -1744,23 +1893,37 @@ Current documented limitations:
   there is something to poll for, so there is nothing to set.
 - A consuming container handles a batch all or nothing. There is no partial batch response, which is
   a Lambda event source feature rather than something a worker container has.
-- A consuming container of a task started by `RunTask` records the same not-simulated reason an
-  unbound container does, since it has no handler that ends and a run task has to end.
+- A consuming or serving container of a task started by `RunTask` records the same not-simulated
+  reason an unbound container does. Neither has a handler that ends, and a run task has to end.
 - A service's tasks come up all at once and are replaced all at once. There are no deployments,
   deployment controllers, circuit breakers or rolling replacement, so `DescribeServices` reports no
   `deployments` and no `events`, and `UpdateService` refuses `forceNewDeployment`.
 - A service whose tasks fail to start does not start replacements for them. Real ECS keeps trying,
   which would be an endless retry in a test rather than a result to assert on, so the service
   reports the running count it actually has.
-- `CreateService` takes `loadBalancers` and records them without acting on them, since nothing here
-  sends a service container a request yet. The declaration is reported back and readable on the
-  simulated service, which is what a load balancer target group has to read to find the service that
-  answers for it.
+- A `loadBalancers` entry needs a `targetGroupArn`, a `containerName` and a `containerPort`, and the
+  target group has to be an `ip` one in the service's own account and region. A `loadBalancerName`,
+  which is the Classic Load Balancer form, is refused, and so is a target group that is not there.
+- Which container of a task a request reaches diverges from real ECS on purpose. Real ECS routes to
+  the container the registration names, on the port it names; here the request goes to a container
+  that is bound, which is the one the registration names where it is bound, otherwise the bound
+  container declaring the registration's port, otherwise the first bound one. The common real task
+  puts an unsimulated proxy on the registered port, and routing strictly would reach a container
+  that does not exist here.
+- A service registered into a target group with no bound container is answered with a 503 by the
+  load balancer. The tasks are registered and there is nothing behind them.
+- A task is registered as a target as soon as the service starts it and deregistered as soon as it
+  stops. There are no health checks, no target health states, no deregistration delay and no
+  connection draining, and the address a task is registered under is counted rather than taken from
+  a network interface that does not exist.
+- Requests are not shared between a service's tasks. The desired count is state rather than
+  concurrency, so a target group holding three targets calls one handler.
 - `CreateService` refuses `serviceRegistries`, `networkConfiguration`, `deploymentConfiguration`,
-  `capacityProviderStrategy` and the rest of what it takes. There is no network here, and nothing
-  serves a service container yet.
-- `UpdateService` changes the desired count and the task definition and nothing else, so a load
-  balancer a service was created with stays as it was declared.
+  `capacityProviderStrategy` and the rest of what it takes. There is no network or capacity here for
+  any of them to apply to.
+- `UpdateService` changes the desired count and the task definition and nothing else, so a service's
+  load balancer registration stays as it was created. Its tasks are registered and deregistered as
+  the count changes.
 - `CreateService` refuses a `schedulingStrategy` of `DAEMON`, which places one task on each container
   instance. There are no container instances here to place one on each of.
 - `CreateService` needs a `desiredCount`, as a replica service does on real ECS, and it can be zero.

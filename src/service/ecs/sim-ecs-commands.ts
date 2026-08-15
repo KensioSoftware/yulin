@@ -4,6 +4,9 @@ import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-s
 import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 import { SimEcsUnreachableConsumerQueues } from "./service/consume/sim-ecs-consumer-queues.js";
+import { SimEcsUnreachableTargetGroups } from "./service/load-balancer/sim-ecs-target-groups.js";
+import type { SimEcsTargetGroupContainers } from "./service/serve/sim-ecs-target-group-containers.js";
+import type { SimEcsContainerServer } from "./service/serve/sim-ecs-container-server.js";
 import { SimEcsClusterStore } from "./cluster/sim-ecs-cluster-store.js";
 import { SimEcsAuthorizer } from "./command/authorize/sim-ecs-authorizer.js";
 import { SimEcsCommandContexts } from "./command/sim-ecs-command-contexts.js";
@@ -82,6 +85,7 @@ export class SimEcsCommands {
   private readonly taskDefinitions = new SimEcsTaskDefinitionStore();
   private readonly services = new SimEcsServiceStore();
   private readonly serviceTasks: SimEcsServiceTasks;
+  private readonly targetGroupContainers: SimEcsTargetGroupContainers;
 
   constructor(properties: SimEcsCommandsProperties) {
     const {
@@ -91,6 +95,7 @@ export class SimEcsCommands {
       runAsOwner,
       secretStores = new SimEcsUnreachableSecretStores(),
       consumerQueues = new SimEcsUnreachableConsumerQueues(),
+      targetGroups = new SimEcsUnreachableTargetGroups(),
     } = properties;
 
     const contexts = new SimEcsCommandContexts({
@@ -105,10 +110,12 @@ export class SimEcsCommands {
       bindings: this.bindings,
       secretStores,
       consumerQueues,
+      targetGroups,
     });
     const { cluster, taskDefinition, task, service } = contexts;
 
     this.serviceTasks = service.serviceTasks;
+    this.targetGroupContainers = contexts.targetGroupContainers;
     this.lookup = new SimEcsLookup({
       accountRegionScope,
       clusters: this.clusters,
@@ -146,6 +153,13 @@ export class SimEcsCommands {
     this.updateService = new UpdateServiceCommandHandler(service);
     this.describeServices = new DescribeServicesCommandHandler(service);
     this.deleteService = new DeleteServiceCommandHandler(service);
+  }
+
+  /**
+   * The container answering for a target group, where a service registered one.
+   */
+  servingContainer(targetGroupArn: string): SimEcsContainerServer | undefined {
+    return this.targetGroupContainers.find(targetGroupArn);
   }
 
   /**

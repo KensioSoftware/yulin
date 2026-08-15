@@ -5,7 +5,7 @@ import type {
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimElbV2ConnectionRefusedError } from "../error/sim-elbv2.error.js";
 import { SimElbV2ActionPerformer } from "./sim-elbv2-action-performer.js";
-import { SimElbV2LambdaTargetInvocation } from "./sim-elbv2-lambda-target-invocation.js";
+import { SimElbV2TargetInvocations } from "./sim-elbv2-target-invocations.js";
 import { requireSimElbV2Listener } from "./sim-elbv2-listener-match.js";
 import {
   type SimElbV2LoadBalancerRoute,
@@ -34,9 +34,10 @@ export class SimElbV2ServiceController implements SimAwsServiceController {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimElbV2Router({ simAws });
     // The clock is taken from the router rather than from properties, so a
-    // supplied router and the event timestamps belong to the same simulation.
+    // supplied router and the forwarded timestamps belong to the same
+    // simulation.
     this.actions = new SimElbV2ActionPerformer(
-      new SimElbV2LambdaTargetInvocation({
+      new SimElbV2TargetInvocations({
         router: this.router,
         clock: this.router.simAws,
       }),

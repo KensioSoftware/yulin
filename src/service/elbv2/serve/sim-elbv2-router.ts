@@ -1,6 +1,7 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimEcsContainerServer } from "../../ecs/service/serve/sim-ecs-container-server.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { parseSimLambdaFunctionArn } from "../../lambda/function/sim-lambda-function-arn-parts.js";
 import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-function.js";
@@ -39,13 +40,14 @@ export interface SimElbV2FunctionTarget {
 
 /**
  * Routes a request to the load balancer behind its host name, and a target
- * group to the function behind that.
+ * group to the function or container behind that.
  *
  * A host name names nothing but itself, while simulated ELBv2 state is per
- * Account and Region, and the registry is the hop between the two. The function
- * is not a second hop: real ELB
- * requires a Lambda target to be in the same Account and Region as its target
- * group, so that is the only scope it is looked for in.
+ * Account and Region, and the registry is the hop between the two. What a
+ * target group holds is not a second hop: real ELB requires a Lambda target to
+ * be in the same Account and Region as its target group, and simulated ECS
+ * refuses a service a target group outside its own, so the target group's own
+ * scope is the only one either is looked for in.
  */
 export class SimElbV2Router {
   /**
@@ -133,5 +135,25 @@ export class SimElbV2Router {
     }
 
     return { simFunction, iam: scope.iam() };
+  }
+
+  /**
+   * Find the container of a simulated ECS service that answers for a target
+   * group.
+   *
+   * Which service that is, and which of its containers, is simulated ECS's
+   * question rather than this one's: a service is what registered into the
+   * group, and what is bound to its containers is what decides whether any of
+   * them can answer.
+   */
+  containerFor(
+    targetGroup: SimElbV2TargetGroup,
+  ): SimEcsContainerServer | undefined {
+    const { accountId, regionName } = targetGroup.accountRegionScope;
+
+    return this.simAws
+      .accountRegionScope(accountId, regionName)
+      .ecs()
+      .servingContainer(targetGroup.arn);
   }
 }

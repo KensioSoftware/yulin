@@ -3,6 +3,7 @@ import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimSqsPollQueues } from "../sqs/poll/sim-sqs-poll-queues.js";
+import type { SimEcsTargetGroups } from "./service/load-balancer/sim-ecs-target-groups.js";
 import type { SimEcsSecretStores } from "./task/run/secret/sim-ecs-secret-stores.js";
 
 /**
@@ -46,4 +47,14 @@ export interface SimEcsProperties {
    * consuming container says so rather than polling nothing forever.
    */
   readonly consumerQueues?: SimSqsPollQueues;
+
+  /**
+   * The target groups a service registers its tasks into.
+   *
+   * This is the surrounding simulation's ELBv2 when ECS was built through a
+   * SimAws instance. Simulated ECS built on its own reaches none, so a service
+   * declaring a load balancer says so rather than being created registered with
+   * nothing.
+   */
+  readonly targetGroups?: SimEcsTargetGroups;
 }

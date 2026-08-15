@@ -19,6 +19,12 @@ a fictional application rather than a simulated AWS resource. The reusable ones 
 as `simIamPolicyDocumentFactory` and `simCognitoSignedInFactory`, live in `src/` and ship with the
 package, and these use them.
 
+## The systems here
+
+- [The image upload pipeline](#the-image-upload-pipeline), an API and the processing behind it.
+- [A load balanced service](#a-load-balanced-service), a request reaching application code in a
+  container.
+
 ## The image upload pipeline
 
 [image-upload-pipeline.iso.test.ts](image-upload-pipeline.iso.test.ts) covers an application that
@@ -52,3 +58,25 @@ A test stands the whole thing up in one call:
 const simAws = new SimAws();
 const { client } = await mediaPipelineFactory.make({}, simAws);
 ```
+
+## A load balanced service
+
+[load-balanced-service.iso.test.ts](load-balanced-service.iso.test.ts) covers the other way an
+application is deployed: not a function behind an API, but a container behind a load balancer. The
+system is built by [test/orders-service](../../test/orders-service), which deploys one
+CloudFormation stack.
+
+**CloudFormation** deploys the lot, and one request then passes through four more services:
+
+1. A client asks for `orders.example.test`, which **Route53** resolves to the **load balancer** the
+   stack created, through an alias record.
+2. The listener forwards the request to a target group, which the **ECS** service registered its
+   tasks into when the stack deployed.
+3. The service's task carries an nginx container on the registered port and the application behind
+   it. Only the application is bound, so that is what answers, which is the divergence the ECS docs
+   set out.
+4. The application reads and writes a **DynamoDB** table with an ordinary SDK client, authorized as
+   the task role the template declared.
+
+Scaling the service to nothing takes its tasks out of the target group, and the load balancer then
+answers 503, which is what a real one answers when no target is in service.

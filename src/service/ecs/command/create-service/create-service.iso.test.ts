@@ -14,6 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { createFixtureIpTargetGroup } from "../../../elbv2/sim-elbv2.fixture.js";
 import { simEcsClusterFactory } from "../../cluster/sim-ecs-cluster.factory.js";
 
 describe("ECS CreateServiceCommand", () => {
@@ -233,8 +234,8 @@ describe("ECS CreateServiceCommand", () => {
     assertArrayLength(listed.taskArns, 1);
   });
 
-  it("records the load balancers the service was created with", async () => {
-    // Given a registered task definition.
+  it("registers the service's tasks with the load balancer it was created with", async () => {
+    // Given a registered task definition and a target group of addresses.
     const simAws = new SimAws();
     const ecs = simAws.ecs();
     await simEcsClusterFactory.make({}, simAws);
@@ -245,14 +246,14 @@ describe("ECS CreateServiceCommand", () => {
       }),
     );
 
-    // When a service is created behind a load balancer target group.
-    const targetGroupArn =
-      "arn:aws:elasticloadbalancing:us-east-1:888888888888:targetgroup/checkout/73e2d6bc";
+    const targetGroupArn = await createFixtureIpTargetGroup(simAws.elbV2());
+
+    // When a service is created behind that target group.
     const created = await ecs.createService(
       new CreateServiceCommand({
         serviceName: "checkout",
         taskDefinition: "checkout",
-        desiredCount: 1,
+        desiredCount: 2,
         loadBalancers: [
           { targetGroupArn, containerName: "app", containerPort: 8080 },
         ],
@@ -260,8 +261,7 @@ describe("ECS CreateServiceCommand", () => {
     );
     await simAws.backgroundTasksComplete();
 
-    // Then the declaration is reported back and held on the service, since
-    // nothing here sends a service container a request yet.
+    // Then the declaration is reported back and held on the service.
     assertIdentical(
       created.service?.loadBalancers?.[0]?.targetGroupArn,
       targetGroupArn,
@@ -269,6 +269,19 @@ describe("ECS CreateServiceCommand", () => {
     assertIdentical(
       ecs.service("checkout").loadBalancers[0]?.containerPort,
       8080,
+    );
+
+    // And each task the service keeps running is a target of the group, on
+    // the port the registration named.
+    const health = await simAws
+      .elbV2()
+      .describeTargetHealth({ input: { TargetGroupArn: targetGroupArn } });
+
+    assertArrayLength(health.TargetHealthDescriptions, 2);
+    assertIdentical(health.TargetHealthDescriptions[0].Target.Port, 8080);
+    assertIdentical(
+      health.TargetHealthDescriptions[0].TargetHealth.State,
+      "healthy",
     );
   });
 

@@ -134,14 +134,26 @@ is refused at runtime with an explanation rather than by the type checker with n
   target and are written by the load balancer itself, which is why a listener holding one serves with
   nothing registered behind it. `sim-elbv2-redirect-location.ts` is separate because building the URI
   is where the reserved keywords and the components a redirect leaves alone live.
-- `sim-elbv2-forward-target.ts` gets from a `forward` action to the target group it names, which so
-  far has to be a `lambda` one. What it cannot carry out is refused here rather than answered with
-  something else, because a load balancer that quietly sends a request somewhere its configuration
-  did not say is worse than one that says it cannot.
-- `sim-elbv2-lambda-target-invocation.ts` owns what the load balancer answers itself. An empty target
-  group is a 503 and everything after that is a 502, which is the same collapse real ELB makes: the
-  difference between a missing permission, a missing function and a thrown handler is only in the
-  load balancer's own logs.
+- `sim-elbv2-forward-target.ts` gets from a `forward` action to the target group it names. What it
+  cannot carry out, which is a weighted forward to several groups, is refused here rather than
+  answered with something else, because a load balancer that quietly sends a request somewhere its
+  configuration did not say is worse than one that says it cannot.
+- `sim-elbv2-target-invocations.ts` picks how the group is reached, which is the one place anything
+  branches on the target type: a `lambda` group holds a function to invoke and an `ip` group holds
+  the addresses of an ECS service's tasks.
+- `sim-elbv2-lambda-target-invocation.ts` owns what the load balancer answers itself for a function.
+  An empty target group is a 503 and everything after that is a 502, which is the same collapse real
+  ELB makes: the difference between a missing permission, a missing function and a thrown handler is
+  only in the load balancer's own logs.
+- `sim-elbv2-container-target-invocation.ts` does the same for a container. Three things are the same
+  503: an empty group, a registered service with no container bound to an HTTP handler, and an
+  address registered by hand, since nothing here listens on an address and only a service
+  registration puts something behind one. A container that throws is a 502, as a function that throws
+  is.
+- `sim-elbv2-forwarded-request.ts` builds the request a container is handed, through the same
+  `SimElbV2RequestParts` the event builder uses, so a container and a function behind one listener do
+  not disagree about what the client asked for. The URL is rewritten to the AWS-facing one, carrying
+  the listener's scheme and port.
 - `sim-elbv2-event-builder.ts` and `sim-elbv2-response-builder.ts` hold the ALB shapes, which are
   ELB's own rather than either API Gateway payload format. `sim-elbv2-body-encoding.ts` is separate
   because its list of text media types is ELB's too, and is shorter than API Gateway's.
@@ -204,6 +216,10 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
   minutes, which every test would wait out for no behaviour it could observe.
 - Every registered target is `healthy`. No health check is ever performed, so health check settings
   are held and reported and nothing acts on them.
+- An `ip` target group is answered by the simulated ECS service registered into it, and reaching it
+  is simulated ECS's question rather than this service's: which service registered, and which of its
+  containers can answer, are both decided there. Nothing is shared between the targets of a group,
+  since a service's desired count is state rather than concurrency.
 - `CanonicalHostedZoneId` is one value everywhere rather than the real per-region table, because
   simulated Route53 resolves an alias by looking the target up rather than by its zone id.
 - Deregistration is immediate, where real ELB drains connections first, because there are no

@@ -24,10 +24,12 @@ Where this genuinely does not work is a sidecar the application depends on, such
 database in the same task. That is not simulated and should not be. The application's connection
 details are ordinary environment variables, so a user who wants a real one points at their own.
 
-The consequence for the code here is that nothing reads a container definition's meaning.
-`SimEcsContainerDefinition` keeps the declaration as it was made and hands it back unchanged, and
-the only two fields it looks at are `name`, which is how everything else refers to a container, and
-`image`, which is the identifier a binding is matched on.
+The consequence for the code here is that almost nothing reads a container definition's meaning.
+`SimEcsContainerDefinition` keeps the declaration as it was made and hands it back unchanged. It
+looks at `name`, which is how everything else refers to a container, and `image`, which is the
+identifier a binding is matched on. The one addition is `portMappings`, read for a single question:
+which container of a task a load balancer's declared container port means, where more than one of
+them is bound.
 
 ## Entry points
 
@@ -87,11 +89,9 @@ Executable bindings live under `bind/`.
 
 `SimEcsContainerBinding` is the shape a user writes. It targets a container either by family and
 container name or by image repository, and carries one of three things: a `run` handler, a `consumes`
-declaration, or an `http` handler. The HTTP shape is settled here even though nothing serves a
-container yet, so that a service container behind a load balancer does not have to renegotiate it: it
-is fetch-style, matching what `SimAwsServiceController` already answers a served request with.
-Binding one is refused rather than held, since a binding that is never called is worse than one that
-says so.
+declaration, or an `http` handler. The HTTP shape is fetch-style, matching what
+`SimAwsServiceController` already answers a served request with, so a container and a Lambda function
+behind the same listener answer in the same terms.
 
 `SimEcsBoundContainerWork` is what the binding says the container does, read once as it is made.
 `SimEcsBoundQueueConsumer` is the `consumes` half: the queue URL turned into the ARN everything else
@@ -99,9 +99,10 @@ names a queue by, a batch size SQS would actually hand out, and the handler. All
 binding time because binding is what a test does while setting up, and a consuming container that
 could never poll would otherwise poll for the whole test and deliver nothing.
 
-A consuming binding has no `run` handler, which is why `SimEcsBoundContainer.runHandler` refuses
-rather than answering with nothing: what a consuming binding supplies is the body of a loop, and a
-run task has nothing to do with a loop.
+Neither a consuming nor a serving binding has a `run` handler, which is why
+`SimEcsBoundContainer.runHandler` refuses rather than answering with nothing: what one supplies is
+the body of a loop and the other an answer to a request, and a run task has neither a loop nor a
+request.
 
 `SimEcsBoundContainer` reads a binding once, as it is made, and refuses one that could never match.
 Binding is something a test does while setting up, so the mistake is worth reporting there rather
@@ -227,10 +228,10 @@ brings nothing up. Stopping is immediate, because there is nothing here to drain
 from a task container: no handler is run to completion. A bound container is marked running and left
 available for whatever reaches it, and an unbound one records the same not-simulated reason a run
 task's container does, from the shared `sim-ecs-container-reason.ts` rather than a second copy of the
-wording. `SimEcsServiceConsumption` is the one thing a service container starts of its own, which is
-the polling behind a `consumes` binding. It runs here because this is where the task's secrets have
-just been resolved, so a consuming container's handler reads the same environment a run task's
-container would.
+wording. `SimEcsServiceConsumption` and `SimEcsServiceServing` are what a bound container is then
+handed to, the first starting the polling behind a `consumes` binding and the second taking on an
+`http` one as a container that answers. Both run here because this is where the task's secrets have
+just been resolved, so either handler reads the same environment a run task's container would.
 
 ## Consuming a queue
 
@@ -265,6 +266,59 @@ container there says what is missing rather than polling nothing.
 
 `SimEcsServiceStore` keys services by cluster and name together, because a service name is unique
 within a cluster on real ECS rather than across an Account.
+
+## Answering a request
+
+What a service container answers a request with lives under `service/serve/`.
+
+`SimEcsContainerServer` is one container of a running service, holding what it needs to answer:
+the handler, the environment the task's secrets resolved to, and the task Role. It answers as that
+Role, through `simAwsRunAsContext`, exactly as a run task's container and a consuming container do,
+so a served request's AWS calls are authorized the way the deployed container's would be.
+
+`SimEcsServiceServers` holds one per service and container rather than one per task, for the same
+reason `SimEcsServiceConsumers` does: the desired count is state rather than concurrency, so a
+handler is called once per request however many tasks are reported running. They are held here
+rather than on the service because a service is state a request can read and a server is the running
+thing behind it, which is what gives deleting or scaling in a service somewhere to take them away.
+
+`SimEcsTargetGroupContainers` is the hop a load balancer makes, from a target group ARN to the
+container that answers for it. Which service that is comes from reading the services back rather
+than from a record kept on the target group, for the same reason simulated ELBv2 reads back which
+load balancers forward to a group: a record the service could change without the group hearing about
+it would go stale.
+
+Which container of that service answers is the deliberate divergence this part exists for. Real ECS
+routes to the container the registration names, on the port it names, and the common real task puts
+a proxy such as nginx on that port with the application behind it. Yulin has nothing to run in place
+of the proxy, so routing strictly by name and port would send every request to a container that does
+not exist here. The request goes to a bound container instead: the one the registration names where
+it is bound, otherwise the one that declared the registration's port, otherwise the only one there
+is. A service with no bound container at all is nothing, which the load balancer answers 503 for.
+
+## Registering a service's tasks
+
+What puts a service's tasks in a target group lives under `service/load-balancer/`.
+
+`SimEcsServiceRegistration` is one `loadBalancers` entry read once, as the request is read and
+before anything is looked up. It requires the three things real ECS requires, refuses the Classic
+Load Balancer form, and refuses a target group outside the service's own Account and Region. That
+last one is what makes the registration reachable from both ends: the tasks go into that scope's
+target group, and a request routed to that group finds this service in the same place.
+
+`SimEcsServiceTargets` registers a task as the service starts it and takes it out again as it stops,
+which is what leaves a scaled-in or deleted service's target group with nothing in it. The address a
+task is registered under is held here rather than on the task, because it is the load balancer's way
+of naming a task rather than anything ECS reports about one, and `SimEcsTaskAddresses` counts them
+out of the private range as simulated ELBv2 counts its ARN ids.
+
+`SimEcsTargetGroups` is the seam to ELBv2, and it is a lookup rather than an operation:
+`SimAwsEcsTargetGroups` writes the targets to the target group itself rather than sending
+`RegisterTargets`. There is no caller to send one as. Real ECS registers a task through the
+service-linked role, which is not something a test creates or could take away, so there would be
+nothing for simulated IAM to decide. `SimEcsUnreachableTargetGroups` is what a simulated ECS built on
+its own gets, so a service declaring a load balancer there says what is missing rather than being
+created with a registration that could never carry a request.
 
 ## Command handling
 
@@ -330,9 +384,9 @@ several task definitions does not bind one handler to all of them.
 `service/` deploys `AWS::ECS::Service`. A service is mostly the two things it names, and both arrive
 already resolved: a `Ref` to a cluster is its name and a `Ref` to a task definition is the ARN of the
 revision the deployment registered, which is why the service pins that revision rather than following
-the family. `LoadBalancers` is read and held on the service without being acted on, since nothing
-serves a service container a request yet, and the rest of what a real service declares is recorded as
-ignored rather than failing the stack.
+the family. `LoadBalancers` goes through as the `CreateService` input it is, so a template's
+registration is the same registration an SDK caller would have made, refusals included, and the rest
+of what a real service declares is recorded as ignored rather than failing the stack.
 
 The three Resource types' `Ref` and `Fn::GetAtt` answers live with the other services' value
 adapters, under `cloudformation/resource/cfn/ecs/`, as the CloudFormation engine's own design has
@@ -362,12 +416,16 @@ them.
   `EssentialContainerExited`. Nothing started, and saying so is what makes a binding that matches
   nothing visible.
 - A service's desired count is state rather than concurrency. A consuming container is polled for
-  once per service rather than once per task, and nothing serves a service container a request yet.
+  once per service rather than once per task, and a serving container answers once per request
+  however many tasks are running.
+- A request reaching a target group goes to a container that is bound, rather than strictly to the
+  one the registration names. The declared port chooses between several bound containers and is
+  otherwise not required to match, because the container it usually names is an unsimulated proxy.
 - A consuming container's loop is Yulin's rather than the container's, so the binding supplies what
   happens to a batch and nothing tries to run a loop written inside the user's own code. A container
   can consume only a simulated SQS queue, in its own Account and Region.
-- A consuming container of a `RunTask` task records a not-simulated reason rather than running. It
-  has no handler that ends, and a run task has to end.
+- A consuming or serving container of a `RunTask` task records a not-simulated reason rather than
+  running. Neither has a handler that ends, and a run task has to end.
 - `CreateService` refuses a name an active service of the cluster already has, which is the opposite
   of what `CreateCluster` does with a name already taken. Real ECS refuses each of them that way.
 - `DeleteService` refuses a service still scaled above zero unless the request forces it, as real ECS
@@ -376,7 +434,6 @@ them.
 - `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
   `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
   structural types. A field it does not name is stored and reported back all the same.
-- `AWS::ECS::Service` has no factory yet, so a template declaring one is skipped.
 - A cluster or task definition a template does not name gets a name composed from the stack name and
   the logical ID, without the random part real CloudFormation adds, so a test can predict it.
 - A cluster property or task definition property `CreateCluster` or `RegisterTaskDefinition` would

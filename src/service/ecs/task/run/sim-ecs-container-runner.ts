@@ -8,6 +8,7 @@ import {
   simEcsConsumingContainerReason,
   simEcsContainerFailureReason,
   simEcsNotSimulatedContainerReason,
+  simEcsServingContainerReason,
 } from "./sim-ecs-container-reason.js";
 import type { SimEcsTaskOverrides } from "./sim-ecs-task-overrides.js";
 import { simEcsTaskPrincipal } from "./sim-ecs-task-principal.js";
@@ -75,6 +76,11 @@ export class SimEcsContainerRunner {
 
     if (bound.consumes !== undefined) {
       container.neverStarted(simEcsConsumingContainerReason);
+      return;
+    }
+
+    if (bound.serves !== undefined) {
+      container.neverStarted(simEcsServingContainerReason);
       return;
     }
 

@@ -135,29 +135,6 @@ describe("ECS CloudFormation binding targets", () => {
     assertIdentical(runs, 1);
   });
 
-  it("refuses an http binding naming the task definition Resource", async () => {
-    // Given a binding naming the Resource and carrying the HTTP shape a
-    // service container will take.
-    const simAws = new SimAws();
-
-    // When the template is deployed, then the binding is refused rather than
-    // held and never called.
-    const error = await assertThrowsErrorAsync(async () => {
-      return await simAws.cloudFormation().deployTemplate({
-        stackName: "orders-stack",
-        template: twoFamilies,
-        bindings: [
-          {
-            logicalId: "WorkerTaskDefinition",
-            http: () => new Response("ok"),
-          },
-        ],
-      });
-    });
-
-    assertStringIncludes(error.message, "an http handler is not simulated");
-  });
-
   it("refuses a Resource binding naming no task definition of the stack", async () => {
     // Given a binding naming a logical ID the stack does not hold.
     const simAws = new SimAws();

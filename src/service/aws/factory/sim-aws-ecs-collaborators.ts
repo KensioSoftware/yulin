@@ -1,3 +1,4 @@
+import { SimAwsEcsTargetGroups } from "../../ecs/service/load-balancer/sim-aws-ecs-target-groups.js";
 import { SimAwsEcsSecretStores } from "../../ecs/task/run/secret/sim-aws-ecs-secret-stores.js";
 import { SimSqsCommandPollQueues } from "../../sqs/poll/sim-sqs-command-poll-queues.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
@@ -10,6 +11,7 @@ interface SimAwsEcsCollaborators {
   readonly runAsOwner: SimAws;
   readonly secretStores: SimAwsEcsSecretStores;
   readonly consumerQueues: SimSqsCommandPollQueues;
+  readonly targetGroups: SimAwsEcsTargetGroups;
 }
 
 /**
@@ -24,6 +26,11 @@ interface SimAwsEcsCollaborators {
  *
  * A container bound to consume a queue polls this scope's own SQS, as a real
  * task reads a queue in the Account and Region it runs in.
+ *
+ * A service registers its tasks into a target group of the whole simulation,
+ * looked for where its ARN says it is. A service is refused a target group
+ * outside its own Account and Region before it gets that far, so the two come
+ * to the same place by different routes.
  */
 export function simAwsEcsCollaborators(
   simAws: SimAws,
@@ -36,5 +43,6 @@ export function simAwsEcsCollaborators(
       accountRegionScope: scope.accountRegionScope,
     }),
     consumerQueues: new SimSqsCommandPollQueues({ sqs: scope.sqs() }),
+    targetGroups: new SimAwsEcsTargetGroups({ simAws }),
   };
 }

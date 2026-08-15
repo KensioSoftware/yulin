@@ -951,6 +951,249 @@ nothing but 502s. Real ELB refuses to register a Lambda target at all until the 
 here the permission is checked when the request arrives instead, so a target group can be built in
 any order and a policy that is later removed stops the requests.
 
+## Carrying a request to an ECS service
+
+An `ip` target group is answered by the simulated [ECS](../ecs/) service registered into it. A
+service declares `loadBalancers` naming a target group, a container and a container port; each task
+it keeps running is registered into that group as an address, and a request forwarded there reaches
+the handler bound to the service's container.
+
+That is the whole path an application takes: a client asks for a name, Route53 resolves it to the
+load balancer, a rule picks the target group, and the container's own code answers. This is a stack
+deployed from a template, which is how one usually arrives.
+
+```typescript sim-elbv2-serve-ecs-service
+/**
+ * A request reaching an ECS service's container through a load balancer.
+ */
+
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+using simSdk = new SimSdk();
+const { simAws } = simSdk;
+
+// The application's own SDK clients, intercepted as they would be in any test.
+simSdk.intercept(DynamoDBClient);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::Table",
+        Properties: {
+          TableName: "orders",
+          BillingMode: "PAY_PER_REQUEST",
+          AttributeDefinitions: [
+            { AttributeName: "orderId", AttributeType: "S" },
+          ],
+          KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+        },
+      },
+      OrdersTaskRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "OrdersTaskRole",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "ecs-tasks.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+          Policies: [
+            {
+              PolicyName: "ReadWriteOrders",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: [
+                  {
+                    Effect: "Allow",
+                    Action: ["dynamodb:PutItem", "dynamodb:GetItem"],
+                    Resource: { "Fn::GetAtt": ["OrdersTable", "Arn"] },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      OrdersAlb: {
+        Type: "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        Properties: { Name: "orders-alb", Scheme: "internet-facing" },
+      },
+      OrdersTargetGroup: {
+        Type: "AWS::ElasticLoadBalancingV2::TargetGroup",
+        Properties: {
+          Name: "orders-tg",
+          TargetType: "ip",
+          Protocol: "HTTP",
+          Port: 80,
+        },
+      },
+      HttpListener: {
+        Type: "AWS::ElasticLoadBalancingV2::Listener",
+        Properties: {
+          LoadBalancerArn: { Ref: "OrdersAlb" },
+          Protocol: "HTTP",
+          Port: 80,
+          DefaultActions: [
+            { Type: "forward", TargetGroupArn: { Ref: "OrdersTargetGroup" } },
+          ],
+        },
+      },
+      OrdersZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: { Name: "example.test" },
+      },
+      OrdersRecord: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: { Ref: "OrdersZone" },
+          Name: "orders.example.test",
+          Type: "A",
+          AliasTarget: {
+            DNSName: { "Fn::GetAtt": ["OrdersAlb", "DNSName"] },
+            HostedZoneId: {
+              "Fn::GetAtt": ["OrdersAlb", "CanonicalHostedZoneID"],
+            },
+          },
+        },
+      },
+      OrdersCluster: {
+        Type: "AWS::ECS::Cluster",
+        Properties: { ClusterName: "orders" },
+      },
+      OrdersTaskDefinition: {
+        Type: "AWS::ECS::TaskDefinition",
+        Properties: {
+          Family: "orders-api",
+          NetworkMode: "awsvpc",
+          TaskRoleArn: { "Fn::GetAtt": ["OrdersTaskRole", "Arn"] },
+          ContainerDefinitions: [
+            // The proxy the service registers, which Yulin has nothing to run.
+            {
+              Name: "nginx",
+              Image: "public.ecr.aws/nginx/nginx:1.27",
+              PortMappings: [{ ContainerPort: 80 }],
+            },
+            {
+              Name: "app",
+              Image: "example.dkr.ecr.eu-west-2.amazonaws.com/orders-api:1",
+              PortMappings: [{ ContainerPort: 8080 }],
+              Environment: [{ Name: "ORDERS_TABLE", Value: "orders" }],
+            },
+          ],
+        },
+      },
+      OrdersService: {
+        Type: "AWS::ECS::Service",
+        Properties: {
+          ServiceName: "orders-api",
+          Cluster: { Ref: "OrdersCluster" },
+          TaskDefinition: { Ref: "OrdersTaskDefinition" },
+          DesiredCount: 2,
+          LaunchType: "FARGATE",
+          LoadBalancers: [
+            {
+              TargetGroupArn: { Ref: "OrdersTargetGroup" },
+              ContainerName: "nginx",
+              ContainerPort: 80,
+            },
+          ],
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "OrdersTaskDefinition",
+      containerName: "app",
+      http: async (request: Request): Promise<Response> => {
+        const dynamoDb = new DynamoDBClient({});
+        const orderId = new URL(request.url).pathname.split("/").at(-1) ?? "";
+
+        if (request.method === "POST") {
+          await dynamoDb.send(
+            new PutItemCommand({
+              TableName: process.env["ORDERS_TABLE"],
+              Item: { orderId: { S: orderId }, item: { S: "flat white" } },
+            }),
+          );
+
+          return new Response("", { status: 201 });
+        }
+
+        const read = await dynamoDb.send(
+          new GetItemCommand({
+            TableName: process.env["ORDERS_TABLE"],
+            Key: { orderId: { S: orderId } },
+          }),
+        );
+
+        return Response.json({ item: read.Item?.["item"]?.S ?? null });
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+// The name Route53 answers for, reached in process rather than over a socket.
+const client = new SimAwsHttp({ simAws });
+const url = "http://orders.example.test.sim-aws.localhost:52341/orders/42";
+
+const placed = await client.fetch(url, { method: "POST" });
+
+console.log(placed.status); // 201
+
+const read = await client.fetch(url);
+
+console.log(await read.json()); // { item: "flat white" }
+```
+
+The container's own AWS calls are authorized as the task role the task definition declared, so a
+policy that would break the deployed service breaks the test. Everything in the handler is ordinary
+application code: an SDK client, `process.env`, a route and a response.
+
+### What the container is given
+
+The request is the one the client made, with the headers a load balancer writes in front of a
+target: the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`, `x-forwarded-port`
+and `x-amzn-trace-id`. Its URL is the AWS-facing one, carrying the listener's scheme and port, so a
+container reading `request.url` sees the name a client asked for rather than the localhost one a
+served request arrived at. A Lambda target behind the same listener gets the same values in its
+event, since both are written by the same rules.
+
+### Which container answers, and when nothing does
+
+Which container of a task a request reaches is a deliberate divergence, documented in full under
+[the ECS service docs](../ecs/#which-container-of-a-task-answers). Briefly: real ECS routes to the
+container the registration names on the port it names, the common real task puts an unsimulated
+proxy on that port, so the request goes to a container that is bound instead.
+
+Three things are all the same 503 real ELB answers when no target is in service:
+
+- a target group with nothing registered in it;
+- a target group whose registered service has no container bound to an HTTP handler;
+- an address registered by hand, since nothing in this simulation listens on an address and only an
+  ECS service registration puts something behind one.
+
+A container whose handler throws is a 502, as a Lambda target that throws is, and so is one that
+answers with something that is not a `Response`. The error goes no further than the load balancer,
+which is where it goes on real AWS too.
+
 ## Reaching a load balancer by name
 
 A load balancer's DNS name resolves through simulated [Route53](../route53/), so a record pointing at
@@ -1549,6 +1792,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   request only when all of its conditions hold.
 - `forward` to a `lambda` target group, which invokes its function with an ALB-shaped event, and the
   `fixed-response` and `redirect` actions, which the load balancer answers itself.
+- `forward` to an `ip` target group, which reaches the container of the simulated ECS service
+  registered into it, with the request carrying the forwarding headers a load balancer writes.
 - The load balancer's own 503, 502 and 413, and the invoke permission the function's resource policy
   has to grant `elasticloadbalancing.amazonaws.com`.
 - Deploying `AWS::ElasticLoadBalancingV2::LoadBalancer`, `TargetGroup`, `Listener` and
@@ -1570,9 +1815,16 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   name in the URL. On real AWS those are the same thing, because DNS is what brought the request to
   the load balancer. A request served under the Yulin-local suffix is matched against the name inside
   that suffix, so `api.example.test.sim-aws.localhost` is matched as `api.example.test`.
-- A `forward` action is carried out only to a `lambda` target group. An `ip` target group and a
-  `ForwardConfig` naming several target groups by weight are each refused when the request arrives
-  rather than answered with something else.
+- A `ForwardConfig` naming several target groups by weight is refused when the request arrives rather
+  than answered with something else. Nothing here reads the weights, so which group takes a request
+  is not a question this can answer.
+- An `ip` target group is answered by the simulated ECS service registered into it, and by nothing
+  else. An address registered by hand is a 503, since nothing in this simulation listens on an
+  address for one to name.
+- Requests are not shared between the targets of a group. An ECS service's desired count is state
+  rather than concurrency, so a group holding three targets calls one container handler.
+- Which container of an ECS task a request reaches diverges from real ECS on purpose, and is
+  documented under [the ECS docs](../ecs/#which-container-of-a-task-answers).
 - A redirect is not checked against the listener it is on, so redirecting HTTPS to HTTP is accepted
   where real ELB refuses it. Nothing here performs TLS, so the listener's protocol is not something a
   request can be trusted to have arrived over.
@@ -1615,9 +1867,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   single-value `headers` and `queryStringParameters` fields. A repeated query string key keeps its
   last value, as real ELB does with the attribute off, while repeated request headers arrive already
   joined with commas rather than reduced to the last one.
-- Health check requests are never sent to a Lambda target, so a handler will not see the
-  `ELB-HealthChecker/2.0` event real ELB sends when health checks are enabled on a `lambda` target
-  group.
+- Health check requests are never sent to a target, so neither a Lambda function nor a container will
+  see the `ELB-HealthChecker/2.0` request real ELB sends when health checks are enabled.
 - Network and gateway load balancers are not simulated. `Type: "network"` and `"gateway"` are
   refused, as are the `TCP`, `TLS`, `UDP`, `TCP_UDP` and `GENEVE` protocols.
 - `TargetType: "instance"` and `"alb"` are refused rather than accepted and ignored, and a target

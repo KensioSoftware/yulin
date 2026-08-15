@@ -6,43 +6,6 @@ import { simElbV2Fetch } from "./sim-elbv2-fetch.js";
 import { simElbV2LambdaTargetFactory } from "./sim-elbv2-lambda-target.factory.js";
 
 describe("What a sim ELBv2 load balancer will not carry a request through", () => {
-  it("refuses a listener forwarding to an ip target group", async () => {
-    // Given a load balancer with a listener
-    const simAws = new SimAws();
-    const loadBalancer = await simElbV2LambdaTargetFactory.make({}, simAws);
-    const elbV2 = simAws.elbV2();
-
-    // And that listener forwarding to a group of addresses
-    const addresses = await elbV2.createTargetGroup({
-      input: {
-        Name: "web-tg",
-        TargetType: "ip",
-        Protocol: "HTTP",
-        Port: 8080,
-      },
-    });
-    await elbV2.modifyListener({
-      input: {
-        ListenerArn: elbV2.findListenerOnPort(loadBalancer.arn, 80)?.arn,
-        DefaultActions: [
-          {
-            Type: "forward",
-            TargetGroupArn: addresses.TargetGroups?.[0]?.TargetGroupArn,
-          },
-        ],
-      },
-    });
-
-    // When a request reaches it
-    const request = simElbV2Fetch(
-      simAws,
-      `http://${loadBalancer.dnsName}/orders`,
-    );
-
-    // Then there is nothing listening on an address here for it to reach
-    await expect(request).rejects.toThrow("holds ip targets");
-  });
-
   it("refuses a listener forwarding to several target groups by weight", async () => {
     // Given a load balancer with a listener, and a second target group
     const simAws = new SimAws();
