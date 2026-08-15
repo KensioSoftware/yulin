@@ -114,6 +114,18 @@ export class SimEcsContainerDefinition {
   }
 
   /**
+   * The secrets this container declared.
+   *
+   * Each one names a store to read a value from when the task starts, and the
+   * variable that value becomes. They are resolved as the task execution Role
+   * before any container runs, so a container reads them through `process.env`
+   * alongside its declared `environment`.
+   */
+  get secrets(): readonly SimEcsSecret[] {
+    return this.declared.secrets ?? [];
+  }
+
+  /**
    * This container as a described task definition reports it.
    */
   toOutput(): SimEcsContainerDefinitionType {

@@ -4,6 +4,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import type { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import type { SimEcsSecretStores } from "../task/run/secret/sim-ecs-secret-stores.js";
 import type { SimEcsTaskArn } from "../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../task/sim-ecs-task-store.js";
 import type { SimEcsTaskDefinitionArn } from "../task-definition/sim-ecs-task-definition-arn.js";
@@ -56,12 +57,14 @@ export interface SimEcsTaskCommandContext extends SimEcsCommandCollaborators {
  * What the simulated ECS RunTask handler is built with.
  *
  * Running a task is the one operation that reaches everything: the task
- * definition it runs, the bindings that say what its containers do, and the
- * SimAws instance whose ambient caller the task Role becomes while they run.
+ * definition it runs, the bindings that say what its containers do, the stores
+ * its container secrets are pulled from, and the SimAws instance whose ambient
+ * caller the task Role becomes while they run.
  */
 export interface SimEcsRunTaskCommandContext extends SimEcsTaskCommandContext {
   readonly taskDefinitions: SimEcsTaskDefinitionStore;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly bindings: SimEcsContainerBindings;
   readonly runAsOwner: SimAwsRunAsOwner;
+  readonly secretStores: SimEcsSecretStores;
 }

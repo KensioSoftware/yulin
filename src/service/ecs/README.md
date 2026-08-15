@@ -129,11 +129,42 @@ the one thing the ambient caller must not be left alone for: the background work
 containers keeps the `RunTask` caller's context, so leaving it would attribute a container's calls
 to whoever started the task.
 
-`SimEcsContainerEnvironment` merges the container definition's `environment` with any `RunTask`
-override and the Region variables, and applies them through `simProcessEnvironment`, the shared
-`process.env` patch under `util/process/`. It is shared with simulated Lambda because it patches a
-process global: two of them would each install a getter, and the second would capture whatever the
-first was reporting as its host environment.
+`SimEcsContainerEnvironment` merges the container definition's `environment` with its resolved
+secrets, any `RunTask` override and the Region variables, and applies them through
+`simProcessEnvironment`, the shared `process.env` patch under `util/process/`. It is shared with
+simulated Lambda because it patches a process global: two of them would each install a getter, and
+the second would capture whatever the first was reporting as its host environment.
+
+## Container secrets
+
+What resolves a container's `secrets` lives under `task/run/secret/`.
+
+The whole task is resolved before any container runs, which is what makes an unreadable secret a
+`TaskFailedToStart` rather than a container that failed. Real ECS pulls a task's secrets while it is
+still provisioning, so resolving one container at a time would let an earlier container run on a
+task that was never going to work.
+
+`SimEcsTaskSecrets` is the resolver and `SimEcsResolvedSecrets` is what it answers with, holding
+either every container's variables or the reason the task cannot start. It is a result object rather
+than a thrown error because the runner has to record the reason on the task and stop it, and there
+is nowhere above it for an error to go: `RunTask` answered long before this happens.
+
+`SimEcsContainerSecrets` resolves one container's entries as the task definition's
+`executionRoleArn`. Reading goes through simulated Secrets Manager's and simulated SSM's ordinary
+commands with that caller, rather than their state, so simulated IAM decides it exactly as it
+decides a call an application makes. A definition declaring secrets and no execution Role says so
+rather than reading anonymously and being denied, since forgetting it is the ordinary way to get
+here and the denial would name nobody.
+
+`parseSimEcsSecretReference` reads a `valueFrom`. It cannot use the shared `parseSimArn`, for the
+same reason ECS's own ARNs cannot: a Secrets Manager `valueFrom` carries a JSON key, a version stage
+and a version id after the secret id, all separated by colons. `sim-ecs-secret-arn.ts` holds the
+part positions and the small readers the two forms share.
+
+`SimEcsSecretStores` is the seam between ECS and the two stores. `SimAwsEcsSecretStores` is the
+implementation a SimAws instance supplies, resolving each reference in the Account and Region its
+ARN names, and `SimEcsUnreachableSecretStores` is what simulated ECS built on its own gets, so a
+container declaring a secret there says what is missing rather than running without the variable.
 
 ## Command handling
 
@@ -183,6 +214,9 @@ command instances.
 - `RunTask` refuses everything about networking, capacity and placement, and refuses an override
   naming a container the task definition does not declare. The last one is the refusal worth having:
   the usual cause is a container renamed in the definition and not in the test.
+- A container secret's JSON key selector resolves only where the key holds a string, and a binary
+  secret is refused outright. An environment variable is text, and real ECS does not document what
+  text a number or a nested object would become, so choosing one here would be inventing behaviour.
 - A task with no bound container stops with `TaskFailedToStart` rather than
   `EssentialContainerExited`. Nothing started, and saying so is what makes a binding that matches
   nothing visible.

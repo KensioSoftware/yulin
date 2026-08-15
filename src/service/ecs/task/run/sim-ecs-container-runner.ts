@@ -40,6 +40,11 @@ interface SimEcsContainerRunnerProperties {
  * message as its reason, rather than failing the request that started the
  * task. Nothing is watching a `RunTask` call by the time a container fails on
  * real ECS either.
+ *
+ * A container's secrets arrive here already resolved. They were read as the
+ * task execution Role before any container of the task started, so nothing in
+ * this class reads a secret store, and by the time it runs there is nothing
+ * left that could fail on one.
  */
 export class SimEcsContainerRunner {
   private readonly bindings: SimEcsContainerBindings;
@@ -73,12 +78,13 @@ export class SimEcsContainerRunner {
   async run(
     task: SimEcsTask,
     declared: SimEcsContainerDefinition,
+    secrets: Record<string, string>,
   ): Promise<void> {
     const container = task.container(declared.name);
     const bound = this.bindings.find(task.family, declared);
 
     if (bound === undefined) {
-      container.notSimulated(notSimulatedReason);
+      container.neverStarted(notSimulatedReason);
       return;
     }
 
@@ -86,7 +92,7 @@ export class SimEcsContainerRunner {
 
     try {
       await this.asTaskRole(async () => {
-        await this.environmentFor(declared).runWith(async () => {
+        await this.environmentFor(declared, secrets).runWith(async () => {
           await bound.runHandler();
         });
       });
@@ -98,10 +104,12 @@ export class SimEcsContainerRunner {
 
   private environmentFor(
     declared: SimEcsContainerDefinition,
+    secrets: Record<string, string>,
   ): SimEcsContainerEnvironment {
     return new SimEcsContainerEnvironment({
       regionName: this.regionName,
       declared: declared.environment,
+      secrets,
       overridden: this.overrides.environmentFor(declared.name),
     });
   }

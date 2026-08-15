@@ -9,11 +9,11 @@ import type {
 /**
  * What a task definition declares besides its family and its containers.
  *
- * These are the settings a described task definition reports back. Nothing
- * acts on any of them yet, since nothing runs a task yet, so each one is held
- * as the registration declared it. A setting that is not one of these is
- * refused at the command rather than held, so nothing a registration declared
- * goes missing from the revision it made.
+ * These are the settings a described task definition reports back. A running
+ * task acts on the two Roles, and every other setting is held as the
+ * registration declared it. A setting that is not one of these is refused at
+ * the command rather than held, so nothing a registration declared goes
+ * missing from the revision it made.
  *
  * https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RegisterTaskDefinition.html
  */
@@ -130,6 +130,18 @@ export class SimEcsTaskDefinitionSettings {
    */
   get taskRoleArn(): string | undefined {
     return this.settings.taskRoleArn;
+  }
+
+  /**
+   * The Role a task made from this definition pulls its container secrets as.
+   *
+   * It is deliberately not the task Role. Real ECS reads a container's
+   * `secrets` with the execution Role while the task is still provisioning,
+   * and attributes what the container itself does to the task Role, so a
+   * policy allowing one grants nothing to the other.
+   */
+  get executionRoleArn(): string | undefined {
+    return this.settings.executionRoleArn;
   }
 
   /**

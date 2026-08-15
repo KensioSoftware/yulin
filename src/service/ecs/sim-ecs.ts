@@ -1,15 +1,7 @@
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
+import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 import type { SimEcsContainerBinding } from "./bind/sim-ecs-container-binding.type.js";
 import { SimEcsClusterStore } from "./cluster/sim-ecs-cluster-store.js";
@@ -31,23 +23,10 @@ import { StopTaskCommandHandler } from "./command/stop-task/stop-task.handler.js
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
+import type { SimEcsProperties } from "./sim-ecs-properties.js";
+import { SimEcsUnreachableSecretStores } from "./task/run/secret/sim-ecs-secret-stores.js";
 import { SimEcsTaskStore } from "./task/sim-ecs-task-store.js";
 import { SimEcsTaskDefinitionStore } from "./task-definition/sim-ecs-task-definition-store.js";
-
-interface SimEcsProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-  /**
-   * Whose ambient caller a running task's task Role becomes.
-   *
-   * This is the owning SimAws instance when ECS was built through one, so a
-   * simulated AWS call a container makes is attributed to the task Role
-   * everywhere in that simulation. Simulated ECS built on its own is its own
-   * owner, which reaches nothing else.
-   */
-  readonly runAsOwner?: SimAwsRunAsOwner;
-}
 
 /**
  * Simulated ECS. Handles SDK commands. Emulates AWS behaviour and state.
@@ -88,6 +67,7 @@ export class SimEcs {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       runAsOwner = this,
+      secretStores = new SimEcsUnreachableSecretStores(),
     } = properties;
 
     const contexts = new SimEcsCommandContexts({
@@ -99,6 +79,7 @@ export class SimEcs {
       taskDefinitions: this.taskDefinitions,
       tasks: this.tasks,
       bindings: this.bindings,
+      secretStores,
     });
     const { cluster, taskDefinition, task } = contexts;
 
