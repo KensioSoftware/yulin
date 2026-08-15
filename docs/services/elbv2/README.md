@@ -5,12 +5,12 @@ balancers, target groups, listeners and listener rules are held in memory and ev
 authorized by simulated IAM. ELBv2-specific types are imported from the `@kensio/yulin/elbv2`
 subpath.
 
-A load balancer created here has a DNS name of the shape real ELB issues, so a
-[Route53](../route53/) alias or a [CloudFront](../cloudfront/) origin has something of the right form
-to point at. It also carries a request: a request is matched to a listener by port and then to one of
-that listener's rules, and a `forward` action sends it to a target group, where a registered
-[Lambda](../lambda/) function is invoked with the request and its response becomes the HTTP
-response.
+A load balancer created here has a DNS name of the shape real ELB issues, and a
+[Route53](../route53/) record pointing at that name resolves to it, so a request made to your own
+hostname reaches the load balancer as it would deployed. A request is matched to a listener by port
+and then to one of that listener's rules, and a `forward` action sends it to a target group, where a
+registered [Lambda](../lambda/) function is invoked with the request and its response becomes the
+HTTP response.
 
 Only the application load balancer is simulated. A network or gateway load balancer routes below
 HTTP, which nothing here speaks, so `Type: "network"` is refused rather than created as an
@@ -22,8 +22,8 @@ application load balancer in disguise.
 /**
  * Creating a load balancer and reading the DNS name it is issued.
  *
- * Nothing answers on that name yet: it is the name a Route53 alias or a
- * CloudFront origin would point at.
+ * That name is what a Route53 alias points at, and what a request reaching the
+ * load balancer is addressed to.
  */
 
 import {
@@ -743,6 +743,141 @@ nothing but 502s. Real ELB refuses to register a Lambda target at all until the 
 here the permission is checked when the request arrives instead, so a target group can be built in
 any order and a policy that is later removed stops the requests.
 
+## Reaching a load balancer by name
+
+A load balancer's DNS name resolves through simulated [Route53](../route53/), so a record pointing at
+it reaches its listeners and rules. An alias record is the usual way, and a CNAME below the apex
+works too, the same as on real AWS. The record's value is `DNSName` exactly as a describe reported
+it, with nothing to rewrite.
+
+A `host-header` condition then sees the name the request was made to, rather than the load balancer's
+own, so a rule on `api.example.test` claims a request that a Route53 record for `api.example.test`
+brought to the load balancer. Host-based routing and DNS agree, which is what makes a stack with one
+load balancer behind several names behave here as it does deployed.
+
+Under `serveSimAws` the same name is served over real localhost HTTP, and a DNS lookup for it answers
+with the address the local server listens on. A request made under the Yulin-local suffix reaches the
+listener on port 80, since the port such a request carries is the local server's rather than one a
+client chose.
+
+```typescript sim-elbv2-route53-alias
+/**
+ * Reaching a load balancer through the Route53 name pointing at it.
+ */
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateRuleCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const elbV2 = simAws.elbV2();
+
+const created = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+
+const loadBalancerArn = created.LoadBalancers?.[0]?.LoadBalancerArn;
+const dnsName = created.LoadBalancers?.[0]?.DNSName;
+
+const listener = await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [
+      {
+        Type: "fixed-response",
+        FixedResponseConfig: {
+          StatusCode: "404",
+          ContentType: "text/plain",
+          MessageBody: "no such site",
+        },
+      },
+    ],
+  }),
+);
+
+// The rule matches on the name a client asks for, not on the load balancer's.
+await elbV2.createRule(
+  new CreateRuleCommand({
+    ListenerArn: listener.Listeners?.[0]?.ListenerArn,
+    Priority: 10,
+    Conditions: [{ Field: "host-header", Values: ["api.example.test"] }],
+    Actions: [
+      {
+        Type: "fixed-response",
+        FixedResponseConfig: {
+          StatusCode: "200",
+          ContentType: "text/plain",
+          MessageBody: "orders",
+        },
+      },
+    ],
+  }),
+);
+
+const zone = await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "shop-zone",
+  }),
+);
+
+await simAws.route53().changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: zone.HostedZone?.Id,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "api.example.test",
+            Type: "A",
+            AliasTarget: {
+              DNSName: dnsName,
+              // The load balancer's CanonicalHostedZoneId, which sim Route53
+              // does not resolve by.
+              HostedZoneId: "Z0000000000000",
+              EvaluateTargetHealth: false,
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const response = await fetch(srv.localUrl("http://api.example.test/orders"));
+
+  console.log(response.status); // 200
+  console.log(await response.text()); // "orders"
+
+  // The same name answers a DNS lookup with the address serving it.
+  console.log(`dig @127.0.0.1 -p ${srv.dnsPort} api.example.test`);
+} finally {
+  await srv.close();
+}
+```
+
+A name pointing at a load balancer that has since been deleted fails rather than answering: nothing
+holds that host name any more, and the failure names it. A DNS lookup for the name still answers,
+because the shape of a load balancer host name is what a lookup recognises, in the same way a lookup
+for a deleted bucket's website name does.
+
 ## Deleting
 
 Deleting a load balancer takes its listeners and their rules with it, and leaves its target groups
@@ -946,6 +1081,11 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - Paged describes with `PageSize` and `Marker`.
 - Carrying a request through `simElbV2Fetch`: a listener matched by port, its rules evaluated in
   priority order with the first match winning, and a fall through to the default action.
+- Resolving a load balancer's DNS name through sim Route53, so an alias record or a CNAME pointing at
+  it reaches its listeners and rules, and a `host-header` condition sees the name the request was
+  made to.
+- Serving a load balancer under `serveSimAws`, over real localhost HTTP and with a DNS lookup for the
+  name answering with the address the local server listens on.
 - `host-header` and `path-pattern` matching with ELB's own wildcard semantics, and a rule claiming a
   request only when all of its conditions hold.
 - `forward` to a `lambda` target group, which invokes its function with an ALB-shaped event, and the
@@ -964,7 +1104,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   matched either.
 - A `host-header` condition is matched against the request's Host header, falling back to the host
   name in the URL. On real AWS those are the same thing, because DNS is what brought the request to
-  the load balancer, and here a request reaches one at its own DNS name.
+  the load balancer. A request served under the Yulin-local suffix is matched against the name inside
+  that suffix, so `api.example.test.sim-aws.localhost` is matched as `api.example.test`.
 - A `forward` action is carried out only to a `lambda` target group. An `ip` target group and a
   `ForwardConfig` naming several target groups by weight are each refused when the request arrives
   rather than answered with something else.
@@ -973,8 +1114,14 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   request can be trusted to have arrived over.
 - The length limits real ELB puts on a fixed response's message body and a redirect's components are
   not enforced. A condition value is held to ELB's own 128 characters.
-- A request only reaches a load balancer through `simElbV2Fetch`. Nothing resolves a load balancer's
-  DNS name yet, so `serveSimAws` does not serve one and a Route53 alias to one does not answer.
+- A request served under the Yulin-local suffix reaches the listener on port 80, or on 443 for an
+  `https:` URL. The port such a request carries is the local server's rather than one a client chose,
+  so it cannot say which listener it is for. To reach a listener on another port over localhost,
+  serve on that port and request the hostname without the suffix, which needs a resolver pointed at
+  the simulator as described in [Route53](../route53/README.md#ports).
+- A DNS lookup for a name pointing at a load balancer that has been deleted still answers with the
+  local server address, because a load balancer host name is recognised by its shape. The request
+  that follows is the thing that fails, naming the host name nothing answers on.
 - No TLS is performed. `simElbV2Fetch` reads only the port out of a URL, so an `https:` URL reaches
   the listener on 443 without a handshake and without being checked against that listener's
   protocol. HTTPS listeners and their certificates follow separately.

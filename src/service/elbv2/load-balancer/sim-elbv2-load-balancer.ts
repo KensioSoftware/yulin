@@ -2,8 +2,8 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import {
   simElbV2CanonicalHostedZoneId,
   simElbV2LoadBalancerArn,
-  simElbV2LoadBalancerDnsName,
 } from "./sim-elbv2-load-balancer-arn.js";
+import { simElbV2LoadBalancerDnsName } from "./sim-elbv2-load-balancer-host.js";
 import type { SimElbV2LoadBalancerScheme } from "./sim-elbv2-load-balancer-scheme.js";
 
 interface SimElbV2LoadBalancerProperties {

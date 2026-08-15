@@ -5,8 +5,12 @@ export type { SimElbV2LoadBalancerView } from "./load-balancer/sim-elbv2-load-ba
 export {
   simElbV2CanonicalHostedZoneId,
   simElbV2LoadBalancerArn,
-  simElbV2LoadBalancerDnsName,
 } from "./load-balancer/sim-elbv2-load-balancer-arn.js";
+export {
+  readSimElbV2LoadBalancerHost,
+  simElbV2LoadBalancerDnsName,
+} from "./load-balancer/sim-elbv2-load-balancer-host.js";
+export type { SimElbV2LoadBalancerHost } from "./load-balancer/sim-elbv2-load-balancer-host.js";
 export type { SimElbV2LoadBalancerScheme } from "./load-balancer/sim-elbv2-load-balancer-scheme.js";
 export { SimElbV2TargetGroup } from "./target-group/sim-elbv2-target-group.js";
 export type { SimElbV2TargetGroupView } from "./target-group/sim-elbv2-target-group.js";

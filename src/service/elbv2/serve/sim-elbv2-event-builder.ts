@@ -21,8 +21,6 @@ interface SimElbV2EventInput {
   readonly bytes: Uint8Array;
   /** The target group the listener forwarded to. */
   readonly targetGroupArn: string;
-  /** The DNS name of the load balancer the request reached. */
-  readonly dnsName: string;
   /** The port the listener taking the request answers on. */
   readonly port: number;
   /** The protocol that listener speaks. */
@@ -62,7 +60,6 @@ export class SimElbV2EventBuilder {
       queryStringParameters: this.requestParts.queryStringParameters(url),
       headers: this.requestParts.headers({
         request,
-        dnsName: input.dnsName,
         port: input.port,
         protocol: input.protocol,
         traceId: simAwsProxiedTraceId(this.clock.now()),

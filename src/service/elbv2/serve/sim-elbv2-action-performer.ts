@@ -1,5 +1,4 @@
 import type { SimElbV2Listener } from "../listener/sim-elbv2-listener.js";
-import type { SimElbV2LoadBalancer } from "../load-balancer/sim-elbv2-load-balancer.js";
 import type { SimElbV2 } from "../sim-elbv2.js";
 import { SimElbV2FixedResponse } from "./sim-elbv2-fixed-response.js";
 import { SimElbV2ForwardTarget } from "./sim-elbv2-forward-target.js";
@@ -9,7 +8,6 @@ import type { SimElbV2MatchedAction } from "./sim-elbv2-rule-evaluation.js";
 
 interface SimElbV2PerformedActionInput {
   readonly matched: SimElbV2MatchedAction;
-  readonly loadBalancer: SimElbV2LoadBalancer;
   readonly listener: SimElbV2Listener;
   readonly elbV2: SimElbV2;
   readonly request: Request;
@@ -54,7 +52,6 @@ export class SimElbV2ActionPerformer {
     input: SimElbV2PerformedActionInput,
   ): Promise<Response> {
     return await this.invocation.invoke({
-      loadBalancer: input.loadBalancer,
       listener: input.listener,
       targetGroup: new SimElbV2ForwardTarget(input.elbV2).resolve(
         input.matched,

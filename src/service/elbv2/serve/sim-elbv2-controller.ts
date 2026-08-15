@@ -63,12 +63,11 @@ export class SimElbV2ServiceController implements SimAwsServiceController {
     route: SimElbV2LoadBalancerRoute,
     request: Request,
   ): Promise<Response> {
-    const { loadBalancer, elbV2 } = route;
+    const { elbV2 } = route;
     const listener = requireSimElbV2Listener(route, request);
 
     return await this.actions.perform({
       matched: new SimElbV2RuleEvaluation(elbV2).actionFor(listener, request),
-      loadBalancer,
       listener,
       elbV2,
       request,
