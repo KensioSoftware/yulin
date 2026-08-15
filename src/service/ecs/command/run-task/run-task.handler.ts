@@ -66,6 +66,7 @@ export class RunTaskCommandHandler
       background: context.background,
       runAsOwner: context.runAsOwner,
       regionName: context.accountRegionScope.regionName,
+      secretStores: context.secretStores,
     });
   }
 

@@ -592,8 +592,132 @@ test rather than in the deployment.
 A `RunTask` request can override the role with `overrides.taskRoleArn`. A task definition declaring
 no task role runs its containers as nobody, so their AWS calls are denied: a real task without one
 has no credentials of its own, and taking the identity of whoever called `RunTask` would let a test
-pass on permissions the deployed task has not got. The execution role is stored but does nothing
-here, because there is no image to pull and no log driver to write to.
+pass on permissions the deployed task has not got. The execution role is what a container's
+`secrets` are resolved as, and nothing else: there is no image to pull and no log driver to write
+to.
+
+## Container secrets
+
+A container definition's `secrets` are resolved when the task starts, from simulated Secrets Manager
+or simulated SSM Parameter Store according to what each `valueFrom` names, and the values appear in
+the container's environment alongside its declared `environment`. A handler reads them through
+`process.env` like anything else.
+
+They are read as the task definition's `executionRoleArn`, not its `taskRoleArn`, which is the
+split real ECS makes: the execution role is what the task agent pulls secrets with before a
+container starts, and the task role is what the running container's own AWS calls are attributed to.
+A role allowed one is not thereby allowed the other.
+
+```typescript sim-ecs-container-secrets
+/**
+ * Resolving a simulated ECS container's secrets as the execution Role.
+ */
+
+import {
+  CreateClusterCommand,
+  RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+} from "@aws-sdk/client-ecs";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateSecretCommand } from "@aws-sdk/client-secrets-manager";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+const secret = await simAws.secretsManager().createSecret(
+  new CreateSecretCommand({
+    Name: "orders/db",
+    SecretString: JSON.stringify({ username: "orders", password: "s3cr3t" }),
+  }),
+);
+
+const executionRole = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersExecutionRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "ecs-tasks.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersExecutionRole",
+    PolicyName: "ReadOrdersDbSecret",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "secretsmanager:GetSecretValue",
+        Resource: secret.ARN,
+      },
+    }),
+  }),
+);
+
+await ecs.createCluster(new CreateClusterCommand({}));
+
+const passwords: (string | undefined)[] = [];
+
+ecs.bindContainer({
+  family: "orders-worker",
+  containerName: "app",
+  run: () => {
+    passwords.push(process.env["DB_PASSWORD"]);
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "orders-worker",
+    executionRoleArn: executionRole.Role.Arn,
+    containerDefinitions: [
+      {
+        name: "app",
+        image: "orders-worker:1",
+        secrets: [
+          {
+            name: "DB_PASSWORD",
+            valueFrom: `${String(secret.ARN)}:password::`,
+          },
+        ],
+      },
+    ],
+  }),
+);
+
+await ecs.runTask(new RunTaskCommand({ taskDefinition: "orders-worker" }));
+await simAws.backgroundTasksComplete();
+
+console.log(passwords); // ["s3cr3t"]
+```
+
+A `valueFrom` may be a Secrets Manager ARN, an SSM parameter ARN, or a bare parameter name, which
+real ECS accepts for a parameter in the task's own region. A Secrets Manager ARN may carry a JSON
+key, a version stage and a version id after the secret id, in the form
+`...:secret:orders/db-AbCdEf:password::` that a CDK construct given a field writes. The key selects
+one field of a secret holding a JSON object. A `SecureString` parameter is decrypted, as it is for a
+real task.
+
+A secret that cannot be resolved stops the task before any container runs, with a
+`ResourceInitializationError` reason naming the variable:
+
+```text
+ResourceInitializationError: unable to pull secrets: DB_PASSWORD: User:
+arn:aws:iam::111111111111:role/OrdersExecutionRole is not authorized to perform:
+secretsmanager:GetSecretValue on resource: arn:aws:secretsmanager:...
+```
+
+The task stops with `TaskFailedToStart` and never reaches `RUNNING`, so the bound handler does not
+run. A secret that does not exist, a task definition declaring secrets with no `executionRoleArn`,
+and a JSON key the secret has not got each stop it the same way with their own reason.
 
 ## Running a task from a rule or a schedule
 
@@ -793,6 +917,8 @@ console.log(described.taskDefinition?.revision); // 1
 - `bindContainer`, targeting a container by family and container name or by image repository
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
+- Container `secrets` resolved from simulated Secrets Manager and SSM Parameter Store as the
+  execution role, including a JSON key selector and a `SecureString` parameter
 - Container definitions stored and reported as declared, whatever their image
 - Task definition tags, reported under `include: ["TAGS"]`
 - Cluster settings, configuration and tags, reported under their matching `include` values
@@ -829,8 +955,20 @@ Current documented limitations:
   no capacity here for any of them to apply to.
 - A `RunTask` override may name `taskRoleArn` and a container's `environment`. A `command`, `cpu` or
   `memory` override is refused, since Yulin never runs an image and nothing here has capacity.
-- The execution role is stored and does nothing. There is no image to pull and no log driver to write
-  to, and container `secrets` are not resolved.
+- The execution role resolves container `secrets` and does nothing else. There is no image to pull
+  and no log driver to write to.
+- A container secret can only come from simulated Secrets Manager or simulated SSM Parameter Store.
+  A `valueFrom` naming anything else stops the task rather than being ignored. Secret rotation is
+  not simulated, so a task always reads the version that is current when it starts.
+- A JSON key selector resolves only where the key holds a string. A key holding a number, a boolean
+  or a nested object is refused, because an environment variable is text and real ECS does not
+  document which text it would become.
+- A secret holding a binary value is refused. Real ECS cannot put one in an environment variable
+  either, but it reports the problem differently.
+- `secretOptions` on a `logConfiguration` are stored and never resolved. There is no log driver here
+  for them to configure.
+- A task definition declaring `secrets` and no `executionRoleArn` fails when a task is run rather
+  than when the revision is registered. Real ECS refuses the registration.
 - `StartTask` and the whole of the service API (`CreateService`, `UpdateService`,
   `DescribeServices`) are not simulated.
 - An EventBridge or Scheduler target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`

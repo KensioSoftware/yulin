@@ -4,16 +4,23 @@ import type { SimEcsKeyValuePair } from "../../task-definition/container/sim-ecs
 interface SimEcsContainerEnvironmentProperties {
   readonly regionName: string;
   readonly declared: readonly SimEcsKeyValuePair[];
+  readonly secrets: Record<string, string>;
   readonly overridden: readonly SimEcsKeyValuePair[];
 }
 
 /**
  * The environment one container of a simulated task runs with.
  *
- * It is the container definition's `environment`, with any `RunTask` container
- * override applied over the top, which is the order real ECS applies them in,
+ * It is the container definition's `environment`, with the values its `secrets`
+ * resolved to and then any `RunTask` container override applied over the top,
  * and the Region variables a real task agent adds, so code that reads
  * `AWS_REGION` to build a client finds one.
+ *
+ * A secret and a declared variable of the same name is not something real ECS
+ * documents an answer for. The secret wins here, since a plaintext variable of
+ * the same name is the thing a secret was introduced to replace, and a
+ * `RunTask` override wins over both, since an override is what a caller asked
+ * for at the moment the task was started.
  *
  * The variables are applied to `process.env` for the length of the run, in the
  * same way a sim Lambda function's are: a bound handler is an ordinary closure
@@ -24,6 +31,7 @@ interface SimEcsContainerEnvironmentProperties {
 export class SimEcsContainerEnvironment {
   private readonly regionName: string;
   private readonly declared: readonly SimEcsKeyValuePair[];
+  private readonly secrets: Record<string, string>;
   private readonly overridden: readonly SimEcsKeyValuePair[];
 
   #variables: Record<string, string> | undefined;
@@ -31,6 +39,7 @@ export class SimEcsContainerEnvironment {
   constructor(properties: SimEcsContainerEnvironmentProperties) {
     this.regionName = properties.regionName;
     this.declared = properties.declared;
+    this.secrets = properties.secrets;
     this.overridden = properties.overridden;
   }
 
@@ -54,7 +63,11 @@ export class SimEcsContainerEnvironment {
    * Whether this container has an environment of its own at all.
    */
   get hasVariables(): boolean {
-    return this.declared.length > 0 || this.overridden.length > 0;
+    return (
+      this.declared.length > 0 ||
+      this.overridden.length > 0 ||
+      Object.keys(this.secrets).length > 0
+    );
   }
 
   /**
@@ -80,6 +93,7 @@ export class SimEcsContainerEnvironment {
     this.#variables ??= {
       ...this.regionVariables(),
       ...SimEcsContainerEnvironment.namedValues(this.declared),
+      ...this.secrets,
       ...SimEcsContainerEnvironment.namedValues(this.overridden),
     };
 

@@ -113,6 +113,22 @@ export class SimEcsTask {
   }
 
   /**
+   * Stop this task without it ever having started its containers.
+   *
+   * A secret the task could not pull is what does this. The whole task carries
+   * the reason and so does every container, because a real resource
+   * initialization error happens while the task is still provisioning rather
+   * than to one container of it.
+   */
+  failToStart(at: Date, reason: string): void {
+    for (const container of this.containers) {
+      container.neverStarted(reason);
+    }
+
+    this.stop({ at, stopCode: "TaskFailedToStart", reason });
+  }
+
+  /**
    * Mark this task stopped, keeping any reason already recorded for it.
    */
   stop(stopped: SimEcsTaskStop): void {

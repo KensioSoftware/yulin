@@ -1,5 +1,6 @@
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
+import { SimAwsEcsSecretStores } from "../../ecs/task/run/secret/sim-aws-ecs-secret-stores.js";
 import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
 import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimAwsSchedulerDeliveryTargets } from "../../scheduler/delivery/sim-aws-scheduler-delivery-targets.js";
@@ -57,6 +58,24 @@ export function simAwsSchedulerDeliveryTargets(
   simAws: SimAws,
 ): SimAwsSchedulerDeliveryTargets {
   return new SimAwsSchedulerDeliveryTargets({ simAws });
+}
+
+/**
+ * The stores a simulated ECS task's container secrets are read from.
+ *
+ * A `valueFrom` names the Account and Region its secret or parameter lives in,
+ * so this reads the whole simulation rather than one scope. The scope is passed
+ * as well because a bare SSM parameter name names neither, and real ECS reads
+ * one of those in the task's own Region.
+ */
+export function simAwsEcsSecretStores(
+  simAws: SimAws,
+  scope: SimAwsAccountRegionContainer,
+): SimAwsEcsSecretStores {
+  return new SimAwsEcsSecretStores({
+    simAws,
+    accountRegionScope: scope.accountRegionScope,
+  });
 }
 
 /**

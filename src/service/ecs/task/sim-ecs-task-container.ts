@@ -93,12 +93,14 @@ export class SimEcsTaskContainer {
   }
 
   /**
-   * Mark this container as one nothing here could run.
+   * Mark this container as one that never started, and say why.
    *
-   * It carries no exit code, because it never started. That is the difference
-   * between a container that ran and exited zero and one Yulin left alone.
+   * Two things get here: a container nothing is bound to, and a container of a
+   * task that could not pull its secrets. Neither carries an exit code, which
+   * is the difference between a container that ran and exited zero and one
+   * whose handler was never called.
    */
-  notSimulated(reason: string): void {
+  neverStarted(reason: string): void {
     this.#lastStatus = "STOPPED";
     this.#reason = reason;
   }

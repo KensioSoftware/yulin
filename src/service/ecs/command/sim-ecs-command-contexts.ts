@@ -4,6 +4,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import type { SimEcsSecretStores } from "../task/run/secret/sim-ecs-secret-stores.js";
 import { SimEcsTaskArn } from "../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../task/sim-ecs-task-store.js";
 import { SimEcsTaskDefinitionArn } from "../task-definition/sim-ecs-task-definition-arn.js";
@@ -25,6 +26,7 @@ interface SimEcsCommandContextsProperties {
   readonly taskDefinitions: SimEcsTaskDefinitionStore;
   readonly tasks: SimEcsTaskStore;
   readonly bindings: SimEcsContainerBindings;
+  readonly secretStores: SimEcsSecretStores;
 }
 
 /**
@@ -69,6 +71,7 @@ export class SimEcsCommandContexts {
       taskDefinitions: properties.taskDefinitions,
       bindings: properties.bindings,
       runAsOwner: properties.runAsOwner,
+      secretStores: properties.secretStores,
     };
   }
 }

@@ -8,6 +8,7 @@ import { SimAcm } from "../../acm/sim-acm.js";
 import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import {
   simAwsAcmDnsRecords,
+  simAwsEcsSecretStores,
   simAwsEventBridgeDeliveryTargets,
   simAwsHttpApiJwtIssuerKeys,
   simAwsRekognitionImages,
@@ -156,10 +157,16 @@ export class SimAwsAccountRegionServiceBuilder {
    *
    * It reaches this simulation because a running task's containers take its
    * task Role as their ambient caller, so what they do is authorized across
-   * the whole of it rather than only in this scope.
+   * the whole of it rather than only in this scope. Container secrets are read
+   * from the whole simulation too, since the ARN a secret is named by carries
+   * the Account and Region it lives in.
    */
   createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
-    return new SimEcs({ ...this.scoped(scope), runAsOwner: this.simAws });
+    return new SimEcs({
+      ...this.scoped(scope),
+      runAsOwner: this.simAws,
+      secretStores: simAwsEcsSecretStores(this.simAws, scope),
+    });
   }
 
   /**
