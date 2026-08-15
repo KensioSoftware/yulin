@@ -1544,7 +1544,8 @@ console.log(described.taskDefinition?.revision); // 1
 - `AWS::ECS::Cluster`, answering `Ref` with the cluster name and `Fn::GetAtt` with `Arn`
 - `AWS::ECS::TaskDefinition`, registering a revision and answering `Ref` with its ARN
 - Deploy-time container bindings, targeting a container by family and container name, by the task
-  definition's logical ID or CDK construct ID, or by its image repository
+  definition's logical ID or CDK construct ID, or by its image repository, and declaring `run` or
+  `consumes` as a directly bound container does
 - Task and execution roles resolved from a `Ref` to a same-stack role or from an ARN
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
