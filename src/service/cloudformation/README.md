@@ -645,6 +645,7 @@ The resolver currently supports factories for:
 - `AWS::S3::*`
 - `AWS::CloudFront::*`
 - `AWS::ECS::*`
+- `AWS::ElasticLoadBalancingV2::*`
 - selected `Custom::*` CDK-oriented resources
 
 Unsupported providers, services, custom resources, or resource types are skipped to improve
@@ -802,6 +803,7 @@ CloudFormation currently integrates with a small set of service simulators:
 - CloudFormation-native test resources such as `WaitConditionHandle`
 - S3 resources implemented by the S3 simulator
 - CloudFront resources implemented by the CloudFront simulator
+- ELBv2 resources implemented by the ELBv2 simulator
 - selected CDK custom resources
 
 The CloudFormation engine itself should not know the detailed schema or behaviour of
