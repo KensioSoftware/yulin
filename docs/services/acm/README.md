@@ -236,13 +236,16 @@ console.log(describeOutput.Certificate?.IssuedAt);
 Real ACM issues a DNS-validated certificate only once the CNAME it requests is resolvable. Simulated
 ACM does the same, but only where the simulation can answer for the domain.
 
-The rules are:
+By default, the rules are:
 
 - If a simulated Route53 hosted zone covers the certificate domain, the certificate waits for its validation record.
 - If no hosted zone covers the domain, the certificate is issued as soon as background tasks drain.
 
 Templates commonly reference hosted zones managed by another team or another tool. Those
 certificates keep working here because the simulation holds no zone for their domain.
+
+[Two methods override that default](#override-when-validation-is-required) where it doesn't suit
+your test.
 
 ```typescript sim-acm-dns-validation
 /**
