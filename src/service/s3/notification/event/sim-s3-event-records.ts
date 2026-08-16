@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SimS3Event } from "./sim-s3-event.type.js";
 import type { SimS3ObjectEvent } from "./sim-s3-object-event.js";
 
 /**
@@ -17,7 +18,7 @@ export const SIM_S3_EVENT_VERSION = "2.5";
  * The event schema version inside the `s3` block, which is separate from the
  * message version and has not moved off 1.0.
  */
-const s3SchemaVersion = "1.0";
+export const SIM_S3_EVENT_SCHEMA_VERSION = "1.0";
 
 /**
  * The `Records` document a destination receives for one Object event.
@@ -29,7 +30,7 @@ const s3SchemaVersion = "1.0";
 export function simS3EventRecordsDocument(
   event: SimS3ObjectEvent,
   configurationId: string,
-): object {
+): SimS3Event {
   return {
     Records: [
       {
@@ -47,7 +48,7 @@ export function simS3EventRecordsDocument(
           "x-amz-id-2": simS3EventRequestId(),
         },
         s3: {
-          s3SchemaVersion,
+          s3SchemaVersion: SIM_S3_EVENT_SCHEMA_VERSION,
           configurationId,
           bucket: {
             name: event.bucketName,
@@ -74,7 +75,7 @@ export function simS3EventRecordsDocument(
  * rather than on anything AWS would report, which is why the Limitations
  * section says so.
  */
-const simS3EventSourceIpAddress = "127.0.0.1";
+export const simS3EventSourceIpAddress = "127.0.0.1";
 
 /**
  * A request id for one event.
@@ -84,7 +85,7 @@ const simS3EventSourceIpAddress = "127.0.0.1";
  * per event and match nothing: they are present because the field is, not
  * because they mean anything.
  */
-function simS3EventRequestId(): string {
+export function simS3EventRequestId(): string {
   return randomUUID().replaceAll("-", "").toUpperCase();
 }
 
@@ -94,6 +95,6 @@ function simS3EventRequestId(): string {
  * Real S3 form-URL-encodes the key, so a space becomes a plus sign, while the
  * slashes that make up a key prefix stay as they are.
  */
-function simS3EventObjectKey(key: string): string {
+export function simS3EventObjectKey(key: string): string {
   return encodeURIComponent(key).replaceAll("%20", "+").replaceAll("%2F", "/");
 }
