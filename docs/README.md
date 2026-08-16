@@ -25,6 +25,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [S3](./services/s3/ "Simulated S3 usage docs")
 - [Scheduler](./services/scheduler/ "Simulated EventBridge Scheduler usage docs")
 - [Secrets Manager](./services/secretsmanager/ "Simulated Secrets Manager usage docs")
+- [SES](./services/ses/ "Simulated SES usage docs")
 - [SNS](./services/sns/ "Simulated SNS usage docs")
 - [SQS](./services/sqs/ "Simulated SQS usage docs")
 - [SSM Parameter Store](./services/ssm/ "Simulated SSM Parameter Store usage docs")

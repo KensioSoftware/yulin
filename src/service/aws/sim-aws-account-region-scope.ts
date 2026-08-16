@@ -27,6 +27,7 @@ import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
+import type { SimSesV2 } from "../ses/index.js";
 import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
@@ -213,6 +214,11 @@ export class SimAwsAccountRegionContainer {
     return this.memo.getOrCreate("secretsManager", () =>
       this.factory.createSecretsManager(this),
     );
+  }
+
+  /** Get simulated SES for this account and region. */
+  sesV2(): SimSesV2 {
+    return this.memo.getOrCreate("sesV2", () => this.factory.createSesV2(this));
   }
 
   /** Get simulated SNS for this account and region. */

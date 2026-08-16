@@ -1,0 +1,93 @@
+# Simulated SES implementation
+
+This directory contains the simulated Amazon SES implementation, through its v2 API. Email
+identities, the sandbox rules, and a record of every message SES would have sent.
+
+The guiding decision here is that there is nothing to deliver, and no delivery to build later
+either. A message SES accepts leaves AWS for a mail system, so the whole of the observable AWS
+behaviour is the decision of whether SES would have accepted it and a record of what it would have
+sent. That record is what a test asserts on, and it is the point of the service.
+
+## Entry points
+
+- `sim-ses-v2.ts` is the main in-memory service object for one account/region scope.
+- `index.ts` exports the public SES simulator API for `@kensio/yulin/ses`.
+
+The class is `SimSesV2` rather than `SimSes`, matching simulated ELBv2 and API Gateway v2: it
+answers the v2 API. The directory is `ses` rather than `sesv2` because the state is the service's
+rather than the API version's. SES has an older API over the same identities and the same account,
+and if that is ever simulated it belongs beside this and shares the stores, not in a directory of
+its own.
+
+A `SimSesV2` owns a `SimSesIdentityStore`, a `SimSesSentEmailStore` and a `SimSesAccount`. All three
+are region scoped because real SES state is: verifying an address in one region verifies nothing in
+another, and the sandbox is a per-region condition.
+
+## Identity model
+
+Identity state lives under `identity/`.
+
+`SimSesIdentity` is the stored resource: the address or domain, its type, its ARN and how far its
+verification has got. An identity starts `PENDING` and only a simulator-side call moves it to
+`SUCCESS`. That is the one deliberate divergence from AWS in this service, and an unavoidable one:
+real SES verifies an address by emailing it a link and a domain by looking for DNS records, and
+neither can happen inside a test process. `SimSesV2.verifyIdentity` is where a test performs it, and
+it creates the identity if it is not already there, because verifying is what setting up a mailbox
+in a test actually means.
+
+Which kind an identity is follows from whether the name has an `@` in it, exactly as SES decides it:
+there is no parameter saying which is meant. `simSesIdentityKey` is how two spellings of the same
+thing meet. Domains are keyed in lower case because they are case insensitive; the local part of an
+address is kept as given because per RFC 5321 it is not, so `Sales@example.com` and
+`sales@example.com` are two identities here.
+
+`SimSesIdentityStore.covering` and `SimSesIdentityStore.isAddressVerified` answer two different
+questions about the same address and are deliberately not the same function.
+
+- `covering` picks the identity IAM authorizes an operation against, and the more specific of the
+  two wins: an address identity over a domain one. A policy naming `identity/hello@example.com`
+  covers a send from that address; one naming `identity/example.com` covers a send from any address
+  at the domain, unless the address is an identity in its own right.
+- `isAddressVerified` asks whether either will do, because either will: an address identity still
+  waiting on its link sends anyway once its domain is verified.
+
+Neither treats a parent domain as covering a subdomain, here or on real SES.
+
+## Sending
+
+Send state lives under `email/`, and the command under `command/send/`.
+
+`SimSesSendEmail` decides a request in the order real SES does: IAM first, then the identity check,
+then the message is recorded. A caller with no permission is therefore refused whether or not its
+identities are verified, which is worth keeping in that order because the error a test sees says
+which of the two is wrong.
+
+`SimSesVerifiedIdentityCheck` holds both sandbox rules. The sender is checked in the sandbox and out
+of it, because SES will not send from an address nobody has proved they own. Recipients are checked
+only in the sandbox, and that is what the sandbox is actually for. Failures are gathered rather than
+reported one at a time, because real SES names every identity that failed in a single message.
+
+`SimSesSentEmail` is what the record keeps. The three recipient lists stay three lists so a test
+asserting a bcc was a bcc still can, and the body keeps text and HTML apart so a test asserting on
+the text of an HTML-only message finds nothing rather than the markup.
+
+Only `Content.Simple` is read. `Content.Raw` and `Content.Template` are refused by name: a raw MIME
+message would have to be parsed to say anything about its subject or body, and templates are not
+here yet. Refusing is the honest answer, since a recorded message with nothing in it would make a
+test pass for a reason unrelated to what it asserts.
+
+## Account model
+
+Account state lives under `account/`.
+
+`SimSesAccount` starts in the sandbox, which is where every real account starts and the state most
+tests should be written against. `PutAccountDetails` with `ProductionAccessEnabled` leaves it. Real
+SES treats that as a request a human at AWS then reviews, and granting it immediately is the
+divergence worth taking: the alternative is a simulator no test can get out of the sandbox in, and
+waiting for a review is not behaviour a test can assert on anyway.
+
+Neither send quota is enforced. Simulating the daily cap would mean a suite that sent two hundred
+messages started failing for a reason unrelated to what it asserts, and simulating the per-second
+rate would mean tests that take real time to run. The numbers `GetAccount` reports are the real
+sandbox and production ones, and `SentLast24Hours` counts what was actually sent, on the simulated
+clock, so moving time forward past the window drops the count the way an account's would.

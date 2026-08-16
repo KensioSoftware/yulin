@@ -140,6 +140,10 @@
       "import": "./dist/service/secretsmanager/index.js",
       "types": "./dist/service/secretsmanager/index.d.ts"
     },
+    "./ses": {
+      "import": "./dist/service/ses/index.js",
+      "types": "./dist/service/ses/index.d.ts"
+    },
     "./sns": {
       "import": "./dist/service/sns/index.js",
       "types": "./dist/service/sns/index.d.ts"
@@ -194,6 +198,7 @@
     "@aws-sdk/client-s3": "^3.1101.0",
     "@aws-sdk/client-scheduler": "^3.1109.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",
+    "@aws-sdk/client-sesv2": "^3.1111.0",
     "@aws-sdk/client-sns": "^3.1104.0",
     "@aws-sdk/client-sqs": "^3.1101.0",
     "@aws-sdk/client-ssm": "^3.1101.0",
