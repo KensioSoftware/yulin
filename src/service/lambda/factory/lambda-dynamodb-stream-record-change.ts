@@ -9,10 +9,15 @@ type StreamRecordOverrides =
   DeepPartialObject<SimLambdaDynamoDbStreamEventRecord>;
 
 /**
- * The images one record carries, which is what the change is.
+ * The images one record carries by default, which is what the change is.
+ *
+ * All three are optional because an image the test described itself is left
+ * out of the defaults entirely. Overrides are merged onto defaults key by key,
+ * so a default image left in would reach the record as the test's item merged
+ * with this one, carrying attributes and even keys the test never mentioned.
  */
 interface StreamRecordImages {
-  readonly Keys: SimLambdaDynamoDbEventImage;
+  readonly Keys?: SimLambdaDynamoDbEventImage;
   readonly NewImage?: SimLambdaDynamoDbEventImage;
   readonly OldImage?: SimLambdaDynamoDbEventImage;
 }
@@ -50,41 +55,32 @@ export function streamRecordChange(
 ): StreamRecordChange {
   const eventName = overrides.eventName ?? "INSERT";
   const body = overrides.dynamodb ?? {};
-  const carriesNew = carriesImage(
-    Object.hasOwn(body, "NewImage"),
-    body.NewImage,
-    eventName !== "REMOVE",
-  );
-  const carriesOld = carriesImage(
-    Object.hasOwn(body, "OldImage"),
-    body.OldImage,
-    eventName !== "INSERT",
-  );
+
+  // Mentioning an image as `undefined` is how a test says a record carries
+  // none, so what is asked here is whether the test named the image at all
+  // rather than whether it gave a value for it.
+  const namedKeys = Object.hasOwn(body, "Keys");
+  const namedNew = Object.hasOwn(body, "NewImage");
+  const namedOld = Object.hasOwn(body, "OldImage");
+
+  const carriesNew = namedNew
+    ? body.NewImage !== undefined
+    : eventName !== "REMOVE";
+  const carriesOld = namedOld
+    ? body.OldImage !== undefined
+    : eventName !== "INSERT";
 
   return {
     eventName,
+    // An image the test described is left out here and comes from the
+    // overrides whole, rather than being merged onto one of these.
     images: {
-      Keys: keys,
-      ...(carriesNew && { NewImage: newImageFor(eventName) }),
-      ...(carriesOld && { OldImage: oldImageFor(eventName) }),
+      ...(!namedKeys && { Keys: keys }),
+      ...(carriesNew && !namedNew && { NewImage: newImageFor(eventName) }),
+      ...(carriesOld && !namedOld && { OldImage: oldImageFor(eventName) }),
     },
     streamViewType: streamViewType(carriesNew, carriesOld),
   };
-}
-
-/**
- * Whether the record carries one of the images, which the test decides when it
- * mentions that image and the event name decides otherwise.
- *
- * Mentioning an image as `undefined` is how a test says a record carries none,
- * so presence of the key is what is asked here rather than presence of a value.
- */
-function carriesImage(
-  mentioned: boolean,
-  image: unknown,
-  byDefault: boolean,
-): boolean {
-  return mentioned ? image !== undefined : byDefault;
 }
 
 function newImageFor(eventName: string): SimLambdaDynamoDbEventImage {

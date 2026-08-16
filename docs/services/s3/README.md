@@ -1089,8 +1089,10 @@ form-URL-encoded, so `red flower.jpg` arrives as `red+flower.jpg`.
 `eventTime` comes from the simulation's clock, so a frozen clock produces a fixed timestamp.
 
 The document is typed as `SimS3Event`, with `SimS3EventRecord` for one record, so a handler can be
-written against it. It is a structural equivalent of the `aws-lambda` typings package's `S3Event`,
-so a handler already written against that one can be passed in unchanged.
+written against it. It is not assignable to the `aws-lambda` typings package's `S3Event`, and that
+is deliberate: that package declares `Records` mutable and requires `s3.object.size` and `eTag`,
+which a removal record does not carry. A handler typed against `S3Event` still receives this
+document at runtime, and typing it as `SimS3Event` is what describes what actually arrives.
 
 ### Making an event notification without a Bucket
 

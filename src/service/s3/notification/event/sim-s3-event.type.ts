@@ -5,9 +5,13 @@
  * destination: a function configured for a Bucket is invoked once per event,
  * with an array holding the single record.
  *
- * This is a minimal structural equivalent of the `aws-lambda` typings
- * package's `S3Event`, so handlers typed against that package can be invoked
- * unchanged.
+ * This is the document real S3 sends rather than the `aws-lambda` typings
+ * package's `S3Event`, and a handler typed against that one has to be given
+ * this as an `S3Event` rather than being assignable from it. That package
+ * declares `Records` mutable and requires `s3.object.size` and `eTag`, which a
+ * removal record does not carry: describing a removal truthfully and
+ * satisfying those declarations are not both possible, and the truthful shape
+ * is the one worth having.
  *
  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html
  */

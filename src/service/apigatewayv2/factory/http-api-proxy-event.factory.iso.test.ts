@@ -77,6 +77,25 @@ describe("The HTTP API proxy invocation event factory", () => {
     expect(event.pathParameters).toStrictEqual({ orderId: "YL-1" });
   });
 
+  it("reports a real method for a route that takes any of them", () => {
+    // When an event is made for an ANY route
+    const event = httpApiProxyEventFactory.make({ routeKey: "ANY /orders" });
+
+    // Then the request came in with a method, since ANY is a route's word for
+    // the methods it accepts rather than one a request can use
+    assertIdentical(event.requestContext.http.method, "GET");
+    assertIdentical(event.rawPath, "/orders");
+    assertIdentical(event.routeKey, "ANY /orders");
+
+    // And the test can still say which method the request used
+    const posted = httpApiProxyEventFactory.make({
+      routeKey: "ANY /orders",
+      requestContext: { http: { method: "POST" } },
+    });
+    assertIdentical(posted.requestContext.http.method, "POST");
+    assertIdentical(posted.routeKey, "ANY /orders");
+  });
+
   it("names the request itself for a $default route", () => {
     // When an event is made for the catch-all route
     const event = httpApiProxyEventFactory.make({

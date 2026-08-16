@@ -97,9 +97,13 @@ export const s3NotificationEventFactory: ItemFactory<SimS3Event> =
  * The Object a record reports, described as it can be for the event reported.
  */
 function eventObject(eventName: string): SimS3EventObject {
-  const sequencer = faker.string
-    .hexadecimal({ length: 16, casing: "upper", prefix: "" })
-    .padStart(16, "0");
+  // Sixteen upper-case hexadecimal digits, the width simulated S3 hands out,
+  // so a test comparing two sequencers as text orders them.
+  const sequencer = faker.string.hexadecimal({
+    length: 16,
+    casing: "upper",
+    prefix: "",
+  });
 
   return {
     key: defaultKey,

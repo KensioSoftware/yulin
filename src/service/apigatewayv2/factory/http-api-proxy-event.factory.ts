@@ -9,6 +9,7 @@ import type { SimPayload2Event } from "../../../serve/payload-2/sim-payload-2-ev
 import { DEFAULT_SIM_AWS_REGION_NAME } from "../../aws/sim-aws-region.js";
 import { simHttpApiHost } from "../api/sim-http-api-host.js";
 import { makeSimHttpApiId } from "../api/sim-http-api-id.js";
+import { simHttpApiAnyMethod } from "../api/route/key/sim-http-api-route-method.js";
 import { simHttpApiDefaultStageName } from "../api/stage/sim-http-api-stage.js";
 
 const httpApiEndpointStyle: SimPayload2EndpointStyle = {
@@ -57,9 +58,11 @@ export const httpApiProxyEventFactory: ItemFactory<SimPayload2Event> =
 /**
  * What an HTTP API route key says about the request that matched it.
  *
- * `$default` names no method and no path, and a path holding a parameter is a
- * template rather than a path a request asked for, so neither says what the
- * request was.
+ * `$default` names no method and no path, so it says nothing. A path holding a
+ * parameter is a template rather than a path a request asked for, and `ANY` is
+ * a method no request uses: an `ANY /orders` route reports in its event the
+ * method the request actually came in with. Neither of those says what the
+ * request was, while the other half of the same route key still does.
  */
 function routeKeyRequestLine(routeKey: string): SimPayload2RequestLine {
   const [method, path, ...rest] = routeKey.split(" ");
@@ -68,5 +71,8 @@ function routeKeyRequestLine(routeKey: string): SimPayload2RequestLine {
     return {};
   }
 
-  return { method, ...(!path.includes("{") && { path }) };
+  return {
+    ...(method !== simHttpApiAnyMethod && { method }),
+    ...(!path.includes("{") && { path }),
+  };
 }

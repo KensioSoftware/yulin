@@ -89,6 +89,23 @@ describe("The Lambda DynamoDB stream event factories", () => {
     });
   });
 
+  it("reports the item the test described and no more", () => {
+    // When a record is made for an item keyed by something else entirely
+    const record = lambdaDynamoDbStreamEventRecordFactory.make({
+      dynamodb: {
+        Keys: { customerId: { S: "C-1" } },
+        NewImage: { customerId: { S: "C-1" } },
+      },
+    });
+
+    // Then the images are that item, rather than it merged with the one the
+    // defaults would have described
+    expect(record.dynamodb.Keys).toStrictEqual({ customerId: { S: "C-1" } });
+    expect(record.dynamodb.NewImage).toStrictEqual({
+      customerId: { S: "C-1" },
+    });
+  });
+
   it("reports the Region of the stream the record came from", () => {
     // When a record is made for a stream in another Region
     const record = lambdaDynamoDbStreamEventRecordFactory.make({
