@@ -475,6 +475,18 @@ The endpoint's own error responses (403 for a denied caller, 404 for an unknown 
 for a handler error) are AWS-shaped JSON documents. The 403 body is real Lambda's wording; the other
 two are approximations.
 
+### Invocation events without a request
+
+`factory/lambda-function-url-event.factory.ts` exports `lambdaFunctionUrlEventFactory`, which makes
+the same events for a test that calls a handler directly rather than serving it.
+
+It is a `DynamicFactory` whose defaults are computed from the overrides, because payload format 2.0
+states the path, the query, the endpoint identity, the caller and the time in more than one field
+each, and a hand-written literal is where those copies come to disagree. Supplying either copy of
+one of them sets both. The proxy headers and the comma-joined query parameters come from
+`src/serve/payload-2/sim-payload-2-request-parts.ts`, the same code a served request builds them
+with, so a made event does not drift from a delivered one.
+
 ### CloudFormation
 
 `cfn/url/` creates `AWS::Lambda::Url`, which is what CDK's `Function.addFunctionUrl()` emits.

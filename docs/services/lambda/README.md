@@ -1147,6 +1147,84 @@ If the handler throws, the endpoint answers `502` with an AWS-like error documen
 handler's error, which stays visible to the test as the thrown error would be through
 `InvokeCommand`.
 
+### Making an invocation event without a request
+
+A test of the handler on its own, with no endpoint serving it, still has to pass it a whole event.
+`lambdaFunctionUrlEventFactory` makes one, so such a test says what the request was and nothing
+else:
+
+```typescript sim-lambda-function-url-event-factory
+/**
+ * Making a Lambda Function URL invocation event to call a handler with.
+ */
+
+import { VariantFactory } from "@kensio/part-factory";
+
+import {
+  lambdaFunctionUrlEventFactory,
+  type SimLambdaFunctionUrlEvent,
+  type SimLambdaFunctionUrlResult,
+} from "@kensio/yulin/lambda";
+
+function greeter(event: SimLambdaFunctionUrlEvent): SimLambdaFunctionUrlResult {
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/plain" },
+    body: `Hello ${event.queryStringParameters?.["name"] ?? "world"}`,
+  };
+}
+
+const event = lambdaFunctionUrlEventFactory.make({
+  rawPath: "/greet",
+  rawQueryString: "name=Yulin",
+});
+
+// Hello Yulin
+console.log(greeter(event).body);
+
+// A named variation of a request is a VariantFactory around it, as with any
+// other @kensio/part-factory factory.
+const formPostFactory = new VariantFactory(lambdaFunctionUrlEventFactory, {
+  headers: { "content-type": "application/x-www-form-urlencoded" },
+  requestContext: { http: { method: "POST" } },
+});
+
+const formPost = formPostFactory.make({
+  rawPath: "/subscribe",
+  body: "email=someone%40yulin.test",
+});
+
+// POST /subscribe
+console.log(
+  `${formPost.requestContext.http.method} ${formPost.requestContext.http.path}`,
+);
+```
+
+The defaults describe an anonymous `GET /` to a `NONE` auth Function URL, down to the headers AWS
+stamps on a proxied request, so a handler reading `host`, `x-forwarded-for` or `x-amzn-trace-id`
+finds what it would find on AWS. The fields a Function URL invocation never carries —
+`pathParameters` and `stageVariables` — are absent rather than empty, as they are in a served event.
+
+A real event says several things twice, and the factory computes its defaults from the overrides so
+that supplying either copy sets both:
+
+| What the request says | Where the event says it                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| the path              | `rawPath` and `requestContext.http.path`                                                          |
+| the query             | `rawQueryString` and the parsed `queryStringParameters`                                           |
+| the endpoint          | `requestContext.apiId`, `requestContext.domainPrefix`, `requestContext.domainName`, `host` header |
+| the caller            | `requestContext.http.sourceIp` and `userAgent`, the `x-forwarded-for` and `user-agent` headers    |
+| the time              | `requestContext.timeEpoch` and the Common Log Format `requestContext.time`                        |
+
+So `make({ rawPath: "/user/status" })` is a request for `/user/status` in both places, rather than
+one for `/user/status` that the request context still calls `/`. Overriding both copies with
+different values is still allowed, for a test that wants an event no real invocation produces.
+
+The same events go to a handler through
+[the API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway HTTP API usage docs") too, where
+the route key, the stage and the path parameters are the endpoint's rather than a Function URL's
+`$default`, so an event for one of those is this factory with those fields overridden.
+
 ### Managing a Function URL
 
 `GetFunctionUrlConfigCommand` reads the configuration back, `UpdateFunctionUrlConfigCommand`
@@ -1974,6 +2052,8 @@ Sim Lambda currently supports:
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
   resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
   control
+- `lambdaFunctionUrlEventFactory`, making a Function URL invocation event for a test that calls a
+  handler directly
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
 - SQS and DynamoDB stream event source mappings, created with `CreateEventSourceMappingCommand` and
