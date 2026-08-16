@@ -1,5 +1,6 @@
 import {
   assertArrayLength,
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -187,5 +188,27 @@ describe("SimCloudWatch invalid alarm input", () => {
     // Then it is refused rather than treated as nothing to do.
     assertInstanceOf(error, SimCloudWatchMissingRequiredParameterException);
     assertArrayLength(simAws.cloudWatch().allAlarms(), 1);
+  });
+
+  it("refuses to force a state without saying why", async () => {
+    // Given an alarm, and a request to force its state with no reason.
+    const simAws = new SimAws();
+
+    await simAws.cloudWatch().putMetricAlarm({ input: valid });
+
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.cloudWatch().setAlarmState({
+          input: { AlarmName: "OrdersFailing", StateValue: "ALARM" },
+        }),
+    );
+
+    // Then it is refused, as real SetAlarmState requires a reason, and the
+    // alarm has not moved.
+    assertInstanceOf(error, SimCloudWatchMissingRequiredParameterException);
+    assertIdentical(
+      simAws.cloudWatch().allAlarms().at(0)?.state,
+      "INSUFFICIENT_DATA",
+    );
   });
 });

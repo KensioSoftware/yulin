@@ -381,20 +381,4 @@ describe("SimCloudWatch alarm actions", () => {
       ["Channel"],
     );
   });
-
-  it("gives a forced state a reason of its own when none was supplied", async () => {
-    // Given an alarm forced into a state with no reason given.
-    const { simAws, topicArn } = await withSubscribedQueue();
-
-    await simAws.cloudWatch().putMetricAlarm(alarmNotifying(topicArn));
-    await simAws.cloudWatch().setAlarmState({
-      input: { AlarmName: "OrdersFailing", StateValue: "ALARM" },
-    });
-
-    // Then it still records why it moved.
-    const forced = simAws.cloudWatch().allAlarms().at(0);
-
-    assertNonNullable(forced);
-    assertIdentical(forced.stateReason, "Set by SetAlarmState");
-  });
 });

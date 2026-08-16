@@ -45,14 +45,14 @@ export class SimCloudWatchAlarmSchedule {
   /**
    * Start evaluating an alarm, from the next period boundary.
    *
-   * An alarm already being evaluated keeps its existing turn rather than
-   * gaining a second one, which is what makes PutMetricAlarm over an existing
-   * name safe to call repeatedly.
+   * An alarm already being evaluated has its existing turn taken back off the
+   * clock first, so it never gains a second one and never keeps a turn due at
+   * the boundary of a period it no longer has: an alarm moved from an hourly
+   * to a one-minute period would otherwise sit unevaluated until the hour it
+   * was first scheduled for came round.
    */
   start(alarm: SimCloudWatchAlarm): void {
-    if (this.#tasks.has(alarm.name)) {
-      return;
-    }
+    this.stop(alarm.name);
 
     const task = async (): Promise<void> => {
       await this.evaluate(alarm);

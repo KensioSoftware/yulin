@@ -4,7 +4,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 
 import { SimAws } from "../aws/sim-aws.js";
 import type { SimPutMetricAlarmCommandInput } from "./command/sim-cloudwatch-command.types.js";
@@ -85,8 +85,17 @@ describe("SimCloudWatch alarm action failures", () => {
   });
 
   it("warns once about an action that keeps failing the same way", async () => {
-    // Given an alarm notifying a topic that is not there, driven back and
-    // forth so the same action fails twice.
+    // Given somewhere to catch what the simulator warns about, and an alarm
+    // notifying a topic that is not there, driven back and forth so the same
+    // action fails twice.
+    const warnings: string[] = [];
+
+    vi.spyOn(console, "warn").mockImplementation(
+      (...parts: unknown[]): void => {
+        warnings.push(parts.map(String).join(" "));
+      },
+    );
+
     const simAws = new SimAws();
     const gone = `arn:aws:sns:${simAws.defaultRegionName}:${simAws.defaultAccountId}:gone`;
 
@@ -107,9 +116,11 @@ describe("SimCloudWatch alarm action failures", () => {
 
     await simAws.backgroundTasksComplete();
 
-    // Then both failures are kept, so a test can find either of them, even
-    // though only the first was warned about.
+    // Then both failures are kept, so a test can find either of them, while
+    // the same action failing the same way is warned about only once.
     assertArrayLength(simAws.cloudWatch().alarmActionFailures, 2);
+    assertArrayLength(warnings, 1);
+    assertStringIncludes(String(warnings.at(0)), "could not notify");
   });
 
   it("says nothing about deleting an alarm that was never there", async () => {

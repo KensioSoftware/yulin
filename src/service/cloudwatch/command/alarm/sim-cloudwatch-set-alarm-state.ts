@@ -4,6 +4,7 @@ import {
 } from "../../alarm/sim-cloudwatch-alarm-state.js";
 import { SimCloudWatchInvalidParameterValueException } from "../../error/sim-cloudwatch.error.js";
 import { requiredSimCloudWatchName } from "../../metric/sim-cloudwatch-name.js";
+import { requiredSimCloudWatchValue } from "./sim-cloudwatch-alarm-numbers.js";
 import type { SimCloudWatchRequestOptions } from "../sim-cloudwatch-request-options.js";
 import type { SimCloudWatchAlarmContext } from "./sim-cloudwatch-alarm-context.js";
 import type {
@@ -40,6 +41,13 @@ export class SimCloudWatchSetAlarmState {
     );
     const state = requiredAlarmState(command.input.StateValue);
 
+    // Real SetAlarmState requires a reason, so an alarm here never carries one
+    // this simulation made up on the caller's behalf.
+    const stateReason = requiredSimCloudWatchValue(
+      "StateReason",
+      command.input.StateReason,
+    );
+
     this.#context.authorizer.authorizeAlarm(
       setAlarmStateAction,
       alarmName,
@@ -56,7 +64,7 @@ export class SimCloudWatchSetAlarmState {
 
     const transition = alarm.moveTo(
       state,
-      command.input.StateReason ?? "Set by SetAlarmState",
+      stateReason,
       this.#context.clock.now(),
     );
 

@@ -1,4 +1,3 @@
-import type { SimCloudWatchAlarm } from "../../alarm/sim-cloudwatch-alarm.js";
 import { SimCloudWatchPage } from "../sim-cloudwatch-page.js";
 import type { SimCloudWatchRequestOptions } from "../sim-cloudwatch-request-options.js";
 import type {
@@ -9,9 +8,10 @@ import type {
 } from "./alarm.command.js";
 import type { SimCloudWatchAlarmContext } from "./sim-cloudwatch-alarm-context.js";
 import {
-  simCloudWatchAlarmHistoryDetail,
-  simCloudWatchMetricAlarmDetail,
-} from "./sim-cloudwatch-alarm-detail.js";
+  selectsSimCloudWatchAlarm,
+  simCloudWatchAlarmHistory,
+} from "./sim-cloudwatch-alarm-selection.js";
+import { simCloudWatchMetricAlarmDetail } from "./sim-cloudwatch-alarm-detail.js";
 
 const describeAlarmsAction = "cloudwatch:DescribeAlarms";
 const describeAlarmHistoryAction = "cloudwatch:DescribeAlarmHistory";
@@ -46,7 +46,9 @@ export class SimCloudWatchAlarmReads {
     this.#context.authorizer.authorize(describeAlarmsAction, options?.caller);
 
     const page = new SimCloudWatchPage({
-      listed: this.#context.alarms.all.filter((alarm) => selects(alarm, input)),
+      listed: this.#context.alarms.all.filter((alarm) =>
+        selectsSimCloudWatchAlarm(alarm, input),
+      ),
       nextToken: input.NextToken,
       pageSize: input.MaxRecords ?? alarmsPerPage,
     });
@@ -78,18 +80,8 @@ export class SimCloudWatchAlarmReads {
       options?.caller,
     );
 
-    const items = this.#context.alarms.all
-      .filter(
-        (alarm) =>
-          input.AlarmName === undefined || alarm.name === input.AlarmName,
-      )
-      .flatMap((alarm) =>
-        alarm.history.all
-          .filter((item) => within(item.timestamp, input))
-          .map((item) => simCloudWatchAlarmHistoryDetail(alarm.name, item)),
-      );
     const page = new SimCloudWatchPage({
-      listed: items,
+      listed: simCloudWatchAlarmHistory(this.#context.alarms.all, input),
       nextToken: input.NextToken,
       pageSize: input.MaxRecords ?? alarmsPerPage,
     });
@@ -100,29 +92,4 @@ export class SimCloudWatchAlarmReads {
       NextToken: page.nextToken,
     };
   }
-}
-
-function selects(
-  alarm: SimCloudWatchAlarm,
-  input: SimDescribeAlarmsCommand["input"],
-): boolean {
-  return (
-    (input.AlarmNames === undefined || input.AlarmNames.includes(alarm.name)) &&
-    alarm.name.startsWith(input.AlarmNamePrefix ?? "") &&
-    (input.StateValue === undefined || alarm.state === input.StateValue) &&
-    (input.ActionPrefix === undefined ||
-      alarm.definition.alarmActions.some((action) =>
-        action.startsWith(input.ActionPrefix ?? ""),
-      ))
-  );
-}
-
-function within(
-  timestamp: Date,
-  input: SimDescribeAlarmHistoryCommand["input"],
-): boolean {
-  return (
-    (input.StartDate === undefined || timestamp >= input.StartDate) &&
-    (input.EndDate === undefined || timestamp < input.EndDate)
-  );
 }

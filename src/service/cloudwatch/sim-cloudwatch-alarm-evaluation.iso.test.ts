@@ -185,4 +185,37 @@ describe("SimCloudWatch alarm evaluation", () => {
       "2026-08-16T09:01:00.000Z",
     );
   });
+
+  it("evaluates on the new period when an alarm's period is changed", async () => {
+    // Given an alarm evaluating once an hour.
+    const simAws = await withAlarm({
+      Period: 3600,
+      EvaluationPeriods: 1,
+      DatapointsToAlarm: 1,
+      TreatMissingData: "breaching",
+    });
+
+    // When it is put again with a one-minute period, well before the hour it
+    // was first scheduled for.
+    await simAws.clock().advanceBy({ minutes: 5 });
+    await simAws.cloudWatch().putMetricAlarm(
+      new PutMetricAlarmCommand({
+        AlarmName: "OrdersFailing",
+        Namespace: "Orders",
+        MetricName: "Failed",
+        Statistic: "Sum",
+        Period: 60,
+        EvaluationPeriods: 1,
+        DatapointsToAlarm: 1,
+        Threshold: 5,
+        ComparisonOperator: "GreaterThanThreshold",
+        TreatMissingData: "breaching",
+      }),
+    );
+    await simAws.clock().advanceBy({ minutes: 1 });
+
+    // Then it evaluated on the minute it now watches, rather than holding the
+    // turn it had booked for the top of the hour.
+    assertIdentical(await stateOf(simAws), "ALARM");
+  });
 });
