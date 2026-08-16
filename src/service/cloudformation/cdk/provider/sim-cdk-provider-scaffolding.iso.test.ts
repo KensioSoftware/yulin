@@ -119,12 +119,12 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
           Prune: false,
         },
       },
-      AlarmRule: { Type: "AWS::CloudWatch::Alarm" },
+      WebServer: { Type: "AWS::EC2::Instance" },
     });
 
     // Then it deploys like any other, and the scaffolding around the two that
     // do name a provider is still recognised.
-    assertArrayEquals(logicalIdsOf(stack.skippedResources), ["AlarmRule"]);
+    assertArrayEquals(logicalIdsOf(stack.skippedResources), ["WebServer"]);
     assertArrayEquals(logicalIdsOf(stack.inertResources), [
       "BucketDeploymentProvider",
       "Deploy0AwsCliLayer",

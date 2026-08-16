@@ -255,6 +255,55 @@ state either way. Keeping the failure is what stops a subscriber's queue being m
   a test pass while the thing the alarm exists to do never happened.
 - Composite alarms, anomaly detection and metric math alarms are all refused.
 
+## Declaring an alarm in a template
+
+Alarms are nearly always declared in infrastructure rather than created through the SDK, so
+`AWS::CloudWatch::Alarm` is deployed by simulated CloudFormation. The alarm a stack creates is the
+same thing `PutMetricAlarm` creates: it evaluates on the clock, fires on a transition, and refuses
+what the command refuses.
+
+```yaml
+OrdersFailing:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+    AlarmName: OrdersFailing
+    Namespace: Orders
+    MetricName: Failed
+    Statistic: Sum
+    Period: 60
+    EvaluationPeriods: 3
+    DatapointsToAlarm: 2
+    Threshold: 5
+    ComparisonOperator: GreaterThanThreshold
+    AlarmActions:
+      - !Ref Alerts
+```
+
+`Ref` resolves to the alarm name and `Fn::GetAtt Arn` to the alarm ARN. An `AlarmActions` entry
+holding a `Ref` to an `AWS::SNS::Topic` in the same stack resolves to that topic's ARN, so a test can
+deploy the stack, publish a breaching datapoint, advance the clock and read the notification off
+whatever is subscribed. Deleting the stack deletes the alarm and takes its scheduled evaluation back
+off the clock with it.
+
+`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID, as real
+CloudFormation names one, so a test still has a name to pass to `DescribeAlarms`.
+
+These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnabled`, `AlarmActions`,
+`OKActions`, `InsufficientDataActions`, `Namespace`, `MetricName`, `Dimensions`, `Statistic`, `Unit`,
+`Period`, `EvaluationPeriods`, `DatapointsToAlarm`, `Threshold`, `ComparisonOperator` and
+`TreatMissingData`.
+
+`Metrics`, `ThresholdMetricId`, `ExtendedStatistic` and `EvaluateLowSampleCountPercentile` are
+refused, in the same words `PutMetricAlarm` refuses them with: each of them changes what the alarm
+watches or how it decides, so an alarm deployed with one ignored would sit in a test looking
+configured and evaluating something else. `Tags` is the one difference from the command, which
+refuses it. A template's tags are usually the whole stack's rather than the alarm's, so they are
+recorded as an ignored property instead of taking the deploy down over something the alarm behaves no
+differently for having.
+
+`AWS::CloudWatch::CompositeAlarm`, `AWS::CloudWatch::Dashboard` and
+`AWS::CloudWatch::AnomalyDetector` are not deployed, and are recorded as gaps in the stack.
+
 ## Permissions
 
 CloudWatch metrics have no ARN, so there is nothing for a policy to name: every metric action here is
@@ -336,6 +385,8 @@ await simAws.cloudWatch().putMetricData(
   with evaluation on the simulation's clock and SNS notifications on a state change.
 - IAM authorization on each action, including the `cloudwatch:namespace` condition key and
   alarm-ARN resources.
+- `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
+  down with the stack.
 
 ## What is not, and how it says so
 

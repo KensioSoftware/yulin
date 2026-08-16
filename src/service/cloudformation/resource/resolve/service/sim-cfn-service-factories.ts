@@ -50,6 +50,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.cloudFront().cfnResourceFactory(),
   ],
   [
+    "CloudWatch",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.cloudWatch().cfnResourceFactory(),
+  ],
+  [
     "Cognito",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.cognitoIdentityProvider().cfnResourceFactory(),

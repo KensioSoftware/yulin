@@ -2046,6 +2046,7 @@ The resource types it creates are:
 - `AWS::CloudFormation::WaitConditionHandle`
 - `AWS::CloudFront::Distribution`, `AWS::CloudFront::Function` and
   `AWS::CloudFront::ResponseHeadersPolicy`
+- `AWS::CloudWatch::Alarm`
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`
 - `AWS::DynamoDB::Table` and `AWS::DynamoDB::GlobalTable`
