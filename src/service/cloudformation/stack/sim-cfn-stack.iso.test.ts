@@ -228,8 +228,8 @@ describe("SimCfnStack", () => {
       stackName: "TestStack",
       template: {
         Resources: {
-          TestRule: {
-            Type: "AWS::CloudWatch::Alarm",
+          TestInstance: {
+            Type: "AWS::EC2::Instance",
           },
         },
       },
@@ -240,11 +240,11 @@ describe("SimCfnStack", () => {
     assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
     assertArrayLength(stack.skippedResources, 1);
     assertNonNullable(skippedResource);
-    assertIdentical(skippedResource.logicalId, "TestRule");
+    assertIdentical(skippedResource.logicalId, "TestInstance");
     assertTrue(skippedResource.skipped);
     assertIdentical(
       skippedResource.skippedReason,
-      "Unsupported sim CloudFormation Resource service CloudWatch",
+      "Unsupported sim CloudFormation Resource service EC2",
     );
   });
 

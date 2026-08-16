@@ -1,4 +1,5 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import { SimCloudWatchCfnResourceFactory } from "./cfn/sim-cloudwatch-cfn-resource-factory.js";
 import type * as simCloudWatchCommands from "./command/sim-cloudwatch-command.types.js";
 import type { SimCloudWatchRequestOptions } from "./command/sim-cloudwatch-request-options.js";
 import type { SimCloudWatchAlarmActionFailure } from "./alarm/action/sim-cloudwatch-alarm-action-failures.js";
@@ -25,6 +26,9 @@ import {
 export class SimCloudWatch {
   readonly #commands: SimCloudWatchCommands;
   readonly #sdkRouter = new SimCloudWatchSdkCommandRouter(this);
+  readonly #cfnFactory = new SimCloudWatchCfnResourceFactory({
+    cloudWatch: this,
+  });
 
   constructor(properties: SimCloudWatchProperties = {}) {
     this.#commands = new SimCloudWatchCommands(properties);
@@ -48,6 +52,16 @@ export class SimCloudWatch {
    */
   allAlarms(): readonly SimCloudWatchAlarm[] {
     return this.#commands.alarms.all;
+  }
+
+  /**
+   * Find an alarm by name.
+   *
+   * This is the simulator's own accessor, for tests inspecting one alarm
+   * without going through a Command and its authorization.
+   */
+  findAlarm(alarmName: string): SimCloudWatchAlarm | undefined {
+    return this.#commands.alarms.find(alarmName);
   }
 
   /**
@@ -158,6 +172,13 @@ export class SimCloudWatch {
   ): Promise<simCloudWatchCommands.SimDescribeAlarmHistoryCommandOutput> {
     await this.#commands.background.sequence();
     return this.#commands.alarmReads.describeAlarmHistory(command, options);
+  }
+
+  /**
+   * Get the CloudFormation Resource factory for AWS::CloudWatch::* Resources.
+   */
+  cfnResourceFactory(): SimCloudWatchCfnResourceFactory {
+    return this.#cfnFactory;
   }
 
   /**
