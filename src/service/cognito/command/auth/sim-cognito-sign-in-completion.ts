@@ -47,9 +47,10 @@ interface SimCognitoCompletedSignIn {
  *
  * A sign-in can finish at the password, at the new password challenge or at an
  * MFA challenge, and all three end the same way, so they end in one place. The
- * order matters and is real Cognito's: the tokens are issued first, and the
- * trigger runs after them, so a handler that throws does not stop the tokens
- * being handed out.
+ * order matters and is real Cognito's: the tokens are issued first and the
+ * trigger runs after them, so a handler that throws leaves the sign-in it was
+ * told about standing. The request itself still fails on the trigger, and the
+ * caller is answered with the failure rather than with the tokens.
  *
  * The two that finish before the second factor go through
  * `challengeOrComplete`, which is where a user that registered one is

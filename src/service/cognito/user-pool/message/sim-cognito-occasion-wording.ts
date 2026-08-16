@@ -23,7 +23,7 @@ const invitationMessage =
  * `SmsAuthenticationMessage` is what a pool sets its own with, and that input
  * is refused here, so this is the wording every MFA code goes out under.
  */
-const authenticationMessage = "Your authentication code is {####}. ";
+const authenticationMessage = "Your authentication code is {####}.";
 
 /**
  * What a pool says on the occasion it is sending on.

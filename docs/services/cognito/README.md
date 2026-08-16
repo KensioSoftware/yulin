@@ -3017,10 +3017,16 @@ the phone number rather than the email address of a user that has both, because 
 factor.
 
 A wrong code is refused with `CodeMismatchException` and leaves the challenge standing, so the user
-can be asked to type it again. A session lasts the three minutes an app client's
-`AuthSessionValidity` gives it, and one that has run out, one already spent, and one issued for a
-different challenge are each refused with `NotAuthorizedException`. `PostAuthentication` runs where
-the tokens are issued, which is the response rather than the sign-in that was challenged.
+can be asked to type it again. Every session lasts three minutes, which is what real Cognito gives
+an app client that names no `AuthSessionValidity` of its own, and that input is refused here. A
+session that has run out, one already spent, and one issued for a different challenge are each
+refused with `NotAuthorizedException`.
+
+`PostAuthentication` runs where the tokens are issued, which is the response rather than the sign-in
+that was challenged. `PreTokenGeneration` runs there too, reporting
+`TokenGeneration_Authentication`, including for a sign-in that answered the new password challenge
+before this one; which source real Cognito reports for that pair of challenges was not checked
+against a live account.
 
 A user with both factors enabled and neither preferred is refused: real Cognito answers that
 sign-in with `SELECT_MFA_TYPE`, which is a challenge of its own. `SetUserMFAPreference` naming one
