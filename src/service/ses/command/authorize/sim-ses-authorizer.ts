@@ -3,18 +3,16 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import {
-  simSesAnyIdentityArn,
-  simSesIdentityArn,
-} from "../../identity/sim-ses-arn.js";
+import { simSesIdentityArn } from "../../identity/sim-ses-arn.js";
 
 /**
  * The resource an action with no resource type authorizes against.
  *
- * Real SES gives `ses:GetAccount` and `ses:PutAccountDetails` no resource type
- * at all, so IAM evaluates them against `*` and only a policy whose Resource
- * is `*` allows them. A policy naming an identity ARN allows neither, here as
- * on AWS.
+ * Real SES gives `ses:ListEmailIdentities`, `ses:GetAccount` and
+ * `ses:PutAccountDetails` no resource type at all, so IAM evaluates them
+ * against `*` and only a policy whose Resource is `*` allows them. A policy
+ * naming an identity ARN allows none of them, not even one written against
+ * every identity in the Account and Region, here as on AWS.
  */
 const noResource = "*";
 
@@ -65,25 +63,15 @@ export class SimSesAuthorizer {
   }
 
   /**
-   * Ensure the caller may perform an action reaching every identity in this
-   * account and region, such as listing them.
+   * Ensure the caller may perform an action real SES gives no resource type,
+   * such as listing identities or reading the account.
+   *
+   * The resource is `*`, which is the only thing such an action can be granted
+   * on. Writing the listing's resource as every identity in the Account and
+   * Region would be the intuitive reading and the wrong one: a policy scoped
+   * that way allows no listing on AWS, and should allow none here.
    */
-  authorizeAnyIdentity(
-    action: string,
-    caller?: SimAwsCaller,
-  ): SimAwsResolvedCaller {
-    return this.authorizeResource(
-      action,
-      simSesAnyIdentityArn(this.#accountRegionScope),
-      caller,
-    );
-  }
-
-  /**
-   * Ensure the caller may perform an account-wide action, which real SES gives
-   * no resource type.
-   */
-  authorizeAccount(
+  authorizeNoResource(
     action: string,
     caller?: SimAwsCaller,
   ): SimAwsResolvedCaller {

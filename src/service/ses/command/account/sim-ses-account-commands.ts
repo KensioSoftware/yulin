@@ -43,7 +43,7 @@ export class SimSesAccountCommands {
    * sandbox.
    */
   getAccount(options?: SimSesRequestOptions): SimGetAccountCommandOutput {
-    this.#authorizer.authorizeAccount("ses:GetAccount", options?.caller);
+    this.#authorizer.authorizeNoResource("ses:GetAccount", options?.caller);
 
     return simSesAccountReport({
       account: this.#account,
@@ -58,7 +58,10 @@ export class SimSesAccountCommands {
     command: SimPutAccountDetailsCommand,
     options?: SimSesRequestOptions,
   ): SimPutAccountDetailsCommandOutput {
-    this.#authorizer.authorizeAccount("ses:PutAccountDetails", options?.caller);
+    this.#authorizer.authorizeNoResource(
+      "ses:PutAccountDetails",
+      options?.caller,
+    );
 
     this.#account.putDetails(
       readSimSesAccountDetails(command.input),

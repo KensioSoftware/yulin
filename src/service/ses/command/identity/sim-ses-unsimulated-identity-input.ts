@@ -13,7 +13,7 @@ import type { SimCreateEmailIdentityCommandInput } from "./identity.command.js";
 export function refuseUnsimulatedIdentityInput(
   input: SimCreateEmailIdentityCommandInput,
 ): void {
-  if (input.Tags !== undefined) {
+  if (input.Tags !== undefined && input.Tags.length > 0) {
     throw new SimSesUnsupportedOperationException(
       "Email identity tags are not simulated, so CreateEmailIdentity " +
         "refuses them rather than dropping them",

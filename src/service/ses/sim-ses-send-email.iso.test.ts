@@ -21,8 +21,8 @@ import type { SimSesV2 } from "./sim-ses-v2.js";
 const sentAt = new Date("2026-08-16T09:00:00.000Z");
 
 /**
- * A simulated SES out of the sandbox, with the sender verified, so a test can
- * be about the message rather than about the identity checks.
+ * A simulated SES with the sender verified. Still in the sandbox, so a test
+ * using it either verifies its recipients too or calls `leaveTheSandbox`.
  */
 function sendingSes(clock?: SimFixedClock): SimSesV2 {
   const ses = new SimAws(clock === undefined ? {} : { clock }).sesV2();

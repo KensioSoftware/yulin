@@ -4,6 +4,7 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayLength,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -242,5 +243,35 @@ describe("SimSesV2 SendEmail refusals", () => {
     });
 
     assertInstanceOf(error, SimSesUnsupportedOperationException);
+  });
+
+  it("refuses a message with no subject", async () => {
+    // Given a simulated SES that would otherwise accept the message.
+    const ses = await sendingSes();
+
+    // When a message is sent with a body and no subject.
+    const error = await assertThrowsErrorAsync(async () => {
+      await ses.sendEmail(
+        new SendEmailCommand({
+          ...welcome,
+          Content: { Simple: { Body: { Text: { Data: "Hi there" } } } },
+        } as SendEmailCommandInput),
+      );
+    });
+
+    // Then it is refused: SES marks the subject of a simple message required.
+    assertInstanceOf(error, SimSesBadRequestException);
+  });
+
+  it("accepts an empty list of message tags", async () => {
+    // Given a simulated SES that would otherwise accept the message.
+    const ses = await sendingSes();
+
+    // When a send carries a tag list with nothing in it, as code that always
+    // passes its tags does when there are none.
+    await ses.sendEmail(new SendEmailCommand({ ...welcome, EmailTags: [] }));
+
+    // Then it is accepted rather than refused for a feature it is not using.
+    assertArrayLength(ses.sentEmails(), 1);
   });
 });

@@ -26,7 +26,7 @@ interface SimSesSentEmailProperties {
   readonly fromEmailAddress: string;
   readonly destination: SimSesSentEmailDestination;
   readonly replyToAddresses: readonly string[];
-  readonly subject: string | undefined;
+  readonly subject: string;
   readonly body: SimSesSentEmailBody;
   readonly configurationSetName: string | undefined;
   readonly sentDate: Date;
@@ -55,7 +55,7 @@ export class SimSesSentEmail {
 
   public readonly replyToAddresses: readonly string[];
 
-  public readonly subject: string | undefined;
+  public readonly subject: string;
 
   public readonly body: SimSesSentEmailBody;
 

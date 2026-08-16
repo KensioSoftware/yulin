@@ -19,13 +19,3 @@ export function simSesIdentityArn(
 ): string {
   return `${simSesArnPrefix(scope)}identity/${emailIdentity}`;
 }
-
-/**
- * The ARN of every email identity in one account and region.
- *
- * An operation that names no particular identity authorizes against this,
- * since that is the resource it actually reaches.
- */
-export function simSesAnyIdentityArn(scope: SimAwsAccountRegionScope): string {
-  return `${simSesArnPrefix(scope)}identity/*`;
-}

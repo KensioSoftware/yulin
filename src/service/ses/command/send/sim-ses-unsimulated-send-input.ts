@@ -28,7 +28,7 @@ export function refuseUnsimulatedSendInput(
     );
   }
 
-  if (input.EmailTags !== undefined) {
+  if (input.EmailTags !== undefined && input.EmailTags.length > 0) {
     throw new SimSesUnsupportedOperationException(
       "Message tags are not simulated, so SendEmail refuses EmailTags " +
         "rather than dropping the dimensions they would be reported under",

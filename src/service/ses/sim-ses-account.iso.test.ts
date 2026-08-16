@@ -174,4 +174,39 @@ describe("SimSesV2 account", () => {
 
     assertInstanceOf(error, SimSesBadRequestException);
   });
+
+  it("keeps a contact language SES writes in", async () => {
+    // Given a simulated SES.
+    const ses = new SimAws().sesV2();
+
+    // When details name one of the two languages SES supports.
+    await ses.putAccountDetails(
+      new PutAccountDetailsCommand({
+        MailType: "TRANSACTIONAL",
+        WebsiteURL: "https://example.com",
+        ContactLanguage: "JA",
+      }),
+    );
+    const account = await ses.getAccount(new GetAccountCommand({}));
+
+    assertIdentical(account.Details?.ContactLanguage, "JA");
+  });
+
+  it("refuses a contact language SES does not write in", async () => {
+    // Given a simulated SES.
+    const ses = new SimAws().sesV2();
+
+    // When details name a language that is neither of the two SES accepts.
+    const error = await assertThrowsErrorAsync(async () => {
+      await ses.putAccountDetails(
+        new PutAccountDetailsCommand({
+          MailType: "TRANSACTIONAL",
+          WebsiteURL: "https://example.com",
+          ContactLanguage: "FR" as "EN",
+        }),
+      );
+    });
+
+    assertInstanceOf(error, SimSesBadRequestException);
+  });
 });

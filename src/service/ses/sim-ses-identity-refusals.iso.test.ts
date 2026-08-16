@@ -4,7 +4,11 @@ import {
   GetEmailIdentityCommand,
   ListEmailIdentitiesCommand,
 } from "@aws-sdk/client-sesv2";
-import { assertInstanceOf, assertThrowsErrorAsync } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertInstanceOf,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../aws/sim-aws.js";
@@ -178,5 +182,21 @@ describe("SimSesV2 email identity refusals", () => {
     });
 
     assertInstanceOf(error, SimSesUnsupportedOperationException);
+  });
+
+  it("accepts an empty list of identity tags", async () => {
+    // Given a simulated SES.
+    const ses = new SimAws().sesV2();
+
+    // When an identity is created with a tag list with nothing in it.
+    const created = await ses.createEmailIdentity(
+      new CreateEmailIdentityCommand({
+        EmailIdentity: "example.com",
+        Tags: [],
+      }),
+    );
+
+    // Then it is accepted rather than refused for a feature it is not using.
+    assertIdentical(created.IdentityType, "DOMAIN");
   });
 });

@@ -8,6 +8,11 @@ import type { SimPutAccountDetailsCommandInput } from "./account.command.js";
 const mailTypes = new Set(["MARKETING", "TRANSACTIONAL"]);
 
 /**
+ * The two languages real SES will write to a contact in.
+ */
+const contactLanguages = new Set(["EN", "JA"]);
+
+/**
  * Read the account details a request carries, refusing what real SES refuses.
  *
  * `MailType` and `WebsiteURL` are both required on real SES, which is easy to
@@ -20,7 +25,7 @@ export function readSimSesAccountDetails(
   return {
     mailType: requiredMailType(input.MailType),
     websiteUrl: requiredWebsiteUrl(input.WebsiteURL),
-    contactLanguage: input.ContactLanguage,
+    contactLanguage: optionalContactLanguage(input.ContactLanguage),
     useCaseDescription: input.UseCaseDescription,
     additionalContactEmailAddresses: input.AdditionalContactEmailAddresses,
   };
@@ -37,6 +42,20 @@ function requiredMailType(mailType: string | undefined): string {
   }
 
   return mailType;
+}
+
+function optionalContactLanguage(
+  contactLanguage: string | undefined,
+): string | undefined {
+  if (contactLanguage !== undefined && !contactLanguages.has(contactLanguage)) {
+    throw new SimSesBadRequestException(
+      `1 validation error detected: Value '${contactLanguage}' at ` +
+        `'contactLanguage' failed to satisfy constraint: Member must be one ` +
+        `of ${[...contactLanguages].join(", ")}`,
+    );
+  }
+
+  return contactLanguage;
 }
 
 function requiredWebsiteUrl(websiteUrl: string | undefined): string {

@@ -184,7 +184,7 @@ console.log(ses.sentEmails().length);
 A rejection names every identity that failed the check in one message, the way real SES does, so a
 caller finds out everything it has to verify from one failure rather than several:
 
-```
+```text
 Email address is not verified. The following identities failed the check in region US-EAST-1: someone@example.org
 ```
 
@@ -274,10 +274,10 @@ The more specific identity wins when both exist. A policy naming `identity/examp
 send from any address at the domain, unless that address is an identity in its own right, in which
 case the send authorizes against `identity/hello@example.com` instead.
 
-`ses:ListEmailIdentities` reaches every identity in the account and region, so it authorizes against
-`identity/*` and a policy naming one identity does not allow it. `ses:GetAccount` and
-`ses:PutAccountDetails` have no resource type at all on real SES, so only a policy written against
-`*` allows them.
+`ses:ListEmailIdentities`, `ses:GetAccount` and `ses:PutAccountDetails` have no resource type at all
+on real SES, so only a policy written against `*` allows them. A policy scoped to identity ARNs
+allows none of the three, not even one written against `identity/*`, which is the intuitive reading
+and the wrong one.
 
 IAM is evaluated before the identity check, as it is on real AWS. A caller with no permission is
 refused whether or not its identities are verified, which means the error a test sees says which of

@@ -101,15 +101,15 @@ export class SimSesIdentityCommands {
   /**
    * List the identities in this scope, in the order they were created.
    *
-   * Real SES gives this action no resource-level permission, so it authorizes
-   * against every identity in the account and region rather than against each
-   * one it reports.
+   * Real SES gives this action no resource type at all, so it authorizes
+   * against `*`: a policy scoped to identity ARNs allows no listing, however
+   * broadly those ARNs are written.
    */
   listEmailIdentities(
     command: SimListEmailIdentitiesCommand,
     options?: SimSesRequestOptions,
   ): SimListEmailIdentitiesCommandOutput {
-    this.#authorizer.authorizeAnyIdentity(
+    this.#authorizer.authorizeNoResource(
       "ses:ListEmailIdentities",
       options?.caller,
     );

@@ -9,13 +9,13 @@ import type { SimSesEmailContent, SimSesMessage } from "./send.command.js";
  * What a message says, read out of the `Simple` content of a send.
  */
 export interface SimSesReadContent {
-  readonly subject: string | undefined;
+  readonly subject: string;
   readonly body: SimSesSentEmailBody;
 }
 
 /**
  * Read the content of a send, refusing the shapes this simulation does not
- * model.
+ * model and the ones real SES would not accept.
  *
  * Only `Simple` content is read. A raw MIME message would have to be parsed to
  * say anything about its subject or body, and a template one needs templates,
@@ -64,6 +64,15 @@ function readSimpleMessage(message: SimSesMessage): SimSesReadContent {
     );
   }
 
+  const subject = message.Subject?.Data;
+
+  if (subject === undefined) {
+    throw new SimSesBadRequestException(
+      "1 validation error detected: Value at 'content.simple.subject' " +
+        "failed to satisfy constraint: Member must not be null",
+    );
+  }
+
   const text = message.Body?.Text?.Data;
   const html = message.Body?.Html?.Data;
 
@@ -74,5 +83,5 @@ function readSimpleMessage(message: SimSesMessage): SimSesReadContent {
     );
   }
 
-  return { subject: message.Subject?.Data, body: { text, html } };
+  return { subject, body: { text, html } };
 }

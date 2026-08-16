@@ -214,11 +214,12 @@ describe("SES IAM authorization", () => {
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
-  it("needs the identity wildcard to list identities", async () => {
-    // Given a Role allowed to list, on every identity in the account.
+  it("needs a policy on every resource to list identities", async () => {
+    // Given a Role allowed to list on `*`, which is the only resource real SES
+    // gives that action.
     const simAws = await simAwsWithRole({
       Action: "ses:ListEmailIdentities",
-      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/*`,
+      Resource: "*",
     });
     const ses = simAws.sesV2();
 
@@ -230,16 +231,14 @@ describe("SES IAM authorization", () => {
       asRole,
     );
 
-    // Then the listing is allowed. A listing reaches every identity, so that
-    // is the resource it authorizes against.
     assertArrayLength(listed.EmailIdentities ?? [], 1);
   });
 
-  it("refuses a listing to a policy naming one identity", async () => {
-    // Given a Role allowed to list, but only on one identity.
+  it("refuses a listing to a policy naming identity ARNs", async () => {
+    // Given a Role allowed to list, on every identity in the Account.
     const simAws = await simAwsWithRole({
       Action: "ses:ListEmailIdentities",
-      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/example.com`,
+      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/*`,
     });
 
     // When it lists them.
@@ -249,8 +248,9 @@ describe("SES IAM authorization", () => {
         .listEmailIdentities(new ListEmailIdentitiesCommand({}), asRole);
     });
 
-    // Then it is refused, as it is on AWS: the request reaches more than the
-    // policy allows.
+    // Then it is refused. Real SES gives ListEmailIdentities no resource type,
+    // so a policy scoped to identity ARNs allows no listing however broadly
+    // those ARNs are written, which is the intuitive reading and the wrong one.
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
