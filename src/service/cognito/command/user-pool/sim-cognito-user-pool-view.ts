@@ -25,6 +25,10 @@ export class SimCognitoUserPoolView {
    * offers is not reported here on real Cognito either:
    * `GetUserPoolMfaConfig` is what reports those.
    *
+   * `SchemaAttributes` is every attribute the pool holds on a user: the
+   * standard ones and the `custom:` ones its `Schema` declared, each under the
+   * name Cognito gave it.
+   *
    * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
    * Cognito refreshes that number periodically rather than on each write, so
    * it can lag there in a way it never does here.
@@ -44,6 +48,7 @@ export class SimCognitoUserPoolView {
       MfaConfiguration: pool.settings.mfa.configuration.value,
       AdminCreateUserConfig: pool.settings.adminCreateUserConfig.toOutput(),
       AutoVerifiedAttributes: pool.settings.autoVerifiedAttributes.toOutput(),
+      SchemaAttributes: pool.settings.schema.toOutput(),
       EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,

@@ -88,6 +88,7 @@ export class SimCognitoFederatedSignIn {
     const user = this.userFactory.federated({
       username,
       attributes,
+      schema: pool.settings.schema,
       identity: new SimCognitoFederatedIdentity({
         userId: externalUser.subject,
         providerName: provider.name,

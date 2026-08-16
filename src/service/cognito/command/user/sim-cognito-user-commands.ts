@@ -99,6 +99,7 @@ export class SimCognitoUserCommands {
     const user = this.userFactory.make({
       username,
       attributes: input.UserAttributes,
+      schema: pool.settings.schema,
       temporaryPassword: input.TemporaryPassword,
       passwordPolicy: pool.settings.passwordPolicy,
     });

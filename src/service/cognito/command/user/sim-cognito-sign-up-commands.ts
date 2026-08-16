@@ -101,6 +101,7 @@ export class SimCognitoSignUpCommands {
     const user = this.userFactory.signUp({
       username,
       attributes: input.UserAttributes,
+      schema: pool.settings.schema,
       password: input.Password,
       passwordPolicy: pool.settings.passwordPolicy,
     });

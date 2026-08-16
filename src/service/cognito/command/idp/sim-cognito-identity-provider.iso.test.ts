@@ -90,6 +90,37 @@ describe("sim Cognito identity providers", () => {
     });
   });
 
+  it("maps a claim onto a custom attribute the pool declared", async () => {
+    // Given a pool holding an attribute of its own.
+    const cognito = new SimAws({
+      defaultRegionName: "eu-west-2",
+    }).cognitoIdentityProvider();
+    const created = await cognito.createUserPool(
+      new CreateUserPoolCommand({
+        PoolName: "myapp-users",
+        Schema: [{ Name: "team", AttributeDataType: "String", Mutable: true }],
+      }),
+    );
+
+    assertNonNullable(created.UserPool?.Id);
+
+    // When a provider maps a claim onto it.
+    const provider = await cognito.createIdentityProvider(
+      new CreateIdentityProviderCommand({
+        UserPoolId: created.UserPool.Id,
+        ProviderName: "Google",
+        ProviderType: "Google",
+        ProviderDetails: googleDetails,
+        AttributeMapping: { "custom:team": "team" },
+      }),
+    );
+
+    // Then it is accepted, where a pool without that attribute refuses it.
+    assertObjectEquals(provider.IdentityProvider?.AttributeMapping, {
+      "custom:team": "team",
+    });
+  });
+
   it("describes a provider by name", async () => {
     // Given a pool with a Google provider.
     const { cognito, userPoolId } = await withGoogle();

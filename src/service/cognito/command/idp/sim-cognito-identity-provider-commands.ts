@@ -64,7 +64,10 @@ export class SimCognitoIdentityProviderCommands {
 
     const provider = new SimCognitoUserPoolIdentityProvider({
       userPoolId: pool.id,
-      settings: new SimCognitoIdentityProviderSettings(input),
+      settings: new SimCognitoIdentityProviderSettings(
+        input,
+        pool.settings.schema,
+      ),
       createdAt: this.clock.now(),
     });
 
@@ -116,10 +119,10 @@ export class SimCognitoIdentityProviderCommands {
     );
 
     provider.update(
-      new SimCognitoIdentityProviderSettings({
-        ...input,
-        ProviderType: provider.type.value,
-      }),
+      new SimCognitoIdentityProviderSettings(
+        { ...input, ProviderType: provider.type.value },
+        pool.settings.schema,
+      ),
       this.clock.now(),
     );
 

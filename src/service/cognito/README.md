@@ -38,10 +38,13 @@ pool that issued it.
 
 `SimCognitoUserPoolSettings` holds the settings a request can change: the password policy, the
 deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, the
-Lambda triggers the pool runs, whether it asks for a second factor, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
+attributes the pool holds on a user, the Lambda triggers the pool runs, whether it asks for a second
+factor, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
 build one out of their own request, and an update swaps the pool's for it. That is what makes an
 update replace rather than merge, and it is where the pool's `LastModifiedDate` moves. Each takes the
-operation name, so a refusal from inside the settings names the request it came from.
+operation name, so a refusal from inside the settings names the request it came from. The schema is
+the one setting an update cannot replace, so `keepSchemaOf` carries it onto the settings replacing
+it, as it has to: only `CreateUserPool` declares one.
 
 `SimCognitoUserPoolMfa` under `user-pool/mfa/` is the multi-factor authentication one pool is
 configured for: a `SimCognitoMfaConfiguration`, which is whether it challenges, and the factors
@@ -154,10 +157,37 @@ rather than settings accepted and ignored: `AllowAdminCreateUserOnly: true` is w
 without `selfSignUpEnabled` emits, and a simulation that took `SignUp` against such a pool would
 pass code that a deployment refuses.
 
-`SimCognitoUserAttributes` validates attribute names against the pool's schema. Only the standard
-attributes exist, because `CreateUserPool` refuses a `Schema`, so a `custom:` attribute is refused
-here as it would be on a real pool created the same way. `sub` is refused too, and lives on the user
-rather than among its attributes, because Cognito allocates it and a request cannot set it.
+`SimCognitoUserAttributes` holds one user's attributes and checks every write against the pool's
+schema: whether the pool has the attribute at all, what kind of value it holds, how long or how
+large that value may be, and whether a user that already has it may be given another. `sub` is
+refused before the schema is consulted, and lives on the user rather than among its attributes,
+because Cognito allocates it and a request cannot set it.
+
+## Schema model
+
+Schema state lives under `user-pool/schema/`, and hangs off the pool's settings because a pool's
+`Schema` arrives with the rest of its `CreateUserPool` request.
+
+`SimCognitoUserPoolSchema` is the whole schema: the standard attributes every pool has, and the ones
+the request declared over them. A declaration naming a standard attribute redeclares that one, which
+is how a pool makes `email` required, and a declaration naming anything else becomes a `custom:`
+attribute. Cognito adds that prefix itself, so a declaration carrying one is refused rather than
+written as `custom:custom:userId` here and on AWS alike.
+
+`SimCognitoSchemaAttribute` is one attribute of it, and is where the declarations real Cognito
+refuses are refused: a `Required` custom attribute, a `DeveloperOnlyAttribute`, a name longer than
+Cognito allows, and an attribute type it does not have. `SimCognitoAttributeDataType` and
+`SimCognitoAttributeConstraints` are what a value is held to. Both are checked on the way in rather
+than reported later, because an attribute Cognito would have refused is one an application reads
+back here and not from a deployment.
+
+`simCognitoStandardAttributes` is the standard schema as data, with the types and bounds real
+Cognito gives each attribute. `sub` is among them, as `DescribeUserPool` reports it, and is the one
+the schema keeps out of what a user has to be created with.
+
+The schema is fixed once the pool exists. `UpdateUserPool` has no `Schema` input on real Cognito, so
+one is refused, and the settings an update builds take the schema of the settings they replace
+rather than dropping the pool back to the standard attributes.
 
 `SimCognitoUserStore` keys users by username. Its refusal for a username that reaches nothing says
 so when the value given is some user's `sub`, because real Cognito accepts a `sub` there and this
@@ -196,8 +226,10 @@ created on real AWS is not created here.
 
 `SimCognitoAttributeMapping` is what a provider's claims become on the pool user. The key is the
 pool attribute and the value is the provider's claim, which is the direction real Cognito reads it
-in and the one most easily got backwards. A mapping onto an attribute no pool here holds is refused
-where it is written rather than during a sign-in much later.
+in and the one most easily got backwards. A mapping is checked against the pool's schema, so a
+`custom:` attribute the pool declared is as good a target as a standard one, and a mapping onto an
+attribute the pool does not hold is refused where it is written rather than during a sign-in much
+later.
 
 `SimCognitoFederatedSignIn` is what links an external subject to a pool user, building the
 `<ProviderName>_<subject>` username real Cognito builds. That username is what makes the same
@@ -338,6 +370,12 @@ Each type states the properties it simulates, and every other property is record
 Resource and left out of what is created. That is an allow-list rather than a list of
 known-unsimulated properties, because CloudFormation has properties the Cognito API does not, and
 those would otherwise be dropped on the way to a Command that has nowhere to record them.
+
+`SimCfnCognitoUserPoolSchema` reads the `Schema` property a CDK `UserPool` emits for its
+`customAttributes` and `standardAttributes`. It passes the declarations on rather than judging them,
+so a template asking for an attribute AWS would refuse fails the stack with the words
+`CreateUserPool` would have given an SDK caller. Bounds written as numbers in a template are passed
+on as the strings the Cognito API carries them in.
 
 `MfaConfiguration` and `EnabledMfas` are the two that do not reach `CreateUserPool` at all.
 `SimCfnCognitoUserPoolCreator` sets them in a `SetUserPoolMfaConfig` call once the pool exists,
@@ -560,8 +598,10 @@ resource, here or on real AWS.
   and is left alone.
 - An update moves a pool's or an app client's `LastModifiedDate` on, as every operation that changes
   a user moves that user's `UserLastModifiedDate` on.
-- `SchemaAttributes` is not reported on a pool, though every pool holds the standard schema and
-  validates user attributes against it.
+- A pool's schema is settled when it is created. `AddCustomAttributes` is not implemented and
+  `UpdateUserPool` refuses a `Schema`, because real `UpdateUserPool` has no such input.
+- A `DeveloperOnlyAttribute` is refused. A `dev:` attribute is readable and settable only by the
+  developer credentials, and nothing here tells one caller from another that way.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
 - Managed login and the classic hosted UI are not simulated. An authorize request naming no

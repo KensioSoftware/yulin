@@ -1,5 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
-import { isSimCognitoStandardAttribute } from "../user/sim-cognito-standard-attributes.js";
+import type { SimCognitoUserPoolSchema } from "../schema/sim-cognito-user-pool-schema.js";
 import type { SimCognitoAttributeType } from "../user/sim-cognito-user-attributes.js";
 import type { SimCognitoExternalUser } from "./sim-cognito-external-user.js";
 
@@ -22,9 +22,14 @@ export type SimCognitoAttributeMappingType = Readonly<Record<string, string>>;
  */
 export class SimCognitoAttributeMapping {
   private readonly mapping: SimCognitoAttributeMappingType;
+  private readonly schema: SimCognitoUserPoolSchema;
 
-  constructor(mapping: SimCognitoAttributeMappingType | undefined) {
+  constructor(
+    mapping: SimCognitoAttributeMappingType | undefined,
+    schema: SimCognitoUserPoolSchema,
+  ) {
     this.mapping = { ...mapping };
+    this.schema = schema;
     this.requireMappedNames();
   }
 
@@ -50,12 +55,16 @@ export class SimCognitoAttributeMapping {
   }
 
   /**
-   * Refuse a mapping onto an attribute no pool here holds.
+   * Refuse a mapping onto an attribute the pool's schema does not hold.
+   *
+   * A `custom:` attribute the pool declared is as good a target as a standard
+   * one, and one it did not declare is refused here rather than during a
+   * sign-in much later, which is where writing the attribute would otherwise
+   * catch it.
    *
    * `username` is refused with its own message: real Cognito builds a
    * federated user's username from the provider and the subject, and a mapping
-   * cannot change it. It is refused here rather than during a sign-in much
-   * later, which is where the pool's schema would otherwise catch it.
+   * cannot change it.
    */
   private requireMappedNames(): void {
     for (const attributeName of Object.keys(this.mapping)) {
@@ -67,11 +76,11 @@ export class SimCognitoAttributeMapping {
         );
       }
 
-      if (!isSimCognitoStandardAttribute(attributeName)) {
+      if (!this.schema.holds(attributeName)) {
         throw new SimCognitoInvalidParameterException(
           `AttributeMapping '${attributeName}' is not in the pool's schema: ` +
-            `a pool here holds the standard attributes only, so there is ` +
-            `nothing for the provider's claim to be mapped onto`,
+            `${this.schema.describeHolding()}, so there is nothing for the ` +
+            `provider's claim to be mapped onto`,
         );
       }
     }

@@ -18,6 +18,8 @@ import {
   SimCognitoUnsimulatedPoolSettings,
   type SimCognitoUnsimulatedPoolSettingsType,
 } from "./sim-cognito-unsimulated-pool-settings.js";
+import type { SimCognitoSchemaAttributeType } from "./schema/sim-cognito-schema-attribute.js";
+import { SimCognitoUserPoolSchema } from "./schema/sim-cognito-user-pool-schema.js";
 import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
 
 /**
@@ -38,6 +40,16 @@ export interface SimCognitoUserPoolSettingsInput
     | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly LambdaConfig?: object | undefined;
+
+  /**
+   * The attributes the pool holds on its users beyond the standard ones.
+   *
+   * Only `CreateUserPool` carries it. It is named among the shared settings
+   * because that is where the pool's schema is built, and `UpdateUserPool`
+   * refuses one rather than replacing the schema of a pool that already has
+   * users written against it.
+   */
+  readonly Schema?: readonly SimCognitoSchemaAttributeType[] | undefined;
 }
 
 interface SimCognitoUserPoolSettingsProperties {
@@ -64,6 +76,10 @@ interface SimCognitoUserPoolSettingsProperties {
  * rather than merge: an update builds a whole configuration out of its own
  * request, and the pool swaps to it, so a setting the update is silent about
  * goes back to its default rather than staying as it was.
+ *
+ * The schema is the exception. Only `CreateUserPool` declares one, so an
+ * update takes on the schema of the settings it replaces rather than dropping
+ * the pool back to the standard attributes.
  */
 export class SimCognitoUserPoolSettings {
   public readonly passwordPolicy: SimCognitoPasswordPolicy;
@@ -99,6 +115,8 @@ export class SimCognitoUserPoolSettings {
    */
   public readonly unsimulated: SimCognitoUnsimulatedPoolSettings;
 
+  #schema: SimCognitoUserPoolSchema;
+
   constructor(properties: SimCognitoUserPoolSettingsProperties) {
     const { input, operation } = properties;
 
@@ -123,5 +141,26 @@ export class SimCognitoUserPoolSettings {
     );
     this.verificationMessages = new SimCognitoVerificationMessages(input);
     this.unsimulated = new SimCognitoUnsimulatedPoolSettings(input);
+    this.#schema = new SimCognitoUserPoolSchema(input.Schema);
+  }
+
+  /**
+   * The attributes the pool holds on its users: the standard ones, and the
+   * ones its `Schema` declared under `custom:` names.
+   */
+  get schema(): SimCognitoUserPoolSchema {
+    return this.#schema;
+  }
+
+  /**
+   * Take on the schema of the settings this set replaces.
+   *
+   * `UpdateUserPool` has no `Schema` input on real Cognito, so an update
+   * changes nothing about the attributes a pool holds. Carrying the schema
+   * across is what keeps that true here, where an update otherwise replaces
+   * every setting with the default of the one it left out.
+   */
+  keepSchemaOf(replaced: SimCognitoUserPoolSettings): void {
+    this.#schema = replaced.schema;
   }
 }

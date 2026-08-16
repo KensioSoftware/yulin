@@ -9,6 +9,7 @@ import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoAdminCreateUserConfig } from "./sim-cfn-cognito-admin-create-user-config.js";
 import { SimCfnCognitoUserPoolMfa } from "./sim-cfn-cognito-user-pool-mfa.js";
+import { SimCfnCognitoUserPoolSchema } from "./sim-cfn-cognito-user-pool-schema.js";
 import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
 
 /**
@@ -28,6 +29,11 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * `selfSignUpEnabled` CDK pool turns on, and both are acted on: the first
  * decides whether `SignUp` is allowed at all, and the second decides which
  * attributes confirming a sign-up marks as verified.
+ *
+ * `Schema` is here because the pool holds the attributes it declares. A CDK
+ * `UserPool` emits one for its `customAttributes` and for any
+ * `standardAttributes` entry, so a stack keying its own data on a `custom:`
+ * attribute deploys and the sign-up it was built for works.
  *
  * `LambdaConfig` is here because the pool runs the triggers it names.
  * CreateUserPool reads it a key at a time, so a template asking for a trigger
@@ -51,6 +57,7 @@ const simulatedProperties = [
   "UserPoolTier",
   "AdminCreateUserConfig",
   "AutoVerifiedAttributes",
+  "Schema",
   "AccountRecoverySetting",
   "EmailVerificationMessage",
   "EmailVerificationSubject",
@@ -124,6 +131,10 @@ export class SimCfnCognitoUserPoolProperties {
         this.properties["AutoVerifiedAttributes"],
         "AutoVerifiedAttributes",
       ),
+      Schema: new SimCfnCognitoUserPoolSchema({
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      }).parse(this.properties["Schema"]),
       VerificationMessageTemplate: this.record(
         this.properties["VerificationMessageTemplate"],
         "VerificationMessageTemplate",
