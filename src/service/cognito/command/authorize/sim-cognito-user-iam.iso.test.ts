@@ -2,6 +2,7 @@ import {
   AdminCreateUserCommand,
   AdminInitiateAuthCommand,
   AdminGetUserCommand,
+  AdminSetUserMFAPreferenceCommand,
   AdminSetUserPasswordCommand,
   CreateUserPoolCommand,
   ListUsersCommand,
@@ -185,6 +186,30 @@ describe("sim Cognito user IAM authorization", () => {
     });
 
     // Then it is denied.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("denies setting a user's MFA preference without the permission", async () => {
+    // Given a Role allowed to read users but not to change their factors.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: "cognito-idp:AdminGetUser",
+      Resource: userPoolArn("*"),
+    });
+
+    // When that Role turns a second factor on for a user.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cognitoIdentityProvider().adminSetUserMFAPreference(
+        new AdminSetUserMFAPreferenceCommand({
+          UserPoolId: userPoolId,
+          Username: "alice",
+          SMSMfaSettings: { Enabled: true },
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is denied, before the user's own attributes are looked at.
     assertInstanceOf(error, SimIamAccessDenied);
   });
 

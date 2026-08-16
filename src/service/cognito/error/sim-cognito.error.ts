@@ -159,3 +159,33 @@ export class SimCognitoInvalidPasswordException extends SimCognitoError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated Cognito EnableSoftwareTokenMFAException error.
+ *
+ * Real Cognito reports a `VerifySoftwareToken` code that is not the one the
+ * shared secret produces this way, rather than as a code mismatch: the code
+ * was wrong, so the software token was not registered.
+ */
+export class SimCognitoEnableSoftwareTokenMfaException extends SimCognitoError {
+  public override readonly name = "EnableSoftwareTokenMFAException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito SoftwareTokenMFANotFoundException error.
+ *
+ * Real Cognito reports a software token operation reaching no such token this
+ * way. Here it is a `VerifySoftwareToken` for a user that was never given a
+ * secret to verify against.
+ */
+export class SimCognitoSoftwareTokenMfaNotFoundException extends SimCognitoError {
+  public override readonly name = "SoftwareTokenMFANotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

@@ -1,3 +1,5 @@
+import { simCognitoUserPoolAdminScope } from "../token/sim-cognito-access-token.js";
+
 interface SimCognitoIssuedTokenProperties {
   readonly value: string;
   readonly username: string;
@@ -41,6 +43,22 @@ export class SimCognitoIssuedToken {
     this.issuedAt = properties.issuedAt;
     this.expiresAt = properties.expiresAt;
     this.scopes = properties.scopes ?? [];
+  }
+
+  /**
+   * Whether this token may act on the user it was issued to.
+   *
+   * Real Cognito refuses an operation a user performs on itself where the
+   * access token does not carry `aws.cognito.signin.user.admin`. A token from
+   * an API sign-in always carries it, which is what an empty scope list here
+   * means, and a hosted sign-in carries it only where the app client asked for
+   * it among its `AllowedOAuthScopes`.
+   */
+  get actsForUser(): boolean {
+    return (
+      this.scopes.length === 0 ||
+      this.scopes.includes(simCognitoUserPoolAdminScope)
+    );
   }
 
   /**

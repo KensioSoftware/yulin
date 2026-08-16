@@ -2,9 +2,9 @@ import type { BackgroundScheduler } from "../../util/background/background.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import type { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import {
-  SimCognitoAuthentication,
+  SimCognitoUserFactors,
   type SimCognitoIdentityProviderRequestOptions,
-} from "./sim-cognito-authentication.js";
+} from "./sim-cognito-user-factors.js";
 
 export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-authentication.js";
 
@@ -18,12 +18,13 @@ interface SimCognitoUserDirectoryProperties {
  * groups they belong to.
  *
  * `SimCognitoIdentityProvider` extends this, which extends
- * `SimCognitoAuthentication`, so a caller reaches every operation on the one
+ * `SimCognitoUserFactors`, so a caller reaches every operation on the one
  * service object the way the real API presents them. They are split up because
- * a pool's settings, a pool's contents and signing in are three separate
- * concerns, and each is long enough to read on its own.
+ * a pool's settings, a pool's contents, the factors a user registers and
+ * signing in are separate concerns, and each is long enough to read on its
+ * own.
  */
-export abstract class SimCognitoUserDirectory extends SimCognitoAuthentication {
+export abstract class SimCognitoUserDirectory extends SimCognitoUserFactors {
   protected constructor(properties: SimCognitoUserDirectoryProperties) {
     super(properties);
   }

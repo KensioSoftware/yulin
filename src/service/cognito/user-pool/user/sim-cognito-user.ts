@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-identity.js";
+import { SimCognitoUserMfa } from "./mfa/sim-cognito-user-mfa.js";
 import { SimCognitoUserConfirmation } from "./sim-cognito-user-confirmation.js";
 import type {
   SimCognitoAttributeType,
@@ -50,6 +51,7 @@ export class SimCognitoUser {
   private readonly clock: SimClock;
   private readonly userAttributes: SimCognitoUserAttributes;
   private readonly confirmation: SimCognitoUserConfirmation;
+  private readonly userMfa: SimCognitoUserMfa;
   private readonly federatedIdentity: SimCognitoFederatedIdentity | undefined;
   private userStatus: SimCognitoUserStatus;
   private userPassword: SimCognitoUserPassword | undefined;
@@ -68,6 +70,12 @@ export class SimCognitoUser {
     this.clock = properties.clock;
     this.creationDate = this.clock.now();
     this.modifiedDate = this.creationDate;
+    this.userMfa = new SimCognitoUserMfa({
+      attributes: this.userAttributes.values,
+      changed: (): void => {
+        this.touch();
+      },
+    });
   }
 
   /**
@@ -141,6 +149,15 @@ export class SimCognitoUser {
    */
   get confirmationCode(): string | undefined {
     return this.confirmation.code;
+  }
+
+  /**
+   * The second factors this user has registered, which it registers and is
+   * challenged with itself. Changing them moves this user's
+   * `UserLastModifiedDate` on, as every other change to a user does.
+   */
+  get mfa(): SimCognitoUserMfa {
+    return this.userMfa;
   }
 
   /**

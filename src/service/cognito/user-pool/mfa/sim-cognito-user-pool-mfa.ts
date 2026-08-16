@@ -1,3 +1,7 @@
+import {
+  requireSimCognitoVerificationWording,
+  simCognitoLongestSmsMessage,
+} from "../message/sim-cognito-verification-wording.js";
 import { SimCognitoMfaConfiguration } from "./sim-cognito-mfa-configuration.js";
 
 /**
@@ -8,18 +12,34 @@ export interface SimCognitoSoftwareTokenMfaConfigType {
 }
 
 /**
+ * What a pool says in the text message carrying a second factor.
+ *
+ * Real Cognito also takes an `SmsConfiguration` here, naming the IAM role it
+ * assumes to call SNS. Nothing here delivers a message, and `CreateUserPool`
+ * refuses the pool's own `SmsConfiguration` for that reason, so the command
+ * refuses this one in the same words rather than recording a role it would
+ * never assume.
+ */
+export interface SimCognitoSmsMfaConfigType {
+  readonly SmsAuthenticationMessage?: string | undefined;
+  readonly SmsConfiguration?: object | undefined;
+}
+
+/**
  * The MFA configuration of a pool, in the shape `SetUserPoolMfaConfig` and
  * `GetUserPoolMfaConfig` carry it.
  *
- * Real Cognito carries two more factor configurations here, one for SMS and
- * one for email. Both need a delivery this simulation does not model, so both
- * are refused by the command rather than reported back.
+ * Real Cognito carries one more factor configuration here, for the code sent
+ * by email. That one needs the pool's `EmailConfiguration`, which
+ * `CreateUserPool` refuses, so the command refuses it rather than reporting it
+ * back.
  */
 export interface SimCognitoUserPoolMfaType {
   readonly MfaConfiguration?: string | undefined;
   readonly SoftwareTokenMfaConfiguration?:
     | SimCognitoSoftwareTokenMfaConfigType
     | undefined;
+  readonly SmsMfaConfiguration?: SimCognitoSmsMfaConfigType | undefined;
 }
 
 /**
@@ -36,6 +56,36 @@ function softwareTokenIn(
   }
 
   return requested.Enabled ?? false;
+}
+
+/**
+ * What a request asked for in a text message carrying a code, and nothing
+ * where it configured no such factor at all.
+ *
+ * The wording is held to the rules real Cognito holds an SMS message to, so a
+ * message that would reach a user with no code in it is refused here rather
+ * than on the way to AWS.
+ */
+function smsIn(
+  input: SimCognitoUserPoolMfaType,
+): SimCognitoSmsMfaConfigType | undefined {
+  const requested = input.SmsMfaConfiguration;
+
+  if (requested === undefined) {
+    return undefined;
+  }
+
+  const message = requested.SmsAuthenticationMessage;
+
+  return {
+    ...(message !== undefined && {
+      SmsAuthenticationMessage: requireSimCognitoVerificationWording(
+        "SmsAuthenticationMessage",
+        message,
+        simCognitoLongestSmsMessage,
+      ),
+    }),
+  };
 }
 
 /**
@@ -64,6 +114,12 @@ export class SimCognitoUserPoolMfa {
    */
   #softwareToken: boolean | undefined;
 
+  /**
+   * What the pool would say in a text message carrying a code, where a request
+   * configured the factor at all.
+   */
+  #sms: SimCognitoSmsMfaConfigType | undefined;
+
   constructor(configuration: SimCognitoMfaConfiguration) {
     this.#configuration = configuration;
   }
@@ -87,6 +143,14 @@ export class SimCognitoUserPoolMfa {
       input.MfaConfiguration,
     );
     this.#softwareToken = softwareTokenIn(input);
+    this.#sms = smsIn(input);
+  }
+
+  /**
+   * Whether the pool offers a second factor sent as a text message.
+   */
+  get sendsSms(): boolean {
+    return this.#sms !== undefined;
   }
 
   /**
@@ -98,6 +162,7 @@ export class SimCognitoUserPoolMfa {
    */
   keepFactorsOf(replaced: SimCognitoUserPoolMfa): void {
     this.#softwareToken = replaced.#softwareToken;
+    this.#sms = replaced.#sms;
   }
 
   /**
@@ -109,6 +174,7 @@ export class SimCognitoUserPoolMfa {
       ...(this.#softwareToken !== undefined && {
         SoftwareTokenMfaConfiguration: { Enabled: this.#softwareToken },
       }),
+      ...(this.#sms !== undefined && { SmsMfaConfiguration: this.#sms }),
     };
   }
 }

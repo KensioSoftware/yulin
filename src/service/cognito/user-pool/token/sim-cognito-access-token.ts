@@ -9,9 +9,11 @@ import {
  *
  * Real Cognito issues this scope for sign-in through the user pool API, which
  * asks for no scopes of its own. A sign-in through the hosted endpoints asks
- * for scopes, and those are what its access token carries instead.
+ * for scopes, and those are what its access token carries instead. It is also
+ * the scope an operation a user performs on itself needs, which is why a
+ * hosted sign-in that never asked for it cannot perform one.
  */
-const userPoolAdminScope = "aws.cognito.signin.user.admin";
+export const simCognitoUserPoolAdminScope = "aws.cognito.signin.user.admin";
 
 /**
  * The claims of a simulated access token.
@@ -52,7 +54,7 @@ export class SimCognitoAccessToken {
     const { scopes } = this.properties;
 
     if (scopes === undefined) {
-      return userPoolAdminScope;
+      return simCognitoUserPoolAdminScope;
     }
 
     return scopes.join(" ");

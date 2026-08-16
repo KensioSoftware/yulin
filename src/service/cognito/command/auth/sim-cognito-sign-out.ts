@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
+import { requireSimCognitoSelfService } from "../user/sim-cognito-self-service-scope.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import type {
   SimAdminUserGlobalSignOutCommand,
@@ -26,9 +27,10 @@ interface SimCognitoCommandOptions {
  * Both forget the refresh and access tokens the user holds, so a later
  * `REFRESH_TOKEN_AUTH` fails and the access token that signed out cannot sign
  * out again. Real Cognito revokes them the same way. Where they differ is
- * authorization: `GlobalSignOut` is authorized by the user's own access token
- * and evaluates no IAM policy, and `AdminUserGlobalSignOut` is an
- * administrative call that needs the IAM permission on the pool.
+ * authorization: `GlobalSignOut` is authorized by the user's own access token,
+ * which has to carry the scope every self-service operation needs, and
+ * evaluates no IAM policy. `AdminUserGlobalSignOut` is an administrative call
+ * that needs the IAM permission on the pool.
  */
 export class SimCognitoSignOutCommands {
   private readonly resolver: SimCognitoRequestResolver;
@@ -59,6 +61,8 @@ export class SimCognitoSignOutCommands {
       accessToken,
       this.clock.now(),
     );
+
+    requireSimCognitoSelfService(token, "GlobalSignOut");
 
     pool.auth.signOut(token.username);
 

@@ -20,16 +20,36 @@ export interface SimCognitoUserType {
 }
 
 /**
+ * The second factors a user has registered, as every read of a user reports
+ * them.
+ *
+ * A user that has registered none is reported without either field rather than
+ * with an empty list, which is what real Cognito answers for one.
+ */
+export interface SimCognitoUserFactors {
+  readonly UserMFASettingList?: readonly string[] | undefined;
+  readonly PreferredMfaSetting?: string | undefined;
+}
+
+/**
  * A user as `AdminGetUser` reports it, which is a user pool response rather
  * than a `UserType`.
  */
-export interface SimCognitoDescribedUser {
+export interface SimCognitoDescribedUser extends SimCognitoUserFactors {
   readonly Username?: string | undefined;
   readonly UserAttributes?: readonly SimCognitoAttributeType[] | undefined;
   readonly UserCreateDate?: Date | undefined;
   readonly UserLastModifiedDate?: Date | undefined;
   readonly Enabled?: boolean | undefined;
   readonly UserStatus?: string | undefined;
+}
+
+/**
+ * A user as `GetUser` reports it to the user itself.
+ */
+export interface SimCognitoSelfUser extends SimCognitoUserFactors {
+  readonly Username?: string | undefined;
+  readonly UserAttributes?: readonly SimCognitoAttributeType[] | undefined;
 }
 
 /**

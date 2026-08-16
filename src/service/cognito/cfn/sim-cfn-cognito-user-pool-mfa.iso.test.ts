@@ -132,6 +132,42 @@ describe("Cognito CloudFormation user pool MFA", () => {
     assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
   });
 
+  it("deploys a pool offering a second factor by text message", async () => {
+    // Given a template whose pool requires MFA and offers both factors, which
+    // is what a CDK UserPool with an sms second factor emits.
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed.
+    const stack = await deploySuccess(
+      simAws,
+      {
+        AppPool: {
+          Type: "AWS::Cognito::UserPool",
+          Properties: {
+            UserPoolName: "myapp-users",
+            MfaConfiguration: "ON",
+            EnabledMfas: ["SMS_MFA", "SOFTWARE_TOKEN_MFA"],
+          },
+        },
+      },
+      { PoolId: { Value: { Ref: "AppPool" } } },
+    );
+    const userPoolId = stack.outputs.get("PoolId")?.value;
+    assertTypeString(userPoolId);
+
+    // Then both factors are configured on the pool, rather than the SMS one
+    // taking the stack down.
+    const mfa = await simAws
+      .cognitoIdentityProvider()
+      .getUserPoolMfaConfig(
+        new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+      );
+
+    assertIdentical(mfa.MfaConfiguration, "ON");
+    assertTrue(mfa.SoftwareTokenMfaConfiguration?.Enabled);
+    assertNonNullable(mfa.SmsMfaConfiguration);
+  });
+
   it("leaves a pool that says nothing about MFA unconfigured", async () => {
     // Given a template declaring a pool with no MFA at all.
     const simAws = simAwsInEuWest2();

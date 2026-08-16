@@ -2646,21 +2646,18 @@ the pool.
 
 A pool can be created with an `MfaConfiguration` of `OFF`, `OPTIONAL` or `ON`, and reports back what
 it was asked for. `SetUserPoolMfaConfig` sets which factors are behind that setting, and
-`GetUserPoolMfaConfig` reads both back, as they do on real Cognito. `SOFTWARE_TOKEN_MFA` is the
-factor this simulation accepts. A second factor sent by SMS or by email is refused, because a pool
-here has neither the `SmsConfiguration` nor the `EmailConfiguration` real Cognito wants before it
-will deliver one.
+`GetUserPoolMfaConfig` reads both back, as they do on real Cognito. `SOFTWARE_TOKEN_MFA` and
+`SMS_MFA` are the factors a pool can offer. A code sent by email is refused, because no pool here
+has the `EmailConfiguration` real Cognito wants before it will send one, and so is the
+`SmsConfiguration` inside an `SmsMfaConfiguration`: no message is delivered here, so the IAM role
+that would send one is never assumed.
 
-No sign-in is ever challenged for a second factor. A pool configured `OPTIONAL` challenges only the
-users that have registered a factor, and nothing here registers one, so a sign-in to such a pool
-hands out tokens as it does on real Cognito for a user that never set one up. That is what makes a
-pool declaring optional MFA testable: everything that is not MFA behaves as it would in a
-deployment.
-
-A pool configured `ON` is the one that differs. Real Cognito answers every sign-in to it with an MFA
-challenge, so `InitiateAuth`, `AdminInitiateAuth` and the new password challenge response are
-refused with `InvalidParameterException` where that challenge would have been, rather than handing
-out tokens a deployment would not.
+No sign-in is ever challenged for a second factor yet. A pool configured `OPTIONAL` challenges only
+the users that have registered a factor, so a sign-in by a user that has not registered one hands
+out tokens as it does on real Cognito. A pool configured `ON` is the one that differs. Real Cognito
+answers every sign-in to it with an MFA challenge, so `InitiateAuth`, `AdminInitiateAuth` and the
+new password challenge response are refused with `InvalidParameterException` where that challenge
+would have been, rather than handing out tokens a deployment would not.
 
 ```typescript sim-cognito-mfa
 /**
@@ -2749,6 +2746,136 @@ const signedIn = await cognito.initiateAuth(
 console.log(typeof signedIn.AuthenticationResult?.AccessToken); // "string"
 ```
 
+### Registering a second factor for a user
+
+A user registers an authenticator app in the three steps Cognito's own documentation gives.
+`AssociateSoftwareToken` issues a `SecretCode`, `VerifySoftwareToken` proves the app holds it, and
+`SetUserMFAPreference` turns the factor on. `AdminSetUserMFAPreference` does the same for a user an
+administrator names, and `AdminGetUser` and `GetUser` report the result as `UserMFASettingList` and
+`PreferredMfaSetting`.
+
+Each of those, and `GetUser`, is authorized by the user's own access token rather than by any IAM
+policy, and the token has to carry the `aws.cognito.signin.user.admin` scope. A sign-in through the
+API always carries it. A sign-in at the hosted domain carries it only where the app client asked for
+it among its `AllowedOAuthScopes`, so a browser sign-in granted `openid email` alone is refused with
+`NotAuthorizedException`, as real Cognito refuses one. `GlobalSignOut` is held to the same rule.
+
+The `SecretCode` is a real RFC 6238 shared secret, so an authenticator app or any TOTP library given
+it produces the codes `VerifySoftwareToken` accepts, and a code from another secret is refused with
+`EnableSoftwareTokenMFAException`. A test that would rather not compute one reads the code the
+user's app would be showing off the pool, through `SimCognitoUserPool.softwareTokenCode`, in the way
+it reads a sign-up confirmation code: real Cognito reports neither to anyone, and nothing here is
+holding the user's phone.
+
+Verifying a token registers it and enables nothing. `SetUserMFAPreference` is what turns a factor on,
+which is the step the Cognito documentation gives for activating one; whether real Cognito also
+activates a TOTP factor on verification alone was not checked against a live account. Enabling
+`SMS_MFA` for a user with no `phone_number` attribute is refused, because there would be nowhere to
+send the code, and so is enabling `SOFTWARE_TOKEN_MFA` for a user that has verified no token. A
+factor a request says nothing about is left as it was, so an application turning on an authenticator
+app does not have to restate what it wants for SMS. One factor at most is preferred, and preferring
+one means enabling it in the same request.
+
+```typescript sim-cognito-user-mfa
+/**
+ * Registering an authenticator app for a user of a simulated pool.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+  AssociateSoftwareTokenCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  GetUserCommand,
+  InitiateAuthCommand,
+  SetUserMFAPreferenceCommand,
+  SetUserPoolMfaConfigCommand,
+  VerifySoftwareTokenCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    MfaConfiguration: "OPTIONAL",
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+await cognito.setUserPoolMfaConfig(
+  new SetUserPoolMfaConfigCommand({
+    UserPoolId: userPoolId,
+    MfaConfiguration: "OPTIONAL",
+    SoftwareTokenMfaConfiguration: { Enabled: true },
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+const AccessToken = signedIn.AuthenticationResult!.AccessToken!;
+
+// The secret an authenticator app would be given, behind a QR code.
+const associated = await cognito.associateSoftwareToken(
+  new AssociateSoftwareTokenCommand({ AccessToken }),
+);
+
+console.log(typeof associated.SecretCode); // "string"
+
+// The code the user's app is showing, which a test reads off the pool rather
+// than computing from the secret itself.
+const verified = await cognito.verifySoftwareToken(
+  new VerifySoftwareTokenCommand({
+    AccessToken,
+    UserCode: cognito.userPool(userPoolId).softwareTokenCode("alice"),
+  }),
+);
+
+console.log(verified.Status); // "SUCCESS"
+
+// Verifying registers the token. Turning the factor on is a step of its own.
+await cognito.setUserMFAPreference(
+  new SetUserMFAPreferenceCommand({
+    AccessToken,
+    SoftwareTokenMfaSettings: { Enabled: true, PreferredMfa: true },
+  }),
+);
+
+const user = await cognito.getUser(new GetUserCommand({ AccessToken }));
+
+console.log(user.UserMFASettingList); // ["SOFTWARE_TOKEN_MFA"]
+console.log(user.PreferredMfaSetting); // "SOFTWARE_TOKEN_MFA"
+```
+
 ## Available functionality
 
 Sim Cognito currently supports:
@@ -2761,7 +2888,11 @@ Sim Cognito currently supports:
   `DeleteUserPoolClientCommand` and `ListUserPoolClientsCommand`
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
   `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
-  `AdminEnableUserCommand` and `ListUsersCommand`
+  `AdminEnableUserCommand` and `ListUsersCommand`, and `GetUserCommand`, which is the signed-in
+  user reading itself
+- `AssociateSoftwareTokenCommand`, `VerifySoftwareTokenCommand` and `SetUserMFAPreferenceCommand`,
+  which register an authenticator app for the signed-in user, and
+  `AdminSetUserMFAPreferenceCommand`, which sets a named user's factors
 - `SignUpCommand`, `ConfirmSignUpCommand` and `ResendConfirmationCodeCommand`, authorized by no IAM
   policy as they are on real Cognito, and `AdminConfirmSignUpCommand`, which is authorized like the
   other admin operations
@@ -2941,17 +3072,30 @@ Current documented limitations:
   implemented, so an attribute can be changed but not removed.
 - `EstimatedNumberOfUsers` is how many users the pool holds now. Real Cognito refreshes that number
   periodically rather than on each write, so it can lag there in a way it never does here.
-- A pool records its `MfaConfiguration` and the factors behind it, and no sign-in is ever challenged
-  for a second factor. Nothing registers a factor for a user, so `AdminGetUser` reports no
-  `UserMFASettingList`, `PreferredMfaSetting` or `MFAOptions`, and `AssociateSoftwareToken`,
-  `VerifySoftwareToken`, `SetUserMFAPreference` and `AdminSetUserMFAPreference` are not implemented.
-  A sign-in to a pool configured `ON` is refused, because real Cognito answers every one of those
-  with a challenge.
-- `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration` alone. `SmsMfaConfiguration` and
-  `EmailMfaConfiguration` are refused, because a pool here has neither the `SmsConfiguration` nor
-  the `EmailConfiguration` real Cognito wants before it will deliver either message.
-  `WebAuthnConfiguration` is refused because a passkey is presented through the `USER_AUTH` flow,
-  which is refused as a flow of its own.
+- A pool records its `MfaConfiguration` and the factors behind it, a user registers factors of its
+  own, and no sign-in is ever challenged for one yet. A sign-in to a pool configured `ON` is
+  refused, because real Cognito answers every one of those with a challenge.
+- A user's software token secret is a real RFC 6238 shared secret, and the pool reports the code the
+  user's authenticator app would be showing through `SimCognitoUserPool.softwareTokenCode`. Real
+  Cognito reports that to nobody: the code is on the user's own device, in the way a confirmation
+  code is in the user's own inbox.
+- `VerifySoftwareToken` registers a token and enables nothing, so `SetUserMFAPreference` is what
+  turns a factor on. Whether real Cognito also activates a TOTP factor on verification alone was not
+  checked against a live account.
+- A `SetUserMFAPreference` request leaves a factor it says nothing about as it was. Real Cognito
+  does not document whether it replaces or merges there, and a request naming both factors behaves
+  the same either way.
+- `AdminGetUser` reports no `MFAOptions`. That field is the deprecated way of reporting an SMS
+  factor, and `UserMFASettingList` and `PreferredMfaSetting` are what report one here.
+- `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration` and `SmsMfaConfiguration`. The
+  `SmsConfiguration` inside the latter is refused, in the same words `CreateUserPool` refuses the
+  pool's own: no message is delivered here, so the IAM role Cognito would assume to send one is
+  never assumed. `EmailMfaConfiguration` is refused because a pool here has no `EmailConfiguration`
+  to send that message with, and `WebAuthnConfiguration` because a passkey is presented through the
+  `USER_AUTH` flow, which is refused as a flow of its own.
+- `AssociateSoftwareToken` and `VerifySoftwareToken` take an `AccessToken` and refuse a `Session`,
+  because the `MFA_SETUP` challenge that would issue one is not simulated. A `FriendlyDeviceName` is
+  refused for the same kind of reason: device tracking is not simulated.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does, so
   a setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
   covers the settings this simulation models: `Policies.PasswordPolicy`, `DeletionProtection`,
