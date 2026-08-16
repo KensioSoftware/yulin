@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimLogsLogStream } from "../stream/sim-logs-log-stream.js";
 import { SimLogsLogStreamStore } from "../stream/sim-logs-log-stream-store.js";
+import { SimLogsSubscriptionFilterStore } from "../subscription/sim-logs-subscription-filter-store.js";
 import {
   simLogsLogGroupArn,
   simLogsLogGroupWildcardArn,
@@ -26,6 +27,12 @@ export class SimLogsLogGroup {
   readonly logGroupArn: string;
   readonly arn: string;
   readonly creationTime: number;
+
+  /**
+   * The subscription filters watching this group, which deliver what is
+   * written to it onward.
+   */
+  readonly subscriptionFilters = new SimLogsSubscriptionFilterStore();
 
   readonly #streams: SimLogsLogStreamStore;
   #retentionInDays: number | undefined;

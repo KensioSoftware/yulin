@@ -19,6 +19,11 @@ import type {
   SimCreateLogStreamCommand,
   SimDescribeLogStreamsCommand,
 } from "../command/stream/stream.command.js";
+import type {
+  SimDeleteSubscriptionFilterCommand,
+  SimDescribeSubscriptionFiltersCommand,
+  SimPutSubscriptionFilterCommand,
+} from "../command/subscription/subscription.command.js";
 import type { SimLogs } from "../sim-logs.js";
 
 /**
@@ -98,6 +103,30 @@ export class SimLogsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLogs.getLogEvents(
             command as SimGetLogEventsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutSubscriptionFilterCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.putSubscriptionFilter(
+            command as SimPutSubscriptionFilterCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeSubscriptionFiltersCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.describeSubscriptionFilters(
+            command as SimDescribeSubscriptionFiltersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteSubscriptionFilterCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.deleteSubscriptionFilter(
+            command as SimDeleteSubscriptionFilterCommand,
             simSdkCallerOptions(context),
           ),
       ],
