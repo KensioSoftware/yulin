@@ -16,6 +16,7 @@ import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resol
 import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import { SimLambdaEnvironment } from "../../function/environment/sim-lambda-environment.js";
 import {
@@ -45,6 +46,7 @@ interface CreateFunctionCommandHandlerProperties {
   containerImages?: SimLambdaContainerImages | undefined;
   vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
   environmentConflicts?: SimLambdaEnvironmentConflicts;
+  logs?: SimLogsServiceWriter | undefined;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -67,6 +69,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly codeResolver: SimLambdaCodeResolver;
   private readonly environmentConflicts: SimLambdaEnvironmentConflicts;
+  private readonly logs: SimLogsServiceWriter | undefined;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
@@ -79,6 +82,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       containerImages,
       vmSdkModuleProvider,
       environmentConflicts = new SimLambdaEnvironmentConflicts(),
+      logs,
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
@@ -94,6 +98,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       clock: background,
     });
     this.environmentConflicts = environmentConflicts;
+    this.logs = logs;
   }
 
   /**
@@ -138,6 +143,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
       clock: this.background,
+      logs: this.logs,
     });
 
     this.functions.set(simFunction.name, simFunction);

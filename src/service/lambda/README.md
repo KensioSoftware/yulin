@@ -133,11 +133,34 @@ The sandbox has writable standard streams (`SimLambdaVmOutputStream`), and its `
 over them as the real runtime's is. Both matter: a library that builds its own console over
 `process.stdout` and `process.stderr` rather than using the global one, as AWS Lambda Powertools'
 logger does at module scope, throws `ERR_CONSOLE_WRITABLE_STREAM` at import without the streams and
-never runs. What is written is forwarded to the matching host stream, the sandbox's standard output
-to the host's standard output and its standard error to the host's standard error, so a handler's
-output arrives there whether it printed through the console or wrote to the stream itself, and a
-test reads it by capturing that host stream. Powertools' metrics print their EMF document to
-standard output, so that is how a test reads the metrics a handler emitted.
+never runs. What is written is both recorded into the function's log group and forwarded to the
+matching host stream, so a handler's output arrives in simulated CloudWatch Logs whether it printed
+through the console or wrote to the stream itself. Powertools' metrics print their EMF document to
+standard output, so that is where a test reads the metrics a handler emitted too.
+
+## Recording handler output
+
+`function/logging/` is where an invocation's output becomes log events.
+
+`SimLambdaFunctionLogging` is what a function holds. It exists so the function does not have to
+carry both the case where something is recording and the case where nothing is: a function built
+standalone, outside a SimAws instance, still reports a group and stream name to its handler, because
+real Lambda derives both from the function and its execution environment whether or not the group
+exists. Both names are settled once, on the first invocation, which is what an execution environment
+cold starting does; Yulin never recycles one, so a function keeps its stream for as long as it
+exists.
+
+The recording is on the streams rather than on the sandbox console built over them, which is what
+makes a logger that builds its own `Console` over `process.stdout` reach the log group as well.
+`SimLambdaLogWriter` splits what arrives into lines, because a line is what a log event is, and
+holds back whatever follows the last newline until the write that completes it, so a line written in
+two calls is one event rather than two. What is still unterminated when the invocation ends is
+recorded then, whether the handler returned or threw.
+
+`SimLambdaExecutableCode.recordOutputTo` is the seam. `SimLambdaVmZipCode` passes the sink to the
+sandbox streams; `SimLambdaHandlerReferenceCode` implements it as a no-op, because a referenced
+handler is an ordinary function closing over the test's own module scope and has no streams of its
+own to tee. Capturing the host stream is still how a test asserts on one of those.
 
 `SimLambdaVmModules` provides a CommonJS module system over the archive: relative requires between
 archived files, Node.js built-ins from the host (as the real runtime provides them), and a minimal

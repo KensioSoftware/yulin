@@ -22,6 +22,7 @@ import { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
 import type { SimLogsLogGroup } from "./group/sim-logs-log-group.js";
 import { SimLogsLogGroupStore } from "./group/sim-logs-log-group-store.js";
 import { SimLogsSdkCommandRouter } from "./sdk/sim-logs-sdk-command-router.js";
+import { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
 interface SimLogsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -51,6 +52,7 @@ export class SimLogs {
   readonly #getLogEventsCommand: SimLogsGetLogEvents;
   readonly #filterLogEventsCommand: SimLogsFilterLogEvents;
   readonly #background: BackgroundScheduler;
+  readonly #serviceWriter: SimLogsServiceWriter;
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);
 
   constructor(properties: SimLogsProperties = {}) {
@@ -87,6 +89,11 @@ export class SimLogs {
       clock: background,
     });
     this.#getLogEventsCommand = new SimLogsGetLogEvents({ groups, authorizer });
+    this.#serviceWriter = new SimLogsServiceWriter({
+      groups,
+      eventIds,
+      clock: background,
+    });
     this.#filterLogEventsCommand = new SimLogsFilterLogEvents({
       groups,
       authorizer,
@@ -108,6 +115,20 @@ export class SimLogs {
    */
   allLogGroups(): readonly SimLogsLogGroup[] {
     return this.#groups.all;
+  }
+
+  /**
+   * How the rest of the simulation writes to a log group.
+   *
+   * Nothing authorizes on this path. A real Lambda function needs
+   * `logs:CreateLogGroup` and `logs:PutLogEvents` on its execution Role, and
+   * one without them produces no logs at all, in silence. Simulating that
+   * would mean nearly every function in a test logged nothing with no failure
+   * to explain why, so writing is unconditional and the divergence is
+   * documented instead.
+   */
+  serviceWriter(): SimLogsServiceWriter {
+    return this.#serviceWriter;
   }
 
   /**

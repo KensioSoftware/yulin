@@ -8,7 +8,12 @@ import {
 } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaExecutableCode } from "./sim-lambda-executable-code.js";
+import { parseLambdaHandlerName } from "./sim-lambda-handler-name.js";
 import { makeSimLambdaVmContext } from "./vm/sim-lambda-vm-context.js";
+import {
+  simLambdaNoOutputSink,
+  type SimLambdaOutputSink,
+} from "../logging/sim-lambda-output-sink.js";
 import { SimLambdaVmModules } from "./vm/sim-lambda-vm-modules.js";
 
 interface SimLambdaVmZipCodeProperties {
@@ -21,29 +26,6 @@ interface SimLambdaVmZipCodeProperties {
    * the time gets the simulation's time.
    */
   readonly clock?: SimClock | undefined;
-}
-
-interface ParsedHandlerName {
-  readonly modulePath: string;
-  readonly exportName: string;
-}
-
-/**
- * Parse an AWS Lambda handler identifier such as "index.handler" or
- * "src/app.handler" into its module path and export name.
- */
-export function parseLambdaHandlerName(handlerName: string): ParsedHandlerName {
-  const separator = handlerName.lastIndexOf(".");
-  if (separator <= 0 || separator === handlerName.length - 1) {
-    throw new SimLambdaRuntimeError(
-      "Runtime.MalformedHandlerName",
-      `Bad handler '${handlerName}': expected format 'file.method'`,
-    );
-  }
-  return {
-    modulePath: handlerName.slice(0, separator),
-    exportName: handlerName.slice(separator + 1),
-  };
 }
 
 /**
@@ -62,8 +44,20 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   readonly runsInHostScope = false;
 
   #handler: SimLambdaHandler | undefined;
+  #sink: SimLambdaOutputSink = simLambdaNoOutputSink;
 
   constructor(private readonly properties: SimLambdaVmZipCodeProperties) {}
+
+  /**
+   * Record what this code writes to its standard streams.
+   *
+   * The sandbox is built at cold start, and an invocation sets this before it
+   * asks for the handler, so the streams function code is handed already carry
+   * the sink by the time any of it runs.
+   */
+  recordOutputTo(sink: SimLambdaOutputSink): void {
+    this.#sink = sink;
+  }
 
   /**
    * Get the handler function, cold-starting the module code if needed.
@@ -80,7 +74,7 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
 
     const modules = new SimLambdaVmModules({
       archive,
-      context: makeSimLambdaVmContext(environment, clock),
+      context: makeSimLambdaVmContext(environment, clock, this.#sink),
       sdkModuleProvider:
         sdkModuleProvider ?? new SimLambdaNoVmSdkModuleProvider(),
     });

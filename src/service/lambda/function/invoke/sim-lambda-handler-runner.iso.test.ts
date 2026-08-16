@@ -18,6 +18,8 @@ const contextBuilder = new SimLambdaInvokeContextBuilder({
     "arn:aws:lambda:eu-west-2:111111111111:function:runner-test",
   timeoutSeconds: 3,
   memorySizeMb: 128,
+  logGroupName: "/aws/lambda/test",
+  logStreamName: "2026/08/16/[$LATEST]abc",
 });
 
 async function yieldEventLoop(): Promise<void> {

@@ -8,6 +8,8 @@ import {
   SimLambdaHandlerReferenceCode,
 } from "./code/sim-lambda-executable-code.js";
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
+import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
+import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
@@ -88,6 +90,12 @@ interface SimLambdaFunctionProperties {
    * real clock.
    */
   clock?: SimClock | undefined;
+  /**
+   * Where this function's handler output is recorded. A function built
+   * standalone, outside a SimAws instance, has nowhere to record to and writes
+   * only to the host streams.
+   */
+  logs?: SimLogsServiceWriter | undefined;
 }
 
 /**
@@ -123,6 +131,7 @@ export class SimLambdaFunction {
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly runner = new SimLambdaHandlerRunner();
   private readonly clock: SimClock;
+  private readonly logging: SimLambdaFunctionLogging;
 
   constructor(properties: SimLambdaFunctionProperties) {
     const {
@@ -140,6 +149,7 @@ export class SimLambdaFunction {
       environment,
       runAsOwner = this,
       clock = new SimRealClock(),
+      logs,
     } = properties;
     this.clock = clock;
     this.name = name as SimLambdaFunctionName;
@@ -160,6 +170,18 @@ export class SimLambdaFunction {
         memorySizeMb,
       });
     this.runAsOwner = runAsOwner;
+    this.logging = new SimLambdaFunctionLogging({
+      functionName: name,
+      logs,
+      clock,
+    });
+  }
+
+  /**
+   * The log group this function's output is recorded to.
+   */
+  get logGroupName(): string {
+    return this.logging.logGroupName;
   }
 
   /**
@@ -222,7 +244,11 @@ export class SimLambdaFunction {
       timeoutSeconds: this.timeoutSeconds,
       memorySizeMb: this.memorySizeMb,
       clock: this.clock,
+      logGroupName: this.logging.logGroupName,
+      logStreamName: this.logging.logStreamName(),
     });
+
+    this.logging.recordFrom(this.code);
 
     return await simAwsRunAsContext.run(
       this.runAsOwner,
@@ -232,10 +258,13 @@ export class SimLambdaFunction {
           async () =>
             await this.runWithSimulatedTime(
               async () =>
-                await this.runner.run(
-                  this.code.handlerFunction(),
-                  event,
-                  contextBuilder,
+                await this.logging.around(
+                  async () =>
+                    await this.runner.run(
+                      this.code.handlerFunction(),
+                      event,
+                      contextBuilder,
+                    ),
                 ),
             ),
         ),

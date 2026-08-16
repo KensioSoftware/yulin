@@ -178,20 +178,39 @@ That is what AWS Lambda Powertools' `Logger` does, at module scope, so a bundled
 runs here. Its `Metrics` writes its embedded metric format document to standard output, so the
 metrics a handler emitted can be read back the same way its log lines can.
 
-What a handler prints reaches the matching host stream, standard output to standard output and
-standard error to standard error, which is where a test or a `pnpm run dev` session already sees
-output. A test that wants to assert on it captures that host stream:
+What a handler prints is recorded into the function's log group in
+[simulated CloudWatch Logs](../logs/ "Simulated CloudWatch Logs usage docs"), at
+`/aws/lambda/<function name>`, so a test asserts on it by searching that group rather than by
+capturing process output:
 
 ```typescript
-const written: string[] = [];
-vi.spyOn(process.stdout, "write").mockImplementation((chunk): boolean => {
-  written.push(String(chunk));
-  return true;
-});
+const found = await simAws.logs().filterLogEvents(
+  new FilterLogEventsCommand({
+    logGroupName: "/aws/lambda/orders",
+    filterPattern: "ERROR",
+  }),
+);
 ```
 
-That captures standard output, which is where log lines and EMF metric documents go. Spy on
-`process.stderr` the same way for what a handler wrote there, including its `console.error`.
+One line becomes one log event, as it does in an account, so a handler printing a multi-line object
+gets several events and a search for one of those lines finds it. EMF metric documents go to the
+same place, since Powertools' `Metrics` writes them to standard output.
+
+Each invocation also reaches the matching host stream, standard output to standard output and
+standard error to standard error, which is where a test or a `pnpm run dev` session already sees
+output. That is a tee rather than a redirect: real Lambda sends output to CloudWatch Logs and
+nowhere else, but a test tool that swallowed it would make a failing test harder to debug than it is
+with none of this.
+
+`context.logGroupName` and `context.logStreamName` name the group and stream that were actually
+written to, and stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format. The hash identifies
+the execution environment rather than the request, so match the shape rather than the value.
+
+Only zip-packaged code is recorded. A function backed by a handler function reference, including one
+bound to a container image, is an ordinary function closing over the test's own module scope: its
+`console.log` reaches the host console directly, and there is nothing to intercept without patching
+a global the whole test run shares. Capturing the host stream is still the way to assert on one of
+those.
 
 ## Function code from S3
 
@@ -2017,9 +2036,13 @@ Current documented limitations:
 - Function versions, aliases, and qualifiers are not simulated (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
-- Handler output goes to the host process's standard output and error. There is no simulated
-  CloudWatch Logs, so nothing holds a function's output for a test to read back per function or per
-  invocation. See [What a handler prints](#what-a-handler-prints).
+- Only zip-packaged code has its output recorded into a log group. A function backed by a handler
+  function reference, including a container image binding, writes to the host console directly and
+  is not recorded, so a test asserting on its output still has to capture the host stream. See
+  [What a handler prints](#what-a-handler-prints).
+- Nothing writes the platform `START`, `END` and `REPORT` lines a real log stream carries, and
+  execution environments are never recycled, so a function keeps one log stream for as long as it
+  exists.
 - Container image functions are not run. Yulin never reads a container image, and stays Docker-free.
   A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
   in-process handler stands in for its image: one bound to it, or one registered in the

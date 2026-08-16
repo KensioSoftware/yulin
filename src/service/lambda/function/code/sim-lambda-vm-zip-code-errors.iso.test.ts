@@ -8,7 +8,7 @@ import {
 import { describe, it } from "vitest";
 import { simLambdaVmZipFunctionFactory } from "./sim-lambda-vm-zip-function.factory.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
-import { parseLambdaHandlerName } from "./sim-lambda-vm-zip-code.js";
+import { parseLambdaHandlerName } from "./sim-lambda-handler-name.js";
 
 describe("sim Lambda vm zip code runtime errors", () => {
   it("reports a missing handler module as Runtime.ImportModuleError", async () => {

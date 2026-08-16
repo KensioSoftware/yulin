@@ -13,6 +13,10 @@ interface SimLambdaInvokeContextBuilderProperties {
   readonly invokedFunctionArn: string;
   readonly timeoutSeconds: number;
   readonly memorySizeMb: number;
+  readonly logGroupName: string;
+
+  /** The stream this invocation's execution environment writes to. */
+  readonly logStreamName: string;
   /**
    * Clock measuring how much of the invocation timeout is left. Reading the
    * remaining time from the simulation's clock means a stopped clock leaves a
@@ -41,6 +45,8 @@ export class SimLambdaInvokeContextBuilder {
       invokedFunctionArn,
       timeoutSeconds,
       memorySizeMb,
+      logGroupName,
+      logStreamName,
       clock = new SimRealClock(),
     } = this.properties;
     const startedAtMs = clock.now().getTime();
@@ -53,8 +59,8 @@ export class SimLambdaInvokeContextBuilder {
       invokedFunctionArn,
       memoryLimitInMB: String(memorySizeMb),
       awsRequestId,
-      logGroupName: `/aws/lambda/${functionName}`,
-      logStreamName: `[$LATEST]${awsRequestId}`,
+      logGroupName,
+      logStreamName,
       getRemainingTimeInMillis: (): number =>
         Math.max(
           0,
