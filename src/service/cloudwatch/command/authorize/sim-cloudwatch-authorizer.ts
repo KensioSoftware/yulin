@@ -1,8 +1,9 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { simCloudWatchNamespaceConditionKey } from "../sim-cloudwatch-request-options.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import { simCloudWatchAlarmArn } from "../../alarm/sim-cloudwatch-alarm-arn.js";
+import { decideSimCloudWatchRequest } from "./sim-cloudwatch-decide.js";
 
 /**
  * The resource every CloudWatch metric action authorizes against.
@@ -15,6 +16,7 @@ const metricResource = "*";
 
 interface SimCloudWatchAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
 /**
@@ -26,16 +28,42 @@ interface SimCloudWatchAuthorizerProperties {
  */
 export class SimCloudWatchAuthorizer {
   readonly #iam: SimIamInterServiceAuthZ;
+  readonly #accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(properties: SimCloudWatchAuthorizerProperties) {
     this.#iam = properties.iam;
+    this.#accountRegionScope = properties.accountRegionScope;
   }
 
   /**
    * Ensure the caller may perform an action on this scope's metrics.
    */
   authorize(action: string, caller?: SimAwsCaller): SimAwsResolvedCaller {
-    return this.decide(action, caller, undefined);
+    return decideSimCloudWatchRequest(this.#iam, {
+      action,
+      resource: metricResource,
+      caller,
+    });
+  }
+
+  /**
+   * Ensure the caller may perform an action on one alarm.
+   *
+   * Alarms are the one thing in CloudWatch a policy can name, so these
+   * authorize against the alarm's ARN rather than against `*`. The alarm need
+   * not exist: real IAM evaluates a request before the service handles it, so
+   * PutMetricAlarm authorizes against the ARN the alarm is about to have.
+   */
+  authorizeAlarm(
+    action: string,
+    alarmName: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return decideSimCloudWatchRequest(this.#iam, {
+      action,
+      resource: simCloudWatchAlarmArn(this.#accountRegionScope, alarmName),
+      caller,
+    });
   }
 
   /**
@@ -49,32 +77,11 @@ export class SimCloudWatchAuthorizer {
     namespace: string,
     caller?: SimAwsCaller,
   ): SimAwsResolvedCaller {
-    return this.decide(action, caller, namespace);
-  }
-
-  private decide(
-    action: string,
-    caller: SimAwsCaller | undefined,
-    namespace: string | undefined,
-  ): SimAwsResolvedCaller {
-    const decision = this.#iam.authorize({
+    return decideSimCloudWatchRequest(this.#iam, {
       action,
       resource: metricResource,
       caller,
-      conditionContext:
-        namespace === undefined
-          ? undefined
-          : { [simCloudWatchNamespaceConditionKey]: namespace },
+      namespace,
     });
-
-    if (decision.isDenied) {
-      throw new SimIamAccessDenied({
-        principal: decision.caller.principal,
-        action,
-        resource: metricResource,
-      });
-    }
-
-    return decision.caller;
   }
 }

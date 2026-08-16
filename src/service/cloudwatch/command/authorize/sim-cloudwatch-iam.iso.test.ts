@@ -1,5 +1,8 @@
 import {
+  DeleteAlarmsCommand,
+  DescribeAlarmsCommand,
   ListMetricsCommand,
+  PutMetricAlarmCommand,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
@@ -147,5 +150,80 @@ describe("CloudWatch metrics IAM authorization", () => {
     // Then it is denied, as it would be in an account: metrics have no ARN, so
     // there is nothing for such a statement to match.
     assertInstanceOf(error, SimIamAccessDenied);
+  });
+});
+
+describe("CloudWatch alarm IAM authorization", () => {
+  const putAlarm = new PutMetricAlarmCommand({
+    AlarmName: "OrdersFailing",
+    Namespace: "Orders",
+    MetricName: "Failed",
+    Statistic: "Sum",
+    Period: 60,
+    EvaluationPeriods: 1,
+    Threshold: 5,
+    ComparisonOperator: "GreaterThanThreshold",
+  });
+
+  it("allows a Role granted the action on one alarm's ARN", async () => {
+    // Given a Role allowed to put exactly that alarm, which unlike a metric
+    // does have an ARN for a policy to name.
+    const simAws = await simAwsWithRole({
+      Action: "cloudwatch:PutMetricAlarm",
+      Resource: `arn:aws:cloudwatch:us-east-1:${accountIdOneOnes}:alarm:OrdersFailing`,
+    });
+
+    // When it creates the alarm.
+    await simAws.cloudWatch().putMetricAlarm(putAlarm, asRole);
+
+    // Then it was created.
+    assertArrayLength(simAws.cloudWatch().allAlarms(), 1);
+  });
+
+  it("denies a Role whose policy names another alarm", async () => {
+    // Given a Role allowed to put a different alarm.
+    const simAws = await simAwsWithRole({
+      Action: "cloudwatch:PutMetricAlarm",
+      Resource: `arn:aws:cloudwatch:us-east-1:${accountIdOneOnes}:alarm:SomethingElse`,
+    });
+
+    // When it tries to create this one.
+    const error = await assertThrowsErrorAsync(
+      async () => await simAws.cloudWatch().putMetricAlarm(putAlarm, asRole),
+    );
+
+    // Then it is denied, and nothing was created.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertIdentical(error.action, "cloudwatch:PutMetricAlarm");
+    assertArrayLength(simAws.cloudWatch().allAlarms(), 0);
+  });
+
+  it("denies deleting an alarm the policy does not cover, and describing needs no resource", async () => {
+    // Given a Role that may put and describe alarms but not delete them.
+    const simAws = await simAwsWithRole({
+      Action: ["cloudwatch:PutMetricAlarm", "cloudwatch:DescribeAlarms"],
+      Resource: "*",
+    });
+
+    await simAws.cloudWatch().putMetricAlarm(putAlarm, asRole);
+
+    // When it describes them, and then tries to delete one.
+    const described = await simAws
+      .cloudWatch()
+      .describeAlarms(new DescribeAlarmsCommand({}), asRole);
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws
+          .cloudWatch()
+          .deleteAlarms(
+            new DeleteAlarmsCommand({ AlarmNames: ["OrdersFailing"] }),
+            asRole,
+          ),
+    );
+
+    // Then describing worked and deleting did not.
+    assertArrayLength(described.MetricAlarms ?? [], 1);
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertArrayLength(simAws.cloudWatch().allAlarms(), 1);
   });
 });

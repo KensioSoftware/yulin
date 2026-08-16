@@ -4,6 +4,53 @@ export {
   type SimCloudWatchRequestOptions,
 } from "./command/sim-cloudwatch-request-options.js";
 export {
+  SimCloudWatchAlarm,
+  type SimCloudWatchAlarmTransition,
+} from "./alarm/sim-cloudwatch-alarm.js";
+export type { SimCloudWatchAlarmDefinition } from "./alarm/sim-cloudwatch-alarm-definition.js";
+export {
+  SimCloudWatchAlarmHistory,
+  type SimCloudWatchAlarmHistoryItem,
+} from "./alarm/sim-cloudwatch-alarm-history.js";
+export { SimCloudWatchAlarmStore } from "./alarm/sim-cloudwatch-alarm-store.js";
+export {
+  simCloudWatchActionsFieldFor,
+  type SimCloudWatchAlarmActionsField,
+  type SimCloudWatchAlarmState,
+  simCloudWatchAlarmStates,
+} from "./alarm/sim-cloudwatch-alarm-state.js";
+export { simCloudWatchAlarmArn } from "./alarm/sim-cloudwatch-alarm-arn.js";
+export {
+  evaluateSimCloudWatchAlarm,
+  type SimCloudWatchEvaluation,
+  type SimCloudWatchPeriodVerdict,
+} from "./alarm/sim-cloudwatch-alarm-evaluation.js";
+export {
+  simCloudWatchAlarmPeriods,
+  simCloudWatchNextPeriodBoundary,
+} from "./alarm/sim-cloudwatch-alarm-periods.js";
+export {
+  requiredSimCloudWatchComparisonOperator,
+  simCloudWatchBreaches,
+  type SimCloudWatchComparisonOperator,
+  simCloudWatchComparisonOperators,
+} from "./alarm/sim-cloudwatch-comparison.js";
+export {
+  simCloudWatchDefaultMissingData,
+  type SimCloudWatchMissingDataTreatment,
+  simCloudWatchMissingDataOrDefault,
+  simCloudWatchMissingDataTreatments,
+} from "./alarm/sim-cloudwatch-missing-data.js";
+export {
+  SimCloudWatchAlarmActionFailure,
+  SimCloudWatchAlarmActionFailures,
+} from "./alarm/action/sim-cloudwatch-alarm-action-failures.js";
+export {
+  type SimCloudWatchAlarmNotification,
+  type SimCloudWatchAlarmTargets,
+  SimCloudWatchNoAlarmTargets,
+} from "./alarm/action/sim-cloudwatch-alarm-targets.js";
+export {
   aggregateSimCloudWatchDatapoints,
   type SimCloudWatchAggregate,
   type SimCloudWatchDatapoint,

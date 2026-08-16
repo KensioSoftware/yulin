@@ -34,6 +34,7 @@ import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
 import type { SimSts } from "../../sts/sim-sts.js";
 import { SimAwsAccountRegionServiceBuilder } from "./sim-aws-account-region-service-builder.js";
+import { SimAwsRegisteredServiceBuilder } from "./sim-aws-registered-service-builder.js";
 import { SimAwsSelfContainedServiceBuilder } from "./sim-aws-self-contained-service-builder.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAwsRequestAuthWiring } from "./sim-aws-request-auth-wiring.js";
@@ -103,6 +104,7 @@ export class SimAwsServiceFactory {
 
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly accountRegionServices: SimAwsAccountRegionServiceBuilder;
+  private readonly registeredServices: SimAwsRegisteredServiceBuilder;
   private readonly selfContainedServices: SimAwsSelfContainedServiceBuilder;
 
   constructor(properties: SimAwsServiceFactoryProperties) {
@@ -125,6 +127,10 @@ export class SimAwsServiceFactory {
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
+      accountServices: this.accountServices,
+    });
+    this.registeredServices = new SimAwsRegisteredServiceBuilder({
+      registries: this.registries,
       accountServices: this.accountServices,
     });
     this.selfContainedServices = new SimAwsSelfContainedServiceBuilder({
@@ -158,12 +164,12 @@ export class SimAwsServiceFactory {
 
   /** Create simulated ACM for an Account Region scope. */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
-    return this.accountRegionServices.createAcm(scope);
+    return this.registeredServices.createAcm(scope);
   }
 
   /** Create simulated API Gateway v2 for an Account Region scope. */
   createApiGatewayV2(scope: SimAwsAccountRegionContainer): SimApiGatewayV2 {
-    return this.accountRegionServices.createApiGatewayV2(scope);
+    return this.registeredServices.createApiGatewayV2(scope);
   }
 
   /** Create simulated CloudFormation for an Account Region scope. */
@@ -183,9 +189,9 @@ export class SimAwsServiceFactory {
     return this.accountRegionServices.createCognitoIdentityProvider(scope);
   }
 
-  /** Create simulated CloudWatch metrics for an Account Region scope. */
+  /** Create simulated CloudWatch metrics and alarms for an Account Region scope. */
   createCloudWatch(scope: SimAwsAccountRegionContainer): SimCloudWatch {
-    return this.selfContainedServices.createCloudWatch(scope);
+    return this.accountRegionServices.createCloudWatch(scope);
   }
 
   /** Create simulated DynamoDB for an Account Region scope. */
@@ -195,7 +201,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated ECR for an Account Region scope. */
   createEcr(scope: SimAwsAccountRegionContainer): SimEcr {
-    return this.accountRegionServices.createEcr(scope);
+    return this.registeredServices.createEcr(scope);
   }
 
   /** Create simulated ECS for an Account Region scope. */
@@ -210,7 +216,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
   createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    return this.accountRegionServices.createElbV2(scope);
+    return this.registeredServices.createElbV2(scope);
   }
 
   /** Create or get simulated IAM for an Account scope. */
@@ -220,7 +226,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated KMS for an Account Region scope. */
   createKms(scope: SimAwsAccountRegionContainer): SimKms {
-    return this.accountRegionServices.createKms(scope);
+    return this.registeredServices.createKms(scope);
   }
 
   /** Create simulated Lambda for an Account Region scope. */

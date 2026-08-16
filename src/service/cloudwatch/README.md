@@ -8,8 +8,10 @@ set together. Real CloudWatch does not roll a custom metric up across dimensions
 is what makes a test here worth writing: a query naming no dimensions reaches the metric published
 with none, not the total of every channel, which is exactly the mistake teams make on a dashboard.
 
-Alarms are not here. They are follow-on work, and they will need something this service does not
-have yet: a schedule on the simulation's clock.
+Alarms are here too, under `alarm/`. The decision that shapes them is that nothing uses a real
+timer: each alarm's next evaluation is scheduled on the background scheduler at the next period
+boundary, and every evaluation schedules the one after it. A frozen clock therefore evaluates
+nothing, and advancing time walks one evaluation per period and settles before the call returns.
 
 ## Entry points
 
@@ -61,12 +63,38 @@ period a test is likely to ask for.
 
 A window includes its start and excludes its end, which is how real CloudWatch reads the two.
 
+## Alarms
+
+`SimCloudWatchAlarmSchedule` owns the clock side. Each alarm keeps one task for its whole life,
+because taking a scheduled turn back off the clock is done by task identity: a fresh closure per
+evaluation could be scheduled and never cancelled, and a deleted alarm would keep waking up and keep
+the simulation from settling.
+
+Evaluation itself is a pure function in `sim-cloudwatch-alarm-evaluation.ts`, taking the periods and
+the definition and answering with a state. That is deliberate: the M-of-N rule and the four
+`TreatMissingData` treatments are the part worth reading and testing on their own, and none of it
+needs a clock or a store to do so.
+
+`sim-cloudwatch-alarm-periods.ts` decides which periods those are: the `evaluationPeriods` complete
+periods before the boundary, never the period the clock is standing in, which has not finished. The
+window reaches back before the alarm was created, and periods there are as missing as any other,
+which is why an alarm with `TreatMissingData: breaching` over a quiet metric fires immediately. Real
+CloudWatch does the same.
+
+An alarm's actions fire only on a transition, so an alarm sitting in ALARM across ten periods
+notifies once. A failing action never stops the others and never stops the alarm: the state has
+already changed by the time actions run, and real CloudWatch does not roll one back because a topic
+was missing.
+
 ## Authorization
 
-`command/authorize/sim-cloudwatch-authorizer.ts` authorizes every action against `*`, because
-CloudWatch metrics have no ARN. This is the one service here where a policy naming a resource is
-always wrong, and the authorizer is deliberately shaped so that it cannot accidentally start
-accepting one.
+`command/authorize/sim-cloudwatch-authorizer.ts` authorizes every metric action against `*`, because
+CloudWatch metrics have no ARN. A policy naming a metric resource is always wrong, and the
+authorizer is shaped so that it cannot accidentally start accepting one.
+
+Alarms are the exception: they do have an ARN, so `PutMetricAlarm`, `DeleteAlarms` and
+`SetAlarmState` authorize against it, while the two describe operations take no resource-level
+permission at all. That split is real CloudWatch's, not a simplification.
 
 `PutMetricData` additionally supplies the namespace to IAM as `cloudwatch:namespace`, which is the
 only way a policy can narrow publishing, and the way AWS's own documented policies do it.

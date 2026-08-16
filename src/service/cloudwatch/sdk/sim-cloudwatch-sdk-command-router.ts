@@ -3,6 +3,13 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type {
+  SimDeleteAlarmsCommand,
+  SimDescribeAlarmHistoryCommand,
+  SimDescribeAlarmsCommand,
+  SimPutMetricAlarmCommand,
+  SimSetAlarmStateCommand,
+} from "../command/alarm/alarm.command.js";
 import type { SimPutMetricDataCommand } from "../command/data/data.command.js";
 import type {
   SimGetMetricDataCommand,
@@ -48,6 +55,46 @@ export class SimCloudWatchSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCloudWatch.getMetricData(
             command as SimGetMetricDataCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutMetricAlarmCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudWatch.putMetricAlarm(
+            command as SimPutMetricAlarmCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeAlarmsCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudWatch.describeAlarms(
+            command as SimDescribeAlarmsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteAlarmsCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudWatch.deleteAlarms(
+            command as SimDeleteAlarmsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "SetAlarmStateCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudWatch.setAlarmState(
+            command as SimSetAlarmStateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeAlarmHistoryCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudWatch.describeAlarmHistory(
+            command as SimDescribeAlarmHistoryCommand,
             simSdkCallerOptions(context),
           ),
       ],

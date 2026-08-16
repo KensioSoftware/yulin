@@ -1,5 +1,4 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
-import { SimCloudWatch } from "../../cloudwatch/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
@@ -31,17 +30,6 @@ export class SimAwsSelfContainedServiceBuilder {
 
   constructor(properties: SimAwsSelfContainedServiceBuilderProperties) {
     this.accountServices = properties.accountServices;
-  }
-
-  /**
-   * Create simulated CloudWatch metrics for an Account Region scope.
-   *
-   * Metrics are Region-scoped on real AWS: a metric published in one Region is
-   * invisible from another, and there is no ARN by which to reach one across
-   * the boundary.
-   */
-  createCloudWatch(scope: SimAwsAccountRegionContainer): SimCloudWatch {
-    return new SimCloudWatch(this.scoped(scope));
   }
 
   /** Create simulated DynamoDB for an Account Region scope. */
