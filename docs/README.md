@@ -18,6 +18,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [IAM](./services/iam/ "Simulated IAM usage docs")
 - [KMS](./services/kms/ "Simulated KMS usage docs")
 - [Lambda](./services/lambda/ "Simulated Lambda usage docs")
+- [CloudWatch Logs](./services/logs/ "Simulated CloudWatch Logs usage docs")
 - [Rekognition](./services/rekognition/ "Simulated Rekognition usage docs")
 - [Route53](./services/route53/ "Simulated Route53 usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")

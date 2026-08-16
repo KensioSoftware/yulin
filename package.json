@@ -102,6 +102,10 @@
       "import": "./dist/service/lambda/index.js",
       "types": "./dist/service/lambda/index.d.ts"
     },
+    "./logs": {
+      "import": "./dist/service/logs/index.js",
+      "types": "./dist/service/logs/index.d.ts"
+    },
     "./oxlint": {
       "import": "./dist/config/oxlint/index.js",
       "types": "./dist/config/oxlint/index.d.ts"
@@ -170,6 +174,7 @@
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",
     "@aws-sdk/client-cloudfront-keyvaluestore": "^3.1108.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1101.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
     "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-dynamodb-streams": "^3.1101.0",
