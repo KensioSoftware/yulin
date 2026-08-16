@@ -380,10 +380,10 @@ console.log(describeOutput.Certificate?.Status); // ISSUED
 Two methods override the default behavior when the hosted zone heuristic doesn't match your test's
 needs:
 
-| Method | Behavior |
-|---|---|
+| Method                                 | Behavior                                                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `simAws.acm().autoIssueCertificates()` | Never requires validation. Use this when a hosted zone exists for unrelated reasons and you don't care about certificates. |
-| `simAws.acm().requireDnsValidation()` | Always requires DNS validation. Use this to exercise the validation path without creating a hosted zone first. |
+| `simAws.acm().requireDnsValidation()`  | Always requires DNS validation. Use this to exercise the validation path without creating a hosted zone first.             |
 
 A standalone `new SimAcm()` instance has no simulated Route53, so it always issues certificates
 immediately. Calling `requireDnsValidation()` on one throws, because nothing can publish the record
@@ -434,8 +434,7 @@ for (const summary of certificateSummaries) {
 }
 ```
 
-Certificates are listed in creation order. `MaxItems` must be between 1 and 1000 and defaults to
-100. When more results are available, pass `NextToken` from the response into your next request.
+Certificates are listed in creation order. `MaxItems` must be between 1 and 1000 and defaults to 100. When more results are available, pass `NextToken` from the response into your next request.
 
 To filter by status, pass `CertificateStatuses` to `ListCertificatesCommand`.
 
@@ -565,13 +564,13 @@ For `AWS::CertificateManager::Certificate`:
 
 Supported certificate properties:
 
-| Property | Description |
-|---|---|
-| `DomainName` | Primary domain for the certificate. |
-| `SubjectAlternativeNames` | Additional DNS names to cover. |
-| `ValidationMethod` | `DNS` or `EMAIL`. |
+| Property                  | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `DomainName`              | Primary domain for the certificate.                      |
+| `SubjectAlternativeNames` | Additional DNS names to cover.                           |
+| `ValidationMethod`        | `DNS` or `EMAIL`.                                        |
 | `DomainValidationOptions` | Validation options per domain, including `HostedZoneId`. |
-| `Tags` | Up to 50 key-value tags. |
+| `Tags`                    | Up to 50 key-value tags.                                 |
 
 ```typescript sim-acm-cloudformation-certificate
 /**
@@ -728,12 +727,12 @@ Unsupported ACM options might be ignored or might throw errors, depending on whe
 
 ## Limitations
 
-| Limitation | Detail |
-|---|---|
-| Certificate deletion | Not supported. |
-| Certificate renewal | Not supported. |
-| Imported certificates | Not supported. |
-| EMAIL validation | Always succeeds; only DNS validation is enforced. |
-| DNS validation scope | Checked against simulated Route53 only, never against real DNS. |
-| Validation timeout | A certificate requested through the SDK whose record never appears stays `PENDING_VALIDATION`. A CloudFormation certificate fails its stack instead. |
-| HTTP API | ACM is not served as an HTTP API by `serveSimAws`. |
+| Limitation            | Detail                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Certificate deletion  | Not supported.                                                                                                                                       |
+| Certificate renewal   | Not supported.                                                                                                                                       |
+| Imported certificates | Not supported.                                                                                                                                       |
+| EMAIL validation      | Always succeeds; only DNS validation is enforced.                                                                                                    |
+| DNS validation scope  | Checked against simulated Route53 only, never against real DNS.                                                                                      |
+| Validation timeout    | A certificate requested through the SDK whose record never appears stays `PENDING_VALIDATION`. A CloudFormation certificate fails its stack instead. |
+| HTTP API              | ACM is not served as an HTTP API by `serveSimAws`.                                                                                                   |
