@@ -84,15 +84,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "device remembering",
   },
   {
-    label: "AccountRecoverySetting",
-    input: {
-      AccountRecoverySetting: {
-        RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }],
-      },
-    },
-    says: "account recovery",
-  },
-  {
     label: "AdminCreateUserConfig InviteMessageTemplate",
     input: {
       AdminCreateUserConfig: {

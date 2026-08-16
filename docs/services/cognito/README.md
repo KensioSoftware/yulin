@@ -2365,8 +2365,9 @@ The properties each type reads are the ones this simulation models:
   sign-up it was built for works. `MfaConfiguration` and `EnabledMfas` are deployed in a
   `SetUserPoolMfaConfig` call once the pool exists, which is how real CloudFormation deploys them
   and why a stack declaring MFA needs `cognito-idp:SetUserPoolMfaConfig` on its execution role. A
-  template asking for neither makes no such call. The last five are accepted at one value each and
-  refused at any other, as `CreateUserPool` refuses them.
+  template asking for neither makes no such call. `AccountRecoverySetting` is recorded as the
+  template declared it, and a setting outside the shape Cognito states fails the stack. The last
+  four are the wording of the messages the pool records.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
@@ -2402,8 +2403,9 @@ Most of them are simulated: `AdminCreateUserConfig` decides whether `SignUp` wor
 and the four verification wording properties are what a recorded message says.
 
 `AccountRecoverySetting` is the one that is not. There is no `ForgotPassword` here, so no recovery
-mechanism is ever reached, and it is accepted at one value and no other so that a CDK stack deploys
-as it stands. The two app client properties are accepted the same way.
+is ever started and no mechanism is ever chosen. The pool records the mechanisms it was asked for
+and `DescribeUserPool` reports them back, so what a template declared stays visible. The two app
+client properties are accepted at one value each instead.
 
 ```typescript sim-cognito-cdk-defaults
 /**
@@ -2481,18 +2483,57 @@ console.log(described.UserPool?.EmailVerificationSubject);
 // "Verify your new account"
 ```
 
-The accepted value of each is below. A pool or a client created without one of these reports it not
-at all, rather than reporting the value it would have had to use.
+The accepted value of each app client property is below. A pool or a client created without one of
+these reports it not at all, rather than reporting the value it would have had to use.
 
-| Property                          | Accepted value                                                             |
-| --------------------------------- | -------------------------------------------------------------------------- |
-| `AccountRecoverySetting`          | `verified_phone_number` at priority 1, then `verified_email` at priority 2 |
-| `AllowedOAuthFlowsUserPoolClient` | `false`                                                                    |
-| `SupportedIdentityProviders`      | `["COGNITO"]`                                                              |
+| Property                          | Accepted value |
+| --------------------------------- | -------------- |
+| `AllowedOAuthFlowsUserPoolClient` | `false`        |
+| `SupportedIdentityProviders`      | `["COGNITO"]`  |
 
-Every key of `AccountRecoverySetting` is compared, so an object carrying one the accepted value does
-not have is refused along with everything else that differs. The refusal names the property, the
-value asked for and the value that is simulated.
+`AccountRecoverySetting` takes any mechanisms Cognito has, in any order: `verified_email`,
+`verified_phone_number` and `admin_only`. Email-only recovery is the one worth naming, because it is
+what goes with a pool that sends no SMS, and CDK writes it for `AccountRecovery.EMAIL_ONLY`.
+
+```typescript sim-cognito-account-recovery
+/**
+ * Creating a pool that recovers an account by email alone.
+ */
+
+import {
+  CreateUserPoolCommand,
+  DescribeUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const created = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AccountRecoverySetting: {
+      RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }],
+    },
+  }),
+);
+
+const userPoolId = created.UserPool?.Id;
+
+// The pool reports back the mechanisms it was asked for, rather than the two
+// real Cognito gives a pool that asked for none.
+const described = await cognito.describeUserPool(
+  new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+);
+
+console.log(described.UserPool?.AccountRecoverySetting);
+// { RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }] }
+```
+
+The setting is held to the shape real Cognito states for it, because a pool created outside that
+shape would exist here and fail to be created on real AWS. A list of mechanisms carries one or two
+of them, each naming a mechanism Cognito has at a priority of 1 or 2. The refusal says which of
+those it was.
 
 `VerificationMessageTemplate` is read rather than compared, and the one thing refused in it is
 `DefaultEmailOption: CONFIRM_WITH_LINK`, along with `EmailMessageByLink` and `EmailSubjectByLink`.
@@ -3159,6 +3200,8 @@ Sim Cognito currently supports:
 - A pool's `Schema`, so a `custom:` attribute is set and read on its users, held to the type, the
   bounds and the mutability it was declared with, and reported as `SchemaAttributes` alongside the
   standard attributes
+- A pool's `AccountRecoverySetting`, recorded as the request set it and reported back by
+  `DescribeUserPool`, held to the one or two mechanisms Cognito takes
 - `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
   `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
   `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
@@ -3432,10 +3475,11 @@ Current documented limitations:
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
   `PasswordHistorySize`.
-- `AccountRecoverySetting` is accepted at one value and refused at any other. Nothing here reads it,
-  because there is no `ForgotPassword`. It is accepted so a CDK stack deploys, and reported back by
-  `DescribeUserPool` so what the template declared stays visible. The accepted value is in
-  "Properties accepted without being simulated" above.
+- `AccountRecoverySetting` is recorded and reported back by `DescribeUserPool`, and nothing reads
+  it, because there is no `ForgotPassword`. Any mechanisms Cognito has are accepted, in any order,
+  and a setting outside the shape Cognito states is refused. A pool that recovers by email alone
+  therefore behaves here exactly as one that recovers by phone number would, which only shows in a
+  recovery neither of them can start.
 - `AdminCreateUserConfig.AllowAdminCreateUserOnly` is acted on, and the two keys beside it are
   refused. `InviteMessageTemplate` is the wording of the invitation, and a pool cannot set its own
   yet, so an invitation is recorded at Cognito's default wording. `UnusedAccountValidityDays`

@@ -38,7 +38,7 @@ pool that issued it.
 `SimCognitoUserPoolSettings` holds the settings a request can change: the password policy, the
 deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, the
 attributes the pool holds on a user, the Lambda triggers the pool runs, whether it asks for a second
-factor, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
+factor, how it recovers an account, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
 build one out of their own request, and an update swaps the pool's for it. That is what makes an
 update replace rather than merge, and it is where the pool's `LastModifiedDate` moves. Each takes the
 operation name, so a refusal from inside the settings names the request it came from. The schema is
@@ -387,13 +387,17 @@ for no MFA makes no second call, here or on real AWS.
 
 A property whose only accepted value is one particular value counts as simulated at this layer and
 is judged by the Command that receives it, so the value is judged in one place rather than two.
-`SimCognitoUnsimulatedInput` compares a string or a boolean, and `SimCognitoUnsimulatedStructure`
-compares an object by its contents, through the canonical rendering in
-`SimCognitoCanonicalValue`. What each Command accepts and why is in the doc comments on
-`SimCognitoUnsimulatedUserPoolFeatures` and `SimCognitoUnsimulatedUserPoolMessaging`. The values
-each pool and client was created with are kept in `SimCognitoUnsimulatedPoolSettings` and
-`SimCognitoUnsimulatedClientSettings`, which exist only so a described resource reports back what
+`SimCognitoUnsimulatedInput` compares the string or the boolean it was given. What each Command
+accepts and why is in the doc comments on `SimCognitoUnsimulatedUserPoolFeatures` and
+`SimCognitoUnsimulatedUserPoolMessaging`. The values a client was created with are kept in
+`SimCognitoUnsimulatedClientSettings`, which exists only so a described client reports back what
 its request set.
+
+`AccountRecoverySetting` is read rather than compared. `SimCfnCognitoAccountRecovery` parses the
+template's mechanisms and `SimCognitoAccountRecovery` holds them on the pool, refusing a setting
+outside the shape Cognito states for it. Nothing reads them back out: there is no `ForgotPassword` here, so the
+refusal that would have to choose a mechanism has nowhere to live yet, and the pool records what it
+was asked for so a described pool reports it.
 
 `UserPoolName` and `ClientName` are both optional, and a CDK `UserPool` construct emits neither,
 while both creation Commands require a name. `SimCfnCognitoGeneratedName` generates one from the

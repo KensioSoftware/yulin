@@ -23,9 +23,10 @@ import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-prov
  * this simulation acts on.
  *
  * The verification wording is read: it is what the messages the pool records
- * say, and any wording is accepted. `AccountRecoverySetting` is not, and this
- * value asks for nothing this simulation does not already do. They are
- * recorded here as one block because a default CDK stack sends them together.
+ * say, and any wording is accepted. `AccountRecoverySetting` is checked against
+ * the shape Cognito states and recorded so a described pool reports it, and no
+ * recovery here ever reads it back out. They are written here as one block
+ * because a default CDK stack sends them together.
  */
 const verificationMessage =
   "The verification code to your new account is {####}";
@@ -59,15 +60,6 @@ interface RefusedValue {
 }
 
 const refusedValues: readonly RefusedValue[] = [
-  {
-    label: "AccountRecoverySetting",
-    input: {
-      AccountRecoverySetting: {
-        RecoveryMechanisms: [{ Name: "admin_only", Priority: 1 }],
-      },
-    },
-    says: "account recovery",
-  },
   {
     label: "VerificationMessageTemplate DefaultEmailOption",
     input: {
