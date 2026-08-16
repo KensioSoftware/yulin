@@ -49,9 +49,17 @@ export class SimLambdaFunctionLogging {
   /**
    * The stream this function's execution environment writes to, opening it if
    * this is the first invocation.
+   *
+   * The group and stream are reopened on every invocation, not just the first.
+   * Opening is idempotent, and a test that deleted the log group in between
+   * would otherwise get it back only if the next handler happened to write
+   * something: real Lambda shows the stream for an invocation that logged
+   * nothing at all.
    */
   logStreamName(): string {
     this.#logStreamName ??= this.coldStart();
+    this.#logs?.openStream(this.logGroupName, this.#logStreamName);
+
     return this.#logStreamName;
   }
 

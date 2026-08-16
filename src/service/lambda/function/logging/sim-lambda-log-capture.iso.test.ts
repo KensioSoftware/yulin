@@ -119,6 +119,28 @@ describe("Lambda handler output in CloudWatch Logs", () => {
     assertArrayEquals(await messagesIn(simAws), ["one line"]);
   });
 
+  it("keeps a multibyte character written across two chunks whole", async () => {
+    // Given a handler writing one character as two Buffer writes, which is
+    // what streaming bytes read in pieces does.
+    const simAws = await simAwsWithLoggingFunction(
+      [
+        '  const bytes = Buffer.from("orders \u{65E5}\u{672C}\u{8A9E}\\n");',
+        "  process.stdout.write(bytes.subarray(0, 8));",
+        "  process.stdout.write(bytes.subarray(8));",
+      ].join("\n"),
+    );
+
+    // When it is invoked.
+    await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+    // Then the character split across the two writes is recorded as itself,
+    // rather than as the replacement character each half would decode to on
+    // its own.
+    assertArrayEquals(await messagesIn(simAws), [
+      "orders \u{65E5}\u{672C}\u{8A9E}",
+    ]);
+  });
+
   it("names the stream the way real Lambda names it, and tells the handler", async () => {
     // Given a handler reporting where it thinks it is writing.
     const simAws = await simAwsWithLoggingFunction(
@@ -158,6 +180,28 @@ describe("Lambda handler output in CloudWatch Logs", () => {
     // Then the invocation makes the group again rather than failing over one
     // that has gone, which is what real Lambda does.
     assertArrayEquals(await messagesIn(simAws), ["ran"]);
+  });
+
+  it("makes the log group again for an invocation that logs nothing", async () => {
+    // Given a function whose handler writes nothing at all, invoked once, and
+    // its log group deleted after.
+    const simAws = await simAwsWithLoggingFunction("  return 1;");
+
+    await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+    await simAws
+      .logs()
+      .deleteLogGroup(new DeleteLogGroupCommand({ logGroupName }));
+
+    // When it is invoked again.
+    await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+    // Then the environment opening its stream is what brings the group back,
+    // rather than the first line the handler happens to write. Real Lambda
+    // shows the stream for an invocation that logged nothing too.
+    const group = simAws.logs().findLogGroup(logGroupName);
+
+    assertNonNullable(group);
+    assertArrayLength(group.streams, 1);
   });
 
   it("records a logger that builds its own console over the streams", async () => {

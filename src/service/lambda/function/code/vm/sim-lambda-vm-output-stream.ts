@@ -1,4 +1,5 @@
 import { Writable } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
 import {
   simLambdaNoOutputSink,
   type SimLambdaOutputSink,
@@ -36,6 +37,18 @@ import {
 export class SimLambdaVmOutputStream extends Writable {
   #sink: SimLambdaOutputSink = simLambdaNoOutputSink;
 
+  /**
+   * Decodes what is recorded, rather than each chunk being decoded on its own.
+   *
+   * A handler writing bytes it read in pieces can split a multibyte character
+   * across two writes, and decoding each Buffer separately would record a
+   * replacement character in place of both halves. The decoder holds the
+   * incomplete bytes until the write that completes them, which is also why it
+   * is never reset: an execution environment writes one continuous stream, so
+   * bytes left over at the end of an invocation belong to the next one.
+   */
+  readonly #decoder = new StringDecoder("utf8");
+
   constructor(private readonly hostStream: () => NodeJS.WritableStream) {
     super();
   }
@@ -61,7 +74,7 @@ export class SimLambdaVmOutputStream extends Writable {
     _encoding: BufferEncoding,
     done: (error?: Error) => void,
   ): void {
-    this.#sink.write(chunk.toString("utf8"));
+    this.#sink.write(this.#decoder.write(chunk));
     this.hostStream().write(chunk);
     done();
   }
