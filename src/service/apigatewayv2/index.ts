@@ -87,6 +87,7 @@ export {
   SimApiGatewayV2NotFound,
 } from "./error/sim-api-gateway-v2.error.js";
 export type { SimHttpApiAuthorizerEvent } from "./serve/auth/sim-http-api-authorizer-event.js";
+export { httpApiProxyEventFactory } from "./factory/http-api-proxy-event.factory.js";
 export type {
   SimPayload2AuthorizerContext,
   SimPayload2Event,

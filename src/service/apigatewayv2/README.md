@@ -288,6 +288,18 @@ fails the stack rather than deploying a template written two ways at once.
    is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for the
    same thing.
 
+## Invocation events without a request
+
+`factory/http-api-proxy-event.factory.ts` exports `httpApiProxyEventFactory`, which makes the same
+events for a test that calls an integration handler directly rather than serving it.
+
+Only the endpoint style lives here. The factory is `src/serve/payload-2/sim-payload-2-event.factory.ts`,
+shared with Lambda Function URLs, and this service supplies what an HTTP API calls itself: the API
+id, the `execute-api` hostname, the default stage, and the route key. The route key is the one place
+the two styles differ by more than a constant, because an HTTP API's names the method and the path,
+so it is read both ways: a request settles the route key it would have matched, and a route key
+settles the request, except where its path is a template, which captures nothing on its own.
+
 ## CloudFormation
 
 `cfn/` creates the five `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory

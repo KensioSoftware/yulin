@@ -1,25 +1,30 @@
-import { faker } from "@faker-js/faker";
-import { DynamicFactory } from "@kensio/part-factory";
+import type { ItemFactory } from "@kensio/part-factory";
 
-import { simAwsProxiedTraceId } from "../../../serve/http/sim-aws-proxied-connection.js";
-import { simPayload2EventTime } from "../../../serve/payload-2/sim-payload-2-event-time.js";
-import { simPayload2AnonymousAccountId } from "../../../serve/payload-2/sim-payload-2-iam-caller.js";
-import {
-  simPayload2ProxyHeaders,
-  simPayload2QueryStringParameters,
-} from "../../../serve/payload-2/sim-payload-2-request-parts.js";
+import type { SimPayload2EndpointStyle } from "../../../serve/payload-2/sim-payload-2-endpoint-style.js";
+import { simPayload2EventFactory } from "../../../serve/payload-2/sim-payload-2-event.factory.js";
+import { DEFAULT_SIM_AWS_REGION_NAME } from "../../aws/sim-aws-region.js";
+import { makeSimLambdaFunctionUrlId } from "../function/url/sim-lambda-function-url.js";
+import { simLambdaFunctionUrlHost } from "../function/url/sim-lambda-function-url-host.js";
 import type { SimLambdaFunctionUrlEvent } from "../serve/event/sim-lambda-url-event.type.js";
-import {
-  type FunctionUrlEventRequest,
-  functionUrlEventRequest,
-} from "./lambda-function-url-event-request.js";
 
 /**
  * The route key and stage a Function URL invocation always carries: there is
  * no route to match and no stage to deploy to, so real Lambda names both
- * `$default`.
+ * `$default`, and neither says anything about the request.
  */
 const functionUrlDefaultKey = "$default";
+
+const functionUrlEndpointStyle: SimPayload2EndpointStyle = {
+  makeEndpointId: makeSimLambdaFunctionUrlId,
+  hostname: (urlId) =>
+    simLambdaFunctionUrlHost({
+      urlId,
+      regionName: DEFAULT_SIM_AWS_REGION_NAME,
+    }),
+  stage: functionUrlDefaultKey,
+  routeKeyFor: () => functionUrlDefaultKey,
+  requestLineFor: () => ({}),
+};
 
 /**
  * Makes Lambda Function URL invocation events, so a test of a Function URL
@@ -54,67 +59,5 @@ const functionUrlDefaultKey = "$default";
  * Overriding both copies of one of those with different values is still
  * allowed, and gives an event no real invocation would produce.
  */
-export const lambdaFunctionUrlEventFactory =
-  new DynamicFactory<SimLambdaFunctionUrlEvent>((overrides = {}) =>
-    makeFunctionUrlEvent(functionUrlEventRequest(overrides)),
-  );
-
-function makeFunctionUrlEvent(
-  request: FunctionUrlEventRequest,
-): SimLambdaFunctionUrlEvent {
-  const queryStringParameters = simPayload2QueryStringParameters(request.query);
-
-  return {
-    version: "2.0",
-    routeKey: functionUrlDefaultKey,
-    rawPath: request.path,
-    rawQueryString: request.query.toString(),
-    headers: eventHeaders(request),
-    // Absent rather than empty for a request that carried no query, as it is
-    // in a served event.
-    ...(Object.keys(queryStringParameters).length > 0 && {
-      queryStringParameters,
-    }),
-    requestContext: eventRequestContext(request),
-    isBase64Encoded: false,
-  };
-}
-
-function eventHeaders(
-  request: FunctionUrlEventRequest,
-): Record<string, string> {
-  return {
-    accept: "*/*",
-    "user-agent": request.userAgent,
-    ...simPayload2ProxyHeaders({
-      domainName: request.domainName,
-      traceId: simAwsProxiedTraceId(request.at),
-      sourceIp: request.sourceIp,
-    }),
-  };
-}
-
-function eventRequestContext(
-  request: FunctionUrlEventRequest,
-): SimLambdaFunctionUrlEvent["requestContext"] {
-  return {
-    // An invocation of a NONE auth Function URL has no Account behind it, and
-    // that is what AWS calls anonymous.
-    accountId: simPayload2AnonymousAccountId,
-    apiId: request.urlId,
-    domainName: request.domainName,
-    domainPrefix: request.urlId,
-    http: {
-      method: request.method,
-      path: request.path,
-      protocol: "HTTP/1.1",
-      sourceIp: request.sourceIp,
-      userAgent: request.userAgent,
-    },
-    requestId: faker.string.uuid(),
-    routeKey: functionUrlDefaultKey,
-    stage: functionUrlDefaultKey,
-    time: simPayload2EventTime(request.at),
-    timeEpoch: request.at.getTime(),
-  };
-}
+export const lambdaFunctionUrlEventFactory: ItemFactory<SimLambdaFunctionUrlEvent> =
+  simPayload2EventFactory(functionUrlEndpointStyle);
