@@ -45,6 +45,7 @@ export function compareSimLogsEvents(
   right: SimLogsStoredEvent,
 ): number {
   return (
-    left.timestamp - right.timestamp || left.eventId.localeCompare(right.eventId)
+    left.timestamp - right.timestamp ||
+    left.eventId.localeCompare(right.eventId)
   );
 }

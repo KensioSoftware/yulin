@@ -8,6 +8,9 @@ const maximumLength = 512;
  */
 const logGroupNamePattern = /^[.\-_/#A-Za-z0-9]+$/;
 
+/** How real CloudWatch Logs writes that pattern when it refuses a name. */
+const reportedNamePattern = String.raw`[\.\-_/#A-Za-z0-9]+`;
+
 /**
  * Read a log group name, refusing one real CloudWatch Logs would refuse.
  *
@@ -33,9 +36,9 @@ export function requiredSimLogsLogGroupName(logGroupName?: string): string {
 
   if (!logGroupNamePattern.test(logGroupName)) {
     throw new SimLogsInvalidParameterException(
-      "1 validation error detected: Value at 'logGroupName' failed to " +
-        "satisfy constraint: Member must satisfy regular expression " +
-        "pattern: [\\.\\-_/#A-Za-z0-9]+",
+      `1 validation error detected: Value at 'logGroupName' failed to ` +
+        `satisfy constraint: Member must satisfy regular expression ` +
+        `pattern: ${reportedNamePattern}`,
     );
   }
 

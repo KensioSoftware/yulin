@@ -30,7 +30,9 @@ export function requiredSimLogsLogStreamName(logStreamName?: string): string {
     );
   }
 
-  if (forbiddenCharacters.some((character) => logStreamName.includes(character))) {
+  if (
+    forbiddenCharacters.some((character) => logStreamName.includes(character))
+  ) {
     throw new SimLogsInvalidParameterException(
       "1 validation error detected: Value at 'logStreamName' failed to " +
         "satisfy constraint: Member must not contain ':' or '*'",

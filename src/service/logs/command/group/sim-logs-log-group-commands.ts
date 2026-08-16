@@ -48,7 +48,9 @@ export class SimLogsLogGroupCommands {
     command: SimCreateLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): SimCreateLogGroupCommandOutput {
-    const logGroupName = requiredSimLogsLogGroupName(command.input.logGroupName);
+    const logGroupName = requiredSimLogsLogGroupName(
+      command.input.logGroupName,
+    );
 
     refuseUnsimulatedLogGroupInput(command.input);
     this.#authorizer.authorizeLogGroup(
@@ -69,7 +71,9 @@ export class SimLogsLogGroupCommands {
     command: SimDeleteLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): SimDeleteLogGroupCommandOutput {
-    const logGroupName = requiredSimLogsLogGroupName(command.input.logGroupName);
+    const logGroupName = requiredSimLogsLogGroupName(
+      command.input.logGroupName,
+    );
 
     this.#authorizer.authorizeLogGroup(
       "logs:DeleteLogGroup",

@@ -1,5 +1,8 @@
 import { SimLogsInvalidParameterException } from "../error/sim-logs.error.js";
-import { simLogsEventSizeBytes, type SimLogsStoredEvent } from "./sim-logs-event.js";
+import {
+  simLogsEventSizeBytes,
+  type SimLogsStoredEvent,
+} from "./sim-logs-event.js";
 import type { SimLogsEventIds } from "./sim-logs-event-ids.js";
 
 /** What real CloudWatch Logs accepts in one PutLogEvents batch. */

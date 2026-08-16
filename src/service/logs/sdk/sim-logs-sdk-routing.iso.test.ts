@@ -120,9 +120,7 @@ describe("CloudWatch Logs SDK interception", () => {
     await client.send(
       new PutRetentionPolicyCommand({ logGroupName, retentionInDays: 14 }),
     );
-    const withRetention = await client.send(
-      new DescribeLogGroupsCommand({}),
-    );
+    const withRetention = await client.send(new DescribeLogGroupsCommand({}));
     await client.send(new DeleteRetentionPolicyCommand({ logGroupName }));
     const streams = await client.send(
       new DescribeLogStreamsCommand({ logGroupName }),

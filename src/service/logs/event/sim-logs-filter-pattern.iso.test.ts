@@ -17,7 +17,7 @@ describe("SimLogsFilterPattern", () => {
   it("matches everything when there is no pattern", () => {
     // Given no pattern, and an empty one.
     const none = new SimLogsFilterPattern();
-    const empty = new SimLogsFilterPattern("   ");
+    const empty = new SimLogsFilterPattern(" ".repeat(3));
 
     // Then both match any message, as an omitted filter pattern does.
     assertTrue(none.matches("anything at all"));
@@ -66,7 +66,7 @@ describe("SimLogsFilterPattern", () => {
   it("matches a quoted phrase, spaces and all", () => {
     // Given a phrase and an escaped quote inside one.
     const phrase = new SimLogsFilterPattern('"order has no items"');
-    const quoted = new SimLogsFilterPattern('"say \\"hello\\""');
+    const quoted = new SimLogsFilterPattern(String.raw`"say \"hello\""`);
 
     // Then the whole phrase has to appear, rather than its words separately.
     assertTrue(phrase.matches("ValidationError: order has no items"));

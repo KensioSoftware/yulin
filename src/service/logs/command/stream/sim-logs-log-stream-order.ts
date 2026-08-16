@@ -27,25 +27,32 @@ export function orderedSimLogsLogStreams(
     );
   }
 
-  if (orderBy === orderByLastEventTime && input.logStreamNamePrefix !== undefined) {
+  if (
+    orderBy === orderByLastEventTime &&
+    input.logStreamNamePrefix !== undefined
+  ) {
     throw new SimLogsInvalidParameterException(
       "Cannot order by LastEventTime with a logStreamNamePrefix.",
     );
   }
 
-  const ordered = [...streams].sort((left, right) =>
+  const ordered = streams.toSorted((left, right) =>
     orderBy === orderByLastEventTime
       ? lastEventTime(left) - lastEventTime(right)
       : left.logStreamName.localeCompare(right.logStreamName),
   );
 
-  return input.descending === true ? ordered.reverse() : ordered;
+  return input.descending === true ? ordered.toReversed() : ordered;
 }
 
 /**
  * When a stream last had an event, treating one that has never had an event as
- * the oldest so it sorts before the streams that have.
+ * older than any timestamp so it sorts before the streams that have.
+ *
+ * Zero would not do it: that is a real timestamp, so a stream carrying an event
+ * from the epoch would tie with one carrying nothing, and the order between
+ * them would fall back to whichever happened to be created first.
  */
 function lastEventTime(stream: SimLogsLogStream): number {
-  return stream.lastEventTimestamp ?? 0;
+  return stream.lastEventTimestamp ?? -Infinity;
 }

@@ -64,7 +64,7 @@ describe("SimLogs PutLogEvents", () => {
       read.events?.map((event) => event.message),
       ["starting", "ValidationError: order has no items"],
     );
-    assertIdentical(read.events?.at(0)?.ingestionTime, ingestedAt.getTime());
+    assertIdentical(read.events.at(0)?.ingestionTime, ingestedAt.getTime());
   });
 
   it("answers with a sequence token, and reports it on the stream", async () => {

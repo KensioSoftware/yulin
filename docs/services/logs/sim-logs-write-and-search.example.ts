@@ -27,7 +27,10 @@ await logs.putLogEvents(
     logGroupName,
     logStreamName,
     logEvents: [
-      { timestamp: Date.parse("2026-08-16T09:00:00Z"), message: "INFO handling order-1" },
+      {
+        timestamp: Date.parse("2026-08-16T09:00:00Z"),
+        message: "INFO handling order-1",
+      },
       {
         timestamp: Date.parse("2026-08-16T09:00:01Z"),
         message: "ERROR order has no items",

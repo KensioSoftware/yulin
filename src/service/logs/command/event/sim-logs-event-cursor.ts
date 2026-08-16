@@ -31,7 +31,10 @@ export class SimLogsEventCursor {
         : tokenPage(nextToken, limit, eventCount);
 
     this.startIndex = Math.max(0, Math.min(bounds.startIndex, eventCount));
-    this.endIndex = Math.max(this.startIndex, Math.min(bounds.endIndex, eventCount));
+    this.endIndex = Math.max(
+      this.startIndex,
+      Math.min(bounds.endIndex, eventCount),
+    );
   }
 
   /**

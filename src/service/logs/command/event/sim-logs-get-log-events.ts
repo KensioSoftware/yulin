@@ -1,10 +1,10 @@
-import { SimLogsInvalidParameterException } from "../../error/sim-logs.error.js";
 import { simLogsEventsInWindow } from "../../event/sim-logs-event-window.js";
 import { requiredSimLogsLogGroupName } from "../../group/sim-logs-log-group-name.js";
 import type { SimLogsLogGroupStore } from "../../group/sim-logs-log-group-store.js";
 import { requiredSimLogsLogStreamName } from "../../stream/sim-logs-log-stream-name.js";
 import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
 import type { SimLogsRequestOptions } from "../sim-logs-request-options.js";
+import { requiredSimLogsLimit } from "../sim-logs-limit.js";
 import { SimLogsEventCursor } from "./sim-logs-event-cursor.js";
 import type {
   SimGetLogEventsCommand,
@@ -54,7 +54,7 @@ export class SimLogsGetLogEvents {
     const events = simLogsEventsInWindow(stream.events, input);
     const cursor = new SimLogsEventCursor({
       eventCount: events.length,
-      limit: requiredLimit(input.limit),
+      limit: requiredSimLogsLimit(input.limit, maximumLimit),
       startFromHead: input.startFromHead ?? false,
       nextToken: input.nextToken,
     });
@@ -72,18 +72,4 @@ export class SimLogsGetLogEvents {
       nextBackwardToken: cursor.nextBackwardToken,
     };
   }
-}
-
-function requiredLimit(requested: number | undefined): number {
-  const limit = requested ?? maximumLimit;
-
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximumLimit) {
-    throw new SimLogsInvalidParameterException(
-      `1 validation error detected: Value '${String(requested)}' at 'limit' ` +
-        `failed to satisfy constraint: Member must be between 1 and ` +
-        `${maximumLimit}`,
-    );
-  }
-
-  return limit;
 }

@@ -69,7 +69,11 @@ describe("CloudWatch Logs IAM authorization", () => {
     // Given a Role with the policy CDK writes for a function's own logs, which
     // names the group with the wildcard covering its streams.
     const simAws = await simAwsWithRole({
-      Action: ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      Action: [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+      ],
       Resource: `arn:aws:logs:us-east-1:${accountIdOneOnes}:log-group:${logGroupName}:*`,
     });
 
@@ -113,10 +117,7 @@ describe("CloudWatch Logs IAM authorization", () => {
       async () =>
         await simAws
           .logs()
-          .createLogGroup(
-            new CreateLogGroupCommand({ logGroupName }),
-            asRole,
-          ),
+          .createLogGroup(new CreateLogGroupCommand({ logGroupName }), asRole),
     );
 
     // Then it is denied here, as it would be on real AWS.

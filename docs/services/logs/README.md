@@ -46,7 +46,10 @@ await logs.putLogEvents(
     logGroupName,
     logStreamName,
     logEvents: [
-      { timestamp: Date.parse("2026-08-16T09:00:00Z"), message: "INFO handling order-1" },
+      {
+        timestamp: Date.parse("2026-08-16T09:00:00Z"),
+        message: "INFO handling order-1",
+      },
       {
         timestamp: Date.parse("2026-08-16T09:00:01Z"),
         message: "ERROR order has no items",
@@ -73,13 +76,13 @@ The plain text filter pattern syntax is supported: terms are matched as case sen
 every unprefixed term must appear, a `-` prefix excludes a term, a `?` prefix makes a term one of a
 set of alternatives, and a quoted phrase matches with its spaces intact.
 
-| Pattern | Matches |
-| --- | --- |
-| `ERROR` | messages containing `ERROR` |
-| `ERROR orders` | messages containing both terms |
-| `?ERROR ?WARN` | messages containing either term |
-| `ERROR -Throttling` | messages containing `ERROR` but not `Throttling` |
-| `"order has no items"` | messages containing that exact phrase |
+| Pattern                | Matches                                          |
+| ---------------------- | ------------------------------------------------ |
+| `ERROR`                | messages containing `ERROR`                      |
+| `ERROR orders`         | messages containing both terms                   |
+| `?ERROR ?WARN`         | messages containing either term                  |
+| `ERROR -Throttling`    | messages containing `ERROR` but not `Throttling` |
+| `"order has no items"` | messages containing that exact phrase            |
 
 An omitted or empty pattern matches everything.
 
@@ -99,6 +102,10 @@ back rather than nothing, so a caller polling a stream keeps it and asks again.
 
 Both readers narrow to a half open time window: an event whose timestamp equals `startTime` is
 included, and one whose timestamp equals `endTime` is not.
+
+A token is an offset into the events the request selected, so keep `startTime` and `endTime` the
+same across a walk. Changing the window part-way through means the offset is counted against a
+different set of events, and the page you get back will not be the one you expected.
 
 ```typescript sim-logs-read-a-stream
 /**

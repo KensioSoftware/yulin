@@ -37,7 +37,7 @@ export class SimLogsLogStream {
    * Every event on this stream, oldest first.
    */
   get events(): readonly SimLogsStoredEvent[] {
-    return [...this.#events].sort(compareSimLogsEvents);
+    return this.#events.toSorted(compareSimLogsEvents);
   }
 
   /**

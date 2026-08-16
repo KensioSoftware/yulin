@@ -40,7 +40,9 @@ export class SimLogsRetentionCommands {
     command: SimPutRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): SimPutRetentionPolicyCommandOutput {
-    const logGroupName = requiredSimLogsLogGroupName(command.input.logGroupName);
+    const logGroupName = requiredSimLogsLogGroupName(
+      command.input.logGroupName,
+    );
     const retentionInDays = requiredSimLogsRetentionDays(
       command.input.retentionInDays,
     );
@@ -63,7 +65,9 @@ export class SimLogsRetentionCommands {
     command: SimDeleteRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): SimDeleteRetentionPolicyCommandOutput {
-    const logGroupName = requiredSimLogsLogGroupName(command.input.logGroupName);
+    const logGroupName = requiredSimLogsLogGroupName(
+      command.input.logGroupName,
+    );
 
     this.#authorizer.authorizeLogGroup(
       "logs:DeleteRetentionPolicy",

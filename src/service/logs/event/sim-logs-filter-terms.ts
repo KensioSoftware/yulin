@@ -15,27 +15,39 @@ const termKindsByPrefix = new Map<string, SimLogsFilterTermKind>([
   ["-", "excluded"],
 ]);
 
+const quote = '"';
+const escape = "\\";
+
 /**
  * Read the terms out of a plain text CloudWatch Logs filter pattern.
  *
  * A term is a bare word or a quoted phrase, optionally prefixed with `?` to
  * make it one of the alternatives or `-` to exclude it. Whitespace separates
  * terms, and only a quoted phrase may carry a space of its own.
+ *
+ * The scan reads characters with `charAt` rather than by index, which answers
+ * with the empty string past the end instead of undefined. That keeps the
+ * whole of this file free of both the assertions and the bounds checks an
+ * indexed scan would need for a position the loop conditions already rule out.
  */
-export function simLogsFilterTerms(pattern: string): readonly SimLogsFilterTerm[] {
+export function simLogsFilterTerms(
+  pattern: string,
+): readonly SimLogsFilterTerm[] {
   const terms: SimLogsFilterTerm[] = [];
   let index = 0;
 
   while (index < pattern.length) {
-    if (pattern[index] === undefined || /\s/.test(pattern[index] as string)) {
+    const character = pattern.charAt(index);
+
+    if (/\s/.test(character)) {
       index += 1;
       continue;
     }
 
-    const kind = termKindsByPrefix.get(pattern[index] as string);
+    const kind = termKindsByPrefix.get(character);
     const start = kind === undefined ? index : index + 1;
     const read =
-      pattern[start] === '"'
+      pattern.charAt(start) === quote
         ? readQuoted(pattern, start)
         : readBare(pattern, start);
 
@@ -59,15 +71,15 @@ function readQuoted(pattern: string, start: number): SimLogsFilterTermRead {
   let index = start + 1;
 
   while (index < pattern.length) {
-    const character = pattern[index] as string;
+    const character = pattern.charAt(index);
 
-    if (character === "\\" && pattern[index + 1] !== undefined) {
-      text += pattern[index + 1] as string;
+    if (character === escape && index + 1 < pattern.length) {
+      text += pattern.charAt(index + 1);
       index += 2;
       continue;
     }
 
-    if (character === '"') {
+    if (character === quote) {
       return { text, next: index + 1 };
     }
 

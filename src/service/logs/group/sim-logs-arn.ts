@@ -56,7 +56,5 @@ export function simLogsLogStreamArn(
   logGroupName: string,
   logStreamName: string,
 ): string {
-  return (
-    `${simLogsLogGroupArn(scope, logGroupName)}:log-stream:${logStreamName}`
-  );
+  return `${simLogsLogGroupArn(scope, logGroupName)}:log-stream:${logStreamName}`;
 }

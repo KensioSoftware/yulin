@@ -44,7 +44,9 @@ export class SimLogsLogStreamCommands {
     command: SimCreateLogStreamCommand,
     options?: SimLogsRequestOptions,
   ): SimCreateLogStreamCommandOutput {
-    const logGroupName = requiredSimLogsLogGroupName(command.input.logGroupName);
+    const logGroupName = requiredSimLogsLogGroupName(
+      command.input.logGroupName,
+    );
     const logStreamName = requiredSimLogsLogStreamName(
       command.input.logStreamName,
     );

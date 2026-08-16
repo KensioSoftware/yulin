@@ -1,4 +1,5 @@
 import { SimLogsInvalidParameterException } from "../error/sim-logs.error.js";
+import { requiredSimLogsLimit } from "./sim-logs-limit.js";
 
 interface SimLogsPageProperties<T> {
   /** Everything the request selected, before paging. */
@@ -18,37 +19,30 @@ interface SimLogsPageProperties<T> {
  * into what the request selected. Tokens are the canonical representation of
  * that offset, so a token from somewhere else is refused rather than quietly
  * starting again from the beginning.
+ *
+ * An offset is only meaningful against the selection it was issued for, so a
+ * token carried over to a request with a different prefix, filter or time
+ * window reaches a different place. That is the same bargain simulated SQS
+ * makes with its own listings, and it is documented rather than defended
+ * against: there is no security boundary between a test and the simulator it
+ * is calling.
  */
 export class SimLogsPage<T> {
   readonly items: readonly T[];
   readonly nextToken: string | undefined;
 
   constructor(properties: SimLogsPageProperties<T>) {
-    const { listed, maximumLimit } = properties;
-    const limit = pageLimit(properties.limit, maximumLimit);
+    const { listed } = properties;
+    const limit = requiredSimLogsLimit(
+      properties.limit,
+      properties.maximumLimit,
+    );
     const startIndex = pageStartIndex(properties.nextToken, listed.length);
     const nextIndex = startIndex + limit;
 
     this.items = listed.slice(startIndex, nextIndex);
     this.nextToken = nextIndex >= listed.length ? undefined : String(nextIndex);
   }
-}
-
-function pageLimit(
-  requested: number | undefined,
-  maximumLimit: number,
-): number {
-  const limit = requested ?? maximumLimit;
-
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximumLimit) {
-    throw new SimLogsInvalidParameterException(
-      `1 validation error detected: Value '${String(requested)}' at 'limit' ` +
-        `failed to satisfy constraint: Member must be between 1 and ` +
-        `${maximumLimit}`,
-    );
-  }
-
-  return limit;
 }
 
 function pageStartIndex(
