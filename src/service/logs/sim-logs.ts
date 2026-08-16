@@ -21,6 +21,7 @@ import { SimLogsLogStreamCommands } from "./command/stream/sim-logs-log-stream-c
 import { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
 import type { SimLogsLogGroup } from "./group/sim-logs-log-group.js";
 import { SimLogsLogGroupStore } from "./group/sim-logs-log-group-store.js";
+import { SimLogsCfnResourceFactory } from "./cfn/sim-logs-cfn-resource-factory.js";
 import { SimLogsSdkCommandRouter } from "./sdk/sim-logs-sdk-command-router.js";
 import { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -54,6 +55,7 @@ export class SimLogs {
   readonly #background: BackgroundScheduler;
   readonly #serviceWriter: SimLogsServiceWriter;
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);
+  readonly #cfnFactory = new SimLogsCfnResourceFactory({ logs: this });
 
   constructor(properties: SimLogsProperties = {}) {
     const {
@@ -239,6 +241,13 @@ export class SimLogs {
   ): Promise<simLogsCommands.SimFilterLogEventsCommandOutput> {
     await this.#background.sequence();
     return this.#filterLogEventsCommand.handle(command, options);
+  }
+
+  /**
+   * Get the CloudFormation Resource factory for AWS::Logs::* Resources.
+   */
+  cfnResourceFactory(): SimLogsCfnResourceFactory {
+    return this.#cfnFactory;
   }
 
   /**

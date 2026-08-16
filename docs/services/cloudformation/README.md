@@ -1335,8 +1335,10 @@ builds it as a singleton.
 
 None of those three do anything here. Yulin makes the copy itself, so the function is never invoked,
 the Layer it would have loaded the CLI from is never read, and nothing is ever written to the log
-group. They are reported in [`stack.inertResources`](#resources-deliberately-left-out) rather than
-as skipped resources, so a stack whose deployments all worked reports no gaps at all.
+group. The function and the Layer are reported in
+[`stack.inertResources`](#resources-deliberately-left-out) rather than as skipped resources, so a
+stack whose deployments all worked reports no gaps at all. The log group is created like any other,
+and stays empty, which is what an account is left with too.
 
 That matters beyond tidiness. Sim Lambda declines the provider on its Python runtime with a message
 saying to [bind a real in-process handler](#lambda-function-bindings) to the function, which is sound
@@ -1869,7 +1871,8 @@ Two things make a Resource inert. Its type can be one no simulated service reads
 - `AWS::CDK::Metadata`, the construct-library analytics CDK adds to every synthesized stack.
 
 Or the stack around it can: the provider Lambda function for a CDK custom resource the simulator
-carries out itself is inert, and so is that function's log group. See
+carries out itself is inert. Its log group is not, because log groups are created: an empty one is
+what an account is left with when nothing invokes the provider either. See
 [the provider CDK synthesizes](#the-provider-cdk-synthesizes).
 
 ## Properties a Resource was created without
@@ -2051,6 +2054,7 @@ The resource types it creates are:
 - `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
 - `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`
+- `AWS::Logs::LogGroup`
 - `AWS::Route53::HostedZone`, `AWS::Route53::RecordSet`, `AWS::Route53::KeySigningKey` and
   `AWS::Route53::DNSSEC`
 - `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
@@ -2076,9 +2080,11 @@ Each service's own docs describe what its resource types support.
   `stack.inertResources` instead, and are listed under
   [resources deliberately left out](#resources-deliberately-left-out). Read both when accounting for
   every resource in a template.
-- `AWS::Logs::LogGroup` is not simulated. The one CDK writes for a custom resource provider is
-  reported as inert, because that provider is never invoked, but a log group a stack declares for
-  itself is skipped like any other unsupported resource type, and nothing simulated writes to it.
+- `AWS::Logs::LogGroup` is created, including the one CDK writes for a custom resource provider,
+  which is left empty because that provider is never invoked. A log group a stack declares for a
+  Lambda function is the same group that function writes to, and a group already there is taken over
+  rather than failing the deploy the way real CloudFormation does. See the
+  [simulated CloudWatch Logs docs](../logs/ "Simulated CloudWatch Logs usage docs").
 - A resource property that is not simulated is left out and recorded in `stack.ignoredProperties`
   rather than failing the stack, so the resource is created behaving differently to the one the
   template describes. See
