@@ -1,8 +1,9 @@
-# Simulated CloudWatch metrics
+# Simulated CloudWatch metrics and alarms
 
 Yulin includes a simulated Amazon CloudWatch for tests and local development. It holds custom
 metrics: the datapoints `PutMetricData` publishes, and the statistics `GetMetricStatistics` and
-`GetMetricData` read back from them, without an AWS account.
+`GetMetricData` read back from them, without an AWS account. It also holds alarms over those
+metrics, which evaluate on the simulation's clock and notify an SNS topic when they change state.
 
 That is what this service is for. Code that publishes a business metric is code teams already have,
 and until now the only way to test it was to assert that the SDK client had been called, which
@@ -143,12 +144,127 @@ console.log(read.MetricDataResults?.at(0)?.Values);
 `ListMetrics` reads `RecentlyActive: "PT3H"` against the same clock, so advancing time past the
 window drops a metric out of the listing without anything having to expire it.
 
+## Alarms
+
+An alarm watches one metric and changes state on the simulation's clock. Nothing here uses a real
+timer: each evaluation is scheduled at the next period boundary, so a frozen clock evaluates nothing
+and advancing time by twenty minutes walks twenty one-minute evaluations and settles before the next
+line of the test runs.
+
+```typescript sim-cloudwatch-alarm
+/**
+ * An alarm that fires into an SNS topic once two of three minutes breach.
+ */
+
+import {
+  DescribeAlarmsCommand,
+  PutMetricAlarmCommand,
+  PutMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { CreateTopicCommand } from "@aws-sdk/client-sns";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const metrics = simAws.cloudWatch();
+
+await simAws.clock().setTo(new Date("2026-08-16T09:00:00.000Z"));
+
+const topic = await simAws
+  .sns()
+  .createTopic(new CreateTopicCommand({ Name: "orders-alerts" }));
+
+await metrics.putMetricAlarm(
+  new PutMetricAlarmCommand({
+    AlarmName: "OrdersFailing",
+    Namespace: "Orders",
+    MetricName: "Failed",
+    Statistic: "Sum",
+    Period: 60,
+    EvaluationPeriods: 3,
+    DatapointsToAlarm: 2,
+    Threshold: 5,
+    ComparisonOperator: "GreaterThanThreshold",
+    AlarmActions: [String(topic.TopicArn)],
+  }),
+);
+
+// Two breaching minutes, without waiting two real minutes.
+for (let minute = 0; minute < 2; minute++) {
+  await metrics.putMetricData(
+    new PutMetricDataCommand({
+      Namespace: "Orders",
+      MetricData: [{ MetricName: "Failed", Value: 10 }],
+    }),
+  );
+  await simAws.clock().advanceBy({ minutes: 1 });
+}
+
+const described = await metrics.describeAlarms(
+  new DescribeAlarmsCommand({ AlarmNames: ["OrdersFailing"] }),
+);
+
+// "ALARM", and anything subscribed to the topic has the notification.
+console.log(described.MetricAlarms?.at(0)?.StateValue);
+```
+
+A new alarm is in `INSUFFICIENT_DATA` until it has evaluated a period, as on real CloudWatch. The
+window it looks back over reaches behind the moment the alarm was created, so an alarm over a metric
+nothing publishes into, with `TreatMissingData: "breaching"`, fires on its first evaluation rather
+than waiting for the periods to accumulate. That is what an account does too.
+
+### Reaching a subscriber
+
+An alarm notifies through the ordinary `Publish` path, so a notification fans out to the topic's
+subscriptions exactly as an SDK caller's message would, with the JSON body real CloudWatch sends:
+`AlarmName`, `NewStateValue`, `OldStateValue`, `NewStateReason`, `StateChangeTime` and `Trigger`.
+Only a change fires anything, so an alarm that stays in `ALARM` across ten periods notifies once.
+
+`SetAlarmState` forces a transition and fires its actions, which is how a test exercises a
+subscriber without arranging for a metric to breach at all.
+
+The topic has to be in the same account and region as the alarm, as real CloudWatch requires. An
+action that reaches nothing is recorded rather than passing quietly:
+
+```typescript sim-cloudwatch-alarm-failures
+/**
+ * Finding out that an alarm action reached nothing.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// ...after an alarm with a bad action ARN has fired:
+for (const failure of simAws.cloudWatch().alarmActionFailures) {
+  console.log(failure.alarmName, failure.actionArn, failure.reason);
+}
+```
+
+Real CloudWatch tells nobody when an alarm action fails, and neither does this: the alarm changes
+state either way. Keeping the failure is what stops a subscriber's queue being mysteriously empty.
+
+### What an alarm can watch and do
+
+- The four threshold comparison operators, `DatapointsToAlarm` for M-of-N evaluation, and all four
+  `TreatMissingData` treatments including `ignore`, which leaves the alarm where it is.
+- `ActionsEnabled: false` still evaluates and records state; it just publishes nothing.
+- `DescribeAlarmHistory` reports the state changes with the simulated time each happened at.
+- An SNS topic ARN is the only action target. Auto Scaling, EC2, Systems Manager and Lambda actions
+  are refused rather than stored and ignored, because an alarm that fired and did nothing would let
+  a test pass while the thing the alarm exists to do never happened.
+- Composite alarms, anomaly detection and metric math alarms are all refused.
+
 ## Permissions
 
-CloudWatch metrics have no ARN, so there is nothing for a policy to name: every action here is
+CloudWatch metrics have no ARN, so there is nothing for a policy to name: every metric action here is
 granted on `*`. A policy written against something like
 `arn:aws:cloudwatch:eu-west-2:111111111111:metric/Orders/Failed` reaches nothing, here and in an
 account.
+
+Alarms are the exception, and do have an ARN. `PutMetricAlarm`, `DeleteAlarms` and `SetAlarmState`
+authorize against `arn:aws:cloudwatch:<region>:<account>:alarm:<name>`, while `DescribeAlarms` and
+`DescribeAlarmHistory` take no resource-level permission at all, exactly as on real CloudWatch.
 
 The one way to narrow publishing is the `cloudwatch:namespace` condition key:
 
@@ -216,7 +332,10 @@ await simAws.cloudWatch().putMetricData(
 - `GetMetricStatistics`, with `SampleCount`, `Average`, `Sum`, `Minimum` and `Maximum` over periods
   of a whole number of minutes, filtered by `Unit`.
 - `GetMetricData`, with `MetricStat` queries, `ScanBy` and `ReturnData`.
-- IAM authorization on each action, including the `cloudwatch:namespace` condition key.
+- `PutMetricAlarm`, `DescribeAlarms`, `DeleteAlarms`, `SetAlarmState` and `DescribeAlarmHistory`,
+  with evaluation on the simulation's clock and SNS notifications on a state change.
+- IAM authorization on each action, including the `cloudwatch:namespace` condition key and
+  alarm-ARN resources.
 
 ## What is not, and how it says so
 
@@ -224,7 +343,8 @@ Anything real CloudWatch would accept and this does not carry out is refused wit
 so, rather than accepted and ignored. A silently dropped filter is worse than a failure, because the
 test still passes and no longer means what it says.
 
-- **Alarms.** Nothing here evaluates a threshold or fires an action yet.
+- **Composite and anomaly detection alarms.** `Metrics` and `ThresholdMetricId` on `PutMetricAlarm`
+  are refused; there is no trained model here for an anomaly band to come from.
 - **Metric math.** A `GetMetricData` query carrying an `Expression` is refused.
 - **Percentiles and other extended statistics.** They need the individual values behind a period,
   which a `StatisticValues` datum never carries, so CloudWatch itself cannot report one for a metric

@@ -1,6 +1,8 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type * as simCloudWatchCommands from "./command/sim-cloudwatch-command.types.js";
 import type { SimCloudWatchRequestOptions } from "./command/sim-cloudwatch-request-options.js";
+import type { SimCloudWatchAlarmActionFailure } from "./alarm/action/sim-cloudwatch-alarm-action-failures.js";
+import type { SimCloudWatchAlarm } from "./alarm/sim-cloudwatch-alarm.js";
 import type { SimCloudWatchMetric } from "./metric/sim-cloudwatch-metric.js";
 import { SimCloudWatchSdkCommandRouter } from "./sdk/sim-cloudwatch-sdk-command-router.js";
 import {
@@ -36,6 +38,27 @@ export class SimCloudWatch {
    */
   allMetrics(): readonly SimCloudWatchMetric[] {
     return this.#commands.metrics.all;
+  }
+
+  /**
+   * Every alarm in this scope, in the order each was created.
+   *
+   * This is the simulator's own accessor, for tests inspecting alarm state
+   * without going through a Command and its authorization.
+   */
+  allAlarms(): readonly SimCloudWatchAlarm[] {
+    return this.#commands.alarms.all;
+  }
+
+  /**
+   * Every alarm notification this scope could not send.
+   *
+   * A failed action is invisible on real CloudWatch: the alarm changes state
+   * either way and nothing reports the failure. Keeping it is what lets a test
+   * find out that the alarm it set up reached nothing.
+   */
+  get alarmActionFailures(): readonly SimCloudWatchAlarmActionFailure[] {
+    return this.#commands.alarmActions.failures.all;
   }
 
   /**
@@ -80,6 +103,61 @@ export class SimCloudWatch {
   ): Promise<simCloudWatchCommands.SimGetMetricDataCommandOutput> {
     await this.#commands.background.sequence();
     return this.#commands.getMetricData.handle(command, options);
+  }
+
+  /**
+   * Handle a PutMetricAlarm Command from the SDK.
+   */
+  async putMetricAlarm(
+    command: simCloudWatchCommands.SimPutMetricAlarmCommand,
+    options?: SimCloudWatchRequestOptions,
+  ): Promise<simCloudWatchCommands.SimPutMetricAlarmCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.alarmWrites.putMetricAlarm(command, options);
+  }
+
+  /**
+   * Handle a DescribeAlarms Command from the SDK.
+   */
+  async describeAlarms(
+    command: simCloudWatchCommands.SimDescribeAlarmsCommand,
+    options?: SimCloudWatchRequestOptions,
+  ): Promise<simCloudWatchCommands.SimDescribeAlarmsCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.alarmReads.describeAlarms(command, options);
+  }
+
+  /**
+   * Handle a DeleteAlarms Command from the SDK.
+   */
+  async deleteAlarms(
+    command: simCloudWatchCommands.SimDeleteAlarmsCommand,
+    options?: SimCloudWatchRequestOptions,
+  ): Promise<simCloudWatchCommands.SimDeleteAlarmsCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.alarmWrites.deleteAlarms(command, options);
+  }
+
+  /**
+   * Handle a SetAlarmState Command from the SDK.
+   */
+  async setAlarmState(
+    command: simCloudWatchCommands.SimSetAlarmStateCommand,
+    options?: SimCloudWatchRequestOptions,
+  ): Promise<simCloudWatchCommands.SimSetAlarmStateCommandOutput> {
+    await this.#commands.background.sequence();
+    return await this.#commands.setAlarmState.handle(command, options);
+  }
+
+  /**
+   * Handle a DescribeAlarmHistory Command from the SDK.
+   */
+  async describeAlarmHistory(
+    command: simCloudWatchCommands.SimDescribeAlarmHistoryCommand,
+    options?: SimCloudWatchRequestOptions,
+  ): Promise<simCloudWatchCommands.SimDescribeAlarmHistoryCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.alarmReads.describeAlarmHistory(command, options);
   }
 
   /**

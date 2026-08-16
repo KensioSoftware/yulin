@@ -1,13 +1,19 @@
 import {
   CloudWatchClient,
+  DeleteAlarmsCommand,
+  DescribeAlarmHistoryCommand,
+  DescribeAlarmsCommand,
   GetMetricDataCommand,
   GetMetricStatisticsCommand,
   ListMetricsCommand,
+  PutMetricAlarmCommand,
   PutMetricDataCommand,
+  SetAlarmStateCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
   assertArrayEquals,
   assertArrayIncludesAll,
+  assertArrayLength,
   assertIdentical,
   assertUndefined,
 } from "@kensio/smartass";
@@ -39,6 +45,11 @@ describe("SimCloudWatchSdkCommandRouter", () => {
       "ListMetricsCommand",
       "GetMetricStatisticsCommand",
       "GetMetricDataCommand",
+      "PutMetricAlarmCommand",
+      "DescribeAlarmsCommand",
+      "DeleteAlarmsCommand",
+      "SetAlarmStateCommand",
+      "DescribeAlarmHistoryCommand",
     ]);
   });
 
@@ -50,7 +61,7 @@ describe("SimCloudWatchSdkCommandRouter", () => {
     const route = simAws
       .cloudWatch()
       .sdkCommandRouter()
-      .route("PutMetricAlarmCommand");
+      .route("PutCompositeAlarmCommand");
 
     // Then there is no route for it.
     assertUndefined(route);
@@ -131,5 +142,51 @@ describe("CloudWatch SDK interception", () => {
 
     // Then it sees none of them, as it would in an account.
     assertArrayEquals(listed.Metrics ?? [], []);
+  });
+
+  it("routes every alarm Command through the intercepted client", async () => {
+    // Given an intercepted CloudWatch SDK client.
+    using simSdk = new SimSdk();
+    simSdk.intercept(CloudWatchClient);
+
+    const client = new CloudWatchClient({ region: "eu-west-2" });
+
+    // When ordinary SDK code creates an alarm and drives it through its whole
+    // life.
+    await client.send(
+      new PutMetricAlarmCommand({
+        AlarmName: "OrdersFailing",
+        Namespace: "Orders",
+        MetricName: "Failed",
+        Statistic: "Sum",
+        Period: 60,
+        EvaluationPeriods: 1,
+        Threshold: 5,
+        ComparisonOperator: "GreaterThanThreshold",
+      }),
+    );
+    await client.send(
+      new SetAlarmStateCommand({
+        AlarmName: "OrdersFailing",
+        StateValue: "ALARM",
+        StateReason: "Forced through the SDK",
+      }),
+    );
+
+    const described = await client.send(new DescribeAlarmsCommand({}));
+    const history = await client.send(
+      new DescribeAlarmHistoryCommand({ AlarmName: "OrdersFailing" }),
+    );
+
+    await client.send(
+      new DeleteAlarmsCommand({ AlarmNames: ["OrdersFailing"] }),
+    );
+
+    const afterDelete = await client.send(new DescribeAlarmsCommand({}));
+
+    // Then every operation reached the simulator.
+    assertIdentical(described.MetricAlarms?.at(0)?.StateValue, "ALARM");
+    assertArrayLength(history.AlarmHistoryItems ?? [], 1);
+    assertArrayLength(afterDelete.MetricAlarms ?? [], 0);
   });
 });

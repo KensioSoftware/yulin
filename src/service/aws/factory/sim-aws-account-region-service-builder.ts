@@ -4,24 +4,19 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
-import { SimAcm } from "../../acm/sim-acm.js";
-import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import {
-  simAwsAcmDnsRecords,
   simAwsEventBridgeDeliveryTargets,
-  simAwsHttpApiJwtIssuerKeys,
   simAwsRekognitionImages,
   simAwsSchedulerDeliveryTargets,
 } from "./sim-aws-cross-account-collaborators.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
+import { SimCloudWatch } from "../../cloudwatch/index.js";
+import { simAwsCloudWatchCollaborators } from "./sim-aws-cloudwatch-collaborators.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
-import { SimEcr } from "../../ecr/index.js";
 import { SimEcs } from "../../ecs/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
-import { SimElbV2 } from "../../elbv2/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
-import { SimKms } from "../../kms/index.js";
 import { SimLambda } from "../../lambda/index.js";
 import { SimLogs } from "../../logs/index.js";
 import { simAwsLogsCollaborators } from "./sim-aws-logs-collaborators.js";
@@ -88,37 +83,27 @@ export class SimAwsAccountRegionServiceBuilder {
   }
 
   /** Create simulated ACM for an Account Region scope. */
-  createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
-    const acm = new SimAcm({
-      ...this.scoped(scope),
-      dnsRecords: simAwsAcmDnsRecords(this.registries),
-    });
-    this.registries.acm.register(scope.accountRegionScope, acm);
-
-    return acm;
-  }
-
-  /**
-   * Create simulated API Gateway v2 for an Account Region scope.
-   *
-   * HTTP APIs are Region-scoped on real AWS: the endpoint API Gateway
-   * generates names the Region, and an API cannot be reached from another one.
-   */
-  createApiGatewayV2(scope: SimAwsAccountRegionContainer): SimApiGatewayV2 {
-    return new SimApiGatewayV2({
-      ...this.scoped(scope),
-      // API ids are unique across the simulation, and an API is reachable by
-      // id alone from the serving layer, whichever scope created it.
-      registry: this.registries.httpApi,
-      jwtIssuerKeys: simAwsHttpApiJwtIssuerKeys(this.registries),
-    });
-  }
-
   /** Create simulated CloudFormation for an Account Region scope. */
   createCloudFormation(scope: SimAwsAccountRegionContainer): SimCloudFormation {
     return new SimCloudFormation({
       ...this.scoped(scope),
       simAws: this.simAws,
+    });
+  }
+
+  /**
+   * Create simulated CloudWatch metrics and alarms for an Account Region
+   * scope.
+   *
+   * Metrics are Region-scoped on real AWS: a metric published in one Region is
+   * invisible from another, and there is no ARN by which to reach one across
+   * the boundary. An alarm's SNS topic has to be in that Region too, which is
+   * what this reaches the rest of the simulation for.
+   */
+  createCloudWatch(scope: SimAwsAccountRegionContainer): SimCloudWatch {
+    return new SimCloudWatch({
+      ...this.scoped(scope),
+      ...simAwsCloudWatchCollaborators(this.simAws, scope.accountRegionScope),
     });
   }
 
@@ -136,21 +121,6 @@ export class SimAwsAccountRegionServiceBuilder {
       userPoolRegistry: this.registries.cognito,
       domainRegistry: this.registries.cognitoDomains,
       triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
-    });
-  }
-
-  /**
-   * Create simulated ECR for an Account Region scope.
-   *
-   * Repositories are Region-scoped on real AWS: a repository ARN names the
-   * Region, and the registry host in an image URI carries the Account and the
-   * Region both. It is registered because a container image function holds
-   * nothing but that URI, and the function need not be in this scope.
-   */
-  createEcr(scope: SimAwsAccountRegionContainer): SimEcr {
-    return new SimEcr({
-      accountRegionScope: scope.accountRegionScope,
-      registry: this.registries.ecr,
     });
   }
 
@@ -173,31 +143,6 @@ export class SimAwsAccountRegionServiceBuilder {
       ...this.scoped(scope),
       deliveryTargets: simAwsEventBridgeDeliveryTargets(this.simAws),
     });
-  }
-
-  /**
-   * Create simulated Elastic Load Balancing v2 for an Account Region scope.
-   *
-   * The registries are the hops from a name to a scope: a load balancer's DNS
-   * name to the Account holding it, and a listener's certificate ARN to ACM.
-   */
-  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    const { elbV2: registry, acm: acmRegistry } = this.registries;
-
-    return new SimElbV2({ ...this.scoped(scope), registry, acmRegistry });
-  }
-
-  /**
-   * Create simulated KMS for an Account Region scope.
-   *
-   * KMS keys are Region-scoped on real AWS: a key ARN names its Region, and a
-   * ciphertext produced in one Region cannot be decrypted in another. That is
-   * why it is registered: a key ARN carries the Region another service needs.
-   */
-  createKms(scope: SimAwsAccountRegionContainer): SimKms {
-    const kms = new SimKms(this.scoped(scope));
-    this.registries.kms.register(scope.accountRegionScope, kms);
-    return kms;
   }
 
   /** Create simulated CloudWatch Logs for an Account Region scope. */
