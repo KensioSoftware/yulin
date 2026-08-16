@@ -46,6 +46,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
       scoped.cloudFrontKeyValueStore().sdkCommandRouter(),
   ],
   [
+    "CloudWatch",
+    (scoped): SimSdkCommandRouter => scoped.cloudWatch().sdkCommandRouter(),
+  ],
+  [
     "Cognito Identity Provider",
     (scoped): SimSdkCommandRouter =>
       scoped.cognitoIdentityProvider().sdkCommandRouter(),

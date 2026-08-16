@@ -11,6 +11,7 @@ import type { SimCloudFormation } from "../../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
+import type { SimCloudWatch } from "../../cloudwatch/index.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimEcr } from "../../ecr/index.js";
 import type { SimEcs } from "../../ecs/index.js";
@@ -180,6 +181,11 @@ export class SimAwsServiceFactory {
     scope: SimAwsAccountRegionContainer,
   ): SimCognitoIdentityProvider {
     return this.accountRegionServices.createCognitoIdentityProvider(scope);
+  }
+
+  /** Create simulated CloudWatch metrics for an Account Region scope. */
+  createCloudWatch(scope: SimAwsAccountRegionContainer): SimCloudWatch {
+    return this.selfContainedServices.createCloudWatch(scope);
   }
 
   /** Create simulated DynamoDB for an Account Region scope. */

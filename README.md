@@ -23,6 +23,7 @@ npm i -D @kensio/yulin
 - [API Gateway HTTP APIs](./docs/services/apigatewayv2 "Simulated API Gateway HTTP API docs")
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
+- [CloudWatch metrics](./docs/services/cloudwatch "Simulated CloudWatch metrics docs")
 - [Cognito user pools](./docs/services/cognito "Simulated Cognito user pools docs")
 - [DynamoDB](./docs/services/dynamodb "Simulated DynamoDB docs")
 - [ECR](./docs/services/ecr "Simulated ECR docs")
