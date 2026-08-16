@@ -1,6 +1,5 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
-import { SimLogs } from "../../logs/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -36,16 +35,6 @@ export class SimAwsSelfContainedServiceBuilder {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return new SimDynamoDatabase(this.scoped(scope));
-  }
-
-  /**
-   * Create simulated CloudWatch Logs for an Account Region scope.
-   *
-   * Log groups are Region-scoped on real AWS: a group name is unique within
-   * one Account and Region, and its ARN names the Region.
-   */
-  createLogs(scope: SimAwsAccountRegionContainer): SimLogs {
-    return new SimLogs(this.scoped(scope));
   }
 
   /**

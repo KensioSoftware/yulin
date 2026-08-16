@@ -244,7 +244,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated CloudWatch Logs for an Account Region scope. */
   createLogs(scope: SimAwsAccountRegionContainer): SimLogs {
-    return this.selfContainedServices.createLogs(scope);
+    return this.accountRegionServices.createLogs(scope);
   }
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */

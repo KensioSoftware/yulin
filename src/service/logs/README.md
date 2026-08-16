@@ -118,6 +118,33 @@ that log groups are created, that branch is gone: a Resource type a service crea
 an empty log group is exactly what an account is left with when nothing invokes the provider
 function either.
 
+## Subscription filters
+
+`subscription/` delivers what is written to a log group onward to a Lambda function.
+
+The shape follows simulated SNS's fan-out, for the same reasons. `SimLogsSubscriptionFanOut`
+schedules a delivery on the background scheduler rather than making it inline, because real
+CloudWatch Logs answers `PutLogEvents` before anything is delivered and a destination that throws
+must not fail the write that triggered it. `SimAwsLogsSubscriptionFunctions` resolves the function
+when an event is delivered rather than when it is built: simulated Lambda records its output here,
+so reaching it during construction would be a cycle with no bottom.
+
+Each filter gets only the events its own pattern matched, in one delivery, so a handler receives the
+lines it subscribed to rather than everything that happened to be written. The payload is gzipped
+and base64 encoded under `awslogs.data` exactly as AWS encodes it, because the first thing a real
+subscription handler does is gunzip that field; delivering the document in the clear would be easier
+to read in a test and would break every handler written against a real subscription.
+
+Two checks matter and happen in different places. The destination is checked at
+`PutSubscriptionFilter`, as real CloudWatch Logs checks it, so a function that never granted
+permission fails the call rather than leaving a filter that drops every event in silence. The
+resource policy is then consulted again on every delivery, so a permission taken away afterwards
+stops delivery, which is what an account does.
+
+Failures are kept rather than thrown. Real CloudWatch Logs tells nobody about a failed delivery,
+which would leave a test with a handler that mysteriously never ran, so every failure lands in
+`subscriptionFailures` for a test to read.
+
 ## Writing from the rest of the simulation
 
 `SimLogsServiceWriter`, under `write/`, is how a simulated service records its own output. It is
@@ -139,7 +166,12 @@ shares.
 
 ## What is not simulated
 
-Nothing expires, as above. Subscription filters, metric filters, Logs Insights queries, export
-tasks, tagging, encryption and data protection policies are all absent. `metricFilterCount` is
-always zero and a stream's `storedBytes` is always zero, the latter matching real CloudWatch Logs,
-which stopped reporting it per stream in 2019.
+Nothing expires, as above. Metric filters, Logs Insights queries, export tasks, tagging, encryption
+and data protection policies are all absent, and `metricFilterCount` is always zero. A stream's
+`storedBytes` is always zero too, which matches real CloudWatch Logs: it stopped reporting the
+figure per stream in 2019.
+
+Subscription filters deliver to a Lambda destination only. Kinesis, Firehose and the logical
+destinations that reach another Account are refused rather than accepted and never delivered to,
+and `Distribution` is held and reported but changes nothing, since there are no shards to spread
+across.

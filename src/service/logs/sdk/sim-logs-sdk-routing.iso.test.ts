@@ -10,7 +10,14 @@ import {
   GetLogEventsCommand,
   PutLogEventsCommand,
   PutRetentionPolicyCommand,
+  PutSubscriptionFilterCommand,
+  DescribeSubscriptionFiltersCommand,
+  DeleteSubscriptionFilterCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 import {
   assertArrayEquals,
   assertArrayIncludesAll,
@@ -23,6 +30,7 @@ import { describe, it } from "vitest";
 
 import { SimSdk } from "../../../sdk/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
 
 const logGroupName = "/aws/lambda/orders";
 const logStreamName = "2026/08/16/[$LATEST]abc";
@@ -47,6 +55,9 @@ describe("SimLogsSdkCommandRouter", () => {
       "PutLogEventsCommand",
       "GetLogEventsCommand",
       "FilterLogEventsCommand",
+      "PutSubscriptionFilterCommand",
+      "DescribeSubscriptionFiltersCommand",
+      "DeleteSubscriptionFilterCommand",
     ]);
   });
 
@@ -130,6 +141,64 @@ describe("CloudWatch Logs SDK interception", () => {
     );
     await client.send(new DeleteLogGroupCommand({ logGroupName }));
     const afterDelete = await client.send(new DescribeLogGroupsCommand({}));
+
+    // And the subscription filter commands route too, on a group subscribed to
+    // a function that admits CloudWatch Logs.
+    await client.send(
+      new CreateLogGroupCommand({ logGroupName: "/aws/lambda/billing" }),
+    );
+    const scoped = simSdk.simAws.accountRegionScope(
+      simSdk.simAws.defaultAccountId,
+      "eu-west-2",
+    );
+
+    await scoped.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "error-tracker",
+        Role: `arn:aws:iam::${simSdk.simAws.defaultAccountId}:role/TrackerRole`,
+        Code: { ZipFile: makeLambdaZipFileInput(() => "recorded") },
+      }),
+    );
+    await scoped.lambda().addPermission(
+      new AddPermissionCommand({
+        FunctionName: "error-tracker",
+        StatementId: "logs",
+        Action: "lambda:InvokeFunction",
+        Principal: "logs.eu-west-2.amazonaws.com",
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    await client.send(
+      new PutSubscriptionFilterCommand({
+        logGroupName: "/aws/lambda/billing",
+        filterName: "errors",
+        filterPattern: "",
+        destinationArn: `arn:aws:lambda:eu-west-2:${simSdk.simAws.defaultAccountId}:function:error-tracker`,
+      }),
+    );
+    const filters = await client.send(
+      new DescribeSubscriptionFiltersCommand({
+        logGroupName: "/aws/lambda/billing",
+      }),
+    );
+    await client.send(
+      new DeleteSubscriptionFilterCommand({
+        logGroupName: "/aws/lambda/billing",
+        filterName: "errors",
+      }),
+    );
+    const afterDeleteFilters = await client.send(
+      new DescribeSubscriptionFiltersCommand({
+        logGroupName: "/aws/lambda/billing",
+      }),
+    );
+
+    assertArrayEquals(
+      filters.subscriptionFilters?.map((filter) => filter.filterName),
+      ["errors"],
+    );
+    assertArrayLength(afterDeleteFilters.subscriptionFilters ?? [], 0);
 
     // Then each one reached simulated CloudWatch Logs.
     assertIdentical(withRetention.logGroups?.at(0)?.retentionInDays, 14);

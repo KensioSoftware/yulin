@@ -42,3 +42,15 @@ export type {
   SimPutLogEventsCommandInput,
   SimPutLogEventsCommandOutput,
 } from "./event/event.command.js";
+export type {
+  SimDeleteSubscriptionFilterCommand,
+  SimDeleteSubscriptionFilterCommandInput,
+  SimDeleteSubscriptionFilterCommandOutput,
+  SimDescribeSubscriptionFiltersCommand,
+  SimDescribeSubscriptionFiltersCommandInput,
+  SimDescribeSubscriptionFiltersCommandOutput,
+  SimLogsSubscriptionFilterDetail,
+  SimPutSubscriptionFilterCommand,
+  SimPutSubscriptionFilterCommandInput,
+  SimPutSubscriptionFilterCommandOutput,
+} from "./subscription/subscription.command.js";

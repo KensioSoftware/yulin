@@ -79,3 +79,17 @@ export class SimLogsUnsupportedOperationException extends SimLogsError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated CloudWatch Logs LimitExceededException error.
+ *
+ * Real CloudWatch Logs reports an account or resource quota this way, such as
+ * putting more subscription filters on a log group than it allows.
+ */
+export class SimLogsLimitExceededException extends SimLogsError {
+  public override readonly name = "LimitExceededException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

@@ -23,6 +23,8 @@ import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
 import { SimLambda } from "../../lambda/index.js";
+import { SimLogs } from "../../logs/index.js";
+import { simAwsLogsCollaborators } from "./sim-aws-logs-collaborators.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimRekognition } from "../../rekognition/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
@@ -196,6 +198,14 @@ export class SimAwsAccountRegionServiceBuilder {
     const kms = new SimKms(this.scoped(scope));
     this.registries.kms.register(scope.accountRegionScope, kms);
     return kms;
+  }
+
+  /** Create simulated CloudWatch Logs for an Account Region scope. */
+  createLogs(scope: SimAwsAccountRegionContainer): SimLogs {
+    return new SimLogs({
+      ...this.scoped(scope),
+      ...simAwsLogsCollaborators(this.simAws, scope.accountRegionScope),
+    });
   }
 
   /** Create simulated Lambda for an Account Region scope. */

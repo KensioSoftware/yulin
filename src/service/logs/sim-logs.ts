@@ -1,35 +1,15 @@
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimLogsAuthorizer } from "./command/authorize/sim-logs-authorizer.js";
-import { SimLogsFilterLogEvents } from "./command/event/sim-logs-filter-log-events.js";
-import { SimLogsGetLogEvents } from "./command/event/sim-logs-get-log-events.js";
-import { SimLogsPutLogEvents } from "./command/event/sim-logs-put-log-events.js";
-import { SimLogsLogGroupCommands } from "./command/group/sim-logs-log-group-commands.js";
-import { SimLogsRetentionCommands } from "./command/group/sim-logs-retention-commands.js";
+import { SimLogsCfnResourceFactory } from "./cfn/sim-logs-cfn-resource-factory.js";
 import type * as simLogsCommands from "./command/sim-logs-command.types.js";
 import type { SimLogsRequestOptions } from "./command/sim-logs-request-options.js";
-import { SimLogsLogStreamCommands } from "./command/stream/sim-logs-log-stream-commands.js";
-import { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
 import type { SimLogsLogGroup } from "./group/sim-logs-log-group.js";
-import { SimLogsLogGroupStore } from "./group/sim-logs-log-group-store.js";
-import { SimLogsCfnResourceFactory } from "./cfn/sim-logs-cfn-resource-factory.js";
 import { SimLogsSdkCommandRouter } from "./sdk/sim-logs-sdk-command-router.js";
-import { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
-
-interface SimLogsProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-}
+import {
+  SimLogsCommands,
+  type SimLogsProperties,
+} from "./sim-logs-commands.js";
+import type { SimLogsSubscriptionFailure } from "./subscription/sim-logs-subscription-fan-out.js";
+import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
 /**
  * Simulated CloudWatch Logs. Handles SDK commands. Emulates AWS behaviour and
@@ -45,61 +25,12 @@ interface SimLogsProperties {
  * deployed rather than the deletion that eventually follows from it.
  */
 export class SimLogs {
-  readonly #groups: SimLogsLogGroupStore;
-  readonly #groupCommands: SimLogsLogGroupCommands;
-  readonly #retentionCommands: SimLogsRetentionCommands;
-  readonly #streamCommands: SimLogsLogStreamCommands;
-  readonly #putLogEventsCommand: SimLogsPutLogEvents;
-  readonly #getLogEventsCommand: SimLogsGetLogEvents;
-  readonly #filterLogEventsCommand: SimLogsFilterLogEvents;
-  readonly #background: BackgroundScheduler;
-  readonly #serviceWriter: SimLogsServiceWriter;
+  readonly #commands: SimLogsCommands;
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);
   readonly #cfnFactory = new SimLogsCfnResourceFactory({ logs: this });
 
   constructor(properties: SimLogsProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
-    } = properties;
-
-    const authorizer = new SimLogsAuthorizer({ iam, accountRegionScope });
-    const groups = new SimLogsLogGroupStore({ accountRegionScope });
-    const eventIds = new SimLogsEventIds();
-
-    this.#background = background;
-    this.#groups = groups;
-    this.#groupCommands = new SimLogsLogGroupCommands({
-      groups,
-      authorizer,
-      clock: background,
-    });
-    this.#retentionCommands = new SimLogsRetentionCommands({
-      groups,
-      authorizer,
-    });
-    this.#streamCommands = new SimLogsLogStreamCommands({
-      groups,
-      authorizer,
-      clock: background,
-    });
-    this.#putLogEventsCommand = new SimLogsPutLogEvents({
-      groups,
-      authorizer,
-      eventIds,
-      clock: background,
-    });
-    this.#getLogEventsCommand = new SimLogsGetLogEvents({ groups, authorizer });
-    this.#serviceWriter = new SimLogsServiceWriter({
-      groups,
-      eventIds,
-      clock: background,
-    });
-    this.#filterLogEventsCommand = new SimLogsFilterLogEvents({
-      groups,
-      authorizer,
-    });
+    this.#commands = new SimLogsCommands(properties);
   }
 
   /**
@@ -109,14 +40,14 @@ export class SimLogs {
    * state without going through a Command and its authorization.
    */
   findLogGroup(logGroupName: string): SimLogsLogGroup | undefined {
-    return this.#groups.find(logGroupName);
+    return this.#commands.groups.find(logGroupName);
   }
 
   /**
    * Every log group in this scope, in creation order.
    */
   allLogGroups(): readonly SimLogsLogGroup[] {
-    return this.#groups.all;
+    return this.#commands.groups.all;
   }
 
   /**
@@ -130,7 +61,7 @@ export class SimLogs {
    * documented instead.
    */
   serviceWriter(): SimLogsServiceWriter {
-    return this.#serviceWriter;
+    return this.#commands.serviceWriter;
   }
 
   /**
@@ -140,8 +71,8 @@ export class SimLogs {
     command: simLogsCommands.SimCreateLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimCreateLogGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#groupCommands.createLogGroup(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.logGroups.createLogGroup(command, options);
   }
 
   /**
@@ -151,8 +82,8 @@ export class SimLogs {
     command: simLogsCommands.SimDeleteLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDeleteLogGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#groupCommands.deleteLogGroup(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.logGroups.deleteLogGroup(command, options);
   }
 
   /**
@@ -162,8 +93,8 @@ export class SimLogs {
     command: simLogsCommands.SimDescribeLogGroupsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDescribeLogGroupsCommandOutput> {
-    await this.#background.sequence();
-    return this.#groupCommands.describeLogGroups(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.logGroups.describeLogGroups(command, options);
   }
 
   /**
@@ -173,8 +104,8 @@ export class SimLogs {
     command: simLogsCommands.SimPutRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimPutRetentionPolicyCommandOutput> {
-    await this.#background.sequence();
-    return this.#retentionCommands.putRetentionPolicy(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.retention.putRetentionPolicy(command, options);
   }
 
   /**
@@ -184,8 +115,8 @@ export class SimLogs {
     command: simLogsCommands.SimDeleteRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDeleteRetentionPolicyCommandOutput> {
-    await this.#background.sequence();
-    return this.#retentionCommands.deleteRetentionPolicy(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.retention.deleteRetentionPolicy(command, options);
   }
 
   /**
@@ -195,8 +126,8 @@ export class SimLogs {
     command: simLogsCommands.SimCreateLogStreamCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimCreateLogStreamCommandOutput> {
-    await this.#background.sequence();
-    return this.#streamCommands.createLogStream(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.streams.createLogStream(command, options);
   }
 
   /**
@@ -206,8 +137,8 @@ export class SimLogs {
     command: simLogsCommands.SimDescribeLogStreamsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDescribeLogStreamsCommandOutput> {
-    await this.#background.sequence();
-    return this.#streamCommands.describeLogStreams(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.streams.describeLogStreams(command, options);
   }
 
   /**
@@ -217,8 +148,8 @@ export class SimLogs {
     command: simLogsCommands.SimPutLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimPutLogEventsCommandOutput> {
-    await this.#background.sequence();
-    return this.#putLogEventsCommand.handle(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.putLogEvents.handle(command, options);
   }
 
   /**
@@ -228,8 +159,8 @@ export class SimLogs {
     command: simLogsCommands.SimGetLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimGetLogEventsCommandOutput> {
-    await this.#background.sequence();
-    return this.#getLogEventsCommand.handle(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.getLogEvents.handle(command, options);
   }
 
   /**
@@ -239,8 +170,61 @@ export class SimLogs {
     command: simLogsCommands.SimFilterLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimFilterLogEventsCommandOutput> {
-    await this.#background.sequence();
-    return this.#filterLogEventsCommand.handle(command, options);
+    await this.#commands.background.sequence();
+    return this.#commands.filterLogEvents.handle(command, options);
+  }
+
+  /**
+   * Every subscription filter delivery this scope could not make.
+   *
+   * A failed delivery is invisible in an account, where it becomes a metric
+   * nobody is watching. Keeping it is what lets a test find out that the
+   * subscription it set up never reached anything.
+   */
+  get subscriptionFailures(): readonly SimLogsSubscriptionFailure[] {
+    return this.#commands.fanOut.failures;
+  }
+
+  /**
+   * Handle a PutSubscriptionFilter Command from the SDK.
+   */
+  async putSubscriptionFilter(
+    command: simLogsCommands.SimPutSubscriptionFilterCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimPutSubscriptionFilterCommandOutput> {
+    await this.#commands.background.sequence();
+    return await this.#commands.subscriptions.putSubscriptionFilter(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a DescribeSubscriptionFilters Command from the SDK.
+   */
+  async describeSubscriptionFilters(
+    command: simLogsCommands.SimDescribeSubscriptionFiltersCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimDescribeSubscriptionFiltersCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.subscriptions.describeSubscriptionFilters(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a DeleteSubscriptionFilter Command from the SDK.
+   */
+  async deleteSubscriptionFilter(
+    command: simLogsCommands.SimDeleteSubscriptionFilterCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimDeleteSubscriptionFilterCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.subscriptions.deleteSubscriptionFilter(
+      command,
+      options,
+    );
   }
 
   /**
