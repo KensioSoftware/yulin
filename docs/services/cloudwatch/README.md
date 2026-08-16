@@ -285,8 +285,10 @@ deploy the stack, publish a breaching datapoint, advance the clock and read the 
 whatever is subscribed. Deleting the stack deletes the alarm and takes its scheduled evaluation back
 off the clock with it.
 
-`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID, as real
-CloudFormation names one, so a test still has a name to pass to `DescribeAlarms`.
+`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID, so a
+test still has a name to pass to `DescribeAlarms`. Real CloudFormation generates a physical ID of the
+same shape with a random tail on the end, which is left off here so the name is one a test can
+predict.
 
 These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnabled`, `AlarmActions`,
 `OKActions`, `InsufficientDataActions`, `Namespace`, `MetricName`, `Dimensions`, `Statistic`, `Unit`,
@@ -296,10 +298,12 @@ These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnab
 `Metrics`, `ThresholdMetricId`, `ExtendedStatistic` and `EvaluateLowSampleCountPercentile` are
 refused, in the same words `PutMetricAlarm` refuses them with: each of them changes what the alarm
 watches or how it decides, so an alarm deployed with one ignored would sit in a test looking
-configured and evaluating something else. `Tags` is the one difference from the command, which
-refuses it. A template's tags are usually the whole stack's rather than the alarm's, so they are
-recorded as an ignored property instead of taking the deploy down over something the alarm behaves no
-differently for having.
+configured and evaluating something else.
+
+`Tags` is the one difference from the command, which refuses it. Real CloudFormation does tag the
+alarm it creates, and nothing here does: a template's tags are usually the whole stack's rather than
+the alarm's, so they are recorded as an ignored property instead of taking the deploy down. Nothing
+reads them back, so an alarm deployed with tags behaves as though the template had never named them.
 
 `AWS::CloudWatch::CompositeAlarm`, `AWS::CloudWatch::Dashboard` and
 `AWS::CloudWatch::AnomalyDetector` are not deployed, and are recorded as gaps in the stack.

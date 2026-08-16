@@ -99,9 +99,11 @@ describe("AWS::CloudWatch::Alarm validation", () => {
   });
 
   it("refuses properties whose types the template got wrong", async () => {
-    // Given templates giving properties values of the wrong shape.
+    // Given templates giving properties values of the wrong shape, including a
+    // Parameter that arrived empty, which is nothing rather than nought.
     const name = await refusalFor({ AlarmName: { Ref: "Nothing" } });
     const period = await refusalFor({ Period: "often" });
+    const blank = await refusalFor({ Threshold: "  " });
     const enabled = await refusalFor({ ActionsEnabled: "sometimes" });
     const actions = await refusalFor({ AlarmActions: "one-topic" });
     const action = await refusalFor({ AlarmActions: [{ Ref: "Nothing" }] });
@@ -111,6 +113,7 @@ describe("AWS::CloudWatch::Alarm validation", () => {
     assertStringIncludes(name.message, "Resource OrdersAlarm");
     assertStringIncludes(name.message, "AlarmName must be a string");
     assertStringIncludes(period.message, "Period must be a number");
+    assertStringIncludes(blank.message, "Threshold must be a number");
     assertStringIncludes(enabled.message, "ActionsEnabled must be a boolean");
     assertStringIncludes(actions.message, "AlarmActions must be a list");
     assertStringIncludes(action.message, "AlarmActions.0 must be a string");

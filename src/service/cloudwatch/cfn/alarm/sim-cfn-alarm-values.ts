@@ -82,7 +82,7 @@ export class SimCfnAlarmValues {
    */
   number(name: string): number | undefined {
     return this.#shape.present(this.#entries.get(name), (value) => {
-      const parsed = typeof value === "string" ? Number(value.trim()) : value;
+      const parsed = typeof value === "string" ? numberHeldBy(value) : value;
 
       if (typeof parsed !== "number" || !Number.isFinite(parsed)) {
         throw alarmPropertyError(this.#logicalId, `${name} must be a number`);
@@ -134,4 +134,17 @@ export class SimCfnAlarmValues {
       };
     });
   }
+}
+
+/**
+ * The number a template string holds, or NaN where it holds none.
+ *
+ * An empty string is not a zero, though `Number("")` is: a Parameter that
+ * arrived empty would otherwise deploy an alarm with a threshold of nought,
+ * which is a threshold nearly everything breaches.
+ */
+function numberHeldBy(value: string): number {
+  const trimmed = value.trim();
+
+  return trimmed === "" ? NaN : Number(trimmed);
 }

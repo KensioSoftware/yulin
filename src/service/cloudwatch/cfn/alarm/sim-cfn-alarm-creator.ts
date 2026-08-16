@@ -32,13 +32,12 @@ export class SimCfnAlarmCreator {
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimCloudWatchAlarm> {
     const alarmProperties = new SimCfnAlarmProperties({ resource, properties });
-    const input = alarmProperties.input();
+    const alarmName = alarmProperties.alarmName();
 
     alarmProperties.recordIgnoredProperties();
 
-    await this.#cloudWatch.putMetricAlarm({ input });
+    await this.#cloudWatch.putMetricAlarm({ input: alarmProperties.input() });
 
-    const alarmName = String(input.AlarmName);
     const alarm = this.#cloudWatch.findAlarm(alarmName);
 
     assertDefined(

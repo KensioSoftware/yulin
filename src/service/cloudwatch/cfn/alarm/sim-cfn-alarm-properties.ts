@@ -78,11 +78,12 @@ export class SimCfnAlarmProperties {
    * The alarm name.
    *
    * An unnamed alarm is named after the stack and the logical ID, as real
-   * CloudFormation names one. An alarm name is the whole of its identity in a
-   * region, so a template that leaves it out still has to deploy something a
-   * test can name in `DescribeAlarms`.
+   * CloudFormation names one, without the random tail a real physical ID
+   * carries. An alarm name is the whole of its identity in a region, so a
+   * template that leaves it out still has to deploy something a test can name
+   * in `DescribeAlarms`.
    */
-  private alarmName(): string {
+  alarmName(): string {
     return (
       this.#values.string("AlarmName") ??
       new SimCfnGeneratedResourceName({
