@@ -94,11 +94,12 @@ export class SimCognitoSchemaAttribute {
   }
 
   /**
-   * Refuse a second value for an attribute the schema fixed.
+   * Refuse a write to an attribute the schema fixed.
    *
-   * Real Cognito takes an immutable attribute when the user is created and
-   * refuses every write after that, which is what makes one usable as an
-   * application's own identifier for the user.
+   * Real Cognito takes an immutable attribute while the user is being created
+   * and refuses every write after that, which is what makes one usable as an
+   * application's own identifier for the user. A user created without one
+   * cannot be given it later either.
    */
   requireMutable(): void {
     if (this.mutable) {

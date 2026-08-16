@@ -40,10 +40,18 @@ export class SimCognitoUserAttributes {
   private readonly byName = new Map<string, string>();
   private readonly schema: SimCognitoUserPoolSchema;
 
+  /**
+   * Whether the user this belongs to exists yet, which is what decides an
+   * immutable attribute: Cognito takes one while the user is being created and
+   * refuses every write afterwards.
+   */
+  private readonly created: boolean = false;
+
   constructor(properties: SimCognitoUserAttributesProperties) {
     this.schema = properties.schema;
     this.update(properties.requested);
     this.schema.requireEveryRequired(new Set(this.byName.keys()));
+    this.created = true;
   }
 
   private static requireValue(name: string, value: string | undefined): string {
@@ -108,8 +116,11 @@ export class SimCognitoUserAttributes {
   /**
    * Write one attribute, holding it to everything the schema says about it.
    *
-   * An attribute the user already has is a change rather than a first value,
-   * and the schema is what says whether a change is allowed at all.
+   * Every write after the user was created is held to the attribute's
+   * mutability, whether or not the user has the attribute already. Real
+   * Cognito refuses both: an immutable attribute is one a user is created with
+   * or does without, and `AdminUpdateUserAttributes` cannot give it a first
+   * value any more than a second one.
    */
   private write(requested: SimCognitoAttributeType): void {
     const attribute = this.requireInSchema(requested.Name);
@@ -118,7 +129,7 @@ export class SimCognitoUserAttributes {
       requested.Value,
     );
 
-    if (this.byName.has(attribute.name)) {
+    if (this.created) {
       attribute.requireMutable();
     }
 

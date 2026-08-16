@@ -208,6 +208,30 @@ describe("sim Cognito custom user attributes", () => {
     );
   });
 
+  it("refuses a first value for an immutable attribute after creation", async () => {
+    // Given a user created without the pool's immutable identifier.
+    const pool = await poolWith(appSchema);
+
+    await adminCreateWith(pool, [{ Name: "custom:seats", Value: "3" }]);
+
+    // When something tries to give it one afterwards.
+    const error = await assertThrowsErrorAsync(async () => {
+      await pool.cognito.adminUpdateUserAttributes(
+        new AdminUpdateUserAttributesCommand({
+          UserPoolId: pool.userPoolId,
+          Username: "alice",
+          UserAttributes: [{ Name: "custom:userId", Value: "usr_01H8" }],
+        }),
+      );
+    });
+
+    // Then it is refused: real Cognito takes an immutable attribute while the
+    // user is being created and at no point after that, so a user created
+    // without one does without it.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "cannot be changed");
+  });
+
   it("refuses an attribute the pool's schema does not declare", async () => {
     // Given a pool declaring two attributes of its own.
     const pool = await poolWith(appSchema);
@@ -232,9 +256,18 @@ describe("sim Cognito custom user attributes", () => {
       await adminCreateWith(pool, [{ Name: "custom:seats", Value: "plenty" }]);
     });
 
-    // Then it is refused, because Cognito refuses a value it cannot read.
+    // And when it is created with a number JavaScript reads and Cognito could
+    // not hold.
+    const infinite = await assertThrowsErrorAsync(async () => {
+      await adminCreateWith(pool, [
+        { Name: "custom:seats", Value: "Infinity" },
+      ]);
+    });
+
+    // Then both are refused, because Cognito refuses a value it cannot read.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "which is not a Number");
+    assertStringIncludes(infinite.message, "which is not a Number");
   });
 
   it("holds a custom attribute to the bounds it was declared with", async () => {

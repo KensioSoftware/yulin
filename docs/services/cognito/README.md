@@ -254,14 +254,16 @@ console.log(
 
 The declaration is held to what real Cognito accepts, so a pool that could not have been created on
 AWS is not created here. A `Required` custom attribute, a `DeveloperOnlyAttribute`, a name longer
-than 20 characters, a name already carrying its own `custom:` prefix, and an attribute type Cognito
-does not have are each refused, saying why.
+than 20 characters, a name carrying a character Cognito does not take or its own `custom:` prefix,
+an attribute type Cognito does not have, the same attribute declared twice, and a `Schema` with
+nothing in it or with more than the 50 attributes one request may carry are each refused, saying
+why.
 
 What an attribute may hold is held to the schema too. A `Number` attribute refuses a value that is
 not a number and one outside its `NumberAttributeConstraints`, a `String` attribute refuses a value
 outside its `StringAttributeConstraints`, and an attribute the schema declares `Mutable: false`
-refuses a second value on a user that already has it. An attribute no schema declares is refused,
-saying which ones the pool does hold.
+refuses every write once the user exists, so an immutable attribute is one a user is created with or
+does without. An attribute no schema declares is refused, saying which ones the pool does hold.
 
 A `Schema` can also redeclare a standard attribute, which is what a CDK `UserPool` emits for its
 `standardAttributes`. That is how a pool makes `email` required, and a user created without a

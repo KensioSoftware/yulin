@@ -100,8 +100,10 @@ export class SimCognitoAttributeDataType {
  * Whether a string is a number Cognito would read as one.
  *
  * An empty string is not, although `Number("")` is zero, because a request
- * sending nothing at all is not sending a number.
+ * sending nothing at all is not sending a number. `Infinity` is not either,
+ * although `Number` reads it: Cognito holds a number as a number, and there is
+ * no such value to hold.
  */
 export function isNumeric(value: string): boolean {
-  return value.trim() !== "" && !Number.isNaN(Number(value));
+  return value.trim() !== "" && Number.isFinite(Number(value));
 }

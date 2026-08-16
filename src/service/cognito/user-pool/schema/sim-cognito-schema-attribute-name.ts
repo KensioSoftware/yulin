@@ -17,6 +17,13 @@ export const simCognitoDeveloperAttributePrefix = "dev:";
 const maxCustomNameLength = 20;
 
 /**
+ * The characters Cognito takes in an attribute name: letters, marks, symbols,
+ * numbers and punctuation. A space is in none of them, which is the one most
+ * often written.
+ */
+const customNamePattern = /^[\p{L}\p{M}\p{S}\p{N}\p{P}]+$/u;
+
+/**
  * The name Cognito holds a declared attribute under.
  *
  * A custom attribute is written under a `custom:` name, because that is the
@@ -47,6 +54,14 @@ export function simCognitoSchemaAttributeName(
     throw new SimCognitoInvalidParameterException(
       `Schema attribute '${name}' is too long: a custom attribute name is ` +
         `at most ${String(maxCustomNameLength)} characters`,
+    );
+  }
+
+  if (!customNamePattern.test(name)) {
+    throw new SimCognitoInvalidParameterException(
+      `Schema attribute '${name}' has a character Cognito does not take in ` +
+        `an attribute name: a name is letters, marks, symbols, numbers and ` +
+        `punctuation, and a space is none of those`,
     );
   }
 

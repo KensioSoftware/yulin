@@ -9,9 +9,13 @@ import {
 } from "./sim-cognito-standard-attributes.js";
 
 /**
- * How many custom attributes Cognito lets one pool declare.
+ * How many attributes Cognito takes in one `Schema`.
+ *
+ * The list is what the limit is on, and a pool cannot reach the 50 custom
+ * attributes it may hold any other way: `AddCustomAttributes` is what adds to
+ * a schema afterwards, and that is not simulated.
  */
-const maxCustomAttributes = 50;
+const maxSchemaAttributes = 50;
 
 /**
  * The attributes one simulated user pool holds on its users.
@@ -33,6 +37,13 @@ const maxCustomAttributes = 50;
 export class SimCognitoUserPoolSchema {
   private readonly byName = new Map<string, SimCognitoSchemaAttribute>();
 
+  /**
+   * The names the request declared, which is what a repeated declaration is
+   * caught by: the standard attributes are held before any of them and are
+   * there to be redeclared rather than to collide with one.
+   */
+  private readonly declaredNames = new Set<string>();
+
   constructor(declared?: readonly SimCognitoSchemaAttributeType[]) {
     for (const standard of simCognitoStandardAttributes) {
       this.hold(
@@ -40,10 +51,34 @@ export class SimCognitoUserPoolSchema {
       );
     }
 
-    const declarations = declared ?? [];
+    if (declared === undefined) {
+      return;
+    }
 
-    for (const attribute of declarations) {
+    SimCognitoUserPoolSchema.requireDeclarableList(declared);
+
+    for (const attribute of declared) {
       this.declare(attribute);
+    }
+  }
+
+  /**
+   * Refuse a `Schema` of a length Cognito would not take.
+   *
+   * A request declaring an empty list is refused rather than treated as a
+   * request declaring nothing, because real Cognito refuses one: a `Schema`
+   * built from an application's own configuration and left empty fails on the
+   * way to AWS, and it should fail here first.
+   */
+  private static requireDeclarableList(
+    declared: readonly SimCognitoSchemaAttributeType[],
+  ): void {
+    if (declared.length === 0 || declared.length > maxSchemaAttributes) {
+      throw new SimCognitoInvalidParameterException(
+        `Schema declares ${String(declared.length)} attributes: Cognito takes ` +
+          `between 1 and ${String(maxSchemaAttributes)} of them in one ` +
+          `CreateUserPool request`,
+      );
     }
   }
 
@@ -136,26 +171,25 @@ export class SimCognitoUserPoolSchema {
 
   /**
    * Take on one attribute a `Schema` declared.
+   *
+   * A name the same request already declared is refused, whether it is a
+   * custom attribute or a standard one being redeclared: taking the last of
+   * them would deploy a pool holding something the request did not plainly
+   * ask for.
    */
   private declare(declared: SimCognitoSchemaAttributeType): void {
     const custom = !isSimCognitoStandardAttribute(declared.Name ?? "");
     const attribute = new SimCognitoSchemaAttribute({ declared, custom });
 
-    if (custom && this.byName.has(attribute.name)) {
+    if (this.declaredNames.has(attribute.name)) {
       throw new SimCognitoInvalidParameterException(
         `Schema attribute '${attribute.name}' is declared twice: a pool holds ` +
           `one attribute of each name`,
       );
     }
 
+    this.declaredNames.add(attribute.name);
     this.hold(attribute);
-
-    if (this.customNames.length > maxCustomAttributes) {
-      throw new SimCognitoInvalidParameterException(
-        `Schema declares more than the ${String(maxCustomAttributes)} custom ` +
-          `attributes Cognito allows one pool`,
-      );
-    }
   }
 
   private hold(attribute: SimCognitoSchemaAttribute): void {
