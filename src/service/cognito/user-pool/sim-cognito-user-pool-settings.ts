@@ -1,4 +1,8 @@
 import {
+  SimCognitoAccountRecovery,
+  type SimCognitoAccountRecoverySettingType,
+} from "./sim-cognito-account-recovery.js";
+import {
   SimCognitoAdminCreateUserConfig,
   type SimCognitoAdminCreateUserConfigType,
 } from "./sim-cognito-admin-create-user-config.js";
@@ -14,10 +18,6 @@ import {
   SimCognitoVerificationMessages,
   type SimCognitoVerificationMessagesType,
 } from "./message/sim-cognito-verification-messages.js";
-import {
-  SimCognitoUnsimulatedPoolSettings,
-  type SimCognitoUnsimulatedPoolSettingsType,
-} from "./sim-cognito-unsimulated-pool-settings.js";
 import type { SimCognitoSchemaAttributeType } from "./schema/sim-cognito-schema-attribute.js";
 import { SimCognitoUserPoolSchema } from "./schema/sim-cognito-user-pool-schema.js";
 import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
@@ -28,10 +28,10 @@ import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
  * `CreateUserPool` and `UpdateUserPool` both carry these, which is what lets
  * an update build a pool's settings the same way a creation does.
  */
-export interface SimCognitoUserPoolSettingsInput
-  extends
-    SimCognitoUnsimulatedPoolSettingsType,
-    SimCognitoVerificationMessagesType {
+export interface SimCognitoUserPoolSettingsInput extends SimCognitoVerificationMessagesType {
+  readonly AccountRecoverySetting?:
+    | SimCognitoAccountRecoverySettingType
+    | undefined;
   readonly Policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly DeletionProtection?: string | undefined;
   readonly MfaConfiguration?: string | undefined;
@@ -66,7 +66,8 @@ interface SimCognitoUserPoolSettingsProperties {
  * The settings of one simulated user pool that a request can change: the
  * password policy, the deletion protection, whether users may sign themselves
  * up, what confirming a sign-up verifies, the Lambda triggers the pool runs,
- * whether it asks for a second factor and what its messages say.
+ * whether it asks for a second factor, how it recovers an account and what its
+ * messages say.
  *
  * The pool's id, ARN and name are not among them. The first two identify the
  * pool, and renaming one is not simulated.
@@ -110,10 +111,10 @@ export class SimCognitoUserPoolSettings {
   public readonly verificationMessages: SimCognitoVerificationMessages;
 
   /**
-   * What the request set that nothing here acts on, kept so a described pool
-   * reports it.
+   * How the pool recovers an account whose password was forgotten, kept so a
+   * described pool reports it. Nothing here starts a recovery.
    */
-  public readonly unsimulated: SimCognitoUnsimulatedPoolSettings;
+  public readonly accountRecovery: SimCognitoAccountRecovery;
 
   #schema: SimCognitoUserPoolSchema;
 
@@ -140,7 +141,10 @@ export class SimCognitoUserPoolSettings {
       new SimCognitoMfaConfiguration(input.MfaConfiguration),
     );
     this.verificationMessages = new SimCognitoVerificationMessages(input);
-    this.unsimulated = new SimCognitoUnsimulatedPoolSettings(input);
+    this.accountRecovery = new SimCognitoAccountRecovery(
+      input.AccountRecoverySetting,
+      operation,
+    );
     this.#schema = new SimCognitoUserPoolSchema(input.Schema);
   }
 

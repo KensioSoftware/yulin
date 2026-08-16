@@ -139,9 +139,52 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
     );
   });
 
-  it("refuses a pool property at a value other than the one it accepts", async () => {
-    // Given a template writing its own account recovery, which nothing here
-    // reaches whichever mechanisms are listed.
+  it("deploys a pool that recovers an account by email alone", async () => {
+    // Given a template declaring email-only recovery, which is what CDK emits
+    // for a pool that sends no SMS.
+    const simAws = simAwsInEuWest2();
+    const accountRecoverySetting = {
+      RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }],
+    };
+
+    // When it is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "app-stack",
+      template: {
+        Resources: {
+          Pool: {
+            Type: "AWS::Cognito::UserPool",
+            Properties: {
+              UserPoolName: "myapp-users",
+              AccountRecoverySetting: accountRecoverySetting,
+            },
+          },
+        },
+        Outputs: { PoolId: { Value: { Ref: "Pool" } } },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the pool deployed with the mechanism the template chose, rather
+    // than the stack failing for choosing anything but the AWS default.
+    const userPoolId = stack.outputs.get("PoolId")?.value;
+    assertTypeString(userPoolId);
+
+    const described = await simAws
+      .cognitoIdentityProvider()
+      .describeUserPool(
+        new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+      );
+
+    assertNonNullable(described.UserPool);
+    assertObjectEquals(
+      described.UserPool.AccountRecoverySetting,
+      accountRecoverySetting,
+    );
+  });
+
+  it("refuses a recovery mechanism Cognito does not have", async () => {
+    // Given a template naming a mechanism no pool recovers through.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -151,22 +194,21 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
         Properties: {
           UserPoolName: "myapp-users",
           AccountRecoverySetting: {
-            RecoveryMechanisms: [{ Name: "admin_only", Priority: 1 }],
+            RecoveryMechanisms: [{ Name: "verified_fax", Priority: 1 }],
           },
         },
       },
     });
 
-    // Then the failure names the logical ID, the property, the value asked
-    // for and the one that is simulated.
+    // Then the failure names the logical ID, the property, the mechanism
+    // asked for and the ones Cognito has.
     assertStringIncludes(error.message, "AppPool");
     assertStringIncludes(
       error.message,
       "CreateUserPool AccountRecoverySetting",
     );
-    assertStringIncludes(error.message, '"Name":"admin_only"');
-    assertStringIncludes(error.message, "account recovery");
-    assertStringIncludes(error.message, "Only");
+    assertStringIncludes(error.message, "verified_fax");
+    assertStringIncludes(error.message, "admin_only");
   });
 
   it("deploys a pool a CDK stack asked for self-service sign-up on", async () => {

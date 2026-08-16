@@ -1,22 +1,5 @@
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
-import { SimCognitoUnsimulatedStructure } from "../sim-cognito-unsimulated-structure.js";
 import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
-
-/**
- * The account recovery a pool is accepted with, which is what `aws-cdk-lib`
- * 2.262.1 emits for a `UserPool` construct asking for nothing in particular.
- *
- * There is no `ForgotPassword` command here, so no mechanism is ever reached
- * whichever ones are listed. A request listing its own is still refused,
- * because choosing them is choosing behaviour, and a pool that ignored the
- * choice would recover accounts differently on real AWS.
- */
-const accountRecoverySetting = {
-  RecoveryMechanisms: [
-    { Name: "verified_phone_number", Priority: 1 },
-    { Name: "verified_email", Priority: 2 },
-  ],
-};
 
 /**
  * Refuses the user pool features this simulation does not model.
@@ -25,9 +8,9 @@ const accountRecoverySetting = {
  * them cannot be honoured here at all, and a pool created as if they had been
  * would behave differently in a deployment.
  *
- * `AccountRecoverySetting` is accepted at one value and refused at every
- * other. That value asks for nothing this simulation does not do, and it is
- * what CDK emits, so a stack that only wanted a pool deploys.
+ * `AccountRecoverySetting` is not here. A pool records the mechanisms it was
+ * asked for and reports them back, and SimCognitoAccountRecovery refuses a
+ * mechanism Cognito does not have.
  *
  * `AdminCreateUserConfig` is simulated as far as `AllowAdminCreateUserOnly`
  * goes, which is what decides whether `SignUp` is allowed. The two keys beside
@@ -41,11 +24,9 @@ const accountRecoverySetting = {
  */
 export class SimCognitoUnsimulatedUserPoolFeatures {
   private readonly unsimulated: SimCognitoUnsimulatedInput;
-  private readonly structure: SimCognitoUnsimulatedStructure;
 
   constructor(operation: string) {
     this.unsimulated = new SimCognitoUnsimulatedInput(operation);
-    this.structure = new SimCognitoUnsimulatedStructure(operation);
   }
 
   /**
@@ -61,12 +42,6 @@ export class SimCognitoUnsimulatedUserPoolFeatures {
       "DeviceConfiguration",
       input.DeviceConfiguration,
       "device remembering",
-    );
-    this.structure.refuseUnless(
-      "AccountRecoverySetting",
-      input.AccountRecoverySetting,
-      accountRecoverySetting,
-      "account recovery",
     );
     this.unsimulated.refuse(
       "AdminCreateUserConfig InviteMessageTemplate",

@@ -167,7 +167,8 @@ app.synth();
 
   it("deploys a CDK user pool a user signs itself up in", async () => {
     // Given a CDK stack with a user pool that lets users sign themselves up,
-    // verifies the email address they sign up with, and offers multi-factor
+    // verifies the email address they sign up with, recovers an account by
+    // email alone because it sends no SMS, and offers multi-factor
     // authentication to the users that want it.
     const cdkProject = new TestCdkProject();
     await cdkProject.writeCdkAppFile(
@@ -183,6 +184,7 @@ const stack = new cdk.Stack(app, "TestStack", {
 const pool = new cognito.UserPool(stack, "Pool", {
   selfSignUpEnabled: true,
   autoVerify: { email: true },
+  accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
   mfa: cognito.Mfa.OPTIONAL,
   mfaSecondFactor: { sms: false, otp: true },
 });
@@ -218,6 +220,16 @@ app.synth();
     assertTypeString(clientId);
 
     const cognito = scoped.cognitoIdentityProvider();
+
+    // And the pool recovers an account the way the construct asked for, rather
+    // than the stack failing for choosing anything but the AWS default.
+    const describedPool = await cognito.describeUserPool(
+      new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+    );
+
+    assertObjectEquals(describedPool.UserPool?.AccountRecoverySetting, {
+      RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }],
+    });
 
     // And the MfaConfiguration and EnabledMfas the construct emits reached the
     // pool, through the SetUserPoolMfaConfig call CloudFormation makes once

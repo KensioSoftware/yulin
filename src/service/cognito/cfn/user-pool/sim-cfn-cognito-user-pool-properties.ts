@@ -7,6 +7,7 @@ import type { SimSetUserPoolMfaConfigCommandInput } from "../../command/user-poo
 import type { SimCreateUserPoolCommandInput } from "../../command/user-pool/user-pool.command.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
+import { SimCfnCognitoAccountRecovery } from "./sim-cfn-cognito-account-recovery.js";
 import { SimCfnCognitoAdminCreateUserConfig } from "./sim-cfn-cognito-admin-create-user-config.js";
 import { SimCfnCognitoUserPoolMfa } from "./sim-cfn-cognito-user-pool-mfa.js";
 import { SimCfnCognitoUserPoolSchema } from "./sim-cfn-cognito-user-pool-schema.js";
@@ -40,12 +41,16 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * this simulation fires deploys and one asking for a trigger it does not fails
  * the stack, rather than the two being decided together.
  *
- * The five from `AccountRecoverySetting` down are here because a CDK
+ * `AccountRecoverySetting` is here because the pool records the mechanisms it
+ * names and reports them back. Nothing here starts a recovery, so a template
+ * declaring email-only recovery deploys and CreateUserPool refuses only a
+ * mechanism Cognito does not have.
+ *
+ * The four from `EmailVerificationMessage` down are here because a CDK
  * `UserPool` construct emits them when it was asked for nothing in
- * particular. Each configures message delivery, verification wording or
- * account recovery, none of which is simulated, so CreateUserPool accepts each
- * at the one value that asks for nothing this simulation does not already do
- * and refuses it at every other.
+ * particular. They are the wording of the messages the pool records, and
+ * `VerificationMessageTemplate` is refused where it asks for verification by
+ * following a link.
  */
 const simulatedProperties = [
   "UserPoolName",
@@ -118,10 +123,10 @@ export class SimCfnCognitoUserPoolProperties {
         this.properties["UserPoolTier"],
         "UserPoolTier",
       ),
-      AccountRecoverySetting: this.record(
-        this.properties["AccountRecoverySetting"],
-        "AccountRecoverySetting",
-      ),
+      AccountRecoverySetting: new SimCfnCognitoAccountRecovery({
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      }).parse(this.properties["AccountRecoverySetting"]),
       AdminCreateUserConfig: new SimCfnCognitoAdminCreateUserConfig({
         resource: this.resource,
         propertyParser: this.propertyParser,
@@ -188,9 +193,8 @@ export class SimCfnCognitoUserPoolProperties {
   /**
    * A property carried as an object, passed on to CreateUserPool as written.
    *
-   * The keys inside are not checked here. CreateUserPool compares the whole
-   * object against the one value it accepts, which refuses an unknown key
-   * along with everything else that differs.
+   * The keys inside are not checked here. CreateUserPool reads them itself, a
+   * key at a time, so the value is judged in one place rather than two.
    */
   private record(
     value: SimCfnTemplateValue | undefined,
