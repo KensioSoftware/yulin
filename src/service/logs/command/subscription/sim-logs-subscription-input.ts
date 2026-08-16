@@ -20,7 +20,7 @@ export function simLogsFilterDetail(
 }
 
 /**
- *
+ * Read the name a subscription filter is identified by on its log group.
  */
 export function requiredSimLogsFilterName(filterName?: string): string {
   if (filterName === undefined || filterName.length === 0) {
@@ -34,7 +34,7 @@ export function requiredSimLogsFilterName(filterName?: string): string {
 }
 
 /**
- *
+ * Read the destination a subscription filter delivers to.
  */
 export function requiredSimLogsDestinationArn(destinationArn?: string): string {
   if (destinationArn === undefined || destinationArn.length === 0) {

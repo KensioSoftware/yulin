@@ -166,7 +166,12 @@ shares.
 
 ## What is not simulated
 
-Nothing expires, as above. Subscription filters, metric filters, Logs Insights queries, export
-tasks, tagging, encryption and data protection policies are all absent. `metricFilterCount` is
-always zero and a stream's `storedBytes` is always zero, the latter matching real CloudWatch Logs,
-which stopped reporting it per stream in 2019.
+Nothing expires, as above. Metric filters, Logs Insights queries, export tasks, tagging, encryption
+and data protection policies are all absent, and `metricFilterCount` is always zero. A stream's
+`storedBytes` is always zero too, which matches real CloudWatch Logs: it stopped reporting the
+figure per stream in 2019.
+
+Subscription filters deliver to a Lambda destination only. Kinesis, Firehose and the logical
+destinations that reach another Account are refused rather than accepted and never delivered to,
+and `Distribution` is held and reported but changes nothing, since there are no shards to spread
+across.

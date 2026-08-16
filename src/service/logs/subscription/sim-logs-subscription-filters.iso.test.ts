@@ -278,6 +278,45 @@ describe("CloudWatch Logs subscription filters", () => {
     assertStringIncludes(error.message, "version or alias");
   });
 
+  it("refuses a destination in another Account or Region", async () => {
+    // Given a log group and function ARNs outside its own scope.
+    const simAws = await simAwsWithTrackers();
+    const otherAccount = `arn:aws:lambda:${simAws.defaultRegionName}:222222222222:function:tracker-one`;
+    const otherRegion = `arn:aws:lambda:eu-west-2:${simAws.defaultAccountId}:function:tracker-one`;
+
+    // When each is used as a destination.
+    const crossAccount = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.logs().putSubscriptionFilter(
+          new PutSubscriptionFilterCommand({
+            logGroupName,
+            filterName: "errors",
+            filterPattern: "",
+            destinationArn: otherAccount,
+          }),
+        ),
+    );
+    const crossRegion = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.logs().putSubscriptionFilter(
+          new PutSubscriptionFilterCommand({
+            logGroupName,
+            filterName: "errors",
+            filterPattern: "",
+            destinationArn: otherRegion,
+          }),
+        ),
+    );
+
+    // Then both are refused. Real CloudWatch Logs takes a Lambda destination
+    // belonging to the same Account as the subscription filter, and reaches
+    // another one only through a logical destination.
+    assertInstanceOf(crossAccount, SimLogsInvalidParameterException);
+    assertInstanceOf(crossRegion, SimLogsInvalidParameterException);
+    assertStringIncludes(crossAccount.message, "same Account");
+    assertStringIncludes(crossRegion.message, "same Region");
+  });
+
   it("takes a log group's filters down with it", async () => {
     // Given a filter on a log group.
     const simAws = await simAwsWithTrackers();

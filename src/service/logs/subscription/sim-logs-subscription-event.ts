@@ -20,7 +20,7 @@ export interface SimLogsSubscriptionDelivery {
  * does: there is no destination to keep warm in this process.
  */
 export interface SimLogsSubscriptionEventDocument {
-  readonly messageType: string;
+  readonly messageType: "DATA_MESSAGE";
   readonly owner: string;
   readonly logGroup: string;
   readonly logStream: string;

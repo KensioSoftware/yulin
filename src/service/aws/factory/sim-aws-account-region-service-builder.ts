@@ -200,15 +200,15 @@ export class SimAwsAccountRegionServiceBuilder {
     return kms;
   }
 
-  /** Create simulated Lambda for an Account Region scope. */
   /** Create simulated CloudWatch Logs for an Account Region scope. */
   createLogs(scope: SimAwsAccountRegionContainer): SimLogs {
     return new SimLogs({
       ...this.scoped(scope),
-      ...simAwsLogsCollaborators(this.simAws),
+      ...simAwsLogsCollaborators(this.simAws, scope.accountRegionScope),
     });
   }
 
+  /** Create simulated Lambda for an Account Region scope. */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return new SimLambda({
       ...this.scoped(scope),

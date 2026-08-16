@@ -1,4 +1,5 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account-id.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { parseSimLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function-arn-parts.js";
 import {
@@ -35,13 +36,22 @@ export class SimLogsSubscriptionFunctionArn {
   /**
    * Read a destination ARN, refusing one no simulated function is behind.
    *
-   * Only a Lambda destination is simulated. Kinesis, Firehose and a
-   * cross-account destination ARN are all real CloudWatch Logs destinations
-   * and are refused here rather than accepted and never delivered to, since a
-   * subscription that takes the configuration and quietly drops every event is
-   * the hardest kind of thing to find.
+   * Only a Lambda destination is simulated. Kinesis and Firehose are real
+   * CloudWatch Logs destinations refused here rather than accepted and never
+   * delivered to, since a subscription that takes the configuration and
+   * quietly drops every event is the hardest kind of thing to find.
+   *
+   * A function outside the filter's own Account and Region is refused too, and
+   * that one is real AWS behaviour rather than a gap: CloudWatch Logs takes a
+   * Lambda destination "belonging to the same account as the subscription
+   * filter", and reaches another Account only through a logical destination,
+   * which is a Kinesis stream. Accepting one here would let a test wire up
+   * something an account would reject.
    */
-  static parse(destinationArn: string): SimLogsSubscriptionFunctionArn {
+  static parse(
+    destinationArn: string,
+    scope: SimAwsAccountRegionScope,
+  ): SimLogsSubscriptionFunctionArn {
     const parts = parseSimLambdaFunctionArn(destinationArn);
 
     if (parts === undefined) {
@@ -57,6 +67,23 @@ export class SimLogsSubscriptionFunctionArn {
         `${destinationArn} names a function version or alias, and simulated ` +
           `Lambda has neither, so delivering to the unqualified function ` +
           `instead would be delivering to a different one`,
+      );
+    }
+
+    if (parts.accountId !== scope.accountId) {
+      throw new SimLogsInvalidParameterException(
+        `${destinationArn} is in Account ${parts.accountId}, and a Lambda ` +
+          `destination has to belong to the same Account as the subscription ` +
+          `filter, which is ${scope.accountId}. Real CloudWatch Logs reaches ` +
+          `another Account through a logical destination instead.`,
+      );
+    }
+
+    if (parts.regionName !== scope.regionName) {
+      throw new SimLogsInvalidParameterException(
+        `${destinationArn} is in Region ${parts.regionName}, and a Lambda ` +
+          `destination has to be in the same Region as the log group, which ` +
+          `is in ${scope.regionName}.`,
       );
     }
 
