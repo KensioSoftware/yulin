@@ -1,3 +1,5 @@
+import type { SimCloudWatchUnit } from "./sim-cloudwatch-unit.js";
+
 /**
  * One observation of a metric, held the way every statistic is read from.
  *
@@ -18,7 +20,7 @@ export interface SimCloudWatchDatapoint {
   readonly maximum: number;
 
   /** The unit given with the observation, if it carried one. */
-  readonly unit: string | undefined;
+  readonly unit: SimCloudWatchUnit | undefined;
 }
 
 /**
@@ -30,28 +32,34 @@ export interface SimCloudWatchAggregate {
   readonly minimum: number;
   readonly maximum: number;
   readonly average: number;
-  readonly unit: string | undefined;
+  readonly unit: SimCloudWatchUnit | undefined;
 }
 
 /**
- * Combine datapoints into the statistics CloudWatch reports for them.
+ * One or more observations of the same metric.
  *
- * An empty set has no statistics rather than zeroed ones: real CloudWatch
- * reports no datapoint at all for a period nothing was written into, which is
- * a different thing from a period whose values summed to zero.
+ * Aggregating takes this rather than a plain array because there are no
+ * statistics to report for no observations at all, and real CloudWatch reports
+ * no datapoint for a period nothing was written into rather than a zeroed one.
+ * Saying so in the type means the empty case cannot reach here to be guarded
+ * against.
+ */
+export type SimCloudWatchObservations = readonly [
+  SimCloudWatchDatapoint,
+  ...SimCloudWatchDatapoint[],
+];
+
+/**
+ * Combine observations into the statistics CloudWatch reports for them.
  *
  * The unit reported is the first one seen. Real CloudWatch keeps values of
  * different units apart within a metric, and a caller wanting one of them says
  * so with the `Unit` filter before the values reach here.
  */
 export function aggregateSimCloudWatchDatapoints(
-  datapoints: readonly SimCloudWatchDatapoint[],
-): SimCloudWatchAggregate | undefined {
-  const first = datapoints.at(0);
-
-  if (first === undefined) {
-    return undefined;
-  }
+  datapoints: SimCloudWatchObservations,
+): SimCloudWatchAggregate {
+  const [first] = datapoints;
 
   let sampleCount = 0;
   let sum = 0;

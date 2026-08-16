@@ -4,13 +4,14 @@ import {
   SimCloudWatchMissingRequiredParameterException,
 } from "../../error/sim-cloudwatch.error.js";
 import type { SimCloudWatchDatapoint } from "../../metric/sim-cloudwatch-datapoint.js";
+import { simCloudWatchUnitOrUndefined } from "../../metric/sim-cloudwatch-unit.js";
 import type { SimCloudWatchMetricDatumInput } from "./data.command.js";
 import {
   readSimCloudWatchStatisticValues,
   readSimCloudWatchValue,
-  readSimCloudWatchValues,
   type SimCloudWatchObservation,
 } from "./sim-cloudwatch-observation.js";
+import { readSimCloudWatchValues } from "./sim-cloudwatch-weighted-values.js";
 
 /**
  * The storage resolution of a standard metric, in seconds. The other value
@@ -34,7 +35,7 @@ export function readSimCloudWatchDatapoint(
   return {
     ...readObservation(datum),
     timestamp: (datum.Timestamp ?? defaultTimestamp).getTime(),
-    unit: datum.Unit,
+    unit: simCloudWatchUnitOrUndefined("Unit", datum.Unit),
   };
 }
 
@@ -45,6 +46,15 @@ export function readSimCloudWatchDatapoint(
 function readObservation(
   datum: SimCloudWatchMetricDatumInput,
 ): SimCloudWatchObservation {
+  // Counts says how often each of Values occurred, so on its own it describes
+  // nothing. Real CloudWatch refuses the pair apart, and dropping it here
+  // would silently discard half of what the caller measured.
+  if (datum.Counts !== undefined && datum.Values === undefined) {
+    throw new SimCloudWatchInvalidParameterCombinationException(
+      "The parameter Counts may only be given with Values.",
+    );
+  }
+
   const forms = [
     datum.Value === undefined
       ? undefined

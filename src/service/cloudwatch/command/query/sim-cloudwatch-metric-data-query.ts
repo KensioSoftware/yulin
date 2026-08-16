@@ -11,6 +11,10 @@ import {
   requiredSimCloudWatchStatistic,
   type SimCloudWatchStatistic,
 } from "../../metric/sim-cloudwatch-statistic.js";
+import {
+  type SimCloudWatchUnit,
+  simCloudWatchUnitOrUndefined,
+} from "../../metric/sim-cloudwatch-unit.js";
 import type { SimCloudWatchMetricDataQueryInput } from "./query.command.js";
 
 /**
@@ -28,7 +32,7 @@ export interface SimCloudWatchReadMetricDataQuery {
   readonly identity: SimCloudWatchMetricIdentity;
   readonly period: number;
   readonly statistic: SimCloudWatchStatistic;
-  readonly unit: string | undefined;
+  readonly unit: SimCloudWatchUnit | undefined;
   readonly returnData: boolean;
 }
 
@@ -73,7 +77,7 @@ export function readSimCloudWatchMetricDataQuery(
     statistic: requiredSimCloudWatchStatistic(
       requiredStat(metricStat.Stat, id),
     ),
-    unit: metricStat.Unit,
+    unit: simCloudWatchUnitOrUndefined("MetricStat.Unit", metricStat.Unit),
     returnData: query.ReturnData ?? true,
   };
 }

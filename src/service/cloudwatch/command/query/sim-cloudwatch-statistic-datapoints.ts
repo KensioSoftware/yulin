@@ -1,10 +1,9 @@
 import { SimCloudWatchInvalidParameterCombinationException } from "../../error/sim-cloudwatch.error.js";
-import {
-  aggregateSimCloudWatchDatapoints,
-  type SimCloudWatchAggregate,
-  type SimCloudWatchDatapoint,
+import type {
+  SimCloudWatchAggregate,
+  SimCloudWatchDatapoint,
 } from "../../metric/sim-cloudwatch-datapoint.js";
-import { bucketSimCloudWatchDatapoints } from "../../metric/sim-cloudwatch-period.js";
+import { simCloudWatchPeriodAggregates } from "../../metric/sim-cloudwatch-period.js";
 import {
   type SimCloudWatchStatistic,
   simCloudWatchStatisticValue,
@@ -30,11 +29,9 @@ export function simCloudWatchStatisticDatapoints(
   period: number,
   statistics: readonly SimCloudWatchStatistic[],
 ): readonly SimCloudWatchDatapointDetail[] {
-  return bucketSimCloudWatchDatapoints(datapoints, period)
+  return simCloudWatchPeriodAggregates(datapoints, period)
     .entries()
-    .map(([start, inPeriod]) =>
-      detail(start, aggregateSimCloudWatchDatapoints(inPeriod), statistics),
-    )
+    .map(([start, aggregate]) => detail(start, aggregate, statistics))
     .toArray();
 }
 
@@ -63,13 +60,9 @@ export function refuseTooManySimCloudWatchPeriods(
  */
 function detail(
   start: number,
-  aggregate: SimCloudWatchAggregate | undefined,
+  aggregate: SimCloudWatchAggregate,
   statistics: readonly SimCloudWatchStatistic[],
 ): SimCloudWatchDatapointDetail {
-  if (aggregate === undefined) {
-    return { Timestamp: new Date(start) };
-  }
-
   const reported: Partial<Record<SimCloudWatchStatistic, number>> =
     Object.fromEntries(
       statistics.map((statistic) => [

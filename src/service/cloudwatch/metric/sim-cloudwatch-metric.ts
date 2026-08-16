@@ -1,5 +1,6 @@
 import type { SimCloudWatchDatapoint } from "./sim-cloudwatch-datapoint.js";
 import type { SimCloudWatchDimension } from "./sim-cloudwatch-dimension.js";
+import type { SimCloudWatchUnit } from "./sim-cloudwatch-unit.js";
 
 /**
  * What names one metric apart from every other.
@@ -25,7 +26,7 @@ export interface SimCloudWatchDatapointWindow {
   readonly endTime: number;
 
   /** Keep only observations recorded in this unit, if one is named. */
-  readonly unit?: string | undefined;
+  readonly unit?: SimCloudWatchUnit | undefined;
 }
 
 /**

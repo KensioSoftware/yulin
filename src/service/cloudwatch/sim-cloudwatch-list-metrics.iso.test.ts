@@ -7,6 +7,7 @@ import {
   assertArrayLength,
   assertInstanceOf,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -156,5 +157,74 @@ describe("SimCloudWatch ListMetrics", () => {
     // Then each is refused rather than quietly ignored.
     assertInstanceOf(window, SimCloudWatchInvalidParameterValueException);
     assertInstanceOf(linked, SimCloudWatchInvalidParameterValueException);
+  });
+
+  it("pages a listing longer than one page, and refuses a token it never issued", async () => {
+    // Given more metrics than one page of a listing holds.
+    const simAws = new SimAws();
+    const metrics = simAws.cloudWatch();
+
+    await metrics.putMetricData(
+      new PutMetricDataCommand({
+        Namespace: "Orders",
+        MetricData: Array.from({ length: 501 }, (_, index) => ({
+          MetricName: "Failed",
+          Value: 1,
+          Dimensions: [{ Name: "Shard", Value: String(index) }],
+        })),
+      }),
+    );
+
+    // When the first page is read, and then the one its token reaches.
+    const first = await metrics.listMetrics(new ListMetricsCommand({}));
+    const second = await metrics.listMetrics(
+      new ListMetricsCommand({ NextToken: first.NextToken }),
+    );
+    const bogus = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.listMetrics(
+          new ListMetricsCommand({ NextToken: "not a token" }),
+        ),
+    );
+
+    // Then the listing came back in two pages, and the second ends it.
+    assertArrayLength(first.Metrics ?? [], 500);
+    assertArrayLength(second.Metrics ?? [], 1);
+    assertUndefined(second.NextToken);
+    assertInstanceOf(bogus, SimCloudWatchInvalidParameterValueException);
+  });
+
+  it("measures recency from the latest write, whatever order they arrived in", async () => {
+    // Given a metric written to twice, the second datum stamped earlier than
+    // the first, which is what a batch of buffered metrics looks like.
+    const simAws = new SimAws();
+    const metrics = simAws.cloudWatch();
+
+    await simAws.clock().setTo(startedAt);
+    await metrics.putMetricData(
+      new PutMetricDataCommand({
+        Namespace: "Orders",
+        MetricData: [
+          { MetricName: "Failed", Value: 1, Timestamp: startedAt },
+          {
+            MetricName: "Failed",
+            Value: 1,
+            Timestamp: new Date("2026-08-16T06:00:00.000Z"),
+          },
+        ],
+      }),
+    );
+
+    // When time moves on past the older write but not the newer.
+    await simAws.clock().advanceBy({ hours: 2 });
+
+    const listed = await listedNames(
+      metrics,
+      new ListMetricsCommand({ RecentlyActive: "PT3H" }),
+    );
+
+    // Then it still counts as recent, because recency is the latest write
+    // rather than the last one to arrive.
+    assertArrayLength(listed, 1);
   });
 });

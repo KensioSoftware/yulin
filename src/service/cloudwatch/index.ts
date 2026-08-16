@@ -7,13 +7,14 @@ export {
   aggregateSimCloudWatchDatapoints,
   type SimCloudWatchAggregate,
   type SimCloudWatchDatapoint,
+  type SimCloudWatchObservations,
 } from "./metric/sim-cloudwatch-datapoint.js";
 export {
   type SimCloudWatchDimension,
   type SimCloudWatchDimensionInput,
   simCloudWatchDimensionsKey,
-  simCloudWatchDimensionsMatch,
   simCloudWatchMaximumDimensions,
+  requiredSimCloudWatchDimensionName,
   requiredSimCloudWatchDimensions,
 } from "./metric/sim-cloudwatch-dimension.js";
 export {
@@ -27,18 +28,24 @@ export {
   SimCloudWatchMetricStore,
 } from "./metric/sim-cloudwatch-metric-store.js";
 export {
+  refuseSimCloudWatchLeadingColon,
   requiredSimCloudWatchName,
   simCloudWatchMaximumNameLength,
 } from "./metric/sim-cloudwatch-name.js";
+export {
+  type SimCloudWatchUnit,
+  simCloudWatchUnitOrUndefined,
+  simCloudWatchUnits,
+} from "./metric/sim-cloudwatch-unit.js";
 export {
   requiredSimCloudWatchNamespace,
   requiredSimCloudWatchWritableNamespace,
   simCloudWatchReservedNamespacePrefix,
 } from "./metric/sim-cloudwatch-namespace.js";
 export {
-  bucketSimCloudWatchDatapoints,
   requiredSimCloudWatchPeriod,
   simCloudWatchMinimumPeriodSeconds,
+  simCloudWatchPeriodAggregates,
   simCloudWatchPeriodStart,
 } from "./metric/sim-cloudwatch-period.js";
 export {

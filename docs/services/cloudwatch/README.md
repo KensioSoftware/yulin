@@ -68,6 +68,12 @@ A datum may state its values as a plain `Value`, as a `StatisticValues` summary,
 matching `Counts`. All three answer the same statistics, so a metric published one way reads back
 like a metric published another.
 
+Values are checked the way real CloudWatch checks them: within -2^360 to 2^360, never `NaN` or an
+infinity, at most 150 unique values in one datum, and `Counts` only alongside the `Values` it counts.
+`Unit` is the closed `StandardUnit` set rather than free text, on the way in and on the way out, so a
+query naming a unit CloudWatch does not have fails here as it would in an account rather than
+quietly matching nothing.
+
 ## Metrics are identified by their dimensions
 
 Real CloudWatch does not roll a custom metric up across its dimensions, and neither does this. The

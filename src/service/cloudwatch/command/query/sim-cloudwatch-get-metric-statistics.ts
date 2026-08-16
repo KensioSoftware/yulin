@@ -4,6 +4,7 @@ import { requiredSimCloudWatchName } from "../../metric/sim-cloudwatch-name.js";
 import { requiredSimCloudWatchNamespace } from "../../metric/sim-cloudwatch-namespace.js";
 import { requiredSimCloudWatchPeriod } from "../../metric/sim-cloudwatch-period.js";
 import { requiredSimCloudWatchTimeRange } from "../../metric/sim-cloudwatch-time-range.js";
+import { simCloudWatchUnitOrUndefined } from "../../metric/sim-cloudwatch-unit.js";
 import type { SimCloudWatchAuthorizer } from "../authorize/sim-cloudwatch-authorizer.js";
 import type { SimCloudWatchRequestOptions } from "../sim-cloudwatch-request-options.js";
 import type {
@@ -68,10 +69,15 @@ export class SimCloudWatchGetMetricStatistics {
     );
     const period = requiredSimCloudWatchPeriod(input.Period);
 
+    // Read before the metric is looked up, so a unit CloudWatch does not have
+    // is refused whether or not anything has been published to the metric. It
+    // would otherwise be an empty answer for a request an account rejects.
+    const unit = simCloudWatchUnitOrUndefined("Unit", input.Unit);
+
     refuseTooManySimCloudWatchPeriods(range.endTime - range.startTime, period);
 
     const found = this.#metrics.find(identity);
-    const selected = found?.within({ ...range, unit: input.Unit }) ?? [];
+    const selected = found?.within({ ...range, unit }) ?? [];
 
     return {
       $metadata: {},

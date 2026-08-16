@@ -1,5 +1,8 @@
 import { SimCloudWatchInvalidParameterValueException } from "../error/sim-cloudwatch.error.js";
-import { requiredSimCloudWatchName } from "./sim-cloudwatch-name.js";
+import {
+  refuseSimCloudWatchLeadingColon,
+  requiredSimCloudWatchName,
+} from "./sim-cloudwatch-name.js";
 
 /**
  * How many dimensions real CloudWatch allows on one metric.
@@ -40,9 +43,20 @@ export function requiredSimCloudWatchDimensions(
   }
 
   return dimensions.map((dimension) => ({
-    name: requiredSimCloudWatchName("Dimension.Name", dimension.Name),
+    name: requiredSimCloudWatchDimensionName(dimension.Name),
     value: requiredSimCloudWatchName("Dimension.Value", dimension.Value),
   }));
+}
+
+/**
+ * Read a dimension name, which real CloudWatch refuses to let start with a
+ * colon. A dimension value carries no such rule.
+ */
+export function requiredSimCloudWatchDimensionName(name?: string): string {
+  return refuseSimCloudWatchLeadingColon(
+    "Dimension.Name",
+    requiredSimCloudWatchName("Dimension.Name", name),
+  );
 }
 
 /**
@@ -61,21 +75,4 @@ export function simCloudWatchDimensionsKey(
   );
 
   return JSON.stringify(sorted.map((one) => [one.name, one.value]));
-}
-
-/**
- * Whether a metric's dimensions are exactly the ones asked for.
- *
- * Real CloudWatch treats the dimension set as part of a metric's identity and
- * does not roll up across it, so a query naming one of two dimensions reaches
- * neither the two-dimension metric nor a metric with none.
- */
-export function simCloudWatchDimensionsMatch(
-  dimensions: readonly SimCloudWatchDimension[],
-  wanted: readonly SimCloudWatchDimension[],
-): boolean {
-  return (
-    simCloudWatchDimensionsKey(dimensions) ===
-    simCloudWatchDimensionsKey(wanted)
-  );
 }

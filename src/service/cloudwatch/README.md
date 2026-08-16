@@ -38,6 +38,20 @@ It also settles what cannot be answered. Percentiles need the individual values,
 cannot report one for a metric published as a statistic set either. Rather than answer for some
 metrics and not others, `ExtendedStatistics` is refused.
 
+## Names are checked loosely on purpose
+
+`sim-cloudwatch-name.ts` accepts any printable ASCII with at least one non-whitespace character,
+because that is what real CloudWatch documents for a namespace, a metric name and both halves of a
+dimension. A tighter whitelist is tempting and wrong: it refuses names an account accepts, and a
+simulator that fails a request AWS would have taken is worse than one that takes a request AWS would
+have failed. The narrow rules that do exist are per field, so the leading-colon refusal applies to a
+namespace and a dimension name and not to a dimension value.
+
+The same reasoning sets the value range at real CloudWatch's own -2^360 to 2^360. Enforcing it at
+the edge is also what makes a stored total safe: the widest batch accepted here is a thousand data
+of a hundred and fifty values, so nothing summed from values inside that range can overflow a
+double, and no aggregate downstream has to defend against one.
+
 ## Periods
 
 `sim-cloudwatch-period.ts` floors a timestamp to a multiple of the period measured from the epoch,

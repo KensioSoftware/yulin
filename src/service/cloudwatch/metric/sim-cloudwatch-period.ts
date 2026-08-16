@@ -2,7 +2,11 @@ import {
   SimCloudWatchInvalidParameterValueException,
   SimCloudWatchMissingRequiredParameterException,
 } from "../error/sim-cloudwatch.error.js";
-import type { SimCloudWatchDatapoint } from "./sim-cloudwatch-datapoint.js";
+import {
+  aggregateSimCloudWatchDatapoints,
+  type SimCloudWatchAggregate,
+  type SimCloudWatchDatapoint,
+} from "./sim-cloudwatch-datapoint.js";
 
 /**
  * The shortest period real CloudWatch offers a standard-resolution metric.
@@ -58,13 +62,22 @@ export function simCloudWatchPeriodStart(
 }
 
 /**
- * Group datapoints by the period each of them falls in, earliest first.
+ * Combine datapoints into one aggregate per period holding any, earliest
+ * first.
+ *
+ * Bucketing and combining are one step rather than two so that a period can
+ * only exist here because something was written into it. A caller therefore
+ * gets an aggregate for every period it is given, and has no empty case to
+ * handle that could never arise.
  */
-export function bucketSimCloudWatchDatapoints(
+export function simCloudWatchPeriodAggregates(
   datapoints: readonly SimCloudWatchDatapoint[],
   periodSeconds: number,
-): ReadonlyMap<number, readonly SimCloudWatchDatapoint[]> {
-  const buckets = new Map<number, SimCloudWatchDatapoint[]>();
+): ReadonlyMap<number, SimCloudWatchAggregate> {
+  const buckets = new Map<
+    number,
+    [SimCloudWatchDatapoint, ...SimCloudWatchDatapoint[]]
+  >();
 
   for (const datapoint of datapoints) {
     const start = simCloudWatchPeriodStart(datapoint.timestamp, periodSeconds);
@@ -81,6 +94,10 @@ export function bucketSimCloudWatchDatapoints(
     buckets
       .entries()
       .toArray()
-      .toSorted(([left], [right]) => left - right),
+      .toSorted(([left], [right]) => left - right)
+      .map(([start, inPeriod]) => [
+        start,
+        aggregateSimCloudWatchDatapoints(inPeriod),
+      ]),
   );
 }

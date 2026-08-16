@@ -238,4 +238,88 @@ describe("SimCloudWatch GetMetricData", () => {
     // though it had widened it.
     assertInstanceOf(error, SimCloudWatchInvalidParameterValueException);
   });
+
+  it("refuses a query id and a scan order real CloudWatch would refuse", async () => {
+    // Given three minutes of failures.
+    const metrics = await withThreeMinutes();
+
+    // When a query with no id, one whose id does not start with a lower-case
+    // letter, one with no Stat, and an unknown scan order are asked for.
+    const noId = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData({
+          input: { MetricDataQueries: [{ MetricStat: {} }], ...window },
+        }),
+    );
+    const badId = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData(
+          new GetMetricDataCommand({
+            MetricDataQueries: [{ ...failuresPerMinute, Id: "Failed" }],
+            ...window,
+          }),
+        ),
+    );
+    const noStat = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData({
+          input: {
+            MetricDataQueries: [
+              {
+                Id: "failed",
+                MetricStat: {
+                  Metric: { Namespace: "Orders", MetricName: "Failed" },
+                  Period: 60,
+                },
+              },
+            ],
+            ...window,
+          },
+        }),
+    );
+    const scanBy = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData({
+          input: {
+            MetricDataQueries: [failuresPerMinute],
+            ScanBy: "Alphabetical",
+            ...window,
+          },
+        }),
+    );
+
+    // Then each is refused.
+    assertInstanceOf(noId, SimCloudWatchMissingRequiredParameterException);
+    assertInstanceOf(badId, SimCloudWatchInvalidParameterValueException);
+    assertInstanceOf(noStat, SimCloudWatchMissingRequiredParameterException);
+    assertInstanceOf(scanBy, SimCloudWatchInvalidParameterValueException);
+  });
+
+  it("refuses a request carrying no queries, and a token it never issued", async () => {
+    // Given three minutes of failures.
+    const metrics = await withThreeMinutes();
+
+    // When a request carries no queries, and another carries a next token.
+    const none = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData(
+          new GetMetricDataCommand({ MetricDataQueries: [], ...window }),
+        ),
+    );
+    const token = await assertThrowsErrorAsync(
+      async () =>
+        await metrics.getMetricData(
+          new GetMetricDataCommand({
+            MetricDataQueries: [failuresPerMinute],
+            NextToken: "10",
+            ...window,
+          }),
+        ),
+    );
+
+    // Then each is refused: every query here is answered in full, so no token
+    // is ever issued to come back with.
+    assertInstanceOf(none, SimCloudWatchMissingRequiredParameterException);
+    assertInstanceOf(token, SimCloudWatchInvalidParameterValueException);
+  });
 });

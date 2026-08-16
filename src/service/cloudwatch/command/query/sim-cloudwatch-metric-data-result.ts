@@ -1,6 +1,6 @@
-import { aggregateSimCloudWatchDatapoints } from "../../metric/sim-cloudwatch-datapoint.js";
+import type { SimCloudWatchDatapoint } from "../../metric/sim-cloudwatch-datapoint.js";
 import type { SimCloudWatchMetricStore } from "../../metric/sim-cloudwatch-metric-store.js";
-import { bucketSimCloudWatchDatapoints } from "../../metric/sim-cloudwatch-period.js";
+import { simCloudWatchPeriodAggregates } from "../../metric/sim-cloudwatch-period.js";
 import { simCloudWatchStatisticValue } from "../../metric/sim-cloudwatch-statistic.js";
 import type { SimCloudWatchTimeRange } from "../../metric/sim-cloudwatch-time-range.js";
 import type { SimCloudWatchMetricDataResult } from "./query.command.js";
@@ -54,22 +54,14 @@ export function simCloudWatchMetricDataResult(
 }
 
 function queryPeriods(
-  datapoints: Parameters<typeof bucketSimCloudWatchDatapoints>[0],
+  datapoints: readonly SimCloudWatchDatapoint[],
   query: SimCloudWatchReadMetricDataQuery,
 ): readonly SimCloudWatchQueryPeriod[] {
-  return bucketSimCloudWatchDatapoints(datapoints, query.period)
+  return simCloudWatchPeriodAggregates(datapoints, query.period)
     .entries()
-    .flatMap(([start, inPeriod]) => {
-      const aggregate = aggregateSimCloudWatchDatapoints(inPeriod);
-
-      return aggregate === undefined
-        ? []
-        : [
-            [
-              new Date(start),
-              simCloudWatchStatisticValue(aggregate, query.statistic),
-            ] as SimCloudWatchQueryPeriod,
-          ];
-    })
+    .map(([start, aggregate]): SimCloudWatchQueryPeriod => [
+      new Date(start),
+      simCloudWatchStatisticValue(aggregate, query.statistic),
+    ])
     .toArray();
 }

@@ -235,4 +235,34 @@ describe("SimCloudWatch PutMetricData", () => {
     // Then neither was stored, as real CloudWatch validates the whole request.
     assertArrayLength(metrics.allMetrics(), 0);
   });
+
+  it("counts each value once when a datum lists values without counts", async () => {
+    // Given values published with no Counts beside them.
+    const metrics = cloudWatch();
+
+    await metrics.putMetricData(
+      new PutMetricDataCommand({
+        Namespace: "Orders",
+        MetricData: [{ MetricName: "Size", Values: [2, 5, 5] }],
+      }),
+    );
+
+    // When the metric is read back.
+    const read = await metrics.getMetricStatistics(
+      new GetMetricStatisticsCommand({
+        Namespace: "Orders",
+        MetricName: "Size",
+        Statistics: ["SampleCount", "Sum", "Maximum"],
+        ...window,
+      }),
+    );
+
+    // Then each value counted once, including the one listed twice.
+    const datapoint = read.Datapoints?.at(0);
+
+    assertNonNullable(datapoint);
+    assertIdentical(datapoint.SampleCount, 3);
+    assertIdentical(datapoint.Sum, 12);
+    assertIdentical(datapoint.Maximum, 5);
+  });
 });

@@ -1,10 +1,7 @@
-import {
-  SimCloudWatchInvalidParameterCombinationException,
-  SimCloudWatchInvalidParameterValueException,
-  SimCloudWatchMissingRequiredParameterException,
-} from "../../error/sim-cloudwatch.error.js";
+import { SimCloudWatchInvalidParameterValueException } from "../../error/sim-cloudwatch.error.js";
 import type { SimCloudWatchDatapoint } from "../../metric/sim-cloudwatch-datapoint.js";
 import type { SimCloudWatchStatisticSetInput } from "./data.command.js";
+import { requiredSimCloudWatchMetricValue } from "./sim-cloudwatch-metric-value.js";
 
 /**
  * What a metric datum measures, before it is placed in time.
@@ -20,7 +17,7 @@ export type SimCloudWatchObservation = Omit<
 export function readSimCloudWatchValue(
   value: number | undefined,
 ): SimCloudWatchObservation {
-  const measured = finiteNumber("Value", value);
+  const measured = requiredSimCloudWatchMetricValue("Value", value);
 
   return {
     sampleCount: 1,
@@ -37,13 +34,22 @@ export function readSimCloudWatchStatisticValues(
   statistics: SimCloudWatchStatisticSetInput | undefined,
 ): SimCloudWatchObservation {
   const observation = {
-    sampleCount: finiteNumber(
+    sampleCount: requiredSimCloudWatchMetricValue(
       "StatisticValues.SampleCount",
       statistics?.SampleCount,
     ),
-    sum: finiteNumber("StatisticValues.Sum", statistics?.Sum),
-    minimum: finiteNumber("StatisticValues.Minimum", statistics?.Minimum),
-    maximum: finiteNumber("StatisticValues.Maximum", statistics?.Maximum),
+    sum: requiredSimCloudWatchMetricValue(
+      "StatisticValues.Sum",
+      statistics?.Sum,
+    ),
+    minimum: requiredSimCloudWatchMetricValue(
+      "StatisticValues.Minimum",
+      statistics?.Minimum,
+    ),
+    maximum: requiredSimCloudWatchMetricValue(
+      "StatisticValues.Maximum",
+      statistics?.Maximum,
+    ),
   };
 
   if (observation.sampleCount <= 0) {
@@ -60,70 +66,4 @@ export function readSimCloudWatchStatisticValues(
   }
 
   return observation;
-}
-
-/**
- * Read a datum stating measurements and how often each of them was seen.
- *
- * They collapse into one observation, because nothing this simulation reports
- * could tell the individual measurements apart afterwards.
- */
-export function readSimCloudWatchValues(
-  values: readonly number[] | undefined,
-  counts: readonly number[] | undefined,
-): SimCloudWatchObservation {
-  const measured = values ?? [];
-
-  if (measured.length === 0) {
-    throw new SimCloudWatchInvalidParameterValueException(
-      "The parameter Values must not be empty.",
-    );
-  }
-
-  if (counts !== undefined && counts.length !== measured.length) {
-    throw new SimCloudWatchInvalidParameterCombinationException(
-      "The parameters Values and Counts must have the same number of entries.",
-    );
-  }
-
-  return measured.entries().reduce<SimCloudWatchObservation>(
-    (observation, [index, value]) => {
-      const measure = finiteNumber("Values", value);
-      const count = positiveNumber("Counts", counts?.at(index) ?? 1);
-
-      return {
-        sampleCount: observation.sampleCount + count,
-        sum: observation.sum + measure * count,
-        minimum: Math.min(observation.minimum, measure),
-        maximum: Math.max(observation.maximum, measure),
-      };
-    },
-    { sampleCount: 0, sum: 0, minimum: Infinity, maximum: -Infinity },
-  );
-}
-
-function finiteNumber(field: string, value: number | undefined): number {
-  if (value === undefined) {
-    throw new SimCloudWatchMissingRequiredParameterException(
-      `The parameter ${field} must be present.`,
-    );
-  }
-
-  if (!Number.isFinite(value)) {
-    throw new SimCloudWatchInvalidParameterValueException(
-      `The parameter ${field} must be a finite number.`,
-    );
-  }
-
-  return value;
-}
-
-function positiveNumber(field: string, value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new SimCloudWatchInvalidParameterValueException(
-      `The parameter ${field} must be a finite number greater than zero.`,
-    );
-  }
-
-  return value;
 }

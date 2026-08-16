@@ -1,5 +1,8 @@
 import { SimCloudWatchInvalidParameterValueException } from "../error/sim-cloudwatch.error.js";
-import { requiredSimCloudWatchName } from "./sim-cloudwatch-name.js";
+import {
+  refuseSimCloudWatchLeadingColon,
+  requiredSimCloudWatchName,
+} from "./sim-cloudwatch-name.js";
 
 /**
  * The namespace prefix real CloudWatch keeps for the metrics AWS publishes
@@ -14,15 +17,10 @@ export const simCloudWatchReservedNamespacePrefix = "AWS/";
  * field is anything whose first character is not a colon.
  */
 export function requiredSimCloudWatchNamespace(namespace?: string): string {
-  const value = requiredSimCloudWatchName("Namespace", namespace);
-
-  if (value.startsWith(":")) {
-    throw new SimCloudWatchInvalidParameterValueException(
-      "The parameter Namespace must not start with a colon.",
-    );
-  }
-
-  return value;
+  return refuseSimCloudWatchLeadingColon(
+    "Namespace",
+    requiredSimCloudWatchName("Namespace", namespace),
+  );
 }
 
 /**

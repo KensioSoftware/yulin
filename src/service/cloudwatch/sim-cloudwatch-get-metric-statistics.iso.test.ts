@@ -202,4 +202,49 @@ describe("SimCloudWatch GetMetricStatistics", () => {
       SimCloudWatchInvalidParameterCombinationException,
     );
   });
+
+  it("reads only the values recorded in the unit asked for", async () => {
+    // Given the same metric published in two units, which real CloudWatch
+    // keeps apart within one metric.
+    const metrics = new SimAws().cloudWatch();
+
+    await metrics.putMetricData(
+      new PutMetricDataCommand({
+        Namespace: namespace,
+        MetricData: [
+          {
+            MetricName: metricName,
+            Value: 3,
+            Unit: "Count",
+            Timestamp: new Date("2026-08-16T09:00:10.000Z"),
+          },
+          {
+            MetricName: metricName,
+            Value: 500,
+            Unit: "Milliseconds",
+            Timestamp: new Date("2026-08-16T09:00:20.000Z"),
+          },
+        ],
+      }),
+    );
+
+    // When one unit is named, and then neither.
+    const counted = await metrics.getMetricStatistics(
+      new GetMetricStatisticsCommand({
+        Namespace: namespace,
+        MetricName: metricName,
+        Statistics: ["Sum"],
+        Unit: "Count",
+        StartTime: new Date("2026-08-16T09:00:00.000Z"),
+        EndTime: new Date("2026-08-16T09:15:00.000Z"),
+        Period: 900,
+      }),
+    );
+    const both = await perMinuteSums(metrics);
+
+    // Then the filtered read sees only its own unit, and the unfiltered read
+    // sees everything written to the metric.
+    assertIdentical(counted.Datapoints?.at(0)?.Sum, 3);
+    assertIdentical(both.Datapoints?.at(0)?.Sum, 503);
+  });
 });
