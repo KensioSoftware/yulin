@@ -30,6 +30,7 @@
         "../src/service/secretsmanager/index.ts"
       ],
       "@kensio/yulin/serve": ["../src/serve/index.ts"],
+      "@kensio/yulin/ses": ["../src/service/ses/index.ts"],
       "@kensio/yulin/sns": ["../src/service/sns/index.ts"],
       "@kensio/yulin/sqs": ["../src/service/sqs/index.ts"],
       "@kensio/yulin/watch": ["../src/watch/index.ts"]

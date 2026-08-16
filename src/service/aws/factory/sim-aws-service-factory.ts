@@ -29,6 +29,7 @@ import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-regis
 import type { SimLogs } from "../../logs/index.js";
 import type { SimSecretsManager } from "../../secretsmanager/index.js";
 import type { SimEventBridge } from "../../eventbridge/index.js";
+import type { SimSesV2 } from "../../ses/index.js";
 import type { SimSns } from "../../sns/index.js";
 import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
@@ -262,6 +263,11 @@ export class SimAwsServiceFactory {
   /** Create simulated EventBridge Scheduler for an Account Region scope. */
   createScheduler(scope: SimAwsAccountRegionContainer): SimScheduler {
     return this.accountRegionServices.createScheduler(scope);
+  }
+
+  /** Create simulated SES for an Account Region scope. */
+  createSesV2(scope: SimAwsAccountRegionContainer): SimSesV2 {
+    return this.selfContainedServices.createSesV2(scope);
   }
 
   /** Create simulated SNS for an Account Region scope. */

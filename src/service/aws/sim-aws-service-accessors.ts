@@ -23,6 +23,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimScheduler } from "../scheduler/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
+import type { SimSesV2 } from "../ses/index.js";
 import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
@@ -152,6 +153,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated Secrets Manager in the default Account Region scope. */
   secretsManager(): SimSecretsManager {
     return this.defaultAccountRegionScope().secretsManager();
+  }
+
+  /** Get simulated SES in the default Account Region scope. */
+  sesV2(): SimSesV2 {
+    return this.defaultAccountRegionScope().sesV2();
   }
 
   /** Get simulated SNS in the default Account Region scope. */

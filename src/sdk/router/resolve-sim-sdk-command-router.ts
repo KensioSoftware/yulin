@@ -99,6 +99,7 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     "Secrets Manager",
     (scoped): SimSdkCommandRouter => scoped.secretsManager().sdkCommandRouter(),
   ],
+  ["SESv2", (scoped): SimSdkCommandRouter => scoped.sesV2().sdkCommandRouter()],
   ["SNS", (scoped): SimSdkCommandRouter => scoped.sns().sdkCommandRouter()],
   ["SQS", (scoped): SimSdkCommandRouter => scoped.sqs().sdkCommandRouter()],
   ["SSM", (scoped): SimSdkCommandRouter => scoped.ssm().sdkCommandRouter()],
