@@ -79,14 +79,16 @@ app.synth();
 
     // And nothing is reported as a gap. The provider CDK synthesized to do that
     // copying is reported as deliberately left out instead, along with the AWS
-    // CLI Layer each construct brings and the provider's log group.
+    // CLI Layer each construct brings. Its log group is not among them:
+    // simulated CloudWatch Logs creates that like any other, and an empty log
+    // group is what an account is left with when nothing invokes the provider
+    // either.
     assertArrayEquals(resourceTypesOf(stack.skippedResources), []);
     assertArrayEquals(resourceTypesOf(stack.inertResources), [
       "AWS::CDK::Metadata",
       "AWS::Lambda::Function",
       "AWS::Lambda::LayerVersion",
       "AWS::Lambda::LayerVersion",
-      "AWS::Logs::LogGroup",
     ]);
   });
 });

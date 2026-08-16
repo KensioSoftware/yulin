@@ -90,6 +90,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.lambda().cfnResourceFactory(),
   ],
   [
+    "Logs",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.logs().cfnResourceFactory(),
+  ],
+  [
     "Route53",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.route53().cfnResourceFactory(),

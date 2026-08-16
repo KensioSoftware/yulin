@@ -271,6 +271,40 @@ Nothing is authorized on this path. A real function needs `logs:CreateLogGroup` 
 Simulating that would mean nearly every function in a test logged nothing with no failure to explain
 why, so writing here is unconditional.
 
+## Declaring a log group in a template
+
+`AWS::Logs::LogGroup` is deployed by simulated CloudFormation, so a test can assert on the retention
+a stack gave a group rather than reading it off the template.
+
+```yaml
+OrdersLogs:
+  Type: AWS::Logs::LogGroup
+  Properties:
+    LogGroupName: /aws/lambda/orders
+    RetentionInDays: 14
+```
+
+`Ref` resolves to the log group name and `Fn::GetAtt Arn` to the ARN with its trailing `:*`, which is
+the form a policy has to name, so a template granting a function permission on its own log group
+gets a resource that reaches the streams inside it.
+
+`LogGroupName` and `RetentionInDays` are the two properties acted on. A `RetentionInDays` outside the
+set AWS accepts fails the deploy, which is the point: it would otherwise only be found on a real one.
+Everything else is recorded as an ignored property rather than refused, so a reader can see what a
+deployed group is not doing without a whole stack failing over a property that changes nothing about
+what the test asserts.
+
+Two divergences are worth knowing about:
+
+- **A group that already exists is taken over rather than refused.** Real CloudFormation fails a
+  deploy that declares a log group already in the account. That is a genuine misconfiguration there
+  and pure noise here, where a Lambda function that logged during test setup has already created
+  `/aws/lambda/orders`.
+- **An update replaces the group rather than changing it in place.** Simulated CloudFormation has no
+  in-place update at all: any resource whose template entry changed is deleted and created again. The
+  retention ends up correct, but the events the group held are gone, where a real update to
+  `RetentionInDays` keeps them.
+
 ## Permissions
 
 Every operation goes through simulated IAM. An operation on a named log group authorizes against
@@ -387,7 +421,8 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 
 - **Nothing expires.** Retention is stored and reported, never acted on.
 - **Subscription filters and metric filters.** Neither exists yet, so nothing is delivered onward
-  from a log group and `metricFilterCount` is always zero.
+  from a log group and `metricFilterCount` is always zero. `AWS::Logs::LogGroup` is the only
+  CloudFormation resource type here; the others are recorded as gaps.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
   `kmsKeyId` on `CreateLogGroup` are refused rather than dropped, so nothing looks set here and
   behaves differently in an account.

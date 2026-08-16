@@ -2051,6 +2051,7 @@ The resource types it creates are:
 - `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
 - `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`
+- `AWS::Logs::LogGroup`
 - `AWS::Route53::HostedZone`, `AWS::Route53::RecordSet`, `AWS::Route53::KeySigningKey` and
   `AWS::Route53::DNSSEC`
 - `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`

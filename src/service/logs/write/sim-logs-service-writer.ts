@@ -1,6 +1,7 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimLogsStoredEvent } from "../event/sim-logs-event.js";
 import type { SimLogsEventIds } from "../event/sim-logs-event-ids.js";
+import type { SimLogsLogGroup } from "../group/sim-logs-log-group.js";
 import type { SimLogsLogGroupStore } from "../group/sim-logs-log-group-store.js";
 import type { SimLogsLogStream } from "../stream/sim-logs-log-stream.js";
 
@@ -36,17 +37,37 @@ export class SimLogsServiceWriter {
   }
 
   /**
+   * The log group of this name, made if nothing has made it yet.
+   *
+   * A declared log group and one a service made for itself are the same thing,
+   * so this answers with either. Real CloudFormation fails a deploy that
+   * declares a group already in the account, which is a genuine
+   * misconfiguration there and pure noise in a test whose Lambda function
+   * logged during setup.
+   */
+  logGroup(logGroupName: string): SimLogsLogGroup {
+    return this.#groups.ensure(logGroupName, this.#clock.now().getTime());
+  }
+
+  /**
+   * Remove a log group, and the streams and events it holds with it.
+   */
+  deleteLogGroup(logGroupName: string): void {
+    this.#groups.delete(logGroupName);
+  }
+
+  /**
    * Make sure a group and a stream in it both exist, without writing to them.
    *
    * A Lambda execution environment opens its stream as it cold starts, so a
    * function that logged nothing still shows the stream its invocation ran in.
    */
   openStream(logGroupName: string, logStreamName: string): SimLogsLogStream {
-    const now = this.#clock.now().getTime();
-    const group = this.#groups.ensure(logGroupName, now);
+    const group = this.logGroup(logGroupName);
 
     return (
-      group.findStream(logStreamName) ?? group.createStream(logStreamName, now)
+      group.findStream(logStreamName) ??
+      group.createStream(logStreamName, this.#clock.now().getTime())
     );
   }
 

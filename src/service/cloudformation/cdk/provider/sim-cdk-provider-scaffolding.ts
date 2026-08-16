@@ -4,7 +4,6 @@ import { parseSimCfnNode } from "../../template/parse/node/sim-cfn-node-parser.j
 
 const customResourceTypePrefix = "Custom::";
 const lambdaFunctionResourceType = "AWS::Lambda::Function";
-const logGroupResourceType = "AWS::Logs::LogGroup";
 
 /**
  * The Resources in a Stack that exist only to run a CDK custom Resource sim
@@ -14,8 +13,14 @@ const logGroupResourceType = "AWS::Logs::LogGroup";
  * `Custom::` Resource and a Lambda function to answer it. Where this simulator
  * creates that custom Resource directly, as it does for `BucketDeployment` and
  * Bucket notifications, the function is left holding nothing: it is never
- * invoked, so its code is never loaded and its log group never written to. The
- * work is already done by the time anything would have called it.
+ * invoked and its code is never loaded. The work is already done by the time
+ * anything would have called it.
+ *
+ * Only the function is recognised here. A newer CDK writes the provider's log
+ * group into the template too, and simulated CloudWatch Logs creates that like
+ * any other log group: an empty log group is exactly what an account is left
+ * with when nothing invokes the function, so creating it says more than
+ * reporting it as deliberately left out ever did.
  *
  * That makes the function and its log group Resources no test can tell apart
  * from ones that were created, which is the same reason a Resource type nothing
@@ -44,10 +49,7 @@ export class SimCdkProviderScaffolding {
    * already carried out, or undefined when it is not.
    */
   reasonFor(resource: SimCfnResource): string | undefined {
-    return (
-      this.providerFunctionReason(resource) ??
-      this.providerLogGroupReason(resource)
-    );
+    return this.providerFunctionReason(resource);
   }
 
   /**
@@ -63,35 +65,6 @@ export class SimCdkProviderScaffolding {
     return (
       `sim CloudFormation carries out ${customResourceType} itself, so CDK's ` +
       `provider function for it is never invoked`
-    );
-  }
-
-  /**
-   * The Resource is the log group of a provider function.
-   *
-   * A newer CDK writes the provider function's log group into the template
-   * rather than leaving Lambda to create it, and names the function in it, so
-   * the same association finds it. Only a log group is looked for this way: the
-   * provider's IAM Role and Policy name it too, and those this simulator
-   * creates for real.
-   */
-  private providerLogGroupReason(resource: SimCfnResource): string | undefined {
-    if (resource.type !== logGroupResourceType) {
-      return undefined;
-    }
-
-    const customResourceType = resource
-      .dependencies()
-      .map((logicalId) => this.#providerFunctions.get(logicalId))
-      .find((found) => found !== undefined);
-
-    if (customResourceType === undefined) {
-      return undefined;
-    }
-
-    return (
-      `the log group of CDK's ${customResourceType} provider function, which ` +
-      `sim CloudFormation never invokes, so nothing is ever written to it`
     );
   }
 

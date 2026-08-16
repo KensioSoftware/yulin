@@ -99,6 +99,25 @@ knows to keep it and ask again.
 than dropping them, following the same rule as the rest of the simulator: something accepted and
 ignored here would be applied in an account.
 
+## CloudFormation
+
+`cfn/` creates `AWS::Logs::LogGroup` from a template, following the shape every other service's
+resource factory has. `SimCfnLogGroupProperties` reads the two properties this simulation acts on
+and `SimCfnLogGroupPropertyRules` records the rest, so a reader can tell a real property this
+simulation chose not to act on from one CloudWatch Logs has never had.
+
+Creation goes through the service writer rather than the command layer, which is what makes a
+declared group and one a Lambda function made for itself the same thing. Real CloudFormation fails a
+deploy that declares a group already in the account; here that is the ordinary case, because a
+function that logged during test setup has already created `/aws/lambda/orders`.
+
+Registering the service had one consequence worth recording. `SimCdkProviderScaffolding` used to
+recognise a CDK provider function's log group and report it as deliberately left out, because
+nothing simulated log groups and reporting it as a gap would have read as a missing feature. Now
+that log groups are created, that branch is gone: a Resource type a service creates is created, and
+an empty log group is exactly what an account is left with when nothing invokes the provider
+function either.
+
 ## Writing from the rest of the simulation
 
 `SimLogsServiceWriter`, under `write/`, is how a simulated service records its own output. It is

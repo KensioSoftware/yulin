@@ -34,9 +34,11 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
     assertArrayEquals(logicalIdsOf(stack.skippedResources), []);
 
     // And the Resources it stood in for are reported as deliberately left out.
+    // The provider's log group is not among them: simulated CloudWatch Logs
+    // creates it like any other, and an empty log group is what an account is
+    // left with when nothing invokes the function either.
     assertArrayEquals(logicalIdsOf(stack.inertResources), [
       "BucketDeploymentProvider",
-      "BucketDeploymentProviderLogGroup",
       "Deploy0AwsCliLayer",
       "Deploy1AwsCliLayer",
     ]);
@@ -46,16 +48,12 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
     // Given the same Stack.
     const stack = await deployScaffoldedStack();
 
-    // Then the provider function and its log group name the custom Resource
-    // this simulator carried out in their place, rather than telling the reader
-    // to bind a handler to a function nothing will ever invoke.
+    // Then the provider function names the custom Resource this simulator
+    // carried out in its place, rather than telling the reader to bind a
+    // handler to a function nothing will ever invoke.
     assertStringIncludes(
       stack.getResource("BucketDeploymentProvider")?.inertReason,
       "sim CloudFormation carries out Custom::CDKBucketDeployment itself",
-    );
-    assertStringIncludes(
-      stack.getResource("BucketDeploymentProviderLogGroup")?.inertReason,
-      "nothing is ever written to it",
     );
 
     // And a Layer says what it would take for one to start mattering, since it
@@ -66,7 +64,7 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
     );
   });
 
-  it("still reports a function and a log group of the reader's own as skipped", async () => {
+  it("still reports a function of the reader's own as skipped", async () => {
     // Given the same Stack with a Python function of the app's own beside the
     // scaffolding, and a log group for it.
     const stack = await deployScaffoldedStack({
@@ -100,12 +98,11 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
       },
     });
 
-    // Then those two are still gaps, because a test written against either of
-    // them would find it missing. Only the scaffolding is quietened.
-    assertArrayEquals(logicalIdsOf(stack.skippedResources), [
-      "Thumbnailer",
-      "ThumbnailerLogGroup",
-    ]);
+    // Then the Python function is still a gap, because a test written against
+    // it would find it missing. Its log group is not: that one deploys for
+    // real now, so a test can assert on the retention it was given even though
+    // nothing will ever write to it.
+    assertArrayEquals(logicalIdsOf(stack.skippedResources), ["Thumbnailer"]);
   });
 
   it("carries on past a hand-written deployment that names no provider", async () => {
@@ -130,7 +127,6 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
     assertArrayEquals(logicalIdsOf(stack.skippedResources), ["AlarmRule"]);
     assertArrayEquals(logicalIdsOf(stack.inertResources), [
       "BucketDeploymentProvider",
-      "BucketDeploymentProviderLogGroup",
       "Deploy0AwsCliLayer",
       "Deploy1AwsCliLayer",
     ]);
