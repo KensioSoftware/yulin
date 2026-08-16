@@ -3,19 +3,26 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimSetUserPoolMfaConfigCommandInput } from "../../command/user-pool/user-pool-mfa.command.js";
 import type { SimCreateUserPoolCommandInput } from "../../command/user-pool/user-pool.command.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoAdminCreateUserConfig } from "./sim-cfn-cognito-admin-create-user-config.js";
+import { SimCfnCognitoUserPoolMfa } from "./sim-cfn-cognito-user-pool-mfa.js";
 import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
 
 /**
  * The AWS::Cognito::UserPool properties this simulation deploys.
  *
- * `MfaConfiguration` and `UserPoolTier` are here because CreateUserPool
- * accepts each at its AWS default and refuses it otherwise, in words that say
- * why. A CDK stack states both routinely, and a pool created without either
- * would be reported as behaving differently when it does not.
+ * `MfaConfiguration` and `EnabledMfas` are here because a pool records what it
+ * was asked for and reports it back. They do not reach CreateUserPool: real
+ * CloudFormation sets a pool's MFA in a SetUserPoolMfaConfig call after the
+ * pool exists, and this deploys them the same way.
+ *
+ * `UserPoolTier` is here because CreateUserPool accepts it at its AWS default
+ * and refuses it otherwise, in words that say why. A CDK stack states it
+ * routinely, and a pool created without it would be reported as behaving
+ * differently when it does not.
  *
  * `AdminCreateUserConfig` and `AutoVerifiedAttributes` are the two a
  * `selfSignUpEnabled` CDK pool turns on, and both are acted on: the first
@@ -40,6 +47,7 @@ const simulatedProperties = [
   "DeletionProtection",
   "LambdaConfig",
   "MfaConfiguration",
+  "EnabledMfas",
   "UserPoolTier",
   "AdminCreateUserConfig",
   "AutoVerifiedAttributes",
@@ -99,10 +107,6 @@ export class SimCfnCognitoUserPoolProperties {
         this.properties["LambdaConfig"],
         "LambdaConfig",
       ),
-      MfaConfiguration: this.string(
-        this.properties["MfaConfiguration"],
-        "MfaConfiguration",
-      ),
       UserPoolTier: this.string(
         this.properties["UserPoolTier"],
         "UserPoolTier",
@@ -137,6 +141,20 @@ export class SimCfnCognitoUserPoolProperties {
         "SmsVerificationMessage",
       ),
     };
+  }
+
+  /**
+   * The SetUserPoolMfaConfig input this Resource asks for, or nothing where
+   * the template says nothing about MFA. That call is a second one after the
+   * pool exists, as it is on real CloudFormation.
+   */
+  setUserPoolMfaConfigInput(
+    userPoolId: string,
+  ): SimSetUserPoolMfaConfigCommandInput | undefined {
+    return new SimCfnCognitoUserPoolMfa({
+      resource: this.resource,
+      propertyParser: this.propertyParser,
+    }).parse(userPoolId, this.properties);
   }
 
   /**

@@ -9,6 +9,7 @@ import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-t
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
+import { SimCognitoMfaChallenge } from "./sim-cognito-mfa-challenge.js";
 import type { SimCognitoAuthRequest } from "./sim-cognito-password-sign-in.js";
 import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 
@@ -42,6 +43,7 @@ export class SimCognitoNewPasswordResponse {
   private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly clock: SimClock;
   private readonly result = new SimCognitoAuthenticationResult();
+  private readonly mfaChallenge = new SimCognitoMfaChallenge();
 
   constructor(properties: SimCognitoNewPasswordResponseProperties) {
     this.authResolver = properties.authResolver;
@@ -86,6 +88,11 @@ export class SimCognitoNewPasswordResponse {
     );
 
     pool.auth.removeSession(session);
+
+    // A pool that challenges every user answers the new password with an MFA
+    // challenge rather than with tokens, and this simulation has none to
+    // issue.
+    this.mfaChallenge.refuseIn(pool);
 
     // This is the one occasion real Cognito passes a request's `ClientMetadata`
     // to the token trigger, so it travels with the tokens here and nowhere

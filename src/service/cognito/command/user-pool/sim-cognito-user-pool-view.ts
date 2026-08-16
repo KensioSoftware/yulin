@@ -20,7 +20,11 @@ export class SimCognitoUserPoolView {
    * `LambdaConfig` is reported only by a pool that was created with one, and
    * carries the triggers that pool runs.
    *
-   * `MfaConfiguration` is always `OFF` because MFA is not simulated.
+   * `MfaConfiguration` is what the pool was asked for, and no pool here
+   * challenges for a second factor whatever it says. Which factors a pool
+   * offers is not reported here on real Cognito either:
+   * `GetUserPoolMfaConfig` is what reports those.
+   *
    * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
    * Cognito refreshes that number periodically rather than on each write, so
    * it can lag there in a way it never does here.
@@ -37,7 +41,7 @@ export class SimCognitoUserPoolView {
       Policies: { PasswordPolicy: pool.settings.passwordPolicy.toOutput() },
       DeletionProtection: pool.settings.deletionProtection.value,
       LambdaConfig: pool.settings.lambdaConfig.toOutput(),
-      MfaConfiguration: "OFF",
+      MfaConfiguration: pool.settings.mfa.configuration.value,
       AdminCreateUserConfig: pool.settings.adminCreateUserConfig.toOutput(),
       AutoVerifiedAttributes: pool.settings.autoVerifiedAttributes.toOutput(),
       EstimatedNumberOfUsers: pool.userCount,

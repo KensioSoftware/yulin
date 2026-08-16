@@ -36,11 +36,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "renaming a pool",
   },
   {
-    label: "MfaConfiguration",
-    input: { MfaConfiguration: "OPTIONAL" },
-    says: "multi-factor authentication",
-  },
-  {
     label: "UserPoolTier",
     input: { UserPoolTier: "PLUS" },
     says: "the Lite and Plus feature plans",
@@ -194,7 +189,6 @@ describe("sim Cognito UpdateUserPool validation", () => {
     await cognito.updateUserPool(
       new UpdateUserPoolCommand({
         UserPoolId: userPoolId,
-        MfaConfiguration: "OFF",
         UserPoolTier: "ESSENTIALS",
         AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
       }),

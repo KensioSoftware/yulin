@@ -12,6 +12,11 @@ import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
  *
  * `CreateUserPool` and `UpdateUserPool` both carry them, so both refuse them,
  * each naming itself in the refusal.
+ *
+ * `MfaConfiguration` is not among them. A pool records what it was asked for
+ * and reports it back, and the sign-in that would have to answer a challenge
+ * is what refuses instead, where the refusal can say what it was that could
+ * not be done.
  */
 export class SimCognitoUnsimulatedUserPoolOptions {
   private readonly unsimulated: SimCognitoUnsimulatedInput;
@@ -28,12 +33,6 @@ export class SimCognitoUnsimulatedUserPoolOptions {
    * Refuse a request carrying an input this simulation cannot honour.
    */
   refuseIn(input: SimCognitoUserPoolCommandInput): void {
-    this.unsimulated.refuseUnless(
-      "MfaConfiguration",
-      input.MfaConfiguration,
-      "OFF",
-      "multi-factor authentication",
-    );
     this.unsimulated.refuseUnless(
       "UserPoolTier",
       input.UserPoolTier,

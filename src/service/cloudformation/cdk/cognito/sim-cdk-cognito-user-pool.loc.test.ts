@@ -6,6 +6,7 @@ import {
   ConfirmSignUpCommand,
   DescribeUserPoolClientCommand,
   DescribeUserPoolCommand,
+  GetUserPoolMfaConfigCommand,
   InitiateAuthCommand,
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -165,8 +166,9 @@ app.synth();
   });
 
   it("deploys a CDK user pool a user signs itself up in", async () => {
-    // Given a CDK stack with a user pool that lets users sign themselves up
-    // and verifies the email address they sign up with.
+    // Given a CDK stack with a user pool that lets users sign themselves up,
+    // verifies the email address they sign up with, and offers multi-factor
+    // authentication to the users that want it.
     const cdkProject = new TestCdkProject();
     await cdkProject.writeCdkAppFile(
       `
@@ -181,6 +183,8 @@ const stack = new cdk.Stack(app, "TestStack", {
 const pool = new cognito.UserPool(stack, "Pool", {
   selfSignUpEnabled: true,
   autoVerify: { email: true },
+  mfa: cognito.Mfa.OPTIONAL,
+  mfaSecondFactor: { sms: false, otp: true },
 });
 const client = pool.addClient("Client", {
   disableOAuth: true,
@@ -214,6 +218,16 @@ app.synth();
     assertTypeString(clientId);
 
     const cognito = scoped.cognitoIdentityProvider();
+
+    // And the MfaConfiguration and EnabledMfas the construct emits reached the
+    // pool, through the SetUserPoolMfaConfig call CloudFormation makes once
+    // the pool exists.
+    const mfa = await cognito.getUserPoolMfaConfig(
+      new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+    );
+
+    assertIdentical(mfa.MfaConfiguration, "OPTIONAL");
+    assertTrue(mfa.SoftwareTokenMfaConfiguration?.Enabled);
 
     await cognito.signUp(
       new SignUpCommand({

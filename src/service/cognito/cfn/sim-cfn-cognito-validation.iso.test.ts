@@ -142,7 +142,8 @@ describe("Cognito CloudFormation validation", () => {
   });
 
   it("refuses a pool feature the Cognito API refuses", async () => {
-    // Given a template asking for MFA, which CreateUserPool does not simulate.
+    // Given a template asking for a feature plan CreateUserPool does not
+    // simulate.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -151,7 +152,7 @@ describe("Cognito CloudFormation validation", () => {
         Type: "AWS::Cognito::UserPool",
         Properties: {
           UserPoolName: "myapp-users",
-          MfaConfiguration: "ON",
+          UserPoolTier: "PLUS",
         },
       },
     });
@@ -161,7 +162,56 @@ describe("Cognito CloudFormation validation", () => {
     assertStringIncludes(error.message, "AppPool");
     assertStringIncludes(
       error.message,
-      "CreateUserPool MfaConfiguration 'ON' is not simulated",
+      "CreateUserPool UserPoolTier 'PLUS' is not simulated",
+    );
+  });
+
+  it("refuses a second factor the pool could not deliver a message for", async () => {
+    // Given a template asking for MFA over SMS, which needs an SmsConfiguration
+    // that CreateUserPool refuses.
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed.
+    const error = await deployFailure(simAws, {
+      AppPool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          UserPoolName: "myapp-users",
+          MfaConfiguration: "OPTIONAL",
+          EnabledMfas: ["SMS_MFA"],
+        },
+      },
+    });
+
+    // Then the refusal comes from the second call the pool's MFA is set in,
+    // saying which factor it was.
+    assertStringIncludes(error.message, "AppPool");
+    assertStringIncludes(
+      error.message,
+      "SetUserPoolMfaConfig SmsMfaConfiguration is not simulated",
+    );
+  });
+
+  it("refuses a second factor Cognito does not have", async () => {
+    // Given a template naming a factor that is not one of Cognito's.
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed.
+    const error = await deployFailure(simAws, {
+      AppPool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          UserPoolName: "myapp-users",
+          EnabledMfas: ["FINGERPRINT"],
+        },
+      },
+    });
+
+    // Then the refusal names the property and the factors Cognito does have.
+    assertStringIncludes(error.message, "AppPool");
+    assertStringIncludes(
+      error.message,
+      "EnabledMfas[0] must be one of SMS_MFA, SOFTWARE_TOKEN_MFA, EMAIL_OTP",
     );
   });
 

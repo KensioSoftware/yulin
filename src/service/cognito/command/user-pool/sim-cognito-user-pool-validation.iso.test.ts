@@ -34,11 +34,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "stores a generated UUID as the username",
   },
   {
-    label: "MfaConfiguration",
-    input: { MfaConfiguration: "OPTIONAL" },
-    says: "multi-factor authentication",
-  },
-  {
     label: "UserPoolTier",
     input: { UserPoolTier: "PLUS" },
     says: "the Lite and Plus feature plans",
@@ -224,7 +219,6 @@ describe("sim Cognito user pool validation", () => {
     const created = await cognito.createUserPool(
       new CreateUserPoolCommand({
         PoolName: "myapp-users",
-        MfaConfiguration: "OFF",
         UserPoolTier: "ESSENTIALS",
       }),
     );

@@ -17,6 +17,14 @@ export type {
   SimUpdateUserPoolCommandOutput,
 } from "./user-pool/user-pool.command.js";
 export type {
+  SimGetUserPoolMfaConfigCommand,
+  SimGetUserPoolMfaConfigCommandInput,
+  SimGetUserPoolMfaConfigCommandOutput,
+  SimSetUserPoolMfaConfigCommand,
+  SimSetUserPoolMfaConfigCommandInput,
+  SimSetUserPoolMfaConfigCommandOutput,
+} from "./user-pool/user-pool-mfa.command.js";
+export type {
   SimCognitoUserPoolDescriptionType,
   SimListUserPoolsCommand,
   SimListUserPoolsCommandInput,

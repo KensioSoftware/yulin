@@ -11,6 +11,10 @@ import type {
 } from "../command/client/user-pool-client.command.js";
 import type { SimListUserPoolsCommand } from "../command/user-pool/list-user-pools.command.js";
 import type {
+  SimGetUserPoolMfaConfigCommand,
+  SimSetUserPoolMfaConfigCommand,
+} from "../command/user-pool/user-pool-mfa.command.js";
+import type {
   SimCreateUserPoolCommand,
   SimDeleteUserPoolCommand,
   SimDescribeUserPoolCommand,
@@ -54,6 +58,22 @@ export function simCognitoSdkPoolRoutes(
       async (command, context): Promise<unknown> =>
         await simCognito.deleteUserPool(
           command as SimDeleteUserPoolCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "SetUserPoolMfaConfigCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.setUserPoolMfaConfig(
+          command as SimSetUserPoolMfaConfigCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "GetUserPoolMfaConfigCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.getUserPoolMfaConfig(
+          command as SimGetUserPoolMfaConfigCommand,
           simSdkCallerOptions(context),
         ),
     ],
