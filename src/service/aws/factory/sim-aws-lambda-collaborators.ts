@@ -4,6 +4,7 @@ import { SimEcrLambdaContainerImages } from "../../lambda/function/code/image/si
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
+import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
@@ -26,6 +27,7 @@ interface SimAwsLambdaCollaborators {
   readonly eventSourceQueues: SimSqsEventSourceQueues;
   readonly eventSourceStreams: SimDynamoDbEventSourceStreams;
   readonly vmSdkModuleProvider: SimSdkLambdaVmModuleProvider;
+  readonly logs: SimLogsServiceWriter;
 }
 
 /**
@@ -44,6 +46,10 @@ interface SimAwsLambdaCollaborators {
  * A container image function's image is resolved in the whole simulation's ECR
  * rather than this scope's, because an image URI names the Account and Region
  * its registry is in, which need not be this one.
+ *
+ * Handler output is recorded to the same Account/Region scope's simulated
+ * CloudWatch Logs, since that is where `/aws/lambda/<name>` lives for a
+ * function in this scope.
  */
 export function simAwsLambdaCollaborators(
   properties: SimAwsLambdaCollaboratorsProperties,
@@ -52,6 +58,7 @@ export function simAwsLambdaCollaborators(
 
   return {
     runAsOwner: simAws,
+    logs: scope.logs().serviceWriter(),
     urlRegistry: properties.urlRegistry,
     codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
     containerImages: new SimEcrLambdaContainerImages({

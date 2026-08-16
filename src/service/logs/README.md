@@ -99,13 +99,28 @@ knows to keep it and ask again.
 than dropping them, following the same rule as the rest of the simulator: something accepted and
 ignored here would be applied in an account.
 
+## Writing from the rest of the simulation
+
+`SimLogsServiceWriter`, under `write/`, is how a simulated service records its own output. It is
+deliberately not the command layer: nothing validates a batch, pages, or authorizes, because real
+CloudWatch Logs does not put a Lambda function's own output through `PutLogEvents` either.
+
+Nothing on that path fails. A group or stream that is not there is made rather than refused, so
+deleting a log group mid-test does not take the next invocation down with it, which is what real
+Lambda does when its group has gone.
+
+Authorization is the deliberate divergence. A real function needs `logs:CreateLogGroup` and
+`logs:PutLogEvents` on its execution Role, and one without them produces no logs at all, in silence.
+Simulating that faithfully would mean nearly every function in a test logged nothing with no failure
+to explain why, so writing is unconditional here.
+
+Only zip-packaged Lambda code reaches this. A handler function reference runs in the host scope with
+no streams of its own, so there is nothing to tee without patching a global the whole test run
+shares.
+
 ## What is not simulated
 
 Nothing expires, as above. Subscription filters, metric filters, Logs Insights queries, export
 tasks, tagging, encryption and data protection policies are all absent. `metricFilterCount` is
 always zero and a stream's `storedBytes` is always zero, the latter matching real CloudWatch Logs,
 which stopped reporting it per stream in 2019.
-
-Nothing writes to a log group by itself yet either. A simulated Lambda invocation still forwards
-its handler's output to the host's streams, so a group only holds what something put there through
-`PutLogEvents`.

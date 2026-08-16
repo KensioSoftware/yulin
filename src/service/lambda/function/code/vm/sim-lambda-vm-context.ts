@@ -6,6 +6,10 @@ import {
   SimRealClock,
 } from "../../../../../util/clock/sim-clock.js";
 import type { SimLambdaEnvironment } from "../../environment/sim-lambda-environment.js";
+import {
+  simLambdaNoOutputSink,
+  type SimLambdaOutputSink,
+} from "../../logging/sim-lambda-output-sink.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
 
 /**
@@ -25,12 +29,17 @@ import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
 export function makeSimLambdaVmContext(
   environment: SimLambdaEnvironment,
   clock: SimClock = new SimRealClock(),
+  sink: SimLambdaOutputSink = simLambdaNoOutputSink,
 ): vm.Context {
   // Writable standard streams, as the real runtime provides. Code that builds
   // its own console over them, as AWS Lambda Powertools' logger does, throws
   // at module load without them.
   const stdout = new SimLambdaVmOutputStream(() => process.stdout);
   const stderr = new SimLambdaVmOutputStream(() => process.stderr);
+
+  // What function code writes reaches the function's log group through here.
+  stdout.recordTo(sink);
+  stderr.recordTo(sink);
 
   return vm.createContext({
     // The sandbox's console is built over those streams, as the real

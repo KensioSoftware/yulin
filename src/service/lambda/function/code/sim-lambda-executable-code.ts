@@ -1,3 +1,4 @@
+import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 
 /**
@@ -19,6 +20,12 @@ export interface SimLambdaExecutableCode {
    */
   readonly runsInHostScope: boolean;
 
+  /**
+   * Record what this code writes to its standard streams, so an invocation's
+   * output reaches the function's log group.
+   */
+  recordOutputTo(sink: SimLambdaOutputSink): void;
+
   handlerFunction(): SimLambdaHandler;
 }
 
@@ -33,6 +40,18 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
   readonly runsInHostScope = true;
 
   constructor(private readonly handler: SimLambdaHandler) {}
+
+  /**
+   * Record nothing.
+   *
+   * A referenced handler has no streams of its own to tee: it is an ordinary
+   * function closing over the test's own module scope, so its `console.log`
+   * reaches the host console directly and there is nothing here to intercept
+   * without patching a global the whole test run shares.
+   */
+  recordOutputTo(): void {
+    // Nothing to record from.
+  }
 
   /**
    * Get the referenced handler function.

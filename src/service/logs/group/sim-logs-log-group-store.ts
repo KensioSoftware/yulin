@@ -52,6 +52,19 @@ export class SimLogsLogGroupStore {
   }
 
   /**
+   * Make a log group, or answer with the one already under that name.
+   *
+   * This is not an operation the CloudWatch Logs API has. It is for the parts
+   * of the simulation that write to a group as a side effect of doing
+   * something else, where a name already in use is the ordinary case rather
+   * than a mistake: a Lambda function creates its own log group on its first
+   * invocation and finds it there on every one after.
+   */
+  ensure(logGroupName: string, creationTime: number): SimLogsLogGroup {
+    return this.find(logGroupName) ?? this.create(logGroupName, creationTime);
+  }
+
+  /**
    * Find a log group by name.
    */
   find(logGroupName: string): SimLogsLogGroup | undefined {

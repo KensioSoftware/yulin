@@ -209,6 +209,68 @@ console.log(
 );
 ```
 
+## Lambda handler output
+
+A zip-packaged Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs,
+so a test can assert on what a handler logged by searching its log group rather than by capturing
+process output.
+
+```typescript sim-logs-lambda-output
+/**
+ * Asserting on what a simulated Lambda handler logged.
+ */
+
+import { FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaCodeZip } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+    Handler: "index.handler",
+    Code: {
+      ZipFile: makeLambdaCodeZip({
+        "index.js":
+          "exports.handler = async () => {\n" +
+          '  console.error("ERROR order has no items");\n' +
+          "};\n",
+      }),
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+const found = await simAws.logs().filterLogEvents(
+  new FilterLogEventsCommand({
+    logGroupName: "/aws/lambda/orders",
+    filterPattern: "ERROR",
+  }),
+);
+
+console.log(found.events?.[0]?.message);
+```
+
+The output still reaches the terminal as well. Real Lambda sends it to CloudWatch Logs and nowhere
+else, but a test tool that swallowed it would make a failing test harder to debug than it is with
+none of this, so recording is a tee rather than a redirect.
+
+Each invocation's `context.logGroupName` and `context.logStreamName` name the group and stream that
+were actually written to. Stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format, and the
+hash identifies the execution environment rather than the request, so a test should match the shape
+rather than the value.
+
+Nothing is authorized on this path. A real function needs `logs:CreateLogGroup` and
+`logs:PutLogEvents` on its execution Role, and one without them produces no logs at all, in silence.
+Simulating that would mean nearly every function in a test logged nothing with no failure to explain
+why, so writing here is unconditional.
+
 ## Permissions
 
 Every operation goes through simulated IAM. An operation on a named log group authorizes against
@@ -331,6 +393,6 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   behaves differently in an account.
 - **Per-stream `storedBytes`.** Always zero, which matches real CloudWatch Logs: it stopped
   reporting the figure per stream in 2019. `DescribeLogGroups` reports the bytes a group holds.
-- **Automatic log capture.** Nothing writes to a log group by itself yet. A simulated Lambda
-  invocation still forwards its handler's output to the host's standard streams, so a group holds
-  only what something put there through `PutLogEvents`.
+- **Log capture from anything but zip-packaged Lambda code.** A function backed by a handler
+  function reference, including a container image binding, writes to the host console directly and
+  is not recorded. See the Lambda docs for why.
