@@ -24,6 +24,7 @@ import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
+import type { SimLogs } from "../logs/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
 import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
@@ -192,6 +193,11 @@ export class SimAwsAccountRegionContainer {
   /** Get simulated S3 for this account and region. */
   s3(): SimS3 {
     return this.memo.getOrCreate("s3", () => this.factory.createS3(this));
+  }
+
+  /** Get simulated CloudWatch Logs for this account and region. */
+  logs(): SimLogs {
+    return this.memo.getOrCreate("logs", () => this.factory.createLogs(this));
   }
 
   /** Get simulated Secrets Manager for this account and region. */

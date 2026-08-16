@@ -25,6 +25,7 @@ import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../../kms/index.js";
 import type { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
+import type { SimLogs } from "../../logs/index.js";
 import type { SimSecretsManager } from "../../secretsmanager/index.js";
 import type { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimSns } from "../../sns/index.js";
@@ -239,6 +240,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Secrets Manager for an Account Region scope. */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return this.selfContainedServices.createSecretsManager(scope);
+  }
+
+  /** Create simulated CloudWatch Logs for an Account Region scope. */
+  createLogs(scope: SimAwsAccountRegionContainer): SimLogs {
+    return this.selfContainedServices.createLogs(scope);
   }
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */

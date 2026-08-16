@@ -1,5 +1,7 @@
 # Logs
-logs
+# Anchored to the root: unanchored, this matches any directory named `logs` at
+# any depth, which silently excludes src/service/logs and docs/services/logs.
+/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
