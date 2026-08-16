@@ -19,6 +19,14 @@ export type {
   SimLambdaFunctionUrlResult,
 } from "./serve/event/sim-lambda-url-event.type.js";
 export { lambdaFunctionUrlEventFactory } from "./factory/lambda-function-url-event.factory.js";
+export {
+  lambdaSqsEventFactory,
+  lambdaSqsEventRecordFactory,
+} from "./factory/lambda-sqs-event.factory.js";
+export {
+  lambdaDynamoDbStreamEventFactory,
+  lambdaDynamoDbStreamEventRecordFactory,
+} from "./factory/lambda-dynamodb-stream-event.factory.js";
 export type {
   SimLambdaSqsEvent,
   SimLambdaSqsEventMessageAttribute,

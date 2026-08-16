@@ -33,12 +33,20 @@ function isAllowedInBody(codePoint: number): boolean {
 }
 
 /**
- * One message body, with the digest a sender checks it by.
+ * The digest SQS reports for a message body.
  *
- * The digest is a real MD5 of the body, as real SQS reports, because that is the
- * whole point of it: a sender comparing `MD5OfMessageBody` against its own
- * digest either finds the body it sent or finds a bug, and a made-up value would
- * tell it nothing.
+ * It is a real MD5 of the body, as real SQS reports, because that is the whole
+ * point of it: a sender comparing `MD5OfMessageBody` against its own digest
+ * either finds the body it sent or finds a bug, and a made-up value would tell
+ * it nothing. An SQS event record carries the same digest of the same body,
+ * which is why this is here rather than inside the message body itself.
+ */
+export function simSqsBodyDigest(value: string): string {
+  return createHash("md5").update(value, "utf8").digest("hex");
+}
+
+/**
+ * One message body, with the digest a sender checks it by.
  */
 export class SimSqsMessageBody {
   public readonly value: string;
@@ -46,7 +54,7 @@ export class SimSqsMessageBody {
 
   private constructor(value: string) {
     this.value = value;
-    this.digest = createHash("md5").update(value, "utf8").digest("hex");
+    this.digest = simSqsBodyDigest(value);
   }
 
   /**

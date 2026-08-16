@@ -617,6 +617,55 @@ A report naming an id that was not in the batch returns the whole batch, as real
 report it cannot trust. So does an entry with no `itemIdentifier`. A handler that returns nothing,
 or an empty `batchItemFailures` list, has handled the whole batch.
 
+### Making an SQS event without a queue
+
+A test of the handler on its own, with no queue and no mapping, still has to pass it a whole event.
+`lambdaSqsEventFactory` makes one, and `lambdaSqsEventRecordFactory` makes the records in it, so
+such a test says what the messages carry and nothing else:
+
+```typescript sim-lambda-sqs-event-factory
+/**
+ * Making an SQS event to call a handler with.
+ */
+
+import {
+  lambdaSqsEventFactory,
+  lambdaSqsEventRecordFactory,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+function ordersHandler(event: SimLambdaSqsEvent): readonly string[] {
+  return event.Records.map(
+    (record) => (JSON.parse(record.body) as { orderId: string }).orderId,
+  );
+}
+
+const batch = lambdaSqsEventFactory.make({
+  Records: [{ body: '{"orderId":"YL-1"}' }, { body: '{"orderId":"YL-2"}' }],
+});
+
+// [ 'YL-1', 'YL-2' ]
+console.log(ordersHandler(batch));
+
+// The record factory makes one on its own, for a test about a single message.
+const record = lambdaSqsEventRecordFactory.make({
+  body: '{"orderId":"YL-9"}',
+  eventSourceARN: "arn:aws:sqs:eu-west-2:888888888888:orders",
+});
+
+// eu-west-2
+console.log(record.awsRegion);
+```
+
+The default is the single-message batch a quiet queue delivers. Each record is completed as a
+delivered one is, including the message id, the receipt handle and the three system `attributes` a
+simulated mapping reports. Two fields a record repeats are computed from the rest: `md5OfBody` is
+the digest of the body given, which is what a handler checking the digest compares against, and
+`awsRegion` is the Region of the queue ARN given.
+
+Reporting individual failures is worth testing against a made event too: the handler's
+`batchItemFailures` name `messageId` values, and those are the ids of the records the factory made.
+
 ### Event source mappings in templates
 
 `AWS::Lambda::EventSourceMapping` deploys the same thing, which is what CDK's
@@ -899,6 +948,58 @@ apart by where the write came from rather than by when it landed.
 
 Writing the projection into a second table is what the guard is asking for, and is what a real
 aggregation or search index does anyway.
+
+### Making a stream event without a table
+
+`lambdaDynamoDbStreamEventFactory` and `lambdaDynamoDbStreamEventRecordFactory` make the same events
+for a test that calls the handler directly, with no table and no mapping:
+
+```typescript sim-lambda-dynamodb-stream-event-factory
+/**
+ * Making a DynamoDB stream event to call a handler with.
+ */
+
+import {
+  lambdaDynamoDbStreamEventFactory,
+  type SimLambdaDynamoDbStreamEvent,
+} from "@kensio/yulin/lambda";
+
+function shippedOrders(event: SimLambdaDynamoDbStreamEvent): readonly string[] {
+  return event.Records.filter(
+    (record) => record.dynamodb.NewImage?.["status"]?.S === "shipped",
+  ).map((record) => record.dynamodb.Keys?.["orderId"]?.S ?? "");
+}
+
+const event = lambdaDynamoDbStreamEventFactory.make({
+  Records: [
+    {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: { orderId: { S: "YL-1" } },
+        OldImage: { orderId: { S: "YL-1" }, status: { S: "placed" } },
+        NewImage: { orderId: { S: "YL-1" }, status: { S: "shipped" } },
+      },
+    },
+    { eventName: "INSERT" },
+  ],
+});
+
+// [ 'YL-1' ]
+console.log(shippedOrders(event));
+
+// NEW_AND_OLD_IMAGES, because that is what this record carries
+console.log(event.Records[0]?.dynamodb.StreamViewType);
+```
+
+The default is the single-record batch one changed item produces. What a record says in more than
+one place is computed from the rest, so it is a record a stream could have delivered: an `INSERT`
+carries a new image, a `REMOVE` an old one and a `MODIFY` both, `StreamViewType` names the images
+the record actually carries, and `awsRegion` is the Region of the stream ARN given. A record for a
+`KEYS_ONLY` stream is one with the images explicitly taken away, as in
+`make({ dynamodb: { NewImage: undefined, OldImage: undefined } })`.
+
+`SizeBytes` is a plausible default rather than a measurement of the images given, so a test
+asserting on it should say what it expects.
 
 ### Stream mappings in templates
 
