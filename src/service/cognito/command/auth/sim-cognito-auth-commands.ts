@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimCognitoPoolMessenger } from "../../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
@@ -7,12 +8,16 @@ import { SimCognitoAdminInitiateAuth } from "./sim-cognito-admin-initiate-auth.j
 import { SimCognitoAdminRespondToChallenge } from "./sim-cognito-admin-respond-to-challenge.js";
 import { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
+import { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
 import { SimCognitoInitiateAuth } from "./sim-cognito-initiate-auth.js";
+import { SimCognitoMfaChallenge } from "./sim-cognito-mfa-challenge.js";
+import { SimCognitoMfaResponse } from "./sim-cognito-mfa-response.js";
 import { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-challenge.js";
 import { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
 import { SimCognitoPasswordSignIn } from "./sim-cognito-password-sign-in.js";
 import { SimCognitoRefreshSignIn } from "./sim-cognito-refresh-sign-in.js";
 import { SimCognitoRespondToChallenge } from "./sim-cognito-respond-to-challenge.js";
+import { SimCognitoSignInCompletion } from "./sim-cognito-sign-in-completion.js";
 import { SimCognitoSignOutCommands } from "./sim-cognito-sign-out.js";
 
 interface SimCognitoAuthCommandsProperties {
@@ -27,6 +32,13 @@ interface SimCognitoAuthCommandsProperties {
    * pool's hosted endpoints so both hand out the same thing.
    */
   readonly tokenIssuer: SimCognitoTokenIssuer;
+
+  /**
+   * What records the message a pool would have texted an MFA code in, shared
+   * with the sign-up and user commands so every message a pool sends is
+   * recorded the same way.
+   */
+  readonly messenger: SimCognitoPoolMessenger;
 }
 
 /**
@@ -48,22 +60,39 @@ export class SimCognitoAuthCommands {
   public readonly signOut: SimCognitoSignOutCommands;
 
   constructor(properties: SimCognitoAuthCommandsProperties) {
-    const { resolver, authResolver, pools, clock, triggers, tokenIssuer } =
-      properties;
+    const {
+      resolver,
+      authResolver,
+      pools,
+      clock,
+      triggers,
+      tokenIssuer,
+      messenger,
+    } = properties;
+    // Every sign-in ends the same way, wherever it finished: with the second
+    // factor where the user owes one, and with the tokens and the
+    // PostAuthentication trigger where it does not.
+    const completion = new SimCognitoSignInCompletion({
+      tokenIssuer,
+      triggers,
+      mfaChallenge: new SimCognitoMfaChallenge({ messenger, clock }),
+    });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn: new SimCognitoPasswordSignIn({
         authResolver,
-        tokenIssuer,
+        completion,
         challenge: new SimCognitoNewPasswordChallenge({ clock }),
         triggers,
       }),
       refreshSignIn: new SimCognitoRefreshSignIn({ tokenIssuer, clock }),
     });
-    const newPassword = new SimCognitoNewPasswordResponse({
-      authResolver,
-      tokenIssuer,
-      triggers,
-      clock,
+    const responses = new SimCognitoChallengeResponses({
+      newPassword: new SimCognitoNewPasswordResponse({
+        authResolver,
+        completion,
+        clock,
+      }),
+      mfa: new SimCognitoMfaResponse({ authResolver, completion, clock }),
     });
 
     this.adminInitiateAuth = new SimCognitoAdminInitiateAuth({
@@ -72,7 +101,7 @@ export class SimCognitoAuthCommands {
     });
     this.adminRespondToChallenge = new SimCognitoAdminRespondToChallenge({
       authResolver,
-      newPassword,
+      responses,
     });
     this.initiateAuth = new SimCognitoInitiateAuth({
       authResolver,
@@ -80,7 +109,7 @@ export class SimCognitoAuthCommands {
     });
     this.respondToChallenge = new SimCognitoRespondToChallenge({
       authResolver,
-      newPassword,
+      responses,
     });
     this.signOut = new SimCognitoSignOutCommands({ resolver, pools, clock });
   }

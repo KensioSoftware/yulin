@@ -1,40 +1,128 @@
-import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { SimCognitoAuthSession } from "../../user-pool/auth/sim-cognito-auth-session.js";
+import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
+import type { SimCognitoPoolMessenger } from "../../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import { simCognitoSmsMfa } from "../../user-pool/user/mfa/sim-cognito-mfa-factors.js";
+import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
+import { simCognitoChallengeFactor } from "./sim-cognito-mfa-factor-choice.js";
+import {
+  simCognitoMaskedDestination,
+  simCognitoMfaCode,
+} from "./sim-cognito-mfa-code.js";
+import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
+
+interface SimCognitoMfaChallengeProperties {
+  readonly messenger: SimCognitoPoolMessenger;
+  readonly clock: SimClock;
+}
 
 /**
- * The multi-factor challenge a pool would answer a sign-in with, which this
- * simulation cannot issue.
+ * A sign-in that has got past the password and may have a factor to answer
+ * for.
+ */
+interface SimCognitoMfaChallengeRequest {
+  readonly pool: SimCognitoUserPool;
+  readonly client: SimCognitoUserPoolClient;
+  readonly user: SimCognitoUser;
+  readonly clientMetadata?: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * The multi-factor challenge a pool answers a sign-in with.
  *
- * A pool configured `ON` challenges every user on real Cognito, whether or not
- * that user has registered a factor: one that has is sent
- * `SOFTWARE_TOKEN_MFA` or `SMS_MFA`, and one that has not is sent `MFA_SETUP`.
- * Either way the request that carried the password is answered with a
- * challenge rather than with tokens, so signing the user in here would hand
- * out tokens a real deployment would not.
+ * A user that has registered a factor is challenged for it: `SMS_MFA` for a
+ * phone number, which the pool texts a code to, and `SOFTWARE_TOKEN_MFA` for
+ * an authenticator app, whose code the user reads off its own device. Either
+ * way the request that carried the password is answered with a challenge and a
+ * session rather than with tokens, and `SimCognitoMfaResponse` is what
+ * completes it.
  *
- * A pool configured `OPTIONAL` challenges only the users that registered a
- * factor. Nothing here registers one, so no user of such a pool has one, and
- * signing in without a challenge is what real Cognito does with it too.
- *
- * This is the refusal `CreateUserPool` used to make. It is here instead
- * because this is where the difference shows: a pool that records the setting
- * and never challenges on it is honest for everything but a sign-in.
+ * A pool configured `OFF` challenges nobody. One configured `OPTIONAL`
+ * challenges the users that registered a factor, and one configured `ON`
+ * challenges every user, which is the case this simulation still cannot serve
+ * in full: real Cognito answers a user with no factor with `MFA_SETUP`, which
+ * registers one mid-sign-in, so that sign-in is refused here rather than
+ * handed tokens a deployment would not have handed out.
  */
 export class SimCognitoMfaChallenge {
+  private readonly messenger: SimCognitoPoolMessenger;
+  private readonly clock: SimClock;
+
+  constructor(properties: SimCognitoMfaChallengeProperties) {
+    this.messenger = properties.messenger;
+    this.clock = properties.clock;
+  }
+
   /**
-   * Refuse a sign-in that real Cognito would answer with an MFA challenge.
+   * Where the code went, for the factor that sends one.
+   *
+   * Real Cognito reports the medium and a masked destination on an `SMS_MFA`
+   * challenge, and neither on a `SOFTWARE_TOKEN_MFA` one, because nothing was
+   * sent anywhere for that.
    */
-  refuseIn(pool: SimCognitoUserPool): void {
-    if (!pool.settings.mfa.configuration.challengesEverySignIn) {
-      return;
+  private static deliveryParameters(
+    factor: string,
+    user: SimCognitoUser,
+  ): Record<string, string> {
+    const destination = user.attributeValues.get("phone_number");
+
+    if (factor !== simCognitoSmsMfa || destination === undefined) {
+      return {};
     }
 
-    throw new SimCognitoInvalidParameterException(
-      `User pool ${pool.id} has an MfaConfiguration of 'ON', so real ` +
-        `Cognito would answer this sign-in with an MFA challenge, and ` +
-        `multi-factor authentication is not simulated. Set the pool's ` +
-        `MfaConfiguration to 'OPTIONAL' or 'OFF' to sign in with a password ` +
-        `alone.`,
-    );
+    return {
+      CODE_DELIVERY_DELIVERY_MEDIUM: "SMS",
+      CODE_DELIVERY_DESTINATION: simCognitoMaskedDestination(destination),
+    };
+  }
+
+  /**
+   * The challenge this user has to get past, or nothing where it has none.
+   *
+   * A sign-in that gets nothing back from here is one that can be answered
+   * with tokens.
+   */
+  async issueFor(
+    request: SimCognitoMfaChallengeRequest,
+  ): Promise<SimCognitoAuthenticationOutput | undefined> {
+    const factor = simCognitoChallengeFactor(request.pool, request.user);
+
+    if (factor === undefined) {
+      return undefined;
+    }
+
+    const { pool, client, user } = request;
+    const code = factor === simCognitoSmsMfa ? simCognitoMfaCode() : undefined;
+    const session = new SimCognitoAuthSession({
+      username: user.username,
+      clientId: client.id,
+      challengeName: factor,
+      code,
+      issuedAt: this.clock.now(),
+    });
+
+    pool.auth.addSession(session);
+
+    if (code !== undefined) {
+      await this.messenger.send({
+        pool,
+        client,
+        user,
+        occasion: "Authentication",
+        code,
+        clientMetadata: request.clientMetadata,
+      });
+    }
+
+    return {
+      $metadata: {},
+      ChallengeName: factor,
+      Session: session.id,
+      ChallengeParameters: {
+        USER_ID_FOR_SRP: user.username,
+        ...SimCognitoMfaChallenge.deliveryParameters(factor, user),
+      },
+    };
   }
 }

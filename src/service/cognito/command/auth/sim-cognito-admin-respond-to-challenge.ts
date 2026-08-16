@@ -1,8 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
-import { requireSimCognitoNewPasswordChallenge } from "./sim-cognito-auth-challenge.js";
-import type { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
+import type { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
 import { SimCognitoUnsimulatedAuthOptions } from "./sim-cognito-unsimulated-auth-options.js";
 import type {
   SimAdminRespondToAuthChallengeCommand,
@@ -11,7 +10,7 @@ import type {
 
 interface SimCognitoAdminRespondToChallengeProperties {
   readonly authResolver: SimCognitoAuthResolver;
-  readonly newPassword: SimCognitoNewPasswordResponse;
+  readonly responses: SimCognitoChallengeResponses;
 }
 
 interface SimCognitoCommandOptions {
@@ -21,17 +20,18 @@ interface SimCognitoCommandOptions {
 /**
  * The AdminRespondToAuthChallenge command.
  *
- * Only `NEW_PASSWORD_REQUIRED` is answered, and the caller needs the
- * `cognito-idp:AdminRespondToAuthChallenge` permission on the pool.
+ * `NEW_PASSWORD_REQUIRED` and the two MFA challenges are answered, and the
+ * caller needs the `cognito-idp:AdminRespondToAuthChallenge` permission on the
+ * pool.
  */
 export class SimCognitoAdminRespondToChallenge {
   private readonly authResolver: SimCognitoAuthResolver;
-  private readonly newPassword: SimCognitoNewPasswordResponse;
+  private readonly responses: SimCognitoChallengeResponses;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedAuthOptions();
 
   constructor(properties: SimCognitoAdminRespondToChallengeProperties) {
     this.authResolver = properties.authResolver;
-    this.newPassword = properties.newPassword;
+    this.responses = properties.responses;
   }
 
   /**
@@ -49,9 +49,7 @@ export class SimCognitoAdminRespondToChallenge {
     );
 
     this.unsimulatedOptions.refuseInAdminResponse(input);
-    requireSimCognitoNewPasswordChallenge(input.ChallengeName);
-
-    return await this.newPassword.handle({
+    return await this.responses.handle(input.ChallengeName, {
       pool,
       client,
       parameters: new SimCognitoAuthParameters(

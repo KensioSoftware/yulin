@@ -8,7 +8,11 @@
  * published build.
  */
 
-import type { AttributeType } from "@aws-sdk/client-cognito-identity-provider";
+import type {
+  AttributeType,
+  ExplicitAuthFlowsType,
+  UserPoolMfaType,
+} from "@aws-sdk/client-cognito-identity-provider";
 import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
@@ -42,6 +46,21 @@ export interface SimCognitoSignedInSetUp {
 export interface SimCognitoSignedInOptions {
   /** The attributes the user is created with, none by default. */
   readonly attributes?: AttributeType[];
+
+  /**
+   * What the pool asks of a second factor, `OFF` by default.
+   *
+   * A pool created `OPTIONAL` challenges the users that go on to register a
+   * factor, and the user here has none when it is signed in, so the sign-in
+   * this fixture ends with is answered with tokens either way.
+   */
+  readonly mfaConfiguration?: UserPoolMfaType;
+
+  /**
+   * The authentication flows the app client supports, the client-side password
+   * flow by default.
+   */
+  readonly explicitAuthFlows?: ExplicitAuthFlowsType[];
 }
 
 /**
@@ -53,7 +72,12 @@ export async function simCognitoSignedIn(
   const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
   const cognito = simAws.cognitoIdentityProvider();
   const pool = await cognito.createUserPool(
-    new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+    new CreateUserPoolCommand({
+      PoolName: "myapp-users",
+      ...(options.mfaConfiguration !== undefined && {
+        MfaConfiguration: options.mfaConfiguration,
+      }),
+    }),
   );
 
   assertNonNullable(pool.UserPool?.Id);
@@ -63,7 +87,9 @@ export async function simCognitoSignedIn(
     new CreateUserPoolClientCommand({
       UserPoolId: userPoolId,
       ClientName: "web",
-      ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+      ExplicitAuthFlows: options.explicitAuthFlows ?? [
+        "ALLOW_USER_PASSWORD_AUTH",
+      ],
     }),
   );
 

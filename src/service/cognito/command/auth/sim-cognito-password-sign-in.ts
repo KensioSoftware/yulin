@@ -5,11 +5,9 @@ import {
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
-import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
-import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
-import { SimCognitoMfaChallenge } from "./sim-cognito-mfa-challenge.js";
+import type { SimCognitoSignInCompletion } from "./sim-cognito-sign-in-completion.js";
 import type { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-challenge.js";
@@ -17,7 +15,7 @@ import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 
 interface SimCognitoPasswordSignInProperties {
   readonly authResolver: SimCognitoAuthResolver;
-  readonly tokenIssuer: SimCognitoTokenIssuer;
+  readonly completion: SimCognitoSignInCompletion;
   readonly challenge: SimCognitoNewPasswordChallenge;
   readonly triggers: SimCognitoUserPoolTriggers;
 }
@@ -48,15 +46,13 @@ export interface SimCognitoAuthRequest {
  */
 export class SimCognitoPasswordSignIn {
   private readonly authResolver: SimCognitoAuthResolver;
-  private readonly tokenIssuer: SimCognitoTokenIssuer;
+  private readonly completion: SimCognitoSignInCompletion;
   private readonly challenge: SimCognitoNewPasswordChallenge;
   private readonly triggers: SimCognitoUserPoolTriggers;
-  private readonly result = new SimCognitoAuthenticationResult();
-  private readonly mfaChallenge = new SimCognitoMfaChallenge();
 
   constructor(properties: SimCognitoPasswordSignInProperties) {
     this.authResolver = properties.authResolver;
-    this.tokenIssuer = properties.tokenIssuer;
+    this.completion = properties.completion;
     this.challenge = properties.challenge;
     this.triggers = properties.triggers;
   }
@@ -95,33 +91,19 @@ export class SimCognitoPasswordSignIn {
       return this.challenge.issue({ pool, clientId: client.id, user });
     }
 
-    // A pool that challenges every user would answer with an MFA challenge
-    // here rather than with tokens, and this simulation has no challenge to
-    // issue, so it refuses where the challenge would have been.
-    this.mfaChallenge.refuseIn(pool);
-
+    // A user that has registered a second factor is challenged for it here
+    // rather than answered with tokens, which is what the pool's
+    // MfaConfiguration decides.
+    //
     // `ClientMetadata` reaches PreAuthentication and PostAuthentication, and
     // not the token trigger: real Cognito does not pass an InitiateAuth or
     // AdminInitiateAuth request's on to that one.
-    const authenticated = {
-      $metadata: {},
-      AuthenticationResult: this.result.of(
-        await this.tokenIssuer.issue({
-          pool,
-          client,
-          user,
-          occasion: SimCognitoTriggerOccasion.tokenGeneration,
-        }),
-      ),
-    };
-
-    await this.triggers.postAuthentication({
+    return await this.completion.challengeOrComplete({
       pool,
       client,
       user,
+      occasion: SimCognitoTriggerOccasion.tokenGeneration,
       clientMetadata,
     });
-
-    return authenticated;
   }
 }

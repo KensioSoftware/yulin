@@ -17,6 +17,15 @@ const invitationMessage =
   "Your username is {username} and temporary password is {####}.";
 
 /**
+ * The wording real Cognito sends an MFA code with when the pool asked for
+ * none.
+ *
+ * `SmsAuthenticationMessage` is what a pool sets its own with, and that input
+ * is refused here, so this is the wording every MFA code goes out under.
+ */
+const authenticationMessage = "Your authentication code is {####}. ";
+
+/**
  * What a pool says on the occasion it is sending on.
  *
  * The invitation an administrator's user is sent is the pool's own wording as
@@ -28,6 +37,10 @@ export function simCognitoOccasionWording(
   occasion: SimCognitoMessageOccasion,
   medium: SimCognitoMessageMedium,
 ): SimCognitoMessageWording {
+  if (occasion === "Authentication") {
+    return new SimCognitoMessageWording({ body: authenticationMessage });
+  }
+
   if (occasion !== "AdminCreateUser") {
     return pool.settings.verificationMessages.wording(medium);
   }

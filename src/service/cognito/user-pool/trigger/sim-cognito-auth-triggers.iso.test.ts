@@ -1,6 +1,10 @@
 import {
   AdminInitiateAuthCommand,
+  AssociateSoftwareTokenCommand,
   InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
+  SetUserMFAPreferenceCommand,
+  VerifySoftwareTokenCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
@@ -10,6 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { simCognitoSoftwareTokenCode } from "../../../../../test/cognito/mfa-fixture.js";
 import {
   makeTriggerPool,
   makeTriggerUser,
@@ -85,6 +90,84 @@ describe("sim Cognito user pool authentication triggers", () => {
     // And the sign-in still answered with the tokens it issued before the
     // second one ran.
     assertNonNullable(signedIn.AuthenticationResult?.IdToken);
+  });
+
+  it("runs PostAuthentication only once an MFA challenge is answered", async () => {
+    // Given a pool that challenges for a second factor, with both triggers on
+    // it, and a user that has registered an authenticator app.
+    const events: unknown[] = [];
+    const pool = await makeTriggerPool({
+      triggers: {
+        PreAuthentication: triggerFunctionArn,
+        PostAuthentication: triggerFunctionArn,
+      },
+      handler: recordingTriggerHandler(events),
+      mfaConfiguration: "OPTIONAL",
+    });
+
+    await makeTriggerUser(pool);
+
+    const registering = await pool.cognito.initiateAuth(signIn(pool.clientId));
+    const accessToken = registering.AuthenticationResult?.AccessToken;
+
+    assertNonNullable(accessToken);
+
+    await pool.cognito.associateSoftwareToken(
+      new AssociateSoftwareTokenCommand({ AccessToken: accessToken }),
+    );
+    await pool.cognito.verifySoftwareToken(
+      new VerifySoftwareTokenCommand({
+        AccessToken: accessToken,
+        UserCode: pool.cognito
+          .userPool(pool.userPoolId)
+          .softwareTokenCode("alice"),
+      }),
+    );
+    await pool.cognito.setUserMFAPreference(
+      new SetUserMFAPreferenceCommand({
+        AccessToken: accessToken,
+        SoftwareTokenMfaSettings: { Enabled: true, PreferredMfa: true },
+      }),
+    );
+
+    // Registering the factor took a sign-in of its own, so what that fired is
+    // not what this test is about.
+    events.length = 0;
+
+    // When the user signs in again and is challenged for the factor.
+    const challenged = await pool.cognito.initiateAuth(signIn(pool.clientId));
+
+    // Then the password has been checked and no token has been issued, so
+    // PreAuthentication has run and PostAuthentication has not.
+    assertUndefined(challenged.AuthenticationResult);
+    assertArrayEquals(
+      events.map((event) => (event as { triggerSource: string }).triggerSource),
+      ["PreAuthentication_Authentication"],
+    );
+
+    // And answering the challenge is what runs the second trigger, because
+    // that is where the tokens are issued.
+    const signedIn = await pool.cognito.respondToAuthChallenge(
+      new RespondToAuthChallengeCommand({
+        ClientId: pool.clientId,
+        ChallengeName: "SOFTWARE_TOKEN_MFA",
+        Session: challenged.Session,
+        ChallengeResponses: {
+          USERNAME: "alice",
+          SOFTWARE_TOKEN_MFA_CODE: simCognitoSoftwareTokenCode(
+            pool.cognito,
+            pool.userPoolId,
+            "alice",
+          ),
+        },
+      }),
+    );
+
+    assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+    assertArrayEquals(
+      events.map((event) => (event as { triggerSource: string }).triggerSource),
+      ["PreAuthentication_Authentication", "PostAuthentication_Authentication"],
+    );
   });
 
   it("passes ClientMetadata to each trigger under the name it reads", async () => {

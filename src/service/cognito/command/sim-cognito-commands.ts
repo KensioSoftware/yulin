@@ -141,6 +141,7 @@ export class SimCognitoCommands {
       clock,
       triggers,
       tokenIssuer,
+      messenger,
     });
     this.domains = new SimCognitoDomainCommands({
       pools,

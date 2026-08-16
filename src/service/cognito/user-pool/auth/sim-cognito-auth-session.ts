@@ -16,6 +16,17 @@ interface SimCognitoAuthSessionProperties {
   readonly clientId: string;
   readonly challengeName: string;
   readonly issuedAt: Date;
+
+  /**
+   * The code the challenge sent the user, for a challenge that sent one.
+   *
+   * An `SMS_MFA` code lives here rather than on the user because it belongs to
+   * this one challenge: it goes when the session goes, so a code from an
+   * abandoned sign-in cannot complete a later one. A `SOFTWARE_TOKEN_MFA`
+   * challenge has none, because the code is whatever the user's authenticator
+   * app is showing.
+   */
+  readonly code?: string | undefined;
 }
 
 /**
@@ -32,12 +43,16 @@ export class SimCognitoAuthSession {
   public readonly challengeName: string;
   public readonly issuedAt: Date;
 
+  /** The code this challenge sent, where it sent one. */
+  public readonly code: string | undefined;
+
   constructor(properties: SimCognitoAuthSessionProperties) {
     this.id = randomBytes(sessionBytes).toString("base64url");
     this.username = properties.username;
     this.clientId = properties.clientId;
     this.challengeName = properties.challengeName;
     this.issuedAt = properties.issuedAt;
+    this.code = properties.code;
   }
 
   /**
@@ -56,5 +71,16 @@ export class SimCognitoAuthSession {
    */
   belongsTo(username: string, clientId: string): boolean {
     return this.username === username && this.clientId === clientId;
+  }
+
+  /**
+   * Whether this session was issued for the challenge being answered.
+   *
+   * A session carries one challenge, so answering an `SMS_MFA` challenge with
+   * the session from a `NEW_PASSWORD_REQUIRED` one is no more a valid session
+   * than one from another user.
+   */
+  answers(challengeName: string): boolean {
+    return this.challengeName === challengeName;
   }
 }

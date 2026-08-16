@@ -6,8 +6,7 @@ which exchange a token for AWS credentials, are a separate service and are not s
 The pool, the app client, the users and groups in it, self-service sign-up, the second factors a
 user registers, the sign-in flows on both sides of the API, the domain and identity providers a
 federated sign-in runs through, the messages it would have sent, the tokens it issues and the
-authorizer are all here. SRP, managed login, MFA challenges, password resets and device tracking are
-not.
+authorizer are all here. SRP, managed login, password resets and device tracking are not.
 
 ## Entry points
 
@@ -53,12 +52,13 @@ configuration, and it is the one setting an update does not wholly replace: only
 `SetUserPoolMfaConfig` says which factors a challenge could use, and it changes them in place, so
 `keepFactorsOf` carries them onto the settings replacing them, as real Cognito keeps them.
 
-Nothing here challenges yet, so what the pool holds is state it reports rather than acts on. The one
-place it is read is `SimCognitoMfaChallenge`, which refuses a sign-in to a pool configured `ON`,
-because real Cognito answers every one of those with a challenge and would never issue the tokens
-this simulation otherwise would. The wording an SMS factor carries is held to the same rules as the
-verification wording, through `requireSimCognitoVerificationWording`, because it is a message with a
-code in it either way.
+A sign-in reads this to decide whether the user owes a second factor, through
+`simCognitoChallengeFactor`, which also refuses the two sign-ins real Cognito answers with a
+challenge this simulation does not issue: a user of an `ON` pool with no factor, which gets
+`MFA_SETUP` there, and a user with both factors enabled and neither preferred, which gets
+`SELECT_MFA_TYPE`. The wording an SMS factor carries is held to the same rules as the verification
+wording, through `requireSimCognitoVerificationWording`, because it is a message with a code in it
+either way.
 
 `makeSimCognitoUserPoolId` builds the `<region>_<nine characters>` form. The region is part of the id
 rather than decoration: SDK code splits a pool id on the underscore to work out which region to talk
@@ -134,9 +134,9 @@ statuses belong to password resets and federation, neither of which is simulated
 `SimCognitoUserMfa` under `user-pool/user/mfa/` is the second factors one user has registered: the
 software token secret it is registering, the one it has registered, which factors are enabled and
 which is preferred. It is the user's own state rather than the pool's, because the pool decides what
-it offers and the user decides what it has. Registering and being challenged are two things, and
-this is the first: `SetUserMFAPreference` is what enables a factor, and verifying a token only
-registers it.
+it offers and the user decides what it has. `SetUserMFAPreference` is what enables a factor, and
+verifying a token only registers it. `challengeFactor` is what a sign-in reads: the preferred
+factor, or the single enabled one where the user named no preference.
 
 `SimCognitoSoftwareToken` is one shared secret, and `sim-cognito-totp.ts` computes the code from it.
 The codes are real RFC 6238 time-based one-time passwords rather than a stand-in, so an
@@ -433,8 +433,10 @@ and because keeping them here leaves `SimCognitoUserPool` as what it is elsewher
 holding its contents.
 
 `SimCognitoAuthSession` is what an unfinished authentication carries between the request that started
-it and the response that completes it. A session is opaque, single use, tied to its user and app
-client, and lasts the three minutes real Cognito gives one.
+it and the response that completes it. A session is opaque, single use, tied to its user, its app
+client and the one challenge it was issued for, and lasts the three minutes real Cognito gives one.
+It also holds the code an `SMS_MFA` challenge texted, because that code belongs to that challenge:
+it goes when the session goes.
 
 `SimCognitoIssuedToken` is a token the pool has handed out, and `SimCognitoIssuedTokenStore` holds
 them. A refresh token is kept because the pool is what exchanges it later, and an access token
@@ -524,10 +526,18 @@ The four sign-in commands are thin because the parts they share are collaborator
 entry it replaced; `SimCognitoAuthFlows` is the set one entry point runs, which is why
 `ADMIN_USER_PASSWORD_AUTH` is refused for `InitiateAuth` as it is on real Cognito.
 `SimCognitoAuthFlowRunner` runs the resolved flow through `SimCognitoPasswordSignIn` or
-`SimCognitoRefreshSignIn`, and `SimCognitoNewPasswordResponse` is the body both challenge responses
-share, and refuses a user disabled since the challenge was issued, because a disabled user cannot
-finish a sign-in any more than it can start one. What is left in each command is how it reaches the
-pool and what it is allowed to run.
+`SimCognitoRefreshSignIn`. `SimCognitoChallengeResponses` sends a response to whichever challenge it
+answers, `SimCognitoNewPasswordResponse` or `SimCognitoMfaResponse`, and both refuse a user disabled
+since the challenge was issued, because a disabled user cannot finish a sign-in any more than it can
+start one. What is left in each command is how it reaches the pool and what it is allowed to run.
+
+`SimCognitoSignInCompletion` is where every sign-in ends, wherever it got to: it issues the tokens
+and runs `PostAuthentication`, and its `challengeOrComplete` is what answers with the MFA challenge
+instead for a user that still owes a factor. Having one of those means the password sign-in and the
+new password response cannot forget the second factor, and that `PostAuthentication` fires once per
+sign-in rather than once per request. `SimCognitoMfaChallenge` issues the challenge and texts the
+code, and `SimCognitoMfaCodeCheck` is what a response is held to: the texted code against the
+session, and an authenticator app's against the secret the user registered.
 
 `SimCognitoRequestResolver` is what every user and group operation starts with: authorize against
 the pool's ARN, then find the pool. Neither a user nor a group has an ARN of its own, so the pool's
@@ -627,14 +637,17 @@ resource, here or on real AWS.
   against, so the two disagree here and agree on real Cognito. Its `authorization_endpoint`,
   `token_endpoint` and `end_session_endpoint` name the pool's domain, once it has one, at that
   domain's local hostname. It names no `userinfo_endpoint`, which is not served.
-- The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
-  issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
-  rather than treated as a flow or challenge that is simulated.
-- A pool records its `MfaConfiguration` and the factors behind it, a user registers factors of its
-  own, and nothing challenges for either yet. A sign-in to a pool configured `ON` is refused, as
-  every one of those is answered with a challenge on real Cognito. `SetUserPoolMfaConfig` accepts
-  `SoftwareTokenMfaConfiguration` and `SmsMfaConfiguration`, and refuses the `SmsConfiguration`
-  inside the second one in the same words `CreateUserPool` refuses the pool's own.
+- The password and refresh flows run on both sides of the API, and `NEW_PASSWORD_REQUIRED`,
+  `SMS_MFA` and `SOFTWARE_TOKEN_MFA` are the challenges issued. SRP, `USER_AUTH`, custom
+  authentication and device tracking are refused rather than treated as a flow or challenge that is
+  simulated, and so are the `MFA_SETUP` and `SELECT_MFA_TYPE` challenges.
+- A sign-in by a user of an `ON` pool that has registered no factor is refused, as real Cognito
+  answers that one with `MFA_SETUP`. `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration`
+  and `SmsMfaConfiguration`, and refuses the `SmsConfiguration` inside the second one in the same
+  words `CreateUserPool` refuses the pool's own.
+- An MFA code is recorded as a sent message with an occasion of `Authentication`, and goes to the
+  user's `phone_number` whatever the pool verifies automatically. Real Cognito texts it and reports
+  it to nobody.
 - A user pool reports the code a user's authenticator app is showing, through
   `SimCognitoUserPool.softwareTokenCode`, which real Cognito reports to nobody. It is the same
   divergence `confirmationCode` is, for the same reason: the code is on the user's own device. A

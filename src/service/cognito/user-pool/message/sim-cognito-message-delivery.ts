@@ -51,7 +51,7 @@ export class SimCognitoMessageDelivery {
     user: SimCognitoUser,
     occasion: SimCognitoMessageOccasion,
   ): SimCognitoMessageDelivery | undefined {
-    for (const [name, medium] of deliverableAttributes) {
+    for (const [name, medium] of this.attributesFor(occasion)) {
       const value = user.attributeValues.get(name);
 
       if (value !== undefined && this.writable(pool, occasion, name)) {
@@ -62,6 +62,32 @@ export class SimCognitoMessageDelivery {
     return undefined;
   }
 
+  /**
+   * The attributes this occasion could write to, in the order Cognito prefers
+   * them.
+   *
+   * An MFA code goes to the user's phone number and nowhere else, because the
+   * phone is the factor: a user with an email address as well is still
+   * challenged by text message, where every other occasion would have written
+   * to the address.
+   */
+  private static attributesFor(
+    occasion: SimCognitoMessageOccasion,
+  ): readonly (readonly [string, SimCognitoMessageMedium])[] {
+    if (occasion === "Authentication") {
+      return [["phone_number", "SMS"]];
+    }
+
+    return deliverableAttributes;
+  }
+
+  /**
+   * A verification message goes only to an attribute the pool verifies
+   * automatically, because that is the address it is trying to prove belongs
+   * to the user. An invitation goes wherever the user can be reached, and so
+   * does an MFA code: the user registered that phone number as its second
+   * factor, whatever the pool verifies.
+   */
   private static writable(
     pool: SimCognitoUserPool,
     occasion: SimCognitoMessageOccasion,
@@ -69,6 +95,7 @@ export class SimCognitoMessageDelivery {
   ): boolean {
     return (
       occasion === "AdminCreateUser" ||
+      occasion === "Authentication" ||
       pool.settings.autoVerifiedAttributes.names.includes(name)
     );
   }

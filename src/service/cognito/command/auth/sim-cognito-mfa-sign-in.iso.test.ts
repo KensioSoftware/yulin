@@ -124,8 +124,9 @@ describe("sim Cognito sign-in to a pool offering MFA", () => {
     assertNonNullable(client.AuthenticationResult?.AccessToken);
   });
 
-  it("refuses a sign-in a pool requiring MFA would challenge", async () => {
-    // Given a pool that requires MFA of every user, with a confirmed user.
+  it("refuses a sign-in by a user of an ON pool with no factor", async () => {
+    // Given a pool that requires MFA of every user, with a confirmed user that
+    // has registered no second factor.
     const { cognito, userPoolId, clientId } = await simCognitoWithClient("ON");
 
     await signUpAlice(cognito, userPoolId, clientId);
@@ -151,20 +152,21 @@ describe("sim Cognito sign-in to a pool offering MFA", () => {
       );
     });
 
-    // Then both are refused where real Cognito would answer with the MFA
-    // challenge, saying what it was that could not be done.
+    // Then both are refused where real Cognito would answer with the
+    // MFA_SETUP challenge that registers a factor mid-sign-in, saying what it
+    // was that could not be done.
     for (const error of [admin, client]) {
       assertInstanceOf(error, SimCognitoInvalidParameterException);
       assertStringIncludes(error.message, userPoolId);
       assertStringIncludes(error.message, "would answer this sign-in with an");
-      assertStringIncludes(error.message, "MFA challenge");
+      assertStringIncludes(error.message, "MFA_SETUP challenge");
       assertStringIncludes(error.message, "not simulated");
     }
   });
 
-  it("refuses a new password answered to a pool requiring MFA", async () => {
+  it("refuses a new password answered by a user of an ON pool with no factor", async () => {
     // Given a pool requiring MFA, with a user that has to change its password
-    // before it can sign in.
+    // before it can sign in and has registered no second factor.
     const { cognito, userPoolId, clientId } = await simCognitoWithClient("ON");
 
     await cognito.adminCreateUser({
@@ -207,6 +209,6 @@ describe("sim Cognito sign-in to a pool offering MFA", () => {
 
     // Then it is refused there instead.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
-    assertStringIncludes(error.message, "MFA challenge");
+    assertStringIncludes(error.message, "MFA_SETUP challenge");
   });
 });
