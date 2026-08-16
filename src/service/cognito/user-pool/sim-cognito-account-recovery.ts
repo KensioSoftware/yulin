@@ -36,6 +36,12 @@ const recoveryMechanismNames: readonly string[] = [
 ];
 
 /**
+ * The priorities Cognito takes, which is one for the mechanism it tries first
+ * and two for the one it falls back to.
+ */
+const recoveryPriorities: ReadonlySet<number> = new Set([1, 2]);
+
+/**
  * How a pool recovers an account whose password was forgotten.
  *
  * A pool records the mechanisms it was asked for and `DescribeUserPool`
@@ -49,10 +55,10 @@ const recoveryMechanismNames: readonly string[] = [
  * belongs at the command that would have to choose one, where it can say what
  * was being attempted, rather than at the pool that named them.
  *
- * A mechanism Cognito does not have is refused, because a pool created with
- * one would exist here and fail to be created on real AWS. The priorities are
- * not checked: real Cognito holds them to a range and to being distinct, and a
- * pool that lists them differently behaves the same way here either way.
+ * The setting is still held to the shape real Cognito states for it, because a
+ * pool created outside that shape would exist here and fail to be created on
+ * real AWS. A list of mechanisms carries one or two of them, each naming a
+ * mechanism Cognito has at a priority of one or two.
  */
 export class SimCognitoAccountRecovery {
   private readonly operation: string;
@@ -89,11 +95,15 @@ export class SimCognitoAccountRecovery {
 
   /**
    * The setting copied out of the request rather than kept by reference, once
-   * every mechanism it names is one Cognito has.
+   * it says what real Cognito would have accepted.
    *
    * The copy goes all the way down, so a described pool reports what the
    * request said at the time it was made even where the caller edits the
    * object afterwards to create a second pool from it.
+   *
+   * A setting naming no mechanisms at all is left alone. Real Cognito states
+   * `RecoveryMechanisms` as optional, and a list is only held to its bounds
+   * where the request wrote one.
    */
   private accepted(
     requested: SimCognitoAccountRecoverySettingType | undefined,
@@ -102,32 +112,71 @@ export class SimCognitoAccountRecovery {
       return undefined;
     }
 
-    const mechanisms = requested.RecoveryMechanisms ?? [];
+    const mechanisms = requested.RecoveryMechanisms;
 
-    for (const mechanism of mechanisms) {
-      this.requireRecognised(mechanism);
+    if (mechanisms !== undefined) {
+      this.requireOneOrTwo(mechanisms);
+
+      for (const mechanism of mechanisms) {
+        this.requireMechanism(mechanism);
+      }
     }
 
     return structuredClone(requested);
   }
 
   /**
+   * Refuse a list of mechanisms real Cognito would refuse for its length.
+   *
+   * There are three mechanisms and a pool ranks at most two of them, so an
+   * empty list and a list of all three are both outside what Cognito takes.
+   */
+  private requireOneOrTwo(
+    mechanisms: readonly SimCognitoRecoveryOptionType[],
+  ): void {
+    if (mechanisms.length > 0 && mechanisms.length <= 2) {
+      return;
+    }
+
+    throw this.refuse(
+      `RecoveryMechanisms lists ${String(mechanisms.length)} mechanisms: ` +
+        `Cognito takes one or two`,
+    );
+  }
+
+  /**
    * Refuse a mechanism real Cognito would refuse.
    */
-  private requireRecognised(mechanism: SimCognitoRecoveryOptionType): void {
+  private requireMechanism(mechanism: SimCognitoRecoveryOptionType): void {
     if (mechanism.Name === undefined) {
-      throw new SimCognitoInvalidParameterException(
-        `${this.operation} AccountRecoverySetting has a RecoveryMechanisms ` +
-          `entry with no Name`,
-      );
+      throw this.refuse("RecoveryMechanisms has a mechanism with no Name");
     }
 
     if (!recoveryMechanismNames.includes(mechanism.Name)) {
-      throw new SimCognitoInvalidParameterException(
-        `${this.operation} AccountRecoverySetting RecoveryMechanisms ` +
-          `'${mechanism.Name}' is not a Cognito account recovery mechanism: ` +
-          `use ${recoveryMechanismNames.join(", ")}`,
+      throw this.refuse(
+        `RecoveryMechanisms '${mechanism.Name}' is not a Cognito account ` +
+          `recovery mechanism: use ${recoveryMechanismNames.join(", ")}`,
       );
     }
+
+    if (
+      mechanism.Priority === undefined ||
+      !recoveryPriorities.has(mechanism.Priority)
+    ) {
+      throw this.refuse(
+        `RecoveryMechanisms '${mechanism.Name}' has a Priority of ` +
+          `${String(mechanism.Priority)}: Cognito takes 1 or 2`,
+      );
+    }
+  }
+
+  /**
+   * The refusal this setting answers with, named after the operation that
+   * carried it.
+   */
+  private refuse(problem: string): SimCognitoInvalidParameterException {
+    return new SimCognitoInvalidParameterException(
+      `${this.operation} AccountRecoverySetting ${problem}`,
+    );
   }
 }

@@ -59,21 +59,24 @@ export class SimCfnCognitoAccountRecovery {
       "AccountRecoverySetting ",
     );
 
-    return {
-      RecoveryMechanisms: this.mechanisms(setting["RecoveryMechanisms"]),
-    };
+    const listed = setting["RecoveryMechanisms"];
+
+    // A setting that lists no mechanisms is passed on as it was written.
+    // CreateUserPool holds a list to the one or two entries Cognito takes, and
+    // a list invented here would be one the template never asked for.
+    if (listed === undefined) {
+      return {};
+    }
+
+    return { RecoveryMechanisms: this.mechanisms(listed) };
   }
 
   /**
    * The mechanisms the setting lists, in the order it lists them.
    */
   private mechanisms(
-    listed: SimCfnTemplateValue | undefined,
+    listed: SimCfnTemplateValue,
   ): readonly SimCognitoRecoveryOptionType[] {
-    if (listed === undefined) {
-      return [];
-    }
-
     if (!Array.isArray(listed)) {
       throw this.parser.invalidPropertyError(
         this.resource,

@@ -2366,8 +2366,8 @@ The properties each type reads are the ones this simulation models:
   `SetUserPoolMfaConfig` call once the pool exists, which is how real CloudFormation deploys them
   and why a stack declaring MFA needs `cognito-idp:SetUserPoolMfaConfig` on its execution role. A
   template asking for neither makes no such call. `AccountRecoverySetting` is recorded as the
-  template declared it, and a mechanism Cognito does not have fails the stack. The last four are
-  the wording of the messages the pool records.
+  template declared it, and a setting outside the shape Cognito states fails the stack. The last
+  four are the wording of the messages the pool records.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
@@ -2530,9 +2530,10 @@ console.log(described.UserPool?.AccountRecoverySetting);
 // { RecoveryMechanisms: [{ Name: "verified_email", Priority: 1 }] }
 ```
 
-A mechanism Cognito does not have is refused, naming it and the ones Cognito does have, because a
-pool created with one would exist here and fail to be created on real AWS. The priorities are not
-checked: real Cognito holds them to a range and to being distinct, and nothing here reads them.
+The setting is held to the shape real Cognito states for it, because a pool created outside that
+shape would exist here and fail to be created on real AWS. A list of mechanisms carries one or two
+of them, each naming a mechanism Cognito has at a priority of 1 or 2. The refusal says which of
+those it was.
 
 `VerificationMessageTemplate` is read rather than compared, and the one thing refused in it is
 `DefaultEmailOption: CONFIRM_WITH_LINK`, along with `EmailMessageByLink` and `EmailSubjectByLink`.
@@ -3200,7 +3201,7 @@ Sim Cognito currently supports:
   bounds and the mutability it was declared with, and reported as `SchemaAttributes` alongside the
   standard attributes
 - A pool's `AccountRecoverySetting`, recorded as the request set it and reported back by
-  `DescribeUserPool`, with a mechanism Cognito does not have refused
+  `DescribeUserPool`, held to the one or two mechanisms Cognito takes
 - `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
   `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
   `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
@@ -3476,9 +3477,9 @@ Current documented limitations:
   `PasswordHistorySize`.
 - `AccountRecoverySetting` is recorded and reported back by `DescribeUserPool`, and nothing reads
   it, because there is no `ForgotPassword`. Any mechanisms Cognito has are accepted, in any order,
-  and one it does not have is refused. A pool that recovers by email alone therefore behaves here
-  exactly as one that recovers by phone number would, which only shows in a recovery neither of
-  them can start.
+  and a setting outside the shape Cognito states is refused. A pool that recovers by email alone
+  therefore behaves here exactly as one that recovers by phone number would, which only shows in a
+  recovery neither of them can start.
 - `AdminCreateUserConfig.AllowAdminCreateUserOnly` is acted on, and the two keys beside it are
   refused. `InviteMessageTemplate` is the wording of the invitation, and a pool cannot set its own
   yet, so an invitation is recorded at Cognito's default wording. `UnusedAccountValidityDays`

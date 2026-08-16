@@ -394,8 +394,8 @@ accepts and why is in the doc comments on `SimCognitoUnsimulatedUserPoolFeatures
 its request set.
 
 `AccountRecoverySetting` is read rather than compared. `SimCfnCognitoAccountRecovery` parses the
-template's mechanisms and `SimCognitoAccountRecovery` holds them on the pool, refusing a mechanism
-Cognito does not have. Nothing reads them back out: there is no `ForgotPassword` here, so the
+template's mechanisms and `SimCognitoAccountRecovery` holds them on the pool, refusing a setting
+outside the shape Cognito states for it. Nothing reads them back out: there is no `ForgotPassword` here, so the
 refusal that would have to choose a mechanism has nowhere to live yet, and the pool records what it
 was asked for so a described pool reports it.
 

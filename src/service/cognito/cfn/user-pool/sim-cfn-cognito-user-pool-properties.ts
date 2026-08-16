@@ -43,8 +43,8 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  *
  * `AccountRecoverySetting` is here because the pool records the mechanisms it
  * names and reports them back. Nothing here starts a recovery, so a template
- * declaring email-only recovery deploys and CreateUserPool refuses only a
- * mechanism Cognito does not have.
+ * declaring email-only recovery deploys, and CreateUserPool refuses a setting
+ * outside the shape Cognito states for it.
  *
  * The four from `EmailVerificationMessage` down are here because a CDK
  * `UserPool` construct emits them when it was asked for nothing in

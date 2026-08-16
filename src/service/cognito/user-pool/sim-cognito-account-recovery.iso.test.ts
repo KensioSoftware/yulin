@@ -41,6 +41,51 @@ const unrecognisedRecovery = {
   RecoveryMechanisms: [{ Name: "verified_fax", Priority: 1 }],
 };
 
+/**
+ * A setting real Cognito would refuse, with what the refusal has to say about
+ * it. The SDK's own types allow none of these, so each is the request as it
+ * reaches the simulator.
+ */
+interface RefusedSetting {
+  readonly label: string;
+  readonly setting: object;
+  readonly says: string;
+}
+
+const refusedSettings: readonly RefusedSetting[] = [
+  {
+    label: "no Name",
+    setting: { RecoveryMechanisms: [{ Priority: 1 }] },
+    says: "mechanism with no Name",
+  },
+  {
+    label: "no Priority",
+    setting: { RecoveryMechanisms: [{ Name: "verified_email" }] },
+    says: "Priority of undefined",
+  },
+  {
+    label: "a priority Cognito does not have",
+    setting: { RecoveryMechanisms: [{ Name: "verified_email", Priority: 3 }] },
+    says: "Priority of 3",
+  },
+  {
+    label: "no mechanisms",
+    setting: { RecoveryMechanisms: [] },
+    says: "lists 0 mechanisms",
+  },
+  {
+    label: "every mechanism",
+    setting: {
+      RecoveryMechanisms: [
+        { Name: "verified_email", Priority: 1 },
+        { Name: "verified_phone_number", Priority: 2 },
+        { Name: "admin_only", Priority: 2 },
+      ],
+    },
+    says: "lists 3 mechanisms",
+  },
+];
+
 function simCognito(): SimCognitoIdentityProvider {
   return new SimAws().cognitoIdentityProvider();
 }
@@ -141,6 +186,21 @@ describe("sim Cognito account recovery", () => {
     assertUndefined(await describedRecovery(cognito, userPoolId));
   });
 
+  it("accepts a setting that lists no mechanisms", async () => {
+    // Given simulated Cognito.
+    const cognito = simCognito();
+
+    // When a pool carries the setting without naming any mechanisms, which
+    // real Cognito allows because the list is optional inside it.
+    const userPoolId = await createdPoolId(cognito, {
+      AccountRecoverySetting: {},
+    });
+
+    // Then it is created, and reports the setting as empty as the request
+    // wrote it.
+    assertObjectEquals(await describedRecovery(cognito, userPoolId), {});
+  });
+
   it("keeps what the request said rather than the request object", async () => {
     // Given a pool created from an input object the caller still holds.
     const cognito = simCognito();
@@ -186,24 +246,33 @@ describe("sim Cognito account recovery", () => {
     assertStringIncludes(error.message, "admin_only");
   });
 
-  it("refuses a mechanism with no name", async () => {
-    // Given simulated Cognito. The SDK's own types allow a mechanism without a
-    // name, so this is the request as it reaches the simulator.
+  it("refuses a setting outside the shape Cognito states for it", async () => {
+    // Given simulated Cognito.
     const cognito = simCognito();
 
-    // When a pool lists a mechanism that says only where it comes in the
-    // order.
-    const error = await assertThrowsErrorAsync(async () => {
-      await cognito.createUserPool({
-        input: {
-          PoolName: "myapp-users",
-          AccountRecoverySetting: { RecoveryMechanisms: [{ Priority: 1 }] },
-        },
-      });
-    });
+    // When a pool asks for each of the settings real Cognito refuses: a
+    // mechanism missing half of what one carries, a priority outside the two
+    // it has, and a list of a length it does not take.
+    const outcomes = await Promise.all(
+      refusedSettings.map(async (refused) => ({
+        refused,
+        error: await assertThrowsErrorAsync(async () => {
+          await cognito.createUserPool({
+            input: {
+              PoolName: "myapp-users",
+              AccountRecoverySetting: refused.setting,
+            },
+          });
+        }, refused.label),
+      })),
+    );
 
-    // Then it is refused, because real Cognito needs the name.
-    assertStringIncludes(error.message, "entry with no Name");
+    // Then each is refused, saying what it was that Cognito would not have
+    // accepted, rather than being created here and failing in a deployment.
+    for (const { refused, error } of outcomes) {
+      assertInstanceOf(error, SimCognitoInvalidParameterException);
+      assertStringIncludes(error.message, refused.says);
+    }
   });
 
   it("refuses a mechanism an update names, in its own words", async () => {

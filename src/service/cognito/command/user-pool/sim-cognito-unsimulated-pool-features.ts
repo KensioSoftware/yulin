@@ -10,7 +10,7 @@ import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
  *
  * `AccountRecoverySetting` is not here. A pool records the mechanisms it was
  * asked for and reports them back, and SimCognitoAccountRecovery refuses a
- * mechanism Cognito does not have.
+ * setting outside the shape Cognito states for it.
  *
  * `AdminCreateUserConfig` is simulated as far as `AllowAdminCreateUserOnly`
  * goes, which is what decides whether `SignUp` is allowed. The two keys beside

@@ -23,9 +23,10 @@ import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-prov
  * this simulation acts on.
  *
  * The verification wording is read: it is what the messages the pool records
- * say, and any wording is accepted. `AccountRecoverySetting` is not read at
- * all, and is recorded so a described pool reports it. They are written here
- * as one block because a default CDK stack sends them together.
+ * say, and any wording is accepted. `AccountRecoverySetting` is checked against
+ * the shape Cognito states and recorded so a described pool reports it, and no
+ * recovery here ever reads it back out. They are written here as one block
+ * because a default CDK stack sends them together.
  */
 const verificationMessage =
   "The verification code to your new account is {####}";
