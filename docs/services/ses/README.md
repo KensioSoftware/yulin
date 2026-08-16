@@ -231,8 +231,14 @@ Refusing at the template rather than at the send is deliberate: it fails where t
 written, and a template surviving into a sent message with `{{#if premium}}` still in it would make
 a test pass on a message no real SES would produce.
 
-Malformed `TemplateData`, or data that is not a JSON object, is refused too. A send with no
-`TemplateData` at all renders every placeholder empty, which is how real SES treats it.
+`TemplateData` is checked only when a send carries it: malformed JSON, or JSON that is not an
+object, is refused. A send with no `TemplateData` at all is accepted and renders every placeholder
+empty, which is how real SES treats it.
+
+A send may name a stored template or write its wording out in `TemplateContent`, but not both.
+Naming both is refused, because which of them real SES renders is not something this simulator
+knows, and recording the message under a template it was not rendered from would be worse than
+failing.
 
 ## The sandbox
 

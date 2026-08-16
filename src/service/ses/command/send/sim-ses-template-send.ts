@@ -64,9 +64,21 @@ export class SimSesTemplateSendReader {
   /**
    * The wording to render: the stored template's, or the one the send wrote
    * out in full.
+   *
+   * A send naming both is refused rather than picking one. Which of them real
+   * SES prefers is not something this simulator knows, and rendering the
+   * inline wording while recording the stored template's name would put a
+   * message in the record under a template it was not rendered from.
    */
   private resolveContent(template: SimSesTemplate): SimSesTemplateContent {
     if (template.TemplateContent !== undefined) {
+      if (template.TemplateName !== undefined) {
+        throw new SimSesUnsupportedOperationException(
+          "A send naming both TemplateName and TemplateContent is refused: " +
+            "which of them real SES renders is not simulated here",
+        );
+      }
+
       return readSimSesTemplateContent(template.TemplateContent);
     }
 

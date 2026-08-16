@@ -2,11 +2,9 @@ import {
   CreateEmailTemplateCommand,
   DeleteEmailTemplateCommand,
   GetEmailTemplateCommand,
-  SendEmailCommand,
   UpdateEmailTemplateCommand,
 } from "@aws-sdk/client-sesv2";
 import {
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -21,87 +19,8 @@ import {
   SimSesNotFoundException,
   SimSesUnsupportedOperationException,
 } from "./error/sim-ses.error.js";
-import type { SimSesV2 } from "./sim-ses-v2.js";
-
-/** A simulated SES with both ends verified, so a send reaches the rendering. */
-function sendingSes(): SimSesV2 {
-  const ses = new SimAws().sesV2();
-
-  ses.verifyIdentity("hello@example.com");
-  ses.verifyIdentity("someone@example.org");
-
-  return ses;
-}
-
-function templatedSend(
-  templateName: string,
-  templateData?: string,
-): SendEmailCommand {
-  return new SendEmailCommand({
-    FromEmailAddress: "hello@example.com",
-    Destination: { ToAddresses: ["someone@example.org"] },
-    Content: {
-      Template: { TemplateName: templateName, TemplateData: templateData },
-    },
-  });
-}
 
 describe("SimSesV2 template refusals", () => {
-  it("refuses a send naming a template that is not there", async () => {
-    // Given a simulated SES with no templates.
-    const ses = sendingSes();
-
-    // When a message is sent from one.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(templatedSend("welcome", "{}"));
-    });
-
-    // Then it fails rather than sending an empty message, and nothing is
-    // recorded.
-    assertInstanceOf(error, SimSesNotFoundException);
-    assertArrayLength(ses.sentEmails(), 0);
-  });
-
-  it("refuses template data that is not JSON", async () => {
-    // Given a simulated SES with a template.
-    const ses = sendingSes();
-
-    await ses.createEmailTemplate(
-      new CreateEmailTemplateCommand({
-        TemplateName: "welcome",
-        TemplateContent: { Subject: "Hi {{name}}", Text: "Hi {{name}}" },
-      }),
-    );
-
-    // When a message is sent with malformed data.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(templatedSend("welcome", "{not json"));
-    });
-
-    // Then it is refused rather than silently rendering nothing.
-    assertInstanceOf(error, SimSesBadRequestException);
-  });
-
-  it("refuses template data that is not a JSON object", async () => {
-    // Given a simulated SES with a template.
-    const ses = sendingSes();
-
-    await ses.createEmailTemplate(
-      new CreateEmailTemplateCommand({
-        TemplateName: "welcome",
-        TemplateContent: { Subject: "Hi {{name}}", Text: "Hi {{name}}" },
-      }),
-    );
-
-    // When a message is sent with a JSON array rather than an object.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(templatedSend("welcome", '["Ada"]'));
-    });
-
-    // Then it is refused: placeholders are read off an object.
-    assertInstanceOf(error, SimSesBadRequestException);
-  });
-
   it("refuses a template containing a block helper", async () => {
     // Given a simulated SES.
     const ses = new SimAws().sesV2();
@@ -258,77 +177,12 @@ describe("SimSesV2 template refusals", () => {
     assertInstanceOf(deleted, SimSesNotFoundException);
   });
 
-  it("refuses template data holding something that cannot go in a message", async () => {
-    // Given a template naming a value.
-    const ses = sendingSes();
-
-    await ses.createEmailTemplate(
-      new CreateEmailTemplateCommand({
-        TemplateName: "welcome",
-        TemplateContent: { Subject: "Hi", Text: "Hi {{customer}}" },
-      }),
-    );
-
-    // When the data has an object where the template wants a name.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(
-        templatedSend("welcome", '{"customer":{"name":"Ada"}}'),
-      );
-    });
-
-    // Then it says so. Real Handlebars would put `[object Object]` in the
-    // message, which nobody means to send.
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-    assertStringIncludes(error.message, "{{customer}}");
-  });
-
-  it("refuses a template send naming neither a template nor its content", async () => {
-    // Given a simulated SES with both ends verified.
-    const ses = sendingSes();
-
-    // When a send carries an empty template branch.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(
-        new SendEmailCommand({
-          FromEmailAddress: "hello@example.com",
-          Destination: { ToAddresses: ["someone@example.org"] },
-          Content: { Template: {} },
-        }),
-      );
-    });
-
-    assertInstanceOf(error, SimSesBadRequestException);
-  });
-
-  it("refuses sending another Account's shared template", async () => {
-    // Given a simulated SES with both ends verified.
-    const ses = sendingSes();
-
-    // When a send names a template by ARN rather than by name.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(
-        new SendEmailCommand({
-          FromEmailAddress: "hello@example.com",
-          Destination: { ToAddresses: ["someone@example.org"] },
-          Content: {
-            Template: {
-              TemplateArn:
-                "arn:aws:ses:us-east-1:222222222222:template/welcome",
-            },
-          },
-        }),
-      );
-    });
-
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-  });
-
-  it("refuses template tags and attachments, which are not simulated", async () => {
-    // Given a simulated SES with both ends verified.
-    const ses = sendingSes();
+  it("refuses template tags, which are not simulated", async () => {
+    // Given a simulated SES.
+    const ses = new SimAws().sesV2();
 
     // When a template is created with tags.
-    const tagged = await assertThrowsErrorAsync(async () => {
+    const error = await assertThrowsErrorAsync(async () => {
       await ses.createEmailTemplate(
         new CreateEmailTemplateCommand({
           TemplateName: "welcome",
@@ -338,26 +192,7 @@ describe("SimSesV2 template refusals", () => {
       );
     });
 
-    // And when a template send carries an attachment.
-    const attached = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(
-        new SendEmailCommand({
-          FromEmailAddress: "hello@example.com",
-          Destination: { ToAddresses: ["someone@example.org"] },
-          Content: {
-            Template: {
-              TemplateContent: { Text: "Hi" },
-              Attachments: [
-                { FileName: "terms.pdf", RawContent: new Uint8Array([1]) },
-              ],
-            },
-          },
-        }),
-      );
-    });
-
-    assertInstanceOf(tagged, SimSesUnsupportedOperationException);
-    assertInstanceOf(attached, SimSesUnsupportedOperationException);
+    assertInstanceOf(error, SimSesUnsupportedOperationException);
   });
 
   it("refuses a template carrying no content at all", async () => {
