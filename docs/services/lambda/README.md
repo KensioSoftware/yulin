@@ -617,6 +617,55 @@ A report naming an id that was not in the batch returns the whole batch, as real
 report it cannot trust. So does an entry with no `itemIdentifier`. A handler that returns nothing,
 or an empty `batchItemFailures` list, has handled the whole batch.
 
+### Making an SQS event without a queue
+
+A test of the handler on its own, with no queue and no mapping, still has to pass it a whole event.
+`lambdaSqsEventFactory` makes one, and `lambdaSqsEventRecordFactory` makes the records in it, so
+such a test says what the messages carry and nothing else:
+
+```typescript sim-lambda-sqs-event-factory
+/**
+ * Making an SQS event to call a handler with.
+ */
+
+import {
+  lambdaSqsEventFactory,
+  lambdaSqsEventRecordFactory,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+function ordersHandler(event: SimLambdaSqsEvent): readonly string[] {
+  return event.Records.map(
+    (record) => (JSON.parse(record.body) as { orderId: string }).orderId,
+  );
+}
+
+const batch = lambdaSqsEventFactory.make({
+  Records: [{ body: '{"orderId":"YL-1"}' }, { body: '{"orderId":"YL-2"}' }],
+});
+
+// [ 'YL-1', 'YL-2' ]
+console.log(ordersHandler(batch));
+
+// The record factory makes one on its own, for a test about a single message.
+const record = lambdaSqsEventRecordFactory.make({
+  body: '{"orderId":"YL-9"}',
+  eventSourceARN: "arn:aws:sqs:eu-west-2:888888888888:orders",
+});
+
+// eu-west-2
+console.log(record.awsRegion);
+```
+
+The default is the single-message batch a quiet queue delivers. Each record is completed as a
+delivered one is, including the message id, the receipt handle and the three system `attributes` a
+simulated mapping reports. Two fields a record repeats are computed from the rest: `md5OfBody` is
+the digest of the body given, which is what a handler checking the digest compares against, and
+`awsRegion` is the Region of the queue ARN given.
+
+Reporting individual failures is worth testing against a made event too: the handler's
+`batchItemFailures` name `messageId` values, and those are the ids of the records the factory made.
+
 ### Event source mappings in templates
 
 `AWS::Lambda::EventSourceMapping` deploys the same thing, which is what CDK's
@@ -900,6 +949,58 @@ apart by where the write came from rather than by when it landed.
 Writing the projection into a second table is what the guard is asking for, and is what a real
 aggregation or search index does anyway.
 
+### Making a stream event without a table
+
+`lambdaDynamoDbStreamEventFactory` and `lambdaDynamoDbStreamEventRecordFactory` make the same events
+for a test that calls the handler directly, with no table and no mapping:
+
+```typescript sim-lambda-dynamodb-stream-event-factory
+/**
+ * Making a DynamoDB stream event to call a handler with.
+ */
+
+import {
+  lambdaDynamoDbStreamEventFactory,
+  type SimLambdaDynamoDbStreamEvent,
+} from "@kensio/yulin/lambda";
+
+function shippedOrders(event: SimLambdaDynamoDbStreamEvent): readonly string[] {
+  return event.Records.filter(
+    (record) => record.dynamodb.NewImage?.["status"]?.S === "shipped",
+  ).map((record) => record.dynamodb.Keys?.["orderId"]?.S ?? "");
+}
+
+const event = lambdaDynamoDbStreamEventFactory.make({
+  Records: [
+    {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: { orderId: { S: "YL-1" } },
+        OldImage: { orderId: { S: "YL-1" }, status: { S: "placed" } },
+        NewImage: { orderId: { S: "YL-1" }, status: { S: "shipped" } },
+      },
+    },
+    { eventName: "INSERT" },
+  ],
+});
+
+// [ 'YL-1' ]
+console.log(shippedOrders(event));
+
+// NEW_AND_OLD_IMAGES, because that is what this record carries
+console.log(event.Records[0]?.dynamodb.StreamViewType);
+```
+
+The default is the single-record batch one changed item produces. What a record says in more than
+one place is computed from the rest, so it is a record a stream could have delivered: an `INSERT`
+carries a new image, a `REMOVE` an old one and a `MODIFY` both, `StreamViewType` names the images
+the record actually carries, and `awsRegion` is the Region of the stream ARN given. A record for a
+`KEYS_ONLY` stream is one with the images explicitly taken away, as in
+`make({ dynamodb: { NewImage: undefined, OldImage: undefined } })`.
+
+`SizeBytes` is a plausible default rather than a measurement of the images given, so a test
+asserting on it should say what it expects.
+
 ### Stream mappings in templates
 
 `AWS::Lambda::EventSourceMapping` deploys a stream mapping too. `EventSourceArn` takes the
@@ -1146,6 +1247,84 @@ A handler can answer in either of the two shapes real Lambda accepts:
 If the handler throws, the endpoint answers `502` with an AWS-like error document rather than the
 handler's error, which stays visible to the test as the thrown error would be through
 `InvokeCommand`.
+
+### Making an invocation event without a request
+
+A test of the handler on its own, with no endpoint serving it, still has to pass it a whole event.
+`lambdaFunctionUrlEventFactory` makes one, so such a test says what the request was and nothing
+else:
+
+```typescript sim-lambda-function-url-event-factory
+/**
+ * Making a Lambda Function URL invocation event to call a handler with.
+ */
+
+import { VariantFactory } from "@kensio/part-factory";
+
+import {
+  lambdaFunctionUrlEventFactory,
+  type SimLambdaFunctionUrlEvent,
+  type SimLambdaFunctionUrlResult,
+} from "@kensio/yulin/lambda";
+
+function greeter(event: SimLambdaFunctionUrlEvent): SimLambdaFunctionUrlResult {
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/plain" },
+    body: `Hello ${event.queryStringParameters?.["name"] ?? "world"}`,
+  };
+}
+
+const event = lambdaFunctionUrlEventFactory.make({
+  rawPath: "/greet",
+  rawQueryString: "name=Yulin",
+});
+
+// Hello Yulin
+console.log(greeter(event).body);
+
+// A named variation of a request is a VariantFactory around it, as with any
+// other @kensio/part-factory factory.
+const formPostFactory = new VariantFactory(lambdaFunctionUrlEventFactory, {
+  headers: { "content-type": "application/x-www-form-urlencoded" },
+  requestContext: { http: { method: "POST" } },
+});
+
+const formPost = formPostFactory.make({
+  rawPath: "/subscribe",
+  body: "email=someone%40yulin.test",
+});
+
+// POST /subscribe
+console.log(
+  `${formPost.requestContext.http.method} ${formPost.requestContext.http.path}`,
+);
+```
+
+The defaults describe an anonymous `GET /` to a `NONE` auth Function URL, down to the headers AWS
+stamps on a proxied request, so a handler reading `host`, `x-forwarded-for` or `x-amzn-trace-id`
+finds what it would find on AWS. The fields a Function URL invocation never carries —
+`pathParameters` and `stageVariables` — are absent rather than empty, as they are in a served event.
+
+A real event says several things twice, and the factory computes its defaults from the overrides so
+that supplying either copy sets both:
+
+| What the request says | Where the event says it                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| the path              | `rawPath` and `requestContext.http.path`                                                          |
+| the query             | `rawQueryString` and the parsed `queryStringParameters`                                           |
+| the endpoint          | `requestContext.apiId`, `requestContext.domainPrefix`, `requestContext.domainName`, `host` header |
+| the caller            | `requestContext.http.sourceIp` and `userAgent`, the `x-forwarded-for` and `user-agent` headers    |
+| the time              | `requestContext.timeEpoch` and the Common Log Format `requestContext.time`                        |
+
+So `make({ rawPath: "/user/status" })` is a request for `/user/status` in both places, rather than
+one for `/user/status` that the request context still calls `/`. Overriding both copies with
+different values is still allowed, for a test that wants an event no real invocation produces.
+
+The same events go to a handler through
+[the API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway HTTP API usage docs") too, where
+the route key, the stage and the path parameters are the endpoint's rather than a Function URL's
+`$default`, so an event for one of those is this factory with those fields overridden.
 
 ### Managing a Function URL
 
@@ -1974,6 +2153,8 @@ Sim Lambda currently supports:
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
   resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
   control
+- `lambdaFunctionUrlEventFactory`, making a Function URL invocation event for a test that calls a
+  handler directly
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
 - SQS and DynamoDB stream event source mappings, created with `CreateEventSourceMappingCommand` and

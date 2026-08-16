@@ -33,6 +33,7 @@ behaviour and includes example code that can be copied into tests or local devel
 ## Feature documentation
 
 - [AWS SDK interception](./sdk/ "Simulated AWS SDK usage docs")
+- [Event factories](./factories/ "Test factories for AWS event shapes usage docs")
 - [Linting CloudFront Functions JS2](./lint/ "CloudFront Functions JS2 lint config usage docs")
 - [Non-AWS dependencies](./non-aws-dependencies/ "Dependencies Yulin does not simulate usage docs")
 - [Serving on localhost](./serve/ "Serving simulated AWS on localhost usage docs")

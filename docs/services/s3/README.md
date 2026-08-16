@@ -1088,6 +1088,60 @@ form-URL-encoded, so `red flower.jpg` arrives as `red+flower.jpg`.
 
 `eventTime` comes from the simulation's clock, so a frozen clock produces a fixed timestamp.
 
+The document is typed as `SimS3Event`, with `SimS3EventRecord` for one record, so a handler can be
+written against it. It is not assignable to the `aws-lambda` typings package's `S3Event`, and that
+is deliberate: that package declares `Records` mutable and requires `s3.object.size` and `eTag`,
+which a removal record does not carry. A handler typed against `S3Event` still receives this
+document at runtime, and typing it as `SimS3Event` is what describes what actually arrives.
+
+### Making an event notification without a Bucket
+
+A test of the handler on its own, with no Bucket and no configuration, still has to pass it a whole
+event. `s3NotificationEventFactory` makes one, and `s3NotificationEventRecordFactory` makes the
+records in it:
+
+```typescript sim-s3-notification-event-factory
+/**
+ * Making an S3 event notification to call a handler with.
+ */
+
+import { VariantFactory } from "@kensio/part-factory";
+
+import { s3NotificationEventFactory, type SimS3Event } from "@kensio/yulin/s3";
+
+function thumbnailKeys(event: SimS3Event): readonly string[] {
+  return event.Records.filter((record) =>
+    record.eventName.startsWith("ObjectCreated"),
+  ).map((record) => `${record.s3.bucket.name}/${record.s3.object.key}`);
+}
+
+const uploaded = s3NotificationEventFactory.make({
+  Records: [
+    { s3: { bucket: { name: "uploads" }, object: { key: "cat.jpg" } } },
+  ],
+});
+
+// [ 'uploads/cat.jpg' ]
+console.log(thumbnailKeys(uploaded));
+
+// A removal is a variation worth naming, since it reports no Object detail.
+const objectRemovedFactory = new VariantFactory(s3NotificationEventFactory, {
+  Records: [{ eventName: "ObjectRemoved:Delete" }],
+});
+
+// []
+console.log(thumbnailKeys(objectRemovedFactory.make()));
+```
+
+The default is the single record one Object event produces, which is all real S3 delivers to a
+function at once. What a record says in more than one place is computed from the rest: the Bucket
+ARN is the ARN of the Bucket named, and a removal carries no `size` and no `eTag` while a creation
+carries both. The key is carried as a record carries it, form-URL-encoded, so a key with a space in
+it goes in as `red+flower.jpg`.
+
+The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+covers what these have in common with the factories for the other event shapes.
+
 ### When delivery fails
 
 Real S3 tells the caller who wrote the Object nothing about a delivery, and neither does the

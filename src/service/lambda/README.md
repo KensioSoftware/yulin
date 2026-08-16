@@ -345,6 +345,21 @@ is also where a malformed entry becomes an id no message has. `SimLambdaSqsEvent
 batch into the event's own shape, which is the lower-case record naming and the base64 binary
 attribute values real AWS uses.
 
+### Event source events without an event source
+
+`factory/lambda-sqs-event.factory.ts` and `factory/lambda-dynamodb-stream-event.factory.ts` export
+the record and event factories for the two shapes above, for a test that calls the handler directly
+rather than creating a mapping. Both are a `DynamicFactory` for one record plus
+`SimRecordsEventFactory` (`src/util/factory/`) for the event carrying them, which is the pattern
+every record-carrying event here follows: the event factory completes each partial record a test
+gives it, because merging overrides replaces a list whole and would otherwise hand the handler
+records with one field in them.
+
+The record defaults are computed from what the test said, so a made record is one the source could
+have delivered: the SQS one digests the body it was given and reads its Region out of the queue ARN,
+and the DynamoDB one carries the images its event name implies and names the view type after the
+images that end up there (`factory/lambda-dynamodb-stream-record-change.ts`).
+
 ### DynamoDB streams
 
 `stream/` is the port onto simulated DynamoDB, and `SimLambdaDynamoDbStreamEventSourcePoller` is a
@@ -474,6 +489,19 @@ Role: who invoked it and what it runs as are separate questions.
 The endpoint's own error responses (403 for a denied caller, 404 for an unknown or deleted URL, 502
 for a handler error) are AWS-shaped JSON documents. The 403 body is real Lambda's wording; the other
 two are approximations.
+
+### Invocation events without a request
+
+`factory/lambda-function-url-event.factory.ts` exports `lambdaFunctionUrlEventFactory`, which makes
+the same events for a test that calls a handler directly rather than serving it.
+
+Only the endpoint style lives here. The factory itself is
+`src/serve/payload-2/sim-payload-2-event.factory.ts`, shared with the HTTP APIs that speak the same
+format, and this service supplies what a Function URL calls itself: the URL id, the `lambda-url`
+hostname, and `$default` for the route key and the stage whatever the request was. The proxy
+headers and the comma-joined query parameters come from
+`src/serve/payload-2/sim-payload-2-request-parts.ts`, the same code a served request builds them
+with, so a made event does not drift from a delivered one.
 
 ### CloudFormation
 

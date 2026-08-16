@@ -1276,6 +1276,67 @@ API's own hostname rather than the localhost one the request arrived at, `x-forw
 
 The stage's variables, when it has any, reach the handler as `event.stageVariables`.
 
+### Making one without an API
+
+A test of the integration handler on its own, with no API in front of it, still has to pass it a
+whole event. `httpApiProxyEventFactory` makes one, so such a test says what the request was and
+nothing else:
+
+```typescript sim-http-api-proxy-event-factory
+/**
+ * Making an HTTP API invocation event to call an integration handler with.
+ */
+
+import { VariantFactory } from "@kensio/part-factory";
+
+import {
+  httpApiProxyEventFactory,
+  type SimPayload2Event,
+} from "@kensio/yulin/apigatewayv2";
+
+function ordersHandler(event: SimPayload2Event): string {
+  return `${event.requestContext.http.method} ${event.pathParameters?.["orderId"] ?? "all"}`;
+}
+
+// A request naming only its route: the method and path come from the route key.
+const listing = httpApiProxyEventFactory.make({ routeKey: "GET /orders" });
+
+// GET all
+console.log(ordersHandler(listing));
+
+// A request to a parameterised route says the concrete path and what the route
+// captured from it.
+const orderRequestFactory = new VariantFactory(httpApiProxyEventFactory, {
+  routeKey: "GET /orders/{orderId}",
+});
+
+const order = orderRequestFactory.make({
+  rawPath: "/orders/YL-1",
+  pathParameters: { orderId: "YL-1" },
+});
+
+// GET YL-1
+console.log(ordersHandler(order));
+```
+
+The defaults describe an unauthorized `GET /` reaching the API's default stage, down to the headers
+API Gateway sets itself. The route key and the request agree whichever a test gives: an event for
+`rawPath: "/orders"` is one for the `GET /orders` route, and an event for `routeKey: "POST /orders"`
+is a POST to `/orders`. A route key whose path is a template captures nothing on its own, so an
+event for a parameterised route says the concrete path and its `pathParameters` itself, as above.
+
+`requestContext.authorizer` is absent, as it is for a route with no authorizer. Adding it is how a
+test describes a request that has been through one: `{ jwt: { claims, scopes } }` for a
+[Cognito user pool](#protecting-a-route-with-a-cognito-user-pool), `{ iam: { ... } }` for
+[IAM](#protecting-a-route-with-iam), and `{ lambda: { ... } }` for a
+[Lambda authorizer](#protecting-a-route-with-a-lambda-authorizer). A Lambda authorizer's own event
+is a different shape, `SimHttpApiAuthorizerEvent`, and has no factory.
+
+The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+covers what the factories have in common; a Function URL invocation, which is the same event from a
+different endpoint, has
+[its own factory](../lambda/#making-an-invocation-event-without-a-request "Simulated Lambda usage docs").
+
 ## The response the handler returns
 
 A handler returning an object with a `statusCode` produces that HTTP response. Its `headers` are

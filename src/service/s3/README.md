@@ -571,6 +571,15 @@ The raise point is one call in `PutObjectCommandHandler` and one in each of the 
 handlers, after the write and with the caller the authorizer resolved. Every write path funnels
 through those, so the SDK, an intercepted SDK client and the REST endpoint are all covered.
 
+`notification/event/sim-s3-event.type.ts` is the `Records` document as a type, so a handler can be
+written against it and `simS3EventRecordsDocument` builds it rather than an anonymous object.
+`factory/s3-notification-event.factory.ts` exports the factories making one for a test that calls a
+handler directly: `s3NotificationEventRecordFactory` for a record and `s3NotificationEventFactory`
+for the event around it, over the shared `SimRecordsEventFactory` every record-carrying event uses.
+The record factory reuses this directory's own constants and request-id generator, so a made record
+does not drift from a delivered one, and computes the Bucket ARN and whether the Object still has a
+size and an eTag from what the test said.
+
 `s3:TestEvent` is deliberately not sent. Real S3 puts one on a queue or topic when a configuration
 naming it is applied, carrying a flat document with no `Records` in it. Sending it would make the
 simplest possible test two messages long and hand a consumer a first body it cannot parse as an

@@ -10,7 +10,10 @@ import {
   type SimPayload2Authorization,
   SimPayload2RequestContextBuilder,
 } from "./sim-payload-2-request-context.js";
-import { SimPayload2RequestParts } from "./sim-payload-2-request-parts.js";
+import {
+  simPayload2QueryStringParameters,
+  SimPayload2RequestParts,
+} from "./sim-payload-2-request-parts.js";
 
 interface SimPayload2EventBuilderProperties {
   /**
@@ -102,7 +105,9 @@ export class SimPayload2EventBuilder {
       event.cookies = cookies;
     }
 
-    const queryStringParameters = this.requestParts.queryStringParameters(url);
+    const queryStringParameters = simPayload2QueryStringParameters(
+      url.searchParams,
+    );
     if (Object.keys(queryStringParameters).length > 0) {
       event.queryStringParameters = queryStringParameters;
     }
