@@ -5,10 +5,13 @@ import type { SimCognitoUserPoolMfaType } from "../../user-pool/mfa/sim-cognito-
  * The SetUserPoolMfaConfig inputs this simulation reads, and the ones it
  * refuses.
  *
- * `SmsMfaConfiguration` and `EmailMfaConfiguration` are the refused two. A
+ * `SmsMfaConfiguration` and `EmailMfaConfiguration` are refused because a
  * factor sent by SMS needs the pool's `SmsConfiguration` and one sent by email
  * needs its `EmailConfiguration`, both of which are refused on
  * `CreateUserPool`, so a pool here could not deliver either message.
+ *
+ * `WebAuthnConfiguration` is refused because a passkey is presented through
+ * the `USER_AUTH` flow, which this simulation refuses as a flow of its own.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/SetUserPoolMfaConfigCommand/
  */
@@ -16,6 +19,7 @@ export interface SimSetUserPoolMfaConfigCommandInput extends SimCognitoUserPoolM
   readonly UserPoolId?: string | undefined;
   readonly SmsMfaConfiguration?: object | undefined;
   readonly EmailMfaConfiguration?: object | undefined;
+  readonly WebAuthnConfiguration?: object | undefined;
 }
 
 /**

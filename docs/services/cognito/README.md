@@ -2950,6 +2950,8 @@ Current documented limitations:
 - `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration` alone. `SmsMfaConfiguration` and
   `EmailMfaConfiguration` are refused, because a pool here has neither the `SmsConfiguration` nor
   the `EmailConfiguration` real Cognito wants before it will deliver either message.
+  `WebAuthnConfiguration` is refused because a passkey is presented through the `USER_AUTH` flow,
+  which is refused as a flow of its own.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does, so
   a setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
   covers the settings this simulation models: `Policies.PasswordPolicy`, `DeletionProtection`,

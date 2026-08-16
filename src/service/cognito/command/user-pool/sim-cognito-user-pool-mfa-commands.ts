@@ -93,11 +93,13 @@ export class SimCognitoUserPoolMfaCommands {
   }
 
   /**
-   * Refuse the two factors this simulation cannot deliver a message for.
+   * Refuse the factors this simulation has no way to present.
    *
    * A pool here has neither an `SmsConfiguration` nor an `EmailConfiguration`,
    * because `CreateUserPool` refuses both, so real Cognito would refuse either
-   * of these factors on a pool built the same way.
+   * of those factors on a pool built the same way. A passkey is presented
+   * through the `USER_AUTH` flow, which is refused as a flow of its own, so a
+   * pool configured for one here would never be asked for it.
    */
   private refuseUnsimulatedFactors(
     input: SimSetUserPoolMfaConfigCommandInput,
@@ -111,6 +113,11 @@ export class SimCognitoUserPoolMfaCommands {
       "EmailMfaConfiguration",
       input.EmailMfaConfiguration,
       "a second factor sent by email, which needs the pool's EmailConfiguration",
+    );
+    this.unsimulated.refuse(
+      "WebAuthnConfiguration",
+      input.WebAuthnConfiguration,
+      "signing in with a passkey, which the unsimulated USER_AUTH flow presents",
     );
   }
 }
