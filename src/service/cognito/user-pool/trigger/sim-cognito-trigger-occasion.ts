@@ -119,6 +119,15 @@ export class SimCognitoTriggerOccasion {
       "CustomMessage_AdminCreateUser",
     );
 
+  /**
+   * The code a sign-in challenged for a second factor is sent.
+   */
+  public static readonly customMessageAuthentication =
+    new SimCognitoTriggerOccasion(
+      "CustomMessage",
+      "CustomMessage_Authentication",
+    );
+
   public readonly trigger: SimCognitoTriggerName;
   public readonly source: string;
 
@@ -146,6 +155,9 @@ export class SimCognitoTriggerOccasion {
       }
       case "AdminCreateUser": {
         return this.customMessageAdminCreateUser;
+      }
+      case "Authentication": {
+        return this.customMessageAuthentication;
       }
     }
   }

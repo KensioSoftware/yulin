@@ -12,12 +12,11 @@ const mfaConfigurationValues: ReadonlySet<SimCognitoMfaConfigurationValue> =
  * `OPTIONAL` challenges only the users that have registered a factor, and `ON`
  * challenges every user.
  *
- * The setting is kept and reported rather than acted on: nothing here
- * registers a factor for a user, so no user of an `OPTIONAL` pool has one, and
- * a sign-in to such a pool goes through without a challenge, as it does on real
- * Cognito for a user that never registered one. An `ON` pool is the one that
- * differs, so a sign-in to that is refused where the challenge would have been
- * issued rather than at pool creation.
+ * The setting is acted on: a sign-in by a user of an `OPTIONAL` or `ON` pool
+ * that has registered a factor is answered with the challenge for it. The one
+ * case left is a user of an `ON` pool that has registered none, which real
+ * Cognito answers with `MFA_SETUP`, and that sign-in is refused where the
+ * challenge would have been issued rather than at pool creation.
  */
 export class SimCognitoMfaConfiguration {
   public readonly value: SimCognitoMfaConfigurationValue;
@@ -41,12 +40,22 @@ export class SimCognitoMfaConfiguration {
   }
 
   /**
+   * Whether any sign-in to the pool could be challenged for a second factor.
+   *
+   * A pool configured `OFF` challenges nobody, whatever factors its users
+   * have registered, so a sign-in to one goes straight to tokens.
+   */
+  get challengesAnySignIn(): boolean {
+    return this.value !== "OFF";
+  }
+
+  /**
    * Whether every sign-in to the pool has to get past a second factor.
    *
-   * This is the one setting no sign-in here can honour. A user of an `ON` pool
-   * is answered with an MFA challenge on real Cognito whether or not it has
-   * registered a factor, so tokens are never issued by the request that sent
-   * the password.
+   * A user of an `ON` pool is answered with a challenge on real Cognito
+   * whether or not it has registered a factor: one that has is challenged for
+   * it, and one that has not is answered with `MFA_SETUP`, which is the
+   * challenge this simulation does not issue.
    */
   get challengesEverySignIn(): boolean {
     return this.value === "ON";

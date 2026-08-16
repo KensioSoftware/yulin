@@ -1,7 +1,6 @@
 import { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
-import { requireSimCognitoNewPasswordChallenge } from "./sim-cognito-auth-challenge.js";
-import type { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
+import type { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
 import { SimCognitoUnsimulatedAuthOptions } from "./sim-cognito-unsimulated-auth-options.js";
 import type {
   SimRespondToAuthChallengeCommand,
@@ -10,7 +9,7 @@ import type {
 
 interface SimCognitoRespondToChallengeProperties {
   readonly authResolver: SimCognitoAuthResolver;
-  readonly newPassword: SimCognitoNewPasswordResponse;
+  readonly responses: SimCognitoChallengeResponses;
 }
 
 /**
@@ -22,12 +21,12 @@ interface SimCognitoRespondToChallengeProperties {
  */
 export class SimCognitoRespondToChallenge {
   private readonly authResolver: SimCognitoAuthResolver;
-  private readonly newPassword: SimCognitoNewPasswordResponse;
+  private readonly responses: SimCognitoChallengeResponses;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedAuthOptions();
 
   constructor(properties: SimCognitoRespondToChallengeProperties) {
     this.authResolver = properties.authResolver;
-    this.newPassword = properties.newPassword;
+    this.responses = properties.responses;
   }
 
   /**
@@ -40,9 +39,7 @@ export class SimCognitoRespondToChallenge {
     const { pool, client } = this.authResolver.client(input.ClientId);
 
     this.unsimulatedOptions.refuseInResponse(input);
-    requireSimCognitoNewPasswordChallenge(input.ChallengeName);
-
-    return await this.newPassword.handle({
+    return await this.responses.handle(input.ChallengeName, {
       pool,
       client,
       parameters: new SimCognitoAuthParameters(

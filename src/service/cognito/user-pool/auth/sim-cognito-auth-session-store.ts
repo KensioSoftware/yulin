@@ -8,6 +8,9 @@ export interface SimCognitoAuthSessionRequest {
   readonly sessionId: string | undefined;
   readonly username: string;
   readonly clientId: string;
+
+  /** The challenge the response is answering, which the session carries. */
+  readonly challengeName: string;
   readonly now: Date;
 }
 
@@ -47,8 +50,8 @@ export class SimCognitoAuthSessionStore {
    * Resolve the session a challenge response carries, or refuse.
    *
    * A session this pool never issued, one already used, one for another user
-   * or app client, and one that has run out all fail the same way, as they do
-   * on real Cognito.
+   * or app client, one issued for a different challenge, and one that has run
+   * out all fail the same way, as they do on real Cognito.
    */
   require(request: SimCognitoAuthSessionRequest): SimCognitoAuthSession {
     const session = this.find(request.sessionId);
@@ -56,6 +59,7 @@ export class SimCognitoAuthSessionStore {
     if (
       session === undefined ||
       !session.belongsTo(request.username, request.clientId) ||
+      !session.answers(request.challengeName) ||
       session.isExpiredAt(request.now)
     ) {
       throw new SimCognitoNotAuthorizedException(

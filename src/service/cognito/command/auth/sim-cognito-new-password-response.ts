@@ -4,19 +4,16 @@ import {
   requireSimCognitoSignInUser,
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
-import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
-import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
-import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
+import { newPasswordRequiredChallenge } from "./sim-cognito-auth-challenge.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
-import { SimCognitoMfaChallenge } from "./sim-cognito-mfa-challenge.js";
+import type { SimCognitoSignInCompletion } from "./sim-cognito-sign-in-completion.js";
 import type { SimCognitoAuthRequest } from "./sim-cognito-password-sign-in.js";
 import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 
 interface SimCognitoNewPasswordResponseProperties {
   readonly authResolver: SimCognitoAuthResolver;
-  readonly tokenIssuer: SimCognitoTokenIssuer;
-  readonly triggers: SimCognitoUserPoolTriggers;
+  readonly completion: SimCognitoSignInCompletion;
   readonly clock: SimClock;
 }
 
@@ -39,16 +36,12 @@ export interface SimCognitoChallengeResponseRequest extends SimCognitoAuthReques
  */
 export class SimCognitoNewPasswordResponse {
   private readonly authResolver: SimCognitoAuthResolver;
-  private readonly tokenIssuer: SimCognitoTokenIssuer;
-  private readonly triggers: SimCognitoUserPoolTriggers;
+  private readonly completion: SimCognitoSignInCompletion;
   private readonly clock: SimClock;
-  private readonly result = new SimCognitoAuthenticationResult();
-  private readonly mfaChallenge = new SimCognitoMfaChallenge();
 
   constructor(properties: SimCognitoNewPasswordResponseProperties) {
     this.authResolver = properties.authResolver;
-    this.tokenIssuer = properties.tokenIssuer;
-    this.triggers = properties.triggers;
+    this.completion = properties.completion;
     this.clock = properties.clock;
   }
 
@@ -71,6 +64,7 @@ export class SimCognitoNewPasswordResponse {
       sessionId: request.session,
       username,
       clientId: client.id,
+      challengeName: newPasswordRequiredChallenge,
       now: this.clock.now(),
     });
     const user = requireSimCognitoSignInUser(pool, client, username);
@@ -89,34 +83,20 @@ export class SimCognitoNewPasswordResponse {
 
     pool.auth.removeSession(session);
 
-    // A pool that challenges every user answers the new password with an MFA
-    // challenge rather than with tokens, and this simulation has none to
-    // issue.
-    this.mfaChallenge.refuseIn(pool);
-
+    // A user that has registered a second factor answers for it before the
+    // sign-in this challenge interrupted can finish, as it would on real
+    // Cognito: one challenge follows the other.
+    //
     // This is the one occasion real Cognito passes a request's `ClientMetadata`
     // to the token trigger, so it travels with the tokens here and nowhere
     // else.
-    const authenticated = {
-      $metadata: {},
-      AuthenticationResult: this.result.of(
-        await this.tokenIssuer.issue({
-          pool,
-          client,
-          user,
-          occasion: SimCognitoTriggerOccasion.newPasswordTokenGeneration,
-          clientMetadata: request.clientMetadata,
-        }),
-      ),
-    };
-
-    await this.triggers.postAuthentication({
+    return await this.completion.challengeOrComplete({
       pool,
       client,
       user,
+      occasion: SimCognitoTriggerOccasion.newPasswordTokenGeneration,
+      tokenClientMetadata: request.clientMetadata,
       clientMetadata: request.clientMetadata,
     });
-
-    return authenticated;
   }
 }

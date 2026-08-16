@@ -167,20 +167,20 @@ describe("sim Cognito RespondToAuthChallenge", () => {
     // Given a user challenged for a new password.
     const { cognito, clientId, session } = await simCognitoChallenged();
 
-    // When an MFA challenge is answered instead.
+    // When a challenge nothing here issues is answered instead.
     const error = await assertThrowsErrorAsync(async () => {
       await cognito.respondToAuthChallenge(
         new RespondToAuthChallengeCommand({
           ClientId: clientId,
-          ChallengeName: "SMS_MFA",
+          ChallengeName: "MFA_SETUP",
           Session: session,
-          ChallengeResponses: { USERNAME: "alice", SMS_MFA_CODE: "123456" },
+          ChallengeResponses: { USERNAME: "alice" },
         }),
       );
     });
 
-    // Then it is refused rather than answered as the one challenge that is
-    // simulated.
+    // Then it is refused rather than answered as one of the challenges that
+    // are simulated.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "is not simulated");
   });

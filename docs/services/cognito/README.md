@@ -2768,12 +2768,17 @@ has the `EmailConfiguration` real Cognito wants before it will send one, and so 
 `SmsConfiguration` inside an `SmsMfaConfiguration`: no message is delivered here, so the IAM role
 that would send one is never assumed.
 
-No sign-in is ever challenged for a second factor yet. A pool configured `OPTIONAL` challenges only
-the users that have registered a factor, so a sign-in by a user that has not registered one hands
-out tokens as it does on real Cognito. A pool configured `ON` is the one that differs. Real Cognito
-answers every sign-in to it with an MFA challenge, so `InitiateAuth`, `AdminInitiateAuth` and the
-new password challenge response are refused with `InvalidParameterException` where that challenge
-would have been, rather than handing out tokens a deployment would not.
+A pool configured `OPTIONAL` challenges the users that have registered a factor, and one configured
+`ON` challenges every user. A pool configured `OFF` challenges nobody. What a user registered is
+covered in [Registering a second factor for a user](#registering-a-second-factor-for-a-user) below,
+and being challenged for it in [Signing in with a second
+factor](#signing-in-with-a-second-factor) after that.
+
+The one sign-in still refused is by a user of an `ON` pool that has registered no factor at all.
+Real Cognito answers that one with `MFA_SETUP`, which registers a factor mid-sign-in, so
+`InitiateAuth`, `AdminInitiateAuth` and the new password challenge response are refused with
+`InvalidParameterException` where that challenge would have been, rather than handing out tokens a
+deployment would not.
 
 ```typescript sim-cognito-mfa
 /**
@@ -2992,14 +2997,144 @@ console.log(user.UserMFASettingList); // ["SOFTWARE_TOKEN_MFA"]
 console.log(user.PreferredMfaSetting); // "SOFTWARE_TOKEN_MFA"
 ```
 
+### Signing in with a second factor
+
+A sign-in by a user that has registered a factor is answered with `SMS_MFA` or `SOFTWARE_TOKEN_MFA`
+and a `Session` rather than with tokens, on `InitiateAuth` and `AdminInitiateAuth` alike, and after
+a `NEW_PASSWORD_REQUIRED` response as well: one challenge follows the other. The code goes back
+through `RespondToAuthChallenge` or `AdminRespondToAuthChallenge` as `SMS_MFA_CODE` or
+`SOFTWARE_TOKEN_MFA_CODE`, and that request is what hands out the tokens.
+
+An `SMS_MFA` challenge carries `CODE_DELIVERY_DELIVERY_MEDIUM` and a masked
+`CODE_DELIVERY_DESTINATION` in its `ChallengeParameters`, as real Cognito does, and the pool records
+the message it would have texted, on an occasion of `Authentication`. That is where a test reads the
+code from, the way it reads a sign-up confirmation code. A `SOFTWARE_TOKEN_MFA` challenge sends
+nothing anywhere: the code is whatever the user's authenticator app is showing, so a test computes
+it from the `SecretCode` or reads it off the pool.
+
+The code goes to the user's `phone_number` whatever the pool's `AutoVerifiedAttributes` say, and to
+the phone number rather than the email address of a user that has both, because the phone is the
+factor.
+
+A wrong code is refused with `CodeMismatchException` and leaves the challenge standing, so the user
+can be asked to type it again. Every session lasts three minutes, which is what real Cognito gives
+an app client that names no `AuthSessionValidity` of its own, and that input is refused here. A
+session that has run out, one already spent, and one issued for a different challenge are each
+refused with `NotAuthorizedException`.
+
+`PostAuthentication` runs where the tokens are issued, which is the response rather than the sign-in
+that was challenged. `PreTokenGeneration` runs there too, reporting
+`TokenGeneration_Authentication`, including for a sign-in that answered the new password challenge
+before this one; which source real Cognito reports for that pair of challenges was not checked
+against a live account.
+
+A user with both factors enabled and neither preferred is refused: real Cognito answers that
+sign-in with `SELECT_MFA_TYPE`, which is a challenge of its own. `SetUserMFAPreference` naming one
+of them as `PreferredMfa` is what settles it.
+
+```typescript sim-cognito-mfa-sign-in
+/**
+ * Signing in with a code texted to the user's phone.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
+  SetUserMFAPreferenceCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    MfaConfiguration: "OPTIONAL",
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const ClientId = appClient.UserPoolClient!.ClientId!;
+
+// The code has somewhere to go, which is what enabling SMS_MFA needs.
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    UserAttributes: [{ Name: "phone_number", Value: "+441632960123" }],
+  }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const signIn = new InitiateAuthCommand({
+  ClientId,
+  AuthFlow: "USER_PASSWORD_AUTH",
+  AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+});
+
+// This sign-in is not challenged: the user has registered no factor yet.
+const first = await cognito.initiateAuth(signIn);
+
+await cognito.setUserMFAPreference(
+  new SetUserMFAPreferenceCommand({
+    AccessToken: first.AuthenticationResult!.AccessToken,
+    SMSMfaSettings: { Enabled: true, PreferredMfa: true },
+  }),
+);
+
+const challenged = await cognito.initiateAuth(signIn);
+
+console.log(challenged.ChallengeName); // "SMS_MFA"
+console.log(challenged.ChallengeParameters?.["CODE_DELIVERY_DESTINATION"]);
+// "+*******0123"
+
+// Nothing is delivered, so the code is read out of the message the pool
+// recorded, as a sign-up confirmation code is.
+const texted = cognito
+  .userPool(userPoolId)
+  .sentMessages()
+  .find((message) => message.occasion === "Authentication");
+const code = /\d{6}/.exec(texted!.body)![0];
+
+const signedIn = await cognito.respondToAuthChallenge(
+  new RespondToAuthChallengeCommand({
+    ClientId,
+    ChallengeName: "SMS_MFA",
+    Session: challenged.Session,
+    ChallengeResponses: { USERNAME: "alice", SMS_MFA_CODE: code },
+  }),
+);
+
+console.log(typeof signedIn.AuthenticationResult?.AccessToken); // "string"
+```
+
 ## Available functionality
 
 Sim Cognito currently supports:
 
 - `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `UpdateUserPoolCommand`,
   `DeleteUserPoolCommand` and `ListUserPoolsCommand`
-- `SetUserPoolMfaConfigCommand` and `GetUserPoolMfaConfigCommand`, which record what a pool offers
-  as a second factor without any sign-in being challenged for one
+- `SetUserPoolMfaConfigCommand` and `GetUserPoolMfaConfigCommand`, which set and read what a pool
+  offers as a second factor
 - `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `UpdateUserPoolClientCommand`,
   `DeleteUserPoolClientCommand` and `ListUserPoolClientsCommand`
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
@@ -3009,6 +3144,9 @@ Sim Cognito currently supports:
 - `AssociateSoftwareTokenCommand`, `VerifySoftwareTokenCommand` and `SetUserMFAPreferenceCommand`,
   which register an authenticator app for the signed-in user, and
   `AdminSetUserMFAPreferenceCommand`, which sets a named user's factors
+- The `SMS_MFA` and `SOFTWARE_TOKEN_MFA` challenges, issued to a user that has registered the
+  factor and answered through `RespondToAuthChallengeCommand` or
+  `AdminRespondToAuthChallengeCommand`, with the texted code recorded as a message on the pool
 - `SignUpCommand`, `ConfirmSignUpCommand` and `ResendConfirmationCodeCommand`, authorized by no IAM
   policy as they are on real Cognito, and `AdminConfirmSignUpCommand`, which is authorized like the
   other admin operations
@@ -3084,9 +3222,9 @@ Current documented limitations:
   `AdminInitiateAuth`, and `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through `InitiateAuth`. SRP,
   `USER_AUTH` choice-based sign-in, custom authentication and device tracking are not simulated, and
   an `AuthFlow` naming one of them is refused rather than run as a flow that is.
-- `NEW_PASSWORD_REQUIRED` is the only challenge issued, so MFA and custom challenges cannot be
-  reached. A `ChallengeName` this simulation does not issue is refused, and a sign-in to a pool
-  whose `MfaConfiguration` is `ON` is refused where the MFA challenge would have been.
+- `NEW_PASSWORD_REQUIRED`, `SMS_MFA` and `SOFTWARE_TOKEN_MFA` are the challenges issued, so
+  `MFA_SETUP`, `SELECT_MFA_TYPE` and the custom authentication challenges cannot be reached. A
+  `ChallengeName` this simulation does not issue is refused rather than answered as one it does.
 - `GetTokensFromRefreshToken` and `RevokeToken` are not implemented, and `RefreshTokenRotation` is
   refused on an app client. Refreshing goes through `REFRESH_TOKEN_AUTH`, which issues no new
   refresh token.
@@ -3194,9 +3332,15 @@ Current documented limitations:
   and sets every attribute the pool holds.
 - `EstimatedNumberOfUsers` is how many users the pool holds now. Real Cognito refreshes that number
   periodically rather than on each write, so it can lag there in a way it never does here.
-- A pool records its `MfaConfiguration` and the factors behind it, a user registers factors of its
-  own, and no sign-in is ever challenged for one yet. A sign-in to a pool configured `ON` is
-  refused, because real Cognito answers every one of those with a challenge.
+- A sign-in by a user of an `ON` pool that has registered no factor is refused, because real Cognito
+  answers that one with the `MFA_SETUP` challenge, which registers a factor mid-sign-in and is not
+  simulated. A user with both factors enabled and neither preferred is refused for the same kind of
+  reason: real Cognito answers that with `SELECT_MFA_TYPE`.
+- An MFA code is texted to the user's `phone_number` whatever the pool's `AutoVerifiedAttributes`
+  say, and the pool records it as a message with an occasion of `Authentication`, which is where a
+  test reads it from. Real Cognito delivers it and reports it to nobody.
+- A `SOFTWARE_TOKEN_MFA` challenge carries no `FRIENDLY_DEVICE_NAME` in its `ChallengeParameters`,
+  because no device is remembered here.
 - A user's software token secret is a real RFC 6238 shared secret, and the pool reports the code the
   user's authenticator app would be showing through `SimCognitoUserPool.softwareTokenCode`. Real
   Cognito reports that to nobody: the code is on the user's own device, in the way a confirmation

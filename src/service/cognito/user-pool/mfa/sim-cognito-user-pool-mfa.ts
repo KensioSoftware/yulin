@@ -99,10 +99,10 @@ function smsIn(
  * also why an update replaces the challenging and leaves the factors where they
  * were.
  *
- * Nothing here challenges for a factor, so this is state a pool reports rather
- * than acts on. The one place it is read is a sign-in to a pool configured
- * `ON`, which real Cognito answers with a challenge and this simulation
- * refuses.
+ * A sign-in reads this to decide whether the user owes a second factor, and
+ * `GetUserPoolMfaConfig` reports it. The factors it lists are what a pool
+ * offers rather than what any one user registered: a challenge is issued for
+ * the factor the user itself enabled.
  */
 export class SimCognitoUserPoolMfa {
   #configuration: SimCognitoMfaConfiguration;

@@ -16,6 +16,7 @@ import {
   CreateUserPoolCommand,
   SignUpCommand,
   type SignUpCommandInput,
+  type UserPoolMfaType,
   type VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
@@ -94,6 +95,9 @@ export interface SimCognitoTriggerPoolInput {
   readonly autoVerifiedAttributes?:
     | readonly VerifiedAttributeType[]
     | undefined;
+
+  /** What the pool asks of a second factor, `OFF` by default. */
+  readonly mfaConfiguration?: UserPoolMfaType | undefined;
 }
 
 /**
@@ -156,6 +160,9 @@ export async function makeTriggerPool(
       LambdaConfig: input.triggers,
       ...(input.autoVerifiedAttributes !== undefined && {
         AutoVerifiedAttributes: [...input.autoVerifiedAttributes],
+      }),
+      ...(input.mfaConfiguration !== undefined && {
+        MfaConfiguration: input.mfaConfiguration,
       }),
     }),
   );

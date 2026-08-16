@@ -24,10 +24,10 @@ interface SimCognitoUserMfaProperties {
 /**
  * The second factors one simulated user has registered.
  *
- * Registering one and being challenged for it are separate: this is what
- * `AssociateSoftwareToken`, `VerifySoftwareToken` and the two MFA preference
- * operations change, and what `AdminGetUser` and `GetUser` report as
- * `UserMFASettingList` and `PreferredMfaSetting`.
+ * This is what `AssociateSoftwareToken`, `VerifySoftwareToken` and the two MFA
+ * preference operations change, what `AdminGetUser` and `GetUser` report as
+ * `UserMFASettingList` and `PreferredMfaSetting`, and what a sign-in reads to
+ * decide which challenge to answer with.
  *
  * A software token is registered in two steps, as real Cognito registers one:
  * a secret is associated, and a code computed from it shows that the user's
@@ -88,6 +88,26 @@ export class SimCognitoUserMfa {
    */
   get preferred(): string | undefined {
     return this.preference;
+  }
+
+  /**
+   * The factor a sign-in would be challenged for, and nothing where this user
+   * has none to be challenged for.
+   *
+   * A user with one factor enabled is challenged for it whether or not it
+   * named a preference, and a user with two is challenged for the one it
+   * preferred. Real Cognito answers a user with two and no preference with
+   * `SELECT_MFA_TYPE`, which is a challenge of its own, so there is nothing to
+   * choose here and the caller says so.
+   */
+  get challengeFactor(): string | undefined {
+    if (this.preference !== undefined) {
+      return this.preference;
+    }
+
+    const enabled = this.settings;
+
+    return enabled.length === 1 ? enabled[0] : undefined;
   }
 
   /**

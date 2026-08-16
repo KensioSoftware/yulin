@@ -306,20 +306,20 @@ describe("sim Cognito AdminRespondToAuthChallenge", () => {
     const { cognito, userPoolId, clientId, session } =
       await simCognitoChallenged();
 
-    // When an SMS challenge is answered instead.
+    // When a challenge nothing here issues is answered instead.
     const error = await assertThrowsErrorAsync(async () => {
       await cognito.adminRespondToAuthChallenge(
         new AdminRespondToAuthChallengeCommand({
           UserPoolId: userPoolId,
           ClientId: clientId,
-          ChallengeName: "SMS_MFA",
+          ChallengeName: "MFA_SETUP",
           Session: session,
-          ChallengeResponses: { USERNAME: "alice", SMS_MFA_CODE: "123456" },
+          ChallengeResponses: { USERNAME: "alice" },
         }),
       );
     });
 
-    // Then it is refused rather than treated as the one challenge simulated.
+    // Then it is refused rather than treated as one of the simulated ones.
     assertStringIncludes(error.message, "is not simulated");
   });
 });
