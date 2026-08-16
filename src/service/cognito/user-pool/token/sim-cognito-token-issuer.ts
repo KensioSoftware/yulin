@@ -187,6 +187,10 @@ export class SimCognitoTokenIssuer {
         clientId: client.id,
         issuedAt,
         expiresAt: accessTokenExpiresAt,
+        // The pool records what the token carries, because an operation a user
+        // performs on itself is refused unless the scope allows it, and the
+        // record is what the pool reads rather than the signed claims.
+        scopes: properties.scopes,
       }),
     );
 

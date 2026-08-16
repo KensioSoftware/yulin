@@ -138,7 +138,7 @@ registers it.
 `SimCognitoSoftwareToken` is one shared secret, and `sim-cognito-totp.ts` computes the code from it.
 The codes are real RFC 6238 time-based one-time passwords rather than a stand-in, so an
 authenticator library handed the `SecretCode` produces codes this accepts, and a secret from another
-registration is refused. A code either side of the current thirty second step is accepted, which is
+registration is refused. A code either side of the current thirty-second step is accepted, which is
 what stops a code computed a moment before the request being refused for crossing a step boundary.
 
 `SimCognitoConfirmationCode` is the six-digit code a signed-up user is issued. A user gets one when
@@ -516,7 +516,10 @@ command instances.
 
 `InitiateAuth`, `RespondToAuthChallenge`, `GlobalSignOut`, `SignUp`, `ConfirmSignUp`,
 `ResendConfirmationCode`, `GetUser`, `AssociateSoftwareToken`, `VerifySoftwareToken` and
-`SetUserMFAPreference` authorize nothing, and read no caller. Real Cognito evaluates no IAM policy
+`SetUserMFAPreference` authorize nothing, and read no caller. What the last four and `GlobalSignOut`
+do check is the access token's own scope, in `requireSimCognitoSelfService`: real Cognito refuses an
+operation a user performs on itself unless the token carries
+`aws.cognito.signin.user.admin`, which a hosted sign-in has only where the app client asked for it. Real Cognito evaluates no IAM policy
 for them: they are what an application calls on behalf of a user, holding no AWS credentials at all. Authorizing them here would pass code that a real
 deployment refuses, and refuse code that really works.
 

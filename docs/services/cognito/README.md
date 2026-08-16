@@ -2754,6 +2754,12 @@ A user registers an authenticator app in the three steps Cognito's own documenta
 administrator names, and `AdminGetUser` and `GetUser` report the result as `UserMFASettingList` and
 `PreferredMfaSetting`.
 
+Each of those, and `GetUser`, is authorized by the user's own access token rather than by any IAM
+policy, and the token has to carry the `aws.cognito.signin.user.admin` scope. A sign-in through the
+API always carries it. A sign-in at the hosted domain carries it only where the app client asked for
+it among its `AllowedOAuthScopes`, so a browser sign-in granted `openid email` alone is refused with
+`NotAuthorizedException`, as real Cognito refuses one. `GlobalSignOut` is held to the same rule.
+
 The `SecretCode` is a real RFC 6238 shared secret, so an authenticator app or any TOTP library given
 it produces the codes `VerifySoftwareToken` accepts, and a code from another secret is refused with
 `EnableSoftwareTokenMFAException`. A test that would rather not compute one reads the code the

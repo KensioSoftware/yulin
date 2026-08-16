@@ -34,7 +34,7 @@ const secretCharacters = 32;
  * than read off the pool.
  *
  * This is what any TOTP library does with the `SecretCode`: decode the base32,
- * hash the thirty second step, and truncate. It is written out in the test so
+ * hash the thirty-second step, and truncate. It is written out in the test so
  * that the secret being a real RFC 6238 shared secret is asserted rather than
  * assumed.
  */

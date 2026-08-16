@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 /**
  * The time-based one-time password an authenticator app computes, as RFC 6238
  * defines it and as Cognito reads one: six digits from an HMAC-SHA1 of the
- * thirty second step the shared secret is being read at.
+ * thirty-second step the shared secret is being read at.
  *
  * It is computed rather than stood in for, so the secret a pool hands out is a
  * real shared secret: code that pairs it with a QR code and a TOTP library

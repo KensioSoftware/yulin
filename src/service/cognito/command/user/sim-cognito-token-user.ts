@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
 import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
+import { requireSimCognitoSelfService } from "./sim-cognito-self-service-scope.js";
 import type { SimCognitoUserInPool } from "../sim-cognito-request-resolver.js";
 
 interface SimCognitoTokenUserProperties {
@@ -18,6 +19,12 @@ interface SimCognitoTokenUserProperties {
  * policy for these, because they are what an application calls on behalf of
  * someone signed in, holding no AWS credentials at all. It also says which
  * pool the request is for, so none of them names one.
+ *
+ * The token has to carry `aws.cognito.signin.user.admin` for that, which one
+ * from an API sign-in always does and one from a hosted sign-in does only
+ * where the app client asked for the scope. Real Cognito refuses the rest, so
+ * a hosted token granted `openid email` alone is refused here rather than
+ * being let through to fail in a deployment.
  */
 export class SimCognitoTokenUser {
   private readonly pools: SimCognitoUserPoolStore;
@@ -46,6 +53,8 @@ export class SimCognitoTokenUser {
       accessToken,
       this.clock.now(),
     );
+
+    requireSimCognitoSelfService(token, operation);
 
     return {
       pool,
