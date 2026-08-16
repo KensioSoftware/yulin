@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-identity.js";
+import type { SimCognitoUserPoolSchema } from "../schema/sim-cognito-user-pool-schema.js";
 import { SimCognitoPasswordCheck } from "../sim-cognito-password-check.js";
 import type { SimCognitoPasswordPolicy } from "../sim-cognito-password-policy.js";
 import {
@@ -16,10 +17,18 @@ interface SimCognitoUserFactoryProperties {
   readonly clock: SimClock;
 }
 
-interface SimCognitoMakeUserProperties {
+interface SimCognitoNewUserProperties {
   readonly username: SimCognitoUsername;
   readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
 
+  /**
+   * The schema of the pool the user is going into, which decides which
+   * attributes it may be given and what each of them may hold.
+   */
+  readonly schema: SimCognitoUserPoolSchema;
+}
+
+interface SimCognitoMakeUserProperties extends SimCognitoNewUserProperties {
   /**
    * The password the user starts with, checked here against the pool's policy.
    * A user made without one has no password at all.
@@ -30,18 +39,12 @@ interface SimCognitoMakeUserProperties {
   readonly passwordPolicy: SimCognitoPasswordPolicy;
 }
 
-interface SimCognitoFederatedUserProperties {
-  readonly username: SimCognitoUsername;
-  readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
-
+interface SimCognitoFederatedUserProperties extends SimCognitoNewUserProperties {
   /** Which provider signed the user in, and which subject it signed in as. */
   readonly identity: SimCognitoFederatedIdentity;
 }
 
-interface SimCognitoSignUpUserProperties {
-  readonly username: SimCognitoUsername;
-  readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
-
+interface SimCognitoSignUpUserProperties extends SimCognitoNewUserProperties {
   /**
    * The password the user chose, checked here against the pool's policy. It is
    * the user's own rather than a temporary one, so the user signs in with it
@@ -95,7 +98,10 @@ export class SimCognitoUserFactory {
     return new SimCognitoUser({
       username: properties.username,
       sub: randomUUID(),
-      attributes: new SimCognitoUserAttributes(properties.attributes),
+      attributes: new SimCognitoUserAttributes({
+        schema: properties.schema,
+        requested: properties.attributes,
+      }),
       password: SimCognitoUserFactory.passwordFor(
         "TemporaryPassword",
         properties.temporaryPassword,
@@ -116,7 +122,10 @@ export class SimCognitoUserFactory {
     return new SimCognitoUser({
       username: properties.username,
       sub: randomUUID(),
-      attributes: new SimCognitoUserAttributes(properties.attributes),
+      attributes: new SimCognitoUserAttributes({
+        schema: properties.schema,
+        requested: properties.attributes,
+      }),
       status: SimCognitoUserStatus.externalProvider,
       identity: properties.identity,
       clock: this.clock,
@@ -133,7 +142,10 @@ export class SimCognitoUserFactory {
     return new SimCognitoUser({
       username: properties.username,
       sub: randomUUID(),
-      attributes: new SimCognitoUserAttributes(properties.attributes),
+      attributes: new SimCognitoUserAttributes({
+        schema: properties.schema,
+        requested: properties.attributes,
+      }),
       // The password a user chose is required, where the temporary one an
       // administrator gives is not.
       password: new SimCognitoUserPassword(

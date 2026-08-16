@@ -59,6 +59,21 @@ export {
   SimCognitoUserAttributes,
   type SimCognitoAttributeType,
 } from "./user-pool/user/sim-cognito-user-attributes.js";
+export { SimCognitoUserPoolSchema } from "./user-pool/schema/sim-cognito-user-pool-schema.js";
+export {
+  SimCognitoSchemaAttribute,
+  type SimCognitoSchemaAttributeType,
+} from "./user-pool/schema/sim-cognito-schema-attribute.js";
+export type {
+  SimCognitoAttributeConstraints,
+  SimCognitoAttributeConstraintsType,
+  SimCognitoNumberAttributeConstraintsType,
+  SimCognitoStringAttributeConstraintsType,
+} from "./user-pool/schema/sim-cognito-attribute-constraints.js";
+export {
+  SimCognitoAttributeDataType,
+  type SimCognitoAttributeDataTypeValue,
+} from "./user-pool/schema/sim-cognito-attribute-data-type.js";
 export {
   SimCognitoOAuthSettings,
   type SimCognitoOAuthSettingsType,

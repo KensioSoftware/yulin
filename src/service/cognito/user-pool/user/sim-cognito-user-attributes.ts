@@ -1,5 +1,6 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
-import { isSimCognitoStandardAttribute } from "./sim-cognito-standard-attributes.js";
+import type { SimCognitoSchemaAttribute } from "../schema/sim-cognito-schema-attribute.js";
+import type { SimCognitoUserPoolSchema } from "../schema/sim-cognito-user-pool-schema.js";
 
 /**
  * One user attribute, in the shape Cognito reads and reports it.
@@ -11,63 +12,44 @@ export interface SimCognitoAttributeType {
   readonly Value?: string | undefined;
 }
 
-const maxAttributeValueLength = 2048;
+interface SimCognitoUserAttributesProperties {
+  /** The schema of the pool the user belongs to, which every write is held to. */
+  readonly schema: SimCognitoUserPoolSchema;
+
+  /** The attributes the request creating the user set. */
+  readonly requested?: readonly SimCognitoAttributeType[] | undefined;
+}
 
 /**
  * The attributes held on one simulated user.
  *
  * Attribute names are checked against the pool's schema rather than stored as
  * written, because real Cognito refuses an attribute its schema does not hold.
- * A pool created here has the standard schema and nothing else, so a
- * `custom:` attribute is refused the same way it would be on a real pool
- * created without it.
+ * A pool created without a `Schema` of its own has the standard attributes and
+ * nothing else, so a `custom:` attribute is refused there exactly as it would
+ * be on a real pool created the same way.
+ *
+ * The schema decides more than the name: what kind of value the attribute
+ * holds, how long or how large it may be, and whether a user that already has
+ * it can be given another value.
  *
  * `sub` is not among them. Cognito allocates it, and a request setting it is
  * refused, so it lives on the user rather than in its attributes.
  */
 export class SimCognitoUserAttributes {
   private readonly byName = new Map<string, string>();
+  private readonly schema: SimCognitoUserPoolSchema;
 
-  constructor(requested?: readonly SimCognitoAttributeType[]) {
-    this.update(requested);
-  }
-
-  private static requireName(name: string | undefined): string {
-    if (name === undefined || name === "") {
-      throw new SimCognitoInvalidParameterException(
-        "A user attribute needs a Name saying which attribute it sets",
-      );
-    }
-
-    if (name === "sub") {
-      throw new SimCognitoInvalidParameterException(
-        "User attribute 'sub' is read-only: Cognito allocates a user's sub " +
-          "when the user is created, and a request cannot set it",
-      );
-    }
-
-    if (!isSimCognitoStandardAttribute(name)) {
-      throw new SimCognitoInvalidParameterException(
-        `User attribute '${name}' is not in the pool's schema: a pool here ` +
-          `holds the standard attributes only, because CreateUserPool ` +
-          `refuses a Schema of its own, so custom attributes cannot exist`,
-      );
-    }
-
-    return name;
+  constructor(properties: SimCognitoUserAttributesProperties) {
+    this.schema = properties.schema;
+    this.update(properties.requested);
+    this.schema.requireEveryRequired(new Set(this.byName.keys()));
   }
 
   private static requireValue(name: string, value: string | undefined): string {
     if (value === undefined) {
       throw new SimCognitoInvalidParameterException(
         `User attribute '${name}' needs a Value`,
-      );
-    }
-
-    if (value.length > maxAttributeValueLength) {
-      throw new SimCognitoInvalidParameterException(
-        `User attribute '${name}' is longer than the ` +
-          `${String(maxAttributeValueLength)} characters Cognito allows`,
       );
     }
 
@@ -119,12 +101,57 @@ export class SimCognitoUserAttributes {
     }
 
     for (const attribute of requested) {
-      const name = SimCognitoUserAttributes.requireName(attribute.Name);
+      this.write(attribute);
+    }
+  }
 
-      this.byName.set(
-        name,
-        SimCognitoUserAttributes.requireValue(name, attribute.Value),
+  /**
+   * Write one attribute, holding it to everything the schema says about it.
+   *
+   * An attribute the user already has is a change rather than a first value,
+   * and the schema is what says whether a change is allowed at all.
+   */
+  private write(requested: SimCognitoAttributeType): void {
+    const attribute = this.requireInSchema(requested.Name);
+    const value = SimCognitoUserAttributes.requireValue(
+      attribute.name,
+      requested.Value,
+    );
+
+    if (this.byName.has(attribute.name)) {
+      attribute.requireMutable();
+    }
+
+    attribute.requireValue(value);
+    this.byName.set(attribute.name, value);
+  }
+
+  /**
+   * The schema attribute a request names, or a refusal saying why the pool has
+   * no such attribute.
+   */
+  private requireInSchema(name: string | undefined): SimCognitoSchemaAttribute {
+    if (name === undefined || name === "") {
+      throw new SimCognitoInvalidParameterException(
+        "A user attribute needs a Name saying which attribute it sets",
       );
     }
+
+    if (name === "sub") {
+      throw new SimCognitoInvalidParameterException(
+        "User attribute 'sub' is read-only: Cognito allocates a user's sub " +
+          "when the user is created, and a request cannot set it",
+      );
+    }
+
+    const attribute = this.schema.find(name);
+
+    if (attribute === undefined) {
+      throw new SimCognitoInvalidParameterException(
+        `User attribute '${name}' is not in the pool's schema: ${this.schema.describeHolding()}`,
+      );
+    }
+
+    return attribute;
   }
 }

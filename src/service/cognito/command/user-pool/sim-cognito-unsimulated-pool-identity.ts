@@ -5,12 +5,13 @@ import type { SimCreateUserPoolCommandInput } from "./user-pool.command.js";
 /**
  * Refuses the inputs deciding how a pool identifies its users.
  *
- * These four are `CreateUserPool` inputs only. Real Cognito fixes each of
+ * These three are `CreateUserPool` inputs only. Real Cognito fixes each of
  * them when the pool is made and has no `UpdateUserPool` input for any of
  * them, so the refusals only ever name creation.
  *
- * `UsernameAttributes` is the one that would hurt most, and it gets its own
- * refusal saying why.
+ * `Schema` is the fourth such input and is not refused: a pool takes the
+ * attributes it declares. `UsernameAttributes` is the one that would hurt
+ * most, and it gets its own refusal saying why.
  */
 export class SimCognitoUnsimulatedUserPoolIdentity {
   private readonly unsimulated = new SimCognitoUnsimulatedInput(
@@ -28,7 +29,6 @@ export class SimCognitoUnsimulatedUserPoolIdentity {
       input.AliasAttributes,
       "sign-in aliases",
     );
-    this.unsimulated.refuse("Schema", input.Schema, "custom attributes");
     this.unsimulated.refuse(
       "UsernameConfiguration",
       input.UsernameConfiguration,

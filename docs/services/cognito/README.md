@@ -158,8 +158,120 @@ Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, 
 `AdminDisableUser` sets `Enabled` to `false` without changing the user's status, and
 `AdminEnableUser` sets it back.
 
-Only the standard attributes exist. A pool here is created without a `Schema` of its own, so a
-`custom:` attribute is refused, as it would be on a real pool created the same way.
+## Custom attributes
+
+A pool holds the standard OpenID Connect attributes, and the ones its `Schema` declares beside them.
+A custom attribute is the ordinary way to hold an application's own identifier for a user: a `sub`
+belongs to the pool that issued it, so keying application data on one welds that data to a pool that
+cannot be moved.
+
+Cognito prefixes an attribute a pool declares with `custom:`, so a `Schema` naming `userId` is
+written and read as `custom:userId`.
+
+```typescript sim-cognito-custom-attributes
+/**
+ * A user pool holding an application's own identifier for a user.
+ */
+
+import {
+  AdminGetUserCommand,
+  AdminUpdateUserAttributesCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  DescribeUserPoolCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    Schema: [
+      // Immutable, because this is the identifier the application keys its own
+      // data on: Cognito takes it when the user is created and refuses every
+      // write after that.
+      { Name: "userId", AttributeDataType: "String", Mutable: false },
+      {
+        Name: "seats",
+        AttributeDataType: "Number",
+        Mutable: true,
+        NumberAttributeConstraints: { MinValue: "1", MaxValue: "10" },
+      },
+    ],
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [
+      { Name: "custom:userId", Value: "usr_01H8" },
+      { Name: "custom:seats", Value: "3" },
+    ],
+  }),
+);
+
+const user = await cognito.adminGetUser(
+  new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+
+console.log(user.UserAttributes?.find((each) => each.Name === "custom:userId"));
+// { Name: "custom:userId", Value: "usr_01H8" }
+
+// A mutable attribute changes.
+await cognito.adminUpdateUserAttributes(
+  new AdminUpdateUserAttributesCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    UserAttributes: [{ Name: "custom:seats", Value: "7" }],
+  }),
+);
+
+// The pool reports its whole schema, the standard attributes included.
+const described = await cognito.describeUserPool(
+  new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+);
+
+console.log(
+  described.UserPool?.SchemaAttributes?.map((attribute) => attribute.Name),
+);
+// [ "sub", "address", ..., "custom:userId", "custom:seats" ]
+```
+
+The declaration is held to what real Cognito accepts, so a pool that could not have been created on
+AWS is not created here. A `Required` custom attribute, a `DeveloperOnlyAttribute`, a name longer
+than 20 characters, a name already carrying its own `custom:` prefix, and an attribute type Cognito
+does not have are each refused, saying why.
+
+What an attribute may hold is held to the schema too. A `Number` attribute refuses a value that is
+not a number and one outside its `NumberAttributeConstraints`, a `String` attribute refuses a value
+outside its `StringAttributeConstraints`, and an attribute the schema declares `Mutable: false`
+refuses a second value on a user that already has it. An attribute no schema declares is refused,
+saying which ones the pool does hold.
+
+A `Schema` can also redeclare a standard attribute, which is what a CDK `UserPool` emits for its
+`standardAttributes`. That is how a pool makes `email` required, and a user created without a
+required attribute is refused. Cognito defaults `Mutable` to `false` in a declaration, so a
+redeclared standard attribute is fixed unless the declaration says otherwise.
+
+A pool's schema is settled when the pool is created. `UpdateUserPool` has no `Schema` input on real
+Cognito, so a request carrying one here is refused rather than replacing the attributes of a pool
+that already has users written against them. Real Cognito adds one with `AddCustomAttributes`, which
+is not simulated.
 
 ## Signing up
 
@@ -2242,11 +2354,13 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 The properties each type reads are the ones this simulation models:
 
 - `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `LambdaConfig`,
-  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `MfaConfiguration`, `EnabledMfas`,
+  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `Schema`, `MfaConfiguration`, `EnabledMfas`,
   `UserPoolTier`, `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
   `SmsVerificationMessage` and `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a
   time, so a template naming a trigger this simulation runs deploys and one naming a trigger it
-  does not fails the stack. `MfaConfiguration` and `EnabledMfas` are deployed in a
+  does not fails the stack. `Schema` is what a CDK `UserPool` emits for its `customAttributes` and
+  its `standardAttributes`, so a stack keying its own data on a `custom:` attribute deploys and the
+  sign-up it was built for works. `MfaConfiguration` and `EnabledMfas` are deployed in a
   `SetUserPoolMfaConfig` call once the pool exists, which is how real CloudFormation deploys them
   and why a stack declaring MFA needs `cognito-idp:SetUserPoolMfaConfig` on its execution role. A
   template asking for neither makes no such call. The last five are accepted at one value each and
@@ -2771,6 +2885,9 @@ Sim Cognito currently supports:
 - `AutoVerifiedAttributes`, so confirming a sign-up sets `email_verified` or
   `phone_number_verified`, and `AdminCreateUserConfig.AllowAdminCreateUserOnly`, which refuses
   `SignUp` against a pool created with it
+- A pool's `Schema`, so a `custom:` attribute is set and read on its users, held to the type, the
+  bounds and the mutability it was declared with, and reported as `SchemaAttributes` alongside the
+  standard attributes
 - `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
   `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
   `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
@@ -2936,9 +3053,12 @@ Current documented limitations:
   `cognito:roles` and `cognito:preferred_role` claims, which are not simulated yet, and identity
   pools, which are not simulated at all.
 - Group to IAM role mapping is an identity pool feature and is not simulated.
-- Only the standard user attributes exist, because a pool is created without a `Schema`. A `custom:`
-  attribute is refused, and so is a request setting `sub`. `AdminDeleteUserAttributes` is not
-  implemented, so an attribute can be changed but not removed.
+- A pool holds the standard user attributes and the ones its `Schema` declared, and an attribute no
+  schema declares is refused, as is a request setting `sub`. A `DeveloperOnlyAttribute` is refused,
+  because a `dev:` attribute needs the developer credentials that read and write it.
+  `AdminDeleteUserAttributes` is not implemented, so an attribute can be changed but not removed.
+  An app client's `ReadAttributes` and `WriteAttributes` are refused, so every client of a pool sees
+  and sets every attribute the pool holds.
 - `EstimatedNumberOfUsers` is how many users the pool holds now. Real Cognito refreshes that number
   periodically rather than on each write, so it can lag there in a way it never does here.
 - A pool records its `MfaConfiguration` and the factors behind it, and no sign-in is ever challenged
@@ -2958,8 +3078,9 @@ Current documented limitations:
   `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes`, `LambdaConfig`,
   `MfaConfiguration` and the verification wording. An update carries no factor configuration, so the
   factors a `SetUserPoolMfaConfig` request set are left alone, as real Cognito leaves them.
-  `PoolName` is refused, so a pool cannot be renamed, and every input `CreateUserPool` refuses is
-  refused here too, in the same words.
+  `PoolName` is refused, so a pool cannot be renamed, a `Schema` is refused because real
+  `UpdateUserPool` has no such input, and every input `CreateUserPool` refuses is refused here too,
+  in the same words.
 - `UpdateUserPoolClient` replaces an app client's settings the same way, so a setting the request
   leaves out goes back to the default `CreateUserPoolClient` would have given it. `ClientName` is
   the exception: a client has to have a name and there is no default to reset to, so an update that
@@ -3016,7 +3137,7 @@ Current documented limitations:
   `AdminCreateUser`, as real Cognito does for an admin operation, and names the app client for the
   two occasions that come through one.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
-  `AliasAttributes`, `Schema`, `UsernameConfiguration`,
+  `AliasAttributes`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
@@ -3044,8 +3165,9 @@ Current documented limitations:
 - Unsimulated authentication inputs are refused the same way: `AnalyticsMetadata` on all four
   operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
   on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow neither of them starts.
-- A pool does not report `SchemaAttributes`. Real Cognito reports the standard attribute schema on
-  every pool, and there are no user attributes here to describe.
+- A pool's schema is settled when the pool is created. `AddCustomAttributes` is not implemented, and
+  an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
+  such input.
 - Managed login and the classic hosted UI are pages a person fills in, and are not simulated. An
   authorize request naming no `identity_provider`, or naming `COGNITO`, would reach one of those
   pages on real Cognito and is refused here with a message saying so. The pool's own users sign in

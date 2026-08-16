@@ -114,6 +114,11 @@ export class SimCognitoUserPoolCommands {
     // SetUserPoolMfaConfig request configured survive it, as they do on real
     // Cognito.
     settings.mfa.keepFactorsOf(pool.settings.mfa);
+
+    // An update declares no schema, and one that tried was refused above, so
+    // the pool keeps the attributes it was created with rather than dropping
+    // back to the standard ones.
+    settings.keepSchemaOf(pool.settings);
     pool.update(settings);
 
     return { $metadata: {} };

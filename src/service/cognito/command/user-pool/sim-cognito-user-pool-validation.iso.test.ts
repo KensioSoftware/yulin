@@ -65,11 +65,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "sign-in aliases",
   },
   {
-    label: "Schema",
-    input: { Schema: [{ Name: "tenant", AttributeDataType: "String" }] },
-    says: "custom attributes",
-  },
-  {
     label: "UsernameConfiguration",
     input: { UsernameConfiguration: { CaseSensitive: false } },
     says: "case-insensitive usernames",

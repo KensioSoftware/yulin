@@ -1,4 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
+import type { SimCognitoUserPoolSchema } from "../schema/sim-cognito-user-pool-schema.js";
 import {
   SimCognitoAttributeMapping,
   type SimCognitoAttributeMappingType,
@@ -36,6 +37,10 @@ export interface SimCognitoIdentityProviderSettingsInput {
  * `CreateIdentityProvider` builds one of these from its request. The provider
  * name is among them although an update cannot change it, because the name is
  * what the update names the provider by and the settings are what hold it.
+ *
+ * The pool's schema comes in alongside the request because the attribute
+ * mapping is checked against it: a claim can only be mapped onto an attribute
+ * the pool holds.
  */
 export class SimCognitoIdentityProviderSettings {
   public readonly name: string;
@@ -44,7 +49,10 @@ export class SimCognitoIdentityProviderSettings {
   public readonly attributeMapping: SimCognitoAttributeMapping;
   public readonly idpIdentifiers: readonly string[];
 
-  constructor(input: SimCognitoIdentityProviderSettingsInput) {
+  constructor(
+    input: SimCognitoIdentityProviderSettingsInput,
+    schema: SimCognitoUserPoolSchema,
+  ) {
     this.name = SimCognitoIdentityProviderSettings.requiredName(
       input.ProviderName,
     );
@@ -55,6 +63,7 @@ export class SimCognitoIdentityProviderSettings {
     );
     this.attributeMapping = new SimCognitoAttributeMapping(
       input.AttributeMapping,
+      schema,
     );
     this.idpIdentifiers = [...(input.IdpIdentifiers ?? [])];
   }

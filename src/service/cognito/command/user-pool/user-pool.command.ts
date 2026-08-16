@@ -3,6 +3,7 @@ import type { SimCognitoAdminCreateUserConfigType } from "../../user-pool/sim-co
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
 import type { SimCognitoVerificationMessagesType } from "../../user-pool/message/sim-cognito-verification-messages.js";
 import type { SimCognitoUnsimulatedPoolSettingsType } from "../../user-pool/sim-cognito-unsimulated-pool-settings.js";
+import type { SimCognitoSchemaAttributeType } from "../../user-pool/schema/sim-cognito-schema-attribute.js";
 import type { SimCognitoUserPoolSettingsInput } from "../../user-pool/sim-cognito-user-pool-settings.js";
 import type { SimCognitoLambdaConfigType } from "../../user-pool/trigger/sim-cognito-lambda-config.js";
 
@@ -11,7 +12,7 @@ import type { SimCognitoLambdaConfigType } from "../../user-pool/trigger/sim-cog
  *
  * Only the properties this simulation models appear, alongside the ones it
  * accepts without acting on and reports back so a request's intent stays
- * visible. Real Cognito reports more, including the pool's schema attributes.
+ * visible.
  *
  * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_UserPoolType.html
  */
@@ -30,6 +31,9 @@ export interface SimCognitoUserPoolType
     | SimCognitoAdminCreateUserConfigType
     | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
+  readonly SchemaAttributes?:
+    | readonly SimCognitoSchemaAttributeType[]
+    | undefined;
   readonly EstimatedNumberOfUsers?: number | undefined;
   readonly CreationDate?: Date | undefined;
   readonly LastModifiedDate?: Date | undefined;
@@ -59,16 +63,18 @@ export interface SimCognitoUserPoolCommandInput extends SimCognitoUserPoolSettin
 /**
  * The CreateUserPool inputs this simulation reads, and the ones it refuses.
  *
- * The four beside the shared ones are the inputs only a creation carries.
+ * The three beside the shared ones are the inputs only a creation carries.
  * They decide how a pool identifies its users, and none of them can be
  * changed afterwards on real Cognito either.
+ *
+ * `Schema` is a creation-only input too, and is named among the shared
+ * settings because it is a pool's schema that is built from it.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/CreateUserPoolCommand/
  */
 export interface SimCreateUserPoolCommandInput extends SimCognitoUserPoolCommandInput {
   readonly PoolName?: string | undefined;
   readonly AliasAttributes?: readonly string[] | undefined;
-  readonly Schema?: readonly object[] | undefined;
   readonly UsernameAttributes?: readonly string[] | undefined;
   readonly UsernameConfiguration?: object | undefined;
 }
