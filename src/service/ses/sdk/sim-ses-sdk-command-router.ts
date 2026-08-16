@@ -14,6 +14,13 @@ import type {
   SimListEmailIdentitiesCommand,
 } from "../command/identity/identity.command.js";
 import type { SimSendEmailCommand } from "../command/send/send.command.js";
+import type {
+  SimCreateEmailTemplateCommand,
+  SimDeleteEmailTemplateCommand,
+  SimGetEmailTemplateCommand,
+  SimListEmailTemplatesCommand,
+  SimUpdateEmailTemplateCommand,
+} from "../command/template/template.command.js";
 import type { SimSesV2 } from "../sim-ses-v2.js";
 
 /**
@@ -53,6 +60,46 @@ export class SimSesSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSes.deleteEmailIdentity(
             command as SimDeleteEmailIdentityCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateEmailTemplateCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.createEmailTemplate(
+            command as SimCreateEmailTemplateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetEmailTemplateCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.getEmailTemplate(
+            command as SimGetEmailTemplateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateEmailTemplateCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.updateEmailTemplate(
+            command as SimUpdateEmailTemplateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListEmailTemplatesCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.listEmailTemplates(
+            command as SimListEmailTemplatesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteEmailTemplateCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.deleteEmailTemplate(
+            command as SimDeleteEmailTemplateCommand,
             simSdkCallerOptions(context),
           ),
       ],

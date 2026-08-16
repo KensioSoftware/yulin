@@ -3,16 +3,16 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { simSesIdentityArn } from "../../identity/sim-ses-arn.js";
+import { simSesIdentityArn, simSesTemplateArn } from "../../sim-ses-arn.js";
 
 /**
  * The resource an action with no resource type authorizes against.
  *
- * Real SES gives `ses:ListEmailIdentities`, `ses:GetAccount` and
+ * Real SES gives the two listings, `ses:GetAccount` and
  * `ses:PutAccountDetails` no resource type at all, so IAM evaluates them
  * against `*` and only a policy whose Resource is `*` allows them. A policy
- * naming an identity ARN allows none of them, not even one written against
- * every identity in the Account and Region, here as on AWS.
+ * naming an identity or template ARN allows none of them, not even one written
+ * against every identity in the Account and Region, here as on AWS.
  */
 const noResource = "*";
 
@@ -58,6 +58,26 @@ export class SimSesAuthorizer {
     return this.authorizeResource(
       action,
       simSesIdentityArn(this.#accountRegionScope, emailIdentity),
+      caller,
+    );
+  }
+
+  /**
+   * Ensure the caller may perform an action on one email template.
+   *
+   * The template need not exist, for the same reason an identity need not:
+   * real IAM decides a request before the service looks at it, so
+   * CreateEmailTemplate authorizes against the ARN the template is about to
+   * have.
+   */
+  authorizeTemplate(
+    action: string,
+    templateName: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(
+      action,
+      simSesTemplateArn(this.#accountRegionScope, templateName),
       caller,
     );
   }

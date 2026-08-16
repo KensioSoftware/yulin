@@ -13,7 +13,7 @@ export {
   type SimSesIdentityType,
   simSesIdentityType,
 } from "./identity/sim-ses-identity-name.js";
-export { simSesArnPrefix, simSesIdentityArn } from "./identity/sim-ses-arn.js";
+export { simSesArnPrefix, simSesIdentityArn } from "./sim-ses-arn.js";
 export {
   SimSesSentEmail,
   type SimSesSentEmailBody,

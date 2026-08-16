@@ -143,29 +143,6 @@ describe("SimSesV2 SendEmail refusals", () => {
     assertStringIncludes(error.message, "Content.Raw");
   });
 
-  it("refuses template content by name", async () => {
-    // Given a simulated SES that would otherwise accept the message.
-    const ses = await sendingSes();
-
-    // When a message is sent from a template.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.sendEmail(
-        new SendEmailCommand({
-          ...welcome,
-          Content: {
-            Template: {
-              TemplateName: "welcome",
-              TemplateData: '{"name":"Ada"}',
-            },
-          },
-        }),
-      );
-    });
-
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-    assertStringIncludes(error.message, "Content.Template");
-  });
-
   it("refuses a message with attachments", async () => {
     // Given a simulated SES that would otherwise accept the message.
     const ses = await sendingSes();
