@@ -95,19 +95,26 @@ export class SimCognitoUserPoolMfaCommands {
   /**
    * Refuse the factors this simulation has no way to present.
    *
-   * A pool here has neither an `SmsConfiguration` nor an `EmailConfiguration`,
-   * because `CreateUserPool` refuses both, so real Cognito would refuse either
-   * of those factors on a pool built the same way. A passkey is presented
-   * through the `USER_AUTH` flow, which is refused as a flow of its own, so a
-   * pool configured for one here would never be asked for it.
+   * The SNS caller role inside an `SmsMfaConfiguration` is refused in the same
+   * words `CreateUserPool` refuses the pool's own `SmsConfiguration`: nothing
+   * here delivers a message, so a role recorded here would never be assumed.
+   * The factor itself is accepted without one, and the pool records the
+   * message it would have sent in the way it records every other one.
+   *
+   * A pool here has no `EmailConfiguration` either, because `CreateUserPool`
+   * refuses that, so real Cognito would refuse a code sent by email on a pool
+   * built the same way. A passkey is presented through the `USER_AUTH` flow,
+   * which is refused as a flow of its own, so a pool configured for one here
+   * would never be asked for it.
    */
   private refuseUnsimulatedFactors(
     input: SimSetUserPoolMfaConfigCommandInput,
   ): void {
     this.unsimulated.refuse(
-      "SmsMfaConfiguration",
-      input.SmsMfaConfiguration,
-      "a second factor sent by SMS, which needs the pool's SmsConfiguration",
+      "SmsMfaConfiguration.SmsConfiguration",
+      input.SmsMfaConfiguration?.SmsConfiguration,
+      "the IAM role Cognito assumes to send a text message, which no pool " +
+        "here needs because no message is delivered",
     );
     this.unsimulated.refuse(
       "EmailMfaConfiguration",

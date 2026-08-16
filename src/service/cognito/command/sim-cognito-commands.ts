@@ -24,7 +24,9 @@ import { SimCognitoListGroups } from "./group/sim-cognito-list-groups.js";
 import { SimCognitoUserPoolClientCommands } from "./client/sim-cognito-user-pool-client-commands.js";
 import { SimCognitoListUsers } from "./user/sim-cognito-list-users.js";
 import { SimCognitoSignUpCommands } from "./user/sim-cognito-sign-up-commands.js";
+import { SimCognitoTokenUser } from "./user/sim-cognito-token-user.js";
 import { SimCognitoUserCommands } from "./user/sim-cognito-user-commands.js";
+import { SimCognitoUserMfaCommands } from "./user/sim-cognito-user-mfa-commands.js";
 import { SimCognitoRequestResolver } from "./sim-cognito-request-resolver.js";
 import { SimCognitoUserUpdateCommands } from "./user/sim-cognito-user-update-commands.js";
 import { SimCognitoListUserPools } from "./user-pool/sim-cognito-list-user-pools.js";
@@ -54,6 +56,7 @@ export class SimCognitoCommands {
   public readonly clients: SimCognitoUserPoolClientCommands;
   public readonly listClients: SimCognitoListUserPoolClients;
   public readonly users: SimCognitoUserCommands;
+  public readonly userMfa: SimCognitoUserMfaCommands;
   public readonly signUp: SimCognitoSignUpCommands;
   public readonly userUpdates: SimCognitoUserUpdateCommands;
   public readonly listUsers: SimCognitoListUsers;
@@ -83,6 +86,9 @@ export class SimCognitoCommands {
     // One token issuer serves the API sign-ins and the hosted endpoints, so a
     // token is the same thing however the user reached it.
     const tokenIssuer = new SimCognitoTokenIssuer({ clock, triggers });
+    // The operations a signed-in user performs on itself name no pool at all:
+    // the access token is what says which pool the request is for.
+    const tokenUser = new SimCognitoTokenUser({ pools, clock });
 
     this.userPools = new SimCognitoUserPoolCommands({
       pools,
@@ -103,9 +109,15 @@ export class SimCognitoCommands {
     this.listClients = new SimCognitoListUserPoolClients({ pools, authorizer });
     this.users = new SimCognitoUserCommands({
       resolver,
+      tokenUser,
       userFactory,
       triggers,
       messenger,
+    });
+    this.userMfa = new SimCognitoUserMfaCommands({
+      resolver,
+      tokenUser,
+      clock,
     });
     this.signUp = new SimCognitoSignUpCommands({
       authResolver,

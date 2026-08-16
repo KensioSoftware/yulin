@@ -72,8 +72,27 @@ export type {
   SimAdminUpdateUserAttributesCommandOutput,
   SimCognitoAdminUserCommandInput,
   SimCognitoDescribedUser,
+  SimCognitoSelfUser,
+  SimCognitoUserFactors,
   SimCognitoUserType,
 } from "./user/user.command.js";
+export type {
+  SimAdminSetUserMFAPreferenceCommand,
+  SimAdminSetUserMFAPreferenceCommandInput,
+  SimAdminSetUserMFAPreferenceCommandOutput,
+  SimAssociateSoftwareTokenCommand,
+  SimAssociateSoftwareTokenCommandInput,
+  SimAssociateSoftwareTokenCommandOutput,
+  SimGetUserCommand,
+  SimGetUserCommandInput,
+  SimGetUserCommandOutput,
+  SimSetUserMFAPreferenceCommand,
+  SimSetUserMFAPreferenceCommandInput,
+  SimSetUserMFAPreferenceCommandOutput,
+  SimVerifySoftwareTokenCommand,
+  SimVerifySoftwareTokenCommandInput,
+  SimVerifySoftwareTokenCommandOutput,
+} from "./user/user-mfa.command.js";
 export type {
   SimListUsersCommand,
   SimListUsersCommandInput,

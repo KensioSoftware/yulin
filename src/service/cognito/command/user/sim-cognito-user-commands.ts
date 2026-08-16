@@ -7,7 +7,12 @@ import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-user
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { simCognitoValidationData } from "../sim-cognito-validation-data.js";
+import type { SimCognitoTokenUser } from "./sim-cognito-token-user.js";
 import { SimCognitoUserView } from "./sim-cognito-user-view.js";
+import type {
+  SimGetUserCommand,
+  SimGetUserCommandOutput,
+} from "./user-mfa.command.js";
 import type {
   SimAdminCreateUserCommand,
   SimAdminCreateUserCommandOutput,
@@ -19,6 +24,7 @@ import type {
 
 interface SimCognitoUserCommandsProperties {
   readonly resolver: SimCognitoRequestResolver;
+  readonly tokenUser: SimCognitoTokenUser;
   readonly userFactory: SimCognitoUserFactory;
   readonly triggers: SimCognitoUserPoolTriggers;
   readonly messenger: SimCognitoPoolMessenger;
@@ -36,6 +42,7 @@ interface SimCognitoCommandOptions {
  */
 export class SimCognitoUserCommands {
   private readonly resolver: SimCognitoRequestResolver;
+  private readonly tokenUser: SimCognitoTokenUser;
   private readonly userFactory: SimCognitoUserFactory;
   private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly messenger: SimCognitoPoolMessenger;
@@ -44,6 +51,7 @@ export class SimCognitoUserCommands {
 
   constructor(properties: SimCognitoUserCommandsProperties) {
     this.resolver = properties.resolver;
+    this.tokenUser = properties.tokenUser;
     this.userFactory = properties.userFactory;
     this.triggers = properties.triggers;
     this.messenger = properties.messenger;
@@ -134,6 +142,24 @@ export class SimCognitoUserCommands {
     );
 
     return { $metadata: {}, ...this.view.describe(user) };
+  }
+
+  /**
+   * Read the user an access token was issued to.
+   *
+   * This is the client-side read, so the access token is the whole of the
+   * authorization and no IAM policy is evaluated, as real Cognito evaluates
+   * none for it. What it reports is narrower than `AdminGetUser`: the user's
+   * attributes and the factors it has registered, and nothing about its
+   * status.
+   */
+  getUser(command: SimGetUserCommand): SimGetUserCommandOutput {
+    const { user } = this.tokenUser.require(
+      command.input.AccessToken,
+      "GetUser",
+    );
+
+    return { $metadata: {}, ...this.view.self(user) };
   }
 
   /**

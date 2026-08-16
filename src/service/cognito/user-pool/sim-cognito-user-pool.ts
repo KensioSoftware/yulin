@@ -16,9 +16,10 @@ import {
   type SimCognitoUserPoolId,
 } from "./sim-cognito-user-pool-id.js";
 import type { SimCognitoUserPoolSettings } from "./sim-cognito-user-pool-settings.js";
-import {
+import { SimCognitoPoolKeys } from "./token/sim-cognito-pool-keys.js";
+import type {
+  SimCognitoJwks,
   SimCognitoSigningKey,
-  type SimCognitoJwks,
 } from "./token/sim-cognito-signing-key.js";
 import type { SimCognitoUser } from "./user/sim-cognito-user.js";
 import { SimCognitoUserStore } from "./user/sim-cognito-user-store.js";
@@ -64,10 +65,10 @@ export class SimCognitoUserPool {
   private readonly clientStore = new SimCognitoUserPoolClientStore();
   private readonly userStore = new SimCognitoUserStore();
   private readonly groupStore = new SimCognitoGroupStore();
+  private readonly keys = new SimCognitoPoolKeys();
 
   #settings: SimCognitoUserPoolSettings;
   #modifiedDate: Date;
-  #signingKey: SimCognitoSigningKey | undefined;
 
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
@@ -111,29 +112,14 @@ export class SimCognitoUserPool {
     return simCognitoUserPoolProviderName(this.id);
   }
 
-  /**
-   * The key this pool signs its tokens with, generated on first use.
-   *
-   * The key belongs to the pool, as it does on real Cognito, so a token from
-   * one pool does not carry a signature another pool's JWKS can verify.
-   */
+  /** The key this pool signs its tokens with, generated on first use. */
   get signingKey(): SimCognitoSigningKey {
-    this.#signingKey ??= SimCognitoSigningKey.generate();
-
-    return this.#signingKey;
+    return this.keys.signingKey;
   }
 
-  /**
-   * The public keys this pool publishes, in the shape its JWKS endpoint
-   * serves.
-   *
-   * A verifier configured for this pool takes this document and verifies the
-   * pool's tokens with nothing else needed. Real Cognito publishes two keys
-   * and rotates between them, and this publishes one, so code assuming a
-   * single entry passes here and is still wrong against real AWS.
-   */
+  /** The public keys this pool publishes, as its JWKS endpoint serves them. */
   jwks(): SimCognitoJwks {
-    return { keys: [this.signingKey.publicJwk()] };
+    return this.keys.jwks();
   }
 
   /**
@@ -242,13 +228,24 @@ export class SimCognitoUserPool {
   /**
    * The confirmation code a user of this pool has outstanding, if it has one.
    *
-   * This is the simulator's own accessor, for a test that signed a user up:
-   * nothing here delivers a message for one to read the code from. Real
-   * Cognito reports a code to nobody, so this is a deliberate divergence.
+   * This and `softwareTokenCode` are the simulator's own accessors, for a test
+   * that has nowhere else to read a code from: nothing here delivers a message
+   * or holds the user's phone. Real Cognito reports either code to nobody.
    */
   confirmationCode(username: string): string | undefined {
     return this.requireUser(requireSimCognitoUsername(username))
       .confirmationCode;
+  }
+
+  /**
+   * The code a user's authenticator app is showing now, for a user that has
+   * been given a software token secret. A test that would rather compute the
+   * code itself can do so from the `SecretCode`, which is a real shared secret.
+   */
+  softwareTokenCode(username: string): string | undefined {
+    return this.requireUser(requireSimCognitoUsername(username)).mfa.codeAt(
+      this.clock.now(),
+    );
   }
 
   /** Every message this pool would have sent, oldest first. */

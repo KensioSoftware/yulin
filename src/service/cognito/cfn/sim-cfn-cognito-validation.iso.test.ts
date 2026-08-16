@@ -167,8 +167,8 @@ describe("Cognito CloudFormation validation", () => {
   });
 
   it("refuses a second factor the pool could not deliver a message for", async () => {
-    // Given a template asking for MFA over SMS, which needs an SmsConfiguration
-    // that CreateUserPool refuses.
+    // Given a template asking for a code sent by email, which needs an
+    // EmailConfiguration that CreateUserPool refuses.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -178,7 +178,7 @@ describe("Cognito CloudFormation validation", () => {
         Properties: {
           UserPoolName: "myapp-users",
           MfaConfiguration: "OPTIONAL",
-          EnabledMfas: ["SMS_MFA"],
+          EnabledMfas: ["EMAIL_OTP"],
         },
       },
     });
@@ -188,7 +188,7 @@ describe("Cognito CloudFormation validation", () => {
     assertStringIncludes(error.message, "AppPool");
     assertStringIncludes(
       error.message,
-      "SetUserPoolMfaConfig SmsMfaConfiguration is not simulated",
+      "SetUserPoolMfaConfig EmailMfaConfiguration is not simulated",
     );
   });
 

@@ -5,15 +5,21 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   AdminGetUserCommand,
+  AdminSetUserMFAPreferenceCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
+  AssociateSoftwareTokenCommand,
   CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
+  GetUserCommand,
+  InitiateAuthCommand,
   ListUsersCommand,
   ResendConfirmationCodeCommand,
+  SetUserMFAPreferenceCommand,
   SignUpCommand,
+  VerifySoftwareTokenCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
@@ -21,6 +27,7 @@ import {
   assertIdentical,
   assertTrue,
   assertTypeString,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimSdk } from "../../../sdk/index.js";
@@ -165,6 +172,90 @@ describe("Cognito user SDK interception", () => {
           attribute.Name === "email_verified" && attribute.Value === "true",
       ),
     );
+  });
+
+  it("routes every MFA registration Command through the intercepted client", async () => {
+    // Given an intercepted Cognito SDK client with a signed-in user.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    using simSdk = new SimSdk({ simAws });
+    simSdk.intercept(CognitoIdentityProviderClient);
+
+    const client = new CognitoIdentityProviderClient({ region: "eu-west-2" });
+    const pool = await client.send(
+      new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+    );
+    const userPoolId = pool.UserPool?.Id;
+    assertTypeString(userPoolId);
+
+    const appClient = await client.send(
+      new CreateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientName: "web",
+        ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+      }),
+    );
+
+    await client.send(
+      new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+    await client.send(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+        Password: "Sup3rSecret!",
+        Permanent: true,
+      }),
+    );
+
+    const signedIn = await client.send(
+      new InitiateAuthCommand({
+        ClientId: appClient.UserPoolClient?.ClientId,
+        AuthFlow: "USER_PASSWORD_AUTH",
+        AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+      }),
+    );
+    const AccessToken = signedIn.AuthenticationResult?.AccessToken;
+
+    // When ordinary SDK code registers an authenticator app and turns it on.
+    const associated = await client.send(
+      new AssociateSoftwareTokenCommand({ AccessToken }),
+    );
+
+    await client.send(
+      new VerifySoftwareTokenCommand({
+        AccessToken,
+        UserCode: simAws
+          .cognitoIdentityProvider()
+          .userPool(userPoolId)
+          .softwareTokenCode("alice"),
+      }),
+    );
+    await client.send(
+      new SetUserMFAPreferenceCommand({
+        AccessToken,
+        SoftwareTokenMfaSettings: { Enabled: true, PreferredMfa: true },
+      }),
+    );
+
+    const read = await client.send(new GetUserCommand({ AccessToken }));
+
+    await client.send(
+      new AdminSetUserMFAPreferenceCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+        SoftwareTokenMfaSettings: { Enabled: false },
+      }),
+    );
+
+    const cleared = await client.send(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+
+    // Then each Command reached simulated Cognito.
+    assertTypeString(associated.SecretCode);
+    assertArrayEquals(read.UserMFASettingList, ["SOFTWARE_TOKEN_MFA"]);
+    assertIdentical(read.PreferredMfaSetting, "SOFTWARE_TOKEN_MFA");
+    assertUndefined(cleared.UserMFASettingList);
   });
 
   it("routes AdminConfirmSignUp through the intercepted client", async () => {

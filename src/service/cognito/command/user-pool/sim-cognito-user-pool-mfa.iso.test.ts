@@ -223,6 +223,59 @@ describe("sim Cognito user pool MFA configuration", () => {
     assertIdentical(await describedMfa(cognito, userPoolId), "OFF");
   });
 
+  it("offers a second factor sent as a text message", async () => {
+    // Given a pool that challenges every user.
+    const { cognito, userPoolId } = await poolWithMfa("ON");
+
+    // When it is configured to send the code as a text message, with the
+    // wording it would say.
+    const set = await cognito.setUserPoolMfaConfig(
+      new SetUserPoolMfaConfigCommand({
+        UserPoolId: userPoolId,
+        MfaConfiguration: "ON",
+        SmsMfaConfiguration: {
+          SmsAuthenticationMessage: "Your authentication code is {####}",
+        },
+      }),
+    );
+
+    // Then the factor is configured, and reported back by both commands.
+    const read = await cognito.getUserPoolMfaConfig(
+      new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+    );
+
+    assertIdentical(
+      set.SmsMfaConfiguration?.SmsAuthenticationMessage,
+      "Your authentication code is {####}",
+    );
+    assertIdentical(
+      read.SmsMfaConfiguration?.SmsAuthenticationMessage,
+      "Your authentication code is {####}",
+    );
+  });
+
+  it("refuses text message wording that carries no code", async () => {
+    // Given a pool.
+    const { cognito, userPoolId } = await poolWithMfa();
+
+    // When it is given wording with no placeholder for the code.
+    const error = await assertThrowsErrorAsync(async () => {
+      await cognito.setUserPoolMfaConfig(
+        new SetUserPoolMfaConfigCommand({
+          UserPoolId: userPoolId,
+          MfaConfiguration: "OPTIONAL",
+          SmsMfaConfiguration: {
+            SmsAuthenticationMessage: "Someone is signing in as you",
+          },
+        }),
+      );
+    });
+
+    // Then it is refused, as real Cognito refuses wording without one.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "SmsAuthenticationMessage");
+  });
+
   it("refuses the second factors it could not deliver a message for", async () => {
     // Given a pool. No pool here has an SmsConfiguration or an
     // EmailConfiguration, because CreateUserPool refuses both.
@@ -234,7 +287,9 @@ describe("sim Cognito user pool MFA configuration", () => {
         new SetUserPoolMfaConfigCommand({
           UserPoolId: userPoolId,
           MfaConfiguration: "OPTIONAL",
-          SmsMfaConfiguration: { SmsAuthenticationMessage: "{####}" },
+          SmsMfaConfiguration: {
+            SmsConfiguration: { SnsCallerArn: "arn:aws:iam::1:role/sms" },
+          },
         }),
       );
     });
@@ -249,8 +304,8 @@ describe("sim Cognito user pool MFA configuration", () => {
     });
 
     // Then both are refused, saying what the pool would have needed.
-    assertStringIncludes(sms.message, "a second factor sent by SMS");
-    assertStringIncludes(sms.message, "SmsConfiguration");
+    assertStringIncludes(sms.message, "SmsMfaConfiguration.SmsConfiguration");
+    assertStringIncludes(sms.message, "no message is delivered");
     assertStringIncludes(email.message, "a second factor sent by email");
     assertStringIncludes(email.message, "EmailConfiguration");
   });

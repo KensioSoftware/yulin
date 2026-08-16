@@ -23,6 +23,13 @@ import type {
   SimSignUpCommand,
 } from "../command/user/sign-up.command.js";
 import type {
+  SimAdminSetUserMFAPreferenceCommand,
+  SimAssociateSoftwareTokenCommand,
+  SimGetUserCommand,
+  SimSetUserMFAPreferenceCommand,
+  SimVerifySoftwareTokenCommand,
+} from "../command/user/user-mfa.command.js";
+import type {
   SimAdminCreateUserCommand,
   SimAdminDeleteUserCommand,
   SimAdminDisableUserCommand,
@@ -68,6 +75,40 @@ export function simCognitoSdkDirectoryRoutes(
       async (command, context): Promise<unknown> =>
         await simCognito.adminConfirmSignUp(
           command as SimAdminConfirmSignUpCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "GetUserCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.getUser(command as SimGetUserCommand),
+    ],
+    [
+      "AssociateSoftwareTokenCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.associateSoftwareToken(
+          command as SimAssociateSoftwareTokenCommand,
+        ),
+    ],
+    [
+      "VerifySoftwareTokenCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.verifySoftwareToken(
+          command as SimVerifySoftwareTokenCommand,
+        ),
+    ],
+    [
+      "SetUserMFAPreferenceCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.setUserMFAPreference(
+          command as SimSetUserMFAPreferenceCommand,
+        ),
+    ],
+    [
+      "AdminSetUserMFAPreferenceCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.adminSetUserMFAPreference(
+          command as SimAdminSetUserMFAPreferenceCommand,
           simSdkCallerOptions(context),
         ),
     ],
