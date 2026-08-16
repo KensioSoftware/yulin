@@ -62,6 +62,10 @@
       "import": "./dist/service/cloudfront/globals.js",
       "types": "./dist/service/cloudfront/globals.d.ts"
     },
+    "./cloudwatch": {
+      "import": "./dist/service/cloudwatch/index.js",
+      "types": "./dist/service/cloudwatch/index.d.ts"
+    },
     "./cognito": {
       "import": "./dist/service/cognito/index.js",
       "types": "./dist/service/cognito/index.d.ts"
@@ -174,6 +178,7 @@
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",
     "@aws-sdk/client-cloudfront-keyvaluestore": "^3.1108.0",
+    "@aws-sdk/client-cloudwatch": "^3.1111.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.1101.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
     "@aws-sdk/client-dynamodb": "^3.1101.0",

@@ -7,6 +7,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimScheduler } from "../scheduler/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontKeyValueStoreApi } from "../cloudfront/sim-cloudfront-key-value-store.js";
+import type { SimCloudWatch } from "../cloudwatch/index.js";
 import type {
   SimDynamoDb as SimDynamoDatabase,
   SimDynamoDbStreams,
@@ -103,6 +104,13 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFrontKeyValueStore(): SimCloudFrontKeyValueStoreApi {
     return this.cloudFront().keyValueStoreApi();
+  }
+
+  /** Get simulated CloudWatch metrics for this account and region. */
+  cloudWatch(): SimCloudWatch {
+    return this.memo.getOrCreate("cloudWatch", () =>
+      this.factory.createCloudWatch(this),
+    );
   }
 
   /** Get simulated Cognito user pools for this account and region. */

@@ -1,0 +1,28 @@
+/**
+ * The sim CloudWatch Command types, gathered for the service facade.
+ */
+export type {
+  SimCloudWatchMetricDatumInput,
+  SimCloudWatchStatisticSetInput,
+  SimPutMetricDataCommand,
+  SimPutMetricDataCommandInput,
+  SimPutMetricDataCommandOutput,
+} from "./data/data.command.js";
+export type {
+  SimCloudWatchDatapointDetail,
+  SimCloudWatchDimensionFilterInput,
+  SimCloudWatchMetricDataQueryInput,
+  SimCloudWatchMetricDataResult,
+  SimCloudWatchMetricDetail,
+  SimCloudWatchMetricInput,
+  SimCloudWatchMetricStatInput,
+  SimGetMetricDataCommand,
+  SimGetMetricDataCommandInput,
+  SimGetMetricDataCommandOutput,
+  SimGetMetricStatisticsCommand,
+  SimGetMetricStatisticsCommandInput,
+  SimGetMetricStatisticsCommandOutput,
+  SimListMetricsCommand,
+  SimListMetricsCommandInput,
+  SimListMetricsCommandOutput,
+} from "./query/query.command.js";
