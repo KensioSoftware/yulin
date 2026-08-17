@@ -247,7 +247,7 @@ request for `/blog/` is passed to the Origin as it arrived, even where that fold
 `index.html`. That is where CloudFront differs from an S3 website index document. The substituted
 path is what the rest of request handling sees, and a Cache Behavior pattern and a `viewer-request`
 CloudFront Function both act on the object being served. The value names an object at the Origin. It may be a
-path such as `public/index.html`, and it must begin with something other than a forward slash. Sim CloudFront refuses one that does with `InvalidDefaultRootObject`. The alternative would
+path such as `public/index.html`, and it must not begin with a forward slash. Sim CloudFront refuses one that does with `InvalidDefaultRootObject`. The alternative would
 be a Distribution that answers its own root with a 403.
 
 A custom error response replaces the Origin's response when its status matches `ErrorCode`. The
@@ -566,7 +566,7 @@ sends a request for `/things` on to `/v1/things`.
 
 Three things follow from the request never leaving the process:
 
-- A domain the simulation has no match for fails with an error naming the Origin and the
+- A domain unknown to the simulation fails with an error naming the Origin and the
   domain. No real request is made to it, and external HTTP Origins are unsupported.
 - The settings inside `CustomOriginConfig` describe how CloudFront connects over the network. The
   protocol policy, ports, SSL protocols and timeouts are accepted and ignored.

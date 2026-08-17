@@ -1,8 +1,8 @@
 # Simulated CloudWatch metrics and alarms
 
 Yulin includes a simulated Amazon CloudWatch for tests and local development. It holds custom
-metrics, being the datapoints `PutMetricData` publishes and the statistics `GetMetricStatistics` and
-`GetMetricData` read back from them, without an AWS account. It also holds alarms over those
+metrics. Those are the datapoints `PutMetricData` publishes, and the statistics
+`GetMetricStatistics` and `GetMetricData` read back from them, without an AWS account. It also holds alarms over those
 metrics, which evaluate on the simulation's clock and notify an SNS topic when they change state.
 
 Code that publishes a business metric is code teams already have, and until now the only way to test
@@ -77,8 +77,8 @@ the way out. A query naming a unit CloudWatch lacks fails here as it would in an
 ## Metrics are identified by their dimensions
 
 Real CloudWatch leaves a custom metric unrolled across its dimensions, and so does this. The same
-metric name published under two channels is two metrics. A read naming no dimensions reaches the
-metric that was published with none, leaving the rest of them out of the total.
+metric name published under two channels is two metrics. A read naming no dimensions reaches only the
+metric that was published with none, and never aggregates across the others.
 
 That is the behaviour teams most often get wrong, and it is worth a test of its own. A dashboard
 query written against a metric name alone finds nothing at all if every publish carried a dimension.

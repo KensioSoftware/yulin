@@ -3646,7 +3646,7 @@ Current documented limitations:
 - A sign-in by a user of an `ON` pool that has registered no factor is refused, because real Cognito
   answers that one with the `MFA_SETUP` challenge, which registers a factor mid-sign-in and is
   outside the simulation. A user with both factors enabled and neither preferred is refused for the
-  same kind of reason, real Cognito answering that with `SELECT_MFA_TYPE`.
+  same kind of reason. Real Cognito answers that with `SELECT_MFA_TYPE`.
 - An MFA code is texted to the user's `phone_number` whatever the pool's `AutoVerifiedAttributes`
   say, and the pool records it as a message with an occasion of `Authentication`, where a test reads
   it from. Real Cognito delivers it and reports it to nobody.
@@ -3672,7 +3672,7 @@ Current documented limitations:
   `USER_AUTH` flow, itself refused as a flow of its own.
 - `AssociateSoftwareToken` and `VerifySoftwareToken` take an `AccessToken` and refuse a `Session`,
   because the `MFA_SETUP` challenge that would issue one is outside the simulation. A
-  `FriendlyDeviceName` is refused for the same kind of reason, device tracking being outside the
+  `FriendlyDeviceName` is refused for the same kind of reason. Device tracking is outside the
   simulation.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does. A
   setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
