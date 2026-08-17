@@ -615,8 +615,8 @@ and the rule counts as delivered.
 
 A rule created with a `ScheduleExpression` in place of an event pattern fires on its own timing,
 independently of anything put onto a bus. That timing is the simulation's clock. The rule fires when
-a test advances simulated time past a due instant, and never otherwise. So a schedule that takes an
-hour in production takes no time at all to test.
+a test advances simulated time to or past a due instant, and never otherwise. So a schedule that
+takes an hour in production takes no time at all to test.
 
 ```typescript sim-event-bridge-scheduled-rules
 /**
@@ -873,9 +873,10 @@ no is a modelled outcome a test may be asking for on purpose.
 
 ## Permissions
 
-Every operation is authorized by simulated IAM against the bus ARN. `events:ListEventBuses` has no
-bus-level resource on real AWS. It authorizes against `*`, and a policy naming a bus will not allow
-it.
+Most operations are authorized by simulated IAM against the bus ARN. The two that name no bus
+authorize against `*` instead, and a policy naming a bus will not allow either. Those are
+`events:ListEventBuses`, which has no bus-level resource on real AWS, and `events:TestEventPattern`,
+which reaches no bus at all.
 
 ```typescript sim-event-bridge-iam-policy
 /**

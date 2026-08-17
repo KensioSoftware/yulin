@@ -78,8 +78,9 @@ only runs forwards. `setTo(...)` is the explicit way to move a clock back.
 
 Advancing moves the clock, and it runs whatever the passage of time should have caused. Work
 scheduled for an instant inside the interval is dispatched in due order, each task running with the
-clock reading its own due time, and any further work it schedules settles before `advanceBy`
-returns. So a test can advance and then assert, with no additional waiting:
+clock reading its own due time. Further work it schedules settles before `advanceBy` returns where
+that work is itself due by the new time, and stays queued where it falls later. So a test can
+advance and then assert, with no additional waiting:
 
 ```typescript sim-clock-session-expiry
 /**

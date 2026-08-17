@@ -459,7 +459,7 @@ await elbV2.removeListenerCertificates(
 ```
 
 The default certificate cannot be removed this way. Replacing it is `ModifyListener`, as on real
-ELB, and trying to remove it is refused with that named.
+ELB, and trying to remove it is refused, naming it.
 
 ### Serving a request over HTTPS
 
@@ -1766,7 +1766,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - `RegisterTargets`, `DeregisterTargets` and `DescribeTargetHealth`.
 - `CreateListener`, `DescribeListeners`, `ModifyListener` and `DeleteListener`, on HTTP and HTTPS.
 - An HTTPS listener's default certificate resolved against simulated ACM, refusing a missing one,
-  one short of `ISSUED`, and one outside the load balancer's own account and region.
+  one whose status falls short of `ISSUED`, and one outside the load balancer's own account and
+  region.
 - `AddListenerCertificates`, `RemoveListenerCertificates` and `DescribeListenerCertificates`, with
   the default certificate reported first and refused removal.
 - `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule` and `SetRulePriorities`, with priorities

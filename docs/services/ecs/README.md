@@ -963,8 +963,8 @@ console.log(handled); // ["order-1"]
 The queue is named by the URL `CreateQueue` answered with, and it has to be in the same account and
 region as the service, as a real task's own queue is. A `batchSize` is how many messages the handler
 is given at once, up to the ten one SQS receive hands out, and it defaults to ten. The handler may
-be async, and is awaited. A container declares either `consumes` or `run`, and binding one that
-declares both is refused.
+be async, and is awaited. A binding declares one of `run`, `consumes` and `http`. Where a binding
+carries more than one, `consumes` wins, then `http`, then `run`.
 
 The task role is required here. That is the part worth noticing before writing the first one.
 Polling is done as the task role, and a task definition with no `taskRoleArn` polls as nobody and
@@ -1613,7 +1613,7 @@ it was scaled to.
 
 `LoadBalancers` registers the service's tasks into the target group it names. A template that
 declares a load balancer, a target group and a service therefore deploys something that answers. The
-target group has to exist and hold addresses, or the deployment fails naming it, and what the
+target group has to exist and be an `ip` one, or the deployment fails naming it, and what the
 template declared is readable on the simulated service:
 
 ```typescript
@@ -1880,8 +1880,8 @@ Current documented limitations:
   reported as running, and the handler bound to a container is called once per request or per poll.
   Yulin runs in one Node.js process, with nothing to copy.
 - A bound container of a service is treated as running and stays available until the service is
-  deleted or its `SimAws` is closed. What calls its handler is whatever reaches it, either a queue
-  it consumes or a request a load balancer routes to it.
+  scaled to zero, deleted, or its `SimAws` is closed. What calls its handler is whatever reaches it,
+  either a queue it consumes or a request a load balancer routes to it.
 - A consuming container's loop belongs to Yulin, and not to the container. A binding supplies what
   happens to a batch, and a polling loop written inside your own container code is never run,
   because an endless loop in a single Node.js process never yields to the test running it.

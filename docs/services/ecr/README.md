@@ -6,7 +6,8 @@ each repository holds images by tag, where a simulated image is a real in-proces
 That is what this service is for. A container image Lambda function cannot run here, because Yulin
 never reads an image, so something has to say what the code inside that image actually is. A
 repository is the natural place to say it. It is the stable name for the thing that holds the code,
-and it outlives any stack, any tag and any CDK construct ID.
+outliving any tag and any CDK construct ID, and a repository holding a registered handler outlives
+the stack that declared it too.
 
 ECR-specific types are imported from the `@kensio/yulin/ecr` subpath.
 
@@ -246,10 +247,9 @@ delete a repository that still holds images, which fails the stack unless the te
 `EmptyOnDelete`. Here the refusal is recorded and the teardown carries on, since what is being
 protected is a test's own registration.
 
-Every other property a repository can declare is about image content, so each one is recorded as an
-ignored property and the repository is created without it. That covers `ImageScanningConfiguration`,
-`ImageTagMutability`, `LifecyclePolicy`, `RepositoryPolicyText`, `EncryptionConfiguration`,
-`EmptyOnDelete` and `Tags`.
+Every other property a repository can declare is recorded as an ignored property, and the repository
+is created without it. That covers `ImageScanningConfiguration`, `ImageTagMutability`,
+`LifecyclePolicy`, `RepositoryPolicyText`, `EncryptionConfiguration`, `EmptyOnDelete` and `Tags`.
 
 ## Where a function's handler comes from
 
@@ -257,8 +257,8 @@ Two things can back a container image function, and a deploy is looked at in thi
 
 1. An [executable binding](../lambda/#executable-bindings) given to that deploy, including one
    naming the image repository. A binding is the more specific thing to have said, since it is about
-   one deploy. 2. The simulated ECR repository the function's `Code.ImageUri` names. That is a standing
-   statement
+   one deploy.
+2. The simulated ECR repository the function's `Code.ImageUri` names. That is a standing statement
    about what the image is, made once and good for every stack that runs it.
 
 A function with no binding and no registered image is skipped with a diagnostic, and the rest of the
