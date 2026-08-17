@@ -17,6 +17,17 @@ export interface SimCognitoAuthorizeInput {
   readonly idp_identifier?: string | undefined;
   readonly code_challenge?: string | undefined;
   readonly code_challenge_method?: string | undefined;
+
+  /**
+   * The username a pool's own user signs in with.
+   *
+   * Real Cognito takes these two from the managed login form rather than from
+   * the query string, and a request carrying them here is the form post the
+   * simulation's own sign-in page makes. Naming no identity provider and
+   * carrying these two is what tells a local sign-in from a federated one.
+   */
+  readonly username?: string | undefined;
+  readonly password?: string | undefined;
 }
 
 /**

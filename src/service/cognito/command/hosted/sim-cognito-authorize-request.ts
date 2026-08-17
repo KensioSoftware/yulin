@@ -17,8 +17,12 @@ const tokenResponseType = "token";
 
 /**
  * The provider name the pool's own users sign in under.
+ *
+ * Real Cognito takes this in an `identity_provider` to mean the local sign-in
+ * form rather than any external provider, and a request naming no provider at
+ * all reaches the same place once the person has chosen it.
  */
-const localProviderName = "COGNITO";
+const simCognitoLocalProviderName = "COGNITO";
 
 /**
  * What an authorize request asked for, once it has been checked.
@@ -98,29 +102,24 @@ export class SimCognitoAuthorizeRequest {
   }
 
   /**
-   * The identity provider this request signs the user in through.
+   * The identity provider this request signs the user in through, and nothing
+   * where it signs one of the pool's own users in.
    *
-   * A request naming none would reach managed login on real Cognito, which is
-   * a page rather than anything an API answers, so it is refused here with a
-   * message saying what to do instead.
+   * A request naming no provider, or naming `COGNITO`, is a local sign-in: on
+   * real Cognito it reaches managed login's own form, and here it carries the
+   * username and password that form would have posted.
    */
-  requiredProvider(
+  signInProvider(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     input: SimCognitoAuthorizeInput,
-  ): SimCognitoUserPoolIdentityProvider {
+  ): SimCognitoUserPoolIdentityProvider | undefined {
     const named = input.identity_provider ?? input.idp_identifier;
 
-    if (named === undefined || named === localProviderName) {
-      throw new SimCognitoOAuthError({
-        code: "invalid_request",
-        description:
-          "This request would reach managed login, which is a sign-in page " +
-          "rather than anything this simulation can answer. Name an " +
-          "identity_provider to sign in through, or sign the pool's own " +
-          "users in with InitiateAuth or AdminInitiateAuth.",
-        redirectable: false,
-      });
+    if (named === undefined || named === simCognitoLocalProviderName) {
+      this.requireSupportedProviderName(client, simCognitoLocalProviderName);
+
+      return undefined;
     }
 
     const providers = pool.auth.identityProviders;
@@ -134,20 +133,28 @@ export class SimCognitoAuthorizeRequest {
       });
     }
 
-    this.requireSupportedProvider(client, provider);
+    this.requireSupportedProviderName(client, provider.name);
 
     return provider;
   }
 
-  private requireSupportedProvider(
+  /**
+   * Refuse a provider the app client does not offer.
+   *
+   * `COGNITO` is checked the same way, because real Cognito treats it as one
+   * of the entries in `SupportedIdentityProviders`: a client without it there
+   * signs nobody in at the hosted domain with a password, however many local
+   * users the pool holds.
+   */
+  private requireSupportedProviderName(
     client: SimCognitoUserPoolClient,
-    provider: SimCognitoUserPoolIdentityProvider,
+    providerName: string,
   ): void {
-    if (!client.oauth.allowsIdentityProvider(provider.name)) {
+    if (!client.oauth.allowsIdentityProvider(providerName)) {
       throw new SimCognitoOAuthError({
         code: "unauthorized_client",
         description:
-          `App client ${client.id} does not support the ${provider.name} ` +
+          `App client ${client.id} does not support the ${providerName} ` +
           `identity provider: add it to the client's ` +
           `SupportedIdentityProviders`,
         redirectable: true,

@@ -1568,6 +1568,74 @@ An authorization code is single use and lasts five minutes on the simulated cloc
 endpoint also answers a `grant_type` of `refresh_token`, with the refresh token the grant handed
 out.
 
+### Signing a local user in
+
+An authorize request naming no `identity_provider` signs in one of the pool's own users. Real
+managed login answers that request with a form and takes an email address and a password from it.
+Here the two arrive as a `username` and a `password` beside the parameters the request already
+carries, and everything after them is the same grant. The app client needs `COGNITO` among its
+`SupportedIdentityProviders`, which is what real Cognito needs before managed login offers the form
+at all.
+
+```typescript sim-cognito-hosted-local-sign-in
+/**
+ * Signing one of a pool's own users in at the authorize endpoint.
+ */
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+const cognito = simAws.cognitoIdentityProvider();
+const pool = cognito.userPool(userPoolId);
+const callbackUrl = "https://www.example.com/user/callback";
+
+// The two fields managed login's form would have taken, passed with the
+// parameters the browser arrived on.
+const redirect = await cognito.hostedAuthorize(pool, {
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: callbackUrl,
+  scope: "openid email",
+  state: "csrf-token",
+  username: "alice",
+  password: "Sup3rSecret!",
+});
+
+const callback = new URL(redirect.location);
+console.log(callback.searchParams.get("state")); // "csrf-token"
+
+// The application's own server exchanges the code, as it does after a
+// federated sign-in.
+const tokens = await cognito.hostedToken(pool, {
+  grant_type: "authorization_code",
+  client_id: clientId,
+  code: callback.searchParams.get("code")!,
+  redirect_uri: callbackUrl,
+});
+
+console.log(tokens.token_type); // "Bearer"
+```
+
+The password is checked the way `InitiateAuth` checks it. A wrong password is a
+`NotAuthorizedException`, a user that has not confirmed its sign-up is a
+`UserNotConfirmedException`, and a username the pool does not hold depends on the app client's
+`PreventUserExistenceErrors`. None of the three issues a code.
+
+An `identity_provider` of `COGNITO` reaches the same place, which is where real managed login sends
+a request that skipped the provider choice.
+
+Two sign-ins real managed login answers with a further page are refused instead. A user that has
+registered a second factor is one, and a user holding a temporary password from `AdminCreateUser` is
+the other. Both say which page would have come next, and where the simulation does answer that
+challenge. `InitiateAuth` issues the MFA challenge and the new password challenge, and
+`AdminSetUserPassword` gives a user a permanent password.
+
+Users sign themselves up through `SignUp` and `ConfirmSignUp`, which are covered under
+[Signing up](#signing-up). A user confirmed that way signs in here with the password it chose.
+
 ### Signing out
 
 `GET /logout?client_id=...&logout_uri=...` redirects to the sign-out URL, once it has checked it is
@@ -3344,6 +3412,8 @@ Sim Cognito currently supports:
 - The `/oauth2/authorize`, `/oauth2/token` and `/logout` endpoints of a pool's domain, served on the
   domain's own hostname, for an authorization code grant through an external identity provider,
   with PKCE and with a `refresh_token` grant
+- An authorize request naming no identity provider, signing one of the pool's own users in from a
+  `username` and a `password` it carries
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
@@ -3613,12 +3683,17 @@ Current documented limitations:
 - A pool's schema is settled when the pool is created. `AddCustomAttributes` is unimplemented, and
   an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
   such input.
-- Managed login and the classic hosted UI are pages a person fills in, and are outside the
-  simulation. An authorize request naming no `identity_provider`, or naming `COGNITO`, would reach
-  one of those pages on real Cognito and is refused here with a message saying so. The pool's own
-  users sign in through `InitiateAuth` and `AdminInitiateAuth`, which are simulated. `/login`,
-  `/signup`, `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML endpoints go
-  unserved.
+- Managed login's pages are outside the simulation. The sign-in behind them is inside it. An
+  authorize request naming no `identity_provider`, or naming `COGNITO`, signs one of the pool's own
+  users in from the `username` and `password` it carries, and answers with the code real managed
+  login answers with. Nothing here draws the form those two fields came from, and
+  `AWS::Cognito::ManagedLoginBranding` is an unsupported resource type. `/login`, `/signup`,
+  `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML endpoints go unserved.
+- A hosted sign-in that real managed login would answer with a further page is refused. That is a
+  user which has registered a second factor, and a user holding a temporary password. Both
+  challenges are simulated at `InitiateAuth` and `AdminInitiateAuth`, which is where a test drives
+  them. Password reset is unsimulated on either side, so `ForgotPassword` and
+  `ConfirmForgotPassword` are unimplemented and no page asks for a reset code.
 - The implicit grant is refused, and so is the client credentials grant, which needs resource
   servers.
 - The served OpenID configuration names its `authorization_endpoint`, `token_endpoint` and
@@ -3641,8 +3716,9 @@ Current documented limitations:
   local user, and signing in as it would hand the application someone else's account.
 - `AdminLinkProviderForUser` is unimplemented, and a federated user is never linked to a user that
   was already in the pool, and the `identities` it carries always names one provider.
-- The `PreAuthentication`, `PostAuthentication` and migrate user triggers do not fire on a federated
-  sign-in.
+- The `PreAuthentication`, `PostAuthentication` and migrate user triggers do not fire on a sign-in
+  at the hosted domain, federated or local. `PreTokenGeneration` does, at the token endpoint where
+  the claims are settled.
 - A domain reports no `S3Bucket` or `Version`, both of which name parts of the machinery real
   Cognito builds a domain out of. Its `Status` is `ACTIVE` as soon as it exists, where a real prefix
   domain takes a minute and a custom domain up to an hour.

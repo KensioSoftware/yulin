@@ -6,7 +6,8 @@ which exchange a token for AWS credentials, are a separate service and are not s
 The pool, the app client, the users and groups in it, self-service sign-up, the second factors a
 user registers, the sign-in flows on both sides of the API, the domain and identity providers a
 federated sign-in runs through, the messages it would have sent, the tokens it issues and the
-authorizer are all here. SRP, managed login, password resets and device tracking are not.
+authorizer are all here. SRP, managed login's own pages, password resets and device tracking are
+not.
 
 ## Entry points
 
@@ -254,12 +255,13 @@ none. What the token endpoint authenticates instead is the app client: one with 
 it, in a basic authorization header or in the body, and a public client presents its client id and
 binds the grant with PKCE.
 
-`SimCognitoAuthorizeEndpoint` signs a user in through an identity provider and answers with the
-redirect back to the application. A request naming no provider would reach managed login on real
-Cognito, which is a page rather than anything an API answers, so it is refused with a message saying
-what to do instead. `SimCognitoTokenEndpoint` exchanges the code, through the pool's own token
-issuer rather than anything of its own, so a hosted sign-in and an API sign-in issue the same tokens
-and run the same `PreTokenGeneration` trigger.
+`SimCognitoAuthorizeEndpoint` signs a user in and answers with the redirect back to the
+application. `SimCognitoHostedSignIn` is what decides which of the two sign-ins a request asked
+for. One naming an identity provider goes through `SimCognitoFederatedSignIn`, and one naming none
+goes through `SimCognitoHostedPasswordSignIn`, which checks the `username` and `password` the
+request carried with the checks `InitiateAuth` makes. `SimCognitoTokenEndpoint` exchanges the code,
+through the pool's own token issuer rather than anything of its own, so a hosted sign-in and an API
+sign-in issue the same tokens and run the same `PreTokenGeneration` trigger.
 
 `SimCognitoOAuthError` is what both refuse with, because an OAuth error is a code and a description
 rather than an API exception. Whether a refusal can be redirected back to the application is part of
@@ -627,10 +629,13 @@ resource, here or on real AWS.
   developer credentials, and nothing here tells one caller from another that way.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
-- Managed login and the classic hosted UI are not simulated. An authorize request naming no
-  identity provider, or naming `COGNITO`, is refused rather than answered with a page. The implicit
-  and client credentials grants are refused too, and `/login`, `/oauth2/userInfo`, `/oauth2/revoke`
-  and the SAML endpoints are not served.
+- Managed login's pages are not simulated, and the local sign-in behind them is. An authorize
+  request naming no identity provider, or naming `COGNITO`, signs a pool user in from a `username`
+  and a `password` passed beside the other parameters. Nothing draws the form they came from. A
+  sign-in managed login would answer with a second page, which is a user owing a second factor and
+  a user holding a temporary password, is refused instead. The implicit and client credentials
+  grants are refused too, and `/login`, `/signup`, `/oauth2/userInfo`, `/oauth2/revoke` and the SAML
+  endpoints are not served.
 - A simulated identity provider signs in the user `signInAs` put there, and calls nothing. A
   provider nobody is signed in at refuses the authorize request rather than inventing one.
 - A custom domain answers on its own hostname with no Route53 record, where real AWS needs an alias

@@ -3,6 +3,7 @@ import { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-feder
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
 import { SimCognitoAuthorizeEndpoint } from "./sim-cognito-authorize-endpoint.js";
+import { SimCognitoHostedSignIn } from "./sim-cognito-hosted-sign-in.js";
 import { SimCognitoLogoutEndpoint } from "./sim-cognito-logout-endpoint.js";
 import { SimCognitoTokenEndpoint } from "./sim-cognito-token-endpoint.js";
 
@@ -30,7 +31,10 @@ export class SimCognitoHostedCommands {
     const { tokenIssuer, userFactory, clock } = properties;
 
     this.authorize = new SimCognitoAuthorizeEndpoint({
-      federatedSignIn: new SimCognitoFederatedSignIn({ userFactory }),
+      signIn: new SimCognitoHostedSignIn({
+        federatedSignIn: new SimCognitoFederatedSignIn({ userFactory }),
+        clock,
+      }),
       clock,
     });
     this.token = new SimCognitoTokenEndpoint({ tokenIssuer, clock });

@@ -217,21 +217,21 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     );
   });
 
-  it("refuses a request that would reach managed login", async () => {
+  it("refuses a local sign-in that carries no credentials", async () => {
     // Given a pool with a domain.
     const setUp = await simCognitoHosted();
     const { identity_provider: unused, ...withoutProvider } =
       authorizeParameters(setUp);
 
-    // When an authorize request names no identity provider.
+    // When an authorize request names no identity provider and no user.
     const response = await authorize(setUp, withoutProvider);
 
-    // Then it says so, rather than answering with a sign-in page this
-    // simulation has no equivalent of.
+    // Then it says which two fields a sign-in by one of the pool's own users
+    // needs.
     assertIdentical(response.status, 400);
     assertStringIncludes(
       await refusedBody(response),
-      "This request would reach managed login",
+      "needs a username and a password",
     );
     assertIdentical(unused, "Google");
   });
