@@ -1,11 +1,11 @@
 # Simulated API Gateway HTTP APIs
 
 Yulin includes a simulated API Gateway v2 service, reachable as `simAws.apiGatewayV2()`. It covers
-HTTP APIs with a Lambda proxy integration, so a handler that runs behind an HTTP API can be tested
-against a real HTTP request rather than against a hand-built event.
+HTTP APIs with a Lambda proxy integration. A handler that runs behind an HTTP API can be tested
+against a real HTTP request, with no hand-built event to keep in step.
 
-WebSocket APIs are not simulated, and neither are REST APIs, which are the older API Gateway v1
-service and a separate SDK client.
+This is HTTP APIs only. WebSocket APIs and REST APIs (the older API Gateway v1 service, on a
+separate SDK client) are outside it.
 
 ## Creating an API
 
@@ -46,20 +46,20 @@ The endpoint names the API id and the region, as a real one does:
 https://a1b2c3d4e5.execute-api.eu-west-1.amazonaws.com
 ```
 
-A name is not an identity here, as it is not on real AWS. Two APIs in one Account and Region may
-share a name, and only the id tells them apart.
+A name is a label here, as it is on real AWS. Two APIs in one Account and Region may share a name,
+and only the id tells them apart.
 
 ## Routing requests to a Lambda function
 
 An API needs three more resources before it serves anything: an integration naming the function, a
 route pointing at that integration, and a stage to serve it from. The function also has to allow API
-Gateway to invoke it, which is a permission on the function rather than anything on the API. See
+Gateway to invoke it. That grant is a permission on the function, not on the API. See
 [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
 Once all of that exists, `serveSimAws` answers requests to the generated endpoint by invoking the
 function.
 
-Pass the API endpoint through `srv.localUrl(...)`, which keeps the endpoint's hostname but sends the
-request to the local server, in the same way it adapts simulated S3 website and Lambda Function URL
+Pass the API endpoint through `srv.localUrl(...)`. It keeps the endpoint's hostname and sends the
+request to the local server, the way it adapts simulated S3 website and Lambda Function URL
 endpoints.
 
 ```typescript sim-apigatewayv2-lambda-proxy
@@ -146,23 +146,23 @@ console.log(await response.text());
 await srv.close();
 ```
 
-The `$default` route matches any method and path, so every request to the endpoint reaches the
+The `$default` route matches any method and path. Every request to the endpoint reaches the
 function. The integration URI is the function's ARN, and the function may be in another Account or
-Region: it is looked up where its ARN says it is.
+Region. It is looked up where its ARN says it is.
 
 ## Granting the API permission to invoke the function
 
-A Lambda proxy integration does not work until the function's resource policy allows
-`apigateway.amazonaws.com` to invoke it. The console adds that permission for you; an integration
-created through CloudFormation, the CLI or an SDK does not, which is what `AddPermissionCommand` in
-the example above is for. Without it the request is answered with a 500 and
-`{"message":"Internal Server Error"}`, and the handler does not run. CDK's
-`HttpLambdaIntegration` emits the same grant as an `AWS::Lambda::Permission`.
+A Lambda proxy integration works once the function's resource policy allows
+`apigateway.amazonaws.com` to invoke it. The console adds that permission for you. An integration
+created through CloudFormation, the CLI or an SDK leaves it to you. That is what
+`AddPermissionCommand` in the example above does. Without it the request is answered with a 500 and
+`{"message":"Internal Server Error"}`, and the handler never runs. CDK's `HttpLambdaIntegration`
+emits the same grant as an `AWS::Lambda::Permission`.
 
 Each request is authorized as `lambda:InvokeFunction` on the function ARN, with the caller being the
-service principal `apigateway.amazonaws.com`. The function's own resource policy is what decides: a
-service principal has no identity policies of its own. The route that matched is supplied as
-`AWS:SourceArn`, so a permission may be granted for one route and not another:
+service principal `apigateway.amazonaws.com`. The function's own resource policy is the whole
+decision. A service principal has no identity policies of its own. The route that matched is supplied
+as `AWS:SourceArn`. A permission may be granted for one route and withheld from another:
 
 ```text
 arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<route path>
@@ -170,29 +170,28 @@ arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<route path>
 
 - The Account and Region are the API's, not the function's.
 - The stage is the one that served the request, so `$default` for the default stage.
-- The method is the request's own, so a `GET` reaching a route keyed `ANY /orders` gives `GET`.
-- The path is the matched route key's template with its parameter braces intact, so a request to
+- The method is the request's own. A `GET` reaching a route keyed `ANY /orders` gives `GET`.
+- The path is the matched route key's template with its parameter braces intact. A request to
   `/orders/42` on the route `GET /orders/{orderId}` gives `orders/{orderId}`. A `SourceArn` is
-  written against route keys rather than against paths, and IAM treats a brace as an ordinary
-  character.
+  written against route keys, and IAM treats a brace as an ordinary character.
 - The `$default` route has no method and no path of its own, so both collapse into one `$default`
   segment: `<apiId>/<stage>/$default`.
 
-A `SourceArn` may wildcard any part of that, which is what the usual grant does:
-`<apiId>/*/*` allows every route of the API on every stage.
+A `SourceArn` may wildcard any part of that, and the usual grant does. `<apiId>/*/*` allows every
+route of the API on every stage.
 
-The API's own Account is supplied as `AWS:SourceAccount`, so a permission carrying a `SourceAccount`
+The API's own Account is supplied as `AWS:SourceAccount`. A permission carrying a `SourceAccount`
 matches when it names the Account the API belongs to. That is the Account the source ARN names, not
-the one owning the function, which matters for an integration reaching across Accounts. CDK writes
-both keys for some grants, and a permission carrying either or both is evaluated on what it says.
+the one owning the function, and the difference shows up on an integration reaching across Accounts.
+CDK writes both keys for some grants, and a permission carrying either or both is evaluated on what
+it says.
 
 `AWS:SourceArn` and `AWS:SourceAccount` are the only condition keys supplied here. A permission that
-also carries `PrincipalOrgID` or `InvokedViaFunctionUrl` never matches, since nothing gives those
-keys a value at request time, so the request is refused with the same 500.
+also carries `PrincipalOrgID` or `InvokedViaFunctionUrl` never matches, since those keys have no
+value at request time. The request is refused with the same 500.
 
-Neither the method nor the path is documented by AWS as the value API Gateway supplies. Both are
-inferred from the permission patterns AWS and CDK write, which is recorded next to the code that
-builds the ARN.
+AWS documents neither the method nor the path as the value API Gateway supplies. Both are inferred
+from the permission patterns AWS and CDK write. The code that builds the ARN records that.
 
 ## Route keys
 
@@ -217,16 +216,16 @@ A path is made of three kinds of segment:
   last segment, and it needs at least one segment to match, so `GET /pets/{proxy+}` matches
   `/pets/cat/1` but not `/pets`.
 
-A route key that cannot be read is refused by `CreateRoute` with a `BadRequestException`, which is
-where real API Gateway refuses it too. That covers a lower-case method, an unbalanced brace, and a
-greedy parameter anywhere but the end.
+A route key that cannot be read is refused by `CreateRoute` with a `BadRequestException`, the same
+place real API Gateway refuses it. That covers a lower-case method, an unbalanced brace, and a greedy
+parameter anywhere but the end.
 
-A parameter name is not part of a route's identity, so `GET /pets/{id}` and `GET /pets/{petId}` are
-the same route key and creating the second gives a `ConflictException`.
+A parameter name falls outside a route's identity, so `GET /pets/{id}` and `GET /pets/{petId}` are
+the same route key, and creating the second gives a `ConflictException`.
 
 One path may not name the same parameter twice, so `GET /pets/{id}/toys/{id}` is refused. A handler
-reads path parameters off one object, so only one of the two captures could arrive. Whether real API
-Gateway refuses it is not established, so this is stricter than AWS rather than known to match it.
+reads path parameters off one object, and only one of the two captures could arrive. Whether real API
+Gateway refuses it too is unestablished. This is stricter than AWS is known to be.
 
 ## Which route serves a request
 
@@ -240,7 +239,7 @@ More than one route may match a request, and the most specific one takes it. In 
    prefix win between two greedy routes, so `GET /pets/dog/{proxy+}` takes `/pets/dog/collars/1`
    ahead of `GET /pets/{proxy+}`.
 
-AWS's worked example, which is encoded as a test here:
+AWS's worked example, encoded as a test here:
 
 | Request           | Route selected       |
 | ----------------- | -------------------- |
@@ -252,19 +251,19 @@ AWS's worked example, which is encoded as a test here:
 from the routes `GET /pets/dog/1`, `GET /pets/dog/{id}`, `GET /pets/{proxy+}`, `ANY /{proxy+}` and
 `$default`.
 
-Rule 1 is documented by AWS, as is the literal-beating-parameter part of rule 3. Rule 2, the
-longest-literal-prefix part of rule 3, and the place of the method comparison above the path
-comparison rather than below it, are observed rather than documented. Each is marked in the code next
-to the rule it governs.
+Rule 1 is documented by AWS, as is the literal-beating-parameter part of rule 3. Three things here
+are observed rather than documented: rule 2, the longest-literal-prefix part of rule 3, and the
+placement of the method comparison above the path comparison. Each is marked in the code next to the
+rule it governs.
 
-A request whose path matches a route but whose method does not simply matches nothing. An API with no
+A request whose path matches a route with a different method matches no route at all. An API with no
 `ANY` route, no greedy route and no `$default` route to catch it answers 404, not 405.
 
 ## Path parameters and named stages
 
 What a route captured reaches the handler as `event.pathParameters`. A named stage is served under
-its own path segment, and stage selection runs before route selection, so the routes never see the
-stage name.
+its own path segment. Stage selection runs before route selection, and the routes never see the stage
+name.
 
 ```typescript sim-apigatewayv2-routes
 /**
@@ -361,7 +360,7 @@ console.log(await response.json());
 await srv.close();
 ```
 
-That handler reports four fields of its event, so the response body it produces is:
+That handler reports four fields of its event. The response body it produces is:
 
 ```json
 {
@@ -372,16 +371,16 @@ That handler reports four fields of its event, so the response body it produces 
 }
 ```
 
-`rawPath` and `requestContext.http.path` keep the stage segment, while `routeKey` and
-`pathParameters` come from the path the routes matched, which is `/pets/6`. The stage prefix in the
-path is corroborated by the documented `$context.path` access log variable, "the request path, for
-example `/{stage}/root/child`", rather than by the payload format page.
+`rawPath` and `requestContext.http.path` keep the stage segment. `routeKey` and `pathParameters` come
+from the path the routes matched, `/pets/6`. The stage prefix in the path is corroborated by the
+documented `$context.path` access log variable ("the request path, for example
+`/{stage}/root/child`"). The payload format page says nothing about it.
 
 A stage name is `$default`, or up to 128 alphanumerics, hyphens and underscores. The `$default` stage
-is served at the root of the endpoint instead of under a name, and both kinds can exist on one API at
-once. An explicit stage match wins over any route match: with a `$default` stage and a stage named
-`pets`, a request for `/pets/dog` is served by the stage `pets` on the route path `/dog`. A request
-reaching an API with no stage for it, and no `$default` stage, is a 404.
+is served at the root of the endpoint, and a named stage under its own segment. Both kinds can exist
+on one API at once. An explicit stage match wins over any route match. With a `$default` stage and a
+stage named `pets`, a request for `/pets/dog` is served by the stage `pets` on the route path `/dog`.
+A request reaching an API with no stage for it, and no `$default` stage, is a 404.
 
 `pathParameters` is left out of the event entirely when the matched route captured nothing, including
 on a `$default` match. `StageVariables` set on the stage arrive as `event.stageVariables`, and are
@@ -393,9 +392,9 @@ A JWT authorizer verifies a signed token before the integration is invoked. `Cre
 creates one, and a route asks for it with `AuthorizationType: "JWT"` and the authorizer's id.
 
 The issuer is a URL. Point it at a [simulated Cognito user pool](../cognito/ "Simulated Cognito docs")
-and the pool's own signing key verifies the token, so a token from
-`InitiateAuthCommand` or `AdminInitiateAuthCommand` reaches the route and nothing else does. The
-audience is the app client ids the authorizer admits.
+and the pool's own signing key verifies the token. A token from `InitiateAuthCommand` or
+`AdminInitiateAuthCommand` reaches the route, and anything else is turned away. The audience is the
+app client ids the authorizer admits.
 
 ```typescript sim-apigatewayv2-jwt-authorizer
 /**
@@ -561,34 +560,32 @@ await srv.close();
 ```
 
 The verification is real. The token is parsed, its `alg` has to be `RS256`, its `kid` has to name a
-key the issuer publishes, and the signature is checked against that key with `node:crypto`. Nothing
-is fetched over the network, and no verification library is involved.
+key the issuer publishes, and the signature is checked against that key with `node:crypto`. The whole
+check runs in process, with no network fetch and no verification library.
 
 ### What a refused request gets back
 
 A token that is missing, unreadable, signed with an unsupported algorithm, signed by an unknown key,
-or carrying a claim that does not hold is answered with a 401, `{"message":"Unauthorized"}` and a
-`www-authenticate: Bearer` header. The integration is never invoked. The client is told nothing about
-which check failed, which is what real API Gateway does, except for an audience that does not match:
-that one carries `error_description="the token does not have a valid audience"`, the one description
-AWS publishes.
+or carrying a claim that fails is answered with a 401, `{"message":"Unauthorized"}` and a
+`www-authenticate: Bearer` header. The integration is never invoked. Which check failed stays
+undisclosed, here and on real API Gateway. A mismatched audience is the exception. That one carries
+`error_description="the token does not have a valid audience"`, the one description AWS publishes.
 
 The claims are checked in the order AWS documents: the issuer, then the audience, then `exp`, `nbf`
 and `iat`. There is no allowance for clock skew, and every timestamp comes from the simulation's
-clock, so `simAws.clock().advanceBy(...)` expires a token that was accepted a moment before.
+clock. `simAws.clock().advanceBy(...)` expires a token that was accepted a moment before.
 
 ### Identity source
 
 `IdentitySource` takes one entry, either `$request.header.<name>` or `$request.querystring.<name>`. A
-`Bearer` prefix on the value, followed by whitespace, is stripped case-insensitively and is not
-required. Anything else is
-refused by `CreateAuthorizer`, because an authorizer looking for the token in a place nothing puts it
-refuses every request for a reason that reads like a signing problem.
+`Bearer` prefix on the value, followed by whitespace, is stripped case-insensitively and is optional.
+Anything else is refused by `CreateAuthorizer`. An authorizer looking for the token where no client
+puts it refuses every request, for a reason that reads like a signing problem.
 
 ### Route scopes, and access tokens versus ID tokens
 
 `AuthorizationScopes` on a route is checked against the token's `scope` claim, split on whitespace.
-The check is any-of: one matching scope is enough. A verified token that matches none of them is
+The check is any-of, so one matching scope is enough. A verified token matching none of them is
 answered with a 403 and `{"message":"Forbidden"}`.
 
 ```typescript
@@ -604,14 +601,14 @@ await apiGateway.createRoute(
 );
 ```
 
-An ID token passes an authorizer that configures only an audience. Nothing checks `token_use`, which
-is what real API Gateway does, and an ID token's `aud` is the app client id, so it matches. AWS
-documents this and recommends route scopes as the way to tell the two apart. A Cognito ID token has no
-`scope` claim at all, so any route scope refuses it.
+An ID token passes an authorizer that configures only an audience. `token_use` goes unchecked here, as
+it does on real API Gateway. An ID token's `aud` is the app client id, and matches. AWS documents this
+and recommends route scopes as the way to tell the two apart. A Cognito ID token has no `scope` claim
+at all, so any route scope refuses it.
 
 Sign-in through the user pool API issues one scope, `aws.cognito.signin.user.admin`, and that is the
 only scope a simulated flow can put in a token. Resource servers, custom scopes and the client
-credentials grant are not simulated, so no other route scope is satisfiable.
+credentials grant are outside the simulation. No other route scope is satisfiable.
 
 ### The claims the handler receives
 
@@ -634,9 +631,9 @@ An accepted token arrives as `event.requestContext.authorizer.jwt`:
 ```
 
 Every claim value is a string, whatever type it was signed as. A list claim such as `cognito:groups`
-is rendered the way Go prints a slice, so two groups arrive as `[Admins Readers]` rather than as JSON
-or as a comma-separated list. `scopes` is `null`, not an empty list, when the token carries no `scope`
-claim. None of that is published by AWS; all of it is what the real endpoint was observed to send.
+is rendered the way Go prints a slice, so two groups arrive as `[Admins Readers]`, and not as JSON or
+a comma-separated list. `scopes` is `null`, not an empty list, when the token carries no `scope` claim.
+AWS publishes none of that. All of it is what the real endpoint was observed to send.
 
 A route with `AuthorizationType: "NONE"` has no caller to describe, so `requestContext.authorizer` is
 left out of its events entirely.
@@ -644,11 +641,11 @@ left out of its events entirely.
 ## Protecting a route with IAM
 
 A route declared `AuthorizationType: "AWS_IAM"` reaches its integration only when the caller is
-allowed `execute-api:Invoke` on the ARN of the route being called. The route takes no authorizer, and
-naming one is refused: IAM itself is what decides.
+allowed `execute-api:Invoke` on the ARN of the route being called. IAM itself decides. The route takes
+no authorizer, and naming one is refused.
 
 The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
-naming a principal directly. A request that offers neither is anonymous, owns no policies, and is
+naming a principal directly. A request offering neither is anonymous, owns no policies, and is
 refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how that
 resolution works and how to sign a served request.
 
@@ -660,12 +657,12 @@ arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<path>
 
 - The Account and Region are the API's own, not the caller's.
 - The stage is the one that served the request, so `$default` for the default stage.
-- The method is the one the client sent, upper case, so a `GET` reaching a route keyed `ANY /orders`
+- The method is the one the client sent, upper case. A `GET` reaching a route keyed `ANY /orders`
   gives `GET`.
-- The path is the request path with the stage segment and the leading slash taken off, so `/dev/orders/42`
-  served from stage `dev` gives `orders/42`. It is the path asked for rather than the route key, because
-  this is the resource a policy is written against by hand. A request to the API root gives an ARN
-  ending `/GET/`.
+- The path is the request path with the stage segment and the leading slash taken off, so
+  `/dev/orders/42` served from stage `dev` gives `orders/42`. This is the path asked for, not the route
+  key, because a policy is written against it by hand. A request to the API root gives an ARN ending
+  `/GET/`.
 
 An identity policy may wildcard any part of that. `<apiId>/*`, `<apiId>/$default/*` and
 `<apiId>/*/GET/orders/*` all allow a `GET` of `/orders/42` on the default stage.
@@ -802,13 +799,13 @@ await srv.close();
 
 ### What a refused request gets back
 
-A caller IAM does not allow is answered with a 403 and `{"message":"Forbidden"}`, and the integration
-is never invoked. That is the answer for an unsigned request too: the serving boundary resolves it to
-an anonymous caller, and nothing allows an anonymous caller anything. An explicit `Deny` beats an
-`Allow`, as it does in any IAM evaluation.
+A caller IAM refuses is answered with a 403 and `{"message":"Forbidden"}`, and the integration is
+never invoked. An unsigned request gets the same answer. The serving boundary resolves it to an
+anonymous caller, and an anonymous caller is allowed nothing. An explicit `Deny` beats an `Allow`, as
+it does in any IAM evaluation.
 
-A request whose signature is malformed, or is scoped to another service, does not reach the route at
-all. The serving boundary refuses it first, with `{"Message":"Forbidden"}` and a capital `M`.
+A request whose signature is malformed, or is scoped to another service, never reaches the route. The
+serving boundary refuses it first, with `{"Message":"Forbidden"}` and a capital `M`.
 
 ### The caller the handler receives
 
@@ -826,15 +823,15 @@ An admitted request carries its caller into the event as `requestContext.authori
 }
 ```
 
-`accountId` and `userArn` come from the resolved principal's ARN. `requestContext.accountId` is that
-Account too, rather than `anonymous`. The block is the same one a Lambda Function URL produces, so
+`accountId` and `userArn` come from the resolved principal's ARN. `requestContext.accountId` carries
+that Account too, in place of `anonymous`. The block is the same one a Lambda Function URL produces, so
 handler code reading it behaves the same behind either.
 
 ### Callers from another Account
 
 A principal of another Account is refused, whatever its own Account allows it. A cross-Account request
-needs an Allow from the resource side as well, and an HTTP API has nowhere to put one: unlike a REST
-API, it has no resource policy at all. Real AWS behaves the same way.
+needs an Allow from the resource side as well, and an HTTP API has nowhere to put one. An HTTP API has
+no resource policy at all, where a REST API does. Real AWS behaves the same way.
 
 The way through, here and on AWS, is for that principal to assume a Role in the API's Account through
 STS and sign with the session credentials. The request is then made by a principal of the API's own
@@ -986,9 +983,9 @@ console.log(await admitted.text()); // '{"tenant":"acme"}'
 await srv.close();
 ```
 
-The authorizer function is invoked once per request reaching the route. Nothing is cached between
-requests until the authorizer is given an `AuthorizerResultTtlInSeconds`, which is what AWS defaults
-to as well. See [Caching the authorizer's decision](#caching-the-authorizers-decision).
+The authorizer function is invoked once per request reaching the route. Caching starts once the
+authorizer is given an `AuthorizerResultTtlInSeconds`, and AWS defaults it off the same way. See
+[Caching the authorizer's decision](#caching-the-authorizers-decision).
 
 ### The event the authorizer receives
 
@@ -1010,20 +1007,20 @@ exported as `SimHttpApiAuthorizerEvent`:
 ```
 
 `identitySource` carries the values found at the authorizer's identity sources, in the order they were
-configured, rather than the expressions that found them. `routeArn` names the route the request
-matched, with the route key's path template rather than the path asked for, so `GET /orders/{orderId}`
-is `<apiId>/<stage>/GET/orders/{orderId}` whichever order was asked for.
+configured. The expressions that found them stay out of the event. `routeArn` names the route the
+request matched, carrying the route key's path template. `GET /orders/{orderId}` is
+`<apiId>/<stage>/GET/orders/{orderId}` whichever order was asked for.
 
-There is no `body` and no `isBase64Encoded`. AWS's published example of this event carries neither, so
-an authorizer cannot read the request body here, as it cannot on AWS.
+There is no `body` and no `isBase64Encoded`. AWS's published example of this event carries neither, and
+an authorizer cannot read the request body here or on AWS.
 
 ### Answering with a policy
 
 With `EnableSimpleResponses` left off, the function answers a `principalId` and an IAM policy
 document, and simulated IAM evaluates it for `execute-api:Invoke` against the route ARN. That is the
-same evaluation an [`AWS_IAM` route](#protecting-a-route-with-iam) goes through, with one difference:
-the returned document is the whole decision, since there is no IAM principal behind it. `principalId`
-is a name the function chose for the caller and grants nothing.
+same evaluation an [`AWS_IAM` route](#protecting-a-route-with-iam) goes through, with one difference.
+The request has no IAM principal behind it, and the returned document is the whole decision.
+`principalId` is a name the function chose for the caller, and grants no access.
 
 ```typescript
 makeLambdaZipFileInput((event: SimHttpApiAuthorizerEvent) => ({
@@ -1042,38 +1039,38 @@ makeLambdaZipFileInput((event: SimHttpApiAuthorizerEvent) => ({
 }));
 ```
 
-An explicit `Deny` beats an `Allow`, and a document allowing nothing relevant refuses the request.
+An explicit `Deny` beats an `Allow`, and a document with no relevant `Allow` refuses the request.
 
 ### What a refused request gets back
 
 - A request missing any configured identity source is a 401 and `{"message":"Unauthorized"}`, and the
   authorizer function is never invoked.
-- `isAuthorized: false`, or a policy that does not allow `execute-api:Invoke` on the route ARN, is a
-  403 and `{"message":"Forbidden"}`.
+- `isAuthorized: false`, or a policy that refuses `execute-api:Invoke` on the route ARN, is a 403 and
+  `{"message":"Forbidden"}`.
 - Returning `{ "errorMessage": "Unauthorized" }` is a 401. That is the only way an authorizer produces
   one, and it is read whichever response format the authorizer is configured for.
-- A function that throws, returns a shape neither response format matches, returns a policy document
+- A function that throws, returns a shape matching no response format, returns a policy document
   IAM cannot read, or has no invoke permission, is a 500 and `{"message":"Internal Server Error"}`.
-  The caller is told nothing further, as it is told nothing about a failed integration.
+  The caller hears no more, the way it hears no detail about a failed integration.
 
 The integration is never invoked in any of these cases.
 
 ### The authorizer's invoke permission
 
 The authorizer's function is invoked under
-`arn:aws:execute-api:<region>:<account>:<apiId>/authorizers/<authorizerId>`, which is the `SourceArn`
-AWS documents for granting API Gateway permission to invoke one. That ARN names no stage and no
-route, so it is a different grant from the integration's, and a function used for both needs both.
+`arn:aws:execute-api:<region>:<account>:<apiId>/authorizers/<authorizerId>`. That is the `SourceArn`
+AWS documents for granting API Gateway permission to invoke one. It names no stage and no route. That
+is a different grant from the integration's, and a function used for both needs both.
 
 ### Caching the authorizer's decision
 
 `AuthorizerResultTtlInSeconds` holds a decision for that many seconds, and a request presenting the
 same identity source values within it is served from that decision without the function running
-again. AWS accepts up to 3600, and 0, which is the default, holds nothing.
+again. AWS accepts up to 3600. The default, 0, holds no decision at all.
 
 The key is the identity source values and nothing else, so one decision covers every route of the API
-that uses the authorizer. Adding `$context.routeKey` as an identity source puts the route in the key,
-which is what AWS documents for caching per route.
+that uses the authorizer. Adding `$context.routeKey` as an identity source puts the route in the key.
+AWS documents that for caching per route.
 
 ```typescript sim-apigatewayv2-lambda-authorizer-cache
 /**
@@ -1212,17 +1209,18 @@ await srv.close();
 ```
 
 A refusal is held the same way an admission is, so a session the authorizer rejected stays rejected
-until the TTL expires. What is not held is an authorizer that could not answer at all: a function that
+until the TTL expires. An authorizer that could not answer at all is the exception. A function that
 threw, or replied in neither format, is asked again on the next request.
 
-Expiry is checked against the simulation's clock, so `simAws.clock().advanceBy(...)` expires a
-decision that was being reused a moment before, and no test has to wait.
+Expiry is checked against the simulation's clock. `simAws.clock().advanceBy(...)` expires a decision
+that was being reused a moment before, and no test has to wait.
 
 ### The context the handler receives
 
 The `context` the authorizer returned arrives as `event.requestContext.authorizer.lambda`, with its
-values as the function returned them rather than stringified. An authorizer that allowed the request
-and returned no context leaves `null` there, so the block still says which kind of authorizer ran.
+values as the function returned them and no stringifying on the way. An authorizer that allowed the
+request and returned no context leaves `null` there, and the block still says which kind of authorizer
+ran.
 
 ## The event the handler receives
 
@@ -1260,17 +1258,17 @@ The handler is invoked with the API Gateway HTTP API payload format 2.0 event, e
 }
 ```
 
-A field with nothing in it is left out rather than set to null, which is what real API Gateway does:
-`cookies`, `queryStringParameters`, `body`, `pathParameters` and `stageVariables` are absent when the
-request has nothing for them. `rawQueryString` is the exception and is always present, as an empty
-string when there was no query.
+An empty field is left out of the event, as real API Gateway leaves it out. `cookies`,
+`queryStringParameters`, `body`, `pathParameters` and `stageVariables` are absent when the request has
+nothing for them. `rawQueryString` is the exception and is always present, as an empty string when
+there was no query.
 
-Repeated query parameters are joined with commas, cookies travel in `cookies` rather than in a
-`cookie` header, and a body is passed through as text for a text content type and base64-encoded
-otherwise, with `isBase64Encoded` saying which happened.
+Repeated query parameters are joined with commas. Cookies travel in `cookies`, with no `cookie`
+header. A body is passed through as text for a text content type and base64-encoded otherwise, with
+`isBase64Encoded` saying which happened.
 
-The headers API Gateway sets itself replace whatever the client sent under those names: `host` is the
-API's own hostname rather than the localhost one the request arrived at, `x-forwarded-proto` is
+The headers API Gateway sets itself replace whatever the client sent under those names. `host` is the
+API's own hostname, in place of the localhost one the request arrived at. `x-forwarded-proto` is
 `https`, `x-forwarded-port` is `443`, `x-forwarded-for` and `requestContext.http.sourceIp` are
 `127.0.0.1`, and `x-amzn-trace-id` carries an X-Ray-shaped id that no trace exists for.
 
@@ -1322,8 +1320,8 @@ console.log(ordersHandler(order));
 The defaults describe an unauthorized `GET /` reaching the API's default stage, down to the headers
 API Gateway sets itself. The route key and the request agree whichever a test gives: an event for
 `rawPath: "/orders"` is one for the `GET /orders` route, and an event for `routeKey: "POST /orders"`
-is a POST to `/orders`. A route key whose path is a template captures nothing on its own, so an
-event for a parameterised route says the concrete path and its `pathParameters` itself, as above.
+is a POST to `/orders`. A route key whose path is a template captures nothing on its own. An event for
+a parameterised route says the concrete path and its `pathParameters` itself, as above.
 
 `requestContext.authorizer` is absent, as it is for a route with no authorizer. Adding it is how a
 test describes a request that has been through one: `{ jwt: { claims, scopes } }` for a
@@ -1333,25 +1331,24 @@ test describes a request that has been through one: `{ jwt: { claims, scopes } }
 is a different shape, `SimHttpApiAuthorizerEvent`, and has no factory.
 
 The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
-covers what the factories have in common; a Function URL invocation, which is the same event from a
-different endpoint, has
+covers what the factories have in common. A Function URL invocation is the same event from a different
+endpoint, and has
 [its own factory](../lambda/#making-an-invocation-event-without-a-request "Simulated Lambda usage docs").
 
 ## The response the handler returns
 
 A handler returning an object with a `statusCode` produces that HTTP response. Its `headers` are
-sent as headers, its `cookies` become `set-cookie` headers, and an empty body is sent as no body, so
-a 204 stays a valid response.
+sent as headers, its `cookies` become `set-cookie` headers, and an empty body is sent as no body,
+leaving a 204 a valid response.
 
 A handler returning anything else produces a 200 whose body is that value as JSON. That includes an
-object with no `statusCode` in it, so a handler returning `{ body: "hi" }` produces a 200 whose body
-is the JSON `{"body":"hi"}` with `content-type: application/json`, which is what real API Gateway
-does with it.
+object with no `statusCode` in it. A handler returning `{ body: "hi" }` produces a 200 whose body is
+the JSON `{"body":"hi"}` with `content-type: application/json`. Real API Gateway does the same.
 
 ## Reading an API back
 
 `GetApisCommand`, `GetIntegrationsCommand`, `GetRoutesCommand` and `GetStagesCommand` list what an
-API has. Each answers in full, since paging is not simulated.
+API has. Each answers in full, as paging is outside the simulation.
 
 ```typescript sim-apigatewayv2-list-resources
 /**
@@ -1395,13 +1392,13 @@ console.log(stages.Items[0]?.StageVariables);
 ## Deleting what an API has
 
 `DeleteRouteCommand`, `DeleteIntegrationCommand` and `DeleteStageCommand` each take one resource off
-an API and leave the rest of it in place. A deleted route stops matching, so a request that used to
-reach it is answered the way any unmatched request is. A deleted stage stops resolving, so a request
-addressed to it finds nothing, while the routes it served are still served by the API's other stages.
+an API and leave the rest of it in place. A deleted route stops matching, and a request that used to
+reach it is answered the way any unmatched request is. A deleted stage stops resolving. A request
+addressed to it finds no stage, while the routes it served are still served by the API's other stages.
 
 An integration a route still points at cannot be deleted. That is a `BadRequestException` naming the
-routes in the way, as it is on real AWS, so an API comes apart routes first and then the integrations
-behind them. Deleting a route does not delete its integration, since an integration outlives the
+routes in the way, as it is on real AWS, and an API comes apart routes first and then the integrations
+behind them. Deleting a route leaves its integration in place, since an integration outlives the
 routes pointing at it.
 
 ```typescript sim-apigatewayv2-delete-resources
@@ -1476,16 +1473,16 @@ these.
 
 ## Turning the generated endpoint off
 
-`DisableExecuteApiEndpoint: true` stops the generated endpoint serving, which is how an API reachable
+`DisableExecuteApiEndpoint: true` stops the generated endpoint serving. That is how an API reachable
 only through a custom domain is configured. A request to it is answered with a 403 and
 `{"message":"Forbidden"}`. AWS publishes neither the status nor the body for that case, so both are
-what a disabled endpoint was observed to answer rather than something documented.
+what a disabled endpoint was observed to answer.
 
 ## Importing an OpenAPI definition
 
 `ImportApiCommand` takes a serialised OpenAPI 3.0 document and creates the API, one route and one
 integration per operation, and one authorizer per security scheme an operation names. The route
-key is the operation key uppercased and the path taken verbatim, since OpenAPI path templating is
+key is the operation key uppercased and the path taken unchanged, since OpenAPI path templating is
 already API Gateway's path parameter syntax.
 
 An import creates no stage. `CreateStageCommand` or an `AWS::ApiGatewayV2::Stage` is still declared
@@ -1589,7 +1586,7 @@ or as the bare function ARN.
 ### Members that are ignored
 
 AWS sorts what an import finds into three categories, and the third is valid OpenAPI that HTTP APIs
-do not support. It is ignored silently, and so is it here: `requestBody`, the content schemas under
+leave unsupported. AWS ignores it silently, and so does this: `requestBody`, the content schemas under
 `responses`, `components.schemas`, and an operation's `parameters`, `summary`, `description` and
 `tags`. HTTP APIs perform no request validation, so a request whose body contradicts a declared
 schema still reaches the handler.
@@ -1681,7 +1678,7 @@ and a value carrying more is refused, as more than one `IdentitySource` is on `C
 
 [Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
 `AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Authorizer`, `AWS::ApiGatewayV2::Integration`,
-`AWS::ApiGatewayV2::Route` and `AWS::ApiGatewayV2::Stage`, so a synthesized or hand-written template
+`AWS::ApiGatewayV2::Route` and `AWS::ApiGatewayV2::Stage`. A synthesized or hand-written template
 produces an API that serves requests.
 
 `Ref` and `Fn::GetAtt` return what real CloudFormation returns for each type:
@@ -1821,8 +1818,8 @@ await srv.close();
 Every property outside the simulated set is left out of what is created and recorded in
 [`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
 naming the Resource type, the logical id and the ones this can act on instead. The API, authorizer,
-integration, route or stage is created either way, so the stack deploys and the record says which of
-its parts behaves differently to the template. The simulated properties are:
+integration, route or stage is created either way. The stack deploys, and the record says which of its
+parts behaves differently to the template. The simulated properties are:
 
 - `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`, `Body`,
   `FailOnWarnings`
@@ -1839,18 +1836,18 @@ requires IAM authorization when it is served.
 
 CDK's `HttpJwtAuthorizer` and `HttpUserPoolAuthorizer` both deploy. `HttpUserPoolAuthorizer` builds
 its issuer from `Fn::GetAtt <UserPool>.ProviderURL`, which resolves to the same string the pool's
-tokens name as their issuer, so a CDK-declared authorizer and a CDK-deployed pool agree with nothing
-to configure. Pass the app client explicitly through `userPoolClients`, because otherwise the
+tokens name as their issuer. A CDK-declared authorizer and a CDK-deployed pool agree, with no
+configuration to write. Pass the app client explicitly through `userPoolClients`, because otherwise the
 authorizer adds a client of its own with CDK's defaults, and those emit the OAuth properties
 [simulated Cognito refuses](../cognito/#limitations).
 
 An `Authorizer` with `AuthorizerType: "REQUEST"` deploys as a Lambda authorizer, and a `Route` with
 `AuthorizationType: "CUSTOM"` and a `Ref` to it is decided by that authorizer's function.
-`AuthorizerUri` is read the same way an integration's URI is, so the bare function ARN and the
+`AuthorizerUri` is read the same way an integration's URI is. The bare function ARN and the
 `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form both
 work. The `AWS::Lambda::Permission` alongside it needs a `SourceArn` of
-`arn:aws:execute-api:<region>:<account>:<api-id>/authorizers/<authorizer-id>`, which is what CDK
-writes and what the authorizer is invoked under. A function used both as an integration and as an
+`arn:aws:execute-api:<region>:<account>:<api-id>/authorizers/<authorizer-id>`. That is what CDK
+writes, and what the authorizer is invoked under. A function used both as an integration and as an
 authorizer needs two permissions, as it does on AWS.
 
 CDK's `HttpLambdaAuthorizer` deploys when it is given `responseTypes: [HttpLambdaResponseType.SIMPLE]`.
@@ -1871,13 +1868,13 @@ httpApi.addRoutes({
 });
 ```
 
-A `Route` with `AuthorizationType: "JWT"` or `"CUSTOM"` whose `AuthorizerId` does not resolve to an
-authorizer of that API, or resolves to one of the other kind, fails the stack, naming both. That
-covers a `Ref` to a Resource this simulation skipped: a skipped Resource resolves to its own logical
+A `Route` with `AuthorizationType: "JWT"` or `"CUSTOM"` whose `AuthorizerId` resolves to something
+other than an authorizer of that API, or to one of the other kind, fails the stack, naming both. That
+covers a `Ref` to a Resource this simulation skipped. A skipped Resource resolves to its own logical
 ID, and no authorizer has that id.
 
-`Api.Body` carries an OpenAPI document as an inline JSON object, which CloudFormation resolves
-`Ref` and `Fn::GetAtt` inside as it does anywhere else, so an operation's integration URI can be an
+`Api.Body` carries an OpenAPI document as an inline JSON object. CloudFormation resolves `Ref` and
+`Fn::GetAtt` inside it as it does anywhere else, and an operation's integration URI can be an
 `Fn::GetAtt` on a function the same stack deploys. The document goes through the same `ImportApi`
 translator an SDK caller reaches, so the two produce the same API.
 
@@ -1898,35 +1895,35 @@ Api:
               payloadFormatVersion: "2.0"
 ```
 
-`Name` and `ProtocolType` are both optional alongside a `Body`, which is what AWS documents. A
-`ProtocolType` that is present has to be `HTTP`, and a `Name` that is present names the API instead
-of the document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are refused alongside a
-`Body`, because `ImportApi` does not take them and nothing here changes an API after it is created.
-Each is recorded rather than applied, so the API is created from the document without them.
+`Name` and `ProtocolType` are both optional alongside a `Body`, as AWS documents. A `ProtocolType`
+that is present has to be `HTTP`, and a `Name` that is present names the API in place of the
+document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are refused alongside a
+`Body`, because `ImportApi` takes neither, and no command here changes an API after it is created.
+Each is recorded rather than applied, and the API is created from the document without them.
 
 A template combining an `Api` with a `Body` and a separate `Route`, `Integration` or `Authorizer`
 Resource for that same API fails the stack, naming both logical IDs. The document already declares
-the API's parts, and which of the two AWS would keep is not established.
+the API's parts, and which of the two AWS would keep is unestablished.
 
-An `Api` carrying a `Policy` property is refused with its own message rather than the generic one. AWS
-has no such property on this Resource type, because an HTTP API has no resource policy, so a template
+An `Api` carrying a `Policy` property is refused with its own message, in place of the generic one.
+AWS has no such property on this Resource type, because an HTTP API has no resource policy. A template
 carrying one was written for a REST API.
 
 `AWS::ApiGatewayV2::Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the WebSocket-only
-`Model`, `RouteResponse` and `IntegrationResponse` create nothing, so a template carrying one has
-that resource skipped rather than deployed.
+`Model`, `RouteResponse` and `IntegrationResponse` create no resource. A template carrying one has
+that resource skipped.
 
 ## Authorization
 
-Every command is authorized by simulated IAM. API Gateway is unusual in what it asks for: the action
-is the HTTP method of the underlying REST call rather than a name matching the SDK operation, and the
-resource is the request path rather than an ARN naming a resource type. Creating a route on API
+Every command is authorized by simulated IAM. API Gateway is unusual in what it asks for. The action
+is the HTTP method of the underlying REST call, not a name matching the SDK operation, and the
+resource is the request path, where other services name an ARN. Creating a route on API
 `a1b2c3d4e5` asks whether the caller may `apigateway:POST` on
 `arn:aws:apigateway:<region>::/apis/a1b2c3d4e5/routes`. Those ARNs carry no Account id, as API Gateway
 control-plane ARNs leave the Account segment empty.
 
-A policy written the way policies for other services are written matches nothing here, as it matches
-nothing on real AWS.
+A policy written the way policies for other services are written matches no request here, as it
+matches none on real AWS.
 
 ## SDK interception
 
@@ -1939,7 +1936,7 @@ the simulation without being given one. See the
 - `CreateApi`, `GetApi`, `GetApis` and `DeleteApi`, with the API id, the generated endpoint, and the
   Account and Region scoping a real API has
 - `CreateIntegration`, `GetIntegrations` and `DeleteIntegration` for an `AWS_PROXY` integration
-  naming a Lambda function, with an integration a route still targets refused rather than deleted
+  naming a Lambda function, with an integration a route still targets refused, never deleted
 - `CreateRoute`, `GetRoutes` and `DeleteRoute`, with route keys parsed and validated at creation,
   requests matched to a route by method, literal segment, `{name}` parameter, `{proxy+}` parameter
   and `$default`, and a deleted route no longer matching anything
@@ -1983,33 +1980,34 @@ Current documented limitations:
 - Two of the route selection rules, and the place of the method comparison in the order, are observed
   rather than published by AWS. See [Which route serves a request](#which-route-serves-a-request).
 - A route path naming the same parameter twice, such as `GET /pets/{id}/toys/{id}`, is refused. This
-  is stricter than AWS is known to be: it was refused because only one of the two captures could
-  reach the handler, not because real API Gateway was seen to refuse it.
-- Deployments are not simulated, so `CreateStage` requires `AutoDeploy: true`. A stage without it
-  serves whichever Deployment it was given, which on real AWS is nothing until one is created.
+  is stricter than AWS is known to be. It was refused because only one of the two captures could
+  reach the handler, and not because real API Gateway was seen to refuse it.
+- Deployments are outside the simulation, so `CreateStage` requires `AutoDeploy: true`. A stage
+  without it serves whichever Deployment it was given, which on real AWS is nothing until one is
+  created.
 - `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any
-  other option `CreateStage` takes and this one does not.
+  other option `CreateStage` takes and this one lacks.
 - `AWS_PROXY` is the only integration type, and its URI must name an unqualified Lambda function
   ARN, written either as that ARN or as the
   `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.
   Both reach the same function, and `GetIntegrations` answers with the function ARN whichever was
   written. A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP
-  proxy integrations and AWS service integrations are not simulated.
-- Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
-  have, so treating one as the other would pass here and fail on AWS.
+  proxy integrations and AWS service integrations are outside the simulation.
+- Payload format 1.0 is refused. A handler written for 1.0 reads event fields absent from a 2.0
+  event, so treating one as the other would pass here and fail on AWS.
 - `AuthorizationScopes` on an `AWS_IAM` or `CUSTOM` route is refused. This is stricter than AWS, which
   documents route scopes as meaningful only for `JWT` and ignores them here. Accepting one would let a
-  test assert on a scope restriction that nothing applies.
+  test assert on a scope restriction no code applies.
 - The method and path segments of the ARN an `AWS_IAM` route is authorized against are inferred
-  rather than documented, and the two callers of that ARN builder fill them differently: this one
+  rather than documented, and the two callers of that ARN builder fill them differently. This one
   names the request's own method and path, while the integration's invoke permission names the route
   key template. AWS documents one format for both. See
   [Protecting a route with IAM](#protecting-a-route-with-iam).
 - A `*` in a policy resource is uniformly greedy here, so it crosses `/` boundaries. AWS distinguishes
-  `*` from `*/*` in some ARN path positions, which makes the simulator more permissive than AWS for a
-  policy relying on that distinction.
-- Only `execute-api:Invoke` is evaluated. Nothing constrains the action string a policy may name, so
-  a policy can be written with `execute-api:ManageConnections` or `execute-api:InvalidateCache` and
+  `*` from `*/*` in some ARN path positions. That makes the simulator more permissive than AWS for a
+  policy relying on the distinction.
+- Only `execute-api:Invoke` is evaluated. The action string a policy names goes unconstrained, so a
+  policy can be written with `execute-api:ManageConnections` or `execute-api:InvalidateCache` and
   nothing will ever ask about it.
 - `accessKey` in the `iam` block is empty, `callerId` and `userId` carry the caller ARN rather than
   the `AIDA`/`AROA` unique id real AWS puts there, and `cognitoIdentity` and `principalOrgId` are
@@ -2020,11 +2018,11 @@ Current documented limitations:
 - An unsigned request to an `AWS_IAM` route is a 403 rather than the 403 with an
   `x-amzn-ErrorType` of `IncompleteSignatureException` real API Gateway was observed to send. The
   simulator resolves such a request to an anonymous caller and refuses it by ordinary IAM evaluation.
-- HTTP API resource policies are not simulated, because AWS does not have them. A caller from another
+- HTTP API resource policies are outside the simulation, because AWS has none. A caller from another
   Account is therefore always refused, since a cross-Account request needs an Allow from the resource
-  side. Assume a Role in the API's Account instead, which is the route through on AWS as well.
-- `AuthorizerPayloadFormatVersion: "2.0"` is required on a `REQUEST` authorizer, and stating nothing
-  is refused too. AWS defaults it to `1.0`, which builds a different event and answers a policy
+  side. Assume a Role in the API's Account instead. That is the route through on AWS as well.
+- `AuthorizerPayloadFormatVersion: "2.0"` is required on a `REQUEST` authorizer, and omitting it is
+  refused too. AWS defaults it to `1.0`, which builds a different event and answers a policy
   against a method ARN, and none of that is built here. CDK defaults `HttpLambdaAuthorizer` to
   `responseTypes: [HttpLambdaResponseType.IAM]`, which sets the format to `1.0`, so a default
   `new HttpLambdaAuthorizer(...)` fails the stack. Pass
@@ -2038,84 +2036,84 @@ Current documented limitations:
   imported document. On an `AWS::ApiGatewayV2::Authorizer` it is recorded instead, and the authorizer
   is created without it. It names a Role API Gateway assumes to invoke the authorizer, and the
   function's own resource policy is the whole decision here.
-- `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, which is the range AWS accepts, and
-  is refused on an authorizer with no `IdentitySource`, since there would be nothing to key the held
-  decision on.
-- A held decision is the whole answer, so a policy response is not re-evaluated per route on a cache
-  hit. That is what AWS's own warning about caching describes, and `$context.routeKey` as an identity
+- `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, the range AWS accepts, and is refused
+  on an authorizer with no `IdentitySource`, since the held decision would have no key.
+- A held decision is the whole answer. A policy response is re-evaluated per route only on a cache
+  miss. That is what AWS's own warning about caching describes, and `$context.routeKey` as an identity
   source is the documented way to separate routes.
-- An authorizer that could not answer at all, by throwing or by replying in neither format, is not
+- An authorizer that could not answer at all, by throwing or by replying in neither format, is never
   held. There is no answer to hold, and the next request asks the function again.
 - A `REQUEST` authorizer requires at least one `IdentitySource`. An authorizer with none is invoked
-  for every request on AWS, including one carrying nothing, and that is not simulated.
+  for every request on AWS, including one carrying nothing, and that is outside the simulation.
 - A `REQUEST` authorizer's identity source is `$request.header.<name>`,
   `$request.querystring.<name>` or `$context.routeKey`. The rest of `$context` and all of
-  `$stageVariables`, which a `REQUEST` authorizer may also name on AWS, are refused rather than read
-  from nowhere. A JWT authorizer takes one identity source naming something the client sent, so
-  `$context.routeKey` is refused for it, and a second source is refused rather than partly read.
-- An identity source naming nothing after its prefix is refused, and so is one naming a header that
-  is not an HTTP field name. Either would find nothing on every request, and an invalid header name
-  would fail at request time rather than at the command that configured it.
-- `JwtConfiguration.Audience` is required. What real API Gateway does with an authorizer that has an
-  empty audience list is not documented, so this is stricter than AWS may be, in the direction that
-  cannot quietly admit an app client.
-- A token with no `exp` claim is refused. Real Cognito always sets one, and admitting a token that
-  nothing can expire is the divergence worth failing on.
-- `token_use` is not checked, which is what real API Gateway does, so an ID token passes an
-  authorizer that configures only an audience. See
+  `$stageVariables`, which a `REQUEST` authorizer may also name on AWS, are refused, with nowhere to
+  read them from. A JWT authorizer takes one identity source naming something the client sent, so
+  `$context.routeKey` is refused for it, and a second source is refused outright.
+- An identity source with an empty name after its prefix is refused, and so is one whose header name is
+  invalid as an HTTP field name. Each would find no value on any request, and an invalid header name
+  would fail at request time, far from the command that configured it.
+- `JwtConfiguration.Audience` is required. AWS documents no behaviour for an authorizer with an empty
+  audience list. This may be stricter than AWS, in the direction that cannot quietly admit an app
+  client.
+- A token with no `exp` claim is refused. Real Cognito always sets one, and admitting a token with no
+  expiry is the divergence worth failing on.
+- `token_use` goes unchecked, as it does on real API Gateway. An ID token passes an authorizer that
+  configures only an audience. See
   [Route scopes, and access tokens versus ID tokens](#route-scopes-and-access-tokens-versus-id-tokens).
-- `aws.cognito.signin.user.admin` is the only scope any simulated Cognito flow issues, so it is the
-  only satisfiable route scope. Resource servers, custom scopes and the client credentials grant are
-  not simulated.
+- `aws.cognito.signin.user.admin` is the only scope any simulated Cognito flow issues, and the only
+  satisfiable route scope. Resource servers, custom scopes and the client credentials grant are
+  outside the simulation.
 - A token invalidated by `GlobalSignOut` still passes. Real API Gateway knows nothing about the pool's
   issued tokens, so consulting them here would refuse a token AWS would accept.
 - The pool's JWKS is read in process rather than fetched. A pool's published OpenID configuration
-  names the localhost origin it is served from while its tokens name the real AWS URL, so a discovery
+  names the localhost origin it is served from while its tokens name the real AWS URL. A discovery
   client would reject its own issuer's tokens.
 - One signing key per issuer, no key rotation and no JWKS caching. Real Cognito publishes two keys
   and rotates between them, so code assuming a single entry passes here and is still wrong on AWS.
 - The 403 body for an unmet route scope, the string rendering of claim values, and `scopes` being
-  `null` rather than `[]` are all what the real endpoint was observed to send rather than anything
-  AWS publishes. Only the one `error_description` AWS documents is ever sent; every other refusal
-  names the scheme and nothing else. How AWS lays out the `www-authenticate` parameters around that
-  description is not published either, so they are comma-separated as RFC 6750 writes them.
+  `null` rather than `[]` are all what the real endpoint was observed to send. AWS publishes none of
+  them. Only the one `error_description` AWS documents is ever sent, and every other refusal names the
+  scheme and nothing else. AWS publishes no layout for the `www-authenticate` parameters around that
+  description either, so they are comma-separated as RFC 6750 writes them.
 - Deleting an authorizer a route still points at leaves that route refusing every request. What real
-  API Gateway does with such a route is not established, so it stays closed rather than falling open.
+  API Gateway does with such a route is unestablished. It stays closed here.
 - The method and path segments of the source ARN are inferred rather than documented. See
   [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
 - An integration `CredentialsArn`, the IAM Role alternative to a resource policy grant, is refused
   by `CreateIntegration`. A permission on the function is the only way to admit the invocation.
 - No `Update*` commands. A route, integration or stage is changed by deleting it and creating it
   again. `DeleteApi` deletes everything under the API, as it does on AWS.
-- Custom domain names and API mappings are not simulated. They change what `rawPath` holds, so an API
-  reached through one behaves differently on AWS from what is served here.
-- No paging. `MaxResults` and `NextToken` are refused rather than ignored, and every list command
-  answers in full.
+- Custom domain names and API mappings are outside the simulation. They change what `rawPath` holds,
+  so an API reached through one behaves differently on AWS from what is served here.
+- No paging. `MaxResults` and `NextToken` are refused, never ignored, and every list command answers
+  in full.
 - `CorsConfiguration` and `Tags` are refused, as is the `RouteKey`/`Target` quick-create shorthand on
-  `CreateApi`. Anything else the real commands accept and this one does not is refused by name rather
+  `CreateApi`. Anything else the real commands accept and this one lacks is refused by name rather
   than dropped.
 - `AWS::ApiGatewayV2::Api` records `CorsConfiguration` rather than applying it. CORS request handling
-  is not simulated, so a CDK stack using `corsPreflight` deploys and its API answers preflight
+  is outside the simulation, so a CDK stack using `corsPreflight` deploys and its API answers preflight
   requests here differently from AWS. The record is where a test checks that.
 - Only OpenAPI 3.0.x is imported. A `swagger: "2.0"` document and an `openapi: "3.1.0"` one are both
   refused by version, and only JSON is parsed, not YAML.
 - `FailOnWarnings` is honoured only in its strict sense. Everything an import cannot apply is refused
-  rather than warned about, so `true` is accepted and has no further effect and `false` is refused by
-  name. What AWS defaults the property to is not established, so nothing here relies on a default.
+  outright, with no warning, so `true` is accepted and has no further effect and `false` is refused by
+  name. What AWS defaults the property to is unestablished, and no code here relies on a default.
 - `Basepath` on `ImportApi`, `BasePath` on `AWS::ApiGatewayV2::Api` and `servers` in the document are
   all refused. A base path changes the path every route matches on, which belongs with custom domain
   names.
-- `ReimportApi` is not simulated, as no `Update*` command is. Delete the API and import again.
-- An imported `operationId` is dropped rather than stored. AWS maps it to the route's
+- `ReimportApi` is outside the simulation, as every `Update*` command is. Delete the API and import
+  again.
+- An imported `operationId` is dropped. AWS maps it to the route's
   `OperationName`, and no command here takes one.
 - A `trace` operation, a path item `$ref`, `x-amazon-apigateway-any-method` and a document-level
   `security` are each refused by name. None of the four is established for HTTP APIs by the research
-  behind this, so each is refused rather than turned into a route the API may not have on AWS.
+  behind this, so each is refused, and never turned into a route the API may lack on AWS.
 - An operation carrying more than one security requirement is refused, as is a requirement naming
   more than one scheme. A route has one authorizer.
-- A security scheme that is not `oauth2` with an explicit `jwtConfiguration.issuer` is refused. That
+- Anything other than an `oauth2` scheme with an explicit `jwtConfiguration.issuer` is refused. That
   includes `openIdConnect`, where AWS reads the issuer out of the discovery document at
-  `openIdConnectUrl`: nothing here is fetched over HTTP, and taking the URL as the issuer would
+  `openIdConnectUrl`. Nothing here is fetched over HTTP, and taking the URL as the issuer would
   mismatch every token's `iss` and answer a silent 401.
 - `http_proxy` integrations, `integrationMethod`, `integrationSubtype`, `requestParameters`,
   `credentials`, `tlsConfig`, `responseTransferMode`, `connectionId` and `connectionType` in an
@@ -2124,21 +2122,21 @@ Current documented limitations:
 - `x-amazon-apigateway-cors` is refused, alongside the `CorsConfiguration` refusal above.
 - A referenced `x-amazon-apigateway-integrations` definition becomes one shared integration, so two
   operations naming it produce one entry in `GetIntegrations`. Whether AWS shares one or creates one
-  per use is not established; this is what a reusable definition reads as.
+  per use is unestablished. This is what a reusable definition reads as.
 - A `Name` on an `AWS::ApiGatewayV2::Api` with a `Body` names the API rather than the document's
-  `info.title`. Which of the two AWS takes when both are present is not established, and it affects
-  only the name `GetApi` reports.
+  `info.title`. Which of the two AWS takes when both are present is unestablished, and it affects only
+  the name `GetApi` reports.
 - A terminal `{proxy+}` in an imported path reaches `CreateRoute` unchanged. Greedy segments are
-  established for route keys rather than for OpenAPI path templating.
-- `AWS::ApiGatewayV2::Api` records `BodyS3Location` rather than reading it, so the API is created
-  with no routes at all. Reading a document out of a simulated S3 bucket adds a fetch path and
-  nothing about OpenAPI.
+  established for route keys, and not for OpenAPI path templating.
+- `AWS::ApiGatewayV2::Api` records `BodyS3Location` rather than reading it. The API is created with no
+  routes at all. Reading a document out of a simulated S3 bucket adds a fetch path and nothing about
+  OpenAPI.
 - `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
-  resource policy. There is no such property on the real Resource type, so a template carrying one
-  was written for a REST API rather than hitting a gap here.
+  resource policy. The real Resource type has no such property. A template carrying one was written
+  for a REST API, not against a gap here.
 - A stack update replaces a changed resource of these types rather than updating it in place, as it
   does for any other type. See the [CloudFormation limitations](../cloudformation/#limitations).
-- Access logging, throttling, usage plans and API keys are not simulated.
+- Access logging, throttling, usage plans and API keys are outside the simulation.
 - The response an API Gateway endpoint returns itself uses a lower-case `message` field, as a real
-  HTTP API does. A Lambda Function URL uses `Message` for the same thing, so the two are not
-  interchangeable.
+  HTTP API does. A Lambda Function URL uses `Message` for the same thing, so the two cannot be
+  swapped.
