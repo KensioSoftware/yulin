@@ -9,7 +9,13 @@
  * published build.
  */
 
+import type {
+  AttributeType,
+  UserPoolMfaType,
+} from "@aws-sdk/client-cognito-identity-provider";
 import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
   CreateIdentityProviderCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
@@ -55,11 +61,38 @@ export interface SimCognitoHostedSetUpOptions {
   /** The scopes the app client allows, `openid` and `email` by default. */
   readonly scopes?: readonly string[];
 
-  /** The providers the app client supports, `Google` by default. */
+  /**
+   * The providers the app client supports, the pool's own users and `Google`
+   * by default.
+   */
   readonly identityProviders?: readonly string[];
 
   /** The domain the pool is created with, the prefix form by default. */
   readonly domain?: string;
+
+  /** What the pool asks of a second factor, `OFF` by default. */
+  readonly mfaConfiguration?: UserPoolMfaType;
+}
+
+/**
+ * The username the pool's own user in these tests holds.
+ */
+export const simCognitoLocalUsername = "alice";
+
+/**
+ * The password that user signs in with.
+ */
+export const simCognitoLocalPassword = "Sup3rSecret!";
+
+export interface SimCognitoLocalUserOptions {
+  /** The username the user holds, `alice` by default. */
+  readonly username?: string;
+
+  /** The password it signs in with. */
+  readonly password?: string;
+
+  /** The attributes it is created with, an email address by default. */
+  readonly attributes?: AttributeType[];
 }
 
 /**
@@ -72,14 +105,19 @@ export async function simCognitoHosted(
   const {
     generateSecret = false,
     scopes = ["openid", "email"],
-    identityProviders = ["Google"],
+    identityProviders = ["COGNITO", "Google"],
     domain = simCognitoDomainPrefix,
   } = options;
   const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
   const cognito = simAws.cognitoIdentityProvider();
 
   const pool = await cognito.createUserPool(
-    new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+    new CreateUserPoolCommand({
+      PoolName: "myapp-users",
+      ...(options.mfaConfiguration !== undefined && {
+        MfaConfiguration: options.mfaConfiguration,
+      }),
+    }),
   );
   assertNonNullable(pool.UserPool?.Id);
   const userPoolId = pool.UserPool.Id;
@@ -138,6 +176,40 @@ export async function simCognitoHosted(
     clientId: client.UserPoolClient.ClientId,
     clientSecret: client.UserPoolClient.ClientSecret,
   };
+}
+
+/**
+ * A confirmed user of the pool's own, holding a password it signs in with.
+ *
+ * An admin creates it and sets a permanent password on it, which is the
+ * shortest route to a user in `CONFIRMED`. The sign-up route to the same place
+ * is what the sign-up tests drive.
+ */
+export async function simCognitoLocalUser(
+  setUp: SimCognitoHostedSetUp,
+  options: SimCognitoLocalUserOptions = {},
+): Promise<void> {
+  const {
+    username = simCognitoLocalUsername,
+    password = simCognitoLocalPassword,
+    attributes = [{ Name: "email", Value: `${username}@example.com` }],
+  } = options;
+
+  await setUp.cognito.adminCreateUser(
+    new AdminCreateUserCommand({
+      UserPoolId: setUp.userPoolId,
+      Username: username,
+      UserAttributes: attributes,
+    }),
+  );
+  await setUp.cognito.adminSetUserPassword(
+    new AdminSetUserPasswordCommand({
+      UserPoolId: setUp.userPoolId,
+      Username: username,
+      Password: password,
+      Permanent: true,
+    }),
+  );
 }
 
 /**

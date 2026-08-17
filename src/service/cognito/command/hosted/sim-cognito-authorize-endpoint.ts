@@ -1,17 +1,17 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoAuthorizationCode } from "../../user-pool/auth/sim-cognito-authorization-code.js";
-import type { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import { SimCognitoAuthorizeRequest } from "./sim-cognito-authorize-request.js";
 import { SimCognitoGrantedScopes } from "./sim-cognito-granted-scopes.js";
 import { SimCognitoHostedClient } from "./sim-cognito-hosted-client.js";
+import type { SimCognitoHostedSignIn } from "./sim-cognito-hosted-sign-in.js";
 import type {
   SimCognitoAuthorizeInput,
   SimCognitoHostedRedirect,
 } from "./hosted-auth.command.js";
 
 interface SimCognitoAuthorizeEndpointProperties {
-  readonly federatedSignIn: SimCognitoFederatedSignIn;
+  readonly signIn: SimCognitoHostedSignIn;
   readonly clock: SimClock;
 }
 
@@ -20,30 +20,31 @@ interface SimCognitoAuthorizeEndpointProperties {
  *
  * Real Cognito answers this request in one of two ways: it sends the browser
  * to an identity provider's sign-in page when the request names a provider,
- * and to managed login's own page when it does not. Only the first has an
- * equivalent here, because the second is a web page a person fills in, and a
- * simulation of a person filling it in would be a simulation of nothing.
+ * and to managed login's own form when it does not. Both end in the same
+ * place, which is the app client's callback URL carrying an authorization
+ * code, and both end there here.
  *
- * So a request naming a provider signs in the user that provider has been told
- * is signed in at it, and answers with the code real Cognito would answer
- * with. A request naming no provider, or naming the pool's own users, is
- * refused with a message saying so, rather than being answered with a page or
- * with a user nothing put there.
+ * A request naming a provider signs in the user that provider has been told is
+ * signed in at it. A request naming none signs in one of the pool's own users,
+ * with the username and password real managed login would have taken from its
+ * form. Nothing here draws the form: the serving layer is what answers a
+ * browser with a page, and a test calling this directly passes the two fields
+ * the form would have posted.
  */
 export class SimCognitoAuthorizeEndpoint {
-  private readonly federatedSignIn: SimCognitoFederatedSignIn;
+  private readonly signIn: SimCognitoHostedSignIn;
   private readonly clock: SimClock;
   private readonly hostedClient = new SimCognitoHostedClient();
   private readonly request = new SimCognitoAuthorizeRequest();
 
   constructor(properties: SimCognitoAuthorizeEndpointProperties) {
-    this.federatedSignIn = properties.federatedSignIn;
+    this.signIn = properties.signIn;
     this.clock = properties.clock;
   }
 
   /**
-   * Sign a user in through an identity provider, and send the browser back to
-   * the application with an authorization code.
+   * Sign a user in, and send the browser back to the application with an
+   * authorization code.
    */
   handle(
     pool: SimCognitoUserPool,
@@ -63,12 +64,7 @@ export class SimCognitoAuthorizeEndpoint {
     this.request.requireChallengeMethod(input);
 
     const scopes = new SimCognitoGrantedScopes(client, input.scope);
-    const provider = this.request.requiredProvider(pool, client, input);
-    const user = this.federatedSignIn.signIn({
-      pool,
-      provider,
-      now: this.clock.now(),
-    });
+    const user = this.signIn.signIn(pool, client, input);
 
     const code = new SimCognitoAuthorizationCode({
       username: user.username,
