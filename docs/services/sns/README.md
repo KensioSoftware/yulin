@@ -5,9 +5,10 @@ every operation is authorized by simulated IAM.
 
 Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
 
-A message published to a topic is delivered to every queue subscribed to it, and invokes every Lambda
-function subscribed to it. Other subscription protocols are not simulated. A message published to a
-phone number is recorded as an SMS a test can assert on.
+A message published to a topic is delivered to every queue subscribed to it, invokes every Lambda
+function subscribed to it, and is recorded as an SMS for every phone number subscribed to it. Other
+subscription protocols are not simulated. A message published straight to a phone number is recorded
+as an SMS a test can assert on.
 
 ## Creating a topic and publishing to it
 
@@ -205,7 +206,8 @@ console.log(published.Failed?.[0]?.Code); // "InvalidParameterValueException"
 
 A `Publish` that names a `PhoneNumber` sends an SMS to that number. The message stays inside the
 simulation. Simulated SNS records what it would have texted, and `sentSmsMessages()` on the service
-reads the records back, oldest first.
+reads the records back, oldest first. A topic texts a number as well, under
+[texting a subscribed number](#texting-a-subscribed-number).
 
 ```typescript sim-sns-sms
 /**
@@ -292,9 +294,10 @@ published in `eu-west-2` is invisible from `us-east-1`.
 
 ## Subscriptions
 
-`Subscribe` with the `sqs` protocol and a queue ARN, or the `lambda` protocol and a function ARN,
-answers with a subscription ARN straight away. There is no confirmation step for either protocol, as
-there is none on real SNS: the subscription is confirmed the moment it exists.
+`Subscribe` with the `sqs` protocol and a queue ARN, the `lambda` protocol and a function ARN, or the
+`sms` protocol and a phone number, answers with a subscription ARN straight away. There is no
+confirmation step for any of the three, as there is none on real SNS. The subscription is confirmed
+the moment it exists.
 
 ```typescript sim-sns-subscriptions
 /**
@@ -365,10 +368,11 @@ A subscription ARN is the topic's ARN with an opaque id on the end. That is the 
 subscription: `Unsubscribe`, `GetSubscriptionAttributes` and `SetSubscriptionAttributes` all name one
 by it.
 
-The endpoint has to be an ARN of the kind the protocol implies, and it is checked when the
-subscription is made: a queue ARN over the `lambda` protocol is refused, as it is on real SNS. A
-qualified function ARN naming a version or an alias is refused too, since simulated Lambda has
-neither and subscribing `$LATEST` instead would be a different function from the one asked for.
+The endpoint has to be what the protocol implies, and it is checked when the subscription is made. A
+queue ARN over the `lambda` protocol is refused, as it is on real SNS, and so is an `sms` endpoint
+outside E.164. A qualified function ARN naming a version or an alias is refused too, since simulated
+Lambda has neither and subscribing `$LATEST` instead would be a different function from the one asked
+for.
 
 Subscribing the same endpoint to the same topic twice answers with the subscription that is already
 there rather than making a second one, as real SNS does. The attributes the repeated request carries
@@ -388,11 +392,11 @@ topic recreated under the same name starts with none.
 
 `GetTopicAttributes` counts the topic's subscriptions in `SubscriptionsConfirmed`, and counts the
 ones that have been unsubscribed in `SubscriptionsDeleted`. `SubscriptionsPending` is always zero,
-because neither protocol simulated needs a confirmation.
+because no protocol simulated needs a confirmation.
 
-Only the `sqs` and `lambda` protocols are simulated. Every other protocol real SNS has is refused by
-name at `Subscribe` time with the reason it is missing, rather than creating a subscription that
-would never be delivered to.
+Only the `sqs`, `lambda` and `sms` protocols are simulated. Every other protocol real SNS has is
+refused by name at `Subscribe` time with the reason it is missing, rather than creating a
+subscription that would never be delivered to.
 
 ## Delivering to a queue
 
@@ -668,6 +672,84 @@ envelope leaves both out.
 
 `RawMessageDelivery` has no effect on a `lambda` subscription. Real SNS treats it as an SQS and HTTP
 setting, so a function is invoked with the whole event whether it is set or not.
+
+## Texting a subscribed number
+
+Subscribing a phone number with the `sms` protocol records one SMS per published message the
+subscription accepts. The records are the ones `sentSmsMessages()` reads back, alongside those a
+publish straight to a `PhoneNumber` leaves.
+
+```typescript sim-sns-sms-subscription
+/**
+ * Fanning a published message out to a subscribed phone number.
+ */
+
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "alerts" }),
+);
+
+// An sms subscription needs no confirmation either, so the ARN comes back at
+// once.
+const { SubscriptionArn } = await sns.subscribe(
+  new SubscribeCommand({
+    TopicArn,
+    Protocol: "sms",
+    Endpoint: "+15550100",
+    Attributes: { FilterPolicy: JSON.stringify({ severity: ["high"] }) },
+  }),
+);
+
+await sns.publish(
+  new PublishCommand({
+    TopicArn,
+    Subject: "Disk usage",
+    Message: "Disk full",
+    MessageAttributes: {
+      severity: { DataType: "String", StringValue: "high" },
+    },
+  }),
+);
+
+// A topic delivers after the publish has been answered, as it does on real
+// SNS.
+await simAws.backgroundTasksComplete();
+
+const [sms] = sns.sentSmsMessages();
+
+console.log(sms?.phoneNumber); // "+15550100"
+console.log(sms?.message); // "Disk full"
+console.log(sms?.topicArn === TopicArn); // true
+console.log(sms?.subscriptionArn === SubscriptionArn); // true
+console.log(sms?.suppressed); // false
+```
+
+The recorded body is the message as it was published. A handset receives the text on its own, so the
+SNS envelope a queue receives and the `Subject` an email carries are both left off.
+
+Each record names the topic and the subscription that produced it, in `topicArn` and
+`subscriptionArn`. A record from a publish straight to a phone number leaves both undefined. That is
+how a test tells one kind of send from the other. The `messageId` is the one the publish was answered
+with, so every SMS one publish fanned out carries it.
+
+A filter policy applies to an `sms` subscription the way it applies to any other. The number receives
+the messages its own policy accepts, and the rest of the topic's subscriptions are unaffected.
+
+A subscribed number on the opt-out list has its message recorded as `suppressed`, and the publish
+still succeeds. The topic's other subscriptions receive theirs. `optOutPhoneNumber` on the service is
+what puts a number on the list, under [sending an SMS](#sending-an-sms).
+
+`Unsubscribe` stops the texting. A message published afterwards leaves no record for that number.
 
 ## Filtering what a subscription receives
 
@@ -1428,8 +1510,8 @@ an SDK caller would get: the same name validation, the same attributes, the same
 `Publish` or `Subscribe`. `Fn::GetAtt … TopicArn` gives the same string, and `Fn::GetAtt … TopicName`
 gives the name without the account and region around it.
 
-`AWS::SNS::Subscription` subscribes through `Subscribe`, so its `Protocol` has to be one of the two
-simulated and its `Endpoint` has to be an ARN that protocol can reach. `RawMessageDelivery`,
+`AWS::SNS::Subscription` subscribes through `Subscribe`, so its `Protocol` has to be one of the three
+simulated and its `Endpoint` has to be something that protocol can reach. `RawMessageDelivery`,
 `FilterPolicy` and `FilterPolicyScope` are carried through as subscription attributes, so a filter
 policy written in a template is read exactly as one set through the SDK. The policy is an object in
 the template where the API takes a JSON string; the conversion happens on the way in. `Ref` on the
@@ -1600,7 +1682,7 @@ Sim SNS currently supports:
 - The phone number opt-out list, with `CheckIfPhoneNumberIsOptedOutCommand`,
   `ListPhoneNumbersOptedOutCommand` and `OptInPhoneNumberCommand`, and `optOutPhoneNumber()` standing
   in for a recipient replying STOP
-- `SubscribeCommand` over the `sqs` and `lambda` protocols, confirmed at once, and
+- `SubscribeCommand` over the `sqs`, `lambda` and `sms` protocols, confirmed at once, and
   `UnsubscribeCommand`
 - `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
   with a `NextToken`
@@ -1612,6 +1694,8 @@ Sim SNS currently supports:
   another region, authorized by that queue's own policy on every message
 - Invocation of every subscribed Lambda function, including a function in another account or another
   region, authorized by that function's own resource policy on every message
+- An SMS recorded for every subscribed phone number, carrying the topic ARN and the subscription ARN
+  that produced it, and marked `suppressed` for a number on the opt-out list
 - The SNS envelope, with a real RSA signature a verifier can check against the certificate the
   message names, and `RawMessageDelivery` for the published message on its own
 - The SNS Lambda event, with one `Records` entry per published message and the message attributes in
@@ -1631,9 +1715,9 @@ Sim SNS currently supports:
 
 Current documented limitations:
 
-- Only the `sqs` and `lambda` subscription protocols are simulated, so a queue and a function are the
-  only things a topic can deliver to. `http`, `https`, `email`, `email-json`, `sms`, `application`
-  and `firehose` are refused at `Subscribe` time.
+- Only the `sqs`, `lambda` and `sms` subscription protocols are simulated, so a queue, a function and
+  a phone number are the only things a topic can deliver to. `http`, `https`, `email`, `email-json`,
+  `application` and `firehose` are refused at `Subscribe` time.
 - A subscribed function is invoked with `Subject: null` and `MessageAttributes: {}` where the publish
   had neither, which is what real SNS sends. The envelope a queue receives leaves both fields out.
 - `RawMessageDelivery` is accepted on a `lambda` subscription and has no effect on it, as it has none
@@ -1653,8 +1737,8 @@ Current documented limitations:
 - Delivery retry policies, subscription dead-letter queues and delivery status logging are not
   simulated, so a message an endpoint would not take is delivered once and recorded as a failure
   rather than retried.
-- `ConfirmSubscription` is not supported. Neither protocol simulated needs a confirmation, so there
-  is no confirmation token to confirm.
+- `ConfirmSubscription` is not supported. No protocol simulated needs a confirmation, so there is no
+  confirmation token to confirm.
 - The `cidr` filter policy operator is not simulated. A policy holding one is refused when it is set,
   naming the operator, rather than accepted and then matching nothing.
 - A filter policy is reported back as the string it was set with. Real SNS re-serialises the
@@ -1721,8 +1805,7 @@ Current documented limitations:
 - Delivery status logging writes to CloudWatch Logs, which is not simulated, so the feedback role and
   sample rate attributes are refused.
 - Platform applications and endpoints, and subscribing over `http`, `https`, `email`, `email-json`,
-  `sms`, `application` and `firehose`, are not supported. An SMS is reached by publishing to a phone
-  number, not yet by subscribing one to a topic.
+  `application` and `firehose`, are not supported.
 - SNS condition keys such as `sns:Endpoint` and `sns:Protocol` are not derived, so a policy relying on
   them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
 - `FifoTopic: false` in a template fails the resource rather than deploying a standard topic. It is

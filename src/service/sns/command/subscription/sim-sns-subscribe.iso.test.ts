@@ -81,6 +81,42 @@ describe("SNS Subscribe", () => {
     });
   });
 
+  it("confirms an sms subscription at once and reports the number", async () => {
+    // Given a topic.
+    const { simAws, topicArn } = await simAwsWithTopic();
+
+    // When a phone number is subscribed to it.
+    const subscribed = await simAws.sns().subscribe(
+      new SubscribeCommand({
+        TopicArn: topicArn,
+        Protocol: "sms",
+        Endpoint: "+15550100",
+      }),
+    );
+
+    // Then the answer is a subscription ARN, as it is for a queue: the number
+    // is the endpoint, so real SNS has nothing to confirm either.
+    assertNonNullable(subscribed.SubscriptionArn);
+    assertStringIncludes(
+      subscribed.SubscriptionArn,
+      `${simSnsOrdersTopicArn}:`,
+    );
+
+    // And the subscription reports where it texts.
+    const read = await simAws.sns().getSubscriptionAttributes(
+      new GetSubscriptionAttributesCommand({
+        SubscriptionArn: subscribed.SubscriptionArn,
+      }),
+    );
+
+    assertNonNullable(read.Attributes);
+    assertObjectMatches(read.Attributes, {
+      Protocol: "sms",
+      Endpoint: "+15550100",
+      PendingConfirmation: "false",
+    });
+  });
+
   it("takes RawMessageDelivery on the Subscribe request", async () => {
     // Given a topic.
     const { simAws, topicArn } = await simAwsWithTopic();

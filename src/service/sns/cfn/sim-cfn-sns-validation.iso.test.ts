@@ -220,7 +220,7 @@ describe("AWS::SNS::Subscription validation", () => {
 
   it("leaves an absent Endpoint to Subscribe to refuse", async () => {
     // Given a subscription with no Endpoint. Real CloudFormation leaves the
-    // property optional, because a protocol such as sms carries the
+    // property optional, because a protocol such as application carries the
     // destination elsewhere, so the refusal belongs to the protocol.
     const error = await deploySubscription({ Protocol: "sqs" });
 
@@ -229,6 +229,22 @@ describe("AWS::SNS::Subscription validation", () => {
       "Invalid AWS::SNS::Subscription Resource FulfilmentSubscription",
     );
     assertStringIncludes(error.message, "Endpoint");
+  });
+
+  it("fails an sms subscription whose Endpoint is not a phone number", async () => {
+    // Given a template texting something that is not an E.164 number.
+    const error = await deploySubscription({
+      Protocol: "sms",
+      Endpoint: "555-0100",
+    });
+
+    // Then the Resource is invalid rather than deployed as a subscription that
+    // would text nobody.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::SNS::Subscription Resource FulfilmentSubscription",
+    );
+    assertStringIncludes(error.message, "is not an E.164 phone number");
   });
 
   it("fails a subscription whose Endpoint is not a string", async () => {

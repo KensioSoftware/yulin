@@ -9,9 +9,9 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimSnsDeliveryEndpoints } from "./delivery/sim-sns-delivery.js";
 import type { SimSnsDeliveryFailure } from "./delivery/sim-sns-delivery-failures.js";
-import { SimSnsNoDeliveryEndpoints } from "./delivery/sim-sns-no-delivery-endpoints.js";
+import { simSnsNoDeliveryEndpoints } from "./delivery/sim-sns-no-delivery-endpoints.js";
+import type { SimSnsOutwardDeliveryEndpoints } from "./delivery/sim-sns-protocol-delivery-endpoints.js";
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
 import { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
@@ -29,12 +29,13 @@ interface SimSnsProperties {
   readonly background?: BackgroundScheduler;
 
   /**
-   * Where this scope's subscriptions deliver to.
+   * Where this scope's subscriptions deliver to, outside simulated SNS itself.
    *
    * A SimSns built on its own has none, since a queue or a function in another
-   * simulated service is only reachable through SimAws.
+   * simulated service is only reachable through SimAws. An `sms` subscription
+   * needs nothing here, because simulated SNS records those itself.
    */
-  readonly deliveryEndpoints?: SimSnsDeliveryEndpoints;
+  readonly deliveryEndpoints?: SimSnsOutwardDeliveryEndpoints;
 }
 
 /**
@@ -57,7 +58,7 @@ export class SimSns extends SimSnsSms {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-      deliveryEndpoints = new SimSnsNoDeliveryEndpoints(),
+      deliveryEndpoints = simSnsNoDeliveryEndpoints(),
     } = properties;
     const topics = new SimSnsTopicStore();
     const subscriptions = new SimSnsSubscriptionStore();

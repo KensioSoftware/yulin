@@ -56,9 +56,10 @@ export class SimCfnSnsSubscriptionProperties {
   /**
    * What the subscription delivers to.
    *
-   * Real CloudFormation leaves it optional, because a protocol such as `sms`
-   * carries the destination elsewhere. Neither protocol simulated here is one
-   * of those, so an absent endpoint is refused by Subscribe rather than here.
+   * Real CloudFormation leaves it optional, because a protocol such as
+   * `application` carries the destination elsewhere. No protocol simulated here
+   * is one of those, so an absent endpoint is refused by Subscribe rather than
+   * here.
    */
   private endpoint(): string | undefined {
     const endpoint = this.properties.get(subscriptionEndpointPropertyName);

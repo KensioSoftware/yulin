@@ -59,13 +59,15 @@ Subscription state lives under `subscription/`.
 
 `SimSnsSubscription` is the stored resource: its ARN, the topic it belongs to, its protocol, its
 endpoint, the Account owning it, and its attributes. The endpoint is held as a
-`SimSnsSubscriptionEndpoint` rather than as a string, because a delivery reaches the Account and
-Region that ARN names rather than the topic's. Which kind of ARN it has to be is the protocol's
-question, answered by `requireSimSnsSubscriptionEndpoint`: `SimSnsQueueEndpointArn` for `sqs`, and
-`SimSnsFunctionEndpointArn` for `lambda`. Reading a function ARN is Lambda's own business, so those
-parts come from `parseSimLambdaFunctionArn`; what SNS adds is what an unreadable one means to a
-`Subscribe` request. A qualified function ARN naming a version or an alias is refused, since
-simulated Lambda has neither and delivering to `$LATEST` instead would be the wrong function.
+`SimSnsSubscriptionEndpoint` rather than as a string, because a delivery over an ARN endpoint reaches
+the Account and Region that ARN names rather than the topic's. What the endpoint has to be is the
+protocol's question, answered by `requireSimSnsSubscriptionEndpoint`: `SimSnsQueueEndpointArn` for
+`sqs`, `SimSnsFunctionEndpointArn` for `lambda`, and `SimSnsPhoneNumber` for `sms`. The Account and
+the Region are optional on the endpoint, since an `sms` endpoint is a phone number. Reading a function
+ARN is Lambda's own business, so those parts come from `parseSimLambdaFunctionArn`; what SNS adds is
+what an unreadable one means to a `Subscribe` request. A qualified function ARN naming a version or
+an alias is refused, since simulated Lambda has neither and delivering to `$LATEST` instead would be
+the wrong function.
 
 Nothing checks that the endpoint queue or function exists when a subscription is created, because
 real SNS does not either: a subscription to something that is not there is created, and fails when
@@ -77,11 +79,12 @@ delivery.
 and `parseSnsSubscriptionArn` reads one. Counting the colon separated parts is what tells a
 subscription ARN from a topic ARN, since neither has a resource type separator.
 
-`SimSnsSubscriptionProtocol` holds the two protocols delivery is simulated over, `sqs` and `lambda`.
-Neither needs a confirmation, which is why `ConfirmSubscription` is not implemented. Every other
+`SimSnsSubscriptionProtocol` holds the three protocols delivery is simulated over, `sqs`, `lambda`
+and `sms`. None needs a confirmation, so `ConfirmSubscription` is not implemented. Every other
 protocol real SNS has is refused by name with the reason it is missing, rather than accepted as a
 subscription that would never be delivered to. A protocol real SNS does not have at all is refused
-the way real SNS refuses one.
+the way real SNS refuses one. `SimSnsOutwardProtocol` is the subset whose delivery leaves simulated
+SNS, and the endpoints supplied from outside cover those.
 
 `SimSnsSubscriptionAttributes` holds `RawMessageDelivery`, the subscription's filter policy and the
 scope that policy is read under, and `SimSnsSubscriptionAttributeNames` is where the refusal of the
@@ -243,7 +246,21 @@ what a destination is asked before it takes a message and what it is handed both
 a second protocol adds a second implementation rather than a branch in an existing one.
 `SimSnsProtocolDeliveryEndpoints` picks between them by the subscription's protocol, holding them in
 a record keyed by the protocol union so that adding a protocol without somewhere to deliver fails to
-compile. `SimAwsSnsDeliveryEndpoints` is that set for one simulated AWS instance.
+compile.
+
+The record is assembled in two halves. `simAwsSnsDeliveryEndpoints` is the outward half for one
+simulated AWS instance, covering the protocols that reach another simulated service, and it is handed
+to `SimSns` from outside because a queue or a function is only reachable through `SimAws`.
+`simSnsNoDeliveryEndpoints` is the outward half of a `SimSns` built on its own, which refuses every
+delivery and records the refusal as a delivery failure. `SimSnsCommands` fills in `sms` itself, with
+`SimSnsDeliverySms`, since an SMS reaches nothing outside simulated SNS. That is also why a
+standalone `SimSns` still texts a subscribed number.
+
+`SimSnsDeliverySms` records the message on the same `SimSnsSentSmsStore` a publish to a phone number
+records on, so `sentSmsMessages()` reads both. It keeps the published message's own id, the topic ARN
+and the subscription ARN, and asks the opt-out list whether the message would have arrived. The body
+is the message as it was published. A handset receives the text on its own, and the envelope and the
+subject belong to the protocols that carry them.
 
 `SimAwsSnsDeliveryQueues` and `SimAwsSnsDeliveryFunctions` resolve the endpoint when a message is
 delivered, never when they are built, for the same reason S3's notification destinations do it that
@@ -421,9 +438,9 @@ here, it does not make another Account's topics reachable through this one.
 
 ## Divergences worth knowing
 
-- Only the `sqs` and `lambda` subscription protocols are simulated, so a queue and a function are the
-  only things a topic delivers to. `ConfirmSubscription` is not implemented, since neither protocol
-  needs a confirmation.
+- Only the `sqs`, `lambda` and `sms` subscription protocols are simulated, so a queue, a function and
+  a phone number are the only things a topic delivers to. `ConfirmSubscription` is not implemented,
+  since no protocol needs a confirmation.
 - A Lambda event carries `Subject: null` and `MessageAttributes: {}` where there is nothing to put in
   either, which is what real SNS sends. The envelope a queue receives leaves both fields out instead.
 - `RawMessageDelivery` is accepted on a `lambda` subscription and has no effect on it, as it has none
@@ -458,8 +475,8 @@ here, it does not make another Account's topics reachable through this one.
   set, since the scope only says how a policy is read.
 - `GetTopicAttributes` reports `TopicArn`, `Owner`, `DisplayName`, the three subscription counts and
   `Policy` when one is set. `EffectiveDeliveryPolicy` and `DeliveryPolicy` are left out, since
-  delivery retry policies are not simulated. `SubscriptionsPending` is always zero, because the one
-  protocol simulated needs no confirmation.
+  delivery retry policies are not simulated. `SubscriptionsPending` is always zero, because no
+  protocol simulated needs a confirmation.
 - Tags, data protection policies and encryption are refused rather than ignored, whether by
   `CreateTopic` or by `SetTopicAttributes`.
 - `MessageStructure` is refused, because a `json` structure picks a different body per protocol and

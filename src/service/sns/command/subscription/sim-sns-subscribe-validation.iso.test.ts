@@ -2,7 +2,9 @@ import { assertInstanceOf, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import {
   endpointRefusal,
+  phoneNumberRefusal,
   protocolRefusal,
+  simSnsEndpointsThatAreNotPhoneNumbers,
   simSnsEndpointsThatAreNotQueues,
   simSnsUnsimulatedProtocols,
 } from "../../../../../test/sns/subscription-fixture.js";
@@ -65,6 +67,24 @@ describe("SNS Subscribe validation", () => {
     for (const error of refusals) {
       assertInstanceOf(error, SimSnsInvalidParameterException);
       assertStringIncludes(error.message, "is not an SQS queue ARN");
+    }
+  });
+
+  it("refuses an endpoint that is not an E.164 phone number", async () => {
+    // Given a topic.
+    // When the sms protocol is given something else as its endpoint, including
+    // no endpoint at all.
+    const refusals = await Promise.all(
+      [...simSnsEndpointsThatAreNotPhoneNumbers, undefined].map(
+        async (endpoint) => phoneNumberRefusal(endpoint),
+      ),
+    );
+
+    // Then each is refused, since an sms subscription texts a phone number and
+    // real SNS takes those in E.164 only.
+    for (const error of refusals) {
+      assertInstanceOf(error, SimSnsInvalidParameterException);
+      assertStringIncludes(error.message, "is not an E.164 phone number");
     }
   });
 

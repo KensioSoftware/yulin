@@ -29,6 +29,8 @@ export {
 } from "./subscription/sim-sns-subscription-attributes.js";
 export {
   simSnsLambdaProtocol,
+  type SimSnsOutwardProtocol,
+  simSnsSmsProtocol,
   simSnsSqsProtocol,
   type SimSnsSubscriptionProtocol,
 } from "./subscription/sim-sns-subscription-protocol.js";
@@ -66,6 +68,7 @@ export {
   type SimSnsDeliveryRequest,
   simSnsServicePrincipal,
 } from "./delivery/sim-sns-delivery.js";
+export type { SimSnsOutwardDeliveryEndpoints } from "./delivery/sim-sns-protocol-delivery-endpoints.js";
 export { SimSnsEnvelope } from "./delivery/sim-sns-envelope.js";
 export {
   SimSnsNotification,

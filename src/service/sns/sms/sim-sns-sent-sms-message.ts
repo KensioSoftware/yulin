@@ -11,6 +11,8 @@ interface SimSnsSentSmsMessageProperties {
   readonly attributes: SimSnsMessageAttributes;
   readonly suppressed: boolean;
   readonly sentDate: Date;
+  readonly topicArn?: string;
+  readonly subscriptionArn?: string;
 }
 
 /**
@@ -52,6 +54,18 @@ export class SimSnsSentSmsMessage {
 
   public readonly sentDate: Date;
 
+  /**
+   * The topic that fanned this one out, where a topic did.
+   *
+   * A publish naming a phone number reaches no topic, so both this and the
+   * subscription ARN are absent for one. A test asserting on the SMS a topic
+   * sent has them to assert on.
+   */
+  public readonly topicArn: string | undefined;
+
+  /** The `sms` subscription that took this message, where one did. */
+  public readonly subscriptionArn: string | undefined;
+
   constructor(properties: SimSnsSentSmsMessageProperties) {
     this.messageId = properties.messageId;
     this.phoneNumber = properties.phoneNumber;
@@ -59,6 +73,8 @@ export class SimSnsSentSmsMessage {
     this.attributes = properties.attributes;
     this.suppressed = properties.suppressed;
     this.sentDate = properties.sentDate;
+    this.topicArn = properties.topicArn;
+    this.subscriptionArn = properties.subscriptionArn;
   }
 
   /**
