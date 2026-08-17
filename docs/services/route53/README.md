@@ -57,9 +57,9 @@ becomes `example.test.`.
 Hosted Zone creation uses background tasks to move the zone to `INSYNC`. If your test needs final
 state, call `await simAws.backgroundTasksComplete()` before continuing.
 
-Hosted Zone IDs are accepted in any real Route53 shape: a `Z` prefix followed by uppercase
-alphanumerics, up to 32 characters. That means a real Hosted Zone ID copied out of an AWS account,
-such as `Z2FDTNDATAQYW2`, can be used in your test setup. An ID with no matching Hosted Zone gives
+Hosted Zone IDs are accepted in any real Route53 shape, being a `Z` prefix followed by uppercase
+alphanumerics, up to 32 characters. A real Hosted Zone ID copied out of an AWS account, such as
+`Z2FDTNDATAQYW2`, can therefore be used in your test setup. An ID with no matching Hosted Zone gives
 `NoSuchHostedZone`, while a malformed one gives `InvalidInput`. Commands also accept the
 `/hostedzone/Z...` form as well as the bare ID.
 
@@ -69,10 +69,10 @@ such as `Z2FDTNDATAQYW2`, can be used in your test setup. An ID with no matching
 from you. When something else already decided the ID, register the Hosted Zone as part of your test
 setup instead.
 
-The usual reason is a CDK app that looks its zone up with `HostedZone.fromLookup` rather than
+The usual reason is a CDK app that looks its zone up with `HostedZone.fromLookup` instead of
 creating it. That bakes the real Hosted Zone ID into the synthesized template, and every
-`AWS::Route53::RecordSet` in the template names that ID. Registering the zone first means the
-template deploys as it is, with no rewriting.
+`AWS::Route53::RecordSet` in the template names that ID. Registering the zone first lets the
+template deploy as it is, with no rewriting.
 
 ```typescript sim-route53-register-hosted-zone
 /**
@@ -121,22 +121,23 @@ already existing rather than created.
 
 `registerHostedZone` takes the same optional `config` as `CreateHostedZoneCommand`, and accepts the
 `/hostedzone/Z...` form of the ID. An ID that another Hosted Zone already holds is refused with
-`HostedZoneAlreadyExists`, and one that is not a Route53 Hosted Zone ID with `InvalidInput`.
+`HostedZoneAlreadyExists`, and one that is no Route53 Hosted Zone ID at all with `InvalidInput`.
 
-### A zone a template names but does not create
+### A zone a template only names
 
 Registering the zone first is optional. An `AWS::Route53::RecordSet` naming a `HostedZoneId` that no
-Hosted Zone holds gets one registered under that ID as the record is created, so a template built
-with `HostedZone.fromLookup` deploys without being told separately about a zone it already describes.
+Hosted Zone holds gets one registered under that ID as the record is created. A template built with
+`HostedZone.fromLookup` therefore deploys without being told separately about a zone it already
+describes.
 
-The template does not carry the zone's name, only its ID, so the name is inferred from the records.
-The first record to name the zone names it, and a record above that name widens it. A stack holding
+The template carries the zone's ID and no name, so the name is inferred from the records. The first
+record to name the zone names it, and a record above that name widens it. A stack holding
 `example.test` and `www.example.test` ends up with a zone called `example.test`. A stack holding only
 `www.example.test` ends up with a zone called `www.example.test`.
 
 Register the zone yourself when a test depends on its name, such as one listing zones by name, or
-when its name is not a suffix of any record the stack holds. A registered zone keeps the name it was
-given rather than inferring one, so its records are stored under the name you chose.
+when its name is a suffix of no record the stack holds. A registered zone keeps the name it was
+given, and its records are stored under the name you chose.
 
 ## Creating records
 
@@ -331,23 +332,22 @@ The stored alias value is normalized without the trailing dot.
 
 Sim Route53 stores ten record types: `A`, `AAAA`, `CAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV` and
 `TXT`. All ten can be created through `ChangeResourceRecordSetsCommand`, read back through
-`ListResourceRecordSetsCommand`, and declared as an `AWS::Route53::RecordSet`, so a zone that models
-a real one — mail records, certificate pinning, a service record — deploys as it stands.
+`ListResourceRecordSetsCommand`, and declared as an `AWS::Route53::RecordSet`. A zone that models a
+real one (mail records, certificate pinning, a service record) deploys as it stands.
 
-A type outside that list is not stored. `ChangeResourceRecordSetsCommand` rejects it, because the
-call asked for a record the simulator cannot keep. A template declaring one is treated more gently:
-the `AWS::Route53::RecordSet` is skipped and the rest of the stack deploys. See
+A type outside that list is refused by `ChangeResourceRecordSetsCommand`, because the call asked for
+a record the simulator cannot keep. A template declaring one is treated more gently. The
+`AWS::Route53::RecordSet` is skipped and the rest of the stack deploys. See
 [unsupported record types in a template](#unsupported-record-types-in-a-template).
 
-Simulated DNS answers queries for six of them: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`. `MX`,
-`SRV`, `CAA` and `PTR` are stored for a test to assert the presence and value of, not for a resolver
-to act on, so a DNS query for one is answered as no data. See
-[What is answered](#what-is-answered).
+Simulated DNS answers queries for six of them, being `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`.
+`MX`, `SRV`, `CAA` and `PTR` are stored for a test to assert the presence and value of, and a DNS
+query for one is answered as no data. See [What is answered](#what-is-answered).
 
-Values of those four are stored exactly as written, along with `TXT`. Nothing takes an `MX`
-preference number or an `SRV` priority apart, so what you assert on is the string your stack
-declared. Values of the other types are hostnames or addresses, and are normalized like DNS names so
-they compare consistently.
+Values of those four are stored exactly as written, along with `TXT`. An `MX` preference number and
+an `SRV` priority are kept whole, so what you assert on is the string your stack declared. Values of
+the other types are hostnames or addresses, and are normalized like DNS names so they compare
+consistently.
 
 ```typescript sim-route53-mail-records
 /**
@@ -548,14 +548,14 @@ Paginate with `MaxItems`. When the listing is truncated, `IsTruncated` is `true`
 back as `StartRecordName` and `StartRecordType`. Marker names are normalised, so `www.example.test`
 and `WWW.EXAMPLE.TEST.` select the same starting point.
 
-Alias records are returned with an `AliasTarget` rather than `ResourceRecords`. The simulator stores
-an alias target as a record value plus an alias flag, so `AliasTarget.DNSName` is returned.
-`AliasTarget.HostedZoneId` is not part of the stored record and is not returned.
+Alias records are returned with an `AliasTarget` in place of `ResourceRecords`. The simulator stores
+an alias target as a record value plus an alias flag, and `AliasTarget.DNSName` is returned.
+`AliasTarget.HostedZoneId` is outside the stored record, and is left out.
 
 ## Inspecting hosted zones in a browser
 
-A served simulated AWS environment reports its Route53 state at `dns.sim-aws.localhost`, so you can
-see which hosted zones and records exist without writing code to read them back.
+A served simulated AWS environment reports its Route53 state at `dns.sim-aws.localhost`. You can see
+which hosted zones and records exist without writing code to read them back.
 
 ```typescript sim-route53-zone-summary
 /**
@@ -593,13 +593,13 @@ Hosted zones from every simulated Account appear, not just the default one, beca
 resolution is environment-wide even though the Route53 service object is Account-scoped.
 
 `dns.sim-aws.localhost` is where the summary is served, not a name it answers for. It is a built-in
-Yulin hostname, so it stays reachable whatever records your test creates, and it is unrelated to any
+Yulin hostname. It stays reachable whatever records your test creates, and it stands apart from any
 hosted zone you might name `dns`.
 
 ## Querying simulated records with dig
 
 A served simulated environment answers real DNS queries over UDP, on the same port number the HTTP
-server took on TCP. UDP and TCP port namespaces are separate, so one number covers both.
+server took on TCP. UDP and TCP port namespaces are separate, and one number covers both.
 
 ```typescript sim-route53-dns
 /**
@@ -664,8 +664,7 @@ The CNAME is followed and an address record is synthesised for the simulated S3 
 the address the local HTTP server listens on. A name that resolves to a simulated service therefore
 answers with somewhere you can actually make a request.
 
-Any DNS client works. Node's own resolver needs no extra dependency, which makes it convenient in
-tests:
+Any DNS client works. Node's own resolver needs no extra dependency, which suits a test:
 
 ```typescript sim-route53-dns-resolver
 /**
@@ -727,41 +726,41 @@ try {
 }
 ```
 
-A short timeout with a single try keeps a test failing quickly rather than
-hanging, should the record not be there.
+A short timeout with a single try keeps a test failing quickly, where a
+missing record would otherwise leave it hanging.
 
 ### Ports
 
-DNS binds the same port number as HTTP, but that is a convenience rather than a guarantee: if the
-number is already held on UDP by something else, DNS binds an ephemeral port instead. Read
-`srv.dnsPort` rather than assuming it matches `srv.port`.
+DNS binds the same port number as HTTP, as a convenience and not a guarantee. Where the number is
+already held on UDP by something else, DNS binds an ephemeral port instead. Read `srv.dnsPort`, and
+leave `srv.port` out of it.
 
-Nothing binds port 53, which would need root. To resolve simulated names system-wide without naming a
-port, point your resolver at the simulator yourself. On macOS, a file such as `/etc/resolver/test`
+Port 53 is left alone, since binding it would need root. To resolve simulated names system-wide
+without naming a port, point your resolver at the simulator yourself. On macOS, a file such as `/etc/resolver/test`
 containing `nameserver 127.0.0.1` and `port <dnsPort>` makes the whole `.test` TLD resolve through
 it. That is a change to your machine, so Yulin does not make it for you. With that in place, the HTTP
-server answers for those names too: see [Local hostname resolution](#local-hostname-resolution).
+server answers for those names too. See [Local hostname resolution](#local-hostname-resolution).
 
 ### What is answered
 
-- Six of the ten record types sim Route53 stores: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`. A
-  query for a stored type outside that list — `MX`, `SRV`, `CAA` or `PTR` — is answered as no data,
-  the same as a query type the simulator does not recognise at all. Those records exist to be
-  asserted on rather than resolved; what a browser reaching a simulated site needs is an address or
-  a CNAME. See [Record types](#record-types).
+- Six of the ten record types sim Route53 stores, being `A`, `AAAA`, `CNAME`, `TXT`, `NS` and
+  `SOA`. A query for a stored type outside that list (`MX`, `SRV`, `CAA` or `PTR`) is answered as no
+  data, the same as a query type the simulator has never heard of. Those records exist to be
+  asserted on. What a browser reaching a simulated site needs is an address or a CNAME. See
+  [Record types](#record-types).
 - CNAME chains are followed, so an `A` query on a name holding a CNAME returns the CNAME and the
   address it leads to together. Chains are bounded, and a cycle stops immediately.
 - Alias records are resolved to the address of whatever they point at, answered under the name that
-  holds the alias, which is how Route53 answers an alias. The alias record itself never appears.
+  holds the alias, as Route53 answers an alias. The alias record itself never appears.
 - A name in a zone holding no record of the queried type gives `NOERROR` with no answers, and a name
-  the zone does not hold gives `NXDOMAIN`. Both carry the zone `SOA` in the authority section, so a
-  resolver knows how long it may cache the negative answer. If the zone holds no `SOA` of its own,
-  one is synthesised.
-- A name held by no hosted zone is `REFUSED` rather than `NXDOMAIN`: the simulator answers only for
+  the zone lacks gives `NXDOMAIN`. Both carry the zone `SOA` in the authority section, so a resolver
+  knows how long it may cache the negative answer. Where the zone holds no `SOA` of its own, one is
+  synthesised.
+- A name held by no hosted zone is `REFUSED`, and never `NXDOMAIN`. The simulator answers only for
   the zones it holds, and cannot claim a name exists nowhere.
 - Zones from every simulated Account are answered, because DNS resolution is environment-wide.
 
-Not modelled: EDNS0, the `ANY` query type, DNS over TCP, more than one question per query, recursion,
+Left out are EDNS0, the `ANY` query type, DNS over TCP, more than one question per query, recursion,
 and DNSSEC. Answers are always authoritative.
 
 ## Local hostname resolution
@@ -779,9 +778,9 @@ The local server resolves the logical hostname `www.example.test` through sim Ro
 request to the simulated target named by the record.
 
 The suffix is optional. It exists so a client can reach the local server without the hostname
-resolving on the public internet, so it is only needed while nothing is resolving the name to the
-simulator. Once a resolver is pointed at the served DNS server, as under [Ports](#ports) above, the
-name resolves on its own and the request can be made under the hostname your application really
+resolving on the public internet, and it is only needed while the name resolves to the simulator
+nowhere else. Once a resolver is pointed at the served DNS server, as under [Ports](#ports) above,
+the name resolves on its own and the request can be made under the hostname your application really
 uses:
 
 ```text
@@ -789,17 +788,17 @@ http://www.example.test:<port>/
 ```
 
 Both forms reach the same simulated target. The suffix-free form is what makes an exact apex `Host`
-possible, so a CloudFront Function redirecting `example.test` to `www.example.test` can be exercised
-in a browser.
+possible. A CloudFront Function redirecting `example.test` to `www.example.test` can then be
+exercised in a browser.
 
 This is most useful with CloudFront aliases. You can create a CloudFront distribution, create a
 Route53 record pointing at the distribution hostname, then fetch through your application hostname.
 
 The hostname you fetch has to be one of the Distribution's alternate domain names, the same as it
-would be in real CloudFront, which refuses a `Host` it does not serve. So the record name goes in the
-Distribution's `Aliases` as well as in the Route53 record. Real CloudFront also wants an ACM
-certificate covering those names, described under
-[Viewer certificates](../cloudfront/README.md#viewer-certificates); it is left out here because this
+would be in real CloudFront, which refuses a `Host` outside the ones it serves. So the record name
+goes in the Distribution's `Aliases` as well as in the Route53 record. Real CloudFront also wants an
+ACM certificate covering those names, described under
+[Viewer certificates](../cloudfront/README.md#viewer-certificates). It is left out here because this
 request is served over plain HTTP on localhost.
 
 ```typescript sim-route53-cloudfront-localhost
@@ -948,7 +947,7 @@ the server to adapt it to the selected local port.
 ### What a name can resolve to
 
 A record chain ends when it reaches a hostname a simulated service owns. Those are recognised by
-their shape, so the value to point a record at is whatever the service reported:
+their shape, and the value to point a record at is whatever the service reported:
 
 | Hostname                                 | What it reaches                               |
 | ---------------------------------------- | --------------------------------------------- |
@@ -961,12 +960,12 @@ their shape, so the value to point a record at is whatever the service reported:
 | `cognito-idp.<region>`                   | the [Cognito](../cognito/) user pool endpoint |
 
 The hostnames the AWS SDK talks to are written without their `.amazonaws.com` or `.on.aws` tail,
-which is the same rewriting Yulin applies to an SDK endpoint. A load balancer's name keeps its whole
-domain, because nothing rewrites it: `DNSName` is what a record points at and what a client asks for.
+the same rewriting Yulin applies to an SDK endpoint. A load balancer's name keeps its whole domain,
+since it goes unrewritten. `DNSName` is what a record points at and what a client asks for.
 
-A name pointing at a load balancer resolves to it, so a request to that name reaches the load
-balancer's listeners and rules, and a `host-header` condition on a rule sees the name the request was
-made to rather than the load balancer's own:
+A name pointing at a load balancer resolves to it. A request to that name reaches the load balancer's
+listeners and rules, and a `host-header` condition on a rule sees the name the request was made to,
+in place of the load balancer's own:
 
 ```typescript sim-route53-elbv2-alias
 /**
@@ -1058,13 +1057,13 @@ try {
 ```
 
 A request served under the suffix reaches the listener on port 80, since the port such a request
-carries is the local server's rather than one a client chose. See
+carries is the local server's and never one a client chose. See
 [Simulated Elastic Load Balancing](../elbv2/) for what happens once the request is there.
 
 ## DNSSEC
 
 A Hosted Zone can be signed. Signing needs a key-signing key, and a key-signing key needs a KMS
-customer managed key: an enabled `ECC_NIST_P256` `SIGN_VERIFY` key, which is the only kind real
+customer managed key. That is an enabled `ECC_NIST_P256` `SIGN_VERIFY` key, the only kind real
 Route53 accepts.
 
 ```typescript sim-route53-dnssec
@@ -1124,28 +1123,28 @@ console.log(dnssec.Status?.ServeSignature); // "SIGNING"
 console.log(dnssec.KeySigningKeys?.[0]?.DSRecord);
 ```
 
-Nothing about the key-signing key is invented. Its `PublicKey` is the KMS key's own public key in
-the base64 form RFC 4034 defines, its `KeyTag` is computed by the RFC 4034 Appendix B algorithm, and
-its `DigestValue` is the SHA-256 delegation signer digest over the zone name and the DNSKEY. So a
-test can assert on the DS record it would hand to a registrar, and two zones on two keys get two
-different ones.
+Every part of the key-signing key is computed from the KMS key. Its `PublicKey` is that key's own
+public key in the base64 form RFC 4034 defines, its `KeyTag` comes from the RFC 4034 Appendix B
+algorithm, and its `DigestValue` is the SHA-256 delegation signer digest over the zone name and the
+DNSKEY. A test can assert on the DS record it would hand to a registrar, and two zones on two keys
+get two different ones.
 
-Adding a key-signing key does not start signing, and stopping signing leaves the keys in place, the
-same as on AWS. `ActivateKeySigningKey` and `DeactivateKeySigningKey` move a key between `ACTIVE`
-and `INACTIVE`; `DeleteKeySigningKey` refuses a key that is still active. `EnableHostedZoneDNSSEC`
-refuses a zone with no active key to sign with, and `DisableHostedZoneDNSSEC` refuses a zone that is
-not signed.
+Adding a key-signing key leaves signing off, and stopping signing leaves the keys in place, the same
+as on AWS. `ActivateKeySigningKey` and `DeactivateKeySigningKey` move a key between `ACTIVE` and
+`INACTIVE`. `DeleteKeySigningKey` refuses a key that is still active. `EnableHostedZoneDNSSEC`
+refuses a zone with no active key to sign with, and `DisableHostedZoneDNSSEC` refuses an unsigned
+zone.
 
-A KMS key that is symmetric, disabled, or not there at all is refused when the key-signing key is
-created, so a stack naming the wrong key fails here rather than on the deployment. A signed zone
-cannot be deleted either, for the reason real Route53 gives: the DS record at the parent would be
-left pointing at a zone that had gone.
+A KMS key that is symmetric, disabled, or absent altogether is refused when the key-signing key is
+created. A stack naming the wrong key fails here, ahead of the deployment. A signed zone cannot
+be deleted either, for the reason real Route53 gives. The DS record at the parent would be left
+pointing at a zone that had gone.
 
-The key's policy is not checked. Real Route53 needs the key to allow `kms:DescribeKey`,
+The key's policy goes unchecked. Real Route53 needs the key to allow `kms:DescribeKey`,
 `kms:GetPublicKey` and `kms:Sign` to the `dnssec-route53.amazonaws.com` service principal, and
 `kms:CreateGrant` conditioned on `kms:GrantIsForAWSResource`, which is what CDK's `KeySigningKey`
 construct adds for you. A key created here without those statements takes a key-signing key anyway,
-so a template that would fail on AWS for that reason deploys here.
+and a template that would fail on AWS for that reason deploys here.
 
 ### DNSSEC from CloudFormation
 
@@ -1214,9 +1213,9 @@ console.log(dnssec.Status?.ServeSignature); // "SIGNING"
 console.log(dnssec.KeySigningKeys?.[0]?.Status); // "ACTIVE"
 ```
 
-`Ref` on an `AWS::Route53::KeySigningKey` returns `<HostedZoneId>|<Name>`, which is what CDK reads
-as `keySigningKeyId`. `Ref` on an `AWS::Route53::DNSSEC` returns the hosted zone ID. Neither type
-has any `Fn::GetAtt` attributes, so one is refused rather than answered.
+`Ref` on an `AWS::Route53::KeySigningKey` returns `<HostedZoneId>|<Name>`, which CDK reads as
+`keySigningKeyId`. `Ref` on an `AWS::Route53::DNSSEC` returns the hosted zone ID. Neither type has
+any `Fn::GetAtt` attributes, and a `Fn::GetAtt` on one is refused.
 
 Tearing the stack down stops signing and takes the key-signing key with it, deactivating it first,
 because an active key cannot be deleted.
@@ -1316,13 +1315,13 @@ await simAws.backgroundTasksComplete();
 ```
 
 Record sets can use either `HostedZoneId` or `HostedZoneName`. `HostedZoneId` is usually the
-clearest option in templates because it can reference the zone resource directly.
+clearest option in templates, since it can reference the zone resource directly.
 
 ### Unsupported record types in a template
 
-A real DNS stack usually holds a few records that have nothing to do with what is being tested. When
-one of them declares a [record type](#record-types) sim Route53 does not store, the RecordSet is
-skipped and the rest of the stack deploys, the same way an unsupported resource type is. The skipped
+A real DNS stack usually holds a few records beside the point of what is being tested. When one of
+them declares a [record type](#record-types) sim Route53 leaves unstored, the RecordSet is skipped
+and the rest of the stack deploys, the same way an unsupported resource type is. The skipped
 RecordSet is in `stack.skippedResources` with a `skippedReason` naming the record type.
 
 ```typescript sim-route53-skipped-record-type
@@ -1385,12 +1384,11 @@ console.log(stack.getResource("DelegationSigner")?.skippedReason);
 ```
 
 Only the record type is treated this way. A RecordSet that makes no sense as a RecordSet still fails
-the stack, so a `Name` that is not a string, a `Type` that is not a string, or a negative `TTL` is
-refused. An unmodelled record type is a gap in the simulation; a malformed RecordSet is a broken
-template.
+the stack. A non-string `Name`, a non-string `Type`, or a negative `TTL` is refused. An unmodelled
+record type is a gap in the simulation, where a malformed RecordSet is a broken template.
 
-Tearing the stack down works with the skipped RecordSet in it. Nothing was created for it, so the
-teardown steps over it rather than asking Route53 to remove a record it never stored.
+Tearing the stack down works with the skipped RecordSet in it. Nothing was created for it, and the
+teardown steps over it without asking Route53 to remove a record it never stored.
 
 ## CDK integration
 
@@ -1445,7 +1443,7 @@ This lets local integration tests use the same CDK infrastructure shape as produ
 the test process local.
 
 A CDK app whose Hosted Zone comes from `HostedZone.fromLookup` names a real Hosted Zone ID
-throughout its template rather than creating the zone. The template deploys as it is: the zone is
+throughout its template, in place of creating the zone. The template deploys as it is. The zone is
 registered under that ID as the first RecordSet naming it is created, with its name inferred from the
 record names. Register it yourself with
 [Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id) when a test
@@ -1503,8 +1501,8 @@ await scopedRoute53.createHostedZone(
 );
 ```
 
-Each `SimAws` instance has its own isolated state, so you can create a fresh instance per test or
-share one across related local setup.
+Each `SimAws` instance has its own isolated state. Create a fresh instance per test, or share one
+across related local setup.
 
 ## Standalone SimRoute53
 
@@ -1531,7 +1529,7 @@ const hostedZoneCreation = await route53.createHostedZone(
 console.log(hostedZoneCreation.HostedZone?.Id);
 ```
 
-A standalone `SimRoute53` instance has its own isolated state and is not connected to a wider
+A standalone `SimRoute53` instance has its own isolated state, standing apart from any wider
 `SimAws` environment. Use `SimAws` when Route53 needs to resolve names to other simulated services.
 
 ## Available functionality
@@ -1561,7 +1559,7 @@ Sim Route53 currently supports:
 - The `AWS::Route53::KeySigningKey` and `AWS::Route53::DNSSEC` CloudFormation resources
 - CDK-created Route53 Hosted Zones and records in synthesized templates
 
-The simulator focuses on useful behaviour for tests and local development rather than full Route53
+The simulator focuses on useful behaviour for tests and local development, ahead of full Route53
 feature parity. Unsupported Route53 options may be ignored or may throw errors depending on whether
 the simulator needs them to model the requested behaviour.
 
@@ -1569,27 +1567,27 @@ the simulator needs them to model the requested behaviour.
 
 Where sim Route53 knowingly behaves differently from AWS:
 
-- **A RecordSet naming a Hosted Zone that does not exist creates one.** CloudFormation would refuse
-  with `NoSuchHostedZone`, because the ID names a zone in an account the simulation is not. Every
-  template built with `HostedZone.fromLookup` would then be undeployable here, so the zone is
+- **A RecordSet naming an absent Hosted Zone creates one.** CloudFormation would refuse with
+  `NoSuchHostedZone`, because the ID names a zone in an account the simulation is not. Every
+  template built with `HostedZone.fromLookup` would then be undeployable here. The zone is
   registered on demand instead. See
-  [A zone a template names but does not create](#a-zone-a-template-names-but-does-not-create).
-- **The name of such a zone is a guess.** Nothing in a synthesized template says what a looked-up
-  zone is called, so the name is inferred from the records that reference it and is only as specific
-  as they are. Register the zone yourself when a test depends on its name.
+  [A zone a template only names](#a-zone-a-template-only-names).
+- **The name of such a zone is a guess.** A synthesized template says nothing about what a
+  looked-up zone is called. The name is inferred from the records that reference it, and is only as
+  specific as they are. Register the zone yourself when a test depends on its name.
 - **A signed zone is signed on paper only.** No RRSIG records are produced, no DNSKEY records are
   added to the zone, and a query answered over UDP is unsigned whatever `GetDNSSEC` says. Signing is
-  observable through `GetDNSSEC`, which is where the key-signing keys and the DS record fields are.
-  Sim Route53 is not a general DNS server, and an RRSIG needs canonical RRset ordering and
-  wire-format signing that nothing here would read back.
-- **A key-signing key does not rotate, and a zone never reports trouble.** `ACTIVE` and `INACTIVE`
-  are the only key statuses, and `SIGNING` and `NOT_SIGNING` the only zone statuses. Real Route53
-  also has `DELETING`, `ACTION_NEEDED` and `INTERNAL_FAILURE`, which describe a key mid-operation or
-  a zone that needs attention, and nothing here produces either.
-- **A key-signing key's KMS key policy is not checked.** Real Route53 refuses a key that does not
-  admit the `dnssec-route53.amazonaws.com` service principal, and this does not, so a template
-  missing those statements deploys here and fails on AWS. Checking it would mean authorizing the
-  service principal against the key policy, which is its own piece of work.
+  observable through `GetDNSSEC`, which holds the key-signing keys and the DS record fields. Sim
+  Route53 is no general DNS server, and an RRSIG needs canonical RRset ordering and wire-format
+  signing that nothing here would read back.
+- **A key-signing key never rotates, and a zone never reports trouble.** `ACTIVE` and `INACTIVE` are
+  the only key statuses, and `SIGNING` and `NOT_SIGNING` the only zone statuses. Real Route53 also
+  has `DELETING`, `ACTION_NEEDED` and `INTERNAL_FAILURE`, which describe a key mid-operation or a
+  zone that needs attention, and neither is produced here.
+- **A key-signing key's KMS key policy goes unchecked.** Real Route53 refuses a key that leaves the
+  `dnssec-route53.amazonaws.com` service principal out, and this accepts one. A template missing
+  those statements deploys here and fails on AWS. Checking it would mean authorizing the service
+  principal against the key policy, which is its own piece of work.
 - **DNSSEC needs KMS wired to Route53.** A standalone `new SimRoute53()` has no simulated KMS to
   resolve a key ARN against, so `CreateKeySigningKey` refuses. Reach Route53 through `SimAws` when a
   test signs a zone.

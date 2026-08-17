@@ -4,7 +4,7 @@ Yulin includes a simulated AWS Systems Manager Parameter Store for tests and loc
 Parameters are stored in memory, versioned on every write, and every operation is authorized by
 simulated IAM.
 
-Only Parameter Store is simulated. Nothing else in Systems Manager is.
+Only Parameter Store is simulated.
 
 SSM-specific types are imported from the `@kensio/yulin/ssm` subpath.
 
@@ -111,11 +111,11 @@ console.log(read.Parameter?.Value); // "db.internal"
 ```
 
 `DescribeParameters` is the exception. Real Parameter Store gives that action no resource-level
-permissions, so it authorizes against `*` here, and a policy naming individual parameter ARNs grants
+permissions. It authorizes against `*` here, and a policy naming individual parameter ARNs grants
 nothing.
 
 `GetParametersByPath` authorizes against the path rather than against each parameter it returns.
-Access to a path is access to everything under it, so a recursive listing of `/myapp` returns
+Access to a path is access to everything under it. A recursive listing of `/myapp` returns
 `/myapp/prod/db-host` even where a policy explicitly denies that parameter.
 
 ## Versions
@@ -220,7 +220,7 @@ A page holds ten parameters, as it does on real AWS. Follow `NextToken` to read 
 ## Reading several parameters at once
 
 `GetParameters` takes up to ten names. A name that resolves to nothing comes back in
-`InvalidParameters` rather than failing the request, which is what makes a typo easy to miss.
+`InvalidParameters`, leaving the request to succeed. That is what makes a typo easy to miss.
 
 ```typescript sim-ssm-get-parameters-batch
 /**
@@ -253,12 +253,12 @@ console.log(read.Parameters?.map((parameter) => parameter.Name));
 console.log(read.InvalidParameters); // [ "/myapp/prod/db-hostt" ]
 ```
 
-`GetParameters` still authorizes each name, so one name the caller may not read fails the whole
+`GetParameters` still authorizes each name. One name the caller may not read fails the whole
 request.
 
 ## String lists
 
-A `StringList` value is one comma-separated string, on read as well as on write. It is not returned
+A `StringList` value comes back as one comma-separated string, on read as well as on write, never
 as an array.
 
 ```typescript sim-ssm-string-list
@@ -302,17 +302,17 @@ deployment failure a passing test would have hidden. A name:
 - may not contain spaces between characters, though surrounding spaces are stripped
 - may not make an ARN longer than 1011 characters, counting the ARN prefix for the account and region
 
-A `String` or `StringList` value holds at most 4KB, which is the standard tier limit. This is the one
-people hit, usually by putting a whole JSON configuration blob in one parameter.
+A `String` or `StringList` value holds at most 4KB, the standard tier limit. This is the one people
+hit, usually by putting a whole JSON configuration blob in one parameter.
 
 ## Deploying a parameter from CloudFormation
 
 Simulated CloudFormation creates a parameter from an `AWS::SSM::Parameter` resource, in the stack's
-account and region. The parameter is written through `PutParameter`, so a template-created parameter
-is the same thing an SDK caller would get: the same name validation, the same ARN, version 1.
+account and region. The parameter is written through `PutParameter`. A template-created parameter is
+the same thing an SDK caller would get, with the same name validation, the same ARN, and version 1.
 
-`Ref` on the resource gives the parameter name rather than its ARN, as it does on real AWS, so it can
-be handed straight to `GetParameter`. `Fn::GetAtt … Type` and `Fn::GetAtt … Value` give those
+`Ref` on the resource gives the parameter name, as it does on real AWS, and it can be handed straight
+to `GetParameter`. `Fn::GetAtt … Type` and `Fn::GetAtt … Value` give those
 properties.
 
 ```typescript sim-ssm-cloudformation-parameter
@@ -362,7 +362,7 @@ console.log(read.Parameter?.Version); // 1
 ```
 
 A parameter with no `Name` is named after its logical ID. Real CloudFormation generates a name from
-the stack name and its own random characters, so a template cannot rely on the exact generated name
+the stack name and its own random characters. A template cannot rely on the exact generated name
 either way.
 
 An IAM policy granting access to a template-created parameter needs the ARN rather than the `Ref`.
@@ -379,7 +379,7 @@ here without hand-editing.
 
 Function code that reads its configuration on cold start needs no special treatment. Any
 `@aws-sdk/client-ssm` client the handler creates is intercepted and dispatched with the function's
-execution role as the caller, so the role's policy decides whether the read succeeds.
+execution role as the caller. The role's policy decides whether the read succeeds.
 
 ```typescript sim-ssm-lambda-handler-config
 /**
@@ -518,10 +518,10 @@ console.log(read.Parameter?.ARN);
 
 A `SecureString` value is encrypted through simulated KMS, under the `aws/ssm` AWS managed key unless
 the request names a key of its own. Simulated KMS creates that managed key the first time something
-asks for it, so nothing has to set it up.
+asks for it, with no setup needed.
 
 A read returns the ciphertext unless it asks for decryption. This is the mistake that is easy to make
-and hard to see: a handler that forgets `WithDecryption` parses a base64 blob as if it were a
+and hard to see. A handler that forgets `WithDecryption` parses a base64 blob as if it were a
 password.
 
 ```typescript sim-ssm-secure-string
@@ -560,22 +560,22 @@ const decrypted = await ssm.getParameter(
 console.log(decrypted.Parameter?.Value); // "hunter2"
 ```
 
-`WithDecryption` on a `String` or `StringList` parameter is ignored rather than refused, as real
-Parameter Store ignores it.
+`WithDecryption` on a `String` or `StringList` parameter is ignored, as real Parameter Store ignores
+it.
 
-Pass `KeyId` to encrypt under a customer managed key instead. A `KeyId` naming a key that does not
-exist, is disabled, or is pending deletion fails with `InvalidKeyId`, which is how real Parameter
-Store reports every KMS key problem.
+Pass `KeyId` to encrypt under a customer managed key instead. A `KeyId` naming a key that is absent,
+disabled, or pending deletion fails with `InvalidKeyId`. That is how real Parameter Store reports
+every KMS key problem.
 
 Each value is bound to its own parameter's ARN as the KMS encryption context, under the
-`PARAMETER_ARN` key, so a ciphertext lifted out of one parameter cannot be decrypted as another.
+`PARAMETER_ARN` key. A ciphertext lifted out of one parameter cannot be decrypted as another.
 
 ### A customer managed key needs its own permission
 
 Encrypting and decrypting go to simulated KMS as the caller, not as the service. Under a customer
 managed key a write needs `kms:Encrypt` on the key on top of `ssm:PutParameter` on the parameter, and
 a decrypting read needs `kms:Decrypt` on top of `ssm:GetParameter`. A role granted one and not the
-other fails here rather than in a deployment.
+other fails here, ahead of a deployment.
 
 ```typescript sim-ssm-secure-string-permissions
 /**
@@ -745,49 +745,48 @@ Sim SSM currently supports:
 Current documented limitations:
 
 - Only standard tier `SecureString` encryption is simulated, which encrypts under the KMS key
-  directly. The advanced tier's envelope encryption through the AWS Encryption SDK is not, so
+  directly. The advanced tier's envelope encryption through the AWS Encryption SDK is left out, and
   `kms:GenerateDataKey` is never needed.
-- Parameter labels are not simulated. `LabelParameterVersion` is not implemented, so nothing can
-  create a label, and a `name:label` selector is refused with an error saying so.
-- `GetParameterHistory` is not simulated, though earlier versions stay readable by number.
-- The advanced tier is not simulated. `Tier: Advanced` and `Tier: Intelligent-Tiering` are refused,
-  and every parameter reports `Tier: Standard` with the 4KB standard tier value limit.
-- Parameter policies (expiration and notification) are not simulated. `Policies` is refused, and
+- Parameter labels are left out. `LabelParameterVersion` is unimplemented, so a label can never be
+  created, and a `name:label` selector is refused with an error saying so.
+- `GetParameterHistory` is absent, though earlier versions stay readable by number.
+- The advanced tier is left out. `Tier: Advanced` and `Tier: Intelligent-Tiering` are refused, and
+  every parameter reports `Tier: Standard` with the 4KB standard tier value limit.
+- Parameter policies (expiration and notification) are left out. `Policies` is refused, and
   `DescribeParameters` always reports an empty `Policies` list.
-- Tags are not simulated. `Tags` on `PutParameter` is refused, and `AddTagsToResource`,
-  `RemoveTagsFromResource` and `ListTagsForResource` are not supported.
-- `AllowedPattern` is refused rather than ignored, because a value it was meant to reject would
-  otherwise be stored without complaint.
+- Tags are left out. `Tags` on `PutParameter` is refused, and `AddTagsToResource`,
+  `RemoveTagsFromResource` and `ListTagsForResource` are absent.
+- `AllowedPattern` is refused outright. Ignoring it would store a value it was meant to reject,
+  without complaint.
 - `KeyId` on a `String` or `StringList` parameter is refused, since nothing would encrypt a value
   stored in the clear.
 - `DataType` other than `text` is refused. Real Parameter Store validates an `aws:ec2:image` value
   against EC2, which this simulation cannot do.
-- Filters are refused rather than ignored. `GetParametersByPath` refuses `ParameterFilters`, and
+- Filters are refused outright. `GetParametersByPath` refuses `ParameterFilters`, and
   `DescribeParameters` refuses `Filters` and `ParameterFilters`. Parameters are listed in name order.
 - `DescribeParameters` refuses `Shared`. Parameters cannot be shared between simulated accounts, and
   there is no resource policy support, so cross-account access to a parameter cannot be granted.
 - Every version is kept. Real Parameter Store keeps the hundred most recent versions and deletes the
   oldest as new ones are made, which can fail with `ParameterMaxVersionLimitExceeded`.
 - There is no per-account parameter count limit, so `ParameterLimitExceeded` never happens.
-- Deletion is immediate. Real Parameter Store asks for thirty seconds before a deleted name is reused;
-  here the name is free straight away.
+- Deletion is immediate. Real Parameter Store asks for thirty seconds before a deleted name is
+  reused, where here the name is free straight away.
 - `AWS::SSM::Parameter` supports `Name`, `Type`, `Value`, `Description` and `Tier`. `AllowedPattern`,
   `DataType`, `Policies` and `Tags` reach `PutParameter`, which refuses them for the reasons above.
-  `Type: SecureString` is refused, as real CloudFormation refuses it for this resource type: the
+  `Type: SecureString` is refused, as real CloudFormation refuses it for this resource type. The
   plaintext value would sit in the template.
 - The other `AWS::SSM::*` resource types (`Document`, `Association`, `MaintenanceWindow`,
-  `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped rather
-  than deployed.
-- Every deployment of an `AWS::SSM::Parameter` is a create, so a name another stack already used is
+  `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped.
+- Every deployment of an `AWS::SSM::Parameter` is a create. A name another stack already used is
   refused. A stack update that changes `Value` deletes the parameter and creates it again, where
   real CloudFormation overwrites it in place, so the parameter's version starts from 1 again.
 - `{{resolve:ssm:...}}` dynamic references and the `AWS::SSM::Parameter::Value<String>` template
-  parameter type are not supported. Those are CloudFormation engine features rather than Parameter
-  Store ones; pass the name from `Ref` instead.
+  parameter type are absent. Those are CloudFormation engine features rather than Parameter Store
+  ones. Pass the name from `Ref` instead.
 - Public parameters under `/aws/service/...` do not exist, and names under the reserved `aws` and
   `ssm` prefixes are refused, as they are on real AWS.
-- The Parameters and Secrets Lambda extension HTTP endpoint is not simulated. Handler code has to use
-  the SDK.
-- Nothing else in Systems Manager is simulated: Run Command, Session Manager, Patch Manager, State
-  Manager, Automation, inventory and maintenance windows are all absent.
+- The Parameters and Secrets Lambda extension HTTP endpoint is absent. Handler code has to use the
+  SDK.
+- Systems Manager is otherwise left out. Run Command, Session Manager, Patch Manager, State Manager,
+  Automation, inventory and maintenance windows are all absent.
 - SSM is not served as an HTTP API by `serveSimAws`.

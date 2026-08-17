@@ -2,12 +2,12 @@
 
 Yulin includes a simulated Amazon SES for tests and local development, through the SES v2 API. It
 holds email identities, applies the sandbox rules, and keeps a record of every message it would have
-sent, so a test can assert that signing someone up produced a welcome email addressed to them,
-without an AWS account and without a mailbox to read.
+sent. A test can assert that signing someone up produced a welcome email addressed to them, without
+an AWS account and without a mailbox to read.
 
-There is no delivery to simulate. A message SES accepts leaves AWS for a mail system, so the whole
-of the observable AWS behaviour is whether SES would have accepted the message and what it would
-have sent. That is what makes this service small and what makes it useful.
+There is no delivery to simulate. A message SES accepts leaves AWS for a mail system. The whole of
+the observable AWS behaviour is whether SES would have accepted the message and what it would have
+sent. That is what makes this service small and what makes it useful.
 
 SES specific types are imported from the `@kensio/yulin/ses` subpath.
 
@@ -52,19 +52,18 @@ const [email] = ses.sentEmails();
 console.log(email?.subject, email?.destination.toAddresses[0]);
 ```
 
-Messages come back in the order they were sent, so the first message of a flow is the first one
-read. The three recipient lists stay apart, so a test asserting a bcc was a bcc still can, and
-`recipients` gathers all three when it does not matter which was which.
+Messages come back in the order they were sent, and the first message of a flow is the first one
+read. The three recipient lists stay apart, leaving a test free to assert that a bcc was a bcc.
+`recipients` gathers all three where it makes no difference which was which.
 
 `body` keeps `text` and `html` apart too. A message sent with only an HTML body reports `undefined`
-for its text rather than handing back the markup.
+for its text, and never the markup.
 
 ## Verifying identities
 
 Real SES verifies an email address by emailing it a link and a domain by looking for DNS records.
 Neither can happen inside a test process, so verification here is the simulator's own operation
-rather than an API call. `verifyIdentity` performs it, creating the identity if it is not already
-there.
+instead of an API call. `verifyIdentity` performs it, creating the identity where one is absent.
 
 Everything else about identities is the ordinary SES API. `CreateEmailIdentity` starts one, and it
 starts unverified, exactly as a real one does:
@@ -109,29 +108,28 @@ const verified = await ses.getEmailIdentity(
 console.log(verified.VerificationStatus, verified.VerifiedForSendingStatus);
 ```
 
-Whether an identity is an address or a domain follows from whether the name has an `@` in it, which
-is how SES itself decides: there is no parameter saying which is meant.
+Whether an identity is an address or a domain follows from whether the name has an `@` in it. That
+is how SES itself decides, with no parameter saying which is meant.
 
-A verified domain covers every address at it, which is the whole reason domain identities exist. It
-does not cover a subdomain: `example.com` does nothing for `orders@mail.example.com`, here or on
-real SES. Domains match without regard to case; the local part of an address does not, per RFC 5321,
-so `Sales@example.com` and `sales@example.com` are two identities.
+A verified domain covers every address at it, the whole reason domain identities exist. Its
+subdomains are a separate matter, and `example.com` leaves `orders@mail.example.com` uncovered, here
+or on real SES. Domains match without regard to case. The local part of an address is
+case-sensitive, per RFC 5321, so `Sales@example.com` and `sales@example.com` are two identities.
 
-`unverify()` on an identity puts it back to `PENDING`, which is what a real one does when the
-records that proved it stop resolving. That gives a test somewhere to go when it wants to see
-sending fail after it once worked.
+`unverify()` on an identity puts it back to `PENDING`, as a real one goes when the records that
+proved it stop resolving. That gives a test somewhere to go when it wants to see sending fail after
+it once worked.
 
 ## Email templates
 
-The assertion a test usually wants is not "the email said this prose", which changes whenever
-someone rewords it. It is "the welcome email went to this address, from this template, with these
-substitutions". Storing the template in SES and sending from it by name is what makes that
-assertion possible.
+The assertion a test usually wants is "the welcome email went to this address, from this template,
+with these substitutions". Asserting on the prose instead breaks whenever someone rewords it.
+Storing the template in SES and sending from it by name is what makes the better assertion possible.
 
 Templates are managed with `CreateEmailTemplate`, `GetEmailTemplate`, `UpdateEmailTemplate`,
 `ListEmailTemplates` and `DeleteEmailTemplate`. A send carrying `Content.Template` renders the
-stored wording against the JSON in `TemplateData`, and the recorded send carries the template name
-and the parsed data alongside the rendered result, so a test can assert on either.
+stored wording against the JSON in `TemplateData`. The recorded send carries the template name and
+the parsed data alongside the rendered result, leaving a test free to assert on either.
 
 ```typescript sim-ses-templates
 /**
@@ -177,26 +175,24 @@ const [email] = ses.sentEmails();
 console.log(email?.templateName, email?.templateData, email?.subject);
 ```
 
-A message written out in full reports `undefined` for both, so a test can tell the two kinds of send
-apart.
+A message written out in full reports `undefined` for both, leaving a test able to tell the two
+kinds of send apart.
 
 ### What the substitution does
 
-Real SES renders templates with Handlebars, and this simulator renders the substitution part of it:
-`{{name}}`, and dotted paths like `{{order.id}}`.
+Real SES renders templates with Handlebars, and this simulator renders the substitution part of it,
+being `{{name}}` and dotted paths like `{{order.id}}`.
 
-A placeholder naming something the data does not have renders as an empty string rather than
-failing. That is what real SES does, and it is much the commonest surprise in an SES template: the
-message goes out with a hole in it and nothing reports a problem. Asserting on the rendered body is
-how that gets caught.
+A placeholder naming something the data lacks renders as an empty string. That is what real SES
+does, and it is much the commonest surprise in an SES template. The message goes out with a hole in
+it and nothing reports a problem. Asserting on the rendered body is how that gets caught.
 
-`{{name}}` HTML-escapes its value and `{{{name}}}` does not, again following Handlebars. The
-escaping applies to the text part as well as the HTML one, because Handlebars renders a string
-without knowing what it is for, so a plain text email carrying an ampersand comes out with
-`&amp;` in it.
+`{{name}}` HTML-escapes its value where `{{{name}}}` leaves it alone, again following Handlebars.
+The escaping applies to the text part as well as the HTML one, because Handlebars renders a string
+without knowing what it is for. A plain text email carrying an ampersand comes out with `&amp;` in
+it.
 
-Everything else Handlebars can do is refused where the template is written, rather than left in
-place:
+Everything else Handlebars can do is refused where the template is written:
 
 ```typescript sim-ses-template-refusals
 /**
@@ -227,24 +223,23 @@ try {
 }
 ```
 
-Refusing at the template rather than at the send is deliberate: it fails where the mistake is
-written, and a template surviving into a sent message with `{{#if premium}}` still in it would make
-a test pass on a message no real SES would produce.
+Refusing at the template is deliberate. It fails where the mistake is written, and a template
+surviving into a sent message with `{{#if premium}}` still in it would make a test pass on a message
+no real SES would produce.
 
-`TemplateData` is checked only when a send carries it: malformed JSON, or JSON that is not an
-object, is refused. A send with no `TemplateData` at all is accepted and renders every placeholder
-empty, which is how real SES treats it.
+`TemplateData` is checked only when a send carries it. Malformed JSON, or JSON that is anything but
+an object, is refused. A send with no `TemplateData` at all is accepted and renders every
+placeholder empty, as real SES treats it.
 
 A send may name a stored template or write its wording out in `TemplateContent`, but not both.
-Naming both is refused, because which of them real SES renders is not something this simulator
-knows, and recording the message under a template it was not rendered from would be worse than
-failing.
+Naming both is refused. Which of them real SES renders is beyond what this simulator knows, and
+recording the message under a template it was not rendered from would be worse than failing.
 
 ## Deploying identities and templates with CloudFormation
 
-`AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy into simulated SES, so a project that
-declares them in CDK or CloudFormation can deploy the same template its application deploys rather
-than creating them by hand in test setup.
+`AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy into simulated SES. A project that
+declares them in CDK or CloudFormation can deploy the same template its application deploys, with no
+hand-written test setup.
 
 ```typescript sim-ses-cloudformation
 /**
@@ -300,12 +295,12 @@ await ses.sendEmail(
 console.log(ses.sentEmails()[0]?.subject);
 ```
 
-An identity deploys **unverified**. That is what a real deploy leaves behind: the confirmation link
-or the DKIM records still have to be dealt with out of band. Verify it afterwards with
-`verifyIdentity`, in that order: verifying first and deploying second fails the deploy, because
+An identity deploys **unverified**. That is what a real deploy leaves behind, with the confirmation
+link or the DKIM records still to be dealt with out of band. Verify it afterwards with
+`verifyIdentity`, in that order. Verifying first and deploying second fails the deploy, because
 CloudFormation is creating an identity that is already there.
 
-`Ref` on an identity returns the address or domain itself, which is directly usable as a
+`Ref` on an identity returns the address or domain itself, directly usable as a
 `FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name.
 
 Deleting the stack removes both.
@@ -313,41 +308,41 @@ Deleting the stack removes both.
 ### DKIM tokens
 
 `Fn::GetAtt` on an identity reads the six DKIM token attributes, and this simulator answers them
-with tokens it made up. They are derived from the identity's own name, so they are the same on every
-run, and they are not real: nothing here signs a message.
+with tokens it made up. They are derived from the identity's own name, and come out the same on every
+run. They are invented, and no message here is signed.
 
 They exist because `ses.Identity.publicHostedZone()` in CDK emits three `AWS::Route53::RecordSet`
 Resources reading exactly these attributes. Refusing them would take an ordinary CDK stack down over
-records nothing in this simulation reads, so the stack deploys with records of the right shape
-pointing at nothing.
+records this simulation never reads. The stack deploys with records of the right shape and no
+target.
 
 ### What an identity Resource is deployed without
 
 `EmailIdentity` is the only property acted on. `DkimAttributes`, `DkimSigningAttributes`,
 `MailFromAttributes`, `FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are recorded as
-ignored and the identity is created without them, because an identity without any of them still does
-the one thing an identity does here: exist to be verified, and let a send from it through.
+ignored and the identity is created without them. An identity lacking all of them still does the one
+thing an identity does here. It exists, it is verified, and it lets a send from it through.
 
-`stack.ignoredProperties` is where they are reported, each with the reason it was not acted on, so
-nothing is dropped in silence.
+`stack.ignoredProperties` is where they are reported, each with the reason it was left alone. None
+is dropped in silence.
 
 The SDK path is stricter on purpose. `CreateEmailIdentity` refuses `DkimSigningAttributes` outright,
-because a caller reaching for it directly is asking for that behaviour and should be told it is not
-there. A template is a whole document, and one property in it should not sink the deploy.
+because a caller reaching for it directly is asking for that behaviour and deserves to hear it is
+absent. A template is a whole document, and one property in it should leave the deploy standing.
 
 A template Resource has no such list, because everything `AWS::SES::Template` can usefully say is
-wording and all of it is acted on. Anything else it says is still reported, at both levels: a
-property beside `Template`, and a part inside it that is not one of the four. In practice that
-catches a misspelling, which is worth catching, since `TextPart` written `Textpart` would otherwise
-send a message with no body and nothing to explain it.
+wording and all of it is acted on. Anything else it says is still reported, at both levels. That
+covers a property beside `Template`, and a part inside it that is none of the four. In practice it
+catches a misspelling. `TextPart` written `Textpart` would otherwise send a message with no body and
+no explanation for it.
 
-A template carrying Handlebars this simulator does not render is a different matter, and fails the
-deploy rather than sitting in the stack waiting to fail at the first send.
+A template carrying Handlebars this simulator leaves unrendered is a different matter, and fails the
+deploy where it would otherwise sit in the stack waiting to fail at the first send.
 
 ## The sandbox
 
 An account starts in the SES sandbox, where **both** the sender and every recipient have to be
-verified. That is the state most tests should be written against: it is the configuration that
+verified. That is the state most tests should be written against. It is the configuration that
 refuses to mail an address nobody verified, and catching that refusal in a test is much better than
 catching it in an account.
 
@@ -404,23 +399,23 @@ await ses.sendEmail(message);
 console.log(ses.sentEmails().length);
 ```
 
-A rejection names every identity that failed the check in one message, the way real SES does, so a
-caller finds out everything it has to verify from one failure rather than several:
+A rejection names every identity that failed the check in one message, the way real SES does. A
+caller finds out everything it has to verify from one failure:
 
 ```text
 Email address is not verified. The following identities failed the check in region US-EAST-1: someone@example.org
 ```
 
-Real SES treats `ProductionAccessEnabled` as a request that a human at AWS then reviews, so an
-account does not leave the sandbox the moment the call returns. Granting it immediately is a
-deliberate divergence: the alternative is a simulator no test can get out of the sandbox in, and
-waiting for a review is not behaviour a test can assert on anyway.
+Real SES treats `ProductionAccessEnabled` as a request that a human at AWS then reviews, and an
+account stays in the sandbox until that review lands. Granting it immediately is a deliberate
+divergence. The alternative is a simulator no test can get out of the sandbox in, and waiting for a
+review is beyond what a test can assert on anyway.
 
 ## Permissions
 
 Every command authorizes through simulated IAM. A send authorizes against the identity being sent
-**from**; recipients never enter into it, which is worth knowing when a policy looks like it should
-cover a send and does not.
+**from**, and recipients never enter into it. That is worth knowing when a policy looks like it
+should cover a send and fails to.
 
 ```typescript sim-ses-permissions
 /**
@@ -498,17 +493,17 @@ send from any address at the domain, unless that address is an identity in its o
 case the send authorizes against `identity/hello@example.com` instead.
 
 `ses:ListEmailIdentities`, `ses:GetAccount` and `ses:PutAccountDetails` have no resource type at all
-on real SES, so only a policy written against `*` allows them. A policy scoped to identity ARNs
-allows none of the three, not even one written against `identity/*`, which is the intuitive reading
-and the wrong one.
+on real SES, and only a policy written against `*` allows them. A policy scoped to identity ARNs
+allows none of the three. Not even one written against `identity/*`, the intuitive reading and the
+wrong one.
 
 IAM is evaluated before the identity check, as it is on real AWS. A caller with no permission is
-refused whether or not its identities are verified, which means the error a test sees says which of
-the two is wrong.
+refused whether or not its identities are verified. The error a test sees says which of the two is
+wrong.
 
 ## SDK interception
 
-An intercepted `SESv2Client` reaches simulated SES with nothing touching the network:
+An intercepted `SESv2Client` reaches simulated SES, served in process:
 
 ```typescript sim-ses-sdk-interception
 /**
@@ -575,9 +570,9 @@ console.log(
 );
 ```
 
-The quota figures are the real sandbox and production ones, and neither is enforced. `SentLast24Hours`
-counts what was actually sent, on the simulated clock, so a test that moves time forward past the
-window sees the count fall the way an account's would.
+The quota figures are the real sandbox and production ones, and both are reported without being
+enforced. `SentLast24Hours` counts what was actually sent, on the simulated clock. A test that moves
+time forward past the window sees the count fall the way an account's would.
 
 ## Simulated commands
 
@@ -596,7 +591,7 @@ window sees the count fall the way an account's would.
 | `GetAccount`          |                                                                                            |
 | `PutAccountDetails`   | `MailType` and `WebsiteURL` are required, as on real SES.                                  |
 
-Anything else refuses on send with `SimSdkUnsupportedCommandError` rather than misbehaving quietly.
+Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 
 ## Divergences and limitations
 
@@ -605,20 +600,20 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError` rather than m
   record.
 - **Production access is granted on request.** Real SES has a human review it first.
 - **Send quotas are reported, not enforced.** A send past the daily figure still succeeds, and
-  nothing here takes real time to respect a per-second rate.
+  a per-second rate would cost real time to respect.
 - **`Content.Raw` is refused by name.** A raw MIME message would have to be parsed to say anything
   about its subject or body.
 - **Only Handlebars substitution is rendered.** Block helpers, partials and comments are refused at
   the template. Template data holding an object where the template wants a value is refused too,
-  rather than rendering `[object Object]` the way real Handlebars would.
-- **`SendBulkEmail` is not simulated**, so there is no per-recipient replacement data.
+  where real Handlebars would render `[object Object]`.
+- **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
   suppression list, no configuration sets and no event destinations. A configuration set named on a
-  send is kept on the record so a test can assert the right one was used, and does nothing else.
+  send is kept on the record so a test can assert the right one was used, and goes no further.
 - **DKIM tokens on `AWS::SES::EmailIdentity` are made up.** They are stable per identity so a test
-  can assert on them, and they prove nothing.
+  can assert on them, and they prove no ownership of anything.
 - **Only `AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy.** `AWS::SES::ConfigurationSet`,
-  `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are not simulated.
-- **SES v2 only.** The older `@aws-sdk/client-ses` API is not simulated.
-- **DKIM, MAIL FROM domains and sending authorization policies are not simulated.** An identity
-  created with `DkimSigningAttributes` is refused rather than reported as configured.
+  `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are left out.
+- **SES v2 only.** The older `@aws-sdk/client-ses` API is absent.
+- **DKIM, MAIL FROM domains and sending authorization policies are left out.** An identity created
+  with `DkimSigningAttributes` is refused, and never reported as configured.
