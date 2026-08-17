@@ -58,15 +58,19 @@ export function simSdkWireErrorResponse(
  * The status a simulated service error is answered with.
  *
  * Simulated services state the status real AWS uses in their error metadata.
- * A bridge error that states none is a client error rather than a fault: the
- * request was understood and refused, so retrying it would only fail again.
+ * An error that states none is a client error rather than a fault: the request
+ * was understood and refused, so retrying it would only fail again.
+ *
+ * Something thrown that is not an Error at all is the exception. It is
+ * reported as InternalFailure, which real AWS answers with a server status,
+ * and it means the simulator itself went wrong rather than the request.
  */
 function errorStatusCode(error: unknown): number {
-  if (!isRecord(error)) {
-    return 400;
+  if (!(error instanceof Error)) {
+    return 500;
   }
 
-  const metadata = error["$metadata"];
+  const metadata = (error as { $metadata?: unknown }).$metadata;
   const statusCode = isRecord(metadata)
     ? metadata["httpStatusCode"]
     : undefined;

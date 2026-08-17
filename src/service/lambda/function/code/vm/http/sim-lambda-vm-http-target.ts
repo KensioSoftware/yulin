@@ -1,18 +1,31 @@
 import { isRecord } from "../../../../../../util/type-guard/record.js";
 
 /**
- * The hostname suffixes AWS issues its API endpoints under.
+ * The hostname suffixes AWS issues its service API endpoints under.
  *
- * A request to one of these is a request to AWS whoever sent it, so it belongs
- * to the simulation rather than the network. Everything else a function asks
- * for still goes wherever it was addressed.
+ * A request to one of these is a request to an AWS service API whoever sent
+ * it, so it belongs to the simulation rather than the network. Everything else
+ * a function asks for still goes wherever it was addressed.
+ *
+ * `.on.aws` is not among them: what AWS issues under it is Lambda Function
+ * URLs, which are the endpoint of one function rather than a service API.
  */
 const awsEndpointSuffixes: readonly string[] = [
   ".amazonaws.com",
   ".amazonaws.com.cn",
   ".api.aws",
-  ".on.aws",
 ];
+
+/**
+ * The label an endpoint hostname carries when it names one resource rather
+ * than a service API: an API Gateway HTTP API, under `.amazonaws.com`.
+ *
+ * A request to one of these is an ordinary HTTP request to something the
+ * simulation may be running, not a serialized Command, so there is nothing
+ * here to route it as. It goes where it was addressed, as it did before this
+ * ran at all.
+ */
+const resourceEndpointLabel = ".execute-api.";
 
 /**
  * Where an outgoing HTTP request from sim Lambda function code is addressed.
@@ -25,10 +38,14 @@ export interface SimLambdaVmHttpTarget {
 }
 
 /**
- * Whether a hostname is an AWS API endpoint.
+ * Whether a hostname is an AWS service API endpoint.
  */
 export function isSimAwsEndpointHostname(hostname: string): boolean {
   const name = hostname.toLowerCase();
+
+  if (name.includes(resourceEndpointLabel)) {
+    return false;
+  }
 
   return awsEndpointSuffixes.some((suffix) => name.endsWith(suffix));
 }

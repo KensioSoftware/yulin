@@ -25,6 +25,20 @@ describe("sim Lambda vm HTTP request target", () => {
     assertFalse(isSimAwsEndpointHostname("notamazonaws.com"));
   });
 
+  it("leaves the endpoints of one resource to the transport", () => {
+    // Given the endpoints AWS issues for a single resource rather than for a
+    // service API, which carry an HTTP request rather than a Command.
+    // Then a Lambda Function URL is not a service API endpoint.
+    assertFalse(
+      isSimAwsEndpointHostname("abcdefg1234.lambda-url.eu-west-2.on.aws"),
+    );
+
+    // And neither is an API Gateway HTTP API endpoint.
+    assertFalse(
+      isSimAwsEndpointHostname("abc123.execute-api.eu-west-2.amazonaws.com"),
+    );
+  });
+
   it("reads a request made with an options object", () => {
     // Given the options an SDK's HTTP handler passes.
     // When the target is read.

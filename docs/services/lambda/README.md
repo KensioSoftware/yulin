@@ -412,6 +412,10 @@ Values the JSON protocols encode travel in their encoded form: a binary attribut
 bundled SDK is stored base64-encoded and decodes correctly when the same path reads it back, but an
 in-process intercepted client reading it sees the encoded string rather than the bytes.
 
+Only service API endpoints are answered this way. A request to the endpoint of one resource, such
+as a Lambda Function URL or an API Gateway HTTP API, is an ordinary HTTP request rather than a
+serialized Command, and goes wherever it was addressed.
+
 ## Invocation types
 
 `InvokeCommand` supports the three AWS invocation types. `RequestResponse` (the default) awaits
