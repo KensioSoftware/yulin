@@ -54,9 +54,9 @@ npm i -D @kensio/yulin
 
 ### Intercept AWS SDK clients
 
-If your code uses the AWS SDK, you can intercept AWS SDK clients and route their Commands to
-simulated AWS services. Your implementation code uses the SDK as normal and never needs to know that
-it's dealing with a simulator behind the scenes:
+If your code uses the AWS SDK, you can intercept its clients and route their Commands to simulated
+AWS services. Your implementation code uses the SDK as normal and never needs to know a simulator is
+answering:
 
 ```typescript
 import {
@@ -90,9 +90,9 @@ simSdk.restoreAll(); // Or `using simSdk = new SimSdk();` to restore on scope ex
 ```
 
 You can intercept a client class, as above, or a single client instance. The simulated Account and
-Region scope is resolved per send: the Region comes from the sending client's configuration, and
-the Account from the ambient `simAws.runAs(...)` caller when one is set, falling back to the
-simulation defaults.
+Region scope is resolved per send. The Region comes from the sending client's configuration, and the
+Account from the ambient `simAws.runAs(...)` caller when one is set, falling back to the simulation
+defaults.
 
 Each `SimSdk` owns its own isolated simulated AWS, available as `simSdk.simAws` when a test needs
 to seed or inspect simulated state directly. To share state with an existing simulation, wrap it
@@ -130,8 +130,8 @@ await simAws.region("eu-west-2").dynamoDb().createTable({ ... });
 await simAws.account("111111111111").region("eu-west-2").dynamoDb().createTable({ ... });
 ```
 
-AWS state is simulated internally, so you can test realistic interactions with multiple AWS
-services.
+AWS state is simulated internally. A test can drive realistic interactions across several AWS
+services at once.
 
 An Account ID is a plain string wherever one is accepted. Code that wants to name the type can get a
 `SimAwsAccountId` from `simAwsAccountId(...)`, which refuses anything that is not a 12-digit AWS
@@ -144,8 +144,8 @@ const accountId = simAwsAccountId("111111111111");
 const someOtherAccountId = makeSimAwsAccountId();
 ```
 
-Each instance of `SimAws` is cheap and encapsulated so you can create them wherever you need them.
-It's fine to create a new instance of `SimAws` in every test case or in shared test setup.
+Each instance of `SimAws` is cheap and encapsulated. Make one wherever you need it, in every test
+case or in shared test setup, whichever suits.
 
 If you prefer, you can also instantiate simulated services individually:
 
@@ -209,7 +209,7 @@ const res = await fetch(new URL("/foo/", bucketWebsiteUrl));
 #### Send requests without a port
 
 A test usually wants the same requests with nothing listening. `SimAwsHttp` answers a Fetch API
-`Request` with a `Response` in process, so there is no port for parallel test files to collide over,
+`Request` with a `Response` in process. There is no port for parallel test files to collide over,
 and no server to start or tear down:
 
 ```typescript
@@ -224,24 +224,24 @@ const simAwsHttp = new SimAwsHttp({ simAws });
 const response = await simAwsHttp.fetch("https://www.example.com/");
 ```
 
-Nothing binds a port, so a URL a simulated service gives out is fetched as it is, with no
-`localUrl(...)` adapting, and a hostname a simulated Route53 answers for is requested by its own
-name. Both routes go through the same authentication, routing and service code, so `serveSimAws` is
-what you want only when the request comes from outside the process. See the
-[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for which to reach for.
+A URL a simulated service gives out is fetched as it is, with no `localUrl(...)` adapting, and a
+hostname a simulated Route53 answers for is requested by its own name. Both routes go through the
+same authentication, routing and service code. Reach for `serveSimAws` when the request comes from
+outside the process. See the
+[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for how to choose.
 
 #### Restarting a served environment
 
-A served environment takes an available port by default, so the URL changes every time the process
+A served environment takes an available port by default. The URL changes every time the process
 starts. Pin a port to keep the URL the same across restarts:
 
 ```typescript
 const srv = await serveSimAws({ simAws, port: 4599 });
 ```
 
-Closing the server ends the connections it is holding, so the process can exit rather than being
-kept alive by a browser tab. Yulin does not install signal handlers, so call `close()` from your
-own:
+Closing the server ends the connections it is holding, and the process can then exit. An open
+browser tab would otherwise keep it alive. Yulin installs no signal handlers, so call `close()` from
+your own:
 
 ```typescript
 process.on("SIGTERM", () => {
@@ -250,12 +250,12 @@ process.on("SIGTERM", () => {
 ```
 
 A restart usually overlaps the process it is replacing. `listen` waits a couple of seconds for a
-pinned port that is still held, then throws `SimAwsLocalPortInUse` naming the port, which means
-something other than the outgoing process owns it.
+pinned port that is still held, then throws `SimAwsLocalPortInUse` naming the port. Something other
+than the outgoing process owns it by then.
 
 #### Reload the browser on a restart
 
-Yulin is the only thing in the response path of a page it serves, so it can tell the browser to
+Yulin is the only thing in the response path of a page it serves, and it can tell the browser to
 reload. Turning `liveReload` on puts a small script into the HTML pages served to browsers, and the
 page reloads itself when the process restarts:
 
@@ -273,16 +273,15 @@ the page refreshed:
 yulin watch -- tsx dev.ts
 ```
 
-It watches the working directory, plus the paths Yulin is holding that a module graph never mentions:
-a directory mounted into a Bucket, and a synthesized template. See the
+It watches the working directory. It also watches the paths Yulin is holding that a module graph
+never mentions, a directory mounted into a Bucket and a synthesized template. See the
 [serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script, what
 is watched, and what is not.
 
 #### Update a stack when its template changes
 
-A synthesized template is data rather than code, so a change to one does not need the process
-restarted. Deploy it with `watch` and Yulin applies the file again whenever it changes, updating the
-stack in place:
+A synthesized template is data, and a change to one needs no restart. Deploy it with `watch` and
+Yulin applies the file again whenever it changes, updating the stack in place:
 
 ```typescript
 await simAws.cloudFormation().deployTemplateFile({
@@ -296,8 +295,8 @@ await simAws.cloudFormation().deployTemplateFile({
 ```
 
 Resources the change left alone keep what they hold, so simulated S3, DynamoDB and SQS survive a
-`cdk synth`. Under `yulin watch` the template is left to the process watching it rather than being a
-reason to restart. See the
+`cdk synth`. Under `yulin watch` the template is left to the process watching it, and never triggers
+a restart. See the
 [CloudFormation docs](./docs/services/cloudformation "Simulated CloudFormation docs") for what an
 update does to each resource.
 
@@ -328,37 +327,36 @@ await simAws.clock().advanceBy({ minutes: 20 });
 // Those session credentials have now expired.
 ```
 
-Advancing runs whatever falls due during the interval and returns once the simulation has settled,
-so the next line can assert. Time belongs to the `SimAws` instance, so moving it never disturbs
-another simulation, or the real clock. See the
+Advancing runs whatever falls due during the interval and returns once the simulation has settled.
+The next line can assert. Time belongs to the `SimAws` instance, so moving it never disturbs another
+simulation, or the real clock. See the
 [simulated time docs](./docs/time "Simulated time docs") for full usage.
 
-## What is yulin?
+## What is Yulin?
 
-TLDR: yulin is an AWS simulator for testing Node.js applications.
+TLDR: Yulin is an AWS simulator for testing Node.js applications.
 
-The simulation is not only local to the machine, but in the same single process
-with the test and application under test. No network or external i/o is
-involved. This is what "isolated" refers to.
+The simulation runs in the same single process as the test and the application
+under test, and not just on the same machine. No network or external i/o is
+involved. That is what "isolated" refers to.
 
 This "isolated system" approach to testing has a few advantages:
 
 - Tests run fast as everything is in memory with no real networking.
-- Test set-up is fast and uncomplicated, as there are no containers or extra
+- Test set-up is quick and uncomplicated, as there are no containers or extra
   dependencies to manage.
 - It's straightforward to use multiple other mocks and simulators alongside
-  yulin, such as [nock](https://github.com/nock/nock), as yulin makes no
+  Yulin, such as [nock](https://github.com/nock/nock), as Yulin makes no
   assumptions about the environment.
-- You can control everything in each isolated test process, such as controlling
-  the current time, even when multiple different AWS services are simulated.
+- You can control everything in each isolated test process, including the
+  current time, even when multiple different AWS services are simulated.
 - One test can cover **meaningful system behaviour** across multiple AWS
   services and applications, such as Lambdas sending events to SQS queues to be
   picked up by other Lambdas, or DynamoDB streams triggering Lambdas.
 
-That last point is the most important. The motivation behind yulin is to enable
-efficient tests that cover the logical behaviour of a system. That is in
-contrast to less valuable microscopic unit tests with fiddly mocks and brittle
-assertions. The goal of yulin is to allow you to test system behaviours that are
+That last point matters most. Yulin exists to make efficient tests that cover
+the logical behaviour of a system, in contrast to microscopic unit tests with
+fiddly mocks and brittle assertions. The behaviours worth testing are the ones
 meaningful to users and stakeholders.
 
 ## What's in a name?

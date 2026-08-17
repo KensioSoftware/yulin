@@ -1,16 +1,16 @@
 # Event factories
 
 A handler is invoked with an event, and a test of a handler has to produce one. The events AWS
-delivers are large, most of each one is fields the handler never reads, and the two or three that
-the test is actually about are buried in them. Written out by hand, that literal is copied between
-files and drifts.
+delivers are large, most of each one is fields the handler never reads, and the two or three the
+test is about are buried in them. Written out by hand, that literal is copied between files and
+drifts.
 
-Yulin exports [`@kensio/part-factory`](https://partfactory.dev/) factories for those event shapes,
-so a test says what the request or the message was and nothing else. They are ordinary factories,
-made in-process, and need no `SimAws` instance and no simulated service running: a handler test that
-does not want a simulator is exactly who they are for. A test that does want one — a Function URL
-served over HTTP, a queue with a real event source mapping — gets its events from the simulator
-instead, and these factories make the same shapes that simulator delivers.
+Yulin exports [`@kensio/part-factory`](https://partfactory.dev/) factories for those event shapes. A
+test made with one says what the request or the message was and leaves the rest of the event alone.
+They are ordinary factories, made in-process, and they need no `SimAws` instance and no simulated
+service running. A handler test that runs without a simulator is who they are for. A test that does want
+one (a Function URL served over HTTP, a queue with a real event source mapping) gets its events from
+the simulator, and these factories make the same shapes that simulator delivers.
 
 ## What is exported
 
@@ -23,12 +23,12 @@ instead, and these factories make the same shapes that simulator delivers.
 | `s3NotificationEventFactory`, `s3NotificationEventRecordFactory`              | `@kensio/yulin/s3`           | An S3 event notification            |
 | `cloudFrontViewerRequestEventFactory`, `cloudFrontViewerResponseEventFactory` | `@kensio/yulin/cloudfront`   | A CloudFront Functions event        |
 
-Each service's own documentation covers what its events mean; this page is about how the factories
+Each service's own documentation covers what its events mean. This page is about how the factories
 are shaped and what they have in common.
 
 ## One factory per shape, and one per record
 
-An event that carries a list of records has two factories: one for a record and one for the event
+An event that carries a list of records has two factories, one for a record and one for the event
 around it. The record factory makes one record, and the event factory completes as many records as
 the test asks for.
 
@@ -68,17 +68,17 @@ const event = lambdaSqsEventFactory.make({
 console.log(ordersHandler(event));
 ```
 
-Passing partial records like that is the reason the event factory exists rather than the event being
-one more `DynamicFactory`. Overrides are merged onto defaults, and merging replaces a list whole
-rather than element by element, so partial records passed to a plain factory would reach the handler
-as the only thing in those records — typed as complete ones, and missing every field the handler
-reads.
+The event factory exists so a test can pass partial records like that. A `DynamicFactory` whose
+defaults hold one record would not manage it. Overrides are merged onto defaults, and merging
+replaces a list whole rather than element by element. A partial record passed that way would reach
+the handler as the only thing in those records, typed as a complete one and missing every field the
+handler reads.
 
 ## Named variations
 
-Every factory here is an `ItemFactory`, so a variation with a name is a `VariantFactory` around it,
-the same as for any other `part-factory` factory. That is usually the tidiest way to describe the
-kind of request or message one application receives:
+Every factory here is an `ItemFactory`. A variation with a name is a `VariantFactory` around it, the
+same as for any other `part-factory` factory. That is usually the tidiest way to describe the kind
+of request or message one application receives:
 
 ```typescript factories-variants
 /**
@@ -121,12 +121,12 @@ console.log(
 ## Events that agree with themselves
 
 A real AWS event says the same thing in more than one field, and those copies are where a
-hand-written literal goes wrong: a request for `/user/status` whose request context still says `/`,
-an SQS record whose digest is of a different body, a DynamoDB record that reports an insert and
-carries an old image.
+hand-written literal goes wrong. It asks for `/user/status` and leaves the request context saying
+`/`, or gives an SQS record the digest of some other body, or reports a DynamoDB insert on a record
+that carries an old image.
 
-Each factory's defaults are computed from the overrides, so supplying either copy settles the
-other. What that covers is listed in each factory's own documentation, and in outline it is:
+Each factory's defaults are computed from the overrides, so supplying either copy settles the other.
+What that covers is listed in each factory's own documentation, and in outline it is:
 
 - **Function URL and HTTP API events** — the path, the query, the route key, the endpoint's id,
   hostname and `host` header, the caller's user agent and address, and the invocation time
@@ -137,4 +137,4 @@ other. What that covers is listed in each factory's own documentation, and in ou
   have a size and an eTag
 
 Overriding both copies of one of those with different values is still allowed. A test that wants an
-event no real invocation would produce is entitled to one; it just has to ask for it twice.
+event no real invocation would produce is entitled to one. It just has to ask for it twice.

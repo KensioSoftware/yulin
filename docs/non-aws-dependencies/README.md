@@ -12,9 +12,9 @@ Simulated AWS services are handled by Yulin. A DynamoDB call reaches an in-memor
 call reaches an in-memory bucket, with no network involved. [AWS SDK interception](../sdk/README.md)
 is how an ordinary SDK client in the code under test gets there.
 
-Everything else is yours to provide, and connects the way it normally would. Yulin does not
-simulate it, does not intercept it, and knows nothing about it. Code that opens a Redis connection
-opens a real one, to whatever address it was given.
+Everything else is yours to provide, and connects the way it normally would. Yulin leaves it alone
+entirely, with no simulation and no interception. Code that opens a Redis connection opens a real
+one, to whatever address it was given.
 
 ## Pointing the code at your own dependency
 
@@ -22,7 +22,7 @@ A deployed Lambda function or ECS container reads its connection details from en
 The simulated ones do the same. A function's `Environment.Variables` and a container definition's
 `environment` are visible through `process.env` while the code runs, so pointing the application
 somewhere else means setting the value it already reads. No Yulin feature is involved, and the code
-under test does not change.
+under test stays as it is.
 
 ```typescript non-aws-dependency-lambda
 /**
@@ -81,8 +81,8 @@ The worked example below runs one simulated ECS container that writes to a simul
 and reads from a cache of its own. The two categories sit next to each other in the same handler and
 are configured the same way, through the container definition's `environment`.
 
-The cache here is a stand-in defined by the example, so nothing has to be running for it to work. A
-real client built from `CACHE_URL` would go in the same place.
+The cache here is a stand-in defined by the example, and it works with no server running. A real
+client built from `CACHE_URL` would go in the same place.
 
 ```typescript non-aws-dependency-ecs
 /**
@@ -220,14 +220,14 @@ console.log(stored.Item?.["rate"]?.S); // "1.27"
 ```
 
 The DynamoDB write is authorized as the task role, in the same way it would be in a deployment. The
-cache read is not authorized by anything, because IAM has nothing to do with it.
+cache read passes through no authorization at all, because IAM has no part in it.
 
 ## Sidecar containers are not started
 
 A task definition sometimes declares the dependency itself as a second container, such as a Redis
-running next to the application in the same task. Yulin does not start it. It never looks inside a
-container image, and the only thing it can run is JavaScript or TypeScript in its own process, so
-there is nothing it could do with an image holding a Redis server.
+running next to the application in the same task. Yulin never looks inside a container image, and
+the only thing it can run is JavaScript or TypeScript in its own process. An image holding a Redis
+server is beyond it.
 
 The container is stored and reported back as declared, and it is recorded as not simulated when the
 task runs, with a reason saying so. An application expecting it has to be given something else to
@@ -238,8 +238,8 @@ run yourself or a stand-in, in the same way as for any other dependency of your 
 
 Handler code gets the function's or the container's variables while it runs, and reads the host
 process environment otherwise. A read at module scope, as in `const url = process.env.CACHE_URL` at
-the top of a file, happens when the test imports that file rather than when the code runs, so it
-sees the host value.
+the top of a file, happens when the test imports that file rather than when the code runs. It sees
+the host value.
 
 That matters here because a connection is often built at module scope. Read inside the handler, or
 build the client there, to get the configured value. Sim Lambda warns on the console when the
@@ -251,8 +251,8 @@ page. Zip code running in the vm runtime is unaffected, because it is imported d
 
 Current documented limitations:
 
-- Nothing outside the simulated AWS services is simulated or started. Anything else the code talks
-  to is yours to run and to tear down.
+- Everything outside the simulated AWS services is yours to run and to tear down. Yulin starts none
+  of it.
 - A dependency declared as a sidecar container in an ECS task definition is not started, because
   Yulin never runs a container image.
 - A connection built at module scope reads the host environment rather than the function's or the
