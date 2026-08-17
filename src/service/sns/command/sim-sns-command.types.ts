@@ -42,6 +42,17 @@ export type {
   SimUnsubscribeCommandOutput,
 } from "./subscription/subscription.command.js";
 export type {
+  SimCheckIfPhoneNumberIsOptedOutCommand,
+  SimCheckIfPhoneNumberIsOptedOutCommandInput,
+  SimCheckIfPhoneNumberIsOptedOutCommandOutput,
+  SimListPhoneNumbersOptedOutCommand,
+  SimListPhoneNumbersOptedOutCommandInput,
+  SimListPhoneNumbersOptedOutCommandOutput,
+  SimOptInPhoneNumberCommand,
+  SimOptInPhoneNumberCommandInput,
+  SimOptInPhoneNumberCommandOutput,
+} from "./sms/sms.command.js";
+export type {
   SimPublishBatchCommand,
   SimPublishBatchCommandInput,
   SimPublishBatchCommandOutput,

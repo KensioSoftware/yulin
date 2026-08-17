@@ -46,6 +46,17 @@ export class SimSnsMessageAttributes {
   }
 
   /**
+   * One attribute by name, where the message carries it.
+   *
+   * SMS is what needs this. Real SNS reads `AWS.SNS.SMS.SenderID` and
+   * `AWS.SNS.SMS.SMSType` out of the attributes of a publish to a phone
+   * number, so a recorded SMS reads them back the same way.
+   */
+  find(name: string): SimSnsMessageAttribute | undefined {
+    return this.attributes.find((attribute) => attribute.name === name);
+  }
+
+  /**
    * What these attributes contribute to the size of a publish.
    */
   get byteSize(): number {

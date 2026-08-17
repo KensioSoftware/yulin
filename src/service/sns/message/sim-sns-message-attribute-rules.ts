@@ -1,5 +1,12 @@
-import { SimSnsInvalidParameterValueException } from "../error/sim-sns.error.js";
+import {
+  SimSnsInvalidParameterValueException,
+  SimSnsUnsimulatedInputException,
+} from "../error/sim-sns.error.js";
 import type { SimSnsMessageAttributeValue } from "./sim-sns-message-attribute-value.js";
+import {
+  simSnsSmsAttributeNames,
+  simSnsUnsimulatedSmsAttributes,
+} from "./sim-sns-sms-attributes.js";
 
 const attributeNamePattern = /^[\w\-.]{1,256}$/;
 
@@ -39,6 +46,18 @@ export function assertUsableSnsAttributeName(name: string): void {
 
   if (name.startsWith(".") || name.endsWith(".") || name.includes("..")) {
     throw invalid;
+  }
+
+  if (simSnsSmsAttributeNames.has(name)) {
+    return;
+  }
+
+  const unsimulated = simSnsUnsimulatedSmsAttributes.get(name);
+
+  if (unsimulated !== undefined) {
+    throw new SimSnsUnsimulatedInputException(
+      `The ${name} message attribute is not simulated. ${unsimulated}`,
+    );
   }
 
   const lowerCased = name.toLowerCase();

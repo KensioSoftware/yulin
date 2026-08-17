@@ -179,6 +179,35 @@ whichever form it arrived in, because the data type already says which form that
 a `Binary` type carries bytes and any other carries text. There is no digest here, unlike simulated
 SQS, because a real SNS publish response carries no digest for a caller to check.
 
+## SMS
+
+SMS state lives under `sms/`, and the commands that reach it under `command/sms/` and
+`command/publish/sim-sns-publish-sms.ts`.
+
+`SimSnsPublishSms` is the half of `Publish` that reaches no topic. It authorizes `sns:Publish`
+against `*`, since there is no topic in the request for a policy to name, reads the message through
+the same `SimSnsPublishedMessage` a topic publish goes through, and records the result.
+
+`SimSnsSentSmsMessage` is one SMS this scope would have sent. Delivery stops at the simulator
+boundary, and the record is the whole of the feature. It carries a phone number, a body, the message
+attributes, an instant, and whether the opt-out list stopped it. Simulated SNS holds these itself,
+the way a simulated Cognito user pool holds the messages it would have texted. A simulated SMS
+service would put one record where two senders need their own.
+
+`SimSnsOptOutList` holds the numbers this scope will send nothing to. Real SNS has no API for putting
+one on, because the recipient does it by replying STOP, so `SimSns.optOutPhoneNumber` stands in for
+the handset. That is the same divergence, and the same reason for it, as `verifyIdentity` on
+simulated SES. A publish to a number on the list is accepted and answered with a message id, as it is
+on real SNS, and the record carries `suppressed` so that a test can tell the two apart.
+
+`SimSnsPhoneNumber` holds the E.164 check in one place. A number reaching the opt-out list or a
+record has been through it already.
+
+The reserved `AWS.SNS.SMS.` attribute names are listed in `message/sim-sns-sms-attributes.ts`, next
+to the general attribute name rules that would otherwise refuse every one of them for its reserved
+prefix. `SenderID` and `SMSType` are recorded. The rest are refused by name, because each changes
+what real SNS does with a message, and none of that behaviour exists here.
+
 ## Delivery
 
 Delivery lives under `delivery/`, and the signing that goes with it under `signature/`.
@@ -435,7 +464,11 @@ here, it does not make another Account's topics reachable through this one.
   `CreateTopic` or by `SetTopicAttributes`.
 - `MessageStructure` is refused, because a `json` structure picks a different body per protocol and
   picking one is not simulated.
-- Publishing to a `TargetArn` or a `PhoneNumber` is refused. Only topics are simulated.
+- Publishing to a `TargetArn` is refused, since mobile application endpoints are not simulated. A
+  publish reaches a topic or a phone number, and one naming both is refused.
+- An SMS is recorded and never delivered. Message part splitting, delivery receipts, pricing and
+  throughput limits are all absent, and so is the SMS sandbox. `AWS.SNS.SMS.MaxPrice` and the other
+  reserved attributes with behaviour behind them are refused rather than recorded.
 - `AddPermission` and `RemovePermission`, which are shorthands for writing one statement of the topic
   policy, are not implemented. The policy is set through the `Policy` attribute only.
 - A CloudFormation property with no simulated behaviour fails the Resource rather than being recorded

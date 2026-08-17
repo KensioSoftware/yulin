@@ -17,6 +17,7 @@ import { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
 import { SimSnsCfnResourceFactory } from "./cfn/sim-sns-cfn-resource-factory.js";
 import { SimSnsSdkCommandRouter } from "./sdk/sim-sns-sdk-command-router.js";
+import { SimSnsSms } from "./sim-sns-sms.js";
 import type { SimSnsSubscription } from "./subscription/sim-sns-subscription.js";
 import { SimSnsSubscriptionStore } from "./subscription/sim-sns-subscription-store.js";
 import type { SimSnsTopic } from "./topic/sim-sns-topic.js";
@@ -45,13 +46,11 @@ interface SimSnsProperties {
  *
  * Only standard topics are simulated. FIFO topics are not.
  */
-export class SimSns {
-  private readonly topics = new SimSnsTopicStore();
-  private readonly subscriptions = new SimSnsSubscriptionStore();
-  private readonly commands: SimSnsCommands;
-  private readonly background: BackgroundScheduler;
-  private readonly sdkRouter = new SimSnsSdkCommandRouter(this);
-  private readonly cfnFactory = new SimSnsCfnResourceFactory({ sns: this });
+export class SimSns extends SimSnsSms {
+  private readonly topics: SimSnsTopicStore;
+  private readonly subscriptions: SimSnsSubscriptionStore;
+  private readonly sdkRouter: SimSnsSdkCommandRouter;
+  private readonly cfnFactory: SimSnsCfnResourceFactory;
 
   constructor(properties: SimSnsProperties = {}) {
     const {
@@ -60,16 +59,25 @@ export class SimSns {
       background = new BackgroundTasks(),
       deliveryEndpoints = new SimSnsNoDeliveryEndpoints(),
     } = properties;
+    const topics = new SimSnsTopicStore();
+    const subscriptions = new SimSnsSubscriptionStore();
 
-    this.background = background;
-    this.commands = new SimSnsCommands({
-      topics: this.topics,
-      subscriptions: this.subscriptions,
-      iam,
+    super({
       background,
-      deliveryEndpoints,
-      accountRegionScope,
+      commands: new SimSnsCommands({
+        topics,
+        subscriptions,
+        iam,
+        background,
+        deliveryEndpoints,
+        accountRegionScope,
+      }),
     });
+
+    this.topics = topics;
+    this.subscriptions = subscriptions;
+    this.sdkRouter = new SimSnsSdkCommandRouter(this);
+    this.cfnFactory = new SimSnsCfnResourceFactory({ sns: this });
   }
 
   /**
@@ -254,28 +262,6 @@ export class SimSns {
       command,
       options,
     );
-  }
-
-  /**
-   * Handle a Publish Command from the SDK.
-   */
-  async publish(
-    command: simSnsCommands.SimPublishCommand,
-    options?: SimSnsRequestOptions,
-  ): Promise<simSnsCommands.SimPublishCommandOutput> {
-    await this.background.sequence();
-    return this.commands.publish.publish(command, options);
-  }
-
-  /**
-   * Handle a PublishBatch Command from the SDK.
-   */
-  async publishBatch(
-    command: simSnsCommands.SimPublishBatchCommand,
-    options?: SimSnsRequestOptions,
-  ): Promise<simSnsCommands.SimPublishBatchCommandOutput> {
-    await this.background.sequence();
-    return this.commands.publish.publishBatch(command, options);
   }
 
   /**
