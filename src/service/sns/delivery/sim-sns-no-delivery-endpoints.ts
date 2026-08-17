@@ -3,9 +3,10 @@ import type {
   SimSnsDeliveryEndpoints,
   SimSnsDeliveryRequest,
 } from "./sim-sns-delivery.js";
+import type { SimSnsOutwardDeliveryEndpoints } from "./sim-sns-protocol-delivery-endpoints.js";
 
 /**
- * The endpoints a simulated SNS built on its own can reach, which is none.
+ * A protocol whose destination a simulated SNS built on its own cannot reach.
  *
  * A standalone SimSns has no other simulated services to reach, and owns its
  * own background scheduler, so nothing could wait for a delivery it made even
@@ -13,7 +14,7 @@ import type {
  * nothing but SNS: it is delivery that is refused, and the refusal is recorded
  * as a delivery failure like any other.
  */
-export class SimSnsNoDeliveryEndpoints implements SimSnsDeliveryEndpoints {
+class SimSnsUnreachableEndpoint implements SimSnsDeliveryEndpoints {
   /**
    * Refuse every delivery, explaining how to get one.
    */
@@ -26,4 +27,17 @@ export class SimSnsNoDeliveryEndpoints implements SimSnsDeliveryEndpoints {
         "queue or a function.",
     );
   }
+}
+
+/**
+ * The endpoints outside itself a simulated SNS built on its own can reach,
+ * which is none.
+ *
+ * An `sms` subscription is unaffected, since simulated SNS records those itself
+ * rather than reaching anything.
+ */
+export function simSnsNoDeliveryEndpoints(): SimSnsOutwardDeliveryEndpoints {
+  const unreachable = new SimSnsUnreachableEndpoint();
+
+  return { sqs: unreachable, lambda: unreachable };
 }

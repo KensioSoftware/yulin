@@ -1,9 +1,13 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimSnsDeliveryEndpoints } from "../delivery/sim-sns-delivery.js";
 import { SimSnsDeliveryRequests } from "../delivery/sim-sns-delivery-request.js";
 import { SimSnsFanOut } from "../delivery/sim-sns-fan-out.js";
+import {
+  type SimSnsOutwardDeliveryEndpoints,
+  SimSnsProtocolDeliveryEndpoints,
+} from "../delivery/sim-sns-protocol-delivery-endpoints.js";
+import { SimSnsDeliverySms } from "../delivery/sms/sim-sns-delivery-sms.js";
 import { SimSnsMessageSigner } from "../signature/sim-sns-message-signer.js";
 import type { SimSnsSubscriptionStore } from "../subscription/sim-sns-subscription-store.js";
 import type { SimSnsTopicStore } from "../topic/sim-sns-topic-store.js";
@@ -28,7 +32,7 @@ interface SimSnsCommandsProperties {
   readonly subscriptions: SimSnsSubscriptionStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
-  readonly deliveryEndpoints: SimSnsDeliveryEndpoints;
+  readonly deliveryEndpoints: SimSnsOutwardDeliveryEndpoints;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
@@ -75,7 +79,18 @@ export class SimSnsCommands {
     this.signer = new SimSnsMessageSigner({ accountRegionScope });
     this.fanOut = new SimSnsFanOut({
       subscriptions,
-      endpoints: properties.deliveryEndpoints,
+      // The protocols reaching another service are supplied from outside, and
+      // the one that reaches nothing is filled in here, where the store it
+      // records on lives.
+      endpoints: new SimSnsProtocolDeliveryEndpoints({
+        byProtocol: {
+          ...properties.deliveryEndpoints,
+          sms: new SimSnsDeliverySms({
+            optOutList: this.optOutList,
+            sent: this.sentSms,
+          }),
+        },
+      }),
       requests: new SimSnsDeliveryRequests({
         signer: this.signer,
         accountRegionScope,

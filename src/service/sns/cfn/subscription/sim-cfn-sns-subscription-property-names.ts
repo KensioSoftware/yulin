@@ -9,8 +9,8 @@ export const subscriptionTopicArnPropertyName = "TopicArn";
 export const subscriptionProtocolPropertyName = "Protocol";
 
 /**
- * What the subscription is delivered to, which is a queue ARN or a function
- * ARN for the two protocols simulated.
+ * What the subscription is delivered to, which is a queue ARN, a function ARN
+ * or a phone number for the three protocols simulated.
  */
 export const subscriptionEndpointPropertyName = "Endpoint";
 

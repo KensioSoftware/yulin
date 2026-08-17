@@ -23,11 +23,43 @@ export const simSnsSqsProtocol = "sqs";
 export const simSnsLambdaProtocol = "lambda";
 
 /**
+ * Delivery by texting a phone number.
+ *
+ * Real SNS confirms this one itself as well, since the number is the endpoint
+ * and there is nothing to confirm. The endpoint is an E.164 phone number rather
+ * than an ARN, and a message reaching it is recorded as a sent SMS rather than
+ * handed to a carrier.
+ */
+export const simSnsSmsProtocol = "sms";
+
+/**
  * A protocol a simulated subscription can be created with.
  */
 export type SimSnsSubscriptionProtocol =
   | typeof simSnsSqsProtocol
+  | typeof simSnsLambdaProtocol
+  | typeof simSnsSmsProtocol;
+
+/**
+ * The protocols whose delivery leaves simulated SNS.
+ *
+ * A queue and a function are other simulated services, only reachable through
+ * `SimAws`, so where they deliver is supplied to `SimSns` from outside. An SMS
+ * goes nowhere but simulated SNS's own record, which is why `sms` is not one of
+ * these.
+ */
+export type SimSnsOutwardProtocol =
+  | typeof simSnsSqsProtocol
   | typeof simSnsLambdaProtocol;
+
+/**
+ * Every protocol delivery is simulated over, in the order a refusal names them.
+ */
+const simulatedProtocols = [
+  simSnsSqsProtocol,
+  simSnsLambdaProtocol,
+  simSnsSmsProtocol,
+] as const;
 
 /**
  * The protocols real SNS has that this simulation does not deliver over.
@@ -42,7 +74,6 @@ const unsimulatedProtocols = new Map<string, string>([
   ["https", "Delivery over HTTPS would leave the simulation."],
   ["email", "Sending email is not simulated."],
   ["email-json", "Sending email is not simulated."],
-  ["sms", "Sending SMS is not simulated."],
   [
     "application",
     "Mobile application endpoints and push notifications are not simulated.",
@@ -63,8 +94,10 @@ const unsimulatedProtocols = new Map<string, string>([
 export function requireSimSnsProtocol(
   value: string | undefined,
 ): SimSnsSubscriptionProtocol {
-  if (value === simSnsSqsProtocol || value === simSnsLambdaProtocol) {
-    return value;
+  const simulated = simulatedProtocols.find((protocol) => protocol === value);
+
+  if (simulated !== undefined) {
+    return simulated;
   }
 
   const named = value ?? "(none)";
@@ -73,8 +106,8 @@ export function requireSimSnsProtocol(
   if (reason !== undefined) {
     throw new SimSnsUnsimulatedInputException(
       `The ${named} subscription protocol is not simulated. ${reason} ` +
-        `Subscribe with the ${simSnsSqsProtocol} or ` +
-        `${simSnsLambdaProtocol} protocol instead.`,
+        `Subscribe with the ${simSnsSqsProtocol}, ${simSnsLambdaProtocol} or ` +
+        `${simSnsSmsProtocol} protocol instead.`,
     );
   }
 

@@ -18,6 +18,7 @@ import { assertNonNullable, assertThrowsErrorAsync } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import type { AwsRegionName } from "../../src/service/aws/sim-aws-region.js";
+import type { SimSnsSentSmsMessage } from "../../src/service/sns/sms/sim-sns-sent-sms-message.js";
 import { simAwsWithTopic } from "./topic-fixture.js";
 
 /**
@@ -104,10 +105,61 @@ export const simSnsUnsimulatedProtocols = [
   "https",
   "email",
   "email-json",
-  "sms",
   "application",
   "firehose",
 ];
+
+/**
+ * Endpoints that are not an E.164 phone number, one of each way to not be one.
+ */
+export const simSnsEndpointsThatAreNotPhoneNumbers = [
+  "5550100",
+  "+0155501000",
+  "+1 555 0100",
+  "+1555010012345678",
+  "",
+];
+
+/**
+ * Subscribe a phone number to a topic, answering with the subscription ARN.
+ */
+export async function subscribePhoneNumber(
+  simAws: SimAws,
+  topicArn: string,
+  phoneNumber: string,
+  attributes?: Record<string, string>,
+): Promise<string> {
+  const subscribed = await simAws.sns().subscribe(
+    new SubscribeCommand({
+      TopicArn: topicArn,
+      Protocol: "sms",
+      Endpoint: phoneNumber,
+      ...(attributes !== undefined && { Attributes: attributes }),
+    }),
+  );
+
+  assertNonNullable(
+    subscribed.SubscriptionArn,
+    "Subscribe answered with an ARN",
+  );
+
+  return subscribed.SubscriptionArn;
+}
+
+/**
+ * Wait for delivery, then take the SMS messages one simulated SNS recorded.
+ *
+ * Delivery happens on the background scheduler, as it does on real SNS after
+ * the publish has been answered, so nothing has been texted until that work is
+ * done.
+ */
+export async function simSnsTextedMessages(
+  simAws: SimAws,
+): Promise<readonly SimSnsSentSmsMessage[]> {
+  await simAws.backgroundTasksComplete();
+
+  return simAws.sns().sentSmsMessages();
+}
 
 /**
  * Endpoints that are not an SQS queue ARN, one of each way to not be one.
@@ -232,4 +284,13 @@ export async function endpointRefusal(
   endpoint: string | undefined,
 ): Promise<Error> {
   return subscribeRefusal({ Protocol: "sqs", Endpoint: endpoint });
+}
+
+/**
+ * Subscribe an endpoint over the sms protocol, answering with what it threw.
+ */
+export async function phoneNumberRefusal(
+  endpoint: string | undefined,
+): Promise<Error> {
+  return subscribeRefusal({ Protocol: "sms", Endpoint: endpoint });
 }

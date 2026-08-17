@@ -28,7 +28,7 @@ import { simAwsEcsCollaborators } from "./sim-aws-ecs-collaborators.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSns } from "../../sns/index.js";
-import { SimAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-delivery-endpoints.js";
+import { simAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-delivery-endpoints.js";
 import { SimSts } from "../../sts/sim-sts.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
@@ -210,7 +210,7 @@ export class SimAwsAccountRegionServiceBuilder {
    * and are resolved on delivery rather than here.
    */
   createSns(scope: SimAwsAccountRegionContainer): SimSns {
-    const endpoints = new SimAwsSnsDeliveryEndpoints({ simAws: this.simAws });
+    const endpoints = simAwsSnsDeliveryEndpoints({ simAws: this.simAws });
 
     return new SimSns({ ...this.scoped(scope), deliveryEndpoints: endpoints });
   }

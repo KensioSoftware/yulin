@@ -1,4 +1,7 @@
-import type { SimSnsSubscriptionProtocol } from "../subscription/sim-sns-subscription-protocol.js";
+import type {
+  SimSnsOutwardProtocol,
+  SimSnsSubscriptionProtocol,
+} from "../subscription/sim-sns-subscription-protocol.js";
 import type {
   SimSnsDeliveryEndpoints,
   SimSnsDeliveryRequest,
@@ -13,6 +16,18 @@ import type {
  */
 type SimSnsEndpointsByProtocol = Readonly<
   Record<SimSnsSubscriptionProtocol, SimSnsDeliveryEndpoints>
+>;
+
+/**
+ * The endpoints a simulated SNS is handed from outside.
+ *
+ * These are the protocols delivering to another simulated service, which is
+ * only reachable through `SimAws`. Simulated SNS fills in the rest itself: an
+ * SMS is recorded here rather than delivered anywhere, so nothing outside has
+ * anything to supply for it.
+ */
+export type SimSnsOutwardDeliveryEndpoints = Readonly<
+  Record<SimSnsOutwardProtocol, SimSnsDeliveryEndpoints>
 >;
 
 interface SimSnsProtocolDeliveryEndpointsProperties {
