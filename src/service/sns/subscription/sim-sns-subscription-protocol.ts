@@ -53,7 +53,11 @@ export type SimSnsOutwardProtocol =
   | typeof simSnsLambdaProtocol;
 
 /**
- * Every protocol delivery is simulated over, as a set to read a request against.
+ * Every protocol delivery is simulated over.
+ *
+ * A Subscribe request's protocol is read against this set. The refusal for a
+ * protocol that is missing writes each of them out itself, so the order here
+ * changes nothing.
  */
 const simulatedProtocols = [
   simSnsSqsProtocol,
