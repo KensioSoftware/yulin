@@ -217,7 +217,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     );
   });
 
-  it("refuses a local sign-in that carries no credentials", async () => {
+  it("answers a local sign-in that carries no credentials with the form", async () => {
     // Given a pool with a domain.
     const setUp = await simCognitoHosted();
     const { identity_provider: unused, ...withoutProvider } =
@@ -226,13 +226,9 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     // When an authorize request names no identity provider and no user.
     const response = await authorize(setUp, withoutProvider);
 
-    // Then it says which two fields a sign-in by one of the pool's own users
-    // needs.
-    assertIdentical(response.status, 400);
-    assertStringIncludes(
-      await refusedBody(response),
-      "needs a username and a password",
-    );
+    // Then the browser is asked who is signing in, rather than being refused.
+    assertIdentical(response.status, 200);
+    assertStringIncludes(await response.text(), 'name="password"');
     assertIdentical(unused, "Google");
   });
 
@@ -291,17 +287,19 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     const http = new SimAwsHttp({ simAws: setUp.simAws });
 
     // When a path the domain does not serve is requested, and the authorize
-    // endpoint is posted to.
+    // endpoint is asked for with a method it does not take.
     const missing = await http.fetch(hostedUrl("/oauth2/userInfo", {}));
-    const posted = await http.fetch(
+    const deleted = await http.fetch(
       hostedUrl("/oauth2/authorize", authorizeParameters(setUp)),
-      { method: "POST" },
+      { method: "DELETE" },
     );
 
-    // Then each is refused, saying what the domain does serve.
+    // Then each is refused, saying what the domain does serve. The authorize
+    // endpoint takes the post of the sign-in form it serves as well as the
+    // get an application sends the browser on.
     assertIdentical(missing.status, 404);
     assertStringIncludes(await refusedBody(missing), "/oauth2/authorize");
-    assertIdentical(posted.status, 405);
-    assertIdentical(posted.headers.get("allow"), "GET");
+    assertIdentical(deleted.status, 405);
+    assertIdentical(deleted.headers.get("allow"), "GET, POST");
   });
 });

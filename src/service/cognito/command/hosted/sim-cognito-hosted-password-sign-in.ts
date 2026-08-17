@@ -1,5 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
-import { SimCognitoOAuthError } from "../../error/sim-cognito-oauth.error.js";
+import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-login.error.js";
 import {
   requireSimCognitoConfirmed,
   requireSimCognitoSignIn,
@@ -57,9 +57,8 @@ export class SimCognitoHostedPasswordSignIn {
    * The username and password the request carried.
    *
    * A request carrying neither, and naming no identity provider, is one a
-   * browser would have been shown the sign-in page for. Calling
-   * `hostedAuthorize` directly skips that page, so this says what to pass
-   * instead.
+   * browser is shown the sign-in page for. The serving layer is what answers
+   * with that page, from this refusal.
    */
   private requiredCredentials(
     input: SimCognitoAuthorizeInput,
@@ -72,14 +71,7 @@ export class SimCognitoHostedPasswordSignIn {
       password === undefined ||
       password === ""
     ) {
-      throw new SimCognitoOAuthError({
-        code: "invalid_request",
-        description:
-          "This request names no identity provider, so it signs in one of " +
-          "the pool's own users and needs a username and a password. Pass " +
-          "both, or name an identity_provider to sign in through.",
-        redirectable: false,
-      });
+      throw new SimCognitoManagedLoginRequired();
     }
 
     return { username, password };
