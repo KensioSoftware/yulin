@@ -1385,6 +1385,14 @@ origin access control, so a Function URL behind a Distribution runs for that Dis
 refuses everything else. See
 [origin access controls](../cloudfront/README.md#origin-access-controls) in the CloudFront docs.
 
+A request declaring what its body hashes to in an `x-amz-content-sha256` header is held to it. The
+header is checked against the bytes that arrived, and a request declaring `UNSIGNED-PAYLOAD` is
+refused with `403` and `The request signature we calculated does not match the signature you
+provided`, because Lambda supports no unsigned payload. A request that declares no hash is invoked as
+before. That is what makes a POST through a CloudFront origin access control need the viewer's own
+digest. See [posting to a Function URL Origin](../cloudfront/README.md#posting-to-a-function-url-origin)
+in the CloudFront docs.
+
 CloudFront is the exception to the two actions being separate. A request from
 `cloudfront.amazonaws.com` is authorized against `lambda:InvokeFunctionUrl` and
 `lambda:InvokeFunction`, and needs a grant for both, which is what real Lambda asks an origin access

@@ -12,6 +12,7 @@ import {
   SimLambdaUrlRouter,
 } from "./sim-lambda-url-router.js";
 import { SimLambdaUrlAuthorizer } from "./auth/sim-lambda-url-authorizer.js";
+import { simLambdaUrlPayloadRefusal } from "./auth/sim-lambda-url-payload-hash.js";
 import type { SimAwsRequestCaller } from "../../iam/request/sim-aws-request-caller.js";
 
 interface SimLambdaServiceControllerProperties {
@@ -77,12 +78,26 @@ export class SimLambdaServiceController implements SimAwsServiceController {
    * What the request is being made on behalf of travels with it, so a
    * CloudFront Distribution reaching this URL through an origin access control
    * is judged against the Distribution the permission names.
+   *
+   * What the request declares its body hashes to is settled first, as real
+   * Lambda authenticates a request before it authorizes one. A POST or PUT
+   * arriving through an origin access control declares an unsigned payload
+   * unless the viewer sent a hash of its own, and Lambda takes no unsigned
+   * payload, so it is refused here rather than reaching the function.
    */
   private async invokeAuthenticated(
     route: SimLambdaFunctionUrlRoute,
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
     const { caller } = serviceRequest;
+    const payloadRefusal = await simLambdaUrlPayloadRefusal(
+      serviceRequest.request,
+    );
+
+    if (payloadRefusal !== undefined) {
+      return this.errorResponse.signatureDoesNotMatch(payloadRefusal);
+    }
+
     const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize({
       simFunction: route.simFunction,
       functionUrl: route.functionUrl,

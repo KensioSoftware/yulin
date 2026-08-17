@@ -8,7 +8,15 @@ import {
 
 export const simIamSigV4UnsignedPayload = "UNSIGNED-PAYLOAD";
 
-const sha256Name = "x-amz-content-sha256";
+/**
+ * The header a signed request declares its payload hash in.
+ *
+ * Whoever builds a signed request states the hash here, and whoever receives
+ * one reads it from here, so the name is shared rather than written out again
+ * at each end.
+ */
+export const simIamSigV4ContentSha256Header = "x-amz-content-sha256";
+
 const sha256DigestPattern = /^[\da-f]{64}$/i;
 
 /**
@@ -37,7 +45,9 @@ export class SimIamSigV4PayloadDeclaration {
    * The declaration a header-signed request makes.
    */
   static fromHeaders(headers: Headers): SimIamSigV4PayloadDeclaration {
-    return new SimIamSigV4PayloadDeclaration(headers.get(sha256Name));
+    return new SimIamSigV4PayloadDeclaration(
+      headers.get(simIamSigV4ContentSha256Header),
+    );
   }
 
   /**
@@ -80,9 +90,10 @@ export class SimIamSigV4PayloadDeclaration {
 
     if (!sha256DigestPattern.test(declared)) {
       throw new SimIamSignatureDoesNotMatch(
-        `Signed ${sha256Name} declares ${declared}, which is neither a ` +
-          `SHA-256 digest nor ${simIamSigV4UnsignedPayload}. Chunked and ` +
-          `streaming payload signing is not simulated.`,
+        `Signed ${simIamSigV4ContentSha256Header} declares ${declared}, ` +
+          `which is neither a SHA-256 digest nor ` +
+          `${simIamSigV4UnsignedPayload}. Chunked and streaming payload ` +
+          `signing is not simulated.`,
       );
     }
 
@@ -91,7 +102,7 @@ export class SimIamSigV4PayloadDeclaration {
     if (received !== declared.toLowerCase()) {
       throw new SimIamSignatureDoesNotMatch(
         `Request body hashes to ${received}, not the ${declared} its signed ` +
-          `${sha256Name} declares`,
+          `${simIamSigV4ContentSha256Header} declares`,
       );
     }
 
