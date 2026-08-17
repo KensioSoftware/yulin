@@ -1,8 +1,8 @@
 # Simulated Rekognition
 
-Simulated Rekognition answers detection calls from results declared against images, so a test can
-say which image fails moderation or holds a cat without any image analysis happening. No recognition
-of any kind is performed on the bytes.
+Simulated Rekognition answers detection calls from results declared against images. A test can say
+which image fails moderation or holds a cat, with no image analysis happening. The bytes are never
+looked at.
 
 Rekognition-specific types are imported from the `@kensio/yulin/rekognition` subpath.
 
@@ -52,7 +52,7 @@ console.log(detected.ModerationLabels.map((label) => label.Name));
 console.log(detected.ModerationModelVersion); // "7.0"
 ```
 
-The image is read through simulated S3 as the caller making the detection, so the caller needs
+The image is read through simulated S3 as the caller making the detection. The caller needs
 `s3:GetObject` for it as well as `rekognition:DetectModerationLabels`.
 
 Image bytes go in as `Image.Bytes` instead, which needs no Bucket:
@@ -68,8 +68,8 @@ const detected = await simAws
 ## Detecting labels in an image
 
 `DetectLabels` answers with the objects, scenes and concepts an image is declared to hold. Each
-label carries the parents, aliases, categories and instances it was declared with, and nothing else:
-a label is reported as written.
+label carries the parents, aliases, categories and instances it was declared with, and no more. A
+label is reported as written.
 
 ```typescript sim-rekognition-detect-labels
 /**
@@ -131,14 +131,14 @@ console.log(detected.LabelModelVersion); // "3.0"
 Labels come back in descending order of confidence, which is the order real Rekognition reports them
 in. A declared instance with no confidence of its own takes its label's.
 
-An image no rule matches gets the built-in default result: the one `Mobile Phone` label from the
-example response in the AWS `DetectLabels` documentation, with the parent, alias, category and
-bounding box AWS documents it with. That is a real Rekognition response, but which labels an
+An image no rule matches gets the built-in default result. That is the one `Mobile Phone` label from
+the example response in the AWS `DetectLabels` documentation, with the parent, alias, category and
+bounding box AWS documents it with. It is a real Rekognition response, though which labels an
 unconfigured image gets is a simulator convention rather than what AWS would return for it.
 
-Nothing is filled in from a label name. Declaring `Cat` with no parents reports `Cat` with no
-parents, and declaring a `Pizza` nobody has heard of reports `Pizza`, because Yulin ships no general
-label ontology to check a name against or to expand one from.
+A label name fills in nothing of its own. Declaring `Cat` with no parents reports `Cat` with no
+parents, and declaring a `Pizza` nobody has heard of reports `Pizza`. Yulin ships no general label
+ontology to check a name against or to expand one from.
 
 ## Detecting faces in an image
 
@@ -201,7 +201,7 @@ console.log(detected.FaceDetails[0]?.Smile);
 ```
 
 Faces come back in the order they were declared. An attribute with no confidence of its own takes
-the face's, so a face detected at 99.4 is reported as smiling at 99.4. A face declared with no
+the face's, and a face detected at 99.4 is reported as smiling at 99.4. A face declared with no
 confidence at all is detected at the built-in one.
 
 An image with nobody in it is `{ faces: [] }`. Two built-in results cover the counting a test
@@ -219,19 +219,19 @@ faces.onName("incoming/landscape.png", simRekognitionNoFaces);
 faces.onName("incoming/crowd.png", simRekognitionSeveralFaces);
 ```
 
-An image no rule matches gets the built-in default result: the one face from the example response in
-the AWS `DetectFaces` documentation, with the attributes and all thirty landmarks AWS documents it
-with. That is a real Rekognition response, but which face an unconfigured image gets is a simulator
-convention rather than what AWS would return for it.
+An image no rule matches gets the built-in default result. That is the one face from the example
+response in the AWS `DetectFaces` documentation, with the attributes and all thirty landmarks AWS
+documents it with. It is a real Rekognition response, though which face an unconfigured image gets is
+a simulator convention rather than what AWS would return for it.
 
 ## Choosing the facial attributes
 
 `BoundingBox`, `Confidence`, `Pose`, `Quality` and `Landmarks` come back whatever a request asked
-for, which is the default subset AWS always returns. `ALL` adds the rest, and naming one attribute
-adds that one, so `["FACE_OCCLUDED"]` is the default subset with face occlusion on top.
+for, being the default subset AWS always returns. `ALL` adds the rest, and naming one attribute adds
+that one, so `["FACE_OCCLUDED"]` is the default subset with face occlusion on top.
 `["ALL", "DEFAULT"]` is the union the two describe together.
 
-Landmarks follow AWS too: five come back unless `ALL` was asked for, and every declared landmark
+Landmarks follow AWS too. Five come back unless `ALL` was asked for, and every declared landmark
 when it was.
 
 ```typescript sim-rekognition-face-attributes
@@ -292,23 +292,23 @@ console.log(
 // [ "eyeLeft", "eyeRight", "chinBottom" ]
 ```
 
-An attribute nothing was declared for is left out of the response rather than carried as an empty
-one, so a face declared with a bounding box and nothing else comes back as a bounding box and a
-confidence however many attributes the request asked for.
+An undeclared attribute is left out of the response, in place of coming back empty. A face declared
+with a bounding box and no more comes back as a bounding box and a confidence, however many
+attributes the request asked for.
 
 A declaration is checked where it is written. A bounding box or a landmark outside the image is
-refused, as is an age range that ends before it begins, an emotion Rekognition does not report, and
-a pair of landmarks that runs the wrong way across the face, such as an `eyeLeft` to the right of
-`eyeRight`. So is a result declaring more than a hundred faces, which is the most real Rekognition
-detects in one image. Landmarks are not required to sit inside the bounding box, because a real
-Rekognition face box routinely excludes the chin.
+refused, as is an age range that ends before it begins, an emotion Rekognition never reports, and a
+pair of landmarks that runs the wrong way across the face, such as an `eyeLeft` to the right of
+`eyeRight`. So is a result declaring more than a hundred faces, the most real Rekognition detects in
+one image. A landmark may sit outside the bounding box, because a real Rekognition face box routinely
+excludes the chin.
 
 ## Declaring results
 
 Results are declared per operation. `moderation()` holds the rules `DetectModerationLabels` answers
 from, `labels()` holds the rules `DetectLabels` answers from, and `faces()` holds the rules
-`DetectFaces` answers from. All three take the same three kinds of rule: an exact S3 object name, an
-exact content hash, or anything at all.
+`DetectFaces` answers from. All three take the same three kinds of rule, being an exact S3
+object name, an exact content hash, or anything at all.
 
 ```typescript sim-rekognition-moderation-rules
 /**
@@ -339,12 +339,12 @@ moderation.onHash(simRekognitionImageHash(fixture), {
 });
 ```
 
-A hash rule wins, then a name rule, then the default. Matching is exact, with no pattern syntax, so
-which rule applies never depends on how specific a pattern looks.
+A hash rule wins, then a name rule, then the default. Matching is exact, with no pattern syntax.
+Which rule applies never depends on how specific a pattern looks.
 
-A name is the `Name` in the request, which is the S3 object key. It is matched on its own rather
-than with the Bucket, so a rule for a key applies to that key in whichever Bucket the request names.
-An image passed as `Image.Bytes` has no name at all, so it consults hash rules and then the default.
+A name is the `Name` in the request, the S3 object key. It is matched on its own, with the Bucket
+left out, so a rule for a key applies to that key in whichever Bucket the request names. An image
+passed as `Image.Bytes` has no name at all, and consults hash rules and then the default.
 
 The hash is the sha256 digest of the image bytes as they were received, as lowercase hex.
 `simRekognitionImageHash` produces it from a fixture. Re-encoding an image between uploading it and
@@ -357,8 +357,8 @@ detection label at `97.53010559082031`.
 ## Sample images
 
 Simulated Rekognition ships with five images whose hashes are already declared. A test uploads one
-through its own code and gets a known answer without registering anything, which is what makes an
-application that generates its own object keys testable: nothing in the test has to know the key.
+through its own code and gets a known answer without registering anything. That is what makes an
+application generating its own object keys testable, since the test never has to know the key.
 
 | Image                                              | Format | Detected as                                       |
 | -------------------------------------------------- | ------ | ------------------------------------------------- |
@@ -405,12 +405,12 @@ console.log(detected.ModerationLabels.map((label) => label.Name));
 ```
 
 Each image is declared for the one operation it is named for. The moderation images say nothing
-about faces and the face images say nothing about moderation, so those detections answer from their
-own rules as they would for any other image.
+about faces and the face images say nothing about moderation. Those detections answer from their own
+rules as they would for any other image.
 
-The built-in rules are ordinary hash rules registered when the service is made, so declaring a rule
-for the same image replaces it. Note the precedence: a hash rule beats a name rule, so a sample
-image is overridden by hash rather than by the key it was uploaded under.
+The built-in rules are ordinary hash rules registered when the service is made, and declaring a rule
+for the same image replaces it. The precedence matters here. A hash rule beats a name rule, so a
+sample image is overridden by hash, and never by the key it was uploaded under.
 
 ```typescript
 const sample = simRekognitionSampleImages.flaggedByModeration();
@@ -421,13 +421,13 @@ simAws
   .onHash(simRekognitionImageHash(sample), { labels: [] });
 ```
 
-The images are real 16 by 16 PNG and JPEG files, 1,909 bytes in total, so the format check reads
-their magic bytes as it does for any other image. What they are pictures of decides nothing, since
-no image is looked at.
+The images are real 16 by 16 PNG and JPEG files, 1,909 bytes in total. The format check reads their
+magic bytes as it does for any other image. What they are pictures of decides nothing, since no
+image is looked at.
 
 ## Moderation labels come back with their parents
 
-A declared label expands to its whole chain in the version 7.0 moderation taxonomy, so handler code
+A declared label expands to its whole chain in the version 7.0 moderation taxonomy. Handler code
 that filters on the top-level category sees what it would see on AWS. Each label carries the
 `ParentName` and `TaxonomyLevel` real Rekognition reports.
 
@@ -465,21 +465,20 @@ console.log(detected.ModerationLabels);
 // ]
 ```
 
-Every label in one chain shares that chain's confidence, and `MinConfidence` filters whole chains,
-so a surviving label never names a parent that is not in the response. A label two chains share is
-reported once, at the higher of the two confidences.
+Every label in one chain shares that chain's confidence, and `MinConfidence` filters whole chains. A
+surviving label always names a parent the response carries. A label two chains share is reported
+once, at the higher of the two confidences.
 
-A label the taxonomy does not have is refused where it is declared rather than at detection time.
-That includes a version 6.1 name that version 7.0 dropped, such as `Drug Products`, which became
-`Products` under `Drugs & Tobacco`. Some names survived the move with a different place in the
-taxonomy: `Drinking` is still a label, but it now sits under `Alcohol Use` rather than directly
-under `Alcohol`.
+A label outside the taxonomy is refused where it is declared, ahead of detection time. That includes
+a version 6.1 name that version 7.0 dropped, such as `Drug Products`, which became `Products` under
+`Drugs & Tobacco`. Some names survived the move with a different place in the taxonomy. `Drinking`
+is still a label, and it now sits under `Alcohol Use` rather than directly under `Alcohol`.
 
 ## Filtering by confidence
 
-`MinConfidence` compares inclusively and defaults to what the operation defaults to on AWS: 50 for
-`DetectModerationLabels` and 55 for `DetectLabels`. An explicit `0` asks for every label rather than
-being read as unset.
+`MinConfidence` compares inclusively and defaults to what the operation defaults to on AWS, being 50
+for `DetectModerationLabels` and 55 for `DetectLabels`. An explicit `0` asks for every label, and is
+never read as unset.
 
 ```typescript sim-rekognition-min-confidence
 /**
@@ -517,12 +516,12 @@ console.log(strict.ModerationLabels.map((label) => label.Name));
 // [ "Violence", "Weapons" ]
 ```
 
-Confidences are float32 values, as real Rekognition confidences are, so a declared `99.4` comes back
-as `99.4000015258789`.
+Confidences are float32 values, as real Rekognition confidences are, and a declared `99.4` comes
+back as `99.4000015258789`.
 
 `DetectLabels` also takes a `MaxLabels`, which applies after the confidence filter and keeps the most
-confident labels of the ones that survived it. An explicit `0` asks for no labels rather than being
-read as unset.
+confident labels of the ones that survived it. An explicit `0` asks for no labels, and is never read
+as unset.
 
 ```typescript sim-rekognition-max-labels
 /**
@@ -563,13 +562,13 @@ console.log(detected.Labels.map((label) => label.Name)); // [ "Cat", "Grass" ]
 
 ## Moderating an upload
 
-An upload can moderate itself: a Bucket notification invokes a function, and the function moderates
+An upload can moderate itself. A Bucket notification invokes a function, and the function moderates
 the object the event names. The function calls Rekognition in the Account and Region it runs in, so
 the rules a test registers on `simAws.rekognition()` are the ones it finds.
 
 This is the flow the sample images exist for. The object goes in under a key the application
-generated, and the sample image's own hash rule decides the result, so nothing in the test names the
-key.
+generated, and the sample image's own hash rule decides the result, leaving the test with no key to
+name.
 
 ```typescript sim-rekognition-upload-pipeline
 /**
@@ -713,23 +712,22 @@ await simAws.backgroundTasksComplete();
 ```
 
 A handler that writes a moderated copy back into the Bucket that triggered it will notify itself for
-ever, so filter the notification configuration by prefix or suffix as this one does.
+ever. Filter the notification configuration by prefix or suffix, as this one does.
 
 ## Permissions and errors
 
-Each detection is authorized as its own action against `*`: `rekognition:DetectModerationLabels`,
-`rekognition:DetectLabels` and `rekognition:DetectFaces`. Real Rekognition gives the detection
-operations no resource-level
-permissions, so a policy naming an ARN reaches nothing, here as on AWS. A denial throws
-`AccessDeniedException` with a 400 status, which is what real Rekognition answers with rather than
-the 403 several other services use.
+Each detection is authorized as its own action against `*`, one of
+`rekognition:DetectModerationLabels`, `rekognition:DetectLabels` and `rekognition:DetectFaces`. Real
+Rekognition gives the detection operations no resource-level permissions, and a policy naming an ARN
+reaches nothing, here as on AWS. A denial throws `AccessDeniedException` with a 400 status, which is
+what real Rekognition answers with, where several other services use 403.
 
-The caller is authorized for the detection before the image is read, so a caller without the
-Rekognition permission is told about that rather than about an S3 object.
+The caller is authorized for the detection before the image is read. A caller without the Rekognition
+permission is told about that, and never about an S3 object.
 
 Every S3 problem becomes `InvalidS3ObjectException`, as it does on real Rekognition, whether the
 Bucket is missing, the object is missing, or the caller may not read it. The underlying simulator
-error is kept as the error's `cause`, so a missing `s3:GetObject` grant is still diagnosable:
+error is kept as the error's `cause`, leaving a missing `s3:GetObject` grant diagnosable:
 
 ```typescript
 try {
@@ -740,8 +738,8 @@ try {
 }
 ```
 
-Bytes that are not a PNG or a JPEG are refused with `InvalidImageFormatException`. The format comes
-from the leading bytes of the image, so a test that stores a placeholder string in a Bucket and
+Bytes that are neither a PNG nor a JPEG are refused with `InvalidImageFormatException`. The format
+comes from the leading bytes of the image. A test that stores a placeholder string in a Bucket and
 moderates it gets that error.
 
 ## Accounts and Regions
@@ -786,45 +784,46 @@ Simulated Rekognition currently supports:
 
 ## Limitations
 
-- `DetectText`, `CompareFaces`, the face collection operations and the video operations are not
-  simulated. An intercepted client sending one of those Commands is refused by name.
+- `DetectText`, `CompareFaces`, the face collection operations and the video operations are left
+  out. An intercepted client sending one of those Commands is refused by name.
 - A face detection reports the emotions that were declared and no others. Real `DetectFaces` returns
-  all eight emotion types every time, the ones it did not see at a low confidence. Declare the
-  emotions the code under test reads.
-- `OrientationCorrection` is not carried on a `DetectFaces` response, because AWS documents its
-  value as always null.
-- A declared bounding box has to sit inside the image. Real Rekognition can report a box that does
-  not, for a face at the image edge that is only partly visible. The check is kept because it
+  all eight emotion types every time, with the ones it failed to see at a low confidence. Declare
+  the emotions the code under test reads.
+- `OrientationCorrection` is left off a `DetectFaces` response, because AWS documents its value as
+  always null.
+- A declared bounding box has to sit inside the image. Real Rekognition can report one that spills
+  over, for a face at the image edge that is only partly visible. The check is kept because it
   catches a box written in pixels.
 - Landmark pairs that run across the face, such as `eyeLeft` and `eyeRight`, have to be declared in
   the order Rekognition reports them in. A face rolled past upright is the one case where that
-  ordering does not hold on AWS, and it cannot be declared here.
+  ordering breaks down on AWS, and it cannot be declared here.
 - Yulin ships no general label ontology, because AWS's is thousands of entries with no published
   enumerable table.
 - A declared label's `Parents` appear on that label alone. Real `DetectLabels` also returns each
   ancestor as a label in its own right, which needs the ontology above. Declare the ancestors as
   labels too when the code under test reads them that way.
-- A declared label name is not checked against anything, for the same reason. Refusing a real AWS
-  label because a Yulin list was missing it would be failing closed against Yulin's own gaps.
-- `DetectLabels` `Settings` filters and `IMAGE_PROPERTIES` are refused rather than ignored. Applying
-  no filters would answer with labels the caller asked to have left out, and image quality and
-  dominant colours would have to be invented by a simulation that looks at no images.
+- A declared label name goes unchecked, for the same reason. Refusing a real AWS label because a
+  Yulin list was missing it would be failing closed against Yulin's own gaps.
+- `DetectLabels` `Settings` filters and `IMAGE_PROPERTIES` are refused outright. Applying no filters
+  would answer with labels the caller asked to have left out, and image quality and dominant colours
+  would have to be invented by a simulation that looks at no images.
 - A custom moderation adapter named with `ProjectVersion`, and a human review loop named with
-  `HumanLoopConfig`, are both refused rather than ignored. Answering from the built-in model would
-  make an adapter look applied here and be applied in production.
+  `HumanLoopConfig`, are both refused outright. Answering from the built-in model would make an
+  adapter look applied here and be applied in production.
 - `ContentTypes` is always empty. Real Rekognition puts `Animated` or `Illustrated` there for
   content it identifies as such, which needs an image to look at.
-- Nothing looks at the image beyond its first few bytes. A PNG of a kitten declared as `Violence`
+- The image is read no further than its first few bytes. A PNG of a kitten declared as `Violence`
   comes back as `Violence`, and an image no rule matches gets the built-in `Mobile Phone` result.
 - The sample images are 16 by 16 pictures of coloured shapes, small enough to ship in the package.
-  They are not photographs of the things they are named for, because nothing decodes them.
+  They are drawings rather than photographs of the things they are named for, since nothing decodes
+  them.
 - The format comes from the image bytes and never from a stored content type. Simulated S3 keeps a
-  `ContentType` given to `PutObject` as a metadata key, and has none at all when the uploader did
-  not set one, so trusting it would make the same bytes detectable or not depending on how they were
+  `ContentType` given to `PutObject` as a metadata key, and has none at all when the uploader left
+  it out. Trusting it would make the same bytes detectable or not depending on how they were
   uploaded.
 - A `Version` on an `Image.S3Object` is refused, because simulated S3 has no object versions and
   would have answered with the current one.
 - There are no CloudFormation resource types for Rekognition, and Rekognition is not served over
   `serveSimAws`.
 - The moderation taxonomy is the published version 7.0 label list. A label from version 6.1 is
-  refused, since real Rekognition no longer returns one.
+  refused, since real Rekognition stopped returning one.

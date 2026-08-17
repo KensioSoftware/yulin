@@ -5,10 +5,10 @@ are held in memory and every operation is authorized by simulated IAM. Scheduler
 imported from the `@kensio/yulin/scheduler` subpath.
 
 Scheduler is a separate service from [EventBridge](../eventbridge/), not a corner of it. It has its
-own SDK client, its own ARN shape, and its own way of reaching a target: a schedule assumes an IAM
+own SDK client, its own ARN shape, and its own way of reaching a target. A schedule assumes an IAM
 execution role, where an EventBridge rule relies on a resource policy admitting a service principal.
-A project using Scheduler cannot be tested against simulated EventBridge rules instead, which is why
-this exists separately.
+A project using Scheduler cannot be tested against simulated EventBridge rules. That is why this
+exists separately.
 
 ## Creating a schedule
 
@@ -51,28 +51,29 @@ console.log(described.ScheduleExpression); // "cron(0 2 * * ? *)"
 
 `FlexibleTimeWindow` and `Target` are both required, as AWS requires them, and a target carries both
 an `Arn` and the `RoleArn` it is invoked as. A schedule ARN always names its group, even the
-`default` one, which is unlike an EventBridge rule ARN, where the bus appears only when it is not
-the default. An IAM policy naming a schedule needs the group in it or it matches nothing.
+`default` one. An EventBridge rule ARN differs, showing the bus only when it is not the default. An
+IAM policy naming a schedule needs the group in it, or it matches no schedule.
 
 ## Writing the schedule expression
 
 Three forms, and the same parser as an [EventBridge scheduled
 rule](../eventbridge/#rules-that-fire-on-a-schedule) with two differences:
 
-- `at(yyyy-mm-ddThh:mm:ss)` runs once, at that instant. There is no timezone on it: the timezone is a
-  separate setting on the schedule rather than part of the expression, so a trailing `Z` is refused.
+- `at(yyyy-mm-ddThh:mm:ss)` runs once, at that instant. The timezone is a separate setting on the
+  schedule, outside the expression, and a trailing `Z` is refused.
 - `rate(<value> <unit>)` runs from when the schedule was created. The unit is `minute`, `hour` or
-  `day`, and Scheduler does not insist it agrees with its value, so `rate(1 hours)` is an hour here
-  and a refusal on an EventBridge rule.
+  `day`, and Scheduler lets it disagree with its value. `rate(1 hours)` is an hour here and a
+  refusal on an EventBridge rule.
 - `cron(<six fields>)` names absolute instants in UTC. Minutes, hours, day-of-month, month,
   day-of-week and year, so every day at two in the morning is `cron(0 2 * * ? *)`. The day-of-month
-  and day-of-week fields cannot both say something: whichever is not deciding the day is written `?`.
+  and day-of-week fields cannot both say something. Whichever is not deciding the day is written
+  `?`.
 
 ## Firing a schedule
 
-A schedule fires on the simulation's clock, not the host's: advancing simulated time past a due
-instant invokes the target, and nothing happens otherwise. So a nightly job takes no time at all to
-test.
+A schedule fires on the simulation's clock. Advancing simulated time past a due
+instant invokes the target. Leave time alone and the target is never invoked. A nightly job takes no
+time at all to test.
 
 ```typescript sim-scheduler-firing
 /**
@@ -152,12 +153,12 @@ await simAws.clock().advanceBy({ hours: 3 });
 console.log(runs.length); // 3
 ```
 
-Firing is per due instant rather than per advance. Advancing an hour with a `rate(1 minute)` schedule
+Firing is per due instant. Advancing an hour with a `rate(1 minute)` schedule
 invokes the target sixty times, at sixty distinct simulated instants. `advanceBy(...)` returns once
-every one of those invocations has settled, so the next line can assert.
+every one of those invocations has settled, leaving the next line free to assert.
 
-A target with an `Input` receives that text; one without receives an empty JSON object, which is what
-AWS documents for a function with no payload. There is no envelope: a schedule has no event of its
+A target with an `Input` receives that text. One without receives an empty JSON object, which AWS
+documents for a function with no payload. There is no envelope, since a schedule has no event of its
 own to describe.
 
 ### The execution role
@@ -171,13 +172,12 @@ Two things therefore have to be right, and they are fixed in different places:
 
 - The role's **trust policy** has to let `scheduler.amazonaws.com` assume it. A role copied from an
   EventBridge rule trusts `events.amazonaws.com` and fails here.
-- A policy **on the role** has to allow the action on the target: `lambda:InvokeFunction`,
+- A policy **on the role** has to allow the action on the target, being `lambda:InvokeFunction`,
   `sqs:SendMessage`, `sns:Publish` or `ecs:RunTask`.
 
-When either is missing the target is not invoked and nothing is thrown, exactly as on AWS, where the
-failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally,
-so a test asserting on a failed invocation reads `deliveryFailures` rather than expecting the advance
-to reject:
+When either is missing the target goes uninvoked and no error is thrown, exactly as on AWS, where the
+failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally. A
+test asserting on a failed invocation reads `deliveryFailures`:
 
 ```typescript sim-scheduler-delivery-failures
 /**
@@ -232,22 +232,22 @@ console.log(failure?.message);
 ### One-time schedules and what happens after
 
 An `at(...)` schedule fires once and then stops. By default it stays in the Account afterwards, which
-surprises people who expected it to clean up: it keeps counting against the schedule quota and keeps
+surprises people who expected it to clean up. It keeps counting against the schedule quota and keeps
 turning up in listings. `ActionAfterCompletion: "DELETE"` is what removes it, and after that
 `GetSchedule` reports it gone.
 
-A schedule that is disabled when its only instant passes has not completed, because nothing was
-invoked, so it is still there afterwards whatever `ActionAfterCompletion` says.
+A schedule that is disabled when its only instant passes has not completed, since nothing was
+invoked. It is still there afterwards whatever `ActionAfterCompletion` says.
 
 `State: "DISABLED"` stops a recurring schedule firing while it is off, and an `UpdateSchedule`
-enabling it picks up from the next due instant rather than replaying what it missed. An update that
+enabling it picks up from the next due instant. What it missed is never replayed. An update that
 changes the expression reschedules from the new one.
 
 ## Running an ECS task on a schedule
 
-A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task instead of being
-invoked with a payload. That is the shape a nightly batch job usually has: a container that runs,
-does its work and stops, rather than a function or a queue.
+A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task, in place of being
+invoked with a payload. That is the shape a nightly batch job usually has. A container runs, does
+its work and stops.
 
 ```typescript sim-scheduler-ecs-target
 /**
@@ -352,16 +352,16 @@ const tasks = await ecs.listTasks(
 console.log(tasks.taskArns?.length); // 1
 ```
 
-The target ARN names the cluster, so an ARN naming anything else in ECS is refused when the schedule
+The target ARN names the cluster. An ARN naming anything else in ECS is refused when the schedule
 is created. `EcsParameters` names the task definition, as a family, a `family:revision` or a full
 ARN, and the same one `RunTask` would take.
 
-An ECS target's `Input` is the task's overrides rather than something the target receives, because a
-task has nowhere to receive a payload. A target with no `Input` runs the task with no overrides.
+An ECS target's `Input` is the task's overrides, since a task has nowhere to receive a payload. A
+target with no `Input` runs the task with no overrides.
 `EcsParameters` on a target whose ARN names anything else is refused, since it would do nothing.
 
-Which containers actually run is [simulated ECS](../ecs/)'s answer rather than the schedule's: a
-container with a binding runs its handler, and a container without one is recorded as not simulated.
+[Simulated ECS](../ecs/) decides which containers actually run. A container
+with a binding runs its handler, and a container without one is recorded as not simulated.
 A target naming a task definition with nothing bound therefore records a task that never started,
 and the schedule counts as invoked.
 
@@ -415,24 +415,22 @@ console.log(described.ScheduleExpression); // "rate(30 minutes)"
 console.log(described.Description); // undefined, and not by accident
 ```
 
-`UpdateSchedule` carries the whole of a schedule, so anything an earlier request set and this one
-leaves out is gone. That is real behaviour and a common surprise. The schedule has to exist:
-updating one that is not there is a `ResourceNotFoundException` rather than a create, which is
-another difference from EventBridge's `PutRule`.
+`UpdateSchedule` carries the whole of a schedule, and anything an earlier request set and this one
+leaves out is gone. That is real behaviour and a common surprise. The schedule has to exist.
+Updating one that is absent raises `ResourceNotFoundException`. EventBridge's `PutRule` creates it.
 
-`CreateSchedule` for a name that already exists is a `ConflictException` rather than a replacement,
-so a deployment running it twice fails the second time here as it does on AWS. `DeleteSchedule` for a
-schedule that is not there is a `ResourceNotFoundException`, where EventBridge's `DeleteRule`
-succeeds.
+`CreateSchedule` for a name that already exists raises `ConflictException`. A deployment running it
+twice fails the second time here as it does on AWS. `DeleteSchedule` for a schedule that is absent
+raises `ResourceNotFoundException`, where EventBridge's `DeleteRule` succeeds.
 
 ## Listing schedules
 
 `ListSchedules` reports the schedules of a group in creation order, narrowed by `NamePrefix` and
 `State` and paged by `MaxResults` and `NextToken`.
 
-A listing carries less than a describe, as it does on AWS: the target's ARN and nothing else about
-the target, and no expression at all. Code reading `ScheduleExpression` off a listing gets
-`undefined` from AWS, so it gets `undefined` here too.
+A listing carries less than a describe, as it does on AWS. It has the target's ARN and no more of the target,
+and no expression at all. Code reading `ScheduleExpression` off a listing gets
+`undefined` from AWS, and gets `undefined` here too.
 
 ## Permissions
 
@@ -497,17 +495,17 @@ const created = await simAws.scheduler().createSchedule(
 console.log(created.ScheduleArn !== undefined); // true
 ```
 
-`ListSchedules` names no schedule, so IAM evaluates it against `*` and only a policy whose `Resource`
+`ListSchedules` names no schedule. IAM evaluates it against `*`, and only a policy whose `Resource`
 is `*` allows it. A policy naming a schedule ARN allows no listing, here as on AWS.
 
 That is the caller's own permission to manage schedules, and it is a separate question from whether a
-schedule's execution role may invoke its target. The second is asked when the schedule fires, against
-the `RoleArn` on the target rather than against whoever created the schedule.
+schedule's execution role may invoke its target. The second is asked when the schedule fires,
+against the `RoleArn` on the target.
 
 ## Deploying from a CloudFormation template
 
-`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](../cloudformation/), so a stack
-that declares its schedules rather than calling the SDK can be exercised end to end. Everything the
+`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](../cloudformation/). A stack
+that declares its schedules can be exercised end to end, with no SDK calls of its own. Everything the
 Resource carries lines up with `CreateSchedule`, and a target ARN or execution role resolved by
 `Fn::GetAtt` from the same template works as it would in a real deployment.
 
@@ -603,12 +601,12 @@ console.log(simAws.scheduler().deliveryFailures.length); // 0
 ```
 
 `Ref` returns the schedule's **name** and `Fn::GetAtt ... Arn` its ARN, which carries the schedule
-group as it always does. A schedule the template does not name gets one generated from the stack name
-and the logical ID.
+group as it always does. A schedule the template leaves unnamed gets one generated from the stack
+name and the logical ID.
 
-A property this simulation does not model is refused at deploy time naming the Resource, rather than
-deploying a schedule that behaves differently from the one that was declared. Tearing the stack down
-removes the schedules it created, so nothing fires afterwards.
+A property this simulation leaves out is refused at deploy time, naming the Resource. Deploying a
+schedule that behaves differently from the one declared would be worse. Tearing the stack down
+removes the schedules it created, and no schedule fires afterwards.
 
 ## Available functionality
 
@@ -628,38 +626,39 @@ removes the schedules it created, so nothing fires afterwards.
 
 ## Limitations
 
-- A schedule only fires while a test advances the simulation's clock. Nothing runs on the host's
-  clock, so a simulation left alone in real time fires nothing however long it is left.
-- Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time and does
-  not promise a single invocation.
-- An invocation is attempted once. There is no retry and no dead letter queue, so a target that
-  throws is a recorded failure rather than a redelivery. A failed invocation never rejects
-  `advanceBy(...)`; it is read from `deliveryFailures`.
-- Schedule groups are not a manageable resource. Every schedule is in `default`, and a `GroupName`
-  naming any other group is refused rather than quietly put in `default`, where its ARN would name a
-  group it is not in.
+- A schedule only fires while a test advances the simulation's clock. The host's clock drives none
+  of it, and a simulation left alone in real time never fires however long it is left.
+- Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time, and its
+  promise is at-least-once.
+- An invocation is attempted once. There is no retry and no dead letter queue. A target that throws
+  is recorded as a failure, and never redelivered. A failed invocation never rejects
+  `advanceBy(...)`, and is read from `deliveryFailures`.
+- Schedule groups are absent as a manageable resource. Every schedule is in `default`, and a
+  `GroupName` naming any other group is refused. Putting it quietly in `default` would give it an
+  ARN naming the wrong group.
 - `FlexibleTimeWindow` with `Mode: "FLEXIBLE"` is refused. Real Scheduler invokes the target at an
   unpredictable moment inside the window, and firing at the exact due time instead would let a test
-  rely on timing AWS does not promise.
-- `ScheduleExpressionTimezone` other than `UTC` is refused rather than ignored, since running a
-  schedule in the wrong zone fires it at the wrong hour.
-- `StartDate` and `EndDate` are refused rather than ignored.
+  rely on timing AWS leaves unpromised.
+- `ScheduleExpressionTimezone` other than `UTC` is refused outright, since running a schedule in the
+  wrong zone fires it at the wrong hour.
+- `StartDate` and `EndDate` are refused outright.
 - Targets are Lambda, SQS, SNS and ECS. The universal target
   (`arn:aws:scheduler:::aws-sdk:<service>:<action>`) and every other target service are refused when
-  the schedule is created rather than when it first falls due.
+  the schedule is created, ahead of the first due instant.
 - A target `DeadLetterConfig`, `RetryPolicy`, `EventBridgeParameters`, `KinesisParameters`,
-  `SageMakerPipelineParameters` and `SqsParameters` are refused rather than dropped, as is
-  `EcsParameters` on a target whose ARN does not name an ECS cluster.
+  `SageMakerPipelineParameters` and `SqsParameters` are refused outright, as is `EcsParameters` on a
+  target whose ARN names something other than an ECS cluster.
 - An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
   `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
   there is no placement and no network here for them to apply to. Anything else it can carry, such
-  as `Group`, `Tags` or `PropagateTags`, is refused rather than dropped.
-- An ECS target's `Input` is read as the task's overrides rather than as text the target receives,
-  so a `containerOverrides` list is how a schedule sets a container's environment. An `Input` that
-  is not a JSON object is refused on an ECS target, where every other target type takes any text.
+  as `Group`, `Tags` or `PropagateTags`, is refused outright.
+- An ECS target's `Input` is read as the task's overrides. A `containerOverrides` list is how a
+  schedule sets a container's environment. An `Input` that is anything but a JSON object is refused
+  on an ECS target, where every other target type takes any text.
 - A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
   for each of them, in this process and one after another.
-- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored: nothing here retries, so there is
-  no request for it to make idempotent.
-- `AWS::Scheduler::ScheduleGroup` is not simulated as a CloudFormation resource type.
-  `AWS::Scheduler::Schedule` is: see [deploying from a template](#deploying-from-a-cloudformation-template).
+- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Nothing here retries, so it has
+  no request to make idempotent.
+- `AWS::Scheduler::ScheduleGroup` is absent as a CloudFormation resource type.
+  `AWS::Scheduler::Schedule` is there, under
+  [deploying from a template](#deploying-from-a-cloudformation-template).

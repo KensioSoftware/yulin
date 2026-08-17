@@ -46,7 +46,7 @@ on read.
 ## Encryption and KMS permissions
 
 Every version is encrypted through simulated KMS when it is written and decrypted when
-`GetSecretValue` reads it. There is no flag for reading a secret without decrypting it: the read
+`GetSecretValue` reads it. There is no flag for reading a secret without decrypting it. The read
 either returns the plaintext or fails.
 
 A secret naming no `KmsKeyId` uses the `aws/secretsmanager` AWS managed key, which asks the caller
@@ -56,8 +56,8 @@ the account's principals to use it through Secrets Manager. A Lambda role grante
 
 Pass `KmsKeyId` to encrypt under a customer managed key instead, and the caller's own permissions on
 that key start to matter. Secrets Manager uses envelope encryption, asking KMS for a data key per
-version, so a write needs `kms:GenerateDataKey` and a read needs `kms:Decrypt`. A role granted the
-secret but not the key fails here rather than in a deployment.
+version. A write needs `kms:GenerateDataKey` and a read needs `kms:Decrypt`. A role granted the
+secret but not the key fails here, ahead of a deployment.
 
 ```typescript sim-secrets-manager-customer-key
 /**
@@ -132,19 +132,19 @@ try {
 ```
 
 Each version is bound to its own secret ARN and version id as the KMS encryption context, as real
-Secrets Manager binds them. A `KmsKeyId` naming a key that does not exist, is disabled, or is pending
-deletion fails with `EncryptionFailure` when a value is written under it, and a version whose key has
-since become unusable fails with `DecryptionFailure` when it is read.
+Secrets Manager binds them. A `KmsKeyId` naming a key that is absent, disabled, or pending deletion
+fails with `EncryptionFailure` when a value is written under it, and a version whose key has since
+become unusable fails with `DecryptionFailure` when it is read.
 
 Changing `KmsKeyId` applies to versions written afterwards. The versions already written keep the key
-they were made with and stay readable, which is what real AWS does too.
+they were made with and stay readable, as they do on real AWS.
 
 ## Secret ARNs and IAM policies
 
-Real Secrets Manager appends a hyphen and six random characters to the secret name in its ARN, so a
-secret named `db-creds` gets an ARN ending `:secret:db-creds-AbCdEf`. Sim Secrets Manager does the
-same. A policy naming the bare ARN therefore matches nothing, and a policy has to end in `-??????` or
-a wildcard.
+Real Secrets Manager appends a hyphen and six random characters to the secret name in its ARN. A
+secret named `db-creds` gets an ARN ending `:secret:db-creds-AbCdEf`, and sim Secrets Manager does
+the same. A policy naming the bare ARN therefore matches nothing, and a policy has to end in
+`-??????` or a wildcard.
 
 ```typescript sim-secrets-manager-iam-policy
 /**
@@ -208,22 +208,23 @@ const read = await simAws
 console.log(read.SecretString); // "hunter2"
 ```
 
-`ListSecrets` is the exception: real Secrets Manager gives it no resource-level permissions, so a
+`ListSecrets` is the exception. Real Secrets Manager gives it no resource-level permissions, and a
 policy allowing it has to use a resource of `*`. A policy naming individual secret ARNs grants
 nothing, here as there.
 
 ## Naming a secret
 
-Every operation takes its target as a `SecretId`, and any of the three forms real Secrets Manager
-accepts will do: the friendly name, the full ARN including the suffix, or the partial ARN without it.
+Every operation takes its target as a `SecretId`, in any of the three forms real Secrets Manager
+accepts. Those are the friendly name, the full ARN including the suffix, and the partial ARN without
+it.
 
-An ARN naming another account or region resolves to nothing, rather than having its name read out and
-looked up locally. A foreign ARN cannot reach a secret that happens to share a name.
+An ARN naming another account or region resolves to no secret at all. Its name is never read out and
+looked up locally, and a foreign ARN cannot reach a secret that happens to share a name.
 
 ## Versions and staging labels
 
-Every write creates a version rather than replacing one. `AWSCURRENT` names the version a plain read
-returns, and writing a new current version demotes the previous one to `AWSPREVIOUS`.
+Every write creates a version, leaving the earlier ones in place. `AWSCURRENT` names the version a
+plain read returns, and writing a new current version demotes the previous one to `AWSPREVIOUS`.
 
 ```typescript sim-secrets-manager-staging-labels
 /**
@@ -264,17 +265,17 @@ console.log(previous.SecretString); // "old-key"
 ```
 
 A `ClientRequestToken` becomes the version id, as it does on real AWS. Repeating a write with the
-same token and the same value is ignored, which makes a retry safe. The same token with a different
+same token and the same value is ignored, so a retry is safe. The same token with a different
 value is refused, because a version's value never changes once written.
 
-`DescribeSecret` reports `VersionIdsToStages`, which lists only the versions still carrying a staging
-label. A version that has lost every label is on its way out of existence, so it is left out.
+`DescribeSecret` reports `VersionIdsToStages`. That lists only the versions still carrying a staging
+label. A version that has lost every label is on its way out of existence, and is left out.
 
 ## Deletion and the recovery window
 
-`DeleteSecret` does not delete. It schedules deletion after a recovery window of 7 to 30 days,
-defaulting to 30. During that window the secret is still there: it can be described and restored, it
-refuses to be read or written, and it still holds its name.
+`DeleteSecret` schedules deletion for later. The recovery window is 7 to 30 days, defaulting to 30.
+During that window the secret is still there. It can be described and restored, it refuses to be
+read or written, and it still holds its name.
 
 Holding the name is what a redeployed stack hits. Advancing the simulated clock past the window frees
 it.
@@ -330,7 +331,7 @@ See [simulated time](../../time/ "Simulated time docs") for what else the clock 
 ## Scoping
 
 Secrets belong to an account and a region, as they do on real AWS. A secret name is unique within one
-account and region and nowhere wider, so the same name can be used in two regions for two different
+account and region and nowhere wider. The same name can be used in two regions for two different
 secrets.
 
 ```typescript sim-secrets-manager-scoping
@@ -434,21 +435,21 @@ console.log(credentials.username); // "app"
 console.log(credentials.password?.length); // 24
 ```
 
-Generated passwords are random, so a test reads the value back out of the simulation the way a
-deployed application does rather than predicting it.
+Generated passwords are random. A test reads the value back out of the simulation the way a deployed
+application does.
 
-`SecretStringTemplate` and `GenerateStringKey` go together: the generated password is added to the
+`SecretStringTemplate` and `GenerateStringKey` go together. The generated password is added to the
 template's JSON object under that key. Without them, the whole secret value is the generated
-password. That is what an empty `GenerateSecretString: {}` produces, which is the property CDK
+password. That is what an empty `GenerateSecretString: {}` produces, and it is the property CDK
 synthesises for a `secretsmanager.Secret` with no options.
 
-The other generation options behave as they do on real AWS: `PasswordLength` (32 by default),
+The other generation options behave as they do on real AWS, being `PasswordLength` (32 by default),
 `ExcludeCharacters`, `ExcludeUppercase`, `ExcludeLowercase`, `ExcludeNumbers`, `ExcludePunctuation`,
-`IncludeSpace`, and `RequireEachIncludedType`. The last is on unless turned off, so a generated
+`IncludeSpace`, and `RequireEachIncludedType`. The last is on unless turned off, and a generated
 password carries one of every character type it was not told to exclude.
 
 A secret with no `Name` is named after its logical ID. Real CloudFormation names it after the stack
-and appends its own random characters, so a template cannot rely on the exact generated name either
+and appends its own random characters. A template cannot rely on the exact generated name either
 way.
 
 ## Inside a simulated Lambda handler
@@ -459,8 +460,8 @@ has to be allowed to, by that role's policy, the same as on real AWS. See
 [simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles
 work.
 
-The same applies to `SimSdk` interception: intercepting `SecretsManagerClient` routes ordinary SDK
-code into the simulation with nothing touching the network. See
+The same applies to `SimSdk` interception. Intercepting `SecretsManagerClient` routes ordinary SDK
+code into the simulation, served in process. See
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
 
 ## Available functionality
@@ -486,48 +487,47 @@ Sim Secrets Manager currently supports:
 Current documented limitations:
 
 - A `KmsKeyId` is checked when a version is written under it, not when it is set on its own. An
-  `UpdateSecret` changing only the key accepts a key that does not exist, and the next write of a
-  value fails.
-- A secret name ending in a hyphen and six alphanumeric characters is refused, which is stricter than
-  AWS. Real AWS only advises against such names, because they cannot be told apart from an ARN's
+  `UpdateSecret` changing only the key accepts a key that is absent, and the next write of a value
+  fails.
+- A secret name ending in a hyphen and six alphanumeric characters is refused. That is stricter than
+  AWS, which only advises against such names, because they cannot be told apart from an ARN's
   resource part when a partial ARN is resolved. This rules out ordinary-looking names such as
   `app-secret` and `prod-config`, since `secret` and `config` are six characters. Name them
   `app-credentials` or `prod-settings` instead.
-- `RotateSecret`, `CancelRotateSecret` and the rotation Lambda protocol are not simulated.
+- `RotateSecret`, `CancelRotateSecret` and the rotation Lambda protocol are left out.
   `DescribeSecret` always reports `RotationEnabled` as `false`.
 - `AWS::SecretsManager::Secret` supports `Name`, `Description`, `KmsKeyId`, `SecretString`,
   `GenerateSecretString` and `Tags`. `ReplicaRegions` is ignored. The other resource types
-  (`SecretTargetAttachment`, `RotationSchedule` and `ResourcePolicy`) are reported as unsupported and
-  skipped rather than deployed.
+  (`SecretTargetAttachment`, `RotationSchedule` and `ResourcePolicy`) are reported as unsupported
+  and skipped.
 - A template declaring neither `SecretString` nor `GenerateSecretString` is refused, which is
   stricter than real CloudFormation. Real CloudFormation creates an empty secret in that case, and a
-  secret with no version is not simulated.
-- `ExcludeCharacters` that removes every character of an included type is refused rather than
-  generating a password missing a type it was told to include.
-- `{{resolve:secretsmanager:...}}` dynamic references are not supported. That is a CloudFormation
-  engine feature rather than a Secrets Manager one; pass the ARN from `Ref` instead.
+  secret with no version is outside this simulation.
+- `ExcludeCharacters` that removes every character of an included type is refused. Generating a
+  password missing a type it was told to include would be worse.
+- `{{resolve:secretsmanager:...}}` dynamic references are absent. That is a CloudFormation engine
+  feature rather than a Secrets Manager one. Pass the ARN from `Ref` instead.
 - Resource policies (`PutResourcePolicy`, `GetResourcePolicy`, `DeleteResourcePolicy`,
-  `ValidateResourcePolicy`) are not simulated, so cross-account access to a secret cannot be granted.
-- Replica regions are not simulated. `AddReplicaRegions`, `ReplicateSecretToRegions` and
-  `RemoveRegionsFromReplication` do nothing, and `ReplicationStatus` is not reported.
-- `BatchGetSecretValue` is not supported, and neither is the Parameters and Secrets Lambda Extension
-  HTTP endpoint.
-- `ListSecrets` refuses `Filters`, `SortOrder` and `SortBy` rather than ignoring them, since quietly
-  returning an unfiltered or differently ordered list would be worse. Secrets are listed in creation
-  order, with `MaxResults` and `NextToken` paging over them. A `NextToken` this simulation did not
-  issue, including one whose offset is past the end of the list, is refused rather than answered with
-  an empty page.
+  `ValidateResourcePolicy`) are left out, and cross-account access to a secret cannot be granted.
+- Replica regions are left out. `AddReplicaRegions`, `ReplicateSecretToRegions` and
+  `RemoveRegionsFromReplication` do nothing, and `ReplicationStatus` goes unreported.
+- `BatchGetSecretValue` is absent, as is the Parameters and Secrets Lambda Extension HTTP endpoint.
+- `ListSecrets` refuses `Filters`, `SortOrder` and `SortBy` outright, since quietly returning an
+  unfiltered or differently ordered list would be worse. Secrets are listed in creation order, with
+  `MaxResults` and `NextToken` paging over them. A `NextToken` this simulation did not issue,
+  including one whose offset is past the end of the list, is refused rather than answered with an
+  empty page.
 - Tags are stored and reported by `DescribeSecret` and `ListSecrets`, but `TagResource` and
-  `UntagResource` are not supported, and the `secretsmanager:ResourceTag` and `aws:ResourceTag`
-  condition keys are not derived.
+  `UntagResource` are absent, and the `secretsmanager:ResourceTag` and `aws:ResourceTag` condition
+  keys are left underived.
 - Other Secrets Manager condition keys, such as `secretsmanager:SecretId` and
-  `secretsmanager:VersionStage`, are not derived either, so a policy relying on them will not match.
+  `secretsmanager:VersionStage`, are left underived too, and a policy relying on them fails to match.
   Ordinary condition operators on values sim IAM does supply work as usual.
 - A version that loses every staging label is kept indefinitely and stays readable by version id,
-  rather than being removed as real Secrets Manager removes it after about a day. It is left out of
-  `VersionIdsToStages` either way.
-- `LastAccessedDate`, `LastRotatedDate`, `NextRotationDate`, `OwningService` and `PrimaryRegion` are
-  not reported.
-- Secret values live in process memory for the lifetime of the `SimAws` instance. That is not a
-  security boundary: anything sharing the process can reach them.
+  where real Secrets Manager removes it after about a day. It is left out of `VersionIdsToStages`
+  either way.
+- `LastAccessedDate`, `LastRotatedDate`, `NextRotationDate`, `OwningService` and `PrimaryRegion` go
+  unreported.
+- Secret values live in process memory for the lifetime of the `SimAws` instance. Anything sharing
+  the process can reach them.
 - Secrets Manager is not served as an HTTP API by `serveSimAws`.
