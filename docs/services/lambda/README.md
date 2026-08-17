@@ -383,7 +383,34 @@ denial surfaces inside the handler.
 A client constructed without a region defaults to the function's account and region scope, as the
 real runtime's `AWS_REGION` provides; an explicit region on the client wins. The archive always
 takes precedence: a package bundled under the archive's `node_modules/` is used as-is rather than
-being intercepted.
+being intercepted, and reaches the simulation through the transport below instead.
+
+### Function code that bundles the SDK
+
+Some deployment packages inline the SDK rather than relying on the runtime to provide it, which is
+what CDK's `NodejsFunction` does when given `bundling: { externalModules: [] }`. There is then no
+`@aws-sdk/*` module left for the runtime to provide, so nothing to intercept.
+
+Those functions reach the simulation anyway. The runtime provides their HTTP transport, `node:http`
+and `node:https`, and a request addressed to an AWS API endpoint is answered from the same
+simulated services, as the same execution role, instead of going to the network. The execution
+role credentials are in the function's environment, as real Lambda puts them there, so the SDK
+resolves credentials without looking outside the sandbox rather than failing with
+`CredentialsProviderError`.
+
+A serialized request states which operation it is and carries its input for the services using the
+AWS JSON protocol, which is what can be read back without the operation's schema:
+
+ACM, CloudWatch Logs, Cognito Identity Provider, DynamoDB, DynamoDB Streams, ECS, EventBridge, KMS,
+Rekognition, Secrets Manager, SQS and SSM.
+
+A bundled call to any other simulated service, such as S3, SNS, SES or Lambda itself, fails with an
+error naming the service rather than reaching it. Leaving the SDK out of that archive puts it back
+on the module interception path above, which every simulated service is reachable through.
+
+Values the JSON protocols encode travel in their encoded form: a binary attribute written through a
+bundled SDK is stored base64-encoded and decodes correctly when the same path reads it back, but an
+in-process intercepted client reading it sees the encoded string rather than the bytes.
 
 ## Invocation types
 
@@ -1571,7 +1598,11 @@ giving the ARN. A synthesized CDK app deploys either way with no special casing.
 
 A function can declare its own environment variables with `Environment.Variables`, as on real
 Lambda. While the function runs, its code reads those variables from `process.env`, alongside the
-AWS-provided runtime variables (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, and the rest).
+AWS-provided runtime variables (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, and the rest). Those
+include placeholder execution role credentials in `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
+`AWS_SESSION_TOKEN`, which is where an AWS SDK in the function code finds credentials, as it does
+on real Lambda. Nothing authorizes against their values: a call from function code is attributed to
+the execution Role because the invocation is running as it.
 
 ```typescript sim-lambda-environment-variables
 /**
