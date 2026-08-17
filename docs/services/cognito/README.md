@@ -1634,7 +1634,94 @@ challenge. `InitiateAuth` issues the MFA challenge and the new password challeng
 `AdminSetUserPassword` gives a user a permanent password.
 
 Users sign themselves up through `SignUp` and `ConfirmSignUp`, which are covered under
-[Signing up](#signing-up). A user confirmed that way signs in here with the password it chose.
+[Signing up](#signing-up). A user confirmed that way signs in here with the password it chose, and
+so does one that signed up on the page below.
+
+### The pages managed login serves
+
+A served domain answers three pages, so a browser in a local development server completes a whole
+sign-up and sign-in without any of it being stubbed out.
+
+`GET /oauth2/authorize` naming no `identity_provider` answers HTML holding the sign-in form. The
+form has a username field, a password field, and the authorize parameters as hidden inputs, and it
+posts back to `/oauth2/authorize`. The pool's identity providers are links to the same endpoint with
+`identity_provider` set, so both ways in are on the one page. Posting the form redirects to the app
+client's callback URL with the code and the `state`, honouring a `code_challenge` the request
+carried.
+
+`/signup` is a link from that page. Its form asks for a username, a password and the attributes the
+pool needs, which are the ones its `Schema` made required and the ones its `AutoVerifiedAttributes`
+names. Posting it does what `SignUp` does and sends the browser to `/confirm`.
+
+`/confirm` asks for the code, does what `ConfirmSignUp` does with it, and sends the browser back to
+`/oauth2/authorize` to sign in. Its second button is `ResendConfirmationCode`. Nothing delivers a
+code to anybody, so a test reads it off the pool the way it does for any other sign-up:
+
+```typescript sim-cognito-managed-login-pages
+/**
+ * Signing up, confirming and signing in through the served pages.
+ */
+
+import type { SimAws } from "@kensio/yulin";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+const http = new SimAwsHttp({ simAws });
+const domain = "https://myapp-login.auth.eu-west-2.amazoncognito.com";
+const parameters = {
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: "https://www.example.com/user/callback",
+  scope: "openid email",
+  state: "csrf-token",
+};
+
+const posted = async (
+  path: string,
+  fields: Record<string, string>,
+): Promise<Response> =>
+  http.fetch(`${domain}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...parameters, ...fields }).toString(),
+  });
+
+// The sign-in page is what the authorize endpoint answers a browser with.
+const signInPage = await http.fetch(
+  `${domain}/oauth2/authorize?${new URLSearchParams(parameters).toString()}`,
+);
+console.log(signInPage.headers.get("content-type")); // "text/html; charset=utf-8"
+
+// The sign-up form creates the user, unconfirmed.
+await posted("/signup", { username: "alice", password: "Sup3rSecret!" });
+
+// The code the pool would have emailed is read off the pool.
+const pool = simAws.cognitoIdentityProvider().userPool(userPoolId);
+await posted("/confirm", {
+  username: "alice",
+  code: pool.confirmationCode("alice") ?? "",
+});
+
+// That same user then signs in and reaches the callback with a code.
+const signedIn = await posted("/oauth2/authorize", {
+  username: "alice",
+  password: "Sup3rSecret!",
+});
+const callbackUrl = new URL(signedIn.headers.get("location")!);
+console.log(callbackUrl.searchParams.get("state")); // "csrf-token"
+console.log(callbackUrl.searchParams.get("code") !== null); // true
+```
+
+A refusal a person can do something about is shown on the form they posted. A wrong password comes
+back on the sign-in form and issues no code, and a password the pool's policy turns down comes back
+on the sign-up form. A refusal the application caused, such as a `redirect_uri` the app client never
+registered, is answered the way every other authorize refusal is.
+
+There is no styling and no script on any of the three. Matching what real managed login looks like
+would be work no test could tell apart from a bare form.
 
 ### Signing out
 
@@ -3414,6 +3501,8 @@ Sim Cognito currently supports:
   with PKCE and with a `refresh_token` grant
 - An authorize request naming no identity provider, signing one of the pool's own users in from a
   `username` and a `password` it carries
+- A served sign-in form at `/oauth2/authorize`, a sign-up form at `/signup` and a confirmation form
+  at `/confirm`, each carrying the authorize parameters through to the next
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
@@ -3683,12 +3772,15 @@ Current documented limitations:
 - A pool's schema is settled when the pool is created. `AddCustomAttributes` is unimplemented, and
   an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
   such input.
-- Managed login's pages are outside the simulation. The sign-in behind them is inside it. An
-  authorize request naming no `identity_provider`, or naming `COGNITO`, signs one of the pool's own
-  users in from the `username` and `password` it carries, and answers with the code real managed
-  login answers with. Nothing here draws the form those two fields came from, and
-  `AWS::Cognito::ManagedLoginBranding` is an unsupported resource type. `/login`, `/signup`,
-  `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML endpoints go unserved.
+- The managed login pages are bare forms with no styling and no script, and
+  `AWS::Cognito::ManagedLoginBranding` is an unsupported resource type. They are also at paths of
+  this simulation's own: real managed login serves its sign-in form at `/login` and confirms a
+  sign-up within `/signup`, where here the authorize endpoint answers with the form itself and
+  `/confirm` is a page. `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML
+  endpoints go unserved.
+- The pages hold no session and set no cookie, so each of them carries the authorize parameters in
+  hidden inputs instead. Real managed login keeps a session cookie, which is what signs a returning
+  browser straight back in without the form.
 - A hosted sign-in that real managed login would answer with a further page is refused. That is a
   user which has registered a second factor, and a user holding a temporary password. Both
   challenges are simulated at `InitiateAuth` and `AdminInitiateAuth`, which is where a test drives

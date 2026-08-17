@@ -248,8 +248,9 @@ two shapes real Cognito reports it in.
 
 ## Hosted endpoints
 
-`command/hosted/` holds the three endpoints a domain serves, and `serve/sim-cognito-domain-controller.ts`
-is the HTTP side of them. They are not SDK commands and authorize no IAM caller: a browser and an
+`command/hosted/` holds the three endpoints a domain serves, `serve/page/` holds the pages managed
+login answers a browser with, and `serve/sim-cognito-domain-controller.ts` is the HTTP side of both.
+They are not SDK commands and authorize no IAM caller: a browser and an
 application's own server hold no AWS credentials, in the same way an `InitiateAuth` caller holds
 none. What the token endpoint authenticates instead is the app client: one with a secret presents
 it, in a basic authorization header or in the body, and a public client presents its client id and
@@ -259,7 +260,9 @@ binds the grant with PKCE.
 application. `SimCognitoHostedSignIn` is what decides which of the two sign-ins a request asked
 for. One naming an identity provider goes through `SimCognitoFederatedSignIn`, and one naming none
 goes through `SimCognitoHostedPasswordSignIn`, which checks the `username` and `password` the
-request carried with the checks `InitiateAuth` makes. `SimCognitoTokenEndpoint` exchanges the code,
+request carried with the checks `InitiateAuth` makes. A request carrying none is refused with
+`SimCognitoManagedLoginRequired`, which is the one refusal the serving layer answers with a page
+rather than with an error. `SimCognitoTokenEndpoint` exchanges the code,
 through the pool's own token issuer rather than anything of its own, so a hosted sign-in and an API
 sign-in issue the same tokens and run the same `PreTokenGeneration` trigger.
 
@@ -426,6 +429,14 @@ serves without any authentication: `/<userPoolId>/.well-known/jwks.json` and
 serving layer dispatches to, `SimCognitoOpenIdConfiguration` builds the discovery document, and
 `SimCognitoEndpointResponse` builds the responses. The Cognito API itself is not served: an SDK
 client reaches the simulator through `SimSdk`.
+
+`serve/page/` under it is the managed login pages. `SimCognitoPageMarkup` is the HTML they are built
+from, `SimCognitoPageForm` is one request read as the form it fetched or posted, and
+`SimCognitoManagedLogin` is what `SimCognitoDomainEndpoints` hands a page request to. The three
+pages are `SimCognitoSignInPage`, `SimCognitoSignUpPage` and `SimCognitoConfirmPage`, and the last
+two call `SignUp`, `ConfirmSignUp` and `ResendConfirmationCode` as an application would. A refusal a
+person can act on is rendered back onto the form they posted, and one the application caused is
+answered as any other authorize refusal is.
 
 `/<userPoolId>/messages` is served alongside them, and real Cognito has no such endpoint. It is the
 serving side of `SimCognitoUserPool.sentMessages`, so a browser or a curl can read what a pool would
@@ -629,13 +640,13 @@ resource, here or on real AWS.
   developer credentials, and nothing here tells one caller from another that way.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
-- Managed login's pages are not simulated, and the local sign-in behind them is. An authorize
-  request naming no identity provider, or naming `COGNITO`, signs a pool user in from a `username`
-  and a `password` passed beside the other parameters. Nothing draws the form they came from. A
-  sign-in managed login would answer with a second page, which is a user owing a second factor and
-  a user holding a temporary password, is refused instead. The implicit and client credentials
-  grants are refused too, and `/login`, `/signup`, `/oauth2/userInfo`, `/oauth2/revoke` and the SAML
-  endpoints are not served.
+- The managed login pages are bare forms at paths of this simulation's own. The authorize endpoint
+  answers with the sign-in form where real managed login redirects to `/login`, and `/confirm` is a
+  page where real managed login confirms within `/signup`. They hold no session and set no cookie,
+  and carry the authorize parameters in hidden inputs instead. A sign-in managed login would answer
+  with a second page, which is a user owing a second factor and a user holding a temporary
+  password, is refused. The implicit and client credentials grants are refused too, and
+  `/oauth2/userInfo`, `/oauth2/revoke` and the SAML endpoints are not served.
 - A simulated identity provider signs in the user `signInAs` put there, and calls nothing. A
   provider nobody is signed in at refuses the authorize request rather than inventing one.
 - A custom domain answers on its own hostname with no Route53 record, where real AWS needs an alias

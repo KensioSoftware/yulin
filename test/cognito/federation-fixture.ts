@@ -11,6 +11,7 @@
 
 import type {
   AttributeType,
+  SchemaAttributeType,
   UserPoolMfaType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
@@ -72,6 +73,9 @@ export interface SimCognitoHostedSetUpOptions {
 
   /** What the pool asks of a second factor, `OFF` by default. */
   readonly mfaConfiguration?: UserPoolMfaType;
+
+  /** The pool's `Schema`, which is the standard attributes by default. */
+  readonly schema?: SchemaAttributeType[];
 }
 
 /**
@@ -117,6 +121,7 @@ export async function simCognitoHosted(
       ...(options.mfaConfiguration !== undefined && {
         MfaConfiguration: options.mfaConfiguration,
       }),
+      ...(options.schema !== undefined && { Schema: options.schema }),
     }),
   );
   assertNonNullable(pool.UserPool?.Id);
