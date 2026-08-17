@@ -115,10 +115,11 @@ export class SimCognitoUserPoolCommands {
     // Cognito.
     settings.mfa.keepFactorsOf(pool.settings.mfa);
 
-    // An update declares no schema, and one that tried was refused above, so
-    // the pool keeps the attributes it was created with rather than dropping
-    // back to the standard ones.
-    settings.keepSchemaOf(pool.settings);
+    // An update declares neither a schema nor the attributes the pool signs
+    // users in by, and one that tried either was refused above, so the pool
+    // keeps what it was created with rather than dropping back to the
+    // standard attributes and to signing in by username.
+    settings.keepCreationSettingsOf(pool.settings);
     pool.update(settings);
 
     return { $metadata: {} };

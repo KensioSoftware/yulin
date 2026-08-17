@@ -92,13 +92,21 @@ export class SimCognitoUserCommands {
       input.UserPoolId,
       options,
     );
-    const username = requireSimCognitoUsername(input.Username);
+    const requested = requireSimCognitoUsername(input.Username);
 
     this.unsimulatedOptions.refuseInCreate(input);
 
+    // A pool signing users in by email or phone number stores a generated
+    // UUID as the username here too, so an admin-created user and one that
+    // signed itself up are identified the same way.
+    const identity = pool.settings.usernameAttributes.identify(
+      requested,
+      input.UserAttributes,
+    );
+
     const user = this.userFactory.make({
-      username,
-      attributes: input.UserAttributes,
+      username: identity.username,
+      attributes: identity.attributes,
       schema: pool.settings.schema,
       temporaryPassword: input.TemporaryPassword,
       passwordPolicy: pool.settings.passwordPolicy,

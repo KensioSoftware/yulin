@@ -94,13 +94,21 @@ export class SimCognitoSignUpCommands {
     this.unsimulatedOptions.refuseInSignUp(input);
     pool.settings.adminCreateUserConfig.requireSelfServiceSignUp();
 
-    const username = requireSimCognitoUsername(input.Username);
+    const requested = requireSimCognitoUsername(input.Username);
 
-    requireSimCognitoSecretHash(username, client, input.SecretHash);
+    requireSimCognitoSecretHash(requested, client, input.SecretHash);
+
+    // A pool signing users in by email or phone number stores a generated
+    // UUID as the username and the value the request called the username as
+    // the attribute it signs in by, as real Cognito does.
+    const identity = pool.settings.usernameAttributes.identify(
+      requested,
+      input.UserAttributes,
+    );
 
     const user = this.userFactory.signUp({
-      username,
-      attributes: input.UserAttributes,
+      username: identity.username,
+      attributes: identity.attributes,
       schema: pool.settings.schema,
       password: input.Password,
       passwordPolicy: pool.settings.passwordPolicy,

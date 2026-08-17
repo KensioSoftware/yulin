@@ -138,6 +138,7 @@ export {
   type SimCognitoOAuthErrorCode,
 } from "./error/sim-cognito-oauth.error.js";
 export {
+  SimCognitoAliasExistsException,
   SimCognitoCodeMismatchException,
   SimCognitoDuplicateProviderException,
   SimCognitoEnableSoftwareTokenMfaException,

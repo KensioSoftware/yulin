@@ -20,6 +20,7 @@ import {
 } from "./message/sim-cognito-verification-messages.js";
 import type { SimCognitoSchemaAttributeType } from "./schema/sim-cognito-schema-attribute.js";
 import { SimCognitoUserPoolSchema } from "./schema/sim-cognito-user-pool-schema.js";
+import { SimCognitoUsernameAttributes } from "./sim-cognito-username-attributes.js";
 import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
 
 /**
@@ -50,6 +51,15 @@ export interface SimCognitoUserPoolSettingsInput extends SimCognitoVerificationM
    * users written against it.
    */
   readonly Schema?: readonly SimCognitoSchemaAttributeType[] | undefined;
+
+  /**
+   * The attributes the pool signs its users in by, rather than by username.
+   *
+   * Only `CreateUserPool` carries it, for the same reason `Schema` is here:
+   * it is the pool's settings that hold it, and `UpdateUserPool` refuses one
+   * rather than changing how a pool with users already in it identifies them.
+   */
+  readonly UsernameAttributes?: readonly string[] | undefined;
 }
 
 interface SimCognitoUserPoolSettingsProperties {
@@ -78,9 +88,10 @@ interface SimCognitoUserPoolSettingsProperties {
  * request, and the pool swaps to it, so a setting the update is silent about
  * goes back to its default rather than staying as it was.
  *
- * The schema is the exception. Only `CreateUserPool` declares one, so an
- * update takes on the schema of the settings it replaces rather than dropping
- * the pool back to the standard attributes.
+ * The schema and the attributes the pool signs users in by are the
+ * exceptions. Only `CreateUserPool` declares either, so an update takes both
+ * on from the settings it replaces rather than dropping the pool back to the
+ * standard attributes and to signing in by username.
  */
 export class SimCognitoUserPoolSettings {
   public readonly passwordPolicy: SimCognitoPasswordPolicy;
@@ -117,6 +128,7 @@ export class SimCognitoUserPoolSettings {
   public readonly accountRecovery: SimCognitoAccountRecovery;
 
   #schema: SimCognitoUserPoolSchema;
+  #usernameAttributes: SimCognitoUsernameAttributes;
 
   constructor(properties: SimCognitoUserPoolSettingsProperties) {
     const { input, operation } = properties;
@@ -146,6 +158,9 @@ export class SimCognitoUserPoolSettings {
       operation,
     );
     this.#schema = new SimCognitoUserPoolSchema(input.Schema);
+    this.#usernameAttributes = new SimCognitoUsernameAttributes(
+      input.UsernameAttributes,
+    );
   }
 
   /**
@@ -157,14 +172,25 @@ export class SimCognitoUserPoolSettings {
   }
 
   /**
-   * Take on the schema of the settings this set replaces.
-   *
-   * `UpdateUserPool` has no `Schema` input on real Cognito, so an update
-   * changes nothing about the attributes a pool holds. Carrying the schema
-   * across is what keeps that true here, where an update otherwise replaces
-   * every setting with the default of the one it left out.
+   * The attributes the pool signs its users in by, from its
+   * `UsernameAttributes`. A pool created without any signs users in by
+   * username.
    */
-  keepSchemaOf(replaced: SimCognitoUserPoolSettings): void {
+  get usernameAttributes(): SimCognitoUsernameAttributes {
+    return this.#usernameAttributes;
+  }
+
+  /**
+   * Take on the settings only a creation declares from the ones this set
+   * replaces: the pool's schema, and what it signs its users in by.
+   *
+   * Real `UpdateUserPool` has neither input, so an update changes nothing
+   * about the attributes a pool holds or how it identifies its users.
+   * Carrying them across is what keeps that true here, where an update
+   * otherwise replaces every setting with the default of the one it left out.
+   */
+  keepCreationSettingsOf(replaced: SimCognitoUserPoolSettings): void {
     this.#schema = replaced.schema;
+    this.#usernameAttributes = replaced.usernameAttributes;
   }
 }

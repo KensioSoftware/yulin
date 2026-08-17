@@ -41,9 +41,17 @@ attributes the pool holds on a user, the Lambda triggers the pool runs, whether 
 factor, how it recovers an account, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
 build one out of their own request, and an update swaps the pool's for it. That is what makes an
 update replace rather than merge, and it is where the pool's `LastModifiedDate` moves. Each takes the
-operation name, so a refusal from inside the settings names the request it came from. The schema is
-the one setting an update cannot replace, so `keepSchemaOf` carries it onto the settings replacing
-it, as it has to: only `CreateUserPool` declares one.
+operation name, so a refusal from inside the settings names the request it came from. The schema and
+the attributes the pool signs users in by are the settings an update cannot replace, so
+`keepCreationSettingsOf` carries them onto the settings replacing them, as it has to: only
+`CreateUserPool` declares either.
+
+`SimCognitoUsernameAttributes` is what a pool signs its users in by, from its `UsernameAttributes`.
+A pool that names one generates a UUID username for each new user and puts the value the request
+called the username into that attribute, which is what real Cognito stores. It also resolves the
+address back to the user, which `SimCognitoUserStore` asks it to do for every lookup, so an admin
+operation or a sign-in naming the address reaches the same user the generated username reaches.
+`SimCognitoSignInAttribute` beside it is one such attribute, and holds the form its values take.
 
 `SimCognitoUserPoolMfa` under `user-pool/mfa/` is the multi-factor authentication one pool is
 configured for: a `SimCognitoMfaConfiguration`, which is whether it challenges, and the factors
@@ -599,9 +607,10 @@ resource, here or on real AWS.
   client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
 - Every unsimulated `CreateUserPool`, `UpdateUserPool`, `CreateUserPoolClient` and
   `UpdateUserPoolClient` input is refused rather than ignored.
-  `UsernameAttributes` is the one that matters most: a pool signing users in by email stores a
-  generated UUID as the username, so a pool quietly created without it would answer with the wrong
-  username here and the right one on real AWS.
+- A pool created with `UsernameAttributes` stores a generated UUID as each user's username and
+  resolves the address to the user, as a real one does. `AliasAttributes` is refused, because there
+  the username is still the one the request chose and the attribute is a second way of naming the
+  user.
 - A pool created with `DeletionProtection: ACTIVE` refuses `DeleteUserPool` until an `UpdateUserPool`
   request deactivates the protection, as real Cognito refuses it.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, so a setting the request

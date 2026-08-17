@@ -29,11 +29,6 @@ interface RefusedInput {
  */
 const refusedInputs: readonly RefusedInput[] = [
   {
-    label: "UsernameAttributes",
-    input: { UsernameAttributes: ["email"] },
-    says: "stores a generated UUID as the username",
-  },
-  {
     label: "UserPoolTier",
     input: { UserPoolTier: "PLUS" },
     says: "the Lite and Plus feature plans",

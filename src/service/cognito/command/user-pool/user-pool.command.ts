@@ -31,6 +31,7 @@ export interface SimCognitoUserPoolType extends SimCognitoVerificationMessagesTy
     | SimCognitoAdminCreateUserConfigType
     | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
+  readonly UsernameAttributes?: readonly string[] | undefined;
   readonly SchemaAttributes?:
     | readonly SimCognitoSchemaAttributeType[]
     | undefined;
@@ -63,19 +64,19 @@ export interface SimCognitoUserPoolCommandInput extends SimCognitoUserPoolSettin
 /**
  * The CreateUserPool inputs this simulation reads, and the ones it refuses.
  *
- * The three beside the shared ones are the inputs only a creation carries.
- * They decide how a pool identifies its users, and none of them can be
- * changed afterwards on real Cognito either.
+ * The two beside the shared ones are the inputs only a creation carries that
+ * this simulation refuses. They decide how a pool identifies its users, and
+ * neither can be changed afterwards on real Cognito either.
  *
- * `Schema` is a creation-only input too, and is named among the shared
- * settings because it is a pool's schema that is built from it.
+ * `Schema` and `UsernameAttributes` are creation-only inputs too, and are
+ * named among the shared settings because it is a pool's settings that are
+ * built from them.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/CreateUserPoolCommand/
  */
 export interface SimCreateUserPoolCommandInput extends SimCognitoUserPoolCommandInput {
   readonly PoolName?: string | undefined;
   readonly AliasAttributes?: readonly string[] | undefined;
-  readonly UsernameAttributes?: readonly string[] | undefined;
   readonly UsernameConfiguration?: object | undefined;
 }
 

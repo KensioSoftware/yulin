@@ -14,9 +14,10 @@ import type { SimUpdateUserPoolCommandInput } from "./user-pool.command.js";
  * carrying one is refused rather than answered with a pool still under its
  * old name.
  *
- * `Schema` is refused for a different reason: real `UpdateUserPool` has no
- * such input at all, and a request carrying one would change a pool's
- * attributes here and nothing on AWS.
+ * `Schema` and `UsernameAttributes` are refused for a different reason: real
+ * `UpdateUserPool` has neither input at all, and a request carrying one would
+ * change a pool's attributes, or how it identifies its users, here and
+ * nothing on AWS.
  */
 export class SimCognitoUnsimulatedUserPoolUpdates {
   private readonly unsimulated = new SimCognitoUnsimulatedInput(
@@ -46,12 +47,35 @@ export class SimCognitoUnsimulatedUserPoolUpdates {
   }
 
   /**
+   * Refuse an update changing how the pool identifies its users.
+   *
+   * What a pool signs users in by is fixed when the pool is created, on real
+   * Cognito as here, and its users were created under the usernames that
+   * choice gave them.
+   */
+  private static refuseUsernameAttributes(
+    attributes: readonly string[] | undefined,
+  ): void {
+    if (attributes === undefined) {
+      return;
+    }
+
+    throw new SimCognitoInvalidParameterException(
+      "UpdateUserPool UsernameAttributes is not an input real Cognito has: " +
+        "what a pool signs its users in by is fixed when the pool is created",
+    );
+  }
+
+  /**
    * Refuse an update carrying an input this simulation cannot honour.
    */
   refuseIn(input: SimUpdateUserPoolCommandInput): void {
     this.unsimulated.refuse("PoolName", input.PoolName, "renaming a pool");
 
     SimCognitoUnsimulatedUserPoolUpdates.refuseSchema(input.Schema);
+    SimCognitoUnsimulatedUserPoolUpdates.refuseUsernameAttributes(
+      input.UsernameAttributes,
+    );
     this.options.refuseIn(input);
   }
 }
