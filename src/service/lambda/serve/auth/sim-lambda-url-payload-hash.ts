@@ -23,6 +23,12 @@ import { SimIamSigV4Error } from "../../../iam/sigv4/error/sim-iam-sigv4.error.j
  * signed the body it sent and left the header off has said nothing to
  * disagree with.
  *
+ * The method the request used makes no difference here. A declaration is a
+ * claim about the body, and SigV4 covers it for a GET as much as for a POST,
+ * so a GET carrying a digest of other bytes is refused as well. The method
+ * matters on the CloudFront side, which invents a declaration for a POST or a
+ * PUT alone.
+ *
  * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html
  */
 export async function simLambdaUrlPayloadRefusal(

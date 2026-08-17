@@ -164,6 +164,45 @@ describe("The payload hash an AWS_IAM Function URL request declares", () => {
     });
   });
 
+  it("invokes for a GET declaring the hash of no body", async () => {
+    // Given a Function URL and a caller allowed to invoke it
+    const simAws = new SimAws();
+    const url = await serveBodyEcho(simAws);
+
+    // When it fetches with the digest a SigV4 client computes for a request
+    // that carries no body
+    const response = await new SimAwsHttp({ simAws }).fetch(url, {
+      headers: {
+        [simAwsCallerHeaderName]: callerArn,
+        [simIamSigV4ContentSha256Header]: sha256(""),
+      },
+    });
+
+    // Then it is invoked, which is what an SDK-signed GET arrives as
+    expect(response.status).toBe(200);
+  });
+
+  it("refuses a GET declaring the hash of some body it does not carry", async () => {
+    // Given a Function URL and a caller allowed to invoke it
+    const simAws = new SimAws();
+    const url = await serveBodyEcho(simAws);
+
+    // When it fetches with a digest of bytes it never sent
+    const response = await new SimAwsHttp({ simAws }).fetch(url, {
+      headers: {
+        [simAwsCallerHeaderName]: callerArn,
+        [simIamSigV4ContentSha256Header]: sha256(faker.lorem.sentence()),
+      },
+    });
+
+    // Then the method makes no difference: a declaration is a claim about the
+    // body, and this one disagrees with the empty body that arrived
+    expect(response.status).toBe(403);
+    expect(await response.json()).toStrictEqual({
+      Message: simLambdaUrlSignatureMismatchMessage,
+    });
+  });
+
   it("refuses an unsigned payload on a request whose signature verifies", async () => {
     // Given a Function URL, and an access key for the user allowed to invoke it
     const simAws = new SimAws();

@@ -95,6 +95,24 @@ describe("Posting through a CloudFront origin access control", () => {
     assertIdentical(await response.text(), body);
   });
 
+  it("invokes the function for a PUT declaring the hash of its body", async () => {
+    // Given the same digest sent with the other method that carries a body
+    const body = faker.lorem.sentence();
+    const response = await fetchThroughDistribution(
+      simCfFunctionUrlOriginTemplateFactory.make({}),
+      () => ({
+        method: "PUT",
+        body,
+        headers: { [simIamSigV4ContentSha256Header]: sha256(body) },
+      }),
+    );
+
+    // Then it reaches the handler too, so declaring the hash is what a PUT
+    // takes rather than the method being turned away
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), body);
+  });
+
   it("invokes the function for an empty body declared as the empty hash", async () => {
     // Given a POST with no body at all, declaring the digest of no bytes
     const response = await fetchThroughDistribution(
