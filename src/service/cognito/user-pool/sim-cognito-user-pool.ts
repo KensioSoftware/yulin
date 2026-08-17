@@ -63,7 +63,7 @@ export class SimCognitoUserPool {
 
   private readonly clock: SimClock;
   private readonly clientStore = new SimCognitoUserPoolClientStore();
-  private readonly userStore = new SimCognitoUserStore();
+  private readonly userStore: SimCognitoUserStore;
   private readonly groupStore = new SimCognitoGroupStore();
   private readonly keys = new SimCognitoPoolKeys();
 
@@ -75,6 +75,9 @@ export class SimCognitoUserPool {
     this.arn = properties.arn;
     this.name = properties.name.value;
     this.#settings = properties.settings;
+    this.userStore = new SimCognitoUserStore(
+      properties.settings.usernameAttributes,
+    );
     this.clock = properties.clock;
     this.creationDate = this.clock.now();
     this.#modifiedDate = this.creationDate;

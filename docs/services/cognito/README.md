@@ -158,6 +158,115 @@ Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, 
 `AdminDisableUser` sets `Enabled` to `false` without changing the user's status, and
 `AdminEnableUser` sets it back.
 
+## Signing in by email or phone number
+
+A pool created with `UsernameAttributes` signs its users in by that attribute rather than by a
+username they chose. Cognito generates a UUID as the username for such a user, and the value the
+request called the username goes into the attribute the pool signs in by. That generated username
+is what `AdminGetUser` reports and what the `cognito:username` claim carries, so an application
+reading "the username" off such a pool reads a UUID.
+
+A CDK `UserPool` with `signInAliases: { email: true }` emits `UsernameAttributes: ["email"]`, which
+is the usual way to build an email sign-in pool.
+
+```typescript sim-cognito-sign-in-by-email
+/**
+ * A simulated pool that signs its users in by email address.
+ */
+
+import {
+  AdminConfirmSignUpCommand,
+  AdminGetUserCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    UsernameAttributes: ["email"],
+  }),
+);
+const userPoolId = pool.UserPool?.Id;
+
+const client = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = client.UserPoolClient?.ClientId;
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: clientId,
+    Username: "alice@example.com",
+    Password: "Sup3rSecret!",
+  }),
+);
+
+await cognito.adminConfirmSignUp(
+  new AdminConfirmSignUpCommand({
+    UserPoolId: userPoolId,
+    // Naming the user by the address reaches it, as it does on real Cognito.
+    Username: "alice@example.com",
+  }),
+);
+
+const read = await cognito.adminGetUser(
+  new AdminGetUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice@example.com",
+  }),
+);
+
+console.log(read.Username); // A UUID, and not "alice@example.com"
+console.log(read.UserAttributes?.find((each) => each.Name === "email")?.Value);
+// "alice@example.com"
+
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: {
+      USERNAME: "alice@example.com",
+      PASSWORD: "Sup3rSecret!",
+    },
+  }),
+);
+
+console.log(signedIn.AuthenticationResult?.IdToken !== undefined); // true
+// The id token's cognito:username claim is the generated username above.
+```
+
+The address goes on reaching the user. The admin operations and the sign-in flows resolve it to the
+user holding it, as real Cognito resolves it, so `AdminGetUser`, `ConfirmSignUp`, `InitiateAuth` and
+`AdminInitiateAuth` all take the address as well as the generated username.
+
+A `SECRET_HASH` covers the value the request itself carries. A sign-up or a sign-in naming the
+address computes it over the address. `REFRESH_TOKEN_AUTH` names no user, so its hash is computed
+over the username the token was issued to, which is the generated one.
+
+Two users cannot sign in by the same address. A second sign-up with one is refused with
+`UsernameExistsException`, and an `AdminUpdateUserAttributes` request setting one another user
+already holds is refused with `AliasExistsException`. A username that is not written the way the
+attribute's values are, such
+as a plain name on a pool signing in by email, is refused too, because a user created that way
+could never sign in. A request naming one address as the username and a different one as the
+attribute is refused rather than resolved in favour of either.
+
+`UsernameAttributes` takes `email` and `phone_number`, and a pool can name both. It is settled when
+the pool is created: real `UpdateUserPool` has no such input, and a request carrying one here is
+refused.
+
 ## Custom attributes
 
 A pool holds the standard OpenID Connect attributes, and the ones its `Schema` declares beside them.
@@ -2356,11 +2465,15 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 The properties each type reads are the ones this simulation models:
 
 - `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `LambdaConfig`,
-  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `Schema`, `MfaConfiguration`, `EnabledMfas`,
+  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `UsernameAttributes`, `Schema`,
+  `MfaConfiguration`, `EnabledMfas`,
   `UserPoolTier`, `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
   `SmsVerificationMessage` and `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a
   time, so a template naming a trigger this simulation runs deploys and one naming a trigger it
-  does not fails the stack. `Schema` is what a CDK `UserPool` emits for its `customAttributes` and
+  does not fails the stack. `UsernameAttributes` is what a CDK `UserPool` emits for its
+  `signInAliases`, so a stack building an email sign-in pool deploys one that
+  [identifies its users](#signing-in-by-email-or-phone-number) the way a deployed one would.
+  `Schema` is what a CDK `UserPool` emits for its `customAttributes` and
   its `standardAttributes`, so a stack keying its own data on a `custom:` attribute deploys and the
   sign-up it was built for works. `MfaConfiguration` and `EnabledMfas` are deployed in a
   `SetUserPoolMfaConfig` call once the pool exists, which is how real CloudFormation deploys them
@@ -3469,8 +3582,8 @@ Current documented limitations:
 - A `CustomMessage` event reports `CLIENT_ID_NOT_APPLICABLE` as its `callerContext.clientId` for an
   `AdminCreateUser`, as real Cognito does for an admin operation, and names the app client for the
   two occasions that come through one.
-- Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
-  `AliasAttributes`, `UsernameConfiguration`,
+- Unsimulated `CreateUserPool` inputs are refused rather than ignored: `AliasAttributes`,
+  `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
@@ -3484,9 +3597,12 @@ Current documented limitations:
   refused. `InviteMessageTemplate` is the wording of the invitation, and a pool cannot set its own
   yet, so an invitation is recorded at Cognito's default wording. `UnusedAccountValidityDays`
   expires a temporary password, and nothing here expires one.
-- `UsernameAttributes` is worth calling out among those. A pool that signs users in by email or phone
-  number stores a generated UUID as the username, so a pool created here without that would answer
-  with the wrong username and the right one on real AWS.
+- `UsernameAttributes` is simulated, and `AliasAttributes` is not. The two differ in what the
+  username is: a `UsernameAttributes` pool generates one, which is what this stores, and an
+  `AliasAttributes` pool keeps the username the request chose and takes the attribute as a second
+  way of naming the user, which is not modelled.
+- A `UsernameAttributes` pool resolves the address for its admin operations and its sign-ins, and
+  refuses a second user holding an address another user already signs in by.
 - Unsimulated `CreateUserPoolClient` inputs are refused the same way: a `ClientSecret` of your own,
   `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
   `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of

@@ -26,6 +26,9 @@ export class SimCognitoUserPoolView {
    * offers is not reported here on real Cognito either:
    * `GetUserPoolMfaConfig` is what reports those.
    *
+   * `UsernameAttributes` is reported only by a pool that signs its users in
+   * by one, and is what says why that pool's usernames are UUIDs.
+   *
    * `SchemaAttributes` is every attribute the pool holds on a user: the
    * standard ones and the `custom:` ones its `Schema` declared, each under the
    * name Cognito gave it.
@@ -50,6 +53,7 @@ export class SimCognitoUserPoolView {
       MfaConfiguration: pool.settings.mfa.configuration.value,
       AdminCreateUserConfig: pool.settings.adminCreateUserConfig.toOutput(),
       AutoVerifiedAttributes: pool.settings.autoVerifiedAttributes.toOutput(),
+      UsernameAttributes: pool.settings.usernameAttributes.toOutput(),
       SchemaAttributes: pool.settings.schema.toOutput(),
       EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,

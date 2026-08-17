@@ -60,6 +60,20 @@ export class SimCognitoUsernameExistsException extends SimCognitoError {
 }
 
 /**
+ * Simulated Cognito AliasExistsException error.
+ *
+ * Real Cognito reports an attribute update this way when the value it sets is
+ * one another user of the pool already signs in by.
+ */
+export class SimCognitoAliasExistsException extends SimCognitoError {
+  public override readonly name = "AliasExistsException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Cognito GroupExistsException error.
  *
  * Real Cognito reports a second group created with a name the pool already

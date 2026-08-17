@@ -85,7 +85,8 @@ describe("Cognito CloudFormation validation", () => {
   });
 
   it("creates a user pool without a property it does not simulate", async () => {
-    // Given a template asking for a pool that signs users in by email.
+    // Given a template asking for a pool that tracks the devices its users
+    // sign in from.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -94,7 +95,7 @@ describe("Cognito CloudFormation validation", () => {
         Type: "AWS::Cognito::UserPool",
         Properties: {
           UserPoolName: "myapp-users",
-          UsernameAttributes: ["email"],
+          DeviceConfiguration: { ChallengeRequiredOnNewDevice: true },
         },
       },
     });
@@ -107,7 +108,7 @@ describe("Cognito CloudFormation validation", () => {
     const [reason] = ignoredReasons(stack);
     assertNonNullable(reason);
     assertStringIncludes(reason, "AppPool");
-    assertStringIncludes(reason, "UsernameAttributes is not simulated");
+    assertStringIncludes(reason, "DeviceConfiguration is not simulated");
     assertStringIncludes(reason, "The simulated properties are");
   });
 

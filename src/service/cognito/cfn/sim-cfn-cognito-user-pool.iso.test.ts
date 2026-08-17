@@ -1,6 +1,7 @@
 import {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
+  AdminGetUserCommand,
   AdminInitiateAuthCommand,
   AdminListGroupsForUserCommand,
   AdminSetUserPasswordCommand,
@@ -12,6 +13,7 @@ import {
   assertNonNullable,
   assertStringStartsWith,
   assertTypeString,
+  assertUuidV4,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -216,5 +218,53 @@ describe("Cognito CloudFormation user pool deployment", () => {
       }),
     );
     assertIdentical(groups.Groups?.[0]?.GroupName, "admins");
+  });
+
+  it("deploys a pool that signs its users in by email", async () => {
+    // Given a template asking for a pool that signs users in by email, which
+    // is what a CDK UserPool with signInAliases: { email: true } emits.
+    const simAws = simAwsInEuWest2();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "email-stack",
+      template: {
+        Resources: {
+          AppPool: {
+            Type: "AWS::Cognito::UserPool",
+            Properties: {
+              UserPoolName: "myapp-users",
+              UsernameAttributes: ["email"],
+            },
+          },
+        },
+        Outputs: { PoolId: { Value: { Ref: "AppPool" } } },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    const userPoolId = output(stack, "PoolId");
+    const cognito = simAws.cognitoIdentityProvider();
+
+    // When a user is created in the deployed pool by its address.
+    const created = await cognito.adminCreateUser(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: "alice@example.com",
+      }),
+    );
+
+    // Then the pool it deployed identifies that user the way a deployed one
+    // would: a generated UUID username, with the address as an attribute
+    // reaching the same user.
+    assertNonNullable(created.User?.Username);
+    assertUuidV4(created.User.Username);
+
+    const found = await cognito.adminGetUser(
+      new AdminGetUserCommand({
+        UserPoolId: userPoolId,
+        Username: "alice@example.com",
+      }),
+    );
+
+    assertIdentical(found.Username, created.User.Username);
   });
 });

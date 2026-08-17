@@ -31,6 +31,11 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * decides whether `SignUp` is allowed at all, and the second decides which
  * attributes confirming a sign-up marks as verified.
  *
+ * `UsernameAttributes` is here because the pool signs its users in by what it
+ * names, and stores the generated UUID username that comes with that. A CDK
+ * `UserPool` with `signInAliases: { email: true }` emits it, so a stack built
+ * that way deploys a pool identifying its users the way a deployed one would.
+ *
  * `Schema` is here because the pool holds the attributes it declares. A CDK
  * `UserPool` emits one for its `customAttributes` and for any
  * `standardAttributes` entry, so a stack keying its own data on a `custom:`
@@ -62,6 +67,7 @@ const simulatedProperties = [
   "UserPoolTier",
   "AdminCreateUserConfig",
   "AutoVerifiedAttributes",
+  "UsernameAttributes",
   "Schema",
   "AccountRecoverySetting",
   "EmailVerificationMessage",
@@ -135,6 +141,11 @@ export class SimCfnCognitoUserPoolProperties {
         this.resource,
         this.properties["AutoVerifiedAttributes"],
         "AutoVerifiedAttributes",
+      ),
+      UsernameAttributes: this.propertyParser.optionalStringArray(
+        this.resource,
+        this.properties["UsernameAttributes"],
+        "UsernameAttributes",
       ),
       Schema: new SimCfnCognitoUserPoolSchema({
         resource: this.resource,

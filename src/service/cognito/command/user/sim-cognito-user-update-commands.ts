@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
+import { SimCognitoSignInValueCheck } from "./sim-cognito-sign-in-value-check.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import type {
@@ -75,13 +76,17 @@ export class SimCognitoUserUpdateCommands {
     options?: SimCognitoCommandOptions,
   ): SimAdminUpdateUserAttributesCommandOutput {
     const { input } = command;
-    const user = this.resolver.user(
+    const { pool, user } = this.resolver.poolUser(
       "cognito-idp:AdminUpdateUserAttributes",
       input,
       options,
     );
 
     this.unsimulatedOptions.refuseInUpdate(input);
+    new SimCognitoSignInValueCheck(pool).requireFreeFor(
+      user,
+      input.UserAttributes,
+    );
 
     user.updateAttributes(input.UserAttributes);
 

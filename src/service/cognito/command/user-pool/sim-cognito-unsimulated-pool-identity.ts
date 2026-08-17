@@ -1,17 +1,18 @@
-import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
 import type { SimCreateUserPoolCommandInput } from "./user-pool.command.js";
 
 /**
- * Refuses the inputs deciding how a pool identifies its users.
+ * Refuses the inputs deciding how a pool identifies its users that this
+ * simulation does not model.
  *
- * These three are `CreateUserPool` inputs only. Real Cognito fixes each of
- * them when the pool is made and has no `UpdateUserPool` input for any of
- * them, so the refusals only ever name creation.
+ * Both are `CreateUserPool` inputs only. Real Cognito fixes each of them when
+ * the pool is made and has no `UpdateUserPool` input for either, so the
+ * refusals only ever name creation.
  *
- * `Schema` is the fourth such input and is not refused: a pool takes the
- * attributes it declares. `UsernameAttributes` is the one that would hurt
- * most, and it gets its own refusal saying why.
+ * `Schema` and `UsernameAttributes` are the other two such inputs and are not
+ * refused: a pool takes the attributes it declares, and a pool that signs
+ * users in by one of them stores the generated UUID username real Cognito
+ * would have stored.
  */
 export class SimCognitoUnsimulatedUserPoolIdentity {
   private readonly unsimulated = new SimCognitoUnsimulatedInput(
@@ -22,8 +23,6 @@ export class SimCognitoUnsimulatedUserPoolIdentity {
    * Refuse a request choosing how its users are identified.
    */
   refuseIn(input: SimCreateUserPoolCommandInput): void {
-    this.refuseUsernameAttributes(input.UsernameAttributes);
-
     this.unsimulated.refuse(
       "AliasAttributes",
       input.AliasAttributes,
@@ -33,29 +32,6 @@ export class SimCognitoUnsimulatedUserPoolIdentity {
       "UsernameConfiguration",
       input.UsernameConfiguration,
       "case-insensitive usernames",
-    );
-  }
-
-  /**
-   * Refuse a pool that signs users in by an attribute rather than by
-   * username.
-   *
-   * Such a pool stores a generated UUID as the username, so code written
-   * against it looks users up by something this simulation would not have
-   * given them.
-   */
-  private refuseUsernameAttributes(
-    attributes: readonly string[] | undefined,
-  ): void {
-    if (attributes === undefined) {
-      return;
-    }
-
-    throw new SimCognitoInvalidParameterException(
-      "CreateUserPool UsernameAttributes is not simulated: a pool that signs " +
-        "users in by email or phone number stores a generated UUID as the " +
-        "username, so simulating the pool without that would answer with the " +
-        "wrong username here and the right one on real AWS",
     );
   }
 }
