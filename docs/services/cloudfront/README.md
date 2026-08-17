@@ -6,8 +6,8 @@ Sim CloudFront can be used directly through `SimAws`, and it can also be served 
 alongside other simulated AWS services, so application code can make HTTP requests through a
 CloudFront-like layer without talking to real AWS.
 
-`SimCloudFront` can also be instantiated on its own, in which case it has its own isolated state that
-is not connected to a wider simulated AWS environment.
+`SimCloudFront` can also be instantiated on its own, in which case it has its own isolated state,
+standing apart from any wider simulated AWS environment.
 
 ## Basic Distribution setup
 
@@ -95,33 +95,33 @@ console.log(distributionCreation.Distribution?.DomainName);
 
 ## What an S3 Origin can read
 
-An S3 Origin reads its Bucket through the ordinary GetObject command, so the Bucket policy decides
-what the Distribution can serve. An Origin with no origin access control reads anonymously, which is
-the unsigned request real CloudFront sends to the S3 REST endpoint, so an Object has to be publicly
-readable for the Distribution to serve it. A Bucket with no policy answers 403 for every Object.
+An S3 Origin reads its Bucket through the ordinary GetObject command. The Bucket policy decides what
+the Distribution can serve. An Origin with no origin access control reads anonymously, the unsigned
+request real CloudFront sends to the S3 REST endpoint. An Object has to be publicly readable for the
+Distribution to serve it, and a Bucket with no policy answers 403 for every Object.
 
-An Origin that does have an origin access control reads as the CloudFront service principal instead,
-so the Bucket stays private and its policy names the Distribution. See
+An Origin that does have an origin access control reads as the CloudFront service principal. The
+Bucket stays private and its policy names the Distribution. See
 [Origin access controls](#origin-access-controls) for the Bucket policy that takes.
 
-That is the two commands in the example above: `PutPublicAccessBlockCommand` to opt out of the block
-on public Bucket policies, then `PutBucketPolicyCommand` granting `s3:GetObject` to `Principal: "*"`.
-The same pair is what a static website Bucket needs, and it is what CDK's `publicReadAccess: true`
-generates.
+That is what the two commands in the example above do. `PutPublicAccessBlockCommand` opts out of the
+block on public Bucket policies, then `PutBucketPolicyCommand` grants `s3:GetObject` to
+`Principal: "*"`. The same pair is what a static website Bucket needs, and it is what CDK's
+`publicReadAccess: true` generates.
 
-A denied read reaches the viewer as a 403 from the Origin, so a Distribution's custom error response
-for 403 replaces it. That is what makes the usual single-page-app setup, rewriting 403 to
-`/index.html`, behave here as it does in AWS.
+A denied read reaches the viewer as a 403 from the Origin, and a Distribution's custom error
+response for 403 replaces it. The usual single-page-app setup, rewriting 403 to `/index.html`,
+behaves here as it does in AWS.
 
-`S3OriginConfig.OriginAccessIdentity` is refused rather than read as anonymous. Leave it empty, as
-CloudFront itself writes it for an Origin that signs nothing.
+`S3OriginConfig.OriginAccessIdentity` is refused. Leave it empty, as CloudFront itself writes it for
+an Origin that signs nothing.
 
-## Static sites: default root object and error pages
+## Static sites, default root objects and error pages
 
-A static site behind CloudFront usually leans on two Distribution settings: `DefaultRootObject`, so
-a request for the site root returns the home page, and `CustomErrorResponses`, so a URL that matches
-no object returns the site's own error page rather than the Origin's. Sim CloudFront applies both,
-so a test can assert what a visitor would actually see.
+A static site behind CloudFront usually leans on two Distribution settings. `DefaultRootObject`
+makes a request for the site root return the home page. `CustomErrorResponses` makes a URL that
+matches no object return the site's own error page in place of the Origin's. Sim CloudFront applies
+both, and a test can assert what a visitor would actually see.
 
 ```typescript sim-cloudfront-static-site
 /**
@@ -244,25 +244,24 @@ try {
 
 The default root object stands in for a request to the root of the Distribution and nothing else. A
 request for `/blog/` is passed to the Origin as it arrived, even where that folder holds its own
-`index.html`, which is where CloudFront differs from an S3 website index document. The substituted
-path is what the rest of request handling sees, so a Cache Behavior pattern and a `viewer-request`
-CloudFront Function both act on the object being served rather than on the root. The value names an
-object at the Origin, so it may be a path such as `public/index.html` but must not begin with a
-forward slash: sim CloudFront refuses one that does with `InvalidDefaultRootObject`, rather than
-creating a Distribution that answers its own root with a 403.
+`index.html`. That is where CloudFront differs from an S3 website index document. The substituted
+path is what the rest of request handling sees, and a Cache Behavior pattern and a `viewer-request`
+CloudFront Function both act on the object being served. The value names an object at the Origin. It may be a
+path such as `public/index.html`, and it must not begin with a forward slash. Sim CloudFront refuses one that does with `InvalidDefaultRootObject`. The alternative would
+be a Distribution that answers its own root with a 403.
 
-A custom error response replaces the Origin's response when its status matches `ErrorCode`, which is
-one of the codes CloudFront supports: 400, 403, 404, 405, 414, 416, 500, 501, 502, 503 and 504. The
-response page is fetched as a request in its own right, so the Cache Behavior matching
-`ResponsePagePath` chooses which Origin it comes from, and error pages can live somewhere other than
-the content that failed. `ResponseCode` is the status the viewer sees, which is how a single-page
-app serves its shell with a 200 for a URL the Bucket has no object for. It is one of the same error
-codes or 200, the set CloudFront allows. Where the response page is itself missing, the viewer gets
-the status from fetching it, as in CloudFront.
+A custom error response replaces the Origin's response when its status matches `ErrorCode`. The
+codes CloudFront supports are 400, 403, 404, 405, 414, 416, 500, 501, 502, 503 and 504. The response
+page is fetched as a request in its own right, and the Cache Behavior matching `ResponsePagePath`
+chooses which Origin it comes from. Error pages can live somewhere other than the content that
+failed. `ResponseCode` is the status the viewer sees. That is how a single-page app serves its shell
+with a 200 for a URL the Bucket has no object for. It is one of the same error codes or 200, the set
+CloudFront allows. Where the response page is itself missing, the viewer gets the status from
+fetching it, as in CloudFront.
 
-Custom error responses are applied before a `viewer-response` CloudFront Function runs, so the
-function sees the response the viewer is about to get. `ErrorCachingMinTTL` is accepted and ignored,
-along with a rule that sets nothing else, because sim CloudFront has no cache to apply it to.
+Custom error responses are applied before a `viewer-response` CloudFront Function runs. The function
+sees the response the viewer is about to get. `ErrorCachingMinTTL` is accepted and ignored, along
+with a rule that sets nothing else, since sim CloudFront has no cache to apply it to.
 
 ## Serve simulated CloudFront on localhost
 
@@ -373,16 +372,16 @@ The Distribution domain is adapted through `server.localUrl(...)` so that the re
 local Yulin server while preserving the simulated CloudFront hostname.
 
 A test that needs no browser can skip the port. `SimAwsHttp` answers the same requests in the
-process, with no server listening and nothing to adapt the URL for, and an alternate domain name a
-simulated Route53 answers for is requested by its own name: `simAwsHttp.fetch("https://cdn.example.test/")`
-reaches the Distribution behind it. See
+process, with no server listening and no URL to adapt. An alternate domain name a simulated Route53
+answers for is requested by its own name, and `simAwsHttp.fetch("https://cdn.example.test/")` reaches
+the Distribution behind it. See
 [requests without a port](../../serve/#requests-without-a-port "Requests without a port docs").
 
 ## Custom Origins
 
-An Origin with a `CustomOriginConfig` is one CloudFront reaches over HTTP rather than as an S3
+An Origin with a `CustomOriginConfig` is one CloudFront reaches over HTTP, in place of reading an S3
 Bucket. Sim CloudFront resolves its `DomainName` in the simulated environment and serves the request
-in process, so a Distribution can front a simulated HTTP API endpoint
+in process. A Distribution can front a simulated HTTP API endpoint
 (`<api-id>.execute-api.<region>.amazonaws.com`), a simulated Lambda Function URL
 (`<url-id>.lambda-url.<region>.on.aws`), or anything a simulated Route53 record points at one of
 those.
@@ -558,19 +557,19 @@ try {
 }
 ```
 
-The Origin domain is resolved when a request is served rather than when the Distribution is created,
-so the Distribution and the service behind its Origin can be created in either order, whichever way
-round a CloudFormation template happens to declare them.
+The Origin domain is resolved when a request is served, and the Distribution and the service behind
+its Origin can be created in either order, whichever way round a CloudFormation template happens to
+declare them.
 
-`OriginPath` is prefixed to the request path, as it is for an S3 Origin, so an Origin path of `/v1`
+`OriginPath` is prefixed to the request path, as it is for an S3 Origin. An Origin path of `/v1`
 sends a request for `/things` on to `/v1/things`.
 
-A few things follow from the request never leaving the process:
+Three things follow from the request never leaving the process:
 
-- A domain that names nothing in the simulation fails with an error naming the Origin and the
-  domain, rather than a real request being made to it. External HTTP Origins are not supported.
-- The settings inside `CustomOriginConfig` describe how CloudFront connects over the network, so
-  the protocol policy, ports, SSL protocols and timeouts are accepted and ignored.
+- A domain unknown to the simulation fails with an error naming the Origin and the
+  domain. No real request is made to it, and external HTTP Origins are unsupported.
+- The settings inside `CustomOriginConfig` describe how CloudFront connects over the network. The
+  protocol policy, ports, SSL protocols and timeouts are accepted and ignored.
 - The Origin is reached anonymously unless it has an origin access control, as CloudFront reaches an
   Origin it has nothing to sign for. A Function URL or an HTTP API route authorizing with `AWS_IAM`
   therefore refuses the request. [Origin access controls](#origin-access-controls) covers the
@@ -579,13 +578,13 @@ A few things follow from the request never leaving the process:
 ## Viewer certificates
 
 A Distribution with alternate domain names needs an ACM certificate, and CloudFront accepts only
-certain ones. Sim CloudFront applies the same rules, so a Distribution that real CloudFront would
+certain ones. Sim CloudFront applies the same rules. A Distribution that real CloudFront would
 reject at deploy time is rejected here first, with `InvalidViewerCertificate`:
 
-- the certificate must be in `us-east-1`, wherever the rest of your infrastructure lives;
-- the certificate must exist and be `ISSUED`;
+- the certificate must be in `us-east-1`, wherever the rest of your infrastructure lives
+- the certificate must exist and be `ISSUED`
 - every alternate domain name must be covered by the certificate's domain name or one of its subject
-  alternative names, with a wildcard covering exactly one label.
+  alternative names, with a wildcard covering exactly one label
 
 The `us-east-1` rule is easy to miss, because nothing else in a stack cares about it. A Distribution
 in `eu-west-2` with a certificate alongside it looks fine until CloudFront refuses it.
@@ -641,25 +640,25 @@ try {
 
 The CloudFront API and CloudFormation capitalise this field differently, and sim CloudFront accepts
 both. SDK calls use `ACMCertificateArn` and `SSLSupportMethod`, as above.
-`AWS::CloudFront::Distribution` uses `AcmCertificateArn` and `SslSupportMethod`, so a template or
-CDK app works without changes.
+`AWS::CloudFront::Distribution` uses `AcmCertificateArn` and `SslSupportMethod`. A template or CDK
+app works without changes.
 
-A Distribution using `CloudFrontDefaultCertificate` needs no ACM certificate and is not checked. A
-standalone `new SimCloudFront()` has no sim ACM to check against, so it does not check either.
+A Distribution using `CloudFrontDefaultCertificate` needs no ACM certificate, and it goes
+unchecked. A standalone `new SimCloudFront()` has no sim ACM to check against, and skips the check
+as well.
 
 ## Disabling and deleting a Distribution
 
-`DeleteDistributionCommand` removes a Distribution. CloudFront will not delete one that is still
-serving, so the sequence is `UpdateDistributionCommand` with `Enabled: false` first, then the
-deletion. Deleting an enabled Distribution answers `DistributionNotDisabled`, as it does in AWS.
+`DeleteDistributionCommand` removes a Distribution. CloudFront will only delete one that has stopped
+serving. The sequence is `UpdateDistributionCommand` with `Enabled: false` first, then the deletion. Deleting an enabled Distribution answers `DistributionNotDisabled`, as it does in AWS.
 
-`UpdateDistributionCommand` takes a whole `DistributionConfig` rather than a patch, so the update is
-applied as a replacement. Anything left out of the new config is dropped, including alternate domain
-names and the default root object. Read the Distribution first, change the field you want, and send
-the config back.
+`UpdateDistributionCommand` takes a whole `DistributionConfig`, and applies the update as a
+replacement. Anything left out of the new config is dropped, including alternate domain names and
+the default root object. Read the Distribution first, change the field you want, and send the config
+back.
 
 Once the Distribution is deleted, a request to its CloudFront domain or any of its alternate domain
-names no longer resolves to it, and those alternate domain names are free for another Distribution.
+names stops resolving to it, and those alternate domain names are free for another Distribution.
 
 ```typescript sim-cloudfront-delete-distribution
 /**
@@ -745,8 +744,8 @@ try {
 ```
 
 `DeleteFunctionCommand` removes a CloudFront Function by name, and answers `NoSuchFunctionExists`
-when the name matches nothing. A cache Behavior still pointing at a deleted Function finds nothing
-and runs no Function code.
+when the name matches nothing. A cache Behavior still pointing at a deleted Function runs no
+Function code.
 
 ## Simulated CloudFront Functions
 
@@ -754,12 +753,12 @@ The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Fu
 
 Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
 
-The `host` header a function sees is the hostname the request was made to CloudFront with: the
-Distribution domain name, or one of its alternate domain names. Requests served on localhost arrive
+The `host` header a function sees is the hostname the request was made to CloudFront with, being the
+Distribution domain name or one of its alternate domain names. Requests served on localhost arrive
 with a Yulin-local host such as `distro123.cloudfront.net.sim-aws.localhost:52341`, and the local
-suffix and port are dropped before the function runs, so a function building a URL from
-`event.request.headers.host.value` behaves as it would on AWS. As on AWS, `host` is read-only: a
-host a function writes is discarded rather than sent on to the Origin.
+suffix and port are dropped before the function runs. A function building a URL from
+`event.request.headers.host.value` behaves as it would on AWS. As on AWS, `host` is read-only, and a
+host a function writes is discarded before the Origin sees it.
 
 ```typescript sim-cloudfront-function
 /**
@@ -960,9 +959,9 @@ export function handler(event) {
 }
 ```
 
-CloudFront Functions run JS2, which is ECMAScript 5.1 plus a named subset of ES 6 to 12, so it
-refuses constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs that report
-those refusals in the editor rather than at publication. See
+CloudFront Functions run JS2, ECMAScript 5.1 plus a named subset of ES 6 to 12. It refuses
+constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs that report those
+refusals in the editor, ahead of publication. See
 [Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
 
 ## Response headers policies
@@ -1086,9 +1085,9 @@ try {
 
 Each header in `CustomHeadersConfig` carries an `Override` boolean. With it set, the policy's value
 replaces one the Origin sent. Without it, the Origin's value is kept and the policy's is dropped. A
-header the Origin did not send is added either way.
+header the Origin left out is added either way.
 
-`RemoveHeadersConfig` takes headers away, and is applied before the added ones, so a header named in
+`RemoveHeadersConfig` takes headers away, and is applied before the added ones. A header named in
 both sections ends up present with the policy's value.
 
 The policy is applied after a custom error response is fetched and before a `viewer-response`
@@ -1096,60 +1095,57 @@ CloudFront Function runs, as CloudFront does. An error page carries the policy's
 function sees them in `event.response.headers` and can change them.
 
 `SecurityHeadersConfig` is what CDK's `ResponseHeadersPolicy` construct synthesizes from
-`securityHeadersBehavior`, and every one of its sections is modelled: `ContentSecurityPolicy`,
+`securityHeadersBehavior`, and every one of its sections is modelled. `ContentSecurityPolicy`,
 `ContentTypeOptions`, `FrameOptions`, `ReferrerPolicy`, `StrictTransportSecurity` and `XSSProtection`
 each become the header CloudFront documents for it, honouring the section's own `Override` the same
 way a `CustomHeadersConfig` item does.
 
 `ServerTimingHeadersConfig` adds a `Server-Timing` header once `Enabled` is true. `SamplingRate` is
-not honoured: this simulation always adds the header rather than sampling a share of responses, so a
-test asserting on it does not depend on chance, and the header's value is a fixed placeholder rather
-than real Origin timing.
+ignored. This simulation adds the header to every response. A test asserting on it never depends on
+chance, and the header's value is a fixed placeholder in place of real Origin timing.
 
 `CorsConfig` is what CDK's `corsBehavior` synthesizes. CloudFront reflects the viewer request's
-`Origin` header against `AccessControlAllowOrigins` rather than sending the list itself: a request
+`Origin` header against `AccessControlAllowOrigins`, in place of sending the list itself. A request
 naming an Origin the list allows gets the CORS headers the section configures, with the response
-varying on `Origin` unless the list contains `*`; a request naming one it does not allow gets none of
-them, the same as CloudFront sending none rather than a mismatched one. `AccessControlAllowMethods`
-of `["ALL"]` expands to CloudFront's full method list, and `AccessControlAllowCredentials: false`
-leaves `Access-Control-Allow-Credentials` off entirely, since a header naming `false` means the same
-as its absence to a browser.
+varying on `Origin` unless the list contains `*`. A request naming one the list omits gets none of
+them, matching CloudFront, which sends none in preference to a mismatched one.
+`AccessControlAllowMethods` of `["ALL"]` expands to CloudFront's full method list, and
+`AccessControlAllowCredentials: false` leaves `Access-Control-Allow-Credentials` off entirely, since
+a header naming `false` means the same as its absence to a browser.
 
 An allow-list entry may use the wildcard on its own, meaning every Origin, or as the leftmost
 subdomain, so `*.example.org` matches `https://site.example.org`. It stands for exactly one label, as
-a wildcard certificate does, so it does not match `https://deep.site.example.org`, and an entry
-naming no scheme matches the host whichever scheme the request used. CloudFront allows the wildcard
-nowhere else, and an entry placing one elsewhere — `example.*`, `test.*.example.org`,
-`*test.example.org`, `exa*mple.org` — fails the stack rather than silently matching nothing.
+a wildcard certificate does, and it leaves `https://deep.site.example.org` unmatched. An entry naming
+no scheme matches the host whichever scheme the request used. CloudFront allows the wildcard nowhere
+else, and an entry placing one elsewhere (`example.*`, `test.*.example.org`, `*test.example.org`,
+`exa*mple.org`) fails the stack.
 
-`OriginOverride` decides the whole CORS section rather than one header at a time, unlike the
-`Override` on a custom or security header. Without it, an Origin response carrying any CORS header at
-all — whether or not the policy names that header — keeps every header the section would have set off
-the response.
+`OriginOverride` decides the whole CORS section at once, where the `Override` on a custom or security
+header decides one header. Without it, an Origin response carrying any CORS header at all, named by
+the policy or otherwise, keeps every header the section would have set off the response.
 
-A Behavior's `ResponseHeadersPolicyId` is checked when the Distribution is created or updated: naming
-a policy this simulation did not create, whether mistyped or a CloudFront managed policy ID, fails the
-Stack there rather than deploying successfully and only failing the first request that reaches the
-Behavior.
+A Behavior's `ResponseHeadersPolicyId` is checked when the Distribution is created or updated. Naming
+a policy this simulation did not create, whether mistyped or a CloudFront managed policy ID, fails
+the Stack there. The alternative would be a successful deploy that fails the first request reaching
+the Behavior.
 
 ## Origin access controls
 
-An origin access control is how a Distribution authenticates to a private Origin, so that the Origin
-admits the Distribution and nothing else. Declare one as
-`AWS::CloudFront::OriginAccessControl` and point an Origin's `OriginAccessControlId` at it with a
-`Ref`, which is what CDK's `S3BucketOrigin.withOriginAccessControl` synthesizes.
+An origin access control is how a Distribution authenticates to a private Origin. The Origin then
+admits the Distribution and nothing else. Declare one as `AWS::CloudFront::OriginAccessControl` and
+point an Origin's `OriginAccessControlId` at it with a `Ref`, which is what CDK's
+`S3BucketOrigin.withOriginAccessControl` synthesizes.
 
 An `OriginAccessControlOriginType` of `s3` signs for an S3 Bucket Origin, and one of `lambda` signs
-for a Lambda Function URL Origin. The origin type has to match the Origin it is attached to: an `s3`
+for a Lambda Function URL Origin. The origin type has to match the Origin it is attached to. An `s3`
 origin access control on a custom Origin, or a `lambda` one on an S3 Origin, fails the Stack when
 the Distribution is created, as CloudFront refuses it.
 
 An S3 Origin whose origin access control signs reads its Bucket as the `cloudfront.amazonaws.com`
 service principal, carrying the Distribution's ARN as `aws:SourceArn`. The Bucket policy is then the
-whole decision, so the Bucket needs a statement granting `s3:GetObject` to that principal,
-conditioned on the Distribution allowed to read it. That is the policy CDK writes. A condition
-naming a different Distribution, or an Origin that was never given an origin access control,
-answers 403 rather than serving.
+whole decision. The Bucket needs a statement granting `s3:GetObject` to that principal, conditioned
+on the Distribution allowed to read it. That is the policy CDK writes. A condition naming a different
+Distribution, or an Origin that was never given an origin access control, answers 403.
 
 ```typescript sim-cloudfront-origin-access-control
 /**
@@ -1268,10 +1264,10 @@ try {
 }
 ```
 
-The Bucket policy names the Distribution's ARN, so it is created after the Distribution: the `Ref`
-inside `Fn::Join` is the dependency CloudFormation orders the Stack by. Nothing about the read is
-settled when the Distribution is created, because the policy deciding it does not exist yet. The
-Origin works out who it is reading as per request instead.
+The Bucket policy names the Distribution's ARN, and is created after the Distribution. The `Ref`
+inside `Fn::Join` is the dependency CloudFormation orders the Stack by. The read is settled per
+request, because the policy deciding it comes into existence after the Distribution does. The Origin
+works out who it is reading as each time.
 
 ### A Lambda Function URL Origin
 
@@ -1284,8 +1280,8 @@ CloudFront without leaving the Function URL open to anyone who finds its endpoin
 Both permissions are needed. One grants `lambda:InvokeFunctionUrl` and the other
 `lambda:InvokeFunction`, to the same principal with the same `SourceArn`, as
 [Restrict access to an AWS Lambda function URL origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html)
-sets out. CDK's `FunctionUrlOrigin.withOriginAccessControl` writes only the first, so a CDK app has
-to add the second itself:
+sets out. CDK's `FunctionUrlOrigin.withOriginAccessControl` writes only the first. A CDK app has to
+add the second itself:
 
 ```typescript
 greeterFunction.addPermission("InvokeFunctionFromCloudFront", {
@@ -1305,8 +1301,8 @@ greeterFunction.addPermission("InvokeFunctionFromCloudFront", {
 The Origin request is made as the `cloudfront.amazonaws.com` service principal carrying the
 Distribution's ARN, the same pair an S3 Origin read carries, and the function's resource policy is
 the whole decision. A Stack missing either permission, or with one naming a different Distribution,
-deploys and then answers 403 through the Distribution, which is what the real deployment does. The
-function is never invoked, so it writes no logs to look at either.
+deploys and then answers 403 through the Distribution, as the real deployment does. The function is
+never invoked, and writes no logs to look at either.
 
 ```typescript sim-cloudfront-function-url-origin-access-control
 /**
@@ -1450,25 +1446,25 @@ try {
 ```
 
 The Function URL is reachable directly as well, on its own endpoint, and it refuses a request that
-arrives there without the permission the Distribution has. That is the point of the auth type: the
+arrives there without the permission the Distribution has. That is the point of the auth type. The
 endpoint exists, and only the Distribution may use it.
 
 `SigningBehavior` takes any of `always`, `never` and `no-override`. `always` and `no-override` both
 sign, since nothing here sends a pre-signed viewer request to an Origin for `no-override` to pass
-through. `never` turns the origin access control off without removing it, so the Origin is reached
-anonymously, as an Origin with no origin access control is. An S3 Origin then needs a Bucket policy
-allowing that, and an `AWS_IAM` Function URL refuses the request outright.
+through. `never` turns the origin access control off while leaving it in place, and the Origin is
+reached anonymously, as an Origin with no origin access control is. An S3 Origin then needs a Bucket
+policy allowing that, and an `AWS_IAM` Function URL refuses the request outright.
 
 `Ref` and `Fn::GetAtt` on `Id` both return the ID, so either resolves an Origin's
 `OriginAccessControlId`. An Origin naming an ID no origin access control holds is refused with
-`InvalidOriginAccessControl` when the Distribution is created, rather than created without one.
-Tearing the Stack down removes the origin access control, and its name is free again.
+`InvalidOriginAccessControl` when the Distribution is created. Tearing the Stack down removes the
+origin access control, and its name is free again.
 
 `OriginAccessControlOriginType` must be `s3` or `lambda`, and `SigningProtocol` must be `sigv4`. Any
 other value fails the Stack by name.
 
-There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
-to make one.
+A CloudFormation template is the only way to make one. There is no `CreateOriginAccessControl`
+command here.
 
 #### Posting to a Function URL Origin
 
@@ -1506,15 +1502,15 @@ missing the header fails in a test as well as on the deployment.
 
 ## Key value stores
 
-A key value store holds data a CloudFront Function reads at request time, so a redirect table or a
-feature flag does not have to be baked into the Function's code.
+A key value store holds data a CloudFront Function reads at request time. A redirect table or a
+feature flag can live there instead of being baked into the Function's code.
 
 AWS splits this across two SDK clients, and so does the simulator. The CloudFront client owns the
-store: `CreateKeyValueStoreCommand`, `DescribeKeyValueStoreCommand`, `ListKeyValueStoresCommand`,
-`UpdateKeyValueStoreCommand` and `DeleteKeyValueStoreCommand`, all addressing a store by name. The
-key value store client owns the data: `GetKeyCommand`, `PutKeyCommand`, `DeleteKeyCommand`,
-`ListKeysCommand`, `UpdateKeysCommand` and its own `DescribeKeyValueStoreCommand`, all addressing a
-store by ARN.
+store, through `CreateKeyValueStoreCommand`, `DescribeKeyValueStoreCommand`,
+`ListKeyValueStoresCommand`, `UpdateKeyValueStoreCommand` and `DeleteKeyValueStoreCommand`, all
+addressing a store by name. The key value store client owns the data, through `GetKeyCommand`,
+`PutKeyCommand`, `DeleteKeyCommand`, `ListKeysCommand`, `UpdateKeysCommand` and its own
+`DescribeKeyValueStoreCommand`, all addressing a store by ARN.
 
 Both clients are intercepted by `SimSdk`. Used directly, they are `simAws.cloudFront().keyValueStores()`
 and `simAws.cloudFrontKeyValueStore()`.
@@ -1581,26 +1577,26 @@ CloudFront. `await simAws.backgroundTasksComplete()` waits for that.
 
 ### ETags
 
-Unlike the Distribution and Function commands, the key value store commands do check `IfMatch`. Both
-APIs require it on every write and CloudFront refuses a stale one, which is what stops two writers
-overwriting each other. A write carrying an ETag that is not current is refused with
-`PreconditionFailed`, so a caller has to thread the ETag through the way it does against CloudFront.
-Each write returns the new ETag for the next one.
+The key value store commands do check `IfMatch`, where the Distribution and Function commands ignore
+it. Both APIs require it on every write and CloudFront refuses a stale one, which is what stops two
+writers overwriting each other. A write carrying a stale ETag is refused with `PreconditionFailed`,
+and a caller has to thread the ETag through the way it does against CloudFront. Each write returns
+the new ETag for the next one.
 
 A store has two ETags and they are not interchangeable, as in AWS. Each `DescribeKeyValueStore`
-returns its own: the CloudFront client's versions the store's configuration, and the key value store
-client's versions the keys. Writing a key does not move the configuration's ETag, and changing the
-comment does not move the keys'. A write carrying the other API's ETag is refused, and the message
-says which of the two it wanted.
+returns its own. The CloudFront client's versions the store's configuration, and the key value store
+client's versions the keys. Writing a key leaves the configuration's ETag where it was, and changing
+the comment leaves the keys' where it was. A write carrying the other API's ETag is refused, and the
+message says which of the two it wanted.
 
 ### Reading a store from a CloudFront Function
 
 A Function reads its store through `cf`, which it gets from `import cf from "cloudfront"`. That is
 the one import JS 2.0 has. `cf.kvs()` opens the store the Function is associated with, and its
-`get`, `exists` and `meta` are all promises, so a Function that reads a store is async.
+`get`, `exists` and `meta` are all promises. A Function that reads a store is async.
 
 A Function names the store it may read with `KeyValueStoreAssociations` on its `FunctionConfig`.
-CloudFront takes at most one, and only on `cloudfront-js-2.0`: an association on the 1.0 runtime is
+CloudFront takes at most one, and only on `cloudfront-js-2.0`. An association on the 1.0 runtime is
 refused, because that runtime has no `cf` to reach a store through.
 
 ```typescript sim-cloudfront-function-key-value-store
@@ -1688,21 +1684,20 @@ console.log((redirected as Response).headers.get("location")); // /new-page
 ```
 
 `get` reads a string by default, and takes `{ format: "json" }` to parse the stored string or
-`{ format: "bytes" }` for its UTF-8 bytes. A key that is not stored rejects, so a Function that
-wants a default checks `exists` first, as the example does.
+`{ format: "bytes" }` for its UTF-8 bytes. A missing key rejects. A Function that wants a default checks
+`exists` first, as the example does.
 
-A Function written as a function reference rather than as source has no import to write, so it reads
-`cf` as a global. Importing `@kensio/yulin/cloudfront/globals` gives that global a type, along with
-the CloudFront Function event types. Each invocation gets its own `cf` through Node.js asynchronous
-context, so two Functions associated with different stores read their own even when they run at the
-same time.
+A Function written as a function reference has no import to write, and reads `cf` as a global.
+Importing `@kensio/yulin/cloudfront/globals` gives that global a type, along with the CloudFront
+Function event types. Each invocation gets its own `cf` through Node.js asynchronous context, and two
+Functions associated with different stores read their own even when they run at the same time.
 
 ### From CloudFormation
 
 `AWS::CloudFront::KeyValueStore` creates a store, and a Function associates one with
-`FunctionConfig.KeyValueStoreAssociations`. CloudFormation takes a plain array there rather than the
-`Quantity` and `Items` pair the SDK uses, and `Ref` on a key value store is its ARN, so the two fit
-together directly:
+`FunctionConfig.KeyValueStoreAssociations`. CloudFormation takes a plain array there, where the SDK
+takes a `Quantity` and `Items` pair. `Ref` on a key value store is its ARN, and the two fit together
+directly:
 
 ```yaml
 Redirects:
@@ -1726,12 +1721,12 @@ RedirectFunction:
 `Fn::GetAtt` supports `Arn`, `Id` and `Status`. Deleting the Stack deletes the store, after the
 Functions holding it have gone.
 
-CDK's `cloudfront.KeyValueStore` and the `keyValueStore` prop on `cloudfront.Function` both deploy,
-so a CDK stack needs no hand-editing.
+CDK's `cloudfront.KeyValueStore` and the `keyValueStore` prop on `cloudfront.Function` both deploy.
+A CDK stack needs no hand-editing.
 
-`cf.kvs()` refuses when the Function is associated with no store, and refuses an ID that is not the
-associated store's. Neither hands back an empty store, which would let a Function that lost its
-association run to completion and quietly take every default.
+`cf.kvs()` refuses when the Function is associated with no store, and refuses an ID belonging to some
+other store. Handing back an empty store would let a Function that lost its association run to
+completion and quietly take every default.
 
 ## Available functionality
 
@@ -1750,11 +1745,11 @@ Sim CloudFront currently supports:
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
-- `AWS::CloudFront::OriginAccessControl`, so an Origin reads a private Bucket as CloudFront
+- `AWS::CloudFront::OriginAccessControl`, letting an Origin read a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
-The simulator focuses on useful behaviour for tests and local development rather than full CloudFront
+The simulator focuses on useful behaviour for tests and local development, ahead of full CloudFront
 feature parity. Unsupported CloudFront options may be ignored or may throw errors depending on
 whether the simulator needs them to model the requested behaviour safely.
 
@@ -1763,83 +1758,81 @@ whether the simulator needs them to model the requested behaviour safely.
 Where sim CloudFront knowingly behaves differently from AWS:
 
 - **An S3 Origin with no origin access control reads its Bucket anonymously.** That is the unsigned
-  request real CloudFront sends to the S3 REST endpoint without one, so the Bucket policy has to
-  make an Object publicly readable for the Distribution to serve it. A legacy
-  `S3OriginConfig.OriginAccessIdentity` is refused by name rather than read as anonymous: it signs
-  the Origin request as a CloudFront canonical user nothing here models, so a Bucket policy written
-  for one would deny the read and say nothing about why.
-- **A signed Origin request is not really signed.** An Origin whose origin access control signs
+  request real CloudFront sends to the S3 REST endpoint without one. The Bucket policy has to make
+  an Object publicly readable for the Distribution to serve it. A legacy
+  `S3OriginConfig.OriginAccessIdentity` is refused by name. It signs the Origin request as a
+  CloudFront canonical user nothing here models, and a Bucket policy written for one would deny the
+  read in silence.
+- **A signed Origin request carries no signature.** An Origin whose origin access control signs
   reaches the Origin as the `cloudfront.amazonaws.com` service principal carrying the Distribution's
-  ARN, which is what the Bucket policy or the function's resource policy is evaluated against, but
-  no SigV4 signature is computed or checked. A Function URL Origin is told who the request is from
-  at the simulated HTTP boundary instead, the same way anything else calling into simulated AWS in
-  process says who it is. Nothing else here signs a simulated request either, so a test cannot
-  assert anything about the signature itself. The payload hash is the one part of a signature that
+  ARN. That pair is what the Bucket policy or the function's resource policy is evaluated against,
+  and no SigV4 signature is computed or checked. A Function URL Origin is told who the request is
+  from at the simulated HTTP boundary, the same way anything else calling into simulated AWS in
+  process says who it is. No other simulated request is signed here either, and the signature
+  itself is beyond what a test can assert on. The payload hash is the one part of a signature that
   is stated and checked, because a Function URL turns a POST away over it. See
   [posting to a Function URL Origin](#posting-to-a-function-url-origin).
 - **An origin access control signs for an S3 or Lambda Function URL Origin only.** CloudFront also
-  signs for MediaStore and MediaPackage V2 Origins, and neither is modelled. An
+  signs for MediaStore and MediaPackage V2 Origins, and both are left out. An
   `OriginAccessControlOriginType` other than `s3` or `lambda`, or a `SigningProtocol` other than
-  `sigv4`, fails the Stack by naming the value rather than deploying and behaving like one of the
-  two.
-- **An origin access control name is unique, but nothing else about it is checked.** A second one
+  `sigv4`, fails the Stack by naming the value. Neither is quietly treated as one of the two.
+- **An origin access control name is unique, and that is the whole of the checking.** A second one
   claiming a name is refused with `OriginAccessControlAlreadyExists`, as CloudFront refuses one.
-- **There is no command surface for an origin access control.** `CreateOriginAccessControl` and its
-  siblings are not simulated, so `AWS::CloudFront::OriginAccessControl` is the only way to make one.
+- **An origin access control has no command surface.** `CreateOriginAccessControl` and its siblings
+  are absent, and `AWS::CloudFront::OriginAccessControl` is the only way to make one.
 - **A list's `Quantity` is only checked when it is there.** Every CloudFront list carries a count
   alongside its items, and a `Quantity` that disagrees with `Items` is refused with
-  `InconsistentQuantities`, as CloudFront refuses it. A list arriving as a plain array has no count
-  to disagree with, which is the CloudFormation shape, so a template is not checked this way. Nor is
-  a hand-written `{ Items: [...] }` with the count left out: the AWS SDK types make omitting
-  `Quantity` a compile error, so what arrives without one is not the mistake this catches.
-- **`IfMatch` ETags are not checked on a Distribution or a Function.**
-  `UpdateDistributionCommand`, `DeleteDistributionCommand` and `DeleteFunctionCommand` all accept
-  `IfMatch` and ignore it, so neither `PreconditionFailed` nor `InvalidIfMatchVersion` is returned
-  for those. A stale ETag there is a retry rather than a design mistake. The key value store
-  commands are the exception and do check it, because the data API is built around it: two writers
-  racing on one store is the case it exists to catch.
+  `InconsistentQuantities`, as CloudFront refuses it. A list arriving as a plain array, which is the
+  CloudFormation shape, has no count to disagree with, and a template goes unchecked this way. So
+  does a hand-written `{ Items: [...] }` with the count left out. The AWS SDK types make omitting
+  `Quantity` a compile error, so what arrives without one is a different mistake from the one this
+  catches.
+- **`IfMatch` ETags are ignored on a Distribution or a Function.** `UpdateDistributionCommand`,
+  `DeleteDistributionCommand` and `DeleteFunctionCommand` all accept `IfMatch` and ignore it,
+  leaving both `PreconditionFailed` and `InvalidIfMatchVersion` unused there. A stale ETag there
+  costs a retry. The key value store commands are the exception and do check it, because the data
+  API is built around it, and two writers racing on one store is the case it exists to catch.
 - **A key value store has no size quota.** CloudFront caps a store's total size and the length of a
   single key and value, and refuses a write that would exceed either. Nothing here counts against a
-  quota, so `TotalSizeInBytes` is reported but never enforced. A test cannot find out that its data
-  would be too large for a real store.
-- **A key value store association cannot be changed after the Function is created.** There is no
-  `UpdateFunction` here, so the store a Function reads is the one it was created with. Delete the
+  quota, and `TotalSizeInBytes` is reported without being enforced. A test can find out nothing
+  about whether its data would be too large for a real store.
+- **A key value store association is fixed once the Function is created.** There is no
+  `UpdateFunction` here, and the store a Function reads is the one it was created with. Delete the
   Function and create it again to change it.
-- **`ImportSource` is not supported.** `CreateKeyValueStoreCommand` ignores it, and
-  `AWS::CloudFront::KeyValueStore` refuses a Resource carrying one rather than deploying a store that
-  came up empty. Nothing here reads an S3 Object as key data, and a test passing against no data the
-  deploy would have seeded is the failure worth avoiding. Write the keys with `PutKey` or
-  `UpdateKeys` instead.
+- **`ImportSource` is unsupported.** `CreateKeyValueStoreCommand` ignores it, and
+  `AWS::CloudFront::KeyValueStore` refuses a Resource carrying one. Nothing here reads an S3 Object
+  as key data, and deploying an empty store would let a test pass against data the deploy should
+  have seeded. Write the keys with `PutKey` or `UpdateKeys`.
 - **A `Status` Output holds the status at deploy time.** CloudFormation Outputs are resolved once,
   while a new store is still `PROVISIONING`, so `Fn::GetAtt` on `Status` in an Output reads
   `PROVISIONING` even though the store goes on to become `READY`. Read the store itself for its
   current status.
-- **Key listing is not paginated.** `ListKeysCommand` and `ListKeyValueStoresCommand` answer with
-  everything and never set a `NextToken` or `NextMarker`, so a test cannot exercise a paging loop.
-- **A deletion does not wait for the disable to deploy.** Real CloudFront needs the disabled
-  Distribution to reach `Deployed` before it accepts the deletion. Here, `Enabled: false` is enough.
+- **Key listing is unpaginated.** `ListKeysCommand` and `ListKeyValueStoresCommand` answer with
+  everything and never set a `NextToken` or `NextMarker`, leaving a test with no paging loop to
+  exercise.
+- **A deletion goes ahead without waiting for the disable to deploy.** Real CloudFront needs the
+  disabled Distribution to reach `Deployed` before it accepts the deletion. Here, `Enabled: false`
+  is enough.
 - **A disabled Distribution still serves requests.** Real CloudFront answers a disabled Distribution
   with a 403. Only deleting a Distribution stops it serving here.
-- **`DeleteFunctionCommand` never answers `FunctionInUse`.** Nothing tells a CloudFront Function that
-  a cache Behavior has taken it up, so every Function is deletable. A Behavior left pointing at a
+- **`DeleteFunctionCommand` never answers `FunctionInUse`.** A CloudFront Function is never told
+  that a cache Behavior has taken it up, and every Function is deletable. A Behavior left pointing at a
   deleted Function runs no Function code.
-- **A response headers policy name is unique, but nothing else about it is checked.** A second
+- **A response headers policy name is unique, and that is the whole of the checking.** A second
   policy claiming a name is refused with `ResponseHeadersPolicyAlreadyExists`, as CloudFront refuses
   one. The header names and values themselves are stored as written.
-- **There is no command surface for a response headers policy.** `CreateResponseHeadersPolicy` and
-  its siblings are not simulated, so `AWS::CloudFront::ResponseHeadersPolicy` is the only way to make
-  one.
-- **`ServerTimingHeadersConfig` always adds the header once enabled, rather than sampling.**
-  `SamplingRate` decides what share of real responses carry `Server-Timing`; this simulation adds it
-  to every response once `Enabled` is true, so a test asserting on it does not depend on chance. The
-  header's value is a fixed placeholder rather than real timing data, since nothing here measures an
-  Origin fetch the way CloudFront's edge does.
-- **A managed policy ID is not found.** CloudFront's managed policies belong to AWS rather than to a
-  template, so nothing here creates them. A Behavior naming one is refused with
-  `InvalidResponseHeadersPolicyId` when the Distribution is created or updated, the same as real
-  CloudFront refuses one at that point, rather than deploying successfully and only failing the first
-  request that reaches the Behavior.
-- **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront does not
-  model edge caching, so a Behavior's cache policy — including an AWS managed policy such as
-  `CachingOptimized` — is neither validated nor applied to TTLs or the cache key. Every request
-  reaches the Origin regardless of what the policy would have cached on real CloudFront.
+- **A response headers policy has no command surface.** `CreateResponseHeadersPolicy` and its
+  siblings are absent, and `AWS::CloudFront::ResponseHeadersPolicy` is the only way to make one.
+- **`ServerTimingHeadersConfig` always adds the header once enabled.** `SamplingRate` decides what
+  share of real responses carry `Server-Timing`. This simulation adds it to every response once
+  `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
+  fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
+- **A managed policy ID is unknown here.** CloudFront's managed policies belong to AWS, and this
+  simulation creates none of them. A Behavior naming one is refused with
+  `InvalidResponseHeadersPolicyId` when the Distribution is created or updated, the same point real
+  CloudFront refuses one at. The alternative would be a successful deploy that fails the first
+  request reaching the Behavior.
+- **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront models no
+  edge caching. A Behavior's cache policy, including an AWS managed policy such as
+  `CachingOptimized`, is left unvalidated and unapplied to TTLs and the cache key. Every request
+  reaches the Origin, whatever the policy would have cached on real CloudFront.

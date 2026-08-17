@@ -1,20 +1,20 @@
 # Simulated CloudWatch Logs
 
 Yulin includes a simulated Amazon CloudWatch Logs for tests and local development. It holds log
-groups, the streams inside them and the events written to those streams, so a test can put log
-events and read them back with `GetLogEvents` or search them with `FilterLogEvents` without an AWS
+groups, the streams inside them and the events written to those streams. A test can put log events
+and read them back with `GetLogEvents`, or search them with `FilterLogEvents`, without an AWS
 account.
 
-That is what this service is for: making log data addressable. Code that writes to CloudWatch Logs
-is code teams already have, and until now a test could only observe it by capturing process output.
+The point of it is to make log data addressable. Code that writes to CloudWatch Logs is code teams
+already have, and the alternative for a test is capturing process output.
 
 CloudWatch Logs specific types are imported from the `@kensio/yulin/logs` subpath.
 
 ## Writing and searching log events
 
 A log group holds streams, a stream holds events, and `FilterLogEvents` searches across every
-stream in a group. That last part is what makes an assertion practical: the test names the group,
-not the stream, so it does not need to know which execution environment wrote the line.
+stream in a group. A test can therefore name the group and leave the stream out, without knowing
+which execution environment wrote the line.
 
 ```typescript sim-logs-write-and-search
 /**
@@ -66,13 +66,13 @@ const found = await logs.filterLogEvents(
 console.log(found.events?.length, found.events?.[0]?.logStreamName);
 ```
 
-Neither the group nor the stream is created on the way. Real CloudWatch Logs refuses a write to
-either one that is not there, which is what makes a missing `logs:CreateLogStream` permission show
-up as a failure rather than as logs that quietly never appear.
+A write needs both the group and the stream to exist already. Real CloudWatch Logs refuses a write
+to either one that is absent. A missing `logs:CreateLogStream` permission therefore shows up as a failure, where
+otherwise the logs would quietly never appear.
 
 ## Filter patterns
 
-The plain text filter pattern syntax is supported: terms are matched as case sensitive substrings,
+The plain text filter pattern syntax is supported. Terms are matched as case sensitive substrings,
 every unprefixed term must appear, a `-` prefix excludes a term, a `?` prefix makes a term one of a
 set of alternatives, and a quoted phrase matches with its spaces intact.
 
@@ -86,26 +86,25 @@ set of alternatives, and a quoted phrase matches with its spaces intact.
 
 An omitted or empty pattern matches everything.
 
-The structured pattern syntaxes are refused rather than approximated. A JSON property pattern
-(`{ $.level = "ERROR" }`), a space delimited field pattern (`[level=ERROR, message]`) and a regular
-expression term (`%ERROR|WARN%`) each raise `SimLogsUnsupportedOperationException`. That is
-deliberate: a pattern quietly treated as matching everything would turn an assertion about one log
-line into an assertion about any log line at all, and the test would keep passing while testing
-nothing.
+The structured pattern syntaxes are refused. A JSON property pattern (`{ $.level = "ERROR" }`), a
+space delimited field pattern (`[level=ERROR, message]`) and a regular expression term
+(`%ERROR|WARN%`) each raise `SimLogsUnsupportedOperationException`. Approximating one would be
+worse. A pattern quietly treated as matching everything would turn an assertion about one log line
+into an assertion about any log line at all, and the test would keep passing while testing nothing.
 
 ## Reading one stream
 
 `GetLogEvents` reads a single stream and pages in both directions. With no token it answers with
-the newest events, as real CloudWatch Logs does; `startFromHead` starts at the oldest instead.
-Following `nextForwardToken` walks towards newer events, and reaching the end gives the same token
-back rather than nothing, so a caller polling a stream keeps it and asks again.
+the newest events, as real CloudWatch Logs does. `startFromHead` starts at the oldest. Following
+`nextForwardToken` walks towards newer events, and reaching the end gives the same token back. A
+caller polling a stream keeps it and asks again.
 
-Both readers narrow to a half open time window: an event whose timestamp equals `startTime` is
-included, and one whose timestamp equals `endTime` is not.
+Both readers narrow to a half open time window. An event whose timestamp equals `startTime` is
+included, and one whose timestamp equals `endTime` is left out.
 
 A token is an offset into the events the request selected, so keep `startTime` and `endTime` the
-same across a walk. Changing the window part-way through means the offset is counted against a
-different set of events, and the page you get back will not be the one you expected.
+same across a walk. Changing the window part-way through counts the offset against a different set
+of events, and the page comes back as a different page.
 
 ```typescript sim-logs-read-a-stream
 /**
@@ -167,13 +166,13 @@ console.log(read);
 
 ## Retention
 
-Retention is held as a property to assert on. Nothing expires here: a test would have to move the
-clock by months to see an event go, and what teams get wrong about retention is the value they
-deployed rather than the deletion that eventually follows from it. A log group with no retention
-keeps its events forever, which is the AWS default.
+Retention is held as a property to assert on. Events stay where they are, and seeing one go would
+mean moving the clock by months. What teams get wrong about retention is the value they deployed,
+ahead of the deletion that eventually follows from it. A log group with no retention keeps its
+events forever, the AWS default.
 
-The set of accepted values is fixed rather than a range, so a reasonable-looking
-`retentionInDays: 10` is refused here exactly as it is by an account.
+The accepted values are a fixed set. A reasonable-looking `retentionInDays: 10` is refused here
+exactly as it is by an account.
 
 ```typescript sim-logs-retention
 /**
@@ -211,9 +210,8 @@ console.log(
 
 ## Lambda handler output
 
-A zip-packaged Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs,
-so a test can assert on what a handler logged by searching its log group rather than by capturing
-process output.
+A zip-packaged Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs.
+A test can then assert on what a handler logged by searching its log group.
 
 ```typescript sim-logs-lambda-output
 /**
@@ -258,23 +256,23 @@ console.log(found.events?.[0]?.message);
 ```
 
 The output still reaches the terminal as well. Real Lambda sends it to CloudWatch Logs and nowhere
-else, but a test tool that swallowed it would make a failing test harder to debug than it is with
-none of this, so recording is a tee rather than a redirect.
+else, but a test tool that swallowed it would make a failing test harder to debug. Recording is a
+tee.
 
 Each invocation's `context.logGroupName` and `context.logStreamName` name the group and stream that
-were actually written to. Stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format, and the
-hash identifies the execution environment rather than the request, so a test should match the shape
-rather than the value.
+were actually written to. Stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format. The hash
+identifies the execution environment, and one environment serves more than one request. Match the
+shape in a test, and leave the value alone.
 
-Nothing is authorized on this path. A real function needs `logs:CreateLogGroup` and
+Writing on this path is unconditional. A real function needs `logs:CreateLogGroup` and
 `logs:PutLogEvents` on its execution Role, and one without them produces no logs at all, in silence.
-Simulating that would mean nearly every function in a test logged nothing with no failure to explain
-why, so writing here is unconditional.
+Simulating that would leave nearly every function in a test logging nothing, with no failure to
+explain why.
 
 ## Declaring a log group in a template
 
-`AWS::Logs::LogGroup` is deployed by simulated CloudFormation, so a test can assert on the retention
-a stack gave a group rather than reading it off the template.
+`AWS::Logs::LogGroup` is deployed by simulated CloudFormation. A test can then assert on the
+retention a stack gave a group.
 
 ```yaml
 OrdersLogs:
@@ -284,32 +282,29 @@ OrdersLogs:
     RetentionInDays: 14
 ```
 
-`Ref` resolves to the log group name and `Fn::GetAtt Arn` to the ARN with its trailing `:*`, which is
-the form a policy has to name, so a template granting a function permission on its own log group
-gets a resource that reaches the streams inside it.
+`Ref` resolves to the log group name, and `Fn::GetAtt Arn` to the ARN with its trailing `:*`. That is
+the form a policy has to name. A template granting a function permission on its own log group gets a
+resource that reaches the streams inside it.
 
 `LogGroupName` and `RetentionInDays` are the two properties acted on. A `RetentionInDays` outside the
-set AWS accepts fails the deploy, which is the point: it would otherwise only be found on a real one.
-Everything else is recorded as an ignored property rather than refused, so a reader can see what a
-deployed group is not doing without a whole stack failing over a property that changes nothing about
-what the test asserts.
+set AWS accepts fails the deploy, where otherwise it would only be found on a real one. Everything
+else is recorded as an ignored property. A reader can see what a deployed group leaves out, and the
+stack still deploys.
 
-Two divergences are worth knowing about:
+Two divergences to know about:
 
-- **A group that already exists is taken over rather than refused.** Real CloudFormation fails a
-  deploy that declares a log group already in the account. That is a genuine misconfiguration there
-  and pure noise here, where a Lambda function that logged during test setup has already created
-  `/aws/lambda/orders`.
-- **An update replaces the group rather than changing it in place.** Simulated CloudFormation has no
-  in-place update at all: any resource whose template entry changed is deleted and created again. The
-  retention ends up correct, but the events the group held are gone, where a real update to
-  `RetentionInDays` keeps them.
+- **A group that already exists is taken over.** Real CloudFormation fails a deploy that declares a
+  log group already in the account. That is a genuine misconfiguration there and pure noise here,
+  where a Lambda function that logged during test setup has already created `/aws/lambda/orders`.
+- **An update replaces the group.** Simulated CloudFormation has no in-place update at all. Any
+  resource whose template entry changed is deleted and created again. The retention ends up correct,
+  but the events the group held are gone, where a real update to `RetentionInDays` keeps them.
 
 ## Subscription filters
 
-A subscription filter delivers the events matching its pattern to a Lambda function, so the code a
-team wrote to forward log lines to an error tracker or a metrics sink can be tested against the
-handler it forwards from.
+A subscription filter delivers the events matching its pattern to a Lambda function. Code written to
+forward log lines to an error tracker or a metrics sink can be tested against the handler it
+forwards from.
 
 ```typescript sim-logs-subscription-filter
 /**
@@ -406,38 +401,38 @@ await simAws.backgroundTasksComplete();
 console.log(received);
 ```
 
-The payload is the real one: an `awslogs.data` field holding the base64 of a gzipped JSON document
+The payload is the real one. An `awslogs.data` field holds the base64 of a gzipped JSON document
 with `messageType`, `owner`, `logGroup`, `logStream`, `subscriptionFilters` and `logEvents`. A
 handler written against a real subscription decodes it unchanged.
 
-A few things are worth knowing:
+The behaviour in detail:
 
-- **Delivery is asynchronous.** `PutLogEvents` is answered before anything is delivered, so a test
-  waits with `await simAws.backgroundTasksComplete()`. A destination that throws does not fail the
-  write that triggered it.
-- **A failed delivery is kept.** Real CloudWatch Logs tells nobody when a delivery fails; it becomes
-  a metric nobody is watching. `simAws.logs().subscriptionFailures` holds them, so a test can find
-  out that the subscription it set up never reached anything.
-- **The destination is checked when the filter is put.** A function that has not granted
+- **Delivery is asynchronous.** `PutLogEvents` is answered before anything is delivered. A test
+  waits with `await simAws.backgroundTasksComplete()`. A destination that throws leaves the write
+  that triggered it alone.
+- **A failed delivery is kept.** Real CloudWatch Logs tells nobody when a delivery fails, and it
+  becomes a metric nobody is watching. `simAws.logs().subscriptionFailures` holds them. A test can
+  find out that the subscription it set up never reached anything.
+- **The destination is checked when the filter is put.** A function that has yet to grant
   `logs.<region>.amazonaws.com` permission to invoke it fails `PutSubscriptionFilter`, as it does in
-  an account, rather than leaving a filter that silently drops every event. The resource policy is
-  consulted again on every delivery, so a permission removed later stops delivery too.
+  an account. The alternative would be a filter that silently drops every event. The resource policy
+  is consulted again on every delivery, and a permission removed later stops delivery too.
 - **What a Lambda function logged is delivered as well.** A subscription on `/aws/lambda/orders`
-  picks up what that function wrote, so a forwarder can be tested against a real handler's output.
+  picks up what that function wrote. A forwarder can be tested against a real handler's output.
 - **Lambda is the only destination.** Kinesis, Firehose and cross-account destinations are refused
-  rather than accepted and never delivered to.
-- **Two filters per log group**, which is the current AWS account default.
+  outright.
+- **Two filters per log group**, the current AWS account default.
 
 ## Permissions
 
 Every operation goes through simulated IAM. An operation on a named log group authorizes against
-that group's ARN with the trailing `:*`, which is the form CloudWatch Logs policies are written in:
-granting `logs:PutLogEvents` on a group grants it on the streams inside, and the wildcard is what
-covers them. A policy naming `log-group:/aws/lambda/orders` without it reaches nothing here, exactly
-as it reaches nothing on real AWS.
+that group's ARN with the trailing `:*`. That is the form CloudWatch Logs policies are written in.
+Granting `logs:PutLogEvents` on a group grants it on the streams inside, and the wildcard is what
+covers them. A policy naming `log-group:/aws/lambda/orders` without it reaches no stream here,
+exactly as on real AWS.
 
-`DescribeLogGroups` names no particular group, so it authorizes against every log group in the
-account and region. A policy scoped to one group cannot describe them all.
+`DescribeLogGroups` names no particular group. It authorizes against every log group in the account
+and region, and a policy scoped to one group cannot describe them all.
 
 ```typescript sim-logs-permissions
 /**
@@ -510,7 +505,7 @@ console.log(simAws.logs().findLogGroup(logGroupName)?.logGroupArn);
 ## Through an intercepted SDK client
 
 Application code that constructs its own `CloudWatchLogsClient` reaches the simulator through SDK
-interception, with nothing to change in the code under test.
+interception, with the code under test unchanged.
 
 ```typescript sim-logs-sdk-interception
 /**
@@ -540,19 +535,19 @@ const described = await client.send(new DescribeLogGroupsCommand({}));
 console.log(described.logGroups?.[0]?.logGroupArn);
 ```
 
-## What is not simulated
+## Limitations
 
-- **Nothing expires.** Retention is stored and reported, never acted on.
+- **Events never expire.** Retention is stored and reported, never acted on.
 - **Metric filters.** Absent, so `metricFilterCount` is always zero.
-- **Subscription filter destinations other than Lambda**, and `Distribution`, which is accepted and
-  reported but changes nothing because there are no shards to spread across.
+- **Subscription filter destinations other than Lambda**, and `Distribution`. `Distribution` is
+  accepted and reported, and with no shards to spread across it has no effect.
 - **`AWS::Logs::SubscriptionFilter` and `AWS::Logs::MetricFilter`.** `AWS::Logs::LogGroup` is the
-  only CloudFormation resource type here; the others are recorded as gaps.
+  only CloudFormation resource type here, and the others are recorded as gaps.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
-  `kmsKeyId` on `CreateLogGroup` are refused rather than dropped, so nothing looks set here and
-  behaves differently in an account.
-- **Per-stream `storedBytes`.** Always zero, which matches real CloudWatch Logs: it stopped
-  reporting the figure per stream in 2019. `DescribeLogGroups` reports the bytes a group holds.
+  `kmsKeyId` on `CreateLogGroup` are refused outright. A property cannot look set here and behave
+  differently in an account.
+- **Per-stream `storedBytes`.** Always zero, matching real CloudWatch Logs, which stopped reporting
+  the figure per stream in 2019. `DescribeLogGroups` reports the bytes a group holds.
 - **Log capture from anything but zip-packaged Lambda code.** A function backed by a handler
   function reference, including a container image binding, writes to the host console directly and
   is not recorded. See the Lambda docs for why.

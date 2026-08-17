@@ -1,8 +1,8 @@
 # Simulated CloudWatch metrics and alarms
 
 Yulin includes a simulated Amazon CloudWatch for tests and local development. It holds custom
-metrics: the datapoints `PutMetricData` publishes, and the statistics `GetMetricStatistics` and
-`GetMetricData` read back from them, without an AWS account. It also holds alarms over those
+metrics. Those are the datapoints `PutMetricData` publishes, and the statistics
+`GetMetricStatistics` and `GetMetricData` read back from them, without an AWS account. It also holds alarms over those
 metrics, which evaluate on the simulation's clock and notify an SNS topic when they change state.
 
 Code that publishes a business metric is code teams already have, and until now the only way to test
@@ -69,23 +69,23 @@ A datum may state its values as a plain `Value`, as a `StatisticValues` summary,
 matching `Counts`. All three answer the same statistics, and a metric published one way reads back
 like a metric published another.
 
-Values are checked the way real CloudWatch checks them: within -2^360 to 2^360, never `NaN` or an
-infinity, at most 150 unique values in one datum, and `Counts` only alongside the `Values` it
-counts. `Unit` is the closed `StandardUnit` set, not free text, on the way in and on the way out. A
-query naming a unit CloudWatch lacks fails here as it would in an account.
+Values are checked the way real CloudWatch checks them. A value sits within -2^360 to 2^360, is
+never `NaN` or an infinity, runs to at most 150 unique values in one datum, and carries `Counts`
+only alongside the `Values` it counts. `Unit` is the closed `StandardUnit` set on the way in and on
+the way out. A query naming a unit CloudWatch lacks fails here as it would in an account.
 
 ## Metrics are identified by their dimensions
 
 Real CloudWatch leaves a custom metric unrolled across its dimensions, and so does this. The same
-metric name published under two channels is two metrics, and a read naming no dimensions reaches the
-metric that was published with none, not the total of all of them.
+metric name published under two channels is two metrics. A read naming no dimensions reaches only the
+metric that was published with none, and never aggregates across the others.
 
 That is the behaviour teams most often get wrong, and it is worth a test of its own. A dashboard
 query written against a metric name alone finds nothing at all if every publish carried a dimension.
 
 ## Metrics and simulated time
 
-A datum carrying no `Timestamp` is stamped from the simulation's clock, not the host's. A test with
+A datum carrying no `Timestamp` is stamped from the simulation's clock. A test with
 a frozen clock therefore gets timestamps it can assert on exactly, and one that moves time on gets
 datapoints in the period it moved to:
 

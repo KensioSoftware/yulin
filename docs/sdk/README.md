@@ -10,8 +10,8 @@ tests.
 ## How it works
 
 `SimSdk` replaces the `send` method of an intercepted SDK client. Each sent Command is routed by
-name to the matching operation of a simulated AWS service, and the result is returned to the
-caller as a normal SDK response. Nothing touches the network.
+name to the matching operation of a simulated AWS service, and the result comes back to the caller
+as a normal SDK response. Every Command is served in process.
 
 Every `SimSdk` owns a simulated AWS environment. You can let it create its own, or give it an
 existing one to share:
@@ -62,25 +62,25 @@ You can intercept a client class or a client instance:
 
 - **A class** (`simSdk.intercept(S3Client)`) intercepts every instance of it, including instances
   the code under test constructs later. This is the most common choice.
-- **An instance** (`simSdk.intercept(s3Client)`) intercepts only that instance, which is useful
-  when a specific client should hit the simulator while others are handled differently.
+- **An instance** (`simSdk.intercept(s3Client)`) intercepts only that instance. Use it when one
+  client should hit the simulator and the others are handled some other way.
 
-A client can only have one interception at a time: intercepting an already-intercepted client
-throws a diagnostic error rather than silently replacing the existing interception.
+A client can only have one interception at a time. Intercepting an already-intercepted client
+throws a diagnostic error, and the existing interception stays in place.
 
 ## Account and Region scope
 
-The simulated Account and Region scope is resolved for each sent Command, never fixed per client:
+Each sent Command resolves its own simulated Account and Region scope:
 
 1. The **Region** comes from the sending client's own configuration, such as
    `new S3Client({ region: "eu-west-2" })`, falling back to the simulation default.
 2. The **Account** comes from the ambient `simAws.runAs(...)` caller when one is set, falling back
    to the simulation default Account.
 
-The resolved caller is passed through to the simulated service, so simulated
-[IAM](../services/iam/) authorization applies to it exactly as for direct sim service use: a
-caller without permission for a Command is denied, like real AWS. When no caller can be
-identified, Commands run as the simulation's default Account root.
+The resolved caller reaches the simulated service, and simulated [IAM](../services/iam/)
+authorization applies to it exactly as it does for direct sim service use. A caller without
+permission for a Command is denied, as on real AWS. Where no caller can be identified, Commands run
+as the simulation's default Account root.
 
 `runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent during
 the run are attributed to that caller, with no changes to the client or the code under test:
@@ -151,17 +151,17 @@ await simAws.runAs(
 simSdk.restoreAll();
 ```
 
-The ambient caller is scoped to its own `SimAws` instance, so separate simulations in the same
-process never observe each other's callers.
+The ambient caller belongs to its own `SimAws` instance. Separate simulations in the same process
+each keep their own.
 
 ## Restoring interception
 
 Restoring puts back the client's real SDK `send`:
 
-- `interception.restore()` restores one interception; `simSdk.intercept(...)` returns the handle.
+- `interception.restore()` restores one interception. `simSdk.intercept(...)` returns the handle.
 - `simSdk.restoreAll()` restores everything intercepted through that `SimSdk`.
-- `SimSdk` and interception handles are disposable, so `using simSdk = new SimSdk();` restores
-  automatically at the end of the scope, which is convenient in tests.
+- `SimSdk` and interception handles are disposable. `using simSdk = new SimSdk();` restores
+  automatically at the end of the scope.
 
 ## Choosing Commands to intercept
 
@@ -172,10 +172,10 @@ throw a diagnostic error.
 
 ## The DynamoDB document client
 
-`@aws-sdk/lib-dynamodb` lets application code write `{ id: "a", count: 1 }` rather than
-`{ id: { S: "a" }, count: { N: "1" } }`. Intercept the document client and its Commands reach
-simulated DynamoDB with the values converted, so code written against it needs no changes to run
-against the simulator.
+`@aws-sdk/lib-dynamodb` takes plain JavaScript values. Application code writes
+`{ id: "a", count: 1 }` where the base client wants `{ id: { S: "a" }, count: { N: "1" } }`.
+Intercept the document client and its Commands reach simulated DynamoDB with the values already
+converted. Code written against the document client runs against the simulator unchanged.
 
 ```typescript sim-sdk-document-client
 /**
@@ -228,17 +228,16 @@ console.log(read.Item?.["total"]); // 42
 console.log(read.Item?.["paid"]); // true
 ```
 
-`DynamoDBDocumentClient.from(client)` builds a separate object rather than wrapping the client in
-place, and that object is not an instance of `DynamoDBClient`. Intercepting the base client
-therefore does nothing for Commands sent through the document client. Intercept the document
-client. Both can be intercepted at once, and they reach the same simulated tables, since the
-document client shares the base client's config and so resolves the same Account and Region.
+`DynamoDBDocumentClient.from(client)` builds a separate object of its own class. Intercepting the
+base client therefore leaves Commands sent through the document client alone. Intercept the
+document client. Both can be intercepted at once, and they reach
+the same simulated tables, since the document client shares the base client's config and so
+resolves the same Account and Region.
 
 The real document client converts values in middleware, which runs inside the `send` that
 interception replaces. So the conversion happens at the interception boundary instead, using the
-option defaults `lib-dynamodb` sets rather than the `util-dynamodb` ones. Which native types map to
-which descriptors is in
-[the sim DynamoDB docs](../services/dynamodb/README.md#the-document-client).
+option defaults `lib-dynamodb` sets (not the `util-dynamodb` ones). Which native types map to which
+descriptors is in [the sim DynamoDB docs](../services/dynamodb/README.md#the-document-client).
 
 ## Supported services and Commands
 
@@ -248,7 +247,7 @@ EventBridge, EventBridge Scheduler, IAM, KMS, Lambda, Rekognition, Route53, S3, 
 SES, SNS, SQS, SSM and STS. Each service's own docs under
 [docs/services](../services/) list the Commands it simulates.
 
-Both kinds of gap are refused on send rather than misbehaving silently, with a different error each:
+A gap in that coverage is refused on send, with a different error for each kind:
 
 - A Command the simulated service doesn't support throws `SimSdkUnsupportedCommandError`, naming the
   Command and listing the Commands that service does support.
@@ -258,14 +257,14 @@ Both kinds of gap are refused on send rather than misbehaving silently, with a d
 ## Limitations
 
 - Only `client.send(command)` is intercepted. SDK utilities that bypass `send`, such as
-  `getSignedUrl`, see nothing of interception. Paginators and waiters go through `send`, so they
-  work. Presigning needs no interception: point the client at the simulated endpoint instead, as
+  `getSignedUrl`, run against real AWS. Paginators and waiters go through `send`, so they work. Presigning works without interception. Point the client at the simulated endpoint, as
   [the sim S3 presigned URL docs](../services/s3/README.md#presigned-urls) show.
 - Simulated errors carry SDK-shaped `name` and `$metadata`, but are not instances of the real SDK
-  exception classes: match errors with `error.name`, not `instanceof`.
-- The callback form of `send(command, callback)` is not supported; use the promise form.
+  exception classes. Match an error by its `error.name`. An `instanceof` check against the SDK class
+  fails.
+- The callback form of `send(command, callback)` is not supported. Use the promise form.
 - The translate config a document client is built with,
-  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`, is not read. The
-  conversion always uses the defaults, so `removeUndefinedValues: true` in particular does not
-  apply: an `undefined` attribute is refused here where AWS would have dropped it. The refusal names
+  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`, is ignored. The
+  conversion always uses the defaults. `removeUndefinedValues: true` in particular has no effect
+  here, and an `undefined` attribute is refused where AWS would have dropped it. The refusal names
   the attribute and says so.
