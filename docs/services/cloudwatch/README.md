@@ -5,12 +5,12 @@ metrics: the datapoints `PutMetricData` publishes, and the statistics `GetMetric
 `GetMetricData` read back from them, without an AWS account. It also holds alarms over those
 metrics, which evaluate on the simulation's clock and notify an SNS topic when they change state.
 
-That is what this service is for. Code that publishes a business metric is code teams already have,
-and until now the only way to test it was to assert that the SDK client had been called, which
-proves the call was made and nothing about what it measured.
+Code that publishes a business metric is code teams already have, and until now the only way to test
+it was to assert that the SDK client had been called. That proves the call was made. What it
+measured goes untested.
 
-Only custom metrics live here. Nothing in this simulation publishes into the `AWS/` namespaces, so a
-query for `AWS/Lambda` `Invocations` finds nothing rather than a number that was never measured.
+Only custom metrics live here. This simulation publishes into no `AWS/` namespace. A query for
+`AWS/Lambda` `Invocations` comes back empty, in place of a number that was never measured.
 
 CloudWatch specific types are imported from the `@kensio/yulin/cloudwatch` subpath.
 
@@ -66,28 +66,27 @@ console.log(read.Datapoints?.at(0)?.Sum);
 ```
 
 A datum may state its values as a plain `Value`, as a `StatisticValues` summary, or as `Values` with
-matching `Counts`. All three answer the same statistics, so a metric published one way reads back
+matching `Counts`. All three answer the same statistics, and a metric published one way reads back
 like a metric published another.
 
 Values are checked the way real CloudWatch checks them: within -2^360 to 2^360, never `NaN` or an
-infinity, at most 150 unique values in one datum, and `Counts` only alongside the `Values` it counts.
-`Unit` is the closed `StandardUnit` set rather than free text, on the way in and on the way out, so a
-query naming a unit CloudWatch does not have fails here as it would in an account rather than
-quietly matching nothing.
+infinity, at most 150 unique values in one datum, and `Counts` only alongside the `Values` it
+counts. `Unit` is the closed `StandardUnit` set, not free text, on the way in and on the way out. A
+query naming a unit CloudWatch lacks fails here as it would in an account.
 
 ## Metrics are identified by their dimensions
 
-Real CloudWatch does not roll a custom metric up across its dimensions, and neither does this. The
-same metric name published under two channels is two metrics, and a read naming no dimensions
-reaches the metric that was published with none rather than the total of all of them.
+Real CloudWatch leaves a custom metric unrolled across its dimensions, and so does this. The same
+metric name published under two channels is two metrics, and a read naming no dimensions reaches the
+metric that was published with none, not the total of all of them.
 
-That is the behaviour teams most often get wrong, so it is worth a test of its own: a dashboard
+That is the behaviour teams most often get wrong, and it is worth a test of its own. A dashboard
 query written against a metric name alone finds nothing at all if every publish carried a dimension.
 
 ## Metrics and simulated time
 
-A datum carrying no `Timestamp` is stamped from the simulation's clock, not the host's. A test with a
-frozen clock therefore gets timestamps it can assert on exactly, and one that moves time on gets
+A datum carrying no `Timestamp` is stamped from the simulation's clock, not the host's. A test with
+a frozen clock therefore gets timestamps it can assert on exactly, and one that moves time on gets
 datapoints in the period it moved to:
 
 ```typescript sim-cloudwatch-simulated-time
@@ -146,9 +145,9 @@ window drops a metric out of the listing without anything having to expire it.
 
 ## Alarms
 
-An alarm watches one metric and changes state on the simulation's clock. Nothing here uses a real
-timer: each evaluation is scheduled at the next period boundary, so a frozen clock evaluates nothing
-and advancing time by twenty minutes walks twenty one-minute evaluations and settles before the next
+An alarm watches one metric and changes state on the simulation's clock, with no real timer behind
+it. Each evaluation is scheduled at the next period boundary. A frozen clock evaluates nothing, and
+advancing time by twenty minutes walks twenty one-minute evaluations and settles before the next
 line of the test runs.
 
 ```typescript sim-cloudwatch-alarm
@@ -209,22 +208,22 @@ console.log(described.MetricAlarms?.at(0)?.StateValue);
 ```
 
 A new alarm is in `INSUFFICIENT_DATA` until it has evaluated a period, as on real CloudWatch. The
-window it looks back over reaches behind the moment the alarm was created, so an alarm over a metric
-nothing publishes into, with `TreatMissingData: "breaching"`, fires on its first evaluation rather
-than waiting for the periods to accumulate. That is what an account does too.
+window it looks back over reaches behind the moment the alarm was created. An alarm over a metric
+nothing publishes into, with `TreatMissingData: "breaching"`, therefore fires on its first
+evaluation, without waiting for the periods to accumulate. That is what an account does too.
 
 ### Reaching a subscriber
 
-An alarm notifies through the ordinary `Publish` path, so a notification fans out to the topic's
+An alarm notifies through the ordinary `Publish` path. A notification fans out to the topic's
 subscriptions exactly as an SDK caller's message would, with the JSON body real CloudWatch sends:
 `AlarmName`, `NewStateValue`, `OldStateValue`, `NewStateReason`, `StateChangeTime` and `Trigger`.
-Only a change fires anything, so an alarm that stays in `ALARM` across ten periods notifies once.
+Only a change fires anything, and an alarm that stays in `ALARM` across ten periods notifies once.
 
-`SetAlarmState` forces a transition and fires its actions, which is how a test exercises a
-subscriber without arranging for a metric to breach at all.
+`SetAlarmState` forces a transition and fires its actions. That is how a test exercises a subscriber
+without arranging for a metric to breach at all.
 
 The topic has to be in the same account and region as the alarm, as real CloudWatch requires. An
-action that reaches nothing is recorded rather than passing quietly:
+action that lands nowhere is recorded, never passed over quietly:
 
 ```typescript sim-cloudwatch-alarm-failures
 /**
@@ -241,25 +240,26 @@ for (const failure of simAws.cloudWatch().alarmActionFailures) {
 }
 ```
 
-Real CloudWatch tells nobody when an alarm action fails, and neither does this: the alarm changes
-state either way. Keeping the failure is what stops a subscriber's queue being mysteriously empty.
+Real CloudWatch tells nobody when an alarm action fails, and this tells nobody either. The alarm
+changes state regardless. Keeping the failure is what stops a subscriber's queue being mysteriously
+empty.
 
 ### What an alarm can watch and do
 
 - The four threshold comparison operators, `DatapointsToAlarm` for M-of-N evaluation, and all four
   `TreatMissingData` treatments including `ignore`, which leaves the alarm where it is.
-- `ActionsEnabled: false` still evaluates and records state; it just publishes nothing.
+- `ActionsEnabled: false` still evaluates and records state. It just publishes no notification.
 - `DescribeAlarmHistory` reports the state changes with the simulated time each happened at.
 - An SNS topic ARN is the only action target. Auto Scaling, EC2, Systems Manager and Lambda actions
-  are refused rather than stored and ignored, because an alarm that fired and did nothing would let
-  a test pass while the thing the alarm exists to do never happened.
+  are refused, never stored and ignored, because an alarm that fired into nowhere would let a test
+  pass while the thing the alarm exists to do never happened.
 - Composite alarms, anomaly detection and metric math alarms are all refused.
 
 ## Declaring an alarm in a template
 
 Alarms are nearly always declared in infrastructure rather than created through the SDK, so
 `AWS::CloudWatch::Alarm` is deployed by simulated CloudFormation. The alarm a stack creates is the
-same thing `PutMetricAlarm` creates: it evaluates on the clock, fires on a transition, and refuses
+same thing `PutMetricAlarm` creates. It evaluates on the clock, fires on a transition, and refuses
 what the command refuses.
 
 ```yaml
@@ -280,37 +280,38 @@ OrdersFailing:
 ```
 
 `Ref` resolves to the alarm name and `Fn::GetAtt Arn` to the alarm ARN. An `AlarmActions` entry
-holding a `Ref` to an `AWS::SNS::Topic` in the same stack resolves to that topic's ARN, so a test can
+holding a `Ref` to an `AWS::SNS::Topic` in the same stack resolves to that topic's ARN. A test can
 deploy the stack, publish a breaching datapoint, advance the clock and read the notification off
 whatever is subscribed. Deleting the stack deletes the alarm and takes its scheduled evaluation back
 off the clock with it.
 
-`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID, so a
-test still has a name to pass to `DescribeAlarms`. Real CloudFormation generates a physical ID of the
-same shape with a random tail on the end, which is left off here so the name is one a test can
+`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID. A test
+still has a name to pass to `DescribeAlarms`. Real CloudFormation generates a physical ID of the
+same shape with a random tail on the end. The tail is left off here, so the name is one a test can
 predict.
 
-These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnabled`, `AlarmActions`,
-`OKActions`, `InsufficientDataActions`, `Namespace`, `MetricName`, `Dimensions`, `Statistic`, `Unit`,
-`Period`, `EvaluationPeriods`, `DatapointsToAlarm`, `Threshold`, `ComparisonOperator` and
-`TreatMissingData`.
+These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnabled`,
+`AlarmActions`, `OKActions`, `InsufficientDataActions`, `Namespace`, `MetricName`, `Dimensions`,
+`Statistic`, `Unit`, `Period`, `EvaluationPeriods`, `DatapointsToAlarm`, `Threshold`,
+`ComparisonOperator` and `TreatMissingData`.
 
 `Metrics`, `ThresholdMetricId`, `ExtendedStatistic` and `EvaluateLowSampleCountPercentile` are
-refused, in the same words `PutMetricAlarm` refuses them with: each of them changes what the alarm
-watches or how it decides, so an alarm deployed with one ignored would sit in a test looking
-configured and evaluating something else.
+refused, in the same words `PutMetricAlarm` refuses them with. Each of them changes what the alarm
+watches or how it decides. An alarm deployed with one ignored would sit in a test looking configured
+and evaluating something else.
 
-`Tags` is the one difference from the command, which refuses it. Real CloudFormation does tag the
-alarm it creates, and nothing here does: a template's tags are usually the whole stack's rather than
-the alarm's, so they are recorded as an ignored property instead of taking the deploy down. Nothing
-reads them back, so an alarm deployed with tags behaves as though the template had never named them.
+`Tags` is the one difference from the command, which refuses it outright. Real CloudFormation tags
+the alarm it creates, and this leaves the alarm untagged. A template's tags are usually the whole
+stack's rather than the alarm's, and they are recorded as an ignored property, leaving the deploy
+standing. Nothing reads them back either. An alarm deployed with tags behaves as though the template
+had never named them.
 
 `AWS::CloudWatch::CompositeAlarm`, `AWS::CloudWatch::Dashboard` and
-`AWS::CloudWatch::AnomalyDetector` are not deployed, and are recorded as gaps in the stack.
+`AWS::CloudWatch::AnomalyDetector` are left undeployed, and recorded as gaps in the stack.
 
 ## Permissions
 
-CloudWatch metrics have no ARN, so there is nothing for a policy to name: every metric action here is
+CloudWatch metrics have no ARN, leaving a policy nothing to name. Every metric action here is
 granted on `*`. A policy written against something like
 `arn:aws:cloudwatch:eu-west-2:111111111111:metric/Orders/Failed` reaches nothing, here and in an
 account.
@@ -392,28 +393,28 @@ await simAws.cloudWatch().putMetricData(
 - `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
   down with the stack.
 
-## What is not, and how it says so
+## What is refused, and how it says so
 
-Anything real CloudWatch would accept and this does not carry out is refused with a message saying
-so, rather than accepted and ignored. A silently dropped filter is worse than a failure, because the
+Anything real CloudWatch would accept and this leaves undone is refused with a message saying so,
+rather than accepted and ignored. A silently dropped filter is worse than a failure, because the
 test still passes and no longer means what it says.
 
 - **Composite and anomaly detection alarms.** `Metrics` and `ThresholdMetricId` on `PutMetricAlarm`
-  are refused; there is no trained model here for an anomaly band to come from.
+  are refused. There is no trained model here for an anomaly band to come from.
 - **Metric math.** A `GetMetricData` query carrying an `Expression` is refused.
 - **Percentiles and other extended statistics.** They need the individual values behind a period,
   which a `StatisticValues` datum never carries, so CloudWatch itself cannot report one for a metric
   published that way.
-- **High-resolution metrics.** `StorageResolution: 1` is refused; every period here is a whole
+- **High-resolution metrics.** `StorageResolution: 1` is refused. Every period here is a whole
   number of minutes.
-- **`MaxDatapoints`.** Real CloudWatch answers it by widening the period, and every result here comes
-  back at the period its query asked for.
-- **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused; there is no
+- **`MaxDatapoints`.** Real CloudWatch answers it by widening the period, and every result here
+  comes back at the period its query asked for.
+- **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused. There is no
   monitoring account.
 - **Metrics AWS publishes.** No simulated service writes its own `AWS/` metrics.
 
-Two divergences are deliberate rather than refusals. Real CloudWatch rejects a datapoint more than
-two weeks old or more than two hours in the future, and this accepts any timestamp, so that a test
-can seed a window without arranging the clock around it. And datapoints come back earliest first,
-which real CloudWatch's contract permits but does not promise, because a test reading the third
-period of five needs an order it can rely on.
+Two divergences are deliberate, and not refusals. Real CloudWatch rejects a datapoint more than two
+weeks old or more than two hours in the future, and this accepts any timestamp, letting a test seed
+a window without arranging the clock around it. And datapoints come back earliest first, which real
+CloudWatch's contract permits without promising, because a test reading the third period of five
+needs an order it can rely on.

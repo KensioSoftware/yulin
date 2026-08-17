@@ -1,9 +1,8 @@
 # Simulated CloudFormation
 
-Yulin includes a simulated CloudFormation service for tests and local development.
-
-Sim CloudFormation creates simulated AWS resources from CloudFormation templates. It can be used with
-hand-written templates, AWS SDK-style `CreateStackCommand` calls, or synthesized CDK template files.
+Yulin includes a simulated CloudFormation service for tests and local development. It creates
+simulated AWS resources from CloudFormation templates, and works with hand-written templates, AWS
+SDK-style `CreateStackCommand` calls, or synthesized CDK template files.
 
 ## Basic usage
 
@@ -287,34 +286,34 @@ stack has moved to `UPDATE_IN_PROGRESS`, and `waitForStackUpdateComplete(...)` w
 resources to change. `DescribeStacksCommand` reports `UPDATE_IN_PROGRESS` in between and
 `UPDATE_COMPLETE` after, along with the outputs resolved again against the new template.
 
-Updating a stack name that is not there is refused with the same `ValidationError` that
-`DescribeStacksCommand` refuses it with, because there is nothing else an update of a stack that is
-not there could mean.
+`UpdateStackCommand` refuses a stack name that was never deployed, with the same `ValidationError`
+that `DescribeStacksCommand` answers such a name with. An update of a stack that was never there
+could mean nothing else.
 
 ### What counts as a change
 
-Resources are compared as they resolve rather than as they are written, so a changed parameter value
-shows up as a changed resource even when the template body is identical, and a template reordered
-without being changed does not. Outputs are compared the same way. The rest of the template body is
-compared as written, so a change to a section the simulator does not act on, such as `Description`,
-is still an update.
+Resources are compared as they resolve, not as they are written. A changed parameter value shows up
+as a changed resource even when the template body is identical, and a template reordered without
+being changed shows up as no change at all. Outputs are compared the same way. The rest of the
+template body is compared as written. A change to a section the simulator ignores, such as
+`Description`, is still an update.
 
 A template that changes nothing at all is refused with a `ValidationError` reading
-`No updates are to be performed.`, which is what CloudFormation answers. So is an update asked for
+`No updates are to be performed.`, the same answer CloudFormation gives. So is an update asked for
 while another is still running.
 
 ### Changed resources are replaced
 
 A resource whose template entry changed is deleted and created again from the new template. Real
-CloudFormation updates most properties in place and keeps what the resource holds, so this is a
-divergence worth knowing about: a bucket that gains a property loses its objects here, where in AWS
-it would keep them. In-place update is the obvious next step and is not implemented yet.
+CloudFormation updates most properties in place and keeps what the resource holds. That makes this a
+divergence worth knowing about. A bucket that gains a property loses its objects here, where in AWS
+it would keep them. In-place update is the obvious next step, still to be built.
 
 Two things follow from replacement:
 
-- A resource naming a replaced resource is replaced too, all the way up the dependency chain, so
+- A resource naming a replaced resource is replaced too, all the way up the dependency chain, and
   nothing is left pointing at a resource that has gone. Real CloudFormation hands the dependent the
-  new physical name instead of recreating it.
+  new physical name and leaves it standing.
 - `UpdateReplacePolicy` is not read. Honouring `Retain` would leave the old resource holding the
   name the replacement needs, and CDK marks buckets and tables with it as a matter of course, so
   every such update would fail. The old resource is deleted whatever the policy says.
@@ -385,15 +384,15 @@ await simCfn.waitForStackDeployComplete("deletable-stack");
 Deletion runs in the background, as deployment does. `deleteStack(...)` returns once the stack has
 moved to `DELETE_IN_PROGRESS`, and `waitForStackDeleteComplete(...)` waits for the resources to go.
 `DescribeStacksCommand` reports `DELETE_IN_PROGRESS` in between, and then refuses the stack name with
-a `ValidationError` once the deletion has finished, which is how CloudFormation answers a name it no
+a `ValidationError` once the deletion has finished. That is how CloudFormation answers a name it no
 longer holds.
 
-Deleting a stack name that is not there succeeds rather than failing, as it does in CloudFormation.
+Deleting a stack name that was never deployed succeeds, as it does in CloudFormation.
 
 ### When a resource cannot be deleted
 
 Some resources refuse to go, the same way they do in AWS. An S3 bucket that still holds objects is
-the common one: CloudFormation fails there rather than emptying the bucket first, which is why CDK
+the common one. CloudFormation fails there and never empties the bucket for you. That is why CDK
 ships an `autoDeleteObjects` custom resource.
 
 A refusal leaves the stack in `DELETE_FAILED` with the reason on it, and keeps the stack name in use.
@@ -403,10 +402,10 @@ A refusal leaves the stack in `DELETE_FAILED` with the reason on it, and keeps t
 ### `DeletionPolicy`
 
 A resource declared with `DeletionPolicy: Retain` is left in simulated AWS and reported as
-`DELETE_SKIPPED`, which is what CloudFormation does with it. The rest of the stack still deletes
-around it, and the stack name is still released. `RetainExceptOnCreate` is treated the same way,
-because the two differ only in what a rolled back creation does, and sim CloudFormation does not roll
-a deployment back.
+`DELETE_SKIPPED`, the same as CloudFormation reports it. The rest of the stack still deletes around
+it, and the stack name is still released. `RetainExceptOnCreate` is treated the same way, because the
+two differ only in what a rolled back creation does, and sim CloudFormation never rolls a deployment
+back.
 
 Retained resources are readable from the stack:
 
@@ -459,7 +458,7 @@ console.log(
 );
 ```
 
-When a parameter value is not supplied, the template default is used if present.
+A parameter with no supplied value takes the template default, when the template has one.
 
 ## Intrinsic functions
 
@@ -568,8 +567,8 @@ simulated CloudFront hostname, such as `e123example.cloudfront.net`.
 
 #### Values from a skipped Resource
 
-A Resource that was skipped, because its type is not simulated or because there is no simulated
-Resource to create at all, still answers both intrinsics. `Ref` returns the logical ID, and
+A Resource that was skipped, because its type is outside the simulation or because there is no
+simulated Resource to create at all, still answers both intrinsics. `Ref` returns the logical ID, and
 `Fn::GetAtt` returns the string `<logical ID>.<attribute name>`.
 
 ```typescript sim-cloudformation-skipped-resource-values
@@ -615,18 +614,18 @@ every Resource holding a `Ref` or `Fn::GetAtt` to a skipped Resource would fail 
 every Resource depending on those, until one EventBridge rule took the whole stack down with it. The skip
 stays where it happened.
 
-A stand-in is deliberately not ARN-shaped, so it fails closed wherever the simulator reads it.
+A stand-in is deliberately shaped unlike an ARN. It fails closed wherever the simulator reads it.
 
 - In an IAM policy `Resource` it matches no ARN, so a caller relying on that statement is denied.
 - In a property that is parsed as an ARN it is refused as malformed, and that Resource fails.
   Handing `Fn::GetAtt: ["Orders", "StreamArn"]` from a skipped DynamoDB table to an
   `AWS::Lambda::EventSourceMapping` fails with
   `EventSourceArn Orders.StreamArn names no simulated Lambda event source`.
-- Handed to a Lambda function through its environment, it names something that is not there, so the
-  function's own SDK call fails as a call for a missing resource does. A `PutItem` naming the
-  skipped table gets `ResourceNotFoundException: No DynamoDB Table named Orders`.
+- Handed to a Lambda function through its environment, it names something absent. The function's own
+  SDK call fails the way a call for a missing resource does. A `PutItem` naming the skipped table
+  gets `ResourceNotFoundException: No DynamoDB Table named Orders`.
 
-A stand-in stands in for something absent, so it is not a value to rely on. A test asserting against
+A stand-in stands in for something absent, and is never a value to rely on. A test asserting against
 one is asserting on a Resource that was never created. `stack.skippedResources` is where to find out
 which Resources those are and why, under
 [Inspecting stacks and resources](#inspecting-stacks-and-resources).
@@ -755,15 +754,15 @@ await stack.waitForDeployComplete();
 console.log(simAws.s3().getSimBucketByName("staging-site-bucket")?.bucketName);
 ```
 
-Each of the three arguments can be a nested expression rather than a literal string, as long as it
+Each of the three arguments can be a nested expression as well as a literal string, as long as it
 resolves to a string. The example above uses a `Ref` to a parameter for the top-level key. A `Ref` to
 the `AWS::Region` pseudo parameter works the same way, for the per-region maps that `Fn::FindInMap`
 is most often used for, and a nested `Fn::FindInMap` can supply any of the three arguments.
 
-The value a lookup returns does not have to be a string. A list value is returned as a list.
+The value a lookup returns can be any type. A list value is returned as a list.
 
-`Fn::FindInMap` is resolved when the template is read, before any resource is created, so it can be
-used in resource properties and in `Outputs`. A map name or key that is not in `Mappings` fails the
+`Fn::FindInMap` is resolved when the template is read, before any resource is created, and can be
+used in resource properties and in `Outputs`. A map name or key missing from `Mappings` fails the
 deployment with an error naming the path that could not be found.
 
 ### `Fn::Split` and `Fn::Select`
@@ -824,9 +823,9 @@ console.log(simAws.s3().getSimBucketByName("site-bucket-logs")?.bucketName);
 ```
 
 The delimiter is a literal string. The string being split can be any expression that resolves to a
-string, including a `Ref`, an `Fn::GetAtt` or another function. A delimiter the string does not
-contain gives a one-element list, and a delimiter at the start or end of the string gives an empty
-element there, as CloudFormation does.
+string, including a `Ref`, an `Fn::GetAtt` or another function. A delimiter absent from the string
+gives a one-element list, and a delimiter at the start or end of the string gives an empty element
+there, as CloudFormation does.
 
 `Fn::Select` takes its list from a literal list, from `Fn::Split`, or from anything else that
 resolves to a list, such as an `Fn::FindInMap` of a list value. The index is a number or a string of
@@ -849,9 +848,9 @@ at a Lambda function URL:
 `https://abc123.lambda-url.eu-west-2.on.aws/` splits into
 `["https:", "", "abc123.lambda-url.eu-west-2.on.aws", ""]`, so index 2 is the host.
 
-An index past the end of the list, a negative or fractional index, and a second argument that is not
-a list all fail the deployment, as they are all templates AWS rejects. The error names the resource
-and the property path the value sat at, for example
+An index past the end of the list, a negative or fractional index, and a second argument of any type
+but a list all fail the deployment, as they are all templates AWS rejects. The error names the
+resource and the property path the value sat at, for example
 `Sim CloudFormation Resource LogsBucket value at Properties.BucketName`.
 
 ## Conditions
@@ -924,11 +923,11 @@ name one written below it in the section.
 }
 ```
 
-`Fn::Equals` compares its two values as strings, as CloudFormation does, so a JSON number in the
+`Fn::Equals` compares its two values as strings, as CloudFormation does. A JSON number in the
 template matches the string a parameter carries.
 
-The whole section is evaluated once per deployment, before any resource is created, so a condition
-can read parameters and pseudo parameters and nothing else. A comparison that would need a created
+The whole section is evaluated once per deployment, before any resource is created. A condition can
+read parameters and pseudo parameters and nothing else. A comparison that would need a created
 resource, such as an `Fn::GetAtt`, fails the deployment rather than reading as false.
 
 ### `Fn::If`
@@ -936,22 +935,22 @@ resource, such as an `Fn::GetAtt`, fails the deployment rather than reading as f
 `Fn::If` takes a condition name, a value to use when it is true, and a value to use when it is
 false. It works anywhere a resource property or an output value is read.
 
-Only the branch the condition selects is resolved. The other branch is left alone, so it can name a
-resource this deployment does not create.
+Only the branch the condition selects is resolved. The other branch is left alone, and may name a
+resource this deployment never creates.
 
 ### The resource `Condition` attribute
 
-A resource carrying a `Condition` attribute whose condition is false is not created at all. It is
-absent from `stack.resources`, which is different from a resource sim CloudFormation skips: a
-skipped resource stays in the stack and answers `Ref` and `Fn::GetAtt` with
+A resource carrying a `Condition` attribute whose condition is false is never created. It is absent
+from `stack.resources`. A resource sim CloudFormation skips behaves differently. A skipped resource
+stays in the stack and answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
-Because the resource does not exist, another resource naming it fails the deployment, with an error
-naming both resources and the condition. That covers a `Ref` or `Fn::GetAtt` that is actually
-reached, and a `DependsOn`. A name carried only by the branch of an `Fn::If` the condition did not
-select is not reached, so it does not fail.
+With the resource absent, another resource naming it fails the deployment, with an error naming both
+resources and the condition. That covers a `Ref` or `Fn::GetAtt` that is actually reached, and a
+`DependsOn`. A name carried only by the unselected branch of an `Fn::If` is never reached, and never
+fails.
 
-A `Condition` attribute naming a condition the template does not define fails the same way.
+A `Condition` attribute naming a condition the template leaves undefined fails the same way.
 
 ## Resource dependencies
 
@@ -1041,7 +1040,7 @@ create the simulated resources from that synthesized output template.
 ## Editing a synthesized template before deploying it
 
 Sometimes a synthesized template needs a change before Yulin will deploy it, such as dropping a
-resource or property that this simulator does not accept. Read the file, edit the parsed object,
+resource or property that this simulator refuses. Read the file, edit the parsed object,
 then deploy it with `deployTemplate(...)`, naming the file it came from:
 
 ```typescript sim-cloudformation-cdk-edited-template
@@ -1081,8 +1080,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 ```
 
-The template file is not read as the template: the `template` object is what gets deployed.
-`templatePath` only tells Yulin which cloud assembly the template came from, so it can find the
+The `template` object is what gets deployed, and the template file itself goes unread.
+`templatePath` only tells Yulin which cloud assembly the template came from, letting it find the
 sibling `TestStack.assets.json` manifest and the staged asset directories beside it. Without it,
 anything that needs a CDK asset, such as a `Custom::CDKBucketDeployment` or a Lambda function
 bundled with `Code.fromAsset`, fails with `No CDK assets manifest is available.`
@@ -1091,8 +1090,8 @@ bundled with `Code.fromAsset`, fails with `No CDK assets manifest is available.`
 
 Editing the parsed object works for a template you deploy once. A template you keep reading, because
 it is [watched](#watching-a-template-file) or applied again as an update, needs the same change made
-every time it is read. `transform` is that: it is given the parsed template and answers with the one
-to deploy, on the deployment and again on every change:
+every time it is read. `transform` is that hook. It is given the parsed template and answers with the
+one to deploy, on the deployment and again on every change:
 
 ```typescript sim-cloudformation-transform-template-file
 /**
@@ -1129,20 +1128,20 @@ await simAws.cloudFormation().deployTemplateFile({
 ```
 
 This is for what a simulation cannot resolve at all, such as an ARN carrying a real account or a
-hosted zone ID that came from `HostedZone.fromLookup`. A property Yulin does not model is usually not
-one you need this for: S3, DynamoDB, Cognito, API Gateway v2, SQS and KMS
+hosted zone ID that came from `HostedZone.fromLookup`. A property Yulin leaves unmodelled rarely
+needs it. S3, DynamoDB, Cognito, API Gateway v2, SQS and KMS
 [record it and carry on](#properties-a-resource-was-created-without).
 
-The template file is still the real one, so there is no derived `.local.template.json` in `cdk.out`
-to keep in step with it. Staged assets resolve as they always did, from the assets manifest beside
-`templatePath`, since the cloud assembly is found by path rather than read out of the template.
+The template file is still the real one. There is no derived `.local.template.json` in `cdk.out` to
+keep in step with it. Staged assets resolve as they always did, from the assets manifest beside
+`templatePath`, since the cloud assembly is found by path and never read out of the template.
 
 `updateTemplateFile(...)` takes it too, for a consumer driving updates itself. Give it the same
-deployment object, so the difference applied is the difference in the file.
+deployment object, and the difference applied is the difference in the file.
 
 A transform that throws fails the deployment, with what it threw as the cause. On a watched change it
-is reported the way a failed update is: the stack keeps the resources it had, and the watch carries
-on to the next save.
+is reported the way a failed update is. The stack keeps the resources it had, and the watch carries on
+to the next save.
 
 ## Applying a changed template file
 
@@ -1174,12 +1173,12 @@ await simAws.cloudFormation().deployTemplateFile({ templatePath });
 await simAws.cloudFormation().updateTemplateFile({ templatePath });
 ```
 
-The sibling assets manifest is read again with the template, so a resource the update replaces reads
-the assets that synthesis staged rather than the ones the stack was deployed with.
+The sibling assets manifest is read again with the template. A resource the update replaces reads the
+assets that synthesis staged, not the ones the stack was deployed with.
 
 A file written without being changed is refused with `No updates are to be performed.`, and a failed
 update leaves the stack in `UPDATE_FAILED` holding whatever the update reached. There is no rollback
-to the template it was deployed from, so a failure part way through has already deleted, replaced or
+to the template it was deployed from. A failure part way through has already deleted, replaced or
 created some of the resources the change asked for.
 
 ## Watching a template file
@@ -1212,42 +1211,41 @@ await simAws.cloudFormation().deployTemplateFile({
 `watch: true` watches with nothing to do afterwards.
 
 `reload` is the local server, and reloads the browsers connected to it once the update is complete.
-It reloads when the resources have changed rather than when the write lands, so a browser reloads
-onto the resources the new template asked for. A write that changed nothing is a no-op, so nothing
-reloads for it, and neither does an update that failed: a browser should not be sent to a stack the
-update did not reach. Anything with a `reload()` method will do, so a test can watch a template
+It reloads when the resources have changed, not when the write lands. A browser therefore arrives on
+the resources the new template asked for. A write that changed nothing is a no-op, and reloads
+nothing. A failed update reloads nothing either, since a browser has no business on a stack the
+update never reached. Anything with a `reload()` method will do, and a test can watch a template
 without serving anything.
 
-A server serving without live reload can never reload anything, and says so as the deployment asks
-it to rather than on the first change, which is a long way from the mistake. Serve with
+A server serving without live reload can never reload anything, and says so as the deployment asks it
+to. Saying it on the first change instead would be a long way from the mistake. Serve with
 [`{ liveReload: true }`](../../serve/README.md#live-reload).
 
 `onUpdated` runs once the update is complete too, for whatever else a change is worth doing, with or
-without a `reload` alongside it. Given both, the callback runs first and the reload follows it, so a
+without a `reload` alongside it. Given both, the callback runs first and the reload follows it, and a
 browser arriving on the new resources finds whatever the callback left ready for it.
 
-`onFailed` is given an update the changed template did not survive. It reports the failure and
-nothing else: the stack is left holding whatever the update reached, as an update through the
-command is. What a failure does keep is the process, and the resources it never got to, so a
-template that no longer deploys leaves a working environment where a restart on it would leave
-none.
+`onFailed` is given the update the changed template failed to survive. It reports the failure and
+nothing else.
+The stack is left holding whatever the update reached, as it is after an update through the command.
+What a failure does keep is the process, and the resources it never got to. A template that no longer
+deploys leaves a working environment where a restart on it would leave none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
 until they stop arriving. `settleMs` is how long that wait is, and it defaults to the 250ms
 [`yulin watch` settles at](../../serve/README.md#one-restart-for-a-burst-of-writes). A synth that
-keeps writing is updated from after five seconds of it, rather than being held off until it stops.
+keeps writing is updated from after five seconds of it, without waiting for it to stop.
 
-[`transform`](#adapting-a-synthesized-template-on-the-way-in) runs again on every change, so a
-template that needs adapting before Yulin will take it can still be watched as the file synthesis
-writes.
+[`transform`](#adapting-a-synthesized-template-on-the-way-in) runs again on every change. A template
+that needs adapting before Yulin will take it can still be watched as the file synthesis writes.
 
-Watching holds a filesystem handle open, so the process does not exit on its own. That is what a dev
+Watching holds a filesystem handle open, so the process stays alive on its own. That is what a dev
 process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is
-done. `watchedTemplateFiles()` names what is being watched. Both are per Account and Region, so a
+done. `watchedTemplateFiles()` names what is being watched. Both are per Account and Region, and a
 simulation deploying into more than one has one call each.
-[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that is not: it lets go
-of the template watches in every scope, along with everything else the environment is holding, and a
-served environment gets that from `srv.close()`.
+[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the exception. It lets go of the
+template watches in every scope, along with everything else the environment is holding, and a served
+environment gets that from `srv.close()`.
 
 Yulin never synthesizes anything. It reads the output template, so run your own `cdk synth` and let
 the watch pick up what it writes.
@@ -1255,9 +1253,9 @@ the watch pick up what it writes.
 ### Under `yulin watch`
 
 [`yulin watch`](../../serve/README.md#restarting-on-a-file-change) restarts the process when a
-deployed template changes. A watched template is left to the process that is watching it instead, so
-the stack updates in place and everything held in simulated S3, DynamoDB and SQS stays where it is.
-Nothing needs configuring for that: the process names the file it is holding.
+deployed template changes. A watched template is left to the process that is watching it instead. The
+stack updates in place, and everything held in simulated S3, DynamoDB and SQS stays where it is. That
+needs no configuring, because the process names the file it is holding.
 
 ## CDK S3 BucketDeployment
 
@@ -1295,35 +1293,35 @@ The files in the staged asset directory become Objects in the destination Bucket
 relative to the asset root. When the Bucket is configured for website hosting, or sits behind a
 CloudFront Distribution, those Objects are what gets served.
 
-This is the `aws s3 sync` the real provider function shells out to, so the properties CDK synthesizes
+This is the `aws s3 sync` the real provider function shells out to. The properties CDK synthesizes
 around it are read the same way:
 
 - `DestinationBucketKeyPrefix` puts the Objects under a key prefix.
 - `Exclude` and `Include` choose which files are copied. Every `Exclude` pattern is applied first and
-  then every `Include` one, and the last pattern to match a path decides, which is what makes
+  then every `Include` one, and the last pattern to match a path decides. That is what makes
   `exclude: ["*"], include: ["*.txt"]` mean "only the text files". A file no pattern matches is
   copied. `*` matches across `/`, so `data/*` covers everything under a `data` directory.
 - `SystemMetadata` sets content headers on every Object the deployment copies, such as
   `content-encoding` or `cache-control`. Without it, the content type is guessed from the file
   extension. See [Object system metadata](../s3/README.md#object-system-metadata) for what comes back
-  on a read. The deployment also tells the destination Bucket what it publishes, so a directory
+  on a read. The deployment also tells the destination Bucket what it publishes. A directory
   [mounted over that Bucket](../s3/README.md#inheriting-what-the-deployment-set) for local
-  development is served with the same headers without restating them.
+  development is then served with the same headers without restating them.
 - `Prune` removes the Objects the deployment covers and its source no longer holds. It is on unless
   the deployment turns it off, as the construct is. Pruning only considers what the filters and the
-  key prefix select, so a deployment does not delete Objects it would never have copied.
+  key prefix select, and leaves alone any Object the deployment would never have copied.
 
-Several deployments can share one Bucket, which is the usual arrangement when the headers differ by
-file type: a `BucketDeployment` sets them for all of its files at once, so a second deployment is how
-the rest of the site gets different ones. Give the second one `prune: false`, or filters that do not
-overlap the first, the same as you would in AWS.
+Several deployments can share one Bucket. That is the usual arrangement when the headers differ by
+file type, since a `BucketDeployment` sets them for all of its files at once. A second deployment is
+how the rest of the site gets different ones. Give the second one `prune: false`, or filters that miss
+what the first one covers, the same as you would in AWS.
 
 A deployment with more than one entry in `SourceObjectKeys` copies each source in turn, and a path
 two of them share ends up with the later one's content.
 
 Filter patterns take `*` and `?`. The CLI also takes character classes such as `[abc]`, and a pattern
-using one is refused by name rather than matched as written, since a pattern that quietly means
-something else would copy the wrong files.
+using one is refused by name. Matching it as written risks copying the wrong files, since the pattern
+quietly means something else.
 
 ### The provider CDK synthesizes
 
@@ -1333,34 +1331,34 @@ in AWS: an AWS CLI Lambda Layer, a Python Lambda function, and that function's l
 deployment adds another Layer and another custom resource, and shares the one function, because CDK
 builds it as a singleton.
 
-None of those three do anything here. Yulin makes the copy itself, so the function is never invoked,
-the Layer it would have loaded the CLI from is never read, and nothing is ever written to the log
+None of those three do anything here. Yulin makes the copy itself. The function is never invoked, the
+Layer it would have loaded the CLI from is never read, and nothing is ever written to the log
 group. The function and the Layer are reported in
-[`stack.inertResources`](#resources-deliberately-left-out) rather than as skipped resources, so a
-stack whose deployments all worked reports no gaps at all. The log group is created like any other,
-and stays empty, which is what an account is left with too.
+[`stack.inertResources`](#resources-deliberately-left-out) rather than as skipped resources, and a
+stack whose deployments all worked reports no gaps at all. The log group is created like any other and
+stays empty, as an account's would.
 
 That matters beyond tidiness. Sim Lambda declines the provider on its Python runtime with a message
-saying to [bind a real in-process handler](#lambda-function-bindings) to the function, which is sound
-advice for a Python function of your own and exactly the wrong thing to do here: it would replace a
+saying to [bind a real in-process handler](#lambda-function-bindings) to the function. That is sound
+advice for a Python function of your own, and exactly the wrong thing to do here. It would replace a
 working simulation with a hand-written one.
 
 The provider is found through the `ServiceToken` its custom resource names it by, not by the logical
-ID CDK generated for it, which is a hash of the construct path and not something to match on.
+ID CDK generated for it. That ID is a hash of the construct path, and no kind of thing to match on.
 
 ## S3 Bucket notifications
 
 The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the ordinary
-`PutBucketNotificationConfiguration` path, so an Object put into the deployed Bucket reaches the
-deployed function. CloudFormation spells the configuration differently from the SDK in four places,
-and Yulin reads the CloudFormation spelling and refuses the others rather than deploying a
-configuration that quietly lost its filter.
+`PutBucketNotificationConfiguration` path. An Object put into the deployed Bucket reaches the deployed
+function. CloudFormation spells the configuration differently from the SDK in four places, and Yulin
+reads the CloudFormation spelling and refuses the others. Accepting them would deploy a configuration
+that quietly lost its filter.
 
 Real CloudFormation has a circular dependency here. The Bucket needs the function's ARN and the
-function's permission needs the Bucket's ARN, so a template hardcodes `BucketName`, names the Bucket
-by ARN literal on the permission, and adds a `DependsOn` so the permission is in place before S3
-validates the destination. Simulated CloudFormation needs the same, and surfaces the alternative as a
-dependency resolution failure.
+function's permission needs the Bucket's ARN. A template therefore hardcodes `BucketName`, names the
+Bucket by ARN literal on the permission, and adds a `DependsOn` so the permission is in place before
+S3 validates the destination. Simulated CloudFormation needs the same, and surfaces the alternative as
+a dependency resolution failure.
 
 Note that every other `AWS::S3::Bucket` property the simulator has no behaviour for fails the stack
 by name. See [Buckets from CloudFormation](../s3/README.md#buckets-from-cloudformation).
@@ -1369,13 +1367,12 @@ by name. See [Buckets from CloudFormation](../s3/README.md#buckets-from-cloudfor
 
 `bucket.addEventNotification(...)` synthesizes a `Custom::S3BucketNotifications` resource rather than
 a Bucket property. Sim CloudFormation applies the configuration it carries through the ordinary
-`PutBucketNotificationConfiguration` path, so an Object put into the deployed Bucket reaches the
+`PutBucketNotificationConfiguration` path, and an Object put into the deployed Bucket reaches the
 deployed function.
 
 Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
-on the `AWS::Lambda::Permission` CDK writes beside the notification is a synth-time literal, so a
-stack deployed into another Account leaves S3 unable to validate the destination, and the stack
-fails.
+on the `AWS::Lambda::Permission` CDK writes beside the notification is a synth-time literal. A stack
+deployed into another Account leaves S3 unable to validate the destination, and the stack fails.
 
 See [Event notifications](../s3/README.md#event-notifications) in the S3 docs for the configuration
 itself and what it refuses.
@@ -1516,9 +1513,9 @@ to provide an executable local function directly.
 ## Lambda function bindings
 
 `AWS::Lambda::Function` resources support the same bindings. The deployed function is backed by your
-real in-process handler, so tests can close over test state and step through the handler in a
-debugger, while the stack still wires roles, grants and references as the template declares. A bound
-function may omit template `Code` and `Handler` entirely.
+real in-process handler. Tests can close over test state and step through the handler in a debugger,
+while the stack still wires roles, grants and references as the template declares. A bound function
+may omit template `Code` and `Handler` entirely.
 
 ```typescript sim-cloudformation-lambda-binding
 /**
@@ -1719,8 +1716,8 @@ created through that same simulated account/region scope unless the underlying s
 different AWS-like scoping behaviour.
 
 An Account ID can always be written as a plain string, as above. Code that wants to name the type
-can get a `SimAwsAccountId` from `simAwsAccountId("111111111111")`, which refuses anything that is
-not a 12-digit AWS Account ID.
+can get a `SimAwsAccountId` from `simAwsAccountId("111111111111")`, which refuses anything other than
+a 12-digit AWS Account ID.
 
 ## Inspecting stacks and resources
 
@@ -1760,8 +1757,8 @@ This is useful in tests when you want to assert that a specific template resourc
 expected simulated service resource.
 
 `stack.skippedResources` lists the Resources the deployment did not create. Each one carries a
-`skippedReason` naming the type that is not simulated, so a test that expected a resource to exist
-can find out why it does not.
+`skippedReason` saying why that Resource was skipped. A test that expected a resource to exist can
+find out why it is missing.
 
 ```typescript sim-cloudformation-inspect-skipped
 /**
@@ -1801,23 +1798,24 @@ console.log(stack.getResource("AlarmRule")?.skippedReason);
 A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
-A skip is not always a whole Resource type nothing simulates. A service can decline one Resource of a
+A skip is more than a whole Resource type nothing simulates. A service can decline one Resource of a
 type it does create, when that Resource asks for something the service cannot model, and the
 `skippedReason` says which part it was. An `AWS::Route53::RecordSet` declaring a record type sim
-Route53 does not store is skipped with the record type named, so a DNS stack carrying a record the
-test is not about still deploys. See [record types](../route53/README.md#record-types).
+Route53 has no room for is skipped with the record type named. A DNS stack carrying a record beside
+the point of the test still deploys. See [record types](../route53/README.md#record-types).
 
-A Resource that was skipped on create is stepped over by a teardown rather than deleted, because
-nothing reached simulated AWS to delete. It reaches `DELETE_COMPLETE` and stays out of
-`stack.skippedResourceDeletions`, which is for Resources that were created and could not be removed.
+A Resource that was skipped on create is stepped over by a teardown, never deleted, because nothing
+reached simulated AWS to delete. It reaches `DELETE_COMPLETE` and stays out of
+`stack.skippedResourceDeletions`. That list is for Resources that were created and could not be
+removed.
 
 ### Resources deliberately left out
 
 `stack.skippedResources` is for gaps. A Resource it names is one a test written against would find
-missing, so some Resources are deliberately kept out of it: the ones the simulator left uncreated on
-purpose, because nothing it models could tell them apart from Resources it had created. Those are in
-`stack.inertResources` instead, each with an `inertReason` for what it would take for the difference
-to start mattering.
+missing, so some Resources are deliberately kept out of it. Those are the ones the simulator left
+uncreated on purpose, because nothing it models could tell them apart from Resources it had created.
+They are in `stack.inertResources` instead, each with an `inertReason` for what it would take for the
+difference to start mattering.
 
 ```typescript sim-cloudformation-inert-resources
 /**
@@ -1870,16 +1868,16 @@ Two things make a Resource inert. Its type can be one no simulated service reads
   function's module path.
 - `AWS::CDK::Metadata`, the construct-library analytics CDK adds to every synthesized stack.
 
-Or the stack around it can: the provider Lambda function for a CDK custom resource the simulator
-carries out itself is inert. Its log group is not, because log groups are created: an empty one is
-what an account is left with when nothing invokes the provider either. See
+Or the stack around it can. The provider Lambda function for a CDK custom resource the simulator
+carries out itself is inert. Its log group stays ordinary, because log groups are created, and an
+empty one is what an account is left with when nothing invokes the provider either. See
 [the provider CDK synthesizes](#the-provider-cdk-synthesizes).
 
 ## Properties a Resource was created without
 
-Deployment is best effort. A Resource type that is not simulated is skipped and the rest of the
-stack still deploys, and the same goes one level down: a property the Resource's own service cannot
-act on does not stop the Resource being created. It is left out, and the omission is recorded in
+Deployment is best effort. A Resource type outside the simulation is skipped and the rest of the
+stack still deploys. The same goes one level down. A property the Resource's own service cannot act
+on still leaves the Resource created. It is left out, and the omission is recorded in
 `stack.ignoredProperties`.
 
 ```typescript sim-cloudformation-ignored-properties
@@ -1921,34 +1919,33 @@ for (const ignored of stack.ignoredProperties) {
 ```
 
 Each entry names the `logicalId` and `resourceType` of the Resource, the `path` to the property, and
-a `reason`. The path is the whole way down, so a setting on one entry of a list says which entry it
+a `reason`. The path is the whole way down, and a setting on one entry of a list says which entry it
 was on, such as `GlobalSecondaryIndexes.1.WarmThroughput`. The same list is on each Resource as
 `resource.ignoredProperties`.
 
 **An ignored property means the simulated Resource behaves differently to the one the template
-describes.** That is the trade this makes: a template deploys as far as it can, and the record is
+describes.** That is the trade this makes. A template deploys as far as it can, and the record is
 where to check whether what it could not do matters to the test you are writing. A test asserting on
 object versions, on a dead-letter queue, or on a rotated key needs to look here before trusting the
 result.
 
-A property name that is not one AWS has is recorded the same way rather than failing the stack. A
-typo and a property AWS added after this simulator read the docs look identical from here, and a
-Resource that deploys with the unread name reported is more useful than a stack that fails over
-either.
+A property name AWS has never had is recorded the same way, and never fails the stack. A typo and a
+property AWS added after this simulator read the docs look identical from here, and a Resource that
+deploys with the unread name reported is more useful than a stack that fails over either.
 
 Two things are still refused outright, and fail the Resource:
 
 - A property that leaves nothing coherent to create, such as an `AWS::S3::Bucket` whose `BucketName`
-  is not a string, or an `AWS::DynamoDB::GlobalTable` whose replica list does not include the region
-  the stack is deploying into. Real CloudFormation refuses these templates too.
-- A value the simulated service itself refuses, which is refused in the same words an SDK caller
-  gets. An `AWS::SQS::Queue` with `FifoQueue: true` is one: a FIFO queue is named `<name>.fifo`,
-  which simulated SQS refuses, so there is no queue to create under the name the template gave it.
+  is some type other than a string, or an `AWS::DynamoDB::GlobalTable` whose replica list omits the
+  region the stack is deploying into. Real CloudFormation refuses these templates too.
+- A value the simulated service itself refuses, in the same words an SDK caller gets. An
+  `AWS::SQS::Queue` with `FifoQueue: true` is one. A FIFO queue is named `<name>.fifo`, which
+  simulated SQS refuses, leaving no queue to create under the name the template gave it.
 
-Properties nothing simulated could tell apart are not listed. There is no simulated KMS and Object
-bytes are stored as they arrive, so an `AWS::S3::Bucket` carrying `BucketEncryption` and `Tags`, as
-almost every Bucket CDK synthesizes does, records nothing: a report of differences that make no
-difference is one nobody can read.
+Properties nothing simulated could tell apart are left off the list. There is no simulated KMS and
+Object bytes are stored as they arrive. An `AWS::S3::Bucket` carrying `BucketEncryption` and `Tags`,
+as almost every Bucket CDK synthesizes does, therefore records nothing. A report of differences that
+make no difference is one nobody can read.
 
 ## Handling deployment failures
 
@@ -2070,7 +2067,7 @@ Each service's own docs describe what its resource types support.
 ## Limitations
 
 - `TemplateBody` must be JSON when using `CreateStackCommand` or `UpdateStackCommand`. YAML parsing
-  is not currently provided by the CloudFormation service.
+  is outside the CloudFormation service for now.
 - Only supported resource types create simulated service resources. An unsupported resource may be
   skipped or may fail the stack, depending on how safely the simulator can model it. A skipped
   resource answers `Ref` and `Fn::GetAtt` with
@@ -2081,24 +2078,23 @@ Each service's own docs describe what its resource types support.
   `stack.inertResources` instead, and are listed under
   [resources deliberately left out](#resources-deliberately-left-out). Read both when accounting for
   every resource in a template.
-- `AWS::Logs::LogGroup` is created, including the one CDK writes for a custom resource provider,
-  which is left empty because that provider is never invoked. A log group a stack declares for a
+- `AWS::Logs::LogGroup` is created, including the one CDK writes for a custom resource provider. That
+  one is left empty, because the provider is never invoked. A log group a stack declares for a
   Lambda function is the same group that function writes to, and a group already there is taken over
   rather than failing the deploy the way real CloudFormation does. See the
   [simulated CloudWatch Logs docs](../logs/ "Simulated CloudWatch Logs usage docs").
-- A resource property that is not simulated is left out and recorded in `stack.ignoredProperties`
-  rather than failing the stack, so the resource is created behaving differently to the one the
+- A resource property outside the simulation is left out and recorded in `stack.ignoredProperties`
+  rather than failing the stack. The resource is created behaving differently to the one the
   template describes. See
   [properties a Resource was created without](#properties-a-resource-was-created-without) for what
   is still refused outright.
 - A stack update replaces a changed resource rather than updating it in place, so what the resource
   held is lost. See [changed resources are replaced](#changed-resources-are-replaced).
-- A watched template file updates its stack in place, which does not make the update itself any
-  gentler: a changed resource is still replaced and loses what it holds, the same as any other
-  update.
-- Yulin never synthesizes a CDK app. It watches the synthesized output template, so a change to the
-  app itself only reaches the stack once something has run `cdk synth` over it.
-- A stack update applies a whole template directly. Change sets are not supported, so
+- A watched template file updates its stack in place. That makes the update itself no gentler. A
+  changed resource is still replaced and loses what it holds, the same as any other update.
+- Yulin never synthesizes a CDK app. It watches the synthesized output template. A change to the app
+  itself reaches the stack once something has run `cdk synth` over it.
+- A stack update applies a whole template directly. Change sets are outside the simulation, so
   `CreateChangeSetCommand` and `ExecuteChangeSetCommand` have nothing behind them, and neither does
   drift detection.
 - A failed stack update is not rolled back to the template the stack was deployed from. The stack is
@@ -2109,7 +2105,7 @@ Each service's own docs describe what its resource types support.
   is no queue behind it.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it
   creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
-  same way an unsupported resource type is on create, so the stack still deletes with that resource
+  same way an unsupported resource type is on create, and the stack still deletes with that resource
   left behind.
 - `DeletionPolicy` is read for `Retain` and `RetainExceptOnCreate` only. `Snapshot` is treated as
   `Delete`, because no simulated service takes snapshots.
@@ -2124,15 +2120,15 @@ Each service's own docs describe what its resource types support.
   argument is `{ "DefaultValue": ... }`, is rejected.
 - `Fn::FindInMap` arguments are resolved from literals, `Parameters` and pseudo parameters. An
   argument that depends on a created resource, such as a `Ref` to a resource logical ID, fails the
-  resource with a "could not find map" error rather than being resolved. Real CloudFormation allows
-  only `Ref` and a nested `Fn::FindInMap` inside `Fn::FindInMap`, so this only affects templates real
-  CloudFormation would reject as well, but the simulator does not reject them up front.
-- `Fn::If` is not supported inside the `Conditions` section itself. It is rejected there rather than
+  resource with a "could not find map" error. Real CloudFormation allows only `Ref` and a nested
+  `Fn::FindInMap` inside `Fn::FindInMap`. The templates affected here are ones real CloudFormation
+  would reject as well. The simulator just rejects them later rather than up front.
+- `Fn::If` is unsupported inside the `Conditions` section itself. It is rejected there rather than
   read against a half-evaluated section.
 - `Fn::Split` and `Fn::Select` accept any argument that resolves to the type they need. Real
-  CloudFormation allows only a named set of functions inside each of them, so a template the
-  simulator resolves may still be one CloudFormation rejects.
+  CloudFormation allows only a named set of functions inside each of them. A template the simulator
+  resolves may still be one CloudFormation rejects.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.
-- Many advanced CloudFormation features are not supported.
+- Many advanced CloudFormation features are outside the simulation.
