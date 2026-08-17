@@ -220,7 +220,7 @@ A page holds ten parameters, as it does on real AWS. Follow `NextToken` to read 
 ## Reading several parameters at once
 
 `GetParameters` takes up to ten names. A name that resolves to nothing comes back in
-`InvalidParameters`, leaving the request to succeed. That is what makes a typo easy to miss.
+`InvalidParameters`, and the request still succeeds. That is what makes a typo easy to miss.
 
 ```typescript sim-ssm-get-parameters-batch
 /**

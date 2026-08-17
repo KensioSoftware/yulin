@@ -732,8 +732,8 @@ missing record would otherwise leave it hanging.
 ### Ports
 
 DNS binds the same port number as HTTP, as a convenience and not a guarantee. Where the number is
-already held on UDP by something else, DNS binds an ephemeral port instead. Read `srv.dnsPort`, and
-leave `srv.port` out of it.
+already held on UDP by something else, DNS binds an ephemeral port instead. Read `srv.dnsPort`, which
+may differ from `srv.port`.
 
 Port 53 is left alone, since binding it would need root. To resolve simulated names system-wide
 without naming a port, point your resolver at the simulator yourself. On macOS, a file such as `/etc/resolver/test`

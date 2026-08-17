@@ -273,9 +273,9 @@ label. A version that has lost every label is on its way out of existence, and i
 
 ## Deletion and the recovery window
 
-`DeleteSecret` schedules deletion after a recovery window of 7 to 30 days, defaulting to 30, rather
-than deleting anything itself. During that window the secret is still there. It can be described and
-restored, it refuses to be read or written, and it still holds its name.
+`DeleteSecret` schedules deletion for later. The recovery window is 7 to 30 days, defaulting to 30.
+During that window the secret is still there. It can be described and restored, it refuses to be
+read or written, and it still holds its name.
 
 Holding the name is what a redeployed stack hits. Advancing the simulated clock past the window frees
 it.
