@@ -7,8 +7,13 @@ import { SimSnsFanOut } from "../delivery/sim-sns-fan-out.js";
 import { SimSnsMessageSigner } from "../signature/sim-sns-message-signer.js";
 import type { SimSnsSubscriptionStore } from "../subscription/sim-sns-subscription-store.js";
 import type { SimSnsTopicStore } from "../topic/sim-sns-topic-store.js";
+import { SimSnsOptOutList } from "../sms/sim-sns-opt-out-list.js";
+import { SimSnsSentSmsStore } from "../sms/sim-sns-sent-sms-store.js";
 import { SimSnsAuthorizer } from "./authorize/sim-sns-authorizer.js";
 import { SimSnsPublishCommands } from "./publish/sim-sns-publish-commands.js";
+import { SimSnsPublishDispatch } from "./publish/sim-sns-publish-dispatch.js";
+import { SimSnsPublishSms } from "./publish/sim-sns-publish-sms.js";
+import { SimSnsOptOutCommands } from "./sms/sim-sns-opt-out-commands.js";
 import { SimSnsSubscriptionAccess } from "./subscription/sim-sns-subscription-access.js";
 import { SimSnsSubscriptionAttributeCommands } from "./subscription/sim-sns-subscription-attribute-commands.js";
 import { SimSnsSubscriptionCommands } from "./subscription/sim-sns-subscription-commands.js";
@@ -42,9 +47,16 @@ export class SimSnsCommands {
   public readonly subscriptions: SimSnsSubscriptionCommands;
   public readonly subscriptionListings: SimSnsSubscriptionListings;
   public readonly subscriptionAttributes: SimSnsSubscriptionAttributeCommands;
-  public readonly publish: SimSnsPublishCommands;
+  public readonly publish: SimSnsPublishDispatch;
+  public readonly optOut: SimSnsOptOutCommands;
   public readonly fanOut: SimSnsFanOut;
   public readonly signer: SimSnsMessageSigner;
+
+  /** Every SMS this scope would have sent, delivered or suppressed. */
+  public readonly sentSms = new SimSnsSentSmsStore();
+
+  /** The numbers this scope will send no SMS to. */
+  public readonly optOutList = new SimSnsOptOutList();
 
   constructor(properties: SimSnsCommandsProperties) {
     const { topics, subscriptions, accountRegionScope, background } =
@@ -92,10 +104,22 @@ export class SimSnsCommands {
     this.subscriptionAttributes = new SimSnsSubscriptionAttributeCommands({
       access: subscriptionAccess,
     });
-    this.publish = new SimSnsPublishCommands({
+    this.publish = new SimSnsPublishDispatch({
+      topic: new SimSnsPublishCommands({
+        access,
+        clock: background,
+        fanOut: this.fanOut,
+      }),
+      sms: new SimSnsPublishSms({
+        access,
+        clock: background,
+        optOutList: this.optOutList,
+        sent: this.sentSms,
+      }),
+    });
+    this.optOut = new SimSnsOptOutCommands({
       access,
-      clock: background,
-      fanOut: this.fanOut,
+      optOutList: this.optOutList,
     });
   }
 }

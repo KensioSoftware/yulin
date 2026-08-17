@@ -8,6 +8,11 @@ import type {
   SimPublishCommand,
 } from "../command/publish/publish.command.js";
 import type {
+  SimCheckIfPhoneNumberIsOptedOutCommand,
+  SimListPhoneNumbersOptedOutCommand,
+  SimOptInPhoneNumberCommand,
+} from "../command/sms/sms.command.js";
+import type {
   SimGetSubscriptionAttributesCommand,
   SimListSubscriptionsByTopicCommand,
   SimListSubscriptionsCommand,
@@ -133,6 +138,30 @@ export class SimSnsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSns.publishBatch(
             command as SimPublishBatchCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CheckIfPhoneNumberIsOptedOutCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.checkIfPhoneNumberIsOptedOut(
+            command as SimCheckIfPhoneNumberIsOptedOutCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListPhoneNumbersOptedOutCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.listPhoneNumbersOptedOut(
+            command as SimListPhoneNumbersOptedOutCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "OptInPhoneNumberCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.optInPhoneNumber(
+            command as SimOptInPhoneNumberCommand,
             simSdkCallerOptions(context),
           ),
       ],

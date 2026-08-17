@@ -1,4 +1,7 @@
-import { SimSnsUnsimulatedInputException } from "../../error/sim-sns.error.js";
+import {
+  SimSnsInvalidParameterException,
+  SimSnsUnsimulatedInputException,
+} from "../../error/sim-sns.error.js";
 import { SimSnsMessageAttributes } from "../../message/sim-sns-message-attributes.js";
 import type { SimSnsPublishedMessageInput } from "../../message/sim-sns-published-message.js";
 import type {
@@ -7,10 +10,10 @@ import type {
 } from "./publish.command.js";
 
 /**
- * Refuse a publish to somewhere other than a topic.
+ * Refuse a publish to somewhere other than a topic or a phone number.
  *
- * Real SNS publishes to a topic, to a mobile application endpoint, or to a
- * phone number. Only the topic is simulated, so the other two are refused
+ * Real SNS publishes to a topic, to a phone number, or to a mobile application
+ * endpoint. The endpoint is the one that is not simulated, so it is refused
  * rather than answered with a message id for a message that reached nothing.
  */
 export function refuseUnsimulatedPublishTarget(
@@ -19,14 +22,14 @@ export function refuseUnsimulatedPublishTarget(
   if (input.TargetArn !== undefined) {
     throw new SimSnsUnsimulatedInputException(
       "TargetArn publishes to a mobile application endpoint, which simulated " +
-        "SNS does not support. Publish to a TopicArn instead.",
+        "SNS does not support. Publish to a TopicArn or a PhoneNumber instead.",
     );
   }
 
-  if (input.PhoneNumber !== undefined) {
-    throw new SimSnsUnsimulatedInputException(
-      "PhoneNumber publishes an SMS message, which simulated SNS does not " +
-        "support. Publish to a TopicArn instead.",
+  if (input.TopicArn !== undefined && input.PhoneNumber !== undefined) {
+    throw new SimSnsInvalidParameterException(
+      "Invalid parameter: A publish names a TopicArn or a PhoneNumber, and " +
+        "this one names both",
     );
   }
 }

@@ -6,7 +6,8 @@ every operation is authorized by simulated IAM.
 Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
 
 A message published to a topic is delivered to every queue subscribed to it, and invokes every Lambda
-function subscribed to it. Other subscription protocols are not simulated.
+function subscribed to it. Other subscription protocols are not simulated. A message published to a
+phone number is recorded as an SMS a test can assert on.
 
 ## Creating a topic and publishing to it
 
@@ -197,6 +198,95 @@ const published = await sns.publishBatch(
 console.log(published.Successful?.map((entry) => entry.Id)); // ["one"]
 console.log(published.Failed?.[0]?.Code); // "InvalidParameterValueException"
 ```
+
+## Sending an SMS
+
+A `Publish` that names a `PhoneNumber` sends an SMS to that number. The message stays inside the
+simulation. Simulated SNS records what it would have texted, and `sentSmsMessages()` on the service
+reads the records back, oldest first.
+
+```typescript sim-sns-sms
+/**
+ * Publishing an SMS to a phone number and reading the record back.
+ */
+
+import {
+  CheckIfPhoneNumberIsOptedOutCommand,
+  PublishCommand,
+} from "@aws-sdk/client-sns";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+
+const { MessageId } = await sns.publish(
+  new PublishCommand({
+    PhoneNumber: "+15550100",
+    Message: "Your code is 123456",
+    MessageAttributes: {
+      "AWS.SNS.SMS.SenderID": { DataType: "String", StringValue: "Orders" },
+      "AWS.SNS.SMS.SMSType": {
+        DataType: "String",
+        StringValue: "Transactional",
+      },
+    },
+  }),
+);
+
+const [sent] = sns.sentSmsMessages();
+
+console.log(sent?.phoneNumber); // "+15550100"
+console.log(sent?.message); // "Your code is 123456"
+console.log(sent?.senderId); // "Orders"
+console.log(sent?.suppressed); // false
+console.log(sent?.messageId === MessageId); // true
+
+// On real SNS a recipient opts out by replying STOP. Nothing in a test process
+// can reply, so the simulator does it.
+sns.optOutPhoneNumber("+15550100");
+
+await sns.publish(
+  new PublishCommand({
+    PhoneNumber: "+15550100",
+    Message: "Your code is 654321",
+  }),
+);
+
+const [, stopped] = sns.sentSmsMessages();
+
+console.log(stopped?.suppressed); // true
+
+const { isOptedOut } = await sns.checkIfPhoneNumberIsOptedOut(
+  new CheckIfPhoneNumberIsOptedOutCommand({ phoneNumber: "+15550100" }),
+);
+
+console.log(isOptedOut); // true
+```
+
+The number is E.164, a plus sign followed by up to fifteen digits. Anything else is refused with
+`InvalidParameterException`. A publish naming both a `TopicArn` and a `PhoneNumber` is refused as
+well, since one of the two would otherwise win silently.
+
+`AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType` are the two reserved attributes a publish may carry.
+Both are recorded, and the record reads them back as `senderId` and `smsType`. The other reserved SMS
+attributes are refused by name. `AWS.SNS.SMS.MaxPrice` caps what a message may cost, and
+`AWS.MM.SMS.OriginationNumber`, `AWS.SNS.SMS.EntityId` and `AWS.SNS.SMS.TemplateId` pick the routing
+and the registration it travels under. Each one changes a real send and would change nothing here.
+
+Real SNS puts a number on the opt-out list when the recipient replies STOP, and its API only takes
+numbers back off. Standing in for the handset is the simulator's job. `optOutPhoneNumber` on the
+service is what puts a number on the list, the same kind of accessor as `verifyIdentity` on simulated
+SES.
+
+A publish to a number on the list succeeds and answers with a `MessageId`, as it does on real SNS.
+The record for that message says `suppressed`. A test can then tell a message that would have arrived
+from one the opt-out list stopped. `CheckIfPhoneNumberIsOptedOutCommand` and
+`ListPhoneNumbersOptedOutCommand` read the list, and `OptInPhoneNumberCommand` takes a number back
+off it. Real SNS allows an opt-in once every thirty days per number, and that limit is absent here.
+
+The records and the opt-out list belong to one account and region, the way topics do. A message
+published in `eu-west-2` is invisible from `us-east-1`.
 
 ## Subscriptions
 
@@ -1503,6 +1593,11 @@ Sim SNS currently supports:
 - `GetTopicAttributesCommand` and `SetTopicAttributesCommand`, for `DisplayName` and `Policy`
 - `PublishCommand` and `PublishBatchCommand`, with message attributes, a subject and the 256 KB size
   limit
+- `PublishCommand` to a `PhoneNumber`, recorded as an SMS that `sentSmsMessages()` reads back, with
+  the `AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType` attributes
+- The phone number opt-out list, with `CheckIfPhoneNumberIsOptedOutCommand`,
+  `ListPhoneNumbersOptedOutCommand` and `OptInPhoneNumberCommand`, and `optOutPhoneNumber()` standing
+  in for a recipient replying STOP
 - `SubscribeCommand` over the `sqs` and `lambda` protocols, confirmed at once, and
   `UnsubscribeCommand`
 - `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
@@ -1584,8 +1679,19 @@ Current documented limitations:
   `MessageDeduplicationId` publish inputs.
 - `MessageStructure` is refused. A `json` structure picks a different message body per protocol, and
   picking one is not simulated, so it would be a body chosen by a rule that never ran.
-- Publishing to a `TargetArn` or a `PhoneNumber` is refused. Mobile application endpoints and SMS are
-  not simulated, so only a `TopicArn` can be published to.
+- Publishing to a `TargetArn` is refused. Mobile application endpoints and push notifications are not
+  simulated, so a publish reaches a topic or a phone number.
+- An SMS is recorded and never delivered, and nothing models what a carrier would do with one. There
+  is no message part splitting, no delivery receipt, no price and no throughput limit.
+- `AWS.SNS.SMS.MaxPrice`, `AWS.MM.SMS.OriginationNumber`, `AWS.SNS.SMS.EntityId` and
+  `AWS.SNS.SMS.TemplateId` are refused rather than recorded. Each one changes what real SNS does with
+  a message, and accepting one that changed nothing would misrepresent the send.
+- `SetSMSAttributes` and `GetSMSAttributes`, which carry the account-wide SMS defaults and the spend
+  limit, are not supported.
+- The SMS sandbox is not simulated. Real SNS only texts verified destination numbers until an account
+  leaves it. Yulin is a sandbox already, so every number here is reachable without verifying it
+  first.
+- The thirty day limit real SNS puts on opting one number back in is not simulated.
 - Message attributes count against the 256 KB publish limit alongside the message body, as they do on
   real SNS. The exact accounting AWS uses for one attribute is not documented, so this counts the
   bytes of the attribute's name, its data type and its value, which is stricter than counting the
@@ -1612,8 +1718,9 @@ Current documented limitations:
 - Message archiving and replay are not simulated, so `ArchivePolicy` is refused.
 - Delivery status logging writes to CloudWatch Logs, which is not simulated, so the feedback role and
   sample rate attributes are refused.
-- Platform applications and endpoints, subscribing over `http`, `https`, `email`, `email-json`,
-  `sms`, `application` and `firehose`, and SMS sandbox and opt-out management are not planned.
+- Platform applications and endpoints, and subscribing over `http`, `https`, `email`, `email-json`,
+  `sms`, `application` and `firehose`, are not supported. An SMS is reached by publishing to a phone
+  number, not yet by subscribing one to a topic.
 - SNS condition keys such as `sns:Endpoint` and `sns:Protocol` are not derived, so a policy relying on
   them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
 - `FifoTopic: false` in a template fails the resource rather than deploying a standard topic. It is

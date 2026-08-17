@@ -12,10 +12,7 @@ import {
   requireSnsBatchEntries,
   runSnsBatch,
 } from "./sim-sns-batch-entries.js";
-import {
-  refuseUnsimulatedPublishTarget,
-  simSnsPublishedMessageInput,
-} from "./sim-sns-publish-input.js";
+import { simSnsPublishedMessageInput } from "./sim-sns-publish-input.js";
 import type {
   SimPublishBatchCommand,
   SimPublishBatchCommandOutput,
@@ -39,6 +36,9 @@ interface SimSnsPublishCommandsProperties {
 
 /**
  * The commands that publish messages to a topic.
+ *
+ * A publish reaches this once `SimSnsPublishDispatch` has decided it names a
+ * topic. Publishing to a phone number never arrives here.
  *
  * A topic keeps nothing a publish sends it. Real SNS hands a message to the
  * topic's subscriptions and forgets it, so a topic with no subscriptions
@@ -64,8 +64,6 @@ export class SimSnsPublishCommands {
     command: SimPublishCommand,
     options?: SimSnsRequestOptions,
   ): SimPublishCommandOutput {
-    refuseUnsimulatedPublishTarget(command.input);
-
     // The topic has to be there and the caller has to be allowed to publish to
     // it before anything is read out of the message.
     const topic = this.access.requireByArn(

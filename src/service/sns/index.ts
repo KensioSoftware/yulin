@@ -44,6 +44,12 @@ export {
 } from "./filter/sim-sns-filter-policy-scope.js";
 export type { SimSnsFilterSubject } from "./filter/sim-sns-filter-subject.js";
 export { SimSnsFilterValue } from "./filter/sim-sns-filter-value.js";
+export { SimSnsPhoneNumber } from "./sms/sim-sns-phone-number.js";
+export { SimSnsSentSmsMessage } from "./sms/sim-sns-sent-sms-message.js";
+export {
+  simSnsSenderIdAttribute,
+  simSnsSmsTypeAttribute,
+} from "./message/sim-sns-sms-attributes.js";
 export { SimSnsMessageAttributes } from "./message/sim-sns-message-attributes.js";
 export type {
   SimSnsMessageAttributeInput,
