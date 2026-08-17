@@ -51,8 +51,8 @@ and only the id tells them apart.
 
 ## Routing requests to a Lambda function
 
-An API needs three more resources before it serves anything: an integration naming the function, a
-route pointing at that integration, and a stage to serve it from. The function also has to allow API
+An API needs three more resources before it serves anything. Those are an integration naming the
+function, a route pointing at that integration, and a stage to serve it from. The function also has to allow API
 Gateway to invoke it. That grant is a permission on the function, not on the API. See
 [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
 Once all of that exists, `serveSimAws` answers requests to the generated endpoint by invoking the
@@ -252,8 +252,8 @@ from the routes `GET /pets/dog/1`, `GET /pets/dog/{id}`, `GET /pets/{proxy+}`, `
 `$default`.
 
 Rule 1 is documented by AWS, as is the literal-beating-parameter part of rule 3. Three things here
-are observed rather than documented: rule 2, the longest-literal-prefix part of rule 3, and the
-placement of the method comparison above the path comparison. Each is marked in the code next to the
+are observed rather than documented. They are rule 2, the longest-literal-prefix part of rule 3, and
+the placement of the method comparison above the path comparison. Each is marked in the code next to the
 rule it governs.
 
 A request whose path matches a route with a different method matches no route at all. An API with no
@@ -571,8 +571,8 @@ or carrying a claim that fails is answered with a 401, `{"message":"Unauthorized
 undisclosed, here and on real API Gateway. A mismatched audience is the exception. That one carries
 `error_description="the token does not have a valid audience"`, the one description AWS publishes.
 
-The claims are checked in the order AWS documents: the issuer, then the audience, then `exp`, `nbf`
-and `iat`. There is no allowance for clock skew, and every timestamp comes from the simulation's
+The claims are checked in the order AWS documents. The issuer comes first, then the audience, then
+`exp`, `nbf` and `iat`. There is no allowance for clock skew, and every timestamp comes from the simulation's
 clock. `simAws.clock().advanceBy(...)` expires a token that was accepted a moment before.
 
 ### Identity source
@@ -1318,7 +1318,7 @@ console.log(ordersHandler(order));
 ```
 
 The defaults describe an unauthorized `GET /` reaching the API's default stage, down to the headers
-API Gateway sets itself. The route key and the request agree whichever a test gives: an event for
+API Gateway sets itself. The route key and the request agree whichever a test gives. An event for
 `rawPath: "/orders"` is one for the `GET /orders` route, and an event for `routeKey: "POST /orders"`
 is a POST to `/orders`. A route key whose path is a template captures nothing on its own. An event for
 a parameterised route says the concrete path and its `pathParameters` itself, as above.

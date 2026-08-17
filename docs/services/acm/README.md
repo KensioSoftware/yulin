@@ -388,7 +388,7 @@ needs:
 | `simAws.acm().autoIssueCertificates()` | Never requires validation. Use this when a hosted zone exists for unrelated reasons and you don't care about certificates. |
 | `simAws.acm().requireDnsValidation()`  | Always requires DNS validation. Use this to exercise the validation path without creating a hosted zone first.             |
 
-A standalone `new SimAcm()` instance has no simulated Route53, so it always issues certificates
+A standalone `new SimAcm()` instance has no simulated Route53, and always issues certificates
 immediately. Calling `requireDnsValidation()` on one throws, because nothing can publish the record
 it would then wait for.
 
@@ -510,7 +510,7 @@ await acm.requestCertificate(
 ## Scope certificates to an account and region
 
 Use `SimAws` scopes to create ACM certificates in different simulated accounts and regions. ACM
-state is scoped to the selected account and region — certificates requested in one scope don't
+state is scoped to the selected account and region. Certificates requested in one scope don't
 appear in another.
 
 ```typescript sim-acm-account-region-scoping
@@ -650,9 +650,9 @@ console.log(describeOutput.Certificate?.Status);
 
 ### Validate a certificate from the template
 
-Give a `DomainValidationOptions` entry a `HostedZoneId` and simulated CloudFormation publishes the validation record itself, the same way real CloudFormation does. This is what CDK emits for `CertificateValidation.fromDns(zone)`, so a CDK-synthesized template works without changes.
+Give a `DomainValidationOptions` entry a `HostedZoneId` and simulated CloudFormation publishes the validation record itself, the same way real CloudFormation does. This is what CDK emits for `CertificateValidation.fromDns(zone)`. A CDK-synthesized template works without changes.
 
-A certificate resource is not complete until the certificate is issued — anything depending on the certificate is created after it exists, as in real CloudFormation.
+A certificate resource is only complete once the certificate is issued. Anything depending on the certificate is created after it exists, as in real CloudFormation.
 
 ```typescript sim-acm-cloudformation-dns-validation
 /**
@@ -708,7 +708,7 @@ console.log(stack.outputs.get("CertificateStatus")?.value); // ISSUED
 
 A `HostedZoneId` that names a hosted zone the simulator doesn't hold is skipped rather than failing. Route53 is often managed by another team or another tool. The certificate then follows the usual rule from [Validate a certificate against simulated Route53](#validate-a-certificate-against-simulated-route53): with nothing authoritative for its domain, it's issued without validation.
 
-If a hosted zone covers the domain but the validation record never appears, the stack fails rather than hanging. Real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing out — that's not useful in a test, so the resource fails immediately and names the record it waited for.
+If a hosted zone covers the domain but the validation record never appears, the stack fails rather than hanging. Real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing out, which is of little use in a test. The resource fails immediately and names the record it waited for.
 
 ## Available functionality
 

@@ -53,7 +53,7 @@ Two pools may share a name. Only the id identifies one.
 
 ## Password policy
 
-A pool created without a `Policies` of its own gets the real default: eight characters, with an
+A pool created without a `Policies` of its own gets the real default of eight characters, with an
 uppercase letter, a lowercase letter, a number and a symbol each required. A request setting some of
 those keeps the defaults for the rest.
 
@@ -504,7 +504,7 @@ Nothing here delivers an email or a text message. A pool records what it would h
 and `sentMessages` on the pool object hands the record over. Each message carries the recipient, the
 medium, the subject, the body and the occasion it was sent on.
 
-A message is recorded on three occasions: a `SignUp`, a `ResendConfirmationCode`, and an
+A message is recorded on three occasions. Those are a `SignUp`, a `ResendConfirmationCode`, and an
 `AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`. The verification wording is the
 pool's own, and `{####}` is replaced with the code the user was issued. A sign-up a `PreSignUp`
 handler auto-confirmed records none. That user has no code to answer with, and real Cognito sends it
@@ -580,7 +580,7 @@ code` and `Your verification code is {####}` for a verification message, and `Yo
 password` and `Your username is {username} and temporary password is {####}.` for an invitation.
 `EmailVerificationMessage`, `EmailVerificationSubject`, `SmsVerificationMessage` and
 `VerificationMessageTemplate` are all read, at whatever wording a request sets, held to the two
-rules real Cognito holds them to: a message carries `{####}`, and runs to 20,000 characters for an
+rules real Cognito holds them to. A message carries `{####}`, and runs to 20,000 characters for an
 email and the 140 an SMS carries.
 
 This is Cognito's own delivery record, not a simulated SES. Real Cognito with the default
@@ -2298,7 +2298,7 @@ A response naming something this simulation would have to drop is refused with
 `iat`, `exp` and `auth_time` come from the simulation's clock, not the host's, and the tokens
 last the hour a pool's tokens last unless the app client says otherwise.
 
-That makes an expired token something a test can produce: sign the user in with the simulated clock
+That makes an expired token something a test can produce. Sign the user in with the simulated clock
 set far enough in the past, and the token a verifier gets is already expired.
 
 ```typescript sim-cognito-expired-token
@@ -2452,7 +2452,7 @@ ARNs grants nothing.
 
 The client-side operations are the other exception. `InitiateAuth`, `RespondToAuthChallenge` and
 `GlobalSignOut` authorize against no resource at all, because real Cognito evaluates no IAM policy
-for them: they are what an application calls on behalf of a user, holding no AWS credentials. A
+for them. They are what an application calls on behalf of a user, holding no AWS credentials. A
 `caller` goes unread on those three, and the tokens or the app client id are what authorizes them.
 
 That is the difference the two sign-in paths make to a policy. Code calling `AdminInitiateAuth`
@@ -3190,7 +3190,7 @@ The `SecretCode` is a real RFC 6238 shared secret. An authenticator app or any T
 it produces the codes `VerifySoftwareToken` accepts, and a code from another secret is refused with
 `EnableSoftwareTokenMFAException`. A test that would rather not compute one reads the code the
 user's app would be showing off the pool, through `SimCognitoUserPool.softwareTokenCode`, in the way
-it reads a sign-up confirmation code: real Cognito reports neither to anyone, and nothing here is
+it reads a sign-up confirmation code. Real Cognito reports neither to anyone, and nothing here is
 holding the user's phone.
 
 Verifying a token registers it and leaves it disabled. `SetUserMFAPreference` is what turns a factor
@@ -3306,7 +3306,7 @@ console.log(user.PreferredMfaSetting); // "SOFTWARE_TOKEN_MFA"
 
 A sign-in by a user that has registered a factor is answered with `SMS_MFA` or `SOFTWARE_TOKEN_MFA`
 and a `Session` in place of tokens, on `InitiateAuth` and `AdminInitiateAuth` alike, and after
-a `NEW_PASSWORD_REQUIRED` response as well: one challenge follows the other. The code goes back
+a `NEW_PASSWORD_REQUIRED` response as well, one challenge following the other. The code goes back
 through `RespondToAuthChallenge` or `AdminRespondToAuthChallenge` as `SMS_MFA_CODE` or
 `SOFTWARE_TOKEN_MFA_CODE`, and that request is what hands out the tokens.
 
@@ -3333,7 +3333,7 @@ was challenged. `PreTokenGeneration` runs there too, reporting
 before this one. Which source real Cognito reports for that pair of challenges was not checked
 against a live account.
 
-A user with both factors enabled and neither preferred is refused: real Cognito answers that
+A user with both factors enabled and neither preferred is refused. Real Cognito answers that
 sign-in with `SELECT_MFA_TYPE`, a challenge of its own. `SetUserMFAPreference` naming one
 of them as `PreferredMfa` is what settles it.
 
@@ -3576,11 +3576,11 @@ Current documented limitations:
 - No message is ever delivered. A pool records what it would have sent and `sentMessages` reads it
   back, which real Cognito reports to nobody. Nothing leaves the simulation, and no
   `CodeDeliveryDetails` is reported by `SignUp` or `ResendConfirmationCode`.
-- A message is recorded on three occasions: `SignUp`, `ResendConfirmationCode` and
+- A message is recorded on three occasions, being `SignUp`, `ResendConfirmationCode` and
   `AdminCreateUser`. Password reset, MFA and the account-taken-over notices are occasions real
   Cognito sends on and this simulation never reaches.
 - A verification message is recorded only for an attribute the pool verifies automatically. A pool
-  with no `AutoVerifiedAttributes` records none, and only for a user that has to confirm: one a
+  with no `AutoVerifiedAttributes` records none, and only for a user that has to confirm. One a
   `PreSignUp` handler auto-confirmed is sent nothing, as on real Cognito. An invitation is recorded
   whatever the pool verifies, and both are recorded only where the user has an `email` or a
   `phone_number` to be reached at.
@@ -3646,7 +3646,7 @@ Current documented limitations:
 - A sign-in by a user of an `ON` pool that has registered no factor is refused, because real Cognito
   answers that one with the `MFA_SETUP` challenge, which registers a factor mid-sign-in and is
   outside the simulation. A user with both factors enabled and neither preferred is refused for the
-  same kind of reason: real Cognito answers that with `SELECT_MFA_TYPE`.
+  same kind of reason, real Cognito answering that with `SELECT_MFA_TYPE`.
 - An MFA code is texted to the user's `phone_number` whatever the pool's `AutoVerifiedAttributes`
   say, and the pool records it as a message with an occasion of `Authentication`, where a test reads
   it from. Real Cognito delivers it and reports it to nobody.
@@ -3654,8 +3654,8 @@ Current documented limitations:
   because no device is remembered here.
 - A user's software token secret is a real RFC 6238 shared secret, and the pool reports the code the
   user's authenticator app would be showing through `SimCognitoUserPool.softwareTokenCode`. Real
-  Cognito reports that to nobody: the code is on the user's own device, in the way a confirmation
-  code is in the user's own inbox.
+  Cognito reports that to nobody, because the code is on the user's own device, in the way a
+  confirmation code is in the user's own inbox.
 - `VerifySoftwareToken` registers a token and enables nothing, so `SetUserMFAPreference` is what
   turns a factor on. Whether real Cognito also activates a TOTP factor on verification alone was not
   checked against a live account.
@@ -3672,7 +3672,7 @@ Current documented limitations:
   `USER_AUTH` flow, itself refused as a flow of its own.
 - `AssociateSoftwareToken` and `VerifySoftwareToken` take an `AccessToken` and refuse a `Session`,
   because the `MFA_SETUP` challenge that would issue one is outside the simulation. A
-  `FriendlyDeviceName` is refused for the same kind of reason: device tracking is outside the
+  `FriendlyDeviceName` is refused for the same kind of reason, device tracking being outside the
   simulation.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does. A
   setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
@@ -3685,7 +3685,7 @@ Current documented limitations:
   in the same words.
 - `UpdateUserPoolClient` replaces an app client's settings the same way. A setting the request
   leaves out goes back to the default `CreateUserPoolClient` would have given it. `ClientName` is
-  the exception: a client has to have a name and there is no default to reset to, and an update that
+  the exception. A client has to have a name and there is no default to reset to, so an update that
   names none keeps the one the client has.
 - An update leaves the client's secret alone. `UpdateUserPoolClient` has no `GenerateSecret` input
   on real Cognito, and a client created without a secret never gains one.
@@ -3696,7 +3696,7 @@ Current documented limitations:
   refused when the pool is created or updated, naming the trigger, because a pool that accepted one
   would never call the function the template named. The custom challenge triggers would need a
   challenge loop this simulation lacks, and the migration and federation triggers have no external
-  directory to reach: a simulated identity provider answers with the user `signInAs` put there,
+  directory to reach. A simulated identity provider answers with the user `signInAs` put there,
   beyond the reach of a trigger.
 - `AdminCreateUser` leaves `PostConfirmation` unfired, here and on real Cognito. It is the tempting
   place to hang the trigger and the wrong one. A project relying on it would pass here and write no
@@ -3757,8 +3757,8 @@ Current documented limitations:
   way of naming the user, and that is unmodelled.
 - A `UsernameAttributes` pool resolves the address for its admin operations and its sign-ins, and
   refuses a second user holding an address another user already signs in by.
-- Unsimulated `CreateUserPoolClient` inputs are refused the same way: a `ClientSecret` of your own,
-  `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
+- Unsimulated `CreateUserPoolClient` inputs are refused the same way. They are a `ClientSecret` of
+  your own, `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
   `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
   `false`. `UpdateUserPoolClient` refuses the same inputs, in the same words.
 - The OAuth settings need `AllowedOAuthFlowsUserPoolClient` to be true before they can be set, as
@@ -3766,8 +3766,8 @@ Current documented limitations:
   browser, and `client_credentials` needs the resource servers that define its scopes, so both are
   refused. `AllowedOAuthScopes` takes the system scopes, and a custom scope is refused for the same
   reason.
-- Unsimulated authentication inputs are refused the same way: `AnalyticsMetadata` on all four
-  operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
+- Unsimulated authentication inputs are refused the same way. They are `AnalyticsMetadata` on all
+  four operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
   on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow neither of them starts.
 - A pool's schema is settled when the pool is created. `AddCustomAttributes` is unimplemented, and
   an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
@@ -3792,7 +3792,7 @@ Current documented limitations:
   `end_session_endpoint` once the pool has a domain, at that domain's local hostname. It carries no
   `userinfo_endpoint`, where real Cognito names one.
 - Nothing calls an external identity provider. A provider's `ProviderDetails` are recorded and
-  validated for presence, and never used: the user a simulated provider signs in is the one
+  validated for presence, and never used. The user a simulated provider signs in is the one
   `signInAs` put there. That accessor is a divergence for the same reason `confirmationCode` is one.
 - A custom domain answers on its own hostname with no Route53 record of its own, where real AWS
   needs an alias record to the CloudFront distribution Cognito creates. The distribution name a

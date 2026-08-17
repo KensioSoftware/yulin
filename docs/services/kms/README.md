@@ -3,14 +3,15 @@
 Yulin includes a simulated AWS Key Management Service (KMS) for tests and local development.
 
 Encryption is real. Each simulated key holds AES-256 key material and the operations run through
-Node.js's own `crypto`, so a ciphertext cannot be read without its key, and a decryption with the
-wrong encryption context fails.
+Node.js's own `crypto`. A ciphertext can only be read with its key, and a decryption with the wrong
+encryption context fails.
 
 KMS-specific types are imported from the `@kensio/yulin/kms` subpath.
 
 ## Encrypting and decrypting
 
-Create a key and use it. `Decrypt` needs no `KeyId` for a symmetric key, because the ciphertext already names the key that produced it.
+Create a key and use it. `Decrypt` needs no `KeyId` for a symmetric key, because the ciphertext
+already names the key that produced it.
 
 ```typescript sim-kms-encrypt-decrypt
 /**
@@ -46,13 +47,13 @@ const decrypted = await kms.decrypt(
 console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter2"
 ```
 
-The ciphertext blob is opaque. Nothing outside the simulator should try to read it. It is not
-portable to real AWS, or between two `SimAws` instances.
+The ciphertext blob is opaque. Only the `SimAws` instance that produced it can read it. Real AWS and
+any second `SimAws` instance both reject it.
 
 ## Encryption context
 
-An encryption context is non-secret key/value data bound to a ciphertext. Supplying a different one
-on decryption fails, which ties a ciphertext to the thing it belongs to.
+An encryption context is non-secret key/value data bound to a ciphertext. Decryption with a
+different context fails. That ties a ciphertext to the thing it belongs to.
 
 ```typescript sim-kms-encryption-context
 /**
@@ -95,13 +96,13 @@ try {
 }
 ```
 
-The context is an unordered map, so the same pairs written in a different order still decrypt.
+The context is an unordered map. The same pairs written in a different order still decrypt.
 
 ## Envelope encryption
 
-`Encrypt` takes at most 4096 bytes, which is the limit that makes envelope encryption necessary.
-`GenerateDataKey` returns a data key twice: once in the clear, to encrypt your data with, and once
-encrypted under the KMS key, to store alongside it.
+`Encrypt` takes at most 4096 bytes. That limit is what makes envelope encryption necessary.
+`GenerateDataKey` returns a data key twice, once in the clear to encrypt your data with, and once
+encrypted under the KMS key to store alongside it.
 
 ```typescript sim-kms-generate-data-key
 /**
@@ -188,16 +189,16 @@ const verified = await kms.verify(
 console.log(verified.SignatureValid); // true
 ```
 
-`Verify` fails with `KMSInvalidSignatureException` when a signature does not check out, rather than
-answering `SignatureValid: false`. That is what real KMS does.
+`Verify` raises `KMSInvalidSignatureException` for a signature that fails to check out. Real KMS
+does the same, in place of answering `SignatureValid: false`.
 
 The key specs simulated are `ECC_NIST_P256`, `ECC_NIST_P384`, `ECC_NIST_P521`, `ECC_SECG_P256K1`,
 `RSA_2048`, `RSA_3072` and `RSA_4096`. Each ECC spec offers the one ECDSA algorithm paired with its
-curve; each RSA spec offers all six RSASSA algorithms. A signing algorithm the key spec does not
-offer is refused. So is `Sign` against an encryption key, and `Encrypt` against a signing key.
+curve. Each RSA spec offers all six RSASSA algorithms. A signing algorithm the key spec leaves out
+is refused. So is `Sign` against an encryption key, and `Encrypt` against a signing key.
 
-`DescribeKey` reports the key's own spec, usage and algorithms, so code that branches on them
-branches the same way it would on AWS.
+`DescribeKey` reports the key's own spec, usage and algorithms. Code that branches on them branches
+the same way it would on AWS.
 
 ### Verifying outside KMS
 
@@ -260,14 +261,14 @@ both matching what KMS produces. `GetPublicKey` against a symmetric key is
 
 ## Key policies and IAM
 
-Every KMS key has a policy, and it cannot be removed. An IAM policy granting `kms:Decrypt` reaches
-nothing unless the key's own policy admits the caller. How it admits them decides what else is
+Every KMS key has a policy, and it cannot be removed. An IAM policy granting `kms:Decrypt` only
+takes effect where the key's own policy admits the caller. How it admits them decides what else is
 needed:
 
-- A statement naming the caller grants access outright, so a role with no permissions of its own can
+- A statement naming the caller grants access outright. A role with no permissions of its own can
   still use the key.
-- A statement naming the account root, which is what the default key policy contains, only delegates
-  to that account's IAM. The caller still needs an identity policy allowing the action.
+- A statement naming the account root only delegates to that account's IAM. The caller still needs
+  an identity policy allowing the action. The default key policy is of this kind.
 
 ```typescript sim-kms-key-policy
 /**
@@ -342,20 +343,20 @@ on real KMS.
 ## AWS managed keys and `kms:ViaService`
 
 An alias beginning `alias/aws/` names an AWS managed key, and the key is created the first time
-something references it. Such a key gets the policy real AWS gives it, which is not the customer
-default:
+something references it. Such a key gets the policy real AWS gives it, which differs from the
+customer default:
 
 - Use of the key is allowed to any principal in the owning account, but only when `kms:ViaService`
   names the service that owns the key, such as `ssm.us-east-1.amazonaws.com` for `aws/ssm`.
-- The account root is allowed to read the key's metadata, and nothing more. Nothing about using the
-  key is delegated to IAM.
+- The account root is allowed to read the key's metadata. That is the whole of what this policy
+  delegates to IAM.
 
 That is why a role holding only `ssm:GetParameter` reads a decrypted `SecureString` under `aws/ssm`,
 and why a role holding `kms:Decrypt` on that key still cannot use it by calling KMS itself.
 
 `kms:ViaService` is set by the service making the call on the caller's behalf. Sim SSM does this for
 `SecureString` parameters. Code calling simulated KMS directly sets it with the `viaService` request
-option, naming the service on its own rather than as an endpoint, since the region is the key's.
+option, naming the service on its own (`ssm`), since the region is the key's.
 
 ```typescript sim-kms-aws-managed-key
 /**
@@ -403,15 +404,15 @@ console.log(policy.Policy); // the via-service-scoped policy
 
 A key policy of your own can use `kms:ViaService` too, with the ordinary condition operators, and it
 matches for requests carrying the option. A request that names no service has no value for the key,
-so a condition on it does not match.
+and a condition on it stays unmatched.
 
 ## Naming a key
 
-Every operation takes its target as a `KeyId`, and any of the four forms real KMS accepts will do: a
-key ID, a key ARN, an alias name such as `alias/app-key`, or an alias ARN.
+Every operation takes its target as a `KeyId`, in any of the four forms real KMS accepts. Those are
+a key ID, a key ARN, an alias name such as `alias/app-key`, and an alias ARN.
 
-A key ARN or alias ARN naming another account or region resolves to nothing, rather than having its
-identifier read out and looked up locally. A foreign ARN cannot reach a key that happens to share an
+A key ARN or alias ARN naming another account or region resolves to no key at all. Its identifier is
+never read out and looked up locally. A foreign ARN cannot reach a key that happens to share an
 identifier.
 
 Aliases beginning `alias/aws/` are reserved for AWS managed keys. `CreateAlias` refuses to create
@@ -461,16 +462,15 @@ console.log(managed.KeyMetadata?.KeyManager); // "AWS"
 
 ## Key state and deletion
 
-A key can be disabled, which leaves it present but unusable, and re-enabled later.
+A key can be disabled and re-enabled later. A disabled key stays present, and refuses to be used.
 
 Deletion is never immediate. `ScheduleKeyDeletion` sets a recovery window of 7 to 30 days, defaulting
 to 30. During that window the key refuses to be used but can still be recovered with
-`CancelKeyDeletion`. Cancelling leaves the key disabled rather than enabled, so re-enabling it is a
-separate step.
+`CancelKeyDeletion`. Cancelling leaves the key disabled. Re-enabling it is a separate step.
 
 A disabled key fails cryptographic operations with `DisabledException`. A key pending deletion fails
-with `KMSInvalidStateException`. The two are distinct: one means the key can be enabled again, the
-other means it is on its way out.
+with `KMSInvalidStateException`. The two are distinct. One means the key can be enabled again, the
+other that it is on its way out.
 
 ## Scoping
 
@@ -511,14 +511,14 @@ try {
 
 Simulated CloudFormation creates a key from an `AWS::KMS::Key` resource and points an
 `AWS::KMS::Alias` at it, in the stack's account and region. The key comes out of the same `CreateKey`
-path an SDK caller uses, so it has real key material. A `KeyPolicy` the template declares becomes the
-key policy. Omitting `KeyPolicy` gets the default root-delegation policy, as `CreateKey` with no
+path an SDK caller uses, with real key material. A `KeyPolicy` the template declares becomes the key
+policy. Omitting `KeyPolicy` gets the default root-delegation policy, as `CreateKey` with no
 `Policy` does.
 
-`Ref` on the key gives its key ID rather than its ARN, as on real AWS, and `Fn::GetAtt` gives `Arn`
-or `KeyId`. `Ref` on the alias gives the alias name, such as `alias/app-key`, which is itself usable
-as a `KeyId`. So a property wanting a key ID takes the `Ref`, while an IAM policy resource wanting
-the key needs `Fn::GetAtt … Arn`.
+`Ref` on the key gives its key ID, as on real AWS, and `Fn::GetAtt` gives `Arn` or `KeyId`. `Ref` on
+the alias gives the alias name, such as `alias/app-key`, and an alias name is itself usable as a
+`KeyId`. So a property wanting a key ID takes the `Ref`, while an IAM policy resource wanting the
+key needs `Fn::GetAtt … Arn`.
 
 ```typescript sim-kms-cloudformation-key
 /**
@@ -572,16 +572,17 @@ console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter
 console.log(stack.outputs.get("KeyArn")?.value); // "arn:aws:kms:...:key/..."
 ```
 
-Properties asking for behaviour that is not simulated do not stop the key being created. The key is
-created without them and each one is recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
-so a template deploys and the record says what the key does not do. `EnableKeyRotation`,
-`RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way: the key encrypts and
-decrypts, its material never rotates, it exists in one region, and nothing reads its tags. A `KeySpec`
-or `KeyUsage` pair simulated KMS does not model, or an `Origin` other than `AWS_KMS`, is still
-refused by `CreateKey` in the same terms it refuses an SDK caller, because there is no key to
-create at all.
-`Enabled: false` is supported, and deploys a key that is disabled from the moment it exists.
+A property asking for behaviour Yulin leaves out still deploys. The key is created without it, and
+the property is recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+The template deploys, and the record says what the key leaves out. `EnableKeyRotation`,
+`RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way. The key encrypts and
+decrypts, its material stays as it was, it exists in one region, and its tags go unread.
+
+A `KeySpec` or `KeyUsage` pair simulated KMS has no model for, or an `Origin` other than `AWS_KMS`,
+is refused by `CreateKey` in the same terms it refuses an SDK caller, since there is no key to
+create at all. `Enabled: false` is supported, and deploys a key that is disabled from the moment it
+exists.
 
 ## Inside a simulated Lambda handler
 
@@ -611,47 +612,48 @@ Sim KMS currently supports:
 
 Current documented limitations:
 
-- Only encryption with a symmetric key and signing with an asymmetric key are simulated. Asymmetric
-  encryption (`RSAES_OAEP_SHA_1` and `RSAES_OAEP_SHA_256`), HMAC keys and `GENERATE_VERIFY_MAC`,
-  key agreement and `DeriveSharedSecret`, the `SM2` key spec, and `ReEncrypt` are not. An RSA key
-  asked for with `KeyUsage: ENCRYPT_DECRYPT` is refused, which real KMS allows.
-- `Sign` and `Verify` take a `MessageType` of `RAW` only. A `DIGEST` message is refused, because
-  Node cannot sign a digest that has already been computed: `crypto.sign` with no algorithm hashes
-  what it is given rather than signing it, so the signature would not be the one real KMS makes and
-  would not verify against the message anywhere outside the simulator.
-- Generating an RSA key pair is real key generation, so an `RSA_4096` key costs a second or so of
-  test time. The ECC specs are effectively free.
-- Imported key material and custom key stores are not simulated; `Origin` other than `AWS_KMS` is
+- Only encryption with a symmetric key and signing with an asymmetric key are simulated. Left out
+  are asymmetric encryption (`RSAES_OAEP_SHA_1` and `RSAES_OAEP_SHA_256`), HMAC keys and
+  `GENERATE_VERIFY_MAC`, key agreement and `DeriveSharedSecret`, the `SM2` key spec, and
+  `ReEncrypt`. An RSA key asked for with `KeyUsage: ENCRYPT_DECRYPT` is refused, which real KMS
+  allows.
+- `Sign` and `Verify` take a `MessageType` of `RAW` only. A `DIGEST` message is refused. Node cannot
+  sign a digest that has already been computed, because `crypto.sign` with no algorithm hashes what
+  it is given. The resulting signature would differ from the one real KMS makes, and would fail to
+  verify against the message anywhere outside the simulator.
+- Generating an RSA key pair is real key generation. An `RSA_4096` key costs a second or so of test
+  time. The ECC specs are effectively free.
+- Imported key material and custom key stores are left out. `Origin` other than `AWS_KMS` is
   refused.
-- Grants (`CreateGrant` and friends) are not simulated.
-- Automatic key rotation is not simulated. An `AWS::KMS::Key` declaring `EnableKeyRotation` or
+- Grants (`CreateGrant` and friends) are left out.
+- Key material stays as it was created. An `AWS::KMS::Key` declaring `EnableKeyRotation` or
   `RotationPeriodInDays` is created without it, and the property is recorded in
   `stack.ignoredProperties`.
-- Multi-Region keys are not simulated. An `AWS::KMS::Key` declaring `MultiRegion: true` is created as
-  a key in one region, and the property is recorded.
+- A Multi-Region key comes out as an ordinary key in one region. An `AWS::KMS::Key` declaring
+  `MultiRegion: true` deploys that way, and the property is recorded.
 - `AWS::KMS::Key` accepts but ignores `PendingWindowInDays` and `BypassPolicyLockoutSafetyCheck`.
-  Neither has anything to act on: a stack teardown schedules the key for deletion with the default
-  window, and simulated KMS applies no policy lockout safety check to bypass.
+  Both are inert here. A stack teardown schedules the key for deletion with the default window, and
+  simulated KMS applies no policy lockout safety check to bypass.
 - An `AWS::KMS::Alias` retargeted by a stack update is deleted and created again pointing at the new
   key, because a stack update replaces a changed resource and simulated KMS has no `UpdateAlias`.
-- `AWS::KMS::Grant` and `AWS::KMS::ReplicaKey` are not supported; a template declaring one is
-  refused.
+- A template declaring `AWS::KMS::Grant` or `AWS::KMS::ReplicaKey` is refused.
 - A key pending deletion stays in that state indefinitely. Advancing the simulated clock past the
-  recovery window does not delete it, so the key ID stays taken.
-- `UpdateAlias` is not supported. An alias is retargeted by deleting it and creating it again.
-- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated. An
-  `AWS::KMS::Key` declaring `Tags` deploys with the tags dropped and the property recorded, so a
-  policy condition written around one matches nothing here and matches on AWS.
-- `kms:EncryptionContext:*` and other KMS-specific condition keys beyond `kms:ViaService` and
-  `kms:CallerAccount` are not derived, so a policy relying on them will not match. Ordinary condition
-  operators on values sim IAM does supply work as usual.
-- The service an AWS managed key belongs to is taken from its alias, so `alias/aws/ebs` is scoped to
+  recovery window leaves it there, and the key ID stays taken.
+- `UpdateAlias` is absent. An alias is retargeted by deleting it and creating it again.
+- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are left out. An
+  `AWS::KMS::Key` declaring `Tags` deploys with the tags dropped and the property recorded. A policy
+  condition written around one fails to match here, where on AWS it would match.
+- `kms:ViaService` and `kms:CallerAccount` are the KMS-specific condition keys derived. A policy
+  relying on `kms:EncryptionContext:*` or any other one fails to match. Ordinary condition operators
+  on values sim IAM does supply work as usual.
+- The service an AWS managed key belongs to is taken from its alias. `alias/aws/ebs` is scoped to
   `ebs.<region>.amazonaws.com`. Real AWS scopes that one to EC2. The two agree for every service
   Yulin simulates.
-- Key material lives in process memory for the lifetime of the `SimAws` instance. That is not a
-  security boundary: anything sharing the process can reach it.
+- Key material lives in process memory for the lifetime of the `SimAws` instance. Anything sharing
+  the process can reach it.
 - Sim SSM encrypts `SecureString` parameters with simulated keys, checking `kms:Encrypt` and
   `kms:Decrypt`, and sim Secrets Manager encrypts every secret version, checking
-  `kms:GenerateDataKey` and `kms:Decrypt`. No other simulated service uses simulated keys: sim S3,
-  sim DynamoDB and sim Lambda environment variables do not, and do not check `kms:Decrypt`.
+  `kms:GenerateDataKey` and `kms:Decrypt`. No other simulated service uses simulated keys. Sim S3,
+  sim DynamoDB and sim Lambda environment variables leave them alone, and skip the `kms:Decrypt`
+  check.
 - KMS is not served as an HTTP API by `serveSimAws`.
