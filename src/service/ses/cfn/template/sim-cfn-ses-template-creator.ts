@@ -41,6 +41,8 @@ export class SimCfnSesTemplateCreator {
     const templateName = templateProperties.templateName();
     const content = templateProperties.content();
 
+    templateProperties.recordIgnoredProperties();
+
     return await simCfnSesResourceCreation(
       sesTemplateResourceType,
       resource.logicalId,

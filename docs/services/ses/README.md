@@ -335,9 +335,14 @@ The SDK path is stricter on purpose. `CreateEmailIdentity` refuses `DkimSigningA
 because a caller reaching for it directly is asking for that behaviour and should be told it is not
 there. A template is a whole document, and one property in it should not sink the deploy.
 
-A template Resource has no such list: everything `AWS::SES::Template` can say is wording, and all of
-it is acted on. A template carrying Handlebars this simulator does not render fails the deploy rather
-than sitting in the stack waiting to fail at the first send.
+A template Resource has no such list, because everything `AWS::SES::Template` can usefully say is
+wording and all of it is acted on. Anything else it says is still reported, at both levels: a
+property beside `Template`, and a part inside it that is not one of the four. In practice that
+catches a misspelling, which is worth catching, since `TextPart` written `Textpart` would otherwise
+send a message with no body and nothing to explain it.
+
+A template carrying Handlebars this simulator does not render is a different matter, and fails the
+deploy rather than sitting in the stack waiting to fail at the first send.
 
 ## The sandbox
 

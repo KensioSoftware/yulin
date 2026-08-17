@@ -188,4 +188,50 @@ describe("AWS::SES::Template", () => {
       "Template.SubjectPart must be a string",
     );
   });
+
+  it("records a misspelled wording part rather than dropping it", async () => {
+    // Given a template that misspells one of its parts, which is the mistake
+    // this reporting exists to catch.
+    const { simAws, stack } = await deployTemplate({
+      TemplateName: "welcome",
+      SubjectPart: "Welcome",
+      Textpart: "Hi there",
+    });
+
+    // Then the template deployed with no body, and the property it was created
+    // without is named rather than dropped in silence.
+    assertUndefined(simAws.sesV2().findTemplate("welcome")?.content.text);
+
+    const ignored = stack.ignoredProperties.find(
+      (property) => property.path === "Template.Textpart",
+    );
+
+    assertNonNullable(ignored);
+    assertStringIncludes(ignored.reason, "AWS::SES::Template");
+  });
+
+  it("records a property sitting beside Template", async () => {
+    // Given a template with a stray property outside the wording.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders",
+      template: {
+        Resources: {
+          WelcomeEmail: {
+            Type: "AWS::SES::Template",
+            Properties: {
+              Template: { TemplateName: "welcome", TextPart: "Hi" },
+              Tags: [{ Key: "team", Value: "orders" }],
+            },
+          },
+        },
+      },
+    });
+
+    // Then it is recorded too: a stray property can sit beside Template as
+    // well as inside it.
+    assertNonNullable(
+      stack.ignoredProperties.find((property) => property.path === "Tags"),
+    );
+  });
 });
