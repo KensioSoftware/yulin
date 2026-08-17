@@ -1,7 +1,6 @@
 Brief, concise description of the change:
 
-<!-- One paragraph of prose, no headings or bullet lists. CodeRabbit will fill
-     in a more detailed description once this is open. -->
+<!-- CodeRabbit will fill in a more detailed description once this is open. -->
 
 <!-- If there is an issue, link it here:
      Resolves https://github.com/KensioSoftware/yulin/issues/N -->
