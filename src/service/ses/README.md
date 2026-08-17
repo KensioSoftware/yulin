@@ -105,6 +105,28 @@ at `CreateEmailTemplate` and `UpdateEmailTemplate` rather than at the send. That
 mistake is written, and follows the house pattern of refusing an unsimulated input at the command
 that carries it.
 
+## CloudFormation model
+
+Resource creation lives under `cfn/`, and the CloudFormation-facing Ref and GetAtt values under
+`src/service/cloudformation/resource/cfn/ses/`, beside every other service's.
+
+Both Resource types go through the ordinary SES commands rather than constructing state directly, so
+one a stack deployed is the same thing an SDK caller would have got, and a template carrying
+unrenderable Handlebars fails the deploy rather than sitting in the stack waiting to fail at the
+first send.
+
+The two resource types split on what an unsimulated property costs, which is the split the whole
+CloudFormation layer makes. An identity Resource records `DkimAttributes`, `MailFromAttributes` and
+the rest as ignored and creates the identity without them, because an identity without any of them
+still does everything an identity does here. A template Resource has no such list: everything it can
+say is wording, and wording it cannot render is a real failure.
+
+`sim-ses-dkim-tokens.ts` is the one piece of invention. `Fn::GetAtt` on an identity reads six DKIM
+tokens, and there is no key here to derive one from, so they are hashed from the identity name:
+stable per identity, and meaningless. Refusing them was the first thing tried and is the wrong
+answer, because `ses.Identity.publicHostedZone()` in CDK emits three Route53 record sets reading
+exactly those attributes, so refusing takes an ordinary stack down over records nothing reads.
+
 ## Account model
 
 Account state lives under `account/`.

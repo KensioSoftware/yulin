@@ -16,6 +16,7 @@ import { route53ValueAdapter } from "./route53/sim-route53-cfn-value-adapter.js"
 import { s3ValueAdapter } from "./s3/sim-s3-cfn-value-adapter.js";
 import { schedulerValueAdapter } from "./scheduler/sim-scheduler-cfn-value-adapter.js";
 import { secretsManagerValueAdapter } from "./secretsmanager/sim-secrets-manager-cfn-value-adapter.js";
+import { sesValueAdapter } from "./ses/sim-ses-cfn-value-adapter.js";
 import { snsValueAdapter } from "./sns/sim-sns-cfn-value-adapter.js";
 import { sqsValueAdapter } from "./sqs/sim-sqs-cfn-value-adapter.js";
 import { ssmValueAdapter } from "./ssm/sim-ssm-cfn-value-adapter.js";
@@ -54,6 +55,7 @@ export const simCfnServiceValueAdapters: readonly ((
   s3ValueAdapter,
   schedulerValueAdapter,
   secretsManagerValueAdapter,
+  sesValueAdapter,
   snsValueAdapter,
   sqsValueAdapter,
   ssmValueAdapter,

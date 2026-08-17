@@ -240,6 +240,110 @@ Naming both is refused, because which of them real SES renders is not something 
 knows, and recording the message under a template it was not rendered from would be worse than
 failing.
 
+## Deploying identities and templates with CloudFormation
+
+`AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy into simulated SES, so a project that
+declares them in CDK or CloudFormation can deploy the same template its application deploys rather
+than creating them by hand in test setup.
+
+```typescript sim-ses-cloudformation
+/**
+ * Deploying an SES identity and template, then sending from them.
+ */
+
+import { SendEmailCommand } from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      SenderIdentity: {
+        Type: "AWS::SES::EmailIdentity",
+        Properties: { EmailIdentity: "example.com" },
+      },
+      WelcomeEmail: {
+        Type: "AWS::SES::Template",
+        Properties: {
+          Template: {
+            TemplateName: "welcome",
+            SubjectPart: "Welcome, {{name}}",
+            TextPart: "Hi {{name}}",
+          },
+        },
+      },
+    },
+  },
+});
+
+const ses = simAws.sesV2();
+
+// The stack leaves the identity unverified, as a real deploy does. Verifying
+// finds the one the stack made rather than creating a second.
+ses.verifyIdentity("example.com");
+ses.verifyIdentity("example.org");
+
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Template: { TemplateName: "welcome", TemplateData: '{"name":"Ada"}' },
+    },
+  }),
+);
+
+// "Welcome, Ada"
+console.log(ses.sentEmails()[0]?.subject);
+```
+
+An identity deploys **unverified**. That is what a real deploy leaves behind: the confirmation link
+or the DKIM records still have to be dealt with out of band. Verify it afterwards with
+`verifyIdentity`, in that order: verifying first and deploying second fails the deploy, because
+CloudFormation is creating an identity that is already there.
+
+`Ref` on an identity returns the address or domain itself, which is directly usable as a
+`FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name.
+
+Deleting the stack removes both.
+
+### DKIM tokens
+
+`Fn::GetAtt` on an identity reads the six DKIM token attributes, and this simulator answers them
+with tokens it made up. They are derived from the identity's own name, so they are the same on every
+run, and they are not real: nothing here signs a message.
+
+They exist because `ses.Identity.publicHostedZone()` in CDK emits three `AWS::Route53::RecordSet`
+Resources reading exactly these attributes. Refusing them would take an ordinary CDK stack down over
+records nothing in this simulation reads, so the stack deploys with records of the right shape
+pointing at nothing.
+
+### What an identity Resource is deployed without
+
+`EmailIdentity` is the only property acted on. `DkimAttributes`, `DkimSigningAttributes`,
+`MailFromAttributes`, `FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are recorded as
+ignored and the identity is created without them, because an identity without any of them still does
+the one thing an identity does here: exist to be verified, and let a send from it through.
+
+`stack.ignoredProperties` is where they are reported, each with the reason it was not acted on, so
+nothing is dropped in silence.
+
+The SDK path is stricter on purpose. `CreateEmailIdentity` refuses `DkimSigningAttributes` outright,
+because a caller reaching for it directly is asking for that behaviour and should be told it is not
+there. A template is a whole document, and one property in it should not sink the deploy.
+
+A template Resource has no such list, because everything `AWS::SES::Template` can usefully say is
+wording and all of it is acted on. Anything else it says is still reported, at both levels: a
+property beside `Template`, and a part inside it that is not one of the four. In practice that
+catches a misspelling, which is worth catching, since `TextPart` written `Textpart` would otherwise
+send a message with no body and nothing to explain it.
+
+A template carrying Handlebars this simulator does not render is a different matter, and fails the
+deploy rather than sitting in the stack waiting to fail at the first send.
+
 ## The sandbox
 
 An account starts in the SES sandbox, where **both** the sender and every recipient have to be
@@ -511,8 +615,10 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError` rather than m
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
   suppression list, no configuration sets and no event destinations. A configuration set named on a
   send is kept on the record so a test can assert the right one was used, and does nothing else.
-- **No `AWS::SES::*` CloudFormation resources yet.** Identities and templates have to be created
-  through the API, or an identity through `verifyIdentity`.
+- **DKIM tokens on `AWS::SES::EmailIdentity` are made up.** They are stable per identity so a test
+  can assert on them, and they prove nothing.
+- **Only `AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy.** `AWS::SES::ConfigurationSet`,
+  `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are not simulated.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is not simulated.
 - **DKIM, MAIL FROM domains and sending authorization policies are not simulated.** An identity
   created with `DkimSigningAttributes` is refused rather than reported as configured.

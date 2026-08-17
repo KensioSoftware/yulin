@@ -4,6 +4,7 @@ import type { SimSesRequestOptions } from "./command/sim-ses-request-options.js"
 import type { SimSesSentEmail } from "./email/sim-ses-sent-email.js";
 import type { SimSesIdentity } from "./identity/sim-ses-identity.js";
 import type { SimSesTemplate } from "./template/sim-ses-template.js";
+import { SimSesCfnResourceFactory } from "./cfn/sim-ses-cfn-resource-factory.js";
 import { SimSesSdkCommandRouter } from "./sdk/sim-ses-sdk-command-router.js";
 import { SimSesCommands, type SimSesV2Properties } from "./sim-ses-commands.js";
 
@@ -31,6 +32,7 @@ import { SimSesCommands, type SimSesV2Properties } from "./sim-ses-commands.js";
 export class SimSesV2 {
   readonly #commands: SimSesCommands;
   readonly #sdkRouter = new SimSesSdkCommandRouter(this);
+  readonly #cfnFactory = new SimSesCfnResourceFactory({ ses: this });
 
   constructor(properties: SimSesV2Properties = {}) {
     this.#commands = new SimSesCommands(properties);
@@ -263,6 +265,13 @@ export class SimSesV2 {
   ): Promise<simSesCommands.SimPutAccountDetailsCommandOutput> {
     await this.#commands.background.sequence();
     return this.#commands.accountCommands.putAccountDetails(command, options);
+  }
+
+  /**
+   * Get the CloudFormation Resource factory for AWS::SES::* Resources.
+   */
+  cfnResourceFactory(): SimSesCfnResourceFactory {
+    return this.#cfnFactory;
   }
 
   /**
