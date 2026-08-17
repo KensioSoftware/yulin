@@ -1,9 +1,10 @@
 # Linting CloudFront Functions JS2
 
 CloudFront Functions run JS2, ECMAScript 5.1 with a named subset of ES 6 to 12 on top, rather than
-a current JavaScript engine. Code using a class, `for...of` or `fetch` is refused when
-the Function is published, a long way from where it was written. Yulin publishes lint configs that
-refuse the same things in the editor.
+a current JavaScript engine. A class or a `for...of` is a syntax error, and CloudFront refuses the
+code when you upload it. A call to `fetch` parses, and then fails at the edge, where that global is
+absent and there is no network to reach. Both are a long way from where the code was written, and
+Yulin publishes lint configs that refuse the same things in the editor.
 
 The configs apply to `**/*.cff.js` files. That is the naming
 [sim CloudFront](../services/cloudfront/ "Simulated CloudFront usage docs") already uses for
