@@ -125,6 +125,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.scheduler().cfnResourceFactory(),
   ],
   [
+    "SES",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.sesV2().cfnResourceFactory(),
+  ],
+  [
     "SNS",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.sns().cfnResourceFactory(),
