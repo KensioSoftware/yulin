@@ -3774,7 +3774,7 @@ Current documented limitations:
   such input.
 - The managed login pages are bare forms with no styling and no script, and
   `AWS::Cognito::ManagedLoginBranding` is an unsupported resource type. They are also at paths of
-  this simulation's own: real managed login serves its sign-in form at `/login` and confirms a
+  this simulation's own. Real managed login serves its sign-in form at `/login` and confirms a
   sign-up within `/signup`, where here the authorize endpoint answers with the form itself and
   `/confirm` is a page. `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML
   endpoints go unserved.
