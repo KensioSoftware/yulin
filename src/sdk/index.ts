@@ -25,6 +25,7 @@ export {
   SimSdkCommandNotInterceptedError,
   SimSdkInvalidClientError,
   SimSdkStreamAlreadyConsumedError,
+  SimSdkUnbridgedWireRequestError,
   SimSdkUnknownServiceError,
   SimSdkUnsupportedCommandError,
 } from "./error/sim-sdk.error.js";

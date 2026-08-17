@@ -51,6 +51,17 @@ export class SimSdkCallbackNotSupportedError extends SimSdkError {
 }
 
 /**
+ * A serialized AWS API request cannot be routed into the simulation.
+ *
+ * Raised for a request from an SDK bundled into the code it runs, where there
+ * is no Command object left to intercept and the request itself is all there
+ * is to route.
+ */
+export class SimSdkUnbridgedWireRequestError extends SimSdkError {
+  public override readonly name = "SimSdkUnbridgedWireRequestError";
+}
+
+/**
  * A simulated SDK stream body was consumed more than once.
  */
 export class SimSdkStreamAlreadyConsumedError extends SimSdkError {

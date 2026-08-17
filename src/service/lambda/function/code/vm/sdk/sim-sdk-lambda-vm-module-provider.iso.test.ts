@@ -1,3 +1,5 @@
+import http from "node:http";
+import https from "node:https";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   assertFalse,
@@ -19,6 +21,13 @@ import { SimSdkLambdaVmModuleProvider } from "./sim-sdk-lambda-vm-module-provide
 function makeModuleNotFoundError(specifier: string): Error {
   const error = new Error(`Cannot find module '${specifier}'`);
   return Object.assign(error, { code: "MODULE_NOT_FOUND" });
+}
+
+function providedModule(
+  provider: SimSdkLambdaVmModuleProvider,
+  specifier: string,
+): Record<string, unknown> {
+  return provider.provideModule(specifier) as Record<string, unknown>;
 }
 
 describe("SimSdkLambdaVmModuleProvider", () => {
@@ -63,6 +72,30 @@ describe("SimSdkLambdaVmModuleProvider", () => {
     // When a non-SDK package is requested, then the provider declines so the
     // archive resolution error is reported instead.
     assertUndefined(provider.provideModule("left-pad"));
+
+    // And a built-in it has nothing to do with is left to the host's own.
+    assertUndefined(provider.provideModule("node:fs"));
+  });
+
+  it("provides the HTTP transport modules a bundled SDK reaches for", () => {
+    // Given a provider for a simulated AWS environment.
+    const provider = new SimSdkLambdaVmModuleProvider({ simAws: new SimAws() });
+
+    // When the transport modules are requested, by both the names a bundler
+    // and a hand-written require use.
+    const plainHttp = providedModule(provider, "http");
+    const nodeHttp = providedModule(provider, "node:http");
+    const plainHttps = providedModule(provider, "https");
+    const nodeHttps = providedModule(provider, "node:https");
+
+    // Then each is the module of the same name, with only the function that
+    // starts a request replaced.
+    assertIdentical(plainHttp["Agent"], http.Agent);
+    assertIdentical(nodeHttp["Agent"], http.Agent);
+    assertIdentical(plainHttps["Agent"], https.Agent);
+    assertIdentical(nodeHttps["Agent"], https.Agent);
+    assertFalse(nodeHttp["request"] === http.request);
+    assertFalse(nodeHttps["request"] === https.request);
   });
 
   it("reports an uninstalled AWS SDK package helpfully", () => {

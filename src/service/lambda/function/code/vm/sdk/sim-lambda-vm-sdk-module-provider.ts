@@ -11,9 +11,11 @@ export const awsSdkPackagePrefix = "@aws-sdk/";
  *
  * The vm module system asks a provider for bare specifiers the code archive
  * cannot resolve, mirroring how the real Lambda Node.js runtime provides the
- * AWS SDK without it being bundled in the deployment package. A provider
- * returns undefined for specifiers it does not serve, so the original
- * archive resolution error is reported.
+ * AWS SDK without it being bundled in the deployment package, and for the
+ * Node.js built-ins, which the runtime provides whatever the package contains.
+ * A provider returns undefined for specifiers it does not serve, so a built-in
+ * falls through to the host's and a bare specifier is reported with the
+ * original archive resolution error.
  */
 export interface SimLambdaVmSdkModuleProvider {
   provideModule(specifier: string): unknown;

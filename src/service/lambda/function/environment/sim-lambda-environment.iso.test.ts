@@ -20,13 +20,17 @@ describe("sim Lambda environment", () => {
     // When its variables are read.
     const variables = environment.variables();
 
-    // Then only the AWS-provided runtime variables are there.
+    // Then only the AWS-provided runtime variables are there, including the
+    // execution role credentials an SDK in the function code looks for.
     assertObjectEquals(variables, {
       AWS_REGION: "eu-west-2",
       AWS_DEFAULT_REGION: "eu-west-2",
       AWS_LAMBDA_FUNCTION_NAME: "greeter",
       AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "256",
       AWS_LAMBDA_FUNCTION_VERSION: "$LATEST",
+      AWS_ACCESS_KEY_ID: "ASIAYULINSIMULATED00",
+      AWS_SECRET_ACCESS_KEY: "yulinSimulatedSecretAccessKeyValue000000",
+      AWS_SESSION_TOKEN: "yulin-simulated-session-token",
     });
     assertFalse(environment.hasDeclaredVariables);
   });

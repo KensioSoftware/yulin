@@ -1,4 +1,5 @@
 import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
+import { simLambdaExecutionCredentials } from "./sim-lambda-execution-credentials.js";
 
 /**
  * The function details the AWS-provided runtime environment variables are
@@ -122,6 +123,7 @@ export class SimLambdaEnvironment {
       ["AWS_LAMBDA_FUNCTION_NAME", functionName],
       ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE", String(memorySizeMb)],
       ["AWS_LAMBDA_FUNCTION_VERSION", "$LATEST"],
+      ...simLambdaExecutionCredentials,
     ]);
   }
 }

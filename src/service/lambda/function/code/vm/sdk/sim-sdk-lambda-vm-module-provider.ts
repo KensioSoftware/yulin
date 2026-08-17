@@ -2,8 +2,13 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { SimSdkModuleClientInterceptor } from "../../../../../../sdk/module/sim-sdk-module-client-interceptor.js";
 import { SimSdkCommandDispatcher } from "../../../../../../sdk/sim-sdk-command-dispatcher.js";
+import { SimSdkWireDispatcher } from "../../../../../../sdk/wire/sim-sdk-wire-dispatcher.js";
 import type { AwsRegionName } from "../../../../../aws/sim-aws-region.js";
 import type { SimAws } from "../../../../../aws/sim-aws.js";
+import {
+  isSimLambdaVmHttpModuleSpecifier,
+  makeSimLambdaVmHttpModule,
+} from "../http/sim-lambda-vm-http-module.js";
 import {
   awsSdkPackagePrefix,
   type SimLambdaVmSdkModuleProvider,
@@ -30,9 +35,17 @@ interface SimSdkLambdaVmModuleProviderProperties {
  * Calls made by the function code are routed per send, so the ambient
  * execution-role caller applies and simulated IAM authorizes them, just as
  * the real Lambda runtime's bundled SDK operates as the execution role.
+ *
+ * A deployment package that bundles the SDK asks for no SDK module at all, so
+ * there is nothing there to intercept. Such a package still gets its HTTP
+ * transport from the runtime, and the modules provided for it answer requests
+ * to AWS API endpoints from the same simulation, by the same routing. Which of
+ * the two paths a function takes is then only a question of how it was
+ * packaged, rather than of whether it works.
  */
 export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvider {
   private readonly interceptor: SimSdkModuleClientInterceptor;
+  private readonly wireDispatcher: SimSdkWireDispatcher;
   private readonly requireModule: (specifier: string) => unknown;
   private readonly providedModules = new Map<string, unknown>();
 
@@ -43,15 +56,20 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
         dispatcher.dispatch(command, client, undefined),
       defaultRegionName: properties.regionName,
     });
+    this.wireDispatcher = new SimSdkWireDispatcher(
+      properties.simAws,
+      properties.regionName,
+    );
     this.requireModule = properties.requireModule ?? requireHostModule;
   }
 
   /**
-   * Provide an intercepted AWS SDK package module, or undefined for other
-   * specifiers.
+   * Provide an intercepted AWS SDK package or HTTP transport module, or
+   * undefined for other specifiers.
    */
   provideModule(specifier: string): unknown {
-    if (!specifier.startsWith(awsSdkPackagePrefix)) {
+    const isTransport = isSimLambdaVmHttpModuleSpecifier(specifier);
+    if (!isTransport && !specifier.startsWith(awsSdkPackagePrefix)) {
       return undefined;
     }
 
@@ -60,11 +78,15 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
       return provided;
     }
 
-    const intercepted = this.interceptor.interceptModule(
-      this.hostModuleExports(specifier),
-    );
-    this.providedModules.set(specifier, intercepted);
-    return intercepted;
+    const hostExports = this.hostModuleExports(specifier);
+    const module = isTransport
+      ? makeSimLambdaVmHttpModule(
+          hostExports as Record<string, unknown>,
+          async (request) => await this.wireDispatcher.dispatch(request),
+        )
+      : this.interceptor.interceptModule(hostExports);
+    this.providedModules.set(specifier, module);
+    return module;
   }
 
   private hostModuleExports(specifier: string): object {

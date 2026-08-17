@@ -4,6 +4,10 @@ import vm from "node:vm";
 import type { SimZipArchive } from "../../../../../util/zip/zip-archive.js";
 import type { SimLambdaVmSdkModuleProvider } from "./sdk/sim-lambda-vm-sdk-module-provider.js";
 import { loadJsonModule } from "./sim-lambda-vm-json-module.js";
+import type {
+  SimLambdaVmCommonJsModule,
+  SimLambdaVmModule,
+} from "./sim-lambda-vm-module.types.js";
 import { SimLambdaVmModuleResolver } from "./sim-lambda-vm-module-resolver.js";
 import { userCodeSyntaxError } from "./sim-lambda-vm-syntax-error.js";
 
@@ -21,18 +25,6 @@ interface SimLambdaVmModulesProperties {
   readonly sdkModuleProvider: SimLambdaVmSdkModuleProvider;
 }
 
-interface VmModule {
-  exports: unknown;
-}
-
-type CommonJsModuleFunction = (
-  exports: unknown,
-  require: (specifier: string) => unknown,
-  module: VmModule,
-  filename: string,
-  dirname: string,
-) => void;
-
 /**
  * A CommonJS module system over a sim Lambda function code zip archive.
  *
@@ -42,7 +34,7 @@ type CommonJsModuleFunction = (
  * the archive.
  */
 export class SimLambdaVmModules {
-  private readonly modules = new Map<string, VmModule>();
+  private readonly modules = new Map<string, SimLambdaVmModule>();
   private readonly resolver: SimLambdaVmModuleResolver;
 
   constructor(private readonly properties: SimLambdaVmModulesProperties) {
@@ -53,8 +45,14 @@ export class SimLambdaVmModules {
    * Require a module by specifier, as CommonJS code in the archive would.
    */
   requireModule(specifier: string, fromDirectory = "."): unknown {
+    // A built-in is the only thing a deployment package that bundles its
+    // dependencies still asks the runtime for, so the provider is offered
+    // those too. Anything it declines is the host built-in itself.
     if (isBuiltin(specifier)) {
-      return hostRequire(specifier);
+      return (
+        this.properties.sdkModuleProvider.provideModule(specifier) ??
+        hostRequire(specifier)
+      );
     }
 
     let filePath: string;
@@ -87,16 +85,16 @@ export class SimLambdaVmModules {
     return provided;
   }
 
-  private loadModule(filePath: string): VmModule {
+  private loadModule(filePath: string): SimLambdaVmModule {
     if (filePath.endsWith(".json")) {
-      const jsonModule: VmModule = {
+      const jsonModule: SimLambdaVmModule = {
         exports: loadJsonModule(this.properties.archive, filePath),
       };
       this.modules.set(filePath, jsonModule);
       return jsonModule;
     }
 
-    const module: VmModule = { exports: {} };
+    const module: SimLambdaVmModule = { exports: {} };
     // Register before evaluation so require cycles observe partial exports,
     // as in Node.js.
     this.modules.set(filePath, module);
@@ -119,7 +117,7 @@ export class SimLambdaVmModules {
     return module;
   }
 
-  private compileModule(filePath: string): CommonJsModuleFunction {
+  private compileModule(filePath: string): SimLambdaVmCommonJsModule {
     const source = this.properties.archive.file(filePath).toString();
     const wrapped = `(function (exports, require, module, __filename, __dirname) {\n${
       source
@@ -135,6 +133,6 @@ export class SimLambdaVmModules {
     return script.runInContext(this.properties.context, {
       timeout: moduleEvaluationTimeoutMs,
       breakOnSigint: true,
-    }) as CommonJsModuleFunction;
+    }) as SimLambdaVmCommonJsModule;
   }
 }
