@@ -1470,6 +1470,40 @@ other value fails the Stack by name.
 There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
 to make one.
 
+#### Posting to a Function URL Origin
+
+A POST or PUT through an origin access control has to carry the SHA-256 of its body in an
+`x-amz-content-sha256` header. CloudFront streams the viewer's body on to the Origin without
+buffering it, and has no hash of its own to sign with. It signs the hash the viewer declared, and
+`UNSIGNED-PAYLOAD` where the viewer declared none. Lambda supports no unsigned payload, and answers
+`403` with `The request signature we calculated does not match the signature you provided`. The
+handler never runs. The declared hash is checked against the body that arrived, and a digest of
+other bytes is refused the same way.
+
+A viewer computes the digest of what it is about to send, the way any SigV4 client does:
+
+```typescript
+const body = JSON.stringify({ email: "someone@example.com" });
+const response = await fetch(`http://${siteHostname}/sign-in`, {
+  method: "POST",
+  body,
+  headers: {
+    "content-type": "application/json",
+    "x-amz-content-sha256": createHash("sha256").update(body).digest("hex"),
+  },
+});
+```
+
+A GET or a HEAD is left alone. SigV4 hashes an empty payload for a request without a body, and
+CloudFront can sign one of those on its own. An origin access control with a `SigningBehavior` of
+`never` signs no Origin request, and states no payload hash for one. A POST through one reaches
+the Origin anonymously, as it did before.
+
+AWS documents the requirement on
+[Restrict access to an AWS Lambda function URL origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html).
+A simulated Distribution refuses the request for the same reason a real one does. A form post
+missing the header fails in a test as well as on the deployment.
+
 ## Key value stores
 
 A key value store holds data a CloudFront Function reads at request time, so a redirect table or a
@@ -1740,7 +1774,9 @@ Where sim CloudFront knowingly behaves differently from AWS:
   no SigV4 signature is computed or checked. A Function URL Origin is told who the request is from
   at the simulated HTTP boundary instead, the same way anything else calling into simulated AWS in
   process says who it is. Nothing else here signs a simulated request either, so a test cannot
-  assert anything about the signature itself.
+  assert anything about the signature itself. The payload hash is the one part of a signature that
+  is stated and checked, because a Function URL turns a POST away over it. See
+  [posting to a Function URL Origin](#posting-to-a-function-url-origin).
 - **An origin access control signs for an S3 or Lambda Function URL Origin only.** CloudFront also
   signs for MediaStore and MediaPackage V2 Origins, and neither is modelled. An
   `OriginAccessControlOriginType` other than `s3` or `lambda`, or a `SigningProtocol` other than

@@ -6,8 +6,9 @@ interface SimCfCustomOriginRequestProperties {
   readonly originPath: string;
   readonly request: Request;
   /**
-   * Headers stating who the Origin request is from, which an Origin whose
-   * origin access control signs carries and an anonymous one does not.
+   * Headers stating who the Origin request is from and what its signature
+   * covers, which an Origin whose origin access control signs carries and an
+   * anonymous one does not.
    */
   readonly signingHeaders?: Readonly<Record<string, string>> | undefined;
 }

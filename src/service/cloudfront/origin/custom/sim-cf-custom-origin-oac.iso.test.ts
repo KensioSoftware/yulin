@@ -2,66 +2,19 @@ import {
   assertIdentical,
   assertObjectEquals,
   assertResponseStatus,
-  assertTypeString,
   describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAwsServiceRequest } from "../../../../serve/controller/sim-service-controller.js";
-import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
-import { SimAws } from "../../../aws/sim-aws.js";
-import type { CfnTemplateBodyRecord } from "../../../cloudformation/template/sim-cfn-template.js";
+import { fetchThroughDistribution } from "../../../../../test/cloudfront/function-url-distribution.js";
 import { simAwsCallerHeaderName } from "../../../iam/request/sim-aws-caller-header.js";
 import {
   simAwsSourceAccountHeaderName,
   simAwsSourceArnHeaderName,
 } from "../../../iam/request/sim-aws-request-source.js";
-import { SimCloudFrontServiceController } from "../../controller/sim-cloudfront-controller.js";
 import { simCfFunctionUrlOriginTemplateFactory } from "./sim-cf-function-url-origin-template.factory.js";
 
 const accountId = "888888888888";
-
-/**
- * Deploy the Stack and fetch a path through the Distribution it created.
- *
- * The viewer's headers are built from the deployed Distribution's ARN, so a
- * test about what a viewer may state can state the one thing that would work.
- */
-async function fetchThroughDistribution(
-  template: CfnTemplateBodyRecord,
-  viewerHeaders: (
-    distributionArn: string,
-  ) => Record<string, string> = () => ({}),
-): Promise<Response> {
-  const simAws = new SimAws();
-  const stack = await simAws
-    .cloudFormation()
-    .deployTemplate({ stackName: "site-stack", template });
-  await stack.waitForDeployComplete();
-
-  const domainName = stack.outputs.get("DistributionDomainName")?.value;
-  const distributionArn = stack.outputs.get("DistributionArn")?.value;
-  assertTypeString(domainName);
-  assertTypeString(distributionArn);
-
-  const url = new SimAwsLocalUrl({
-    input: `https://${domainName}/greeting`,
-  }).toString();
-  const request = new Request(url, {
-    headers: viewerHeaders(distributionArn),
-  });
-
-  // Straight to the CloudFront controller rather than through SimAwsHttp, so
-  // that the request arrives as written. The HTTP boundary strips the
-  // simulator's control headers, and a test about what a viewer can state to
-  // an Origin has to be able to send them.
-  return await new SimCloudFrontServiceController({ simAws }).handleRequest(
-    new SimAwsServiceRequest({
-      target: { service: "cloudFront", resourceName: "" },
-      request,
-    }),
-  );
-}
 
 describe("Simulated CloudFront custom Origin with an origin access control", () => {
   it("reaches an AWS_IAM Function URL as the CloudFront service principal", async () => {
@@ -144,9 +97,11 @@ describe("Simulated CloudFront custom Origin with an origin access control", () 
         originAccessControl: false,
       }),
       (distributionArn) => ({
-        [simAwsCallerHeaderName]: "service:cloudfront.amazonaws.com",
-        [simAwsSourceArnHeaderName]: distributionArn,
-        [simAwsSourceAccountHeaderName]: accountId,
+        headers: {
+          [simAwsCallerHeaderName]: "service:cloudfront.amazonaws.com",
+          [simAwsSourceArnHeaderName]: distributionArn,
+          [simAwsSourceAccountHeaderName]: accountId,
+        },
       }),
     );
 

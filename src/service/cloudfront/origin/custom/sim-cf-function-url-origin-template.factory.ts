@@ -74,9 +74,12 @@ export const simCfFunctionUrlOriginTemplateFactory = new MappedFactory<
           FunctionName: "greeter",
           Role: { "Fn::GetAtt": ["GreeterRole", "Arn"] },
           Code: {
+            // The handler answers with whatever it was sent, so a test about a
+            // request with a body can see that the body reached it, and one
+            // about a request without stays as readable as it was.
             ZipFile:
-              "exports.handler = async () => " +
-              "({ statusCode: 200, body: 'Hello from behind CloudFront' });",
+              "exports.handler = async (event) => ({ statusCode: 200, " +
+              "body: event.body ?? 'Hello from behind CloudFront' });",
           },
           Handler: "index.handler",
           Runtime: "nodejs22.x",
