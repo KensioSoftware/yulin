@@ -286,9 +286,9 @@ stack has moved to `UPDATE_IN_PROGRESS`, and `waitForStackUpdateComplete(...)` w
 resources to change. `DescribeStacksCommand` reports `UPDATE_IN_PROGRESS` in between and
 `UPDATE_COMPLETE` after, along with the outputs resolved again against the new template.
 
-Updating a stack name that was never deployed is refused with the same `ValidationError`
-`DescribeStacksCommand` refuses it with. An update of a stack that was never there could mean nothing
-else.
+`UpdateStackCommand` refuses a stack name that was never deployed, with the same `ValidationError`
+that `DescribeStacksCommand` answers such a name with. An update of a stack that was never there
+could mean nothing else.
 
 ### What counts as a change
 
@@ -1225,7 +1225,8 @@ to. Saying it on the first change instead would be a long way from the mistake. 
 without a `reload` alongside it. Given both, the callback runs first and the reload follows it, and a
 browser arriving on the new resources finds whatever the callback left ready for it.
 
-`onFailed` is given an update the changed template failed. It reports the failure and nothing else.
+`onFailed` is given the update the changed template failed to survive. It reports the failure and
+nothing else.
 The stack is left holding whatever the update reached, as it is after an update through the command.
 What a failure does keep is the process, and the resources it never got to. A template that no longer
 deploys leaves a working environment where a restart on it would leave none.
@@ -1756,8 +1757,8 @@ This is useful in tests when you want to assert that a specific template resourc
 expected simulated service resource.
 
 `stack.skippedResources` lists the Resources the deployment did not create. Each one carries a
-`skippedReason` naming the type outside the simulation. A test that expected a resource to exist can
-find out what happened to it.
+`skippedReason` saying why that Resource was skipped. A test that expected a resource to exist can
+find out why it is missing.
 
 ```typescript sim-cloudformation-inspect-skipped
 /**

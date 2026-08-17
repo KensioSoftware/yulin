@@ -1047,8 +1047,8 @@ An explicit `Deny` beats an `Allow`, and a document with no relevant `Allow` ref
   authorizer function is never invoked.
 - `isAuthorized: false`, or a policy that refuses `execute-api:Invoke` on the route ARN, is a 403 and
   `{"message":"Forbidden"}`.
-- Returning `{ "errorMessage": "Unauthorized" }` is a 401. That is the only way an authorizer produces
-  one, and it is read whichever response format the authorizer is configured for.
+- Returning `{ "errorMessage": "Unauthorized" }` is a 401. That is the only way the authorizer
+  function produces one, and it is read whichever response format the authorizer is configured for.
 - A function that throws, returns a shape matching no response format, returns a policy document
   IAM cannot read, or has no invoke permission, is a 500 and `{"message":"Internal Server Error"}`.
   The caller hears no more, the way it hears no detail about a failed integration.
@@ -1897,9 +1897,9 @@ Api:
 
 `Name` and `ProtocolType` are both optional alongside a `Body`, as AWS documents. A `ProtocolType`
 that is present has to be `HTTP`, and a `Name` that is present names the API in place of the
-document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are refused alongside a
-`Body`, because `ImportApi` takes neither, and no command here changes an API after it is created.
-Each is recorded rather than applied, and the API is created from the document without them.
+document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are recorded rather than
+applied alongside a `Body`, because `ImportApi` takes neither, and no command here changes an API
+after it is created. The API is created from the document without them, and the stack deploys.
 
 A template combining an `Api` with a `Body` and a separate `Route`, `Integration` or `Authorizer`
 Resource for that same API fails the stack, naming both logical IDs. The document already declares
