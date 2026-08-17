@@ -119,11 +119,16 @@ export class SimCognitoPageMarkup {
   /**
    * A submit button, named so that a form with two of them says which was
    * pressed.
+   *
+   * A button that asks the form to do something other than what its fields
+   * were filled in for skips the browser's own validation, so an empty
+   * required field does not stop it.
    */
-  submit(name: string, label: string): string {
+  submit(name: string, label: string, skipValidation = false): string {
     return (
       `<p><button type="submit" name="${this.escaped(name)}" ` +
-      `value="${this.escaped(name)}">${this.escaped(label)}</button></p>\n`
+      `value="${this.escaped(name)}"${skipValidation ? " formnovalidate" : ""}>` +
+      `${this.escaped(label)}</button></p>\n`
     );
   }
 

@@ -178,4 +178,21 @@ describe("The pages a sim Cognito hosted domain serves", () => {
     assertStringIncludes(page, "&quot;&gt;&lt;script&gt;");
     assertStringNotIncludes(page, "<script>");
   });
+
+  it("offers only the providers the app client supports", async () => {
+    // Given an app client offering the pool's own users and nothing else,
+    // over a pool that has a Google provider.
+    const setUp = await simCognitoHosted({ identityProviders: ["COGNITO"] });
+
+    // When the sign-in form is served.
+    const response = await simCognitoGetPage(
+      setUp,
+      "/oauth2/authorize",
+      simCognitoAuthorizeParameters(setUp),
+    );
+
+    // Then Google is left off it, because the request that link would make is
+    // one the authorize endpoint refuses.
+    assertStringNotIncludes(await response.text(), "identity_provider=Google");
+  });
 });

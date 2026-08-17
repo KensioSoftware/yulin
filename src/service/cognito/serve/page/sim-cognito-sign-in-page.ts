@@ -46,14 +46,26 @@ export class SimCognitoSignInPage {
   }
 
   /**
-   * One link per identity provider the pool has, each starting the federated
-   * sign-in this endpoint already answers.
+   * One link per identity provider this app client offers, each starting the
+   * federated sign-in the same endpoint already answers.
+   *
+   * A provider the client left out of its `SupportedIdentityProviders` is left
+   * off the page, because the authorize request the link would make is one
+   * that endpoint refuses.
    */
   private providerLinks(
     pool: SimCognitoUserPool,
     parameters: SimCognitoPageParameters,
   ): string {
+    const clientId = parameters["client_id"];
+    const client =
+      clientId === undefined ? undefined : pool.findClient(clientId);
+
     return pool.auth.identityProviders.all
+      .filter(
+        (provider) =>
+          client?.oauth.allowsIdentityProvider(provider.name) ?? false,
+      )
       .map((provider) =>
         this.markup.link(
           simCognitoAuthorizePath,

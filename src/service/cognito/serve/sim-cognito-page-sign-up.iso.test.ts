@@ -148,4 +148,21 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
       "someone@example.com",
     );
   });
+
+  it("asks who is confirming when the page was reached from sign-in", async () => {
+    // Given a browser that followed the confirmation link on the sign-in page,
+    // which names nobody.
+    const setUp = await simCognitoHosted();
+
+    // When that page is fetched.
+    const response = await simCognitoGetPage(
+      setUp,
+      "/confirm",
+      simCognitoAuthorizeParameters(setUp),
+    );
+
+    // Then it asks for the username as well as the code, rather than holding
+    // an empty one nothing can fill in.
+    assertStringIncludes(await response.text(), 'id="username"');
+  });
 });

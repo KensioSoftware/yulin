@@ -81,15 +81,24 @@ export class SimCognitoConfirmPage {
    * has already been refused once or a fresh code has just been sent.
    */
   private render(form: SimCognitoPageForm, message?: string): Response {
-    const { parameters } = form;
+    const { parameters, username } = form;
+
+    // The sign-up that has just been made names the user, and a browser that
+    // came here from the sign-in page instead has to say who it is.
+    const user =
+      username === ""
+        ? this.markup.field("username", "Username")
+        : this.markup.hidden({ username });
+
     const body =
       (message === undefined ? "" : this.markup.message(message)) +
       this.markup.form(
         simCognitoConfirmPath,
-        this.markup.hidden({ ...parameters, username: form.username }) +
+        this.markup.hidden(parameters) +
+          user +
           this.markup.field("code", "Confirmation code") +
           this.markup.submit("confirm", "Confirm") +
-          this.markup.submit(resendField, "Send another code"),
+          this.markup.submit(resendField, "Send another code", true),
       ) +
       this.markup.link(simCognitoAuthorizePath, parameters, "Back to sign in");
 
