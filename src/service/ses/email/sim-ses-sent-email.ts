@@ -28,6 +28,8 @@ interface SimSesSentEmailProperties {
   readonly replyToAddresses: readonly string[];
   readonly subject: string;
   readonly body: SimSesSentEmailBody;
+  readonly templateName: string | undefined;
+  readonly templateData: Readonly<Record<string, unknown>> | undefined;
   readonly configurationSetName: string | undefined;
   readonly sentDate: Date;
 }
@@ -59,6 +61,22 @@ export class SimSesSentEmail {
 
   public readonly body: SimSesSentEmailBody;
 
+  /**
+   * The template this message was rendered from, if it was rendered from a
+   * stored one. A message written out in full has none, and so does one
+   * rendered from a template the send wrote inline.
+   */
+  public readonly templateName: string | undefined;
+
+  /**
+   * What the template's placeholders were filled from, parsed out of the JSON
+   * the send carried.
+   *
+   * This is usually the better thing for a test to assert on than the rendered
+   * body: it survives someone rewording the email.
+   */
+  public readonly templateData: Readonly<Record<string, unknown>> | undefined;
+
   public readonly configurationSetName: string | undefined;
 
   public readonly sentDate: Date;
@@ -70,6 +88,8 @@ export class SimSesSentEmail {
     this.replyToAddresses = properties.replyToAddresses;
     this.subject = properties.subject;
     this.body = properties.body;
+    this.templateName = properties.templateName;
+    this.templateData = properties.templateData;
     this.configurationSetName = properties.configurationSetName;
     this.sentDate = properties.sentDate;
   }

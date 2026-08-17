@@ -38,3 +38,22 @@ export type {
   SimSesAccountDetailsOutput,
   SimSesSendQuotaDetail,
 } from "./account/account.command.js";
+export type {
+  SimCreateEmailTemplateCommand,
+  SimCreateEmailTemplateCommandInput,
+  SimCreateEmailTemplateCommandOutput,
+  SimDeleteEmailTemplateCommand,
+  SimDeleteEmailTemplateCommandInput,
+  SimDeleteEmailTemplateCommandOutput,
+  SimGetEmailTemplateCommand,
+  SimGetEmailTemplateCommandInput,
+  SimGetEmailTemplateCommandOutput,
+  SimListEmailTemplatesCommand,
+  SimListEmailTemplatesCommandInput,
+  SimListEmailTemplatesCommandOutput,
+  SimSesEmailTemplateContent,
+  SimSesTemplateMetadata,
+  SimUpdateEmailTemplateCommand,
+  SimUpdateEmailTemplateCommandInput,
+  SimUpdateEmailTemplateCommandOutput,
+} from "./template/template.command.js";

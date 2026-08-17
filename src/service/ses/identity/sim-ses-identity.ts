@@ -1,5 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import { simSesIdentityArn } from "./sim-ses-arn.js";
+import { simSesIdentityArn } from "../sim-ses-arn.js";
 import {
   simSesIdentityKey,
   simSesIdentityType,

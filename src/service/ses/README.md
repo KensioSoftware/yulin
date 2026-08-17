@@ -71,10 +71,39 @@ reported one at a time, because real SES names every identity that failed in a s
 asserting a bcc was a bcc still can, and the body keeps text and HTML apart so a test asserting on
 the text of an HTML-only message finds nothing rather than the markup.
 
-Only `Content.Simple` is read. `Content.Raw` and `Content.Template` are refused by name: a raw MIME
-message would have to be parsed to say anything about its subject or body, and templates are not
-here yet. Refusing is the honest answer, since a recorded message with nothing in it would make a
-test pass for a reason unrelated to what it asserts.
+`SimSesContentReader` dispatches the three kinds of content. `Simple` and `Template` are both read;
+`Raw` is refused by name, since a raw MIME message would have to be parsed to say anything about its
+subject or body and a recorded message with nothing in it would make a test pass for a reason
+unrelated to what it asserts.
+
+## Template model
+
+Template state lives under `template/`, and the send-side rendering under `command/send/`.
+
+`SimSesTemplate` holds the wording with its placeholders still in it. That separation is the reason
+templates are worth having in a simulator at all: a test can assert which template went out and what
+was substituted into it, rather than matching against rendered prose that changes whenever someone
+rewords the email. `SimSesSentEmail` therefore carries `templateName` and `templateData` as well as
+the rendered result.
+
+`sim-ses-render.ts` does the substitution. Real SES renders with Handlebars and this renders the
+substitution part of it: `{{name}}`, dotted paths, `{{{name}}}` for an unescaped value, and HTML
+escaping otherwise. Two decisions in there are worth knowing about.
+
+Escaping is applied to the text part as well as the HTML one, because Handlebars escapes without
+knowing what the string is for. If that turns out not to match real SES it is a one-line change, and
+the direction was chosen on which way round the error is cheaper: escaping when SES does not gives a
+test that fails for a visible, documented reason, while not escaping when SES does gives a test that
+passes on a message that would go out with `&lt;b&gt;` in it.
+
+A value that is not a string, number or boolean is refused rather than rendered. Real Handlebars
+would put `[object Object]` in the message, which nobody means to send, so naming the placeholder is
+more use than reproducing it.
+
+`readSimSesTemplateContent` refuses everything Handlebars can do beyond substitution, and it does so
+at `CreateEmailTemplate` and `UpdateEmailTemplate` rather than at the send. That fails where the
+mistake is written, and follows the house pattern of refusing an unsimulated input at the command
+that carries it.
 
 ## Account model
 

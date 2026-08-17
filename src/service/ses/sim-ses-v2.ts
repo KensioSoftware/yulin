@@ -3,6 +3,7 @@ import type * as simSesCommands from "./command/sim-ses-command.types.js";
 import type { SimSesRequestOptions } from "./command/sim-ses-request-options.js";
 import type { SimSesSentEmail } from "./email/sim-ses-sent-email.js";
 import type { SimSesIdentity } from "./identity/sim-ses-identity.js";
+import type { SimSesTemplate } from "./template/sim-ses-template.js";
 import { SimSesSdkCommandRouter } from "./sdk/sim-ses-sdk-command-router.js";
 import { SimSesCommands, type SimSesV2Properties } from "./sim-ses-commands.js";
 
@@ -90,6 +91,23 @@ export class SimSesV2 {
   }
 
   /**
+   * Find a template by name.
+   *
+   * The simulator's own accessor, for tests seeding or inspecting template
+   * state without going through a Command and its authorization.
+   */
+  findTemplate(templateName: string): SimSesTemplate | undefined {
+    return this.#commands.templates.find(templateName);
+  }
+
+  /**
+   * Every template in this scope, in the order they were created.
+   */
+  allTemplates(): readonly SimSesTemplate[] {
+    return this.#commands.templates.all;
+  }
+
+  /**
    * Whether this account is still in the SES sandbox, where every recipient
    * has to be verified as well as the sender.
    */
@@ -145,6 +163,70 @@ export class SimSesV2 {
   ): Promise<simSesCommands.SimDeleteEmailIdentityCommandOutput> {
     await this.#commands.background.sequence();
     return this.#commands.identityCommands.deleteEmailIdentity(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a CreateEmailTemplate Command from the SDK.
+   */
+  async createEmailTemplate(
+    command: simSesCommands.SimCreateEmailTemplateCommand,
+    options?: SimSesRequestOptions,
+  ): Promise<simSesCommands.SimCreateEmailTemplateCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.templateCommands.createEmailTemplate(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a GetEmailTemplate Command from the SDK.
+   */
+  async getEmailTemplate(
+    command: simSesCommands.SimGetEmailTemplateCommand,
+    options?: SimSesRequestOptions,
+  ): Promise<simSesCommands.SimGetEmailTemplateCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.templateCommands.getEmailTemplate(command, options);
+  }
+
+  /**
+   * Handle an UpdateEmailTemplate Command from the SDK.
+   */
+  async updateEmailTemplate(
+    command: simSesCommands.SimUpdateEmailTemplateCommand,
+    options?: SimSesRequestOptions,
+  ): Promise<simSesCommands.SimUpdateEmailTemplateCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.templateCommands.updateEmailTemplate(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a ListEmailTemplates Command from the SDK.
+   */
+  async listEmailTemplates(
+    command: simSesCommands.SimListEmailTemplatesCommand,
+    options?: SimSesRequestOptions,
+  ): Promise<simSesCommands.SimListEmailTemplatesCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.templateCommands.listEmailTemplates(command, options);
+  }
+
+  /**
+   * Handle a DeleteEmailTemplate Command from the SDK.
+   */
+  async deleteEmailTemplate(
+    command: simSesCommands.SimDeleteEmailTemplateCommand,
+    options?: SimSesRequestOptions,
+  ): Promise<simSesCommands.SimDeleteEmailTemplateCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.templateCommands.deleteEmailTemplate(
       command,
       options,
     );

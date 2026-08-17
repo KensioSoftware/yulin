@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimSesEmailTemplateContent } from "../template/template.command.js";
 
 /**
  * One part of a message: its subject line, or one representation of its body.
@@ -25,15 +26,19 @@ export interface SimSesRawMessage {
 }
 
 /**
- * The template branch of a message, which this issue's scope does not render.
+ * The template branch of a message.
  *
- * It is typed here so a send carrying one can be told apart from a malformed
- * request and refused with a message saying so.
+ * The wording comes either from a template stored under `TemplateName` or from
+ * one written into `TemplateContent` on the request itself, both of which real
+ * SES accepts. `TemplateData` is the JSON its placeholders are filled from.
  */
 export interface SimSesTemplate {
   readonly TemplateName?: string | undefined;
   readonly TemplateArn?: string | undefined;
+  readonly TemplateContent?: SimSesEmailTemplateContent | undefined;
   readonly TemplateData?: string | undefined;
+  readonly Headers?: readonly unknown[] | undefined;
+  readonly Attachments?: readonly unknown[] | undefined;
 }
 
 export interface SimSesEmailContent {

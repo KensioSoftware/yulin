@@ -2,12 +2,17 @@ import {
   CreateEmailIdentityCommand,
   CreateEmailTemplateCommand,
   DeleteEmailIdentityCommand,
+  DeleteEmailTemplateCommand,
   GetAccountCommand,
   GetEmailIdentityCommand,
+  GetEmailTemplateCommand,
   ListEmailIdentitiesCommand,
+  ListEmailTemplatesCommand,
   PutAccountDetailsCommand,
+  SendBulkEmailCommand,
   SendEmailCommand,
   SESv2Client,
+  UpdateEmailTemplateCommand,
 } from "@aws-sdk/client-sesv2";
 import {
   assertArrayEquals,
@@ -43,6 +48,11 @@ describe("SimSesSdkCommandRouter", () => {
       "SendEmailCommand",
       "GetAccountCommand",
       "PutAccountDetailsCommand",
+      "CreateEmailTemplateCommand",
+      "GetEmailTemplateCommand",
+      "UpdateEmailTemplateCommand",
+      "ListEmailTemplatesCommand",
+      "DeleteEmailTemplateCommand",
     ]);
   });
 
@@ -54,7 +64,7 @@ describe("SimSesSdkCommandRouter", () => {
     const route = simAws
       .sesV2()
       .sdkCommandRouter()
-      .route("CreateEmailTemplateCommand");
+      .route("SendBulkEmailCommand");
 
     // Then there is no route for it.
     assertUndefined(route);
@@ -138,6 +148,66 @@ describe("SES SDK interception", () => {
     assertArrayLength(afterDelete.EmailIdentities ?? [], 0);
   });
 
+  it("routes a template send through the intercepted client", async () => {
+    // Given an intercepted client with a verified sender and a template.
+    using simSdk = new SimSdk();
+    simSdk.intercept(SESv2Client);
+
+    const client = new SESv2Client({ region: "eu-west-2" });
+    const scoped = simSdk.simAws.accountRegionScope(
+      simSdk.simAws.defaultAccountId,
+      "eu-west-2",
+    );
+
+    scoped.sesV2().verifyIdentity("example.com");
+    scoped.sesV2().verifyIdentity("example.org");
+
+    await client.send(
+      new CreateEmailTemplateCommand({
+        TemplateName: "welcome",
+        TemplateContent: { Subject: "Welcome, {{name}}", Text: "Hi {{name}}" },
+      }),
+    );
+
+    // When ordinary SDK code sends from it.
+    await client.send(
+      new SendEmailCommand({
+        FromEmailAddress: "hello@example.com",
+        Destination: { ToAddresses: ["someone@example.org"] },
+        Content: {
+          Template: { TemplateName: "welcome", TemplateData: '{"name":"Ada"}' },
+        },
+      }),
+    );
+
+    // Then the message was rendered and recorded with what filled it.
+    const [email] = scoped.sesV2().sentEmails();
+
+    assertNonNullable(email);
+    assertIdentical(email.subject, "Welcome, Ada");
+    assertIdentical(email.templateName, "welcome");
+
+    // And the template commands round-trip through the client too.
+    const read = await client.send(
+      new GetEmailTemplateCommand({ TemplateName: "welcome" }),
+    );
+    const listed = await client.send(new ListEmailTemplatesCommand({}));
+
+    await client.send(
+      new UpdateEmailTemplateCommand({
+        TemplateName: "welcome",
+        TemplateContent: { Subject: "Hello", Text: "Hello" },
+      }),
+    );
+    await client.send(
+      new DeleteEmailTemplateCommand({ TemplateName: "welcome" }),
+    );
+
+    assertIdentical(read.TemplateContent?.Subject, "Welcome, {{name}}");
+    assertArrayLength(listed.TemplatesMetadata ?? [], 1);
+    assertArrayLength(scoped.sesV2().allTemplates(), 0);
+  });
+
   it("keeps sends in one Region out of another", async () => {
     // Given two intercepted clients in different Regions, each with the
     // identities that Region needs.
@@ -194,9 +264,11 @@ describe("SES SDK interception", () => {
     // When a Command outside what is simulated is sent.
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new CreateEmailTemplateCommand({
-          TemplateName: "welcome",
-          TemplateContent: { Subject: "Welcome" },
+        new SendBulkEmailCommand({
+          DefaultContent: { Template: { TemplateName: "welcome" } },
+          BulkEmailEntries: [
+            { Destination: { ToAddresses: ["someone@example.org"] } },
+          ],
         }),
       );
     });
@@ -204,6 +276,6 @@ describe("SES SDK interception", () => {
     // Then it is refused on send, naming the Command, rather than reaching the
     // network or quietly doing nothing.
     assertInstanceOf(error, SimSdkUnsupportedCommandError);
-    assertStringIncludes(error.message, "CreateEmailTemplateCommand");
+    assertStringIncludes(error.message, "SendBulkEmailCommand");
   });
 });

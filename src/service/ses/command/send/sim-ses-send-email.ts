@@ -17,12 +17,13 @@ import type {
   SimSendEmailCommandOutput,
   SimSesDestination,
 } from "./send.command.js";
-import { readSimSesContent } from "./sim-ses-simple-content.js";
+import type { SimSesContentReader } from "./sim-ses-content.js";
 import { refuseUnsimulatedSendInput } from "./sim-ses-unsimulated-send-input.js";
 import type { SimSesVerifiedIdentityCheck } from "./sim-ses-verified-identities.js";
 
 interface SimSesSendEmailProperties {
   readonly identities: SimSesIdentityStore;
+  readonly content: SimSesContentReader;
   readonly sent: SimSesSentEmailStore;
   readonly identityCheck: SimSesVerifiedIdentityCheck;
   readonly authorizer: SimSesAuthorizer;
@@ -41,6 +42,7 @@ interface SimSesSendEmailProperties {
  */
 export class SimSesSendEmail {
   readonly #identities: SimSesIdentityStore;
+  readonly #content: SimSesContentReader;
   readonly #sent: SimSesSentEmailStore;
   readonly #identityCheck: SimSesVerifiedIdentityCheck;
   readonly #authorizer: SimSesAuthorizer;
@@ -48,6 +50,7 @@ export class SimSesSendEmail {
 
   constructor(properties: SimSesSendEmailProperties) {
     this.#identities = properties.identities;
+    this.#content = properties.content;
     this.#sent = properties.sent;
     this.#identityCheck = properties.identityCheck;
     this.#authorizer = properties.authorizer;
@@ -82,7 +85,7 @@ export class SimSesSendEmail {
       );
     }
 
-    const content = readSimSesContent(input.Content);
+    const content = this.#content.read(input.Content);
 
     this.#identityCheck.check({ fromEmailAddress, recipients });
 
@@ -96,6 +99,8 @@ export class SimSesSendEmail {
         replyToAddresses: [...(input.ReplyToAddresses ?? [])],
         subject: content.subject,
         body: content.body,
+        templateName: content.templateName,
+        templateData: content.templateData,
         configurationSetName: input.ConfigurationSetName,
         sentDate: this.#clock.now(),
       }),

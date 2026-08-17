@@ -121,6 +121,125 @@ so `Sales@example.com` and `sales@example.com` are two identities.
 records that proved it stop resolving. That gives a test somewhere to go when it wants to see
 sending fail after it once worked.
 
+## Email templates
+
+The assertion a test usually wants is not "the email said this prose", which changes whenever
+someone rewords it. It is "the welcome email went to this address, from this template, with these
+substitutions". Storing the template in SES and sending from it by name is what makes that
+assertion possible.
+
+Templates are managed with `CreateEmailTemplate`, `GetEmailTemplate`, `UpdateEmailTemplate`,
+`ListEmailTemplates` and `DeleteEmailTemplate`. A send carrying `Content.Template` renders the
+stored wording against the JSON in `TemplateData`, and the recorded send carries the template name
+and the parsed data alongside the rendered result, so a test can assert on either.
+
+```typescript sim-ses-templates
+/**
+ * Sending from a stored template and asserting on the substitutions.
+ */
+
+import {
+  CreateEmailTemplateCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+ses.verifyIdentity("hello@example.com");
+ses.verifyIdentity("someone@example.org");
+
+await ses.createEmailTemplate(
+  new CreateEmailTemplateCommand({
+    TemplateName: "welcome",
+    TemplateContent: {
+      Subject: "Welcome, {{name}}",
+      Text: "Hi {{name}}, thanks for signing up.",
+      Html: "<p>Hi {{name}}, thanks for signing up.</p>",
+    },
+  }),
+);
+
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Template: { TemplateName: "welcome", TemplateData: '{"name":"Ada"}' },
+    },
+  }),
+);
+
+const [email] = ses.sentEmails();
+
+// "welcome" { name: "Ada" } "Welcome, Ada"
+console.log(email?.templateName, email?.templateData, email?.subject);
+```
+
+A message written out in full reports `undefined` for both, so a test can tell the two kinds of send
+apart.
+
+### What the substitution does
+
+Real SES renders templates with Handlebars, and this simulator renders the substitution part of it:
+`{{name}}`, and dotted paths like `{{order.id}}`.
+
+A placeholder naming something the data does not have renders as an empty string rather than
+failing. That is what real SES does, and it is much the commonest surprise in an SES template: the
+message goes out with a hole in it and nothing reports a problem. Asserting on the rendered body is
+how that gets caught.
+
+`{{name}}` HTML-escapes its value and `{{{name}}}` does not, again following Handlebars. The
+escaping applies to the text part as well as the HTML one, because Handlebars renders a string
+without knowing what it is for, so a plain text email carrying an ampersand comes out with
+`&amp;` in it.
+
+Everything else Handlebars can do is refused where the template is written, rather than left in
+place:
+
+```typescript sim-ses-template-refusals
+/**
+ * The Handlebars this simulator will not render, refused at the template.
+ */
+
+import { CreateEmailTemplateCommand } from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+import { SimSesUnsupportedOperationException } from "@kensio/yulin/ses";
+
+const ses = new SimAws().sesV2();
+
+try {
+  await ses.createEmailTemplate(
+    new CreateEmailTemplateCommand({
+      TemplateName: "welcome",
+      TemplateContent: {
+        Subject: "Welcome",
+        Text: "{{#if premium}}Thanks for subscribing{{/if}}",
+      },
+    }),
+  );
+} catch (error) {
+  // true: block helpers, partials and comments are not rendered here, and a
+  // template carrying one is refused rather than sent with it still in place.
+  console.log(error instanceof SimSesUnsupportedOperationException);
+}
+```
+
+Refusing at the template rather than at the send is deliberate: it fails where the mistake is
+written, and a template surviving into a sent message with `{{#if premium}}` still in it would make
+a test pass on a message no real SES would produce.
+
+`TemplateData` is checked only when a send carries it: malformed JSON, or JSON that is not an
+object, is refused. A send with no `TemplateData` at all is accepted and renders every placeholder
+empty, which is how real SES treats it.
+
+A send may name a stored template or write its wording out in `TemplateContent`, but not both.
+Naming both is refused, because which of them real SES renders is not something this simulator
+knows, and recording the message under a template it was not rendered from would be worse than
+failing.
+
 ## The sandbox
 
 An account starts in the SES sandbox, where **both** the sender and every recipient have to be
@@ -360,11 +479,16 @@ window sees the count fall the way an account's would.
 
 | Command               | Notes                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------ |
-| `SendEmail`           | `Content.Simple` only. Recorded rather than delivered.                                     |
+| `SendEmail`           | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                   |
 | `CreateEmailIdentity` | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are refused. |
 | `GetEmailIdentity`    |                                                                                            |
 | `ListEmailIdentities` | Paged with `PageSize` and `NextToken`.                                                     |
 | `DeleteEmailIdentity` |                                                                                            |
+| `CreateEmailTemplate` | Substitution only. `Tags` are refused.                                                     |
+| `GetEmailTemplate`    | Reports the wording with its placeholders unrendered.                                      |
+| `UpdateEmailTemplate` | Replaces the wording outright, keeping the creation time.                                  |
+| `ListEmailTemplates`  | Names and creation times only, paged.                                                      |
+| `DeleteEmailTemplate` |                                                                                            |
 | `GetAccount`          |                                                                                            |
 | `PutAccountDetails`   | `MailType` and `WebsiteURL` are required, as on real SES.                                  |
 
@@ -378,13 +502,17 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError` rather than m
 - **Production access is granted on request.** Real SES has a human review it first.
 - **Send quotas are reported, not enforced.** A send past the daily figure still succeeds, and
   nothing here takes real time to respect a per-second rate.
-- **Only `Content.Simple` is read.** `Content.Raw` and `Content.Template` are refused by name.
-  Templates are a separate piece of work.
+- **`Content.Raw` is refused by name.** A raw MIME message would have to be parsed to say anything
+  about its subject or body.
+- **Only Handlebars substitution is rendered.** Block helpers, partials and comments are refused at
+  the template. Template data holding an object where the template wants a value is refused too,
+  rather than rendering `[object Object]` the way real Handlebars would.
+- **`SendBulkEmail` is not simulated**, so there is no per-recipient replacement data.
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
   suppression list, no configuration sets and no event destinations. A configuration set named on a
   send is kept on the record so a test can assert the right one was used, and does nothing else.
-- **No `AWS::SES::*` CloudFormation resources yet.** Identities have to be created through the API
-  or through `verifyIdentity`.
+- **No `AWS::SES::*` CloudFormation resources yet.** Identities and templates have to be created
+  through the API, or an identity through `verifyIdentity`.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is not simulated.
 - **DKIM, MAIL FROM domains and sending authorization policies are not simulated.** An identity
   created with `DkimSigningAttributes` is refused rather than reported as configured.
