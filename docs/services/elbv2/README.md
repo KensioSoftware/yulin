@@ -6,18 +6,17 @@ authorized by simulated IAM. ELBv2-specific types are imported from the `@kensio
 subpath.
 
 A load balancer created here has a DNS name of the shape real ELB issues, and a
-[Route53](../route53/) record pointing at that name resolves to it, so a request made to your own
+[Route53](../route53/) record pointing at that name resolves to it. A request made to your own
 hostname reaches the load balancer as it would deployed. A request is matched to a listener by port
 and then to one of that listener's rules, and a `forward` action sends it to a target group, where a
 registered [Lambda](../lambda/) function is invoked with the request and its response becomes the
 HTTP response.
 
 Only the application load balancer is simulated. A network or gateway load balancer routes below
-HTTP, which nothing here speaks, so `Type: "network"` is refused rather than created as an
-application load balancer in disguise.
+HTTP, which nothing here speaks, and `Type: "network"` is refused outright.
 
 No TLS is performed anywhere in this. An HTTPS listener holds a certificate and is checked against
-simulated ACM, and nothing is ever encrypted or handshaken. See
+simulated ACM, and everything travels in the clear. See
 [HTTPS listeners and certificates](#https-listeners-and-certificates) for what that leaves a test
 able to conclude.
 
@@ -66,17 +65,17 @@ console.log(described.LoadBalancers?.[0]?.State.Code); // "active"
 ```
 
 A load balancer is `active` as soon as it is created, where real ELB leaves one in `provisioning`
-for a few minutes first. A name is unique within one account and region, so the same name can be used in
-another region and the two do not see each other.
+for a few minutes first. A name is unique within one account and region. The same name can be used
+in another region, and the two stay separate.
 
-An internal load balancer's host name carries the `internal-` prefix real ELB gives it, which is also
+An internal load balancer's host name carries the `internal-` prefix real ELB gives it. That is also
 why a load balancer cannot be named starting with `internal-`.
 
 ## Target groups hold functions or addresses
 
-A target group names what it holds through its `TargetType`, and that decides the rest: how many
-targets it takes, what a target's `Id` has to look like, and whether the group carries a protocol and
-port at all.
+A target group names what it holds through its `TargetType`, and that decides the rest. It sets how
+many targets the group takes, what a target's `Id` has to look like, and whether the group carries a
+protocol and port at all.
 
 ```typescript sim-elbv2-lambda-target-group
 /**
@@ -124,7 +123,7 @@ console.log(health.TargetHealthDescriptions?.[0]?.TargetHealth.State);
 // "healthy"
 ```
 
-A `lambda` target group takes exactly one function, as real ELB does, so registering a second is
+A `lambda` target group takes exactly one function, as real ELB does, and registering a second is
 refused. An `ip` target group is what a container service registers itself as, takes many addresses,
 and requires the `Protocol` and `Port` its targets are reached on.
 
@@ -179,16 +178,15 @@ console.log(health.TargetHealthDescriptions?.length); // 1
 console.log(health.TargetHealthDescriptions?.[0]?.Target.Port); // 8080
 ```
 
-`TargetType: "instance"` is refused rather than accepted and ignored, because there are no EC2
-instances here for it to mean anything about: a group created as one would look configured and route
-nowhere. A request naming no target type at all is refused for the same reason, since real ELB
-defaults it to `instance`.
+`TargetType: "instance"` is refused outright, because there are no EC2 instances here for it to mean
+anything about. A group created as one would look configured and route nowhere. A request naming no
+target type at all is refused for the same reason, since real ELB defaults it to `instance`.
 
 ## Listeners and the rules on them
 
 A listener answers on a port and holds the default actions for a request no rule claims. Rules carry
-a priority, and that is what decides which of several matching rules claims a request, so two rules
-on one listener cannot hold the same priority.
+a priority, and that is what decides which of several matching rules claims a request. Two rules on
+one listener cannot hold the same priority.
 
 ```typescript sim-elbv2-listener-rules
 /**
@@ -263,26 +261,25 @@ console.log(rules.Rules?.map((rule) => rule.Priority)); // ["10", "default"]
 ```
 
 Conditions are `host-header` and `path-pattern`. What is checked when a rule is written is that it
-could match something: the field has to be one of those two, and it has to have values to compare
+could match something. The field has to be one of those two, and it has to have values to compare
 against. A forward action naming a target group that was never created is refused for the same
-reason. The other four condition fields real ELB has are refused, rather than stored and then never
-matched. [Matching a request against the rules](#matching-a-request-against-the-rules) covers how the
-values are compared.
+reason. The other four condition fields real ELB has are refused at write time, ahead of any
+request. [Matching a request against the rules](#matching-a-request-against-the-rules) covers how
+the values are compared.
 
 `ModifyRule` changes a rule's conditions and actions but not its priority, as on real ELB. Moving
-rules about is `SetRulePriorities`, which reorders a whole listener, and which judges a request
-against the order it would leave behind rather than the one it started from, so two rules can swap
-places in one request.
+rules about is `SetRulePriorities`, which reorders a whole listener. It judges a request against the
+order it would leave behind, and two rules can therefore swap places in one request.
 
 ## HTTPS listeners and certificates
 
 A listener on `HTTPS` carries a certificate from simulated ACM. The certificate has to be one that
-exists and has been issued, and one in the load balancer's own account and region, or the listener is
-refused with the reason. That refusal is the point of connecting the two simulations: a test can
-prove that a stack's certificate and its listener line up, rather than the stack finding out at
-deploy time.
+exists and has been issued, and one in the load balancer's own account and region, or the listener
+is refused with the reason. That refusal is the point of connecting the two simulations. A test can
+prove that a stack's certificate and its listener line up, ahead of the deploy that would otherwise
+find out.
 
-**No TLS is performed here.** Nothing is encrypted, no handshake happens, and no certificate is
+**No TLS is performed here.** Everything travels in the clear, with no handshake and no certificate
 presented to anything. What is simulated is the configuration relationship between a listener and a
 certificate, and the protocol a request is treated as having arrived on.
 
@@ -365,19 +362,19 @@ try {
 }
 ```
 
-A certificate that is still `PENDING_VALIDATION` is refused the same way, since a listener presenting
-one could serve nothing. That is what makes a test of the whole issuance path worth writing: the
-certificate has to have been validated for the listener that uses it to be created.
+A certificate that is still `PENDING_VALIDATION` is refused the same way, since a listener
+presenting one could serve nothing. That is what makes a test of the whole issuance path worth
+writing. The certificate has to have been validated for the listener that uses it to be created.
 
 An HTTPS listener with no certificate at all is refused, and so is a listener that names a
 certificate and speaks something other than HTTPS, which would otherwise look configured for HTTPS
 while answering plain HTTP. Moving a listener to HTTP without naming a certificate drops the ones it
-was carrying, since nothing would present them.
+was carrying, since only an HTTPS listener presents a certificate.
 
 ### The certificate list
 
-A listener's default certificate is the one `CreateListener` and `ModifyListener` name, and it is the
-one a described listener reports. The rest of the list is `AddListenerCertificates`,
+A listener's default certificate is the one `CreateListener` and `ModifyListener` name, and it is
+the one a described listener reports. The rest of the list is `AddListenerCertificates`,
 `RemoveListenerCertificates` and `DescribeListenerCertificates`, which are the certificates a real
 listener would choose between by the host name a client asked for.
 
@@ -461,25 +458,25 @@ await elbV2.removeListenerCertificates(
 );
 ```
 
-The default certificate cannot be removed this way. Replacing it is `ModifyListener`, as on real ELB,
-and trying to remove it is refused with that named.
+The default certificate cannot be removed this way. Replacing it is `ModifyListener`, as on real
+ELB, and trying to remove it is refused, naming it.
 
 ### Serving a request over HTTPS
 
 A request to `https://<dns-name>/orders` reaches the listener on port 443, and from there it is the
-same request as any other: the same rules are evaluated in the same order, and the same target groups
-answer. The listener's protocol is what the target is told the request arrived on, so a function
-behind an HTTPS listener sees `x-forwarded-proto: https` and `x-forwarded-port: 443`.
+same request as any other. The same rules are evaluated in the same order, and the same target
+groups answer. The listener's protocol is what the target is told the request arrived on, and a
+function behind an HTTPS listener sees `x-forwarded-proto: https` and `x-forwarded-port: 443`.
 
-Because no TLS happens, the URL scheme is not checked against the listener it reaches. What decides
+Because no TLS happens, the URL scheme goes unchecked against the listener it reaches. What decides
 the listener is the port, and what decides the protocol in the event is the listener. A test can
 therefore conclude that a request treated as arriving over HTTPS is routed and forwarded the way the
-configuration says, and cannot conclude anything about certificates, ciphers or a handshake.
+configuration says. Certificates, ciphers and handshakes stay out of reach.
 
 ## Carrying a request to a Lambda function
 
 `simElbV2Fetch` sends a request to whichever load balancer its host name names, in process and
-without a socket. The port in the URL is the listener's, so `http://<dns-name>/orders` reaches the
+without a socket. The port in the URL is the listener's, and `http://<dns-name>/orders` reaches the
 listener on port 80.
 
 The listener then evaluates its rules, and the first one to claim the request says what happens to
@@ -586,19 +583,19 @@ A rule with more than one condition claims a request only when every one of them
 condition, a list of values is satisfied when any one of them matches.
 
 Both fields support the two wildcards real ELB has, `*` for zero or more characters and `?` for
-exactly one, and both compare the pattern against the whole value rather than looking for it inside
-one. That last part is the one worth knowing, because a pattern can read as though it covers
-something it does not:
+exactly one, and both compare the pattern against the whole value. Neither looks for the pattern
+inside a longer value. That last part is the one worth knowing, because a pattern can read as though
+it covers more than it does:
 
-- `/api/*` claims `/api/orders` and `/api/v1/orders`, and does not claim `/api`. The pattern has a
-  slash the bare path does not. Real ELB behaves the same way, which is why a rule meant to cover
-  both is written as `["/api", "/api/*"]`.
-- `*.example.com` claims `admin.example.com` and `a.b.example.com`, and does not claim
-  `example.com`, for the same reason.
+- `/api/*` claims `/api/orders` and `/api/v1/orders`, and leaves `/api` alone. The pattern has a
+  slash the bare path lacks. Real ELB behaves the same way, and a rule meant to cover both is
+  written as `["/api", "/api/*"]`.
+- `*.example.com` claims `admin.example.com` and `a.b.example.com`, and leaves `example.com` alone,
+  for the same reason.
 - `*` covers slashes and dots, so `/api/*` claims paths any number of segments deep.
 
 A path pattern is compared with regard to case and a host name without, as on real ELB. A path
-pattern is compared against the path alone, so a query string is not part of it.
+pattern is compared against the path alone, and a query string plays no part in it.
 
 ```typescript sim-elbv2-serve-listener-rules
 /**
@@ -704,17 +701,17 @@ const toWeb = await simElbV2Fetch(simAws, `http://${dnsName}/api`);
 console.log(await toWeb.text()); // "web"
 ```
 
-A `host-header` condition is matched against the request's Host header, falling back to the host name
-in the URL when the request carries none. On real AWS those are the same thing, since DNS is what
-brought the request to the load balancer. Here a request reaches one at its own DNS name, so sending
-a Host header is how a test says which name the client asked for. Any port in the header is left out
-of the comparison, since a condition value cannot carry one.
+A `host-header` condition is matched against the request's Host header, falling back to the host
+name in the URL when the request carries none. On real AWS those are the same thing, since DNS is
+what brought the request to the load balancer. Here a request reaches one at its own DNS name, so
+sending a Host header is how a test says which name the client asked for. Any port in the header is
+left out of the comparison, since a condition value cannot carry one.
 
 ### Answering without a target
 
 A `fixed-response` action answers with the status, content type and body it holds, and a `redirect`
-action answers with a status and a `Location`. Neither touches a target group, so a listener holding
-one serves with nothing registered behind it.
+action answers with a status and a `Location`. Neither touches a target group, and a listener
+holding one serves with nothing registered behind it.
 
 ```typescript sim-elbv2-serve-fixed-response
 /**
@@ -790,21 +787,21 @@ console.log(redirected.headers.get("location"));
 // "https://shop.example.com:443/orders"
 ```
 
-A redirect keeps the components it does not name, and the five reserved keywords put a component back
-where one is named: `#{protocol}`, `#{host}`, `#{port}`, `#{path}` and `#{query}`. `#{path}` comes
-without its leading slash, which is why a redirect keeping the path writes it as `/#{path}`, and
+A redirect keeps every component it leaves unnamed, and the five reserved keywords put a component
+back where one is named. They are `#{protocol}`, `#{host}`, `#{port}`, `#{path}` and `#{query}`.
+`#{path}` comes without its leading slash, and a redirect keeping the path writes it as `/#{path}`.
 `#{query}` comes without its leading question mark, which the load balancer adds. A redirect that
 changes none of the protocol, host, port or path is refused when it is written, since it would
 redirect to the request's own URI.
 
-The port is always in the `Location`, including when it is the protocol's own. A redirect to HTTPS on
-443 therefore answers with a `Location` ending `:443`, which is what real ELB sends.
+The port is always in the `Location`, including when it is the protocol's own. A redirect to HTTPS
+on 443 therefore answers with a `Location` ending `:443`, as real ELB sends it.
 
 ### The event and the response
 
-The event is ELB's own shape, not either API Gateway payload format. A handler can tell them apart by
-the request context: an ALB event has an `elb` block carrying the target group ARN, and nothing else
-in it.
+The event is ELB's own shape, distinct from both API Gateway payload formats. A handler can tell
+them apart by the request context. An ALB event's request context holds one `elb` block, carrying
+the target group ARN.
 
 ```typescript
 {
@@ -818,22 +815,22 @@ in it.
 }
 ```
 
-Every field is always there. A request with no query string carries an empty `queryStringParameters`
-rather than none, and one with no body carries an empty `body`. Cookies stay in the `cookie` header
-they arrived in rather than being lifted into a field of their own. Query string values arrive as
-they were sent, since real ELB does not decode percent escapes and leaves that to the function.
+Every field is always there. A request with no query string carries an empty
+`queryStringParameters`, and one with no body carries an empty `body`. Cookies stay in the `cookie`
+header they arrived in, and never move into a field of their own. Query string values arrive as they
+were sent, since real ELB leaves percent escapes for the function to decode.
 
 The load balancer writes `host`, `x-amzn-trace-id`, `x-forwarded-port` and `x-forwarded-proto`
-itself, so whatever a client sent under those names does not survive. `x-forwarded-for` is the
-exception: the client's address is appended to what the request already carried, which is what makes
-that header a chain of proxies.
+itself, and overwrites whatever a client sent under those names. `x-forwarded-for` is the exception.
+The client's address is appended to what the request already carried. That is what makes that header
+a chain of proxies.
 
 A body is passed through as text for `text/*`, `application/json`, `application/javascript` and
 `application/xml`, and base64 encoded otherwise, with `isBase64Encoded` saying which happened. A
 request carrying a `content-encoding` header is always base64. That list is shorter than API
-Gateway's: a form post is text to API Gateway and base64 to a load balancer. A body called text that
-is not valid UTF-8 fails the invocation rather than reaching the handler with replacement characters
-in it.
+Gateway's, and a form post is text to API Gateway and base64 to a load balancer. A body called text
+that turns out to be invalid UTF-8 fails the invocation, ahead of any handler seeing replacement
+characters.
 
 The response has to carry a `statusCode`. `statusDescription`, `headers`, `body` and
 `isBase64Encoded` are all optional, and a `statusDescription` of `200 OK` becomes the reason phrase
@@ -922,43 +919,41 @@ const malformed = await simElbV2Fetch(simAws, `http://${dnsName}/orders`);
 console.log(malformed.status); // 502
 ```
 
-A 503 means there was no target to send the request to, which is a target group with nothing
-registered in it.
+A 503 means there was no target to send the request to, such as an empty target group.
 
-A 502 means there was a target and it did not produce a response. A missing invoke permission, a
-function that is not there, a handler that threw, a result with no usable `statusCode`, and a
-response over 1 MB are all 502, as they are on real ELB, where the difference between them is only
-visible in the load balancer's own logs. The response limit is on the whole response document rather
-than on the body alone, so a base64 body counts at its encoded size.
+A 502 means there was a target and it failed to produce a response. A missing invoke permission, a
+function that was never created, a handler that threw, a result with no usable `statusCode`, and a
+response over 1 MB are all 502, as they are on real ELB, where the difference between them shows up
+only in the load balancer's own logs. The response limit is on the whole response document, and a
+base64 body counts at its encoded size.
 
-A request body over 1 MB is a 413, which is the limit on what real ELB sends to a Lambda target.
+A request body over 1 MB is a 413, the limit on what real ELB sends to a Lambda target.
 
 A host name no load balancer answers on, and a port no listener holds, both throw a
-`SimElbV2ConnectionRefusedError` rather than answering. Neither reaches a load balancer on real AWS
-either: one resolves to nothing and the other refuses the connection, so there is no status for
-either.
+`SimElbV2ConnectionRefusedError`. Neither reaches a load balancer on real AWS either. One resolves
+to nothing and the other refuses the connection, and there is no status for either.
 
 ### The invoke permission
 
 A load balancer invokes a Lambda function through the function's resource-based policy, exactly as
 real ELB does. The grant names `elasticloadbalancing.amazonaws.com` as the principal and the target
 group as the source ARN, and the load balancer supplies the target group's own Account as the source
-Account, so a policy written with the `aws:SourceAccount` condition the ELB documentation recommends
-matches.
+Account. A policy written with the `aws:SourceAccount` condition the ELB documentation recommends
+therefore matches.
 
 Forgetting the grant is a common way to end up with a load balancer that looks configured and serves
-nothing but 502s. Real ELB refuses to register a Lambda target at all until the permission is there;
-here the permission is checked when the request arrives instead, so a target group can be built in
-any order and a policy that is later removed stops the requests.
+nothing but 502s. Real ELB refuses to register a Lambda target at all until the permission is there.
+Here the permission is checked when the request arrives. A target group can be built in any order,
+and a policy that is later removed stops the requests.
 
 ## Carrying a request to an ECS service
 
 An `ip` target group is answered by the simulated [ECS](../ecs/) service registered into it. A
-service declares `loadBalancers` naming a target group, a container and a container port; each task
+service declares `loadBalancers` naming a target group, a container and a container port. Each task
 it keeps running is registered into that group as an address, and a request forwarded there reaches
 the handler bound to the service's container.
 
-That is the whole path an application takes: a client asks for a name, Route53 resolves it to the
+That is the whole path an application takes. A client asks for a name, Route53 resolves it to the
 load balancer, a rule picks the target group, and the container's own code answers. This is a stack
 deployed from a template, which is how one usually arrives.
 
@@ -1163,53 +1158,53 @@ const read = await client.fetch(url);
 console.log(await read.json()); // { item: "flat white" }
 ```
 
-The container's own AWS calls are authorized as the task role the task definition declared, so a
-policy that would break the deployed service breaks the test. Everything in the handler is ordinary
-application code: an SDK client, `process.env`, a route and a response.
+The container's own AWS calls are authorized as the task role the task definition declared. A policy
+that would break the deployed service breaks the test. Everything in the handler is ordinary
+application code, with an SDK client, `process.env`, a route and a response.
 
 ### What the container is given
 
 The request is the one the client made, with the headers a load balancer writes in front of a
-target: the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`, `x-forwarded-port`
-and `x-amzn-trace-id`. Its URL is the AWS-facing one, carrying the listener's scheme and port, so a
-container reading `request.url` sees the name a client asked for rather than the localhost one a
-served request arrived at. A Lambda target behind the same listener gets the same values in its
-event, since both are written by the same rules.
+target. Those are the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`,
+`x-forwarded-port` and `x-amzn-trace-id`. Its URL is the AWS-facing one, carrying the listener's
+scheme and port. A container reading `request.url` sees the name a client asked for, and never the
+localhost one a served request arrived at. A Lambda target behind the same listener gets the same
+values in its event, since both are written by the same rules.
 
-### Which container answers, and when nothing does
+### Which container answers, and what a 503 means
 
 Which container of a task a request reaches is a deliberate divergence, documented in full under
-[the ECS service docs](../ecs/#which-container-of-a-task-answers). Briefly: real ECS routes to the
+[the ECS service docs](../ecs/#which-container-of-a-task-answers). In short, real ECS routes to the
 container the registration names on the port it names, the common real task puts an unsimulated
-proxy on that port, so the request goes to a container that is bound instead.
+proxy on that port, and the request here goes to a container that is bound.
 
 Three things are all the same 503 real ELB answers when no target is in service:
 
-- a target group with nothing registered in it;
-- a target group whose registered service has no container bound to an HTTP handler;
-- an address registered by hand, since nothing in this simulation listens on an address and only an
-  ECS service registration puts something behind one.
+- a target group with nothing registered in it
+- a target group whose registered service has no container bound to an HTTP handler
+- an address registered by hand, since only an ECS service registration puts something behind an
+  address in this simulation
 
-A container whose handler throws is a 502, as a Lambda target that throws is, and so is one that
-answers with something that is not a `Response`. The error goes no further than the load balancer,
-which is where it goes on real AWS too.
+A container whose handler throws is a 502, as a Lambda target that throws is, and so is one
+answering with something other than a `Response`. The error goes no further than the load balancer,
+as it goes no further on real AWS.
 
 ## Reaching a load balancer by name
 
-A load balancer's DNS name resolves through simulated [Route53](../route53/), so a record pointing at
-it reaches its listeners and rules. An alias record is the usual way, and a CNAME below the apex
+A load balancer's DNS name resolves through simulated [Route53](../route53/), and a record pointing
+at it reaches its listeners and rules. An alias record is the usual way, and a CNAME below the apex
 works too, the same as on real AWS. The record's value is `DNSName` exactly as a describe reported
-it, with nothing to rewrite.
+it.
 
-A `host-header` condition then sees the name the request was made to, rather than the load balancer's
-own, so a rule on `api.example.test` claims a request that a Route53 record for `api.example.test`
-brought to the load balancer. Host-based routing and DNS agree, which is what makes a stack with one
-load balancer behind several names behave here as it does deployed.
+A `host-header` condition then sees the name the request was made to, and never the load balancer's
+own. A rule on `api.example.test` claims a request that a Route53 record for `api.example.test`
+brought to the load balancer. Host-based routing and DNS agree, and a stack with one load balancer
+behind several names behaves here as it does deployed.
 
-Under `serveSimAws` the same name is served over real localhost HTTP, and a DNS lookup for it answers
-with the address the local server listens on. A request made under the Yulin-local suffix reaches the
-listener on port 80, since the port such a request carries is the local server's rather than one a
-client chose.
+Under `serveSimAws` the same name is served over real localhost HTTP, and a DNS lookup for it
+answers with the address the local server listens on. A request made under the Yulin-local suffix
+reaches the listener on port 80, since the port such a request carries belongs to the local server
+and not to a client's choice.
 
 ```typescript sim-elbv2-route53-alias
 /**
@@ -1324,17 +1319,17 @@ try {
 }
 ```
 
-A name pointing at a load balancer that has since been deleted fails rather than answering: nothing
-holds that host name any more, and the failure names it. A DNS lookup for the name still answers,
-because the shape of a load balancer host name is what a lookup recognises, in the same way a lookup
-for a deleted bucket's website name does.
+A name pointing at a load balancer that has since been deleted fails. Nothing holds that host name
+any more, and the failure names it. A DNS lookup for the name still answers, because the shape of a
+load balancer host name is what a lookup recognises, in the same way a lookup for a deleted bucket's
+website name does.
 
 ## Deleting
 
 Deleting a load balancer takes its listeners and their rules with it, and leaves its target groups
-where they are, which is what real ELB does: a target group is a resource in its own right and a
-replacement load balancer's listeners forward to the same ones. A target group a listener or rule
-still forwards to cannot be deleted until it does not.
+where they are, as real ELB does. A target group is a resource in its own right, and a replacement
+load balancer's listeners forward to the same ones. A target group a listener or rule still forwards
+to cannot be deleted until that forward has gone.
 
 ```typescript sim-elbv2-delete-load-balancer
 /**
@@ -1413,12 +1408,12 @@ try {
 ## Deploying a load balancer from CloudFormation
 
 `AWS::ElasticLoadBalancingV2::LoadBalancer`, `TargetGroup`, `Listener` and `ListenerRule` create
-their simulated counterparts, so a test can start from the stack the routing is actually defined in.
-Each one goes through the same command an SDK caller would use, so a template's listener rule matches
-requests the way the same rule created by hand does, and a declaration real ELB would refuse fails
-the deployment rather than deploying as something else.
+their simulated counterparts, and a test can start from the stack the routing is actually defined
+in. Each one goes through the same command an SDK caller would use. A template's listener rule
+matches requests the way the same rule created by hand does, and a declaration real ELB would refuse
+fails the deployment.
 
-`Ref` returns the ARN of all four, which is what a listener's `LoadBalancerArn`, a rule's
+`Ref` returns the ARN of all four, and that is what a listener's `LoadBalancerArn`, a rule's
 `ListenerArn` and a forward action's `TargetGroupArn` each take. `Fn::GetAtt` answers with:
 
 - `DNSName`, `LoadBalancerArn`, `LoadBalancerName`, `LoadBalancerFullName` and
@@ -1426,9 +1421,9 @@ the deployment rather than deploying as something else.
 - `TargetGroupArn`, `TargetGroupName` and `TargetGroupFullName` on a target group
 - `ListenerArn` on a listener, and `RuleArn` and `IsDefault` on a rule
 
-A load balancer or target group the template does not name is named after the stack and the logical
-ID, trimmed to the 32 characters ELB allows. A target group declaring `Targets` has them registered
-as part of creating it, so the group routes as soon as the stack has deployed.
+An unnamed load balancer or target group is named after the stack and the logical ID, trimmed to the
+32 characters ELB allows. A target group declaring `Targets` has them registered as part of creating
+it, and the group routes as soon as the stack has deployed.
 
 ```typescript sim-elbv2-cloudformation
 /**
@@ -1550,11 +1545,10 @@ const unclaimed = await simElbV2Fetch(simAws, `http://${dnsName}/other`);
 console.log(unclaimed.status); // 404
 ```
 
-A listener's `Certificates` resolves against simulated [ACM](../acm/), so a stack that creates a
+A listener's `Certificates` resolves against simulated [ACM](../acm/), and a stack that creates a
 certificate and attaches it to an HTTPS listener works end to end. A certificate that was never
-issued, or that belongs to another account or region, fails the deployment rather than leaving a
-listener that could not serve. A `Fn::GetAtt` on `DNSName` is a name a Route53 alias in the same
-stack can point at and reach.
+issued, or that belongs to another account or region, fails the deployment outright. A `Fn::GetAtt`
+on `DNSName` is a name a Route53 alias in the same stack can point at and reach.
 
 ```typescript sim-elbv2-cloudformation-certificate
 /**
@@ -1645,23 +1639,23 @@ console.log(listener?.Certificates[0]?.CertificateArn);
 console.log(listener?.SslPolicy); // "ELBSecurityPolicy-2016-08"
 ```
 
-Properties Yulin has nothing to act on are read and left out rather than failing the stack. Subnets,
+Properties Yulin has no use for are read and left out, and the stack still deploys. Subnets,
 security groups, load balancer and target group attributes, listener attributes, mutual
-authentication and health check configuration are all in that group, and each one is recorded on the
-Resource so a reader can see what the deployed load balancer is not doing:
+authentication and health check configuration are all in that group. Each one is recorded on the
+Resource, where a reader can see which parts of the deployed load balancer are inert:
 
 ```typescript
 const ignored = stack.resources.get("ShopAlb")?.ignoredProperties;
 ```
 
-Tearing the stack down removes all four in reverse dependency order, so a rule comes down before its
+Tearing the stack down removes all four in reverse dependency order. A rule comes down before its
 listener, a listener before its load balancer, and a target group after everything forwarding to it.
 
 ## IAM authorization
 
 Every operation is authorized by simulated [IAM](../iam/) as the caller making it, against the
-`elasticloadbalancing:` action and the ARN of whatever it names. An operation naming nothing that
-exists yet, such as `CreateLoadBalancer` or a describe, is authorized against `*`, so only a policy
+`elasticloadbalancing:` action and the ARN of whatever it names. An operation that names no existing
+resource, such as `CreateLoadBalancer` or a describe, is authorized against `*`, and only a policy
 whose Resource is `*` allows it.
 
 ```typescript sim-elbv2-iam-policy
@@ -1771,8 +1765,9 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   `lambda` and `ip` target types.
 - `RegisterTargets`, `DeregisterTargets` and `DescribeTargetHealth`.
 - `CreateListener`, `DescribeListeners`, `ModifyListener` and `DeleteListener`, on HTTP and HTTPS.
-- An HTTPS listener's default certificate resolved against simulated ACM, refusing one that does not
-  exist, one that is not `ISSUED`, and one outside the load balancer's own account and region.
+- An HTTPS listener's default certificate resolved against simulated ACM, refusing a missing one,
+  one whose status falls short of `ISSUED`, and one outside the load balancer's own account and
+  region.
 - `AddListenerCertificates`, `RemoveListenerCertificates` and `DescribeListenerCertificates`, with
   the default certificate reported first and refused removal.
 - `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule` and `SetRulePriorities`, with priorities
@@ -1781,13 +1776,13 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   conditions. A condition is read through its own field's configuration, so one carrying another
   field's is refused.
 - Paged describes with `PageSize` and `Marker`.
-- Carrying a request through `simElbV2Fetch`: a listener matched by port, its rules evaluated in
-  priority order with the first match winning, and a fall through to the default action.
-- Resolving a load balancer's DNS name through sim Route53, so an alias record or a CNAME pointing at
-  it reaches its listeners and rules, and a `host-header` condition sees the name the request was
-  made to.
-- Serving a load balancer under `serveSimAws`, over real localhost HTTP and with a DNS lookup for the
-  name answering with the address the local server listens on.
+- Carrying a request through `simElbV2Fetch`, with a listener matched by port, its rules evaluated
+  in priority order with the first match winning, and a fall through to the default action.
+- Resolving a load balancer's DNS name through sim Route53, where an alias record or a CNAME
+  pointing at it reaches its listeners and rules, and a `host-header` condition sees the name the
+  request was made to.
+- Serving a load balancer under `serveSimAws`, over real localhost HTTP and with a DNS lookup for
+  the name answering with the address the local server listens on.
 - `host-header` and `path-pattern` matching with ELB's own wildcard semantics, and a rule claiming a
   request only when all of its conditions hold.
 - `forward` to a `lambda` target group, which invokes its function with an ALB-shaped event, and the
@@ -1807,54 +1802,52 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 ## Limitations
 
 - Only `host-header` and `path-pattern` conditions exist. The `http-header`, `http-request-method`,
-  `query-string` and `source-ip` fields real ELB has are refused when the rule is written, rather
-  than stored and then never matching, which would leave a rule that looks configured and claims
-  nothing. Regular expression condition values, which real ELB takes in `RegexValues`, are not
-  matched either.
+  `query-string` and `source-ip` fields real ELB has are refused when the rule is written. Storing
+  them would leave a rule that looks configured while claiming no request at all. Regular expression
+  condition values, which real ELB takes in `RegexValues`, go unmatched too.
 - A `host-header` condition is matched against the request's Host header, falling back to the host
   name in the URL. On real AWS those are the same thing, because DNS is what brought the request to
-  the load balancer. A request served under the Yulin-local suffix is matched against the name inside
-  that suffix, so `api.example.test.sim-aws.localhost` is matched as `api.example.test`.
-- A `ForwardConfig` naming several target groups by weight is refused when the request arrives rather
-  than answered with something else. Nothing here reads the weights, so which group takes a request
-  is not a question this can answer.
-- An `ip` target group is answered by the simulated ECS service registered into it, and by nothing
-  else. An address registered by hand is a 503, since nothing in this simulation listens on an
-  address for one to name.
-- Requests are not shared between the targets of a group. An ECS service's desired count is state
-  rather than concurrency, so a group holding three targets calls one container handler.
+  the load balancer. A request served under the Yulin-local suffix is matched against the name
+  inside that suffix, so `api.example.test.sim-aws.localhost` is matched as `api.example.test`.
+- A `ForwardConfig` naming several target groups by weight is refused when the request arrives.
+  Nothing here reads the weights, and which group takes a request is a question this cannot answer.
+- An `ip` target group is answered by the simulated ECS service registered into it, and by that
+  alone. An address registered by hand is a 503, since only an ECS service registration puts
+  something behind an address here.
+- Requests are never shared between the targets of a group. An ECS service's desired count is state
+  and not concurrency, and a group holding three targets calls one container handler.
 - Which container of an ECS task a request reaches diverges from real ECS on purpose, and is
   documented under [the ECS docs](../ecs/#which-container-of-a-task-answers).
-- A redirect is not checked against the listener it is on, so redirecting HTTPS to HTTP is accepted
-  where real ELB refuses it. Nothing here performs TLS, so the listener's protocol is not something a
-  request can be trusted to have arrived over.
-- No TLS is performed on an HTTPS listener. Nothing is encrypted, no handshake happens, and no
-  certificate is presented to a client. What a test can conclude is that a listener's certificate
-  exists, was issued, and is in the load balancer's account and region, and that a request treated as
-  arriving over HTTPS is routed and forwarded the way the configuration says. What it cannot conclude
-  is anything about a client trusting the certificate, about expiry, about protocol versions or
-  ciphers, or about a request having really arrived over a secure connection.
-- The URL scheme a request is written with is not checked against the listener it reaches. The port
+- A redirect goes unchecked against the listener it is on, and redirecting HTTPS to HTTP is accepted
+  where real ELB refuses it. Nothing here performs TLS, and the listener's protocol says nothing
+  about what a request really arrived over.
+- No TLS is performed on an HTTPS listener. Everything travels in the clear, with no handshake and
+  no certificate presented to a client. What a test can conclude is that a listener's certificate
+  exists, was issued, and is in the load balancer's account and region, and that a request treated
+  as arriving over HTTPS is routed and forwarded the way the configuration says. Out of reach are a
+  client trusting the certificate, expiry, protocol versions and ciphers, and whether a request
+  really arrived over a secure connection.
+- The URL scheme a request is written with goes unchecked against the listener it reaches. The port
   decides the listener, and the listener decides the protocol the event and the forwarding headers
-  report, so `http://<dns-name>:443/` reaching an HTTPS listener is served as an HTTPS request rather
-  than refused as a failed handshake.
-- SNI certificate selection by host name is not simulated. The certificates beyond the default are
-  held and reported, and nothing chooses between them when a request arrives, since there is no
-  handshake to choose in. The default certificate is the one every request is served under.
+  report. So `http://<dns-name>:443/` reaching an HTTPS listener is served as an HTTPS request,
+  where a real handshake would have failed.
+- SNI certificate selection by host name is absent. The certificates beyond the default are held and
+  reported, and nothing chooses between them when a request arrives, since there is no handshake to
+  choose in. The default certificate is the one every request is served under.
 - Security policies and cipher suites are accepted and ignored. A listener that names no `SslPolicy`
   is given the one real ELB defaults to, the value is reported back, and nothing acts on it.
 - `IsDefault` is ignored on `AddListenerCertificates`, as real ELB documents that it should not be
   set there. The default certificate is replaced with `ModifyListener`, which drops the certificate
-  that was the default rather than moving it into the rest of the list.
-- A certificate is only ever an ACM one. `ImportCertificate` and IAM server certificates are not
-  simulated, and neither is mutual TLS, so there is no trust store to give a listener.
-- The length limits real ELB puts on a fixed response's message body and a redirect's components are
-  not enforced. A condition value is held to ELB's own 128 characters.
+  that was the default instead of moving it into the rest of the list.
+- A certificate is only ever an ACM one. `ImportCertificate`, IAM server certificates and mutual TLS
+  are all absent, and there is no trust store to give a listener.
+- The length limits real ELB puts on a fixed response's message body and a redirect's components go
+  unenforced. A condition value is held to ELB's own 128 characters.
 - A request served under the Yulin-local suffix reaches the listener on port 80, or on 443 for an
-  `https:` URL. The port such a request carries is the local server's rather than one a client chose,
-  so it cannot say which listener it is for. To reach a listener on another port over localhost,
-  serve on that port and request the hostname without the suffix, which needs a resolver pointed at
-  the simulator as described in [Route53](../route53/README.md#ports).
+  `https:` URL. The port such a request carries belongs to the local server, and cannot say which
+  listener it is for. To reach a listener on another port over localhost, serve on that port and
+  request the hostname without the suffix, which needs a resolver pointed at the simulator as
+  described in [Route53](../route53/README.md#ports).
 - A DNS lookup for a name pointing at a load balancer that has been deleted still answers with the
   local server address, because a load balancer host name is recognised by its shape. The request
   that follows is the thing that fails, naming the host name nothing answers on.
@@ -1862,44 +1855,43 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   target is registered and refuses `RegisterTargets` without it. A target naming a function in
   another Account or Region is registered here and then answers 502, where real ELB refuses the
   registration.
-- Multi-value headers are not simulated. `lambda.multi_value_headers.enabled` cannot be set, since
-  target group attributes are not simulated, so the event and the accepted response always use the
+- Multi-value headers are absent. `lambda.multi_value_headers.enabled` cannot be set, because target
+  group attributes are absent too, and the event and the accepted response always use the
   single-value `headers` and `queryStringParameters` fields. A repeated query string key keeps its
   last value, as real ELB does with the attribute off, while repeated request headers arrive already
-  joined with commas rather than reduced to the last one.
-- Health check requests are never sent to a target, so neither a Lambda function nor a container will
-  see the `ELB-HealthChecker/2.0` request real ELB sends when health checks are enabled.
-- Network and gateway load balancers are not simulated. `Type: "network"` and `"gateway"` are
-  refused, as are the `TCP`, `TLS`, `UDP`, `TCP_UDP` and `GENEVE` protocols.
-- `TargetType: "instance"` and `"alb"` are refused rather than accepted and ignored, and a target
-  group naming no target type at all is refused rather than defaulted to `instance` as real ELB
-  defaults it.
-- Health checks are not performed. Health check settings are held and reported, and every registered
-  target is `healthy` however it is configured, so a test cannot watch a deployment come up.
-- A load balancer is `active` immediately rather than `provisioning` for the minutes real ELB takes,
-  and deregistration is immediate rather than draining connections first.
-- Subnets, security groups, availability zones and cross-zone configuration are accepted and left out
-  of a describe rather than modelled, and `AvailabilityZones` and `SecurityGroups` are therefore
-  absent from a described load balancer.
-- `CanonicalHostedZoneId` is one value everywhere rather than the real per-region one. Simulated
+  joined with commas.
+- Health check requests never reach a target. A Lambda function or a container here will never see
+  the `ELB-HealthChecker/2.0` request real ELB sends when health checks are enabled.
+- Network and gateway load balancers are absent. `Type: "network"` and `"gateway"` are refused, as
+  are the `TCP`, `TLS`, `UDP`, `TCP_UDP` and `GENEVE` protocols.
+- `TargetType: "instance"` and `"alb"` are refused outright, and so is a target group naming no
+  target type at all, where real ELB defaults it to `instance`.
+- Health checks never run. Health check settings are held and reported, and every registered target
+  is `healthy` however it is configured, so a test cannot watch a deployment come up.
+- A load balancer is `active` immediately, where real ELB spends minutes in `provisioning`, and
+  deregistration is immediate, where real ELB drains connections first.
+- Subnets, security groups, availability zones and cross-zone configuration are accepted and left
+  out of a describe, and `AvailabilityZones` and `SecurityGroups` are therefore absent from a
+  described load balancer.
+- `CanonicalHostedZoneId` is one value everywhere, where the real one varies by region. Simulated
   Route53 resolves an alias by looking its target up, so only the shape is load-bearing, and copying
   this value into a real template would be copying the wrong one.
-- ARN ids and DNS name suffixes count from one rather than being random, so a test can assert on an
-  ARN it did not capture. The shape is the one real ELB issues either way.
+- ARN ids and DNS name suffixes count from one, where real ones are random, and a test can therefore
+  assert on an ARN it never captured. The shape is the one real ELB issues either way.
 - `authenticate-oidc` and `authenticate-cognito` actions are refused. Nothing here performs that
   exchange, and treating one as a plain forward would quietly skip authentication. Since those are
   the only actions that may precede a routing action, a listener or rule takes exactly one action
   here and a longer list is refused.
-- Load balancer and target group attributes, access logs, and tags as a readable resource are not
-  simulated.
-- `AWS::ElasticLoadBalancingV2::TrustStore`, `TrustStoreRevocation` and `ListenerCertificate` are not
-  deployed, and a stack declaring one records it as unsupported and carries on. The first two have
-  nothing to attach to, since mutual TLS is not simulated, and a listener's additional certificates
-  are added with `AddListenerCertificates` instead.
-- `Fn::GetAtt` `SecurityGroups` on a load balancer and `LoadBalancerArns` on a target group are
-  refused rather than answered. Nothing places a simulated load balancer behind a security group, and
-  nothing records on a target group which load balancers forward to it, which `DescribeTargetGroups`
-  reads back out of the listeners instead.
-- Sim CloudFormation has no in-place resource update, so a changed load balancer, target group,
-  listener or rule is deleted and created again, and everything naming it is replaced too. A replaced
-  load balancer gets a new DNS name.
+- Load balancer and target group attributes, access logs, and tags as a readable resource are all
+  absent.
+- `AWS::ElasticLoadBalancingV2::TrustStore`, `TrustStoreRevocation` and `ListenerCertificate` are
+  never deployed, and a stack declaring one records it as unsupported and carries on. The first two
+  have nothing to attach to, with mutual TLS absent, and a listener's additional certificates are
+  added with `AddListenerCertificates`.
+- `Fn::GetAtt` `SecurityGroups` on a load balancer and `LoadBalancerArns` on a target group are both
+  refused. Nothing places a simulated load balancer behind a security group, and a target group
+  keeps no record of which load balancers forward to it, which `DescribeTargetGroups` reads back out
+  of the listeners instead.
+- Sim CloudFormation has no in-place resource update. A changed load balancer, target group,
+  listener or rule is deleted and created again, and everything naming it is replaced too. A
+  replaced load balancer gets a new DNS name.
