@@ -8,23 +8,24 @@ ECS-specific types are imported from the `@kensio/yulin/ecs` subpath.
 
 ## What Yulin does with a container image
 
-Yulin never looks inside a container image. It cannot: an image may hold a Go binary, nginx, Redis or
-anything else, and the only thing Yulin can run is JavaScript or TypeScript in its own process.
+Yulin never looks inside a container image, and it could not if it tried. An image may hold a Go
+binary, nginx, Redis or anything else, and the only thing Yulin can run is JavaScript or TypeScript
+in its own process.
 
 So an image URI is only ever an identifier. Nothing here reads it, pulls it, or runs anything from
 it. It is stored as declared, and it is what a container is matched on when a task runs, in the same
-way an image URI identifies a container image Lambda function. The rule that follows from it is that
-a container matched to a handler runs that handler, and a container with no match is recorded as not
-simulated rather than failing anything.
+way an image URI identifies a container image Lambda function. The rule that follows is that a
+container matched to a handler runs that handler, and a container with no match is recorded as not
+simulated while the rest of the task carries on.
 
 A realistic task definition holds an application container, a log router and an observability agent.
-Only the first of those is something Yulin could ever run, and all three are stored and reported back
-exactly as declared.
+Only the first of those is something Yulin could ever run, and all three are stored and reported
+back exactly as declared.
 
-Where this does not work is a sidecar the application depends on, such as a Redis or a database in
-the same task. Yulin does not simulate that. The connection details are ordinary environment
-variables, so point them at a real one you run yourself. See
-[non-AWS dependencies](../../non-aws-dependencies/README.md) for how that fits together.
+The case this leaves out is a sidecar the application depends on, such as a Redis or a database in
+the same task. Point its connection details, which are ordinary environment variables, at a real one
+you run yourself. See [non-AWS dependencies](../../non-aws-dependencies/README.md) for how that fits
+together.
 
 ## Registering a task definition
 
@@ -76,16 +77,16 @@ console.log(described.taskDefinition?.containerDefinitions?.[0]?.image);
 ```
 
 Container definitions are stored as declared, whatever the image is and whether or not Yulin could
-ever run it. That includes port mappings, environment variables and secrets: a `valueFrom` naming a
-Secrets Manager secret is held as the identifier it is, since nothing resolves it.
+ever run it. That covers port mappings, environment variables and secrets. A `valueFrom` naming a
+Secrets Manager secret is held as the identifier it is, and never resolved.
 
-A registration is refused rather than trimmed if it declares something this simulation does not hold.
-That way a declaration cannot go missing from the revision it made.
+A registration that declares something this simulation has no room for is refused outright, and
+never trimmed. That way a declaration cannot go missing from the revision it made.
 
 ## Revisions
 
 Each registration of a family takes the next revision number. Naming the family alone means its
-latest active revision, so it follows registrations as they are made.
+latest active revision, which follows registrations as they are made.
 
 ```typescript sim-ecs-task-definition-revisions
 /**
@@ -125,15 +126,15 @@ console.log(first.taskDefinition?.containerDefinitions?.[0]?.image);
 // "checkout:1"
 ```
 
-`DescribeTaskDefinition` takes all three forms ECS takes: a family, a `family:revision`, and a full
-task definition ARN. The ARN of a revision is
+`DescribeTaskDefinition` takes all three forms ECS takes, namely a family, a `family:revision`, and
+a full task definition ARN. The ARN of a revision is
 `arn:aws:ecs:<region>:<account>:task-definition/<family>:<revision>`.
 
 ## Deregistering a revision
 
-`DeregisterTaskDefinition` marks one revision `INACTIVE` without removing it. It stays describable by
-`family:revision` and by ARN, because something already holding either of those still needs to find
-out what it declared. What it stops being is the revision the family resolves to.
+`DeregisterTaskDefinition` marks one revision `INACTIVE` without removing it. It stays describable
+by `family:revision` and by ARN, because something already holding either of those still needs to
+find out what it declared. What it stops being is the revision the family resolves to.
 
 ```typescript sim-ecs-deregister-task-definition
 /**
@@ -185,9 +186,9 @@ revision 3.
 ## Listing task definitions
 
 `ListTaskDefinitions` reports revision ARNs and `ListTaskDefinitionFamilies` reports family names.
-Both take a `familyPrefix`. A `ListTaskDefinitions` request saying nothing about status gets the
-active revisions, while a `ListTaskDefinitionFamilies` request saying nothing gets both the active
-and the inactive families, which is how real ECS defaults each of them.
+Both take a `familyPrefix`. A `ListTaskDefinitions` request silent on status gets the active
+revisions, while a `ListTaskDefinitionFamilies` request silent on it gets both the active and the
+inactive families. That is how real ECS defaults each of them.
 
 ```typescript sim-ecs-list-task-definitions
 /**
@@ -280,14 +281,14 @@ console.log(listed.clusterArns?.[0]);
 Settings, configuration and tags are reported only where the request asked for them by name, as they
 are on real ECS. A request naming no cluster means the `default` cluster.
 
-`DeleteCluster` marks a cluster `INACTIVE`. It stays describable and drops out of `ListClusters`, and
-creating a cluster of the same name again makes a new active one, listed in the position it was
-created in. Unlike the operations that read a cluster, `DeleteCluster` needs one to be named: a
-request naming none is refused rather than taken as meaning the `default` cluster.
+`DeleteCluster` marks a cluster `INACTIVE`. It stays describable and drops out of `ListClusters`,
+and creating a cluster of the same name again makes a new active one, listed in the position it was
+created in. Unlike the operations that read a cluster, `DeleteCluster` needs one to be named. A
+request naming none is refused, and never read as meaning the `default` cluster.
 
 A cluster is named either by its short name or by its full ARN, and the two are interchangeable. An
-ARN belonging to another account or region names a different cluster, so `DescribeClusters` reports
-it as a `MISSING` failure and `DeleteCluster` refuses it.
+ARN belonging to another account or region names a different cluster. `DescribeClusters` reports it
+as a `MISSING` failure, and `DeleteCluster` refuses it.
 
 A cluster has to exist before a task can run in it, including the `default` one. Yulin creates no
 cluster on its own, so create the one the tasks run in.
@@ -361,17 +362,17 @@ console.log(described.tasks?.[0]?.containers?.[1]?.reason);
 // "Not simulated: no executable binding matches this container, ..."
 ```
 
-`RunTask` answers before the containers have run, with the task in `PROVISIONING`, which is what real
-ECS answers with. Waiting for the simulator's background work is what runs them.
+`RunTask` answers before the containers have run, with the task in `PROVISIONING`, as real ECS
+answers it. Waiting for the simulator's background work is what runs them.
 
-The log router in that task definition has no binding, so it never starts and says why. That is the
-ordinary shape of a real task definition: an application container Yulin can run, next to containers
-it never could.
+The log router in that task definition has no binding. It never starts, and says why. That is the
+ordinary shape of a real task definition, with an application container Yulin can run next to
+containers it never could.
 
 A handler that throws stops its container with an exit code of 1 and the error message as its
-reason. The `RunTask` call itself does not fail, because nothing is watching one by the time a real
-container fails either. A task definition where nothing at all is bound still creates the task, which
-stops with a `stopCode` of `TaskFailedToStart` saying that nothing ran.
+reason. The `RunTask` call itself still succeeds, because a real container fails with nobody
+watching the call either. A task definition where nothing at all is bound still creates the task.
+The task stops with a `stopCode` of `TaskFailedToStart` saying that nothing ran.
 
 ### Binding by image repository
 
@@ -424,13 +425,13 @@ await simAws.backgroundTasksComplete();
 console.log(started); // ["app"]
 ```
 
-The registry host is part of the repository, so a same-named repository in another account or region
-does not match. A binding naming the family and the container name beats one naming a repository
+The registry host is part of the repository, and a same-named repository in another account or
+region misses. A binding naming the family and the container name beats one naming a repository
 where both would match, and binding the same container again replaces what it runs.
 
-The other shape a binding can take is `http`, a fetch-style
-`(request: Request) => Response | Promise<Response>` for a service container behind a load balancer.
-It is called once for each request routed to the container, and is covered under
+The other shape a binding can take is `http`, a fetch-style `(request: Request) => Response |
+Promise<Response>` for a service container behind a load balancer. It is called once for each
+request routed to the container, and is covered under
 [serving requests behind a load balancer](#serving-requests-behind-a-load-balancer).
 
 ## What a container sees while it runs
@@ -438,7 +439,7 @@ It is called once for each request routed to the container, and is covered under
 The container definition's `environment` is visible through `process.env` for the length of the run,
 along with any `RunTask` container override and the region variables a real task agent sets. This
 works the same way it does for a sim Lambda function handler, through Node.js asynchronous context
-tracking, so a container that declares nothing reads the host environment untouched.
+tracking. A container that declares nothing reads the host environment untouched.
 
 ```typescript sim-ecs-run-task-environment
 /**
@@ -496,8 +497,8 @@ await simAws.backgroundTasksComplete();
 console.log(batchSizes); // ["10"]
 ```
 
-A variable read at module scope, as in `const size = process.env.BATCH_SIZE` at the top of a file, is
-read when the test imports that file rather than when the container runs, so it sees the host value.
+A variable read at module scope, as in `const size = process.env.BATCH_SIZE` at the top of a file,
+is read when the test imports that file and not when the container runs, and it sees the host value.
 Read inside the handler to get the container's own.
 
 ## The task role
@@ -586,15 +587,14 @@ await simAws.backgroundTasksComplete();
 ```
 
 Take the policy away and the same run stops the container with an exit code of 1, carrying the IAM
-denial as its reason. That is the test worth writing: a task role missing a permission fails in the
-test rather than in the deployment.
+denial as its reason. That is the test worth writing. A task role missing a permission fails in the
+test, ahead of the deployment.
 
 A `RunTask` request can override the role with `overrides.taskRoleArn`. A task definition declaring
-no task role runs its containers as nobody, so their AWS calls are denied: a real task without one
+no task role runs its containers as nobody, and their AWS calls are denied. A real task without one
 has no credentials of its own, and taking the identity of whoever called `RunTask` would let a test
-pass on permissions the deployed task has not got. The execution role is what a container's
-`secrets` are resolved as, and nothing else: there is no image to pull and no log driver to write
-to.
+pass on permissions the deployed task lacks. The execution role covers a container's `secrets`
+alone, since there is no image to pull and no log driver to write to.
 
 ## Container secrets
 
@@ -603,8 +603,8 @@ or simulated SSM Parameter Store according to what each `valueFrom` names, and t
 the container's environment alongside its declared `environment`. A handler reads them through
 `process.env` like anything else.
 
-They are read as the task definition's `executionRoleArn`, not its `taskRoleArn`, which is the
-split real ECS makes: the execution role is what the task agent pulls secrets with before a
+They are read as the task definition's `executionRoleArn` rather than its `taskRoleArn`. That is the
+split real ECS makes. The execution role is what the task agent pulls secrets with before a
 container starts, and the task role is what the running container's own AWS calls are attributed to.
 A role allowed one is not thereby allowed the other.
 
@@ -715,55 +715,56 @@ arn:aws:iam::111111111111:role/OrdersExecutionRole is not authorized to perform:
 secretsmanager:GetSecretValue on resource: arn:aws:secretsmanager:...
 ```
 
-The task stops with `TaskFailedToStart` and never reaches `RUNNING`, so the bound handler does not
-run. A secret that does not exist, a task definition declaring secrets with no `executionRoleArn`,
-and a JSON key the secret has not got each stop it the same way with their own reason.
+The task stops with `TaskFailedToStart`, never reaches `RUNNING`, and the bound handler stays unrun.
+A secret that was never created, a task definition declaring secrets with no `executionRoleArn`, and
+a JSON key the secret lacks each stop it the same way with their own reason.
 
 ## Running a task from a rule or a schedule
 
-A task does not have to be started by a `RunTask` call. A [simulated EventBridge](../eventbridge/)
-rule target and a [simulated Scheduler](../scheduler/) schedule target can both name an ECS cluster,
-and both then run a task here when the rule matches an event or the schedule falls due. That is the
-usual shape of a nightly batch job or an import kicked off by something happening.
+A `RunTask` call is one way to start a task, and there are two others. A
+[simulated EventBridge](../eventbridge/) rule target and a [simulated Scheduler](../scheduler/)
+schedule target can both name an ECS cluster, and both then run a task here when the rule matches an
+event or the schedule falls due. That is the usual shape of a nightly batch job or an import kicked
+off by something happening.
 
-Both go through `RunTask`, so a task started that way is the same task as one started by a caller:
-the same cluster and revision lookups, the same IAM decision against `ecs:RunTask`, and the same
-task state afterwards. What a target may ask for is not the same, though. `EcsParameters` takes and
+Both go through `RunTask`, and a task started that way is the same task as one started by a caller.
+That means the same cluster and revision lookups, the same IAM decision against `ecs:RunTask`, and
+the same task state afterwards. What a target may ask for differs, though. `EcsParameters` takes and
 ignores the launch type, platform version, network configuration and capacity provider strategy that
 `RunTask` refuses, since a target written for real AWS carries them and refusing one would make an
-otherwise workable target unusable. The other difference is who runs it. A rule or a
-schedule runs the task as the role on its target, so that role needs `ecs:RunTask` on the revision,
-and the task role inside the task definition is still what the containers' own AWS calls are
-attributed to.
+otherwise workable target unusable. The other difference is who runs it. A rule or a schedule runs
+the task as the role on its target, and that role needs `ecs:RunTask` on the revision. The task role
+inside the task definition is still what the containers' own AWS calls are attributed to.
 
-The container model applies unchanged: only a bound container runs, and a target naming a task
-definition with nothing bound records a task that never started rather than failing the rule or the
-schedule. Writing one of these targets is documented where the target is written, in
+The container model applies unchanged. Only a bound container runs, and a target naming a task
+definition with nothing bound records a task that never started, leaving the rule or the schedule
+itself successful. Writing one of these targets is documented where the target is written, in
 [running an ECS task](../eventbridge/#running-an-ecs-task) for a rule and
 [running an ECS task on a schedule](../scheduler/#running-an-ecs-task-on-a-schedule) for a schedule.
 
 ## Describing, listing and stopping tasks
 
 `DescribeTasks` reports a task by its id or its full ARN, with its containers, which of them ran and
-their exit codes. A task it cannot find is a `MISSING` failure entry rather than an error.
+their exit codes. A task it cannot find comes back as a `MISSING` failure entry, and never as an
+error.
 
-`ListTasks` filters on a desired status of `RUNNING` when a request says nothing, as real ECS does,
-so a task that has finished is only listed by asking for the stopped ones with
-`desiredStatus: "STOPPED"`. It also filters by `family`, `startedBy` and `launchType`.
+`ListTasks` filters on a desired status of `RUNNING` when a request says nothing, as real ECS does.
+A task that has finished is only listed by asking for the stopped ones with `desiredStatus:
+"STOPPED"`. It also filters by `family`, `startedBy` and `launchType`.
 
 `StopTask` sets the desired status to `STOPPED` and records the reason. A task whose containers have
-not started yet runs none of them, and one stopped part way through runs no more, so a test can stop
-a task between `RunTask` and the background work that runs it. A task that has already stopped is
-reported as it stands, keeping the reason it stopped for.
+yet to start runs none of them, and one stopped part way through runs no more. A test can therefore
+stop a task between `RunTask` and the background work that runs it. A task that has already stopped
+is reported as it stands, keeping the reason it stopped for.
 
 ## Services
 
-A task runs and stops. A service keeps tasks running, which is what a deployed application usually
-is: a named service in a cluster, running some number of tasks from a task definition.
+A task runs and stops. A service keeps tasks running, and that is what a deployed application
+usually is. It is a named service in a cluster, running some number of tasks from a task definition.
 
 `CreateService` creates one. Its tasks exist as soon as the request is answered and reach `RUNNING`
-on the simulation's background work, as real ECS brings a new service up, so the service reports the
-desired count it was given and a running count that catches up.
+on the simulation's background work, as real ECS brings a new service up. The service reports the
+desired count it was given, and a running count that catches up.
 
 ```typescript sim-ecs-create-service
 /**
@@ -832,35 +833,35 @@ async function handleOneRequest(): Promise<void> {
 }
 ```
 
-Each of those tasks is a task like any other: `ListTasks` returns its ARN, `DescribeTasks` describes
+Each of those tasks is a task like any other. `ListTasks` returns its ARN, `DescribeTasks` describes
 it, and its containers report which of them Yulin is simulating.
 
-### The desired count is state, not concurrency
+### What the desired count models
 
 A desired count of three does not mean three copies of your handler. Yulin runs in one Node.js
-process and there are no containers to copy, so the count is simulated as state: three tasks exist
-and are reported as running, while the handler bound to a container is called once per request or per
-poll, whenever something reaches it.
+process and there are no containers to copy, so the count is simulated as state. Three tasks exist
+and are reported as running, while the handler bound to a container is called once per request or
+per poll, whenever something reaches it.
 
-That is a deliberate divergence. What it means in practice is that a service is worth asserting on
-for its state — how many tasks it keeps, which revision they run — rather than for anything about
-running three things at once. A test that needs concurrency is a test about your own code, not about
-ECS.
+That is a deliberate divergence. In practice a service is worth asserting on for its state (how many
+tasks it keeps, which revision they run) and not for anything about running three things at once. A
+test that needs concurrency is a test about your own code.
 
 A container of a service that has come up is treated as running from that point, and what calls it
-is whatever reaches it: a queue it consumes, or a load balancer sending it a request. Both are
+is whatever reaches it, either a queue it consumes or a load balancer sending it a request. Both are
 covered below.
 
 ### Consuming a queue
 
-A worker container reads an SQS queue in a loop: receive a batch, handle it, delete it, go round
-again. A binding cannot do that. An endless loop in a single Node.js process blocks everything and
-never yields to the test running it, so nothing would ever get to assert on what the loop did.
+A worker container reads an SQS queue in a loop. It receives a batch, handles it, deletes it, and
+goes round again. A binding cannot do that. An endless loop in a single Node.js process blocks
+everything and never yields to the test running it, leaving the test no chance to assert on what the
+loop did.
 
-So Yulin runs the loop and the binding supplies its body. A container declares `consumes` instead of
-`run`, naming the queue and a handler for a batch of messages, and Yulin receives, hands the batch
-over, and deletes it when the handler returns. The bound thing is the body of the loop rather than
-the loop itself, which is the one divergence worth keeping in mind here.
+So Yulin runs the loop and the binding supplies its body. A container declares `consumes` in place
+of `run`, naming the queue and a handler for a batch of messages, and Yulin receives, hands the
+batch over, and deletes it when the handler returns. The bound thing is the body of the loop, and
+not the loop itself. That is the one divergence worth keeping in mind here.
 
 ```typescript sim-ecs-consume-queue
 /**
@@ -961,20 +962,20 @@ console.log(handled); // ["order-1"]
 
 The queue is named by the URL `CreateQueue` answered with, and it has to be in the same account and
 region as the service, as a real task's own queue is. A `batchSize` is how many messages the handler
-is given at once, up to the ten one SQS receive hands out; it defaults to ten. The handler may be
-async, and is awaited. A container that declares `consumes` declares no `run` handler, and binding
-one that declares both is refused.
+is given at once, up to the ten one SQS receive hands out, and it defaults to ten. The handler may
+be async, and is awaited. A container declares either `consumes` or `run`, and binding one that
+declares both is refused.
 
-The task role is not optional here, which is the part worth noticing before writing the first one.
-Polling is done as the task role, so a task definition with no `taskRoleArn` polls as nobody and its
-very first poll is denied. That is what a real worker container with no credentials would hit.
+The task role is required here. That is the part worth noticing before writing the first one.
+Polling is done as the task role, and a task definition with no `taskRoleArn` polls as nobody and
+has its very first poll denied. That is what a real worker container with no credentials would hit.
 
 #### Polling runs on the simulated clock
 
 Yulin never polls in the background of a test. A message that can be received now is delivered as
-soon as the simulation settles, so `await simAws.backgroundTasksComplete()` is enough for an
-ordinary send. Anything that has to wait — a message sent with `DelaySeconds`, or a batch coming back
-after its visibility timeout — waits on the simulated clock, so freezing time holds it and advancing
+soon as the simulation settles, and `await simAws.backgroundTasksComplete()` is enough for an
+ordinary send. Anything that has to wait (a message sent with `DelaySeconds`, or a batch coming back
+after its visibility timeout) waits on the simulated clock. Freezing time holds it, and advancing
 time delivers it.
 
 ```typescript sim-ecs-consume-queue-clock
@@ -1010,11 +1011,11 @@ console.log(handled.length); // 1, the clock got there and the poll happened
 
 #### What the handler returning and throwing mean
 
-A handler that returns has handled the batch, so Yulin deletes it. A handler that throws has not, so
-the whole batch is left on the queue: it stays hidden for the queue's visibility timeout and is
-handed over again when that runs out, which is what a real worker crashing part way through a batch
-does. A redrive policy therefore gives up on a message the handler keeps throwing on, exactly as it
-would for the deployed container.
+A handler that returns has handled the batch, and Yulin deletes it. A handler that throws leaves the
+whole batch on the queue. It stays hidden for the queue's visibility timeout and is handed over
+again when that runs out. That is what a real worker crashing part way through a batch does. A
+redrive policy therefore gives up on a message the handler keeps throwing on, exactly as it would
+for the deployed container.
 
 The error goes no further than the container. What the sender sees is the message coming back.
 
@@ -1022,9 +1023,9 @@ The error goes no further than the container. What the sender sees is the messag
 
 Receiving, deleting and reading the queue's visibility timeout are all made as the task definition's
 `taskRoleArn`, and so is anything the handler itself does. A task role without `sqs:ReceiveMessage`,
-`sqs:DeleteMessage` or `sqs:GetQueueAttributes` on the queue is refused, which surfaces from
-`backgroundTasksComplete()` rather than being quietly allowed. That is the point of it: a policy that
-would break the deployed worker breaks the test.
+`sqs:DeleteMessage` or `sqs:GetQueueAttributes` on the queue is refused, and the refusal surfaces
+from `backgroundTasksComplete()`. That is the point of it. A policy that would break the deployed
+worker breaks the test.
 
 A task definition with no `taskRoleArn` polls anonymously and is denied at its very first poll, as a
 real task with no credentials of its own would be.
@@ -1032,26 +1033,26 @@ real task with no credentials of its own would be.
 #### Polling starts and stops with the service
 
 Polling starts when the service's first task comes up and stops when the service is deleted, scaled
-to zero, or its `SimAws` is closed. A stopped poller leaves nothing watching the queue and nothing
-waiting on the clock, so a test that finishes with a consuming service leaves nothing behind it.
+to zero, or its `SimAws` is closed. A stopped poller releases both the queue watch and the clock
+wait. A test that finishes with a consuming service leaves nothing behind it.
 
-There is one poller per service and container, not one per task. A desired count of three is three
-simulated tasks reported as running, and the handler is still called once per poll, which is the same
-divergence the desired count already rests on. Three real containers would each run their own loop
-and share the queue between them, which comes to the same messages being handled once.
+There is one poller per service and container, and never one per task. A desired count of three is
+three simulated tasks reported as running, and the handler is still called once per poll, which is
+the same divergence the desired count already rests on. Three real containers would each run their
+own loop and share the queue between them, coming to the same messages being handled once.
 
-A consuming container is the one kind a `RunTask` task cannot run. It has no handler that ends, and a
-task has to end, so a task started from the same definition records the container as not simulated
+A consuming container is the one kind a `RunTask` task cannot run. It has no handler that ends, and
+a task has to end. A task started from the same definition records the container as not simulated,
 with a reason saying to create a service instead.
 
 ### Serving requests behind a load balancer
 
-A service container that answers HTTP requests declares `http` instead of `run` or `consumes`. The
-handler is fetch-style: it is given a `Request` and answers with a `Response`, which is the same
-shape a simulated load balancer already answers a served request with.
+A service container that answers HTTP requests declares `http` in place of `run` or `consumes`. The
+handler is fetch-style. It is given a `Request` and answers with a `Response`, the same shape a
+simulated load balancer already answers a served request with.
 
 What reaches it is a request routed through simulated [Elastic Load Balancing](../elbv2/). A service
-declares `loadBalancers` naming a target group, a container and a container port; creating the
+declares `loadBalancers` naming a target group, a container and a container port. Creating the
 service registers each of its tasks into that target group, and a request the load balancer forwards
 there reaches the bound container's handler.
 
@@ -1155,9 +1156,9 @@ consuming a queue or one run by `RunTask` does. So application code inside it bu
 from `process.env` and is authorized by simulated IAM against the role the task definition declared.
 
 The container sees the request the client made, with the headers a load balancer writes in front of
-a target: the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`, `x-forwarded-port`
-and `x-amzn-trace-id`. The URL is the AWS-facing one, so `new URL(request.url)` reads the name the
-client asked for rather than a localhost one.
+a target. Those are the `host` the client asked for, `x-forwarded-for`, `x-forwarded-proto`,
+`x-forwarded-port` and `x-amzn-trace-id`. The URL is the AWS-facing one, and `new URL(request.url)`
+reads the name the client asked for and never a localhost one.
 
 #### Which container of a task answers
 
@@ -1165,17 +1166,17 @@ Real ECS sends the request to the container the registration names, on the port 
 diverges from that on purpose, and it is worth knowing why.
 
 A great many deployed services put a proxy container, usually nginx, on the port the service
-registers, with the application listening behind it. Yulin has nothing to run in place of that proxy:
-there is no image to run and nothing a test could bind to it. Routing strictly by name and port would
-therefore send every request to a container that does not exist here, and the service would answer
-nothing however carefully it was set up.
+registers, with the application listening behind it. Yulin has nothing to run in place of that
+proxy. There is no image to run and nothing a test could bind to it. Routing strictly by name and
+port would therefore send every request to a container that is absent here, and the service would
+answer no request at all, however carefully it was set up.
 
-So the request goes to a container that is bound:
+So the request goes to a container that is bound, chosen in this order:
 
-- the container the registration names, when that container is bound;
-- otherwise the bound container that declared the registration's `containerPort`, which is what
-  chooses between two containers that both answer;
-- otherwise the first bound container of the task.
+- the container the registration names, when that container is bound
+- otherwise the bound container that declared the registration's `containerPort`, which settles a
+  choice between two containers that both answer
+- otherwise the first bound container of the task
 
 ```typescript
 // A registration naming the proxy still reaches the application behind it.
@@ -1183,17 +1184,18 @@ loadBalancers: [{ targetGroupArn, containerName: "nginx", containerPort: 80 }];
 ```
 
 A target group whose service has no bound container at all is answered with a 503 by the load
-balancer, which is the honest answer: the tasks are registered and there is nothing behind them.
+balancer. That is the honest answer, since the tasks are registered and there is nothing behind
+them.
 
 `RunTask` cannot run a serving container, for the same reason it cannot run a consuming one. It has
-no handler that ends and no request to send it, so a task started from the same definition records
-the container as not simulated with a reason saying to create a service instead.
+no handler that ends and no request to send it. A task started from the same definition records the
+container as not simulated, with a reason saying to create a service instead.
 
 ### Updating and deleting a service
 
 `UpdateService` changes the desired count, the task definition, or both. A new count starts or stops
-tasks to reach it. A new revision moves the service onto it, which replaces every task the service is
-running: real ECS replaces them a few at a time under a deployment configuration, and Yulin replaces
+tasks to reach it. A new revision moves the service onto it and replaces every task the service is
+running. Real ECS replaces them a few at a time under a deployment configuration, and Yulin replaces
 them at once because nothing here takes any time to start.
 
 ```typescript sim-ecs-update-service
@@ -1269,7 +1271,7 @@ console.log(listed.taskArns?.length); // 4, all of them on the new revision
 ```
 
 `DeleteService` stops the service and its tasks. A service still scaled above zero is refused unless
-the request forces it, as real ECS refuses one, so scaling to zero first is the ordinary way round. A
+the request forces it, as real ECS refuses one. Scaling to zero first is the ordinary way round. A
 deleted service is still describable as `INACTIVE`, and its name is free to create again.
 
 ```typescript sim-ecs-delete-service
@@ -1331,21 +1333,21 @@ const described = await ecs.describeServices(
 console.log(described.services?.[0]?.runningCount); // 0
 ```
 
-Closing the simulated environment with `simAws.close()` stops the tasks of every service in it, and
-nothing is left scheduled either way: a service is kept as state rather than by a timer, so a test
-that finishes with a service running leaves nothing behind it.
+Closing the simulated environment with `simAws.close()` stops the tasks of every service in it. A
+service is kept as state, and nothing is left scheduled either way. A test that finishes with a
+service running leaves nothing behind it.
 
 ## Deploying ECS from CloudFormation
 
 `AWS::ECS::Cluster` creates a simulated cluster, `AWS::ECS::TaskDefinition` registers a simulated
-task definition revision, and `AWS::ECS::Service` creates a simulated service running it, so a test
-can start from the stack the application is actually defined in rather than from
-`RegisterTaskDefinition` and `CreateService` calls written for the test.
+task definition revision, and `AWS::ECS::Service` creates a simulated service running it. A test can
+start from the stack the application is actually defined in, without `RegisterTaskDefinition` and
+`CreateService` calls written for the test.
 
 `Ref` on a cluster returns the cluster name and `Fn::GetAtt` `Arn` returns its ARN. `Ref` on a task
-definition returns the task definition ARN, revision and all, which is also what `Fn::GetAtt`
-`TaskDefinitionArn` returns. Each deployment registers a new revision, as real CloudFormation does,
-because a revision is immutable and a changed one is a new revision of the same family.
+definition returns the task definition ARN, revision and all, and so does `Fn::GetAtt`
+`TaskDefinitionArn`. Each deployment registers a new revision, as real CloudFormation does, because
+a revision is immutable and a changed one is a new revision of the same family.
 
 Containers are stored as declared, whatever their image, and what makes one of them run is an
 executable binding supplied at deploy time, in the same `bindings` list a Lambda function handler is
@@ -1426,7 +1428,7 @@ console.log(processedOrders); // ["outstanding orders"]
 ```
 
 A binding can name the task definition Resource instead, which is what a CDK stack gives a test to
-name: the construct ID is accepted as well as the synthesized logical ID, and the container name can
+name. The construct ID is accepted as well as the synthesized logical ID, and the container name can
 be left out where the task definition declares one container. A binding naming an image repository
 matches any container running an image from it, whichever family declares it, which covers a tag
 that changes with every build.
@@ -1502,12 +1504,12 @@ console.log(simAws.ecs().taskDefinition("orders-worker").revision); // 1
 
 A binding that resolves to no Resource in the stack fails the deployment naming the binding, since
 the usual cause is a container renamed in the template and not in the test. A container with no
-binding is a different thing: the stack deploys, the container is stored as declared, and it is
-recorded as not simulated when a task runs, which is what lets a task definition holding a log
-router and an observability agent alongside the application deploy and run.
+binding is a different thing. The stack deploys, the container is stored as declared, and it is
+recorded as not simulated when a task runs. That is what lets a task definition holding a log router
+and an observability agent alongside the application deploy and run.
 
 A task definition's `TaskRoleArn` and `ExecutionRoleArn` resolve whether the template gives an ARN
-or a `Ref` to an `AWS::IAM::Role` of the same stack, so a container's AWS calls are authorized as
+or a `Ref` to an `AWS::IAM::Role` of the same stack, and a container's AWS calls are authorized as
 the role the stack deploys.
 
 ### Deploying a service
@@ -1519,9 +1521,9 @@ revision the deployment registered, or an ARN, or a family. A container bound at
 running once the stack has deployed, because the service names the task definition and is created
 after it.
 
-`Ref` on a service returns the service ARN, which is also what `Fn::GetAtt` `ServiceArn` returns,
-and `Fn::GetAtt` `Name` returns the service name. `simAws.ecs().service(name, cluster)` reads the
-simulated service itself, by name in a cluster or by its full ARN.
+`Ref` on a service returns the service ARN, and so does `Fn::GetAtt` `ServiceArn`. `Fn::GetAtt`
+`Name` returns the service name. `simAws.ecs().service(name, cluster)` reads the simulated service
+itself, by name in a cluster or by its full ARN.
 
 ```typescript sim-ecs-cloudformation-service
 /**
@@ -1600,30 +1602,30 @@ const listed = await simAws
 console.log(listed.taskArns?.length); // 2
 ```
 
-A service the template does not name is named after the stack and the logical ID, as a cluster and a
-family are, and a service declaring no `DesiredCount` keeps one task running, which is what real
-CloudFormation gives a new service.
+An unnamed service is named after the stack and the logical ID, as a cluster and a family are. A
+service declaring no `DesiredCount` keeps one task running, which is what real CloudFormation gives
+a new service.
 
-Updating the stack moves the service: a changed `DesiredCount` scales it, and a changed task
+Updating the stack moves the service. A changed `DesiredCount` scales it, and a changed task
 definition moves it onto the revision the update registered, replacing the tasks it was keeping.
 Tearing the stack down deletes the service, stopping its tasks and leaving it `INACTIVE`, whatever
 it was scaled to.
 
-`LoadBalancers` registers the service's tasks into the target group it names, so a template that
-declares a load balancer, a target group and a service deploys something that answers. The target
-group has to exist and hold addresses, or the deployment fails naming it, and what the template
-declared is readable on the simulated service:
+`LoadBalancers` registers the service's tasks into the target group it names. A template that
+declares a load balancer, a target group and a service therefore deploys something that answers. The
+target group has to exist and hold addresses, or the deployment fails naming it, and what the
+template declared is readable on the simulated service:
 
 ```typescript
 console.log(simAws.ecs().service("orders-worker", "orders").loadBalancers);
 ```
 
 Everything else the three Resource types declare is stored as declared, or recorded as ignored where
-this simulation has nothing to act on it with. `CapacityProviders`,
-`DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster, `InferenceAccelerators`
-and `EnableFaultInjection` on a task definition, and a service's `NetworkConfiguration`,
-`CapacityProviderStrategy`, `DeploymentConfiguration` and `ServiceRegistries` among the rest, are
-read and ignored rather than failing the stack, and each one is reported on the Resource:
+this simulation has no use for it. `CapacityProviders`, `DefaultCapacityProviderStrategy` and
+`ServiceConnectDefaults` on a cluster, `InferenceAccelerators` and `EnableFaultInjection` on a task
+definition, and a service's `NetworkConfiguration`, `CapacityProviderStrategy`,
+`DeploymentConfiguration` and `ServiceRegistries` among the rest, are read and ignored while the
+stack deploys, and each one is reported on the Resource:
 
 ```typescript
 console.log(stack.resources.get("OrdersCluster")?.ignoredProperties);
@@ -1634,12 +1636,12 @@ console.log(stack.resources.get("OrdersCluster")?.ignoredProperties);
 Every operation is authorized by simulated IAM against the real ECS action.
 
 Real ECS gives the task definition operations no resource type at all, and gives `CreateCluster`,
-`ListClusters` and `ListTasks` none either, so all of those authorize against `*`. A policy naming a
-task definition ARN grants none of them, here as on AWS. The operations that do take a resource are
-`DescribeClusters` and `DeleteCluster`, which take the cluster's ARN, `RunTask`, which takes the
-task definition revision it would run, `DescribeTasks` and `StopTask`, which take the task's ARN, and
-the service operations, which take the service's ARN. `CreateService` authorizes against the ARN the
-service is about to have, so a policy can name one service by name before it exists.
+`ListClusters` and `ListTasks` none either, and all of those authorize against `*`. A policy naming
+a task definition ARN grants none of them, here as on AWS. The operations that do take a resource
+are `DescribeClusters` and `DeleteCluster`, which take the cluster's ARN, `RunTask`, which takes the
+task definition revision it would run, `DescribeTasks` and `StopTask`, which take the task's ARN,
+and the service operations, which take the service's ARN. `CreateService` authorizes against the ARN
+the service is about to have, and a policy can therefore name one service by name before it exists.
 
 ```typescript sim-ecs-iam-policy
 /**
@@ -1783,7 +1785,8 @@ console.log(described.taskDefinition?.revision); // 1
 - `DescribeTaskDefinitionCommand`, taking a family, a `family:revision` or a full ARN
 - `ListTaskDefinitionsCommand` and `ListTaskDefinitionFamiliesCommand`, with prefix, status and
   paging
-- `CreateClusterCommand`, `DescribeClustersCommand`, `ListClustersCommand` and `DeleteClusterCommand`
+- `CreateClusterCommand`, `DescribeClustersCommand`, `ListClustersCommand` and
+  `DeleteClusterCommand`
 - `RunTaskCommand`, running the handlers bound to a task definition's containers, up to a `count` of
   ten tasks at a time
 - `DescribeTasksCommand`, `ListTasksCommand` and `StopTaskCommand`
@@ -1792,7 +1795,7 @@ console.log(described.taskDefinition?.revision); // 1
 - `CreateServiceCommand`, keeping a desired count of tasks running from a task definition
 - `UpdateServiceCommand`, changing the desired count, the task definition, or both
 - `DescribeServicesCommand` and `DeleteServiceCommand`, with the `force` a scaled-up service needs
-- `ListTasks` filtering by `serviceName`, so a service's tasks can be listed on their own
+- `ListTasks` filtering by `serviceName`, listing a service's tasks on their own
 - `bindContainer`, targeting a container by family and container name or by image repository
 - A container binding that `consumes` a simulated SQS queue, with Yulin driving the polling loop on
   the simulated clock while the service is running
@@ -1827,36 +1830,35 @@ console.log(described.taskDefinition?.revision); // 1
 
 Current documented limitations:
 
-- Image contents are never read. An image URI is an identifier and nothing else, so no image is
-  pulled, inspected or run, and a tag that does not exist on any registry is stored without
-  complaint.
-- A container definition field the `SimEcsContainerDefinitionType` shape does not name, such as
+- Image contents are never read. An image URI is an identifier and nothing more. No image is pulled,
+  inspected or run, and a tag no registry holds is stored without complaint.
+- A container definition field the `SimEcsContainerDefinitionType` shape leaves unnamed, such as
   `hostname` or `links`, is still stored and reported back. The shape names the fields the docs
   describe rather than every field ECS has, and it deliberately carries no index signature, since
   one would stop a real SDK command input being passed straight in.
 - `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts. Nothing
-  deletes a task definition here, so the answer would always be an empty listing, and refusing says
-  so rather than looking like a result.
-- Yulin creates no cluster on its own, including the `default` one, so a `RunTask` request naming no
-  cluster needs one to have been created. An AWS account often has a `default` cluster already,
+  deletes a task definition here, and the answer would always be an empty listing. Refusing says so,
+  where a result would look like an answer.
+- Yulin creates no cluster on its own, including the `default` one. A `RunTask` request naming no
+  cluster needs one to have been created already. An AWS account often has a `default` cluster,
   created the first time ECS was used from the console.
-- A container of a task definition with no `taskRoleArn` is denied every AWS call, rather than
-  running with whatever credentials a container instance role might have supplied.
-- Only a bound container runs. A container with no binding never starts and is reported with a reason
-  saying so, and a task where nothing is bound stops with `TaskFailedToStart`.
-- Containers run one after another in the order the task definition declares them, rather than
+- A container of a task definition with no `taskRoleArn` is denied every AWS call. It never falls
+  back to whatever credentials a container instance role might have supplied.
+- Only a bound container runs. A container with no binding never starts and is reported with a
+  reason saying so, and a task with no binding at all stops with `TaskFailedToStart`.
+- Containers run one after another in the order the task definition declares them, and never
   alongside each other. `dependsOn`, `essential`, health checks and `startTimeout` are stored and
   ignored.
 - `RunTask` refuses `networkConfiguration`, `capacityProviderStrategy`, `platformVersion`, `tags`,
   `placementConstraints`, `placementStrategy` and the rest of what it takes. There is no network and
   no capacity here for any of them to apply to.
 - A `RunTask` override may name `taskRoleArn` and a container's `environment`. A `command`, `cpu` or
-  `memory` override is refused, since Yulin never runs an image and nothing here has capacity.
+  `memory` override is refused, since Yulin never runs an image and has no capacity to allocate.
 - The execution role resolves container `secrets` and does nothing else. There is no image to pull
   and no log driver to write to.
 - A container secret can only come from simulated Secrets Manager or simulated SSM Parameter Store.
-  A `valueFrom` naming anything else stops the task rather than being ignored. Secret rotation is
-  not simulated, so a task always reads the version that is current when it starts.
+  A `valueFrom` naming anything else stops the task outright. Secret rotation is absent, and a task
+  always reads the version that is current when it starts.
 - A JSON key selector resolves only where the key holds a string. A key holding a number, a boolean
   or a nested object is refused, because an environment variable is text and real ECS does not
   document which text it would become.
@@ -1864,74 +1866,74 @@ Current documented limitations:
   either, but it reports the problem differently.
 - `secretOptions` on a `logConfiguration` are stored and never resolved. There is no log driver here
   for them to configure.
-- A task definition declaring `secrets` and no `executionRoleArn` fails when a task is run rather
-  than when the revision is registered. Real ECS refuses the registration.
+- A task definition declaring `secrets` and no `executionRoleArn` fails when a task is run, and not
+  when the revision is registered. Real ECS refuses the registration.
 - An EventBridge or Scheduler target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`
   only, taking and ignoring the launch type, platform version, network configuration and capacity
-  provider strategy for the same reason `RunTask` refuses them: there is no placement and no network
-  here. A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs
-  once for each of them, in this process and one after another.
-- A rule or schedule target's `Input` is read as the task's overrides rather than as a payload,
-  since a task has nowhere to receive one, so container environment variables are set with a
-  `containerOverrides` list naming the container.
-- A service's desired count is simulated as state rather than as concurrency. Three tasks exist and
-  are reported as running, and the handler bound to a container is called once per request or per
-  poll rather than once per task. Yulin runs in one Node.js process, so there is nothing to copy.
+  provider strategy for the same reason `RunTask` refuses them, which is that there is no placement
+  and no network here. A `TaskCount` above one runs that many simulated tasks, and a bound container
+  handler runs once for each of them, in this process and one after another.
+- A rule or schedule target's `Input` is read as the task's overrides, since a task has nowhere to
+  receive a payload. Container environment variables are set with a `containerOverrides` list naming
+  the container.
+- A service's desired count is simulated as state, and not as concurrency. Three tasks exist and are
+  reported as running, and the handler bound to a container is called once per request or per poll.
+  Yulin runs in one Node.js process, with nothing to copy.
 - A bound container of a service is treated as running and stays available until the service is
-  deleted or its `SimAws` is closed. What calls its handler is whatever reaches it: a queue it
-  consumes, or a request a load balancer routes to it.
-- A consuming container's loop is Yulin's rather than the container's. A binding supplies what
-  happens to a batch, and nothing tries to run a polling loop written inside your own container code,
+  deleted or its `SimAws` is closed. What calls its handler is whatever reaches it, either a queue
+  it consumes or a request a load balancer routes to it.
+- A consuming container's loop belongs to Yulin, and not to the container. A binding supplies what
+  happens to a batch, and a polling loop written inside your own container code is never run,
   because an endless loop in a single Node.js process never yields to the test running it.
 - A container can only consume a simulated SQS queue, in the same account and region as the service.
   Nothing else is a source, and a queue URL naming another scope reaches no queue.
-- Yulin polls once per service and container rather than once per task, so a desired count above one
-  does not hand a batch over more than once. It also polls in response to something rather than
-  continuously: a message arriving, a batch coming back, or a full batch suggesting there is more
+- Yulin polls once per service and container, and never once per task, and a desired count above one
+  hands a batch over exactly once. It also polls in response to something, and never continuously.
+  The triggers are a message arriving, a batch coming back, or a full batch suggesting there is more
   waiting.
-- Long polling is not simulated. A `WaitTimeSeconds` has nothing to mean when the queue says when
-  there is something to poll for, so there is nothing to set.
-- A consuming container handles a batch all or nothing. There is no partial batch response, which is
-  a Lambda event source feature rather than something a worker container has.
+- Long polling is absent. A `WaitTimeSeconds` is meaningless when the queue itself says when there
+  is something to poll for, and the setting is gone.
+- A consuming container handles a batch all or nothing. There is no partial batch response, since
+  that is a Lambda event source feature and not something a worker container has.
 - A consuming or serving container of a task started by `RunTask` records the same not-simulated
   reason an unbound container does. Neither has a handler that ends, and a run task has to end.
 - A service's tasks come up all at once and are replaced all at once. There are no deployments,
   deployment controllers, circuit breakers or rolling replacement, so `DescribeServices` reports no
   `deployments` and no `events`, and `UpdateService` refuses `forceNewDeployment`.
-- A service whose tasks fail to start does not start replacements for them. Real ECS keeps trying,
-  which would be an endless retry in a test rather than a result to assert on, so the service
-  reports the running count it actually has.
+- A service whose tasks fail to start never starts replacements for them. Real ECS keeps trying,
+  which in a test would be an endless retry with nothing to assert on. The service here reports the
+  running count it actually has.
 - A `loadBalancers` entry needs a `targetGroupArn`, a `containerName` and a `containerPort` between
   1 and 65535, and the target group has to be an `ip` one in the service's own account and region. A
-  `loadBalancerName`, which is the Classic Load Balancer form, is refused, and so is a target group
-  that is not there.
+  `loadBalancerName` is the Classic Load Balancer form, and is refused, as is a target group that
+  was never created.
 - Which container of a task a request reaches diverges from real ECS on purpose. Real ECS routes to
-  the container the registration names, on the port it names; here the request goes to a container
-  that is bound, which is the one the registration names where it is bound, otherwise the bound
+  the container the registration names, on the port it names. Here the request goes to a bound
+  container, which is the one the registration names where that one is bound, otherwise the bound
   container declaring the registration's port, otherwise the first bound one. The common real task
   puts an unsimulated proxy on the registered port, and routing strictly would reach a container
-  that does not exist here.
+  absent here.
 - A service registered into a target group with no bound container is answered with a 503 by the
   load balancer. The tasks are registered and there is nothing behind them.
 - A task is registered as a target as soon as the service starts it and deregistered as soon as it
   stops. There are no health checks, no target health states, no deregistration delay and no
-  connection draining, and the address a task is registered under is counted rather than taken from
-  a network interface that does not exist.
-- Requests are not shared between a service's tasks. The desired count is state rather than
-  concurrency, so a target group holding three targets calls one handler.
+  connection draining. The address a task is registered under is counted, since there is no network
+  interface to take one from.
+- Requests are never shared between a service's tasks. The desired count is state and not
+  concurrency, and a target group holding three targets calls one handler.
 - `CreateService` refuses `serviceRegistries`, `networkConfiguration`, `deploymentConfiguration`,
   `capacityProviderStrategy` and the rest of what it takes. There is no network or capacity here for
   any of them to apply to.
-- `UpdateService` changes the desired count and the task definition and nothing else, so a service's
-  load balancer registration stays as it was created. Its tasks are registered and deregistered as
-  the count changes.
-- `CreateService` refuses a `schedulingStrategy` of `DAEMON`, which places one task on each container
-  instance. There are no container instances here to place one on each of.
+- `UpdateService` changes the desired count and the task definition alone. A service's load balancer
+  registration stays as it was created, and its tasks are registered and deregistered as the count
+  changes.
+- `CreateService` refuses a `schedulingStrategy` of `DAEMON`, which places one task on each
+  container instance. There are no container instances here to place one on each of.
 - `CreateService` needs a `desiredCount`, as a replica service does on real ECS, and it can be zero.
 - A service's tasks are `startedBy` `ecs-svc/` and the service name. Real ECS uses `ecs-svc/` and a
   number, which would name nothing here.
-- Service autoscaling and service discovery are not simulated, and neither is `ListServices`.
-- `StartTask` is not simulated.
+- Service autoscaling, service discovery and `ListServices` are all absent.
+- `StartTask` is absent.
 - Closing a `SimAws` stops the tasks of every service in it. The services stay describable with the
   desired count they had, and their tasks are not brought back.
 - `DescribeTasks` refuses `include`, and a task carries no tags, so `RunTask` refuses `tags` too.
@@ -1939,15 +1941,15 @@ Current documented limitations:
   wanted either running or stopped, so the answer would always be an empty listing.
 - A stopped task is kept for as long as the simulation lasts. Real ECS stops reporting one about an
   hour after it stops.
-- A task reports no `cpu`, `memory`, `connectivity`, `attachments` or `availabilityZone`. There is no
-  capacity and no network here to report.
+- A task reports no `cpu`, `memory`, `connectivity`, `attachments` or `availabilityZone`. There is
+  no capacity and no network here to report.
 - A described task definition reports neither `compatibilities` nor `requiresAttributes`. Real ECS
   works both out from what the definition declares, which would mean reading a container
   definition's meaning.
-- `RegisterTaskDefinition` refuses a setting this simulation does not hold, rather than dropping it.
-  `inferenceAccelerators` and `enableFaultInjection` are refused for that reason.
-- Nothing is defaulted. A revision registered without `networkMode` describes without one, rather
-  than reporting the `bridge` real ECS would have chosen, because that value would be made up here.
+- `RegisterTaskDefinition` refuses a setting this simulation has no room for, and never drops one
+  silently. `inferenceAccelerators` and `enableFaultInjection` are refused for that reason.
+- Nothing is defaulted. A revision registered without `networkMode` describes without one, where
+  real ECS would have chosen `bridge`, because that value would be made up here.
 - `CreateCluster` refuses `capacityProviders`, `defaultCapacityProviderStrategy` and
   `serviceConnectDefaults`. There is no capacity and no service discovery here to attach them to.
 - `DescribeClusters` refuses `include` values of `ATTACHMENTS` and `STATISTICS`, and always reports
@@ -1955,27 +1957,27 @@ Current documented limitations:
   cluster holds.
 - `ListClusters` leaves out a deleted cluster, which is still describable by name or ARN as
   `INACTIVE`.
-- `CreateCluster` with a name an active cluster already has hands that cluster back rather than
-  raising, as real ECS does. The settings, configuration and tags on the second request are ignored.
+- `CreateCluster` with a name an active cluster already has hands that cluster back, as real ECS
+  does. The settings, configuration and tags on the second request are ignored.
 - Deleting a cluster is immediate, and never fails for a cluster still holding running tasks or
   active services, which real ECS refuses. The services in it go on reporting what they are keeping.
 - `DescribeClusters` reports zero services and zero tasks whatever the cluster holds.
   `DescribeServices` and `ListTasks` are what report those.
-- Task definition and cluster tags are stored and reported, but `TagResource`,
-  `UntagResource` and `ListTagsForResource` are not simulated.
-- A cluster, task definition or service the template does not name gets a name composed from the
-  stack name and the logical ID, without the random part real CloudFormation adds, so a test can
-  predict it. A stack deployed twice under different names therefore gets two different families.
-- A service that declares no `DesiredCount` keeps one task running, which is the default real
+- Task definition and cluster tags are stored and reported, but `TagResource`, `UntagResource` and
+  `ListTagsForResource` are absent.
+- An unnamed cluster, task definition or service gets a name composed from the stack name and the
+  logical ID, without the random part real CloudFormation adds, which makes it predictable in a
+  test. A stack deployed twice under different names therefore gets two different families.
+- A service that declares no `DesiredCount` keeps one task running. That is the default real
   CloudFormation documents for a new service. A `DesiredCount` written as the text of a number is
   taken as that number, since a String Parameter resolves to text, and anything else is refused
   naming the Resource and the property, a fraction of a task included.
-- An update replaces a task definition Resource rather than updating it in place, so it registers a
-  new revision and deregisters the one it replaced. The family accumulates revisions with only the
-  newest one `ACTIVE`, where real CloudFormation leaves the earlier revisions active.
-- An update replaces a service Resource as well, so a scaled or redeployed service is deleted and
-  created again rather than updated. Its tasks stop and new ones start, and its ARN is unchanged as
-  long as its name is, since a service ARN is its cluster and its name.
+- An update replaces a task definition Resource in full, registering a new revision and
+  deregistering the one it replaced. The family accumulates revisions with only the newest one
+  `ACTIVE`, where real CloudFormation leaves the earlier revisions active.
+- An update replaces a service Resource as well, and a scaled or redeployed service is deleted and
+  created again. Its tasks stop and new ones start, and its ARN is unchanged as long as its name is,
+  since a service ARN is its cluster and its name.
 - A stack teardown deletes its cluster, leaving it `INACTIVE`, deregisters the revision it
   registered, leaving that `INACTIVE`, and deletes its service, leaving that `INACTIVE` too. None of
   them is removed, and revision numbers are not freed. The service is deleted with force, because
@@ -1988,18 +1990,19 @@ Current documented limitations:
 - `CapacityProviders`, `DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster,
   `InferenceAccelerators` and `EnableFaultInjection` on a task definition, and everything a service
   declares beyond its cluster, task definition, count, launch type, scheduling strategy and load
-  balancers, are read and recorded as ignored rather than refused, where the equivalent SDK request
-  is refused. A stack that will not deploy is worth less to a test than a Resource without a
-  property nothing here acts on.
-- A deploy-time binding is checked against the template as the stack is built, so a family, a
-  container name or an image repository built from another Resource's attribute rather than written
-  as a string resolves to nothing and fails the deployment.
-- A `TaskRoleArn` or `ExecutionRoleArn` given as a `Ref` to a role resolves to the role name, which
-  is turned into the ARN that name would have at the default path. A role declaring a `Path` of its
-  own therefore resolves to an ARN without it. This is what an `AWS::Lambda::Function` `Role` already
-  does, so the two agree, and naming the role by `Fn::GetAtt` `Arn` gets the real ARN either way.
+  balancers, are read and recorded as ignored, where the equivalent SDK request is refused. A stack
+  that fails to deploy is worth less to a test than a Resource missing a property this simulation
+  has no use for.
+- A deploy-time binding is checked against the template as the stack is built. A family, a container
+  name or an image repository built from another Resource's attribute, in place of a plain string,
+  resolves to no target and fails the deployment.
+- A `TaskRoleArn` or `ExecutionRoleArn` given as a `Ref` to a role resolves to the role name, and
+  that name is turned into the ARN it would have at the default path. A role declaring a `Path` of
+  its own therefore resolves to an ARN without it. An `AWS::Lambda::Function` `Role` already behaves
+  this way, so the two agree, and naming the role by `Fn::GetAtt` `Arn` gets the real ARN either
+  way.
 - Cluster and family names are validated to the 255 letters, numbers, hyphens and underscores real
   ECS accepts, but error messages differ from the real ones.
-- Account-wide limits do not exist, so no request fails for having registered too many task
-  definitions or created too many clusters.
-- ECS is not served as an HTTP API by `serveSimAws`.
+- Account-wide limits are absent. No request fails for having registered too many task definitions
+  or created too many clusters.
+- `serveSimAws` serves no ECS HTTP API.
