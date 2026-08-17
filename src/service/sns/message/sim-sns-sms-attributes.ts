@@ -39,11 +39,11 @@ export const simSnsUnsimulatedSmsAttributes: ReadonlyMap<string, string> =
       "Origination numbers and phone pools are not simulated.",
     ],
     [
-      "AWS.SNS.SMS.EntityId",
+      "AWS.MM.SMS.EntityId",
       "The India DLT registration these identify is not simulated.",
     ],
     [
-      "AWS.SNS.SMS.TemplateId",
+      "AWS.MM.SMS.TemplateId",
       "The India DLT registration these identify is not simulated.",
     ],
   ]);

@@ -149,7 +149,9 @@ console.log(published.MessageId !== undefined); // true
 
 The name and data type rules are the real ones. A name using a reserved `AWS.` or `Amazon.` prefix, a
 data type that is not `String`, `String.Array`, `Number` or `Binary`, or a value that does not match
-its data type is refused here rather than on AWS.
+its data type is refused here rather than on AWS. The two reserved names real SNS defines for SMS,
+`AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType`, are the exception. [Sending an SMS](#sending-an-sms)
+covers those.
 
 A `Subject` is UTF-8 text with no line breaks or control characters, of fewer than 100 characters,
 which is the contract real SNS states. A subject of exactly 100 characters is already too long. A
@@ -271,7 +273,7 @@ well, since one of the two would otherwise win silently.
 `AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType` are the two reserved attributes a publish may carry.
 Both are recorded, and the record reads them back as `senderId` and `smsType`. The other reserved SMS
 attributes are refused by name. `AWS.SNS.SMS.MaxPrice` caps what a message may cost, and
-`AWS.MM.SMS.OriginationNumber`, `AWS.SNS.SMS.EntityId` and `AWS.SNS.SMS.TemplateId` pick the routing
+`AWS.MM.SMS.OriginationNumber`, `AWS.MM.SMS.EntityId` and `AWS.MM.SMS.TemplateId` pick the routing
 and the registration it travels under. Each one changes a real send and would change nothing here.
 
 Real SNS puts a number on the opt-out list when the recipient replies STOP, and its API only takes
@@ -1683,8 +1685,8 @@ Current documented limitations:
   simulated, so a publish reaches a topic or a phone number.
 - An SMS is recorded and never delivered, and nothing models what a carrier would do with one. There
   is no message part splitting, no delivery receipt, no price and no throughput limit.
-- `AWS.SNS.SMS.MaxPrice`, `AWS.MM.SMS.OriginationNumber`, `AWS.SNS.SMS.EntityId` and
-  `AWS.SNS.SMS.TemplateId` are refused rather than recorded. Each one changes what real SNS does with
+- `AWS.SNS.SMS.MaxPrice`, `AWS.MM.SMS.OriginationNumber`, `AWS.MM.SMS.EntityId` and
+  `AWS.MM.SMS.TemplateId` are refused rather than recorded. Each one changes what real SNS does with
   a message, and accepting one that changed nothing would misrepresent the send.
 - `SetSMSAttributes` and `GetSMSAttributes`, which carry the account-wide SMS defaults and the spend
   limit, are not supported.

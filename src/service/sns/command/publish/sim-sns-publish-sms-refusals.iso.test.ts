@@ -49,7 +49,7 @@ describe("SNS publish to a phone number refusals", () => {
       [
         "AWS.SNS.SMS.MaxPrice",
         "AWS.MM.SMS.OriginationNumber",
-        "AWS.SNS.SMS.EntityId",
+        "AWS.MM.SMS.EntityId",
       ].map(async (attributeName) =>
         assertThrowsErrorAsync(async () => {
           await simAws.sns().publish(
