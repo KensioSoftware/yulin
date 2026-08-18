@@ -11,8 +11,10 @@
 
 import type {
   AttributeType,
+  PreventUserExistenceErrorTypes,
   SchemaAttributeType,
   UserPoolMfaType,
+  VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   AdminCreateUserCommand,
@@ -83,6 +85,15 @@ export interface SimCognitoHostedSetUpOptions {
 
   /** The pool's `Schema`, which is the standard attributes by default. */
   readonly schema?: SchemaAttributeType[];
+
+  /**
+   * The attributes the pool verifies automatically, none by default. A pool
+   * with none has nowhere to send a password reset code.
+   */
+  readonly autoVerifiedAttributes?: readonly VerifiedAttributeType[];
+
+  /** What the app client does about a username the pool lacks. */
+  readonly preventUserExistenceErrors?: PreventUserExistenceErrorTypes;
 }
 
 /**
@@ -129,6 +140,9 @@ export async function simCognitoHosted(
         MfaConfiguration: options.mfaConfiguration,
       }),
       ...(options.schema !== undefined && { Schema: options.schema }),
+      ...(options.autoVerifiedAttributes !== undefined && {
+        AutoVerifiedAttributes: [...options.autoVerifiedAttributes],
+      }),
     }),
   );
   assertNonNullable(pool.UserPool?.Id);
@@ -162,6 +176,7 @@ export async function simCognitoHosted(
       CallbackURLs: [simCognitoCallbackUrl],
       LogoutURLs: [simCognitoLogoutUrl],
       SupportedIdentityProviders: [...identityProviders],
+      PreventUserExistenceErrors: options.preventUserExistenceErrors,
     }),
   );
   assertNonNullable(client.UserPoolClient?.ClientId);

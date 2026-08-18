@@ -2,13 +2,17 @@ import { isSimCognitoManagedLoginRequired } from "../../error/sim-cognito-manage
 import { isSimCognitoOAuthError } from "../../error/sim-cognito-oauth.error.js";
 import type { SimCognitoDomainRequest } from "../sim-cognito-domain-request.js";
 import { SimCognitoConfirmPage } from "./sim-cognito-confirm-page.js";
+import { SimCognitoForgotPasswordPage } from "./sim-cognito-forgot-password-page.js";
 import { SimCognitoPageForm } from "./sim-cognito-page-form.js";
 import type { SimCognitoPageParameters } from "./sim-cognito-page-markup.js";
 import {
-  simCognitoConfirmPath,
+  simCognitoForgotPasswordPath,
   simCognitoIsLocalSignIn,
+  simCognitoPagePaths,
+  simCognitoResetPasswordPath,
   simCognitoSignUpPath,
 } from "./sim-cognito-page-paths.js";
+import { SimCognitoResetPasswordPage } from "./sim-cognito-reset-password-page.js";
 import { SimCognitoPageRequest } from "./sim-cognito-page-request.js";
 import { SimCognitoSignInPage } from "./sim-cognito-sign-in-page.js";
 import { SimCognitoSignUpPage } from "./sim-cognito-sign-up-page.js";
@@ -17,37 +21,47 @@ import { SimCognitoSignUpPage } from "./sim-cognito-sign-up-page.js";
  * The pages simulated managed login serves.
  *
  * A person reaches the sign-in form at the authorize endpoint, the sign-up
- * form from a link on it, and the confirmation form from the sign-up it has
- * just made. Each form carries the authorize request's own parameters through
- * as hidden inputs, so the sign-in at the end of it reaches the app client's
- * callback URL the application asked for.
+ * form and the forgotten password form from links on it, and the confirmation
+ * and new password forms from the step before each. Each form carries the
+ * authorize request's own parameters through as hidden inputs, so the sign-in
+ * at the end of it reaches the app client's callback URL the application asked
+ * for.
  */
 export class SimCognitoManagedLogin {
   private readonly pageRequest = new SimCognitoPageRequest();
   private readonly signInPage = new SimCognitoSignInPage();
   private readonly signUpPage = new SimCognitoSignUpPage();
   private readonly confirmPage = new SimCognitoConfirmPage();
+  private readonly forgotPasswordPage = new SimCognitoForgotPasswordPage();
+  private readonly resetPasswordPage = new SimCognitoResetPasswordPage();
 
   /**
-   * Whether a path is one of the two pages served beside the OAuth endpoints.
+   * Whether a path is one of the pages served beside the OAuth endpoints.
    */
   static servesPage(pathname: string): boolean {
-    return (
-      pathname === simCognitoSignUpPath || pathname === simCognitoConfirmPath
-    );
+    return simCognitoPagePaths.has(pathname);
   }
 
   /**
-   * Answer the sign-up or confirmation page a request reached.
+   * Answer the page a request reached.
    */
   async handlePage(request: SimCognitoDomainRequest): Promise<Response> {
     const form = this.formIn(request);
 
-    if (request.url.pathname === simCognitoSignUpPath) {
-      return await this.signUpPage.handle(form);
+    switch (request.url.pathname) {
+      case simCognitoSignUpPath: {
+        return await this.signUpPage.handle(form);
+      }
+      case simCognitoForgotPasswordPath: {
+        return await this.forgotPasswordPage.handle(form);
+      }
+      case simCognitoResetPasswordPath: {
+        return await this.resetPasswordPage.handle(form);
+      }
+      default: {
+        return await this.confirmPage.handle(form);
+      }
     }
-
-    return await this.confirmPage.handle(form);
   }
 
   /**

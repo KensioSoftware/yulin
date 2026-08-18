@@ -25,6 +25,32 @@ export const simCognitoSignUpPath = "/signup";
 export const simCognitoConfirmPath = "/confirm";
 
 /**
+ * The path the form asking who has forgotten a password is served at.
+ */
+export const simCognitoForgotPasswordPath = "/forgotPassword";
+
+/**
+ * The path the form taking the reset code and the new password is served at.
+ *
+ * Real managed login serves both halves of a reset at these two paths, and
+ * that is where an application's own links to them point.
+ */
+export const simCognitoResetPasswordPath = "/confirmForgotPassword";
+
+/**
+ * The pages served beside the OAuth endpoints.
+ *
+ * The sign-in form is not among them. It is what the authorize endpoint
+ * answers with, so it has no path of its own.
+ */
+export const simCognitoPagePaths: ReadonlySet<string> = new Set([
+  simCognitoSignUpPath,
+  simCognitoConfirmPath,
+  simCognitoForgotPasswordPath,
+  simCognitoResetPasswordPath,
+]);
+
+/**
  * The authorize parameters every page carries on to the next.
  *
  * A sign-up ends in a sign-in, and that sign-in has to reach the app client's

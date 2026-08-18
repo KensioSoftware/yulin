@@ -442,11 +442,14 @@ client reaches the simulator through `SimSdk`.
 
 `serve/page/` under it is the managed login pages. `SimCognitoPageMarkup` is the HTML they are built
 from, `SimCognitoPageForm` is one request read as the form it fetched or posted, and
-`SimCognitoManagedLogin` is what `SimCognitoDomainEndpoints` hands a page request to. The three
-pages are `SimCognitoSignInPage`, `SimCognitoSignUpPage` and `SimCognitoConfirmPage`, and the last
-two call `SignUp`, `ConfirmSignUp` and `ResendConfirmationCode` as an application would. A refusal a
-person can act on is rendered back onto the form they posted, and one the application caused is
-answered as any other authorize refusal is.
+`SimCognitoManagedLogin` is what `SimCognitoDomainEndpoints` hands a page request to. The five pages
+are `SimCognitoSignInPage`, `SimCognitoSignUpPage`, `SimCognitoConfirmPage`,
+`SimCognitoForgotPasswordPage` and `SimCognitoResetPasswordPage`, and the last four call `SignUp`,
+`ConfirmSignUp`, `ResendConfirmationCode`, `ForgotPassword` and `ConfirmForgotPassword` as an
+application would. `simCognitoPagePaths` is the set `SimCognitoDomainEndpoints` routes by, and the
+sign-in form is absent from it because the authorize endpoint is what answers with that one. A
+refusal a person can act on is rendered back onto the form they posted, and one the application
+caused is answered as any other authorize refusal is.
 
 `/<userPoolId>/messages` is served alongside them, and real Cognito has no such endpoint. It is the
 serving side of `SimCognitoUserPool.sentMessages`, so a browser or a curl can read what a pool would
