@@ -174,6 +174,7 @@ export class SimAwsAccountRegionServiceBuilder {
    */
   createRekognition(scope: SimAwsAccountRegionContainer): SimRekognition {
     return new SimRekognition({
+      accountRegionScope: scope.accountRegionScope,
       iam: this.accountServices.createIam(scope),
       background: this.background,
       images: simAwsRekognitionImages(this.simAws, scope),

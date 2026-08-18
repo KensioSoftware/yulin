@@ -3,6 +3,11 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type {
+  SimCreateCollectionCommand,
+  SimDeleteCollectionCommand,
+  SimListCollectionsCommand,
+} from "../command/collection/collection.command.js";
 import type { SimDetectFacesCommand } from "../command/detect-faces/detect-faces.command.js";
 import type { SimDetectLabelsCommand } from "../command/detect-labels/detect-labels.command.js";
 import type { SimDetectModerationLabelsCommand } from "../command/detect-moderation-labels/detect-moderation-labels.command.js";
@@ -17,6 +22,30 @@ export class SimRekognitionSdkCommandRouter implements SimSdkCommandRouter {
 
   constructor(simRekognition: SimRekognition) {
     this.routes = new Map<string, SimSdkCommandRoute>([
+      [
+        "CreateCollectionCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.createCollection(
+            command as SimCreateCollectionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListCollectionsCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.listCollections(
+            command as SimListCollectionsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteCollectionCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.deleteCollection(
+            command as SimDeleteCollectionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
       [
         "DetectModerationLabelsCommand",
         async (command, context): Promise<unknown> =>

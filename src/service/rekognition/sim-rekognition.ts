@@ -3,6 +3,18 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimRekognitionCollections } from "./collection/sim-rekognition-collections.js";
+import { SimRekognitionCollectionHandler } from "./command/collection/collection.handler.js";
+import type {
+  SimCreateCollectionCommand,
+  SimCreateCollectionCommandOutput,
+  SimDeleteCollectionCommand,
+  SimDeleteCollectionCommandOutput,
+  SimListCollectionsCommand,
+  SimListCollectionsCommandOutput,
+} from "./command/collection/collection.command.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -34,6 +46,7 @@ import { SimRekognitionModeration } from "./moderation/sim-rekognition-moderatio
 import { SimRekognitionSdkCommandRouter } from "./sdk/sim-rekognition-sdk-command-router.js";
 
 interface SimRekognitionProperties {
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly images?: SimRekognitionImageObjects;
@@ -60,14 +73,26 @@ export class SimRekognition {
   private readonly detectLabelsCommand: DetectLabelsHandler;
   private readonly detectFacesCommand: DetectFacesHandler;
   private readonly sdkRouter = new SimRekognitionSdkCommandRouter(this);
+  private readonly collectionStore: SimRekognitionCollections;
+  private readonly collectionCommands: SimRekognitionCollectionHandler;
 
   constructor(properties: SimRekognitionProperties = {}) {
     const {
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       images = new SimRekognitionUnreachableImageObjects(),
     } = properties;
     const authorizer = new SimRekognitionAuthorizer({ iam });
+
+    this.collectionStore = new SimRekognitionCollections({
+      accountRegionScope,
+    });
+    this.collectionCommands = new SimRekognitionCollectionHandler({
+      collections: this.collectionStore,
+      authorizer,
+      background,
+    });
 
     this.detectModerationLabelsCommand = new DetectModerationLabelsHandler({
       moderation: this.moderationRules,
@@ -89,6 +114,36 @@ export class SimRekognition {
       images,
       background,
     });
+  }
+
+  /**
+   * Handle a CreateCollectionCommand from the SDK.
+   */
+  async createCollection(
+    command: SimCreateCollectionCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimCreateCollectionCommandOutput> {
+    return await this.collectionCommands.create(command, options);
+  }
+
+  /**
+   * Handle a ListCollectionsCommand from the SDK.
+   */
+  async listCollections(
+    command: SimListCollectionsCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimListCollectionsCommandOutput> {
+    return await this.collectionCommands.list(command, options);
+  }
+
+  /**
+   * Handle a DeleteCollectionCommand from the SDK.
+   */
+  async deleteCollection(
+    command: SimDeleteCollectionCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimDeleteCollectionCommandOutput> {
+    return await this.collectionCommands.delete(command, options);
   }
 
   /**
