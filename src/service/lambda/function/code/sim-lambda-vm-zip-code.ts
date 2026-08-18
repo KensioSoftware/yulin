@@ -1,4 +1,3 @@
-import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
@@ -6,26 +5,26 @@ import {
   SimLambdaNoVmSdkModuleProvider,
   type SimLambdaVmSdkModuleProvider,
 } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
-import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaExecutableCode } from "./sim-lambda-executable-code.js";
 import { parseLambdaHandlerName } from "./sim-lambda-handler-name.js";
-import { makeSimLambdaVmContext } from "./vm/sim-lambda-vm-context.js";
+import {
+  makeSimLambdaVmContext,
+  type SimLambdaVmContextProperties,
+} from "./vm/sim-lambda-vm-context.js";
 import {
   simLambdaNoOutputSink,
   type SimLambdaOutputSink,
 } from "../logging/sim-lambda-output-sink.js";
 import { SimLambdaVmModules } from "./vm/sim-lambda-vm-modules.js";
 
-interface SimLambdaVmZipCodeProperties {
+/**
+ * The archive and handler this code runs, on top of everything its sandbox is
+ * built from.
+ */
+interface SimLambdaVmZipCodeProperties extends SimLambdaVmContextProperties {
   readonly archive: SimZipArchive;
   readonly handlerName: string;
-  readonly environment: SimLambdaEnvironment;
   readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
-  /**
-   * Clock the sandbox's Date reports, so function code asking JavaScript for
-   * the time gets the simulation's time.
-   */
-  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -68,13 +67,12 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   }
 
   private coldStart(): SimLambdaHandler {
-    const { archive, handlerName, environment, sdkModuleProvider, clock } =
-      this.properties;
+    const { archive, handlerName, sdkModuleProvider } = this.properties;
     const parsedName = parseLambdaHandlerName(handlerName);
 
     const modules = new SimLambdaVmModules({
       archive,
-      context: makeSimLambdaVmContext(environment, clock, this.#sink),
+      context: makeSimLambdaVmContext({ ...this.properties, sink: this.#sink }),
       sdkModuleProvider:
         sdkModuleProvider ?? new SimLambdaNoVmSdkModuleProvider(),
     });

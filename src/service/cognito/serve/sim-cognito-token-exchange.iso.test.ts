@@ -10,10 +10,10 @@ import { describe, it } from "vitest";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import {
+  simCognitoAuthorizationCode,
   simCognitoCallbackUrl,
   simCognitoDomainHost,
   simCognitoHosted,
-  simCognitoSignedInAtGoogle,
   type SimCognitoHostedSetUp,
 } from "../../../../test/cognito/federation-fixture.js";
 
@@ -23,36 +23,6 @@ function hostedUrl(path: string, query = ""): string {
   return new SimAwsLocalUrl({
     input: `https://${simCognitoDomainHost}${path}${query}`,
   }).toString();
-}
-
-/**
- * Sign a user in and give back the authorization code the browser carried.
- */
-async function signedInCode(
-  setUp: SimCognitoHostedSetUp,
-  extra: Record<string, string> = {},
-): Promise<string> {
-  simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
-    email: "someone@example.com",
-  });
-
-  const parameters = new URLSearchParams({
-    response_type: "code",
-    client_id: setUp.clientId,
-    redirect_uri: simCognitoCallbackUrl,
-    identity_provider: "Google",
-    ...extra,
-  });
-  const response = await new SimAwsHttp({ simAws: setUp.simAws }).fetch(
-    hostedUrl("/oauth2/authorize", `?${parameters.toString()}`),
-  );
-  const location = response.headers.get("location");
-  assertNonNullable(location);
-
-  const code = new URL(location).searchParams.get("code");
-  assertNonNullable(code);
-
-  return code;
 }
 
 async function postToken(
@@ -81,7 +51,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("authenticates a client with a secret in a basic header", async () => {
     // Given a server-side app client, which has a secret.
     const setUp = await simCognitoHosted({ generateSecret: true });
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
     assertNonNullable(setUp.clientSecret);
 
     // When the code is exchanged with the secret in an authorization header.
@@ -109,7 +79,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("refuses a client that authenticates with the wrong secret", async () => {
     // Given a server-side app client and a code it can exchange.
     const setUp = await simCognitoHosted({ generateSecret: true });
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
 
     // When the code is exchanged with the wrong secret.
     const response = await postToken(setUp, {
@@ -129,7 +99,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("completes a grant made with PKCE", async () => {
     // Given a sign-in that carried a PKCE challenge.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp, {
+    const code = await simCognitoAuthorizationCode(setUp, {
       code_challenge: createHash("sha256")
         .update(codeVerifier)
         .digest("base64url"),
@@ -152,7 +122,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("refuses a grant made with PKCE and no verifier", async () => {
     // Given a sign-in that carried a PKCE challenge.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp, {
+    const code = await simCognitoAuthorizationCode(setUp, {
       code_challenge: createHash("sha256")
         .update(codeVerifier)
         .digest("base64url"),
@@ -175,7 +145,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("refuses a code that has already been exchanged", async () => {
     // Given a code that has been exchanged once.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
     const fields = {
       grant_type: "authorization_code",
       client_id: setUp.clientId,
@@ -195,7 +165,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
   it("refuses a redirect URI that is not the one the code was issued for", async () => {
     // Given a code issued for the app client's callback URL.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
 
     // When it is exchanged naming another URL.
     const response = await postToken(setUp, {

@@ -18,10 +18,17 @@ import {
 } from "./store/sim-lambda-code-store.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 
 interface SimLambdaCodeResolverProperties {
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  /**
+   * Where the HTTP requests vm zip code makes to hostnames the simulation
+   * serves are answered. A handler reference needs none: it runs in the host
+   * scope, where the invocation bridges the HTTP clients.
+   */
+  readonly outboundHttp?: SimLambdaOutboundHttp | undefined;
   /**
    * Where a container image URI is resolved to a real in-process handler.
    */
@@ -63,6 +70,7 @@ export class SimLambdaCodeResolver {
       properties.containerImages ?? new SimLambdaNoContainerImages();
     this.vmZipCodeFactory = new SimLambdaVmZipCodeFactory({
       vmSdkModuleProvider: properties.vmSdkModuleProvider,
+      outboundHttp: properties.outboundHttp,
       clock: properties.clock,
     });
   }

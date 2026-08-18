@@ -1,18 +1,23 @@
-import { STATUS_CODES } from "node:http";
-import { Readable, Writable } from "node:stream";
-import type {
-  SimSdkWireHandler,
-  SimSdkWireResponse,
-} from "../../../../../../sdk/wire/sim-sdk-wire.types.js";
-import type { SimLambdaVmHttpTarget } from "./sim-lambda-vm-http-target.js";
+import { Writable } from "node:stream";
+import { simLambdaHttpResponseMessage } from "./sim-lambda-http-response.js";
+import type { SimLambdaHttpTarget } from "./sim-lambda-http-target.js";
+import type { SimLambdaOutboundHttp } from "./sim-lambda-outbound-http.js";
 
 /**
- * What an HTTP client library reads off a response.
+ * The methods that carry no request body, which a request may not be built
+ * with one for.
  */
-interface SimLambdaVmWireResponseMessage extends Readable {
-  statusCode: number;
-  statusMessage: string;
-  headers: Record<string, string>;
+const bodilessMethods: ReadonlySet<string> = new Set(["GET", "HEAD"]);
+
+interface SimLambdaHttpRequestProperties {
+  readonly target: SimLambdaHttpTarget;
+  readonly outbound: SimLambdaOutboundHttp;
+
+  /**
+   * The scheme of the transport module the call was made through, which
+   * stands in when the call itself named none.
+   */
+  readonly scheme: string;
 }
 
 /**
@@ -26,13 +31,10 @@ interface SimLambdaVmWireResponseMessage extends Readable {
  * client may reach for do nothing rather than being absent, since there is no
  * socket to time out.
  */
-export class SimLambdaVmWireRequest extends Writable {
+export class SimLambdaHttpRequest extends Writable {
   private readonly chunks: Buffer[] = [];
 
-  constructor(
-    private readonly target: SimLambdaVmHttpTarget,
-    private readonly handler: SimSdkWireHandler,
-  ) {
+  constructor(private readonly properties: SimLambdaHttpRequestProperties) {
     super();
   }
 
@@ -75,35 +77,29 @@ export class SimLambdaVmWireRequest extends Writable {
     callback: (error?: Error | null) => void,
   ): Promise<void> {
     try {
-      const response = await this.handler({
-        method: this.target.method,
-        hostname: this.target.hostname,
-        path: this.target.path,
-        headers: this.target.headers,
-        body: Buffer.concat(this.chunks),
-      });
+      const response = await this.properties.outbound.fetch(this.request());
 
-      this.emit("response", wireResponseMessage(response));
+      this.emit("response", await simLambdaHttpResponseMessage(response));
       callback();
     } catch (error) {
       callback(error as Error);
     }
   }
-}
 
-/**
- * Present a simulated response as the incoming message an HTTP client reads.
- */
-function wireResponseMessage(
-  response: SimSdkWireResponse,
-): SimLambdaVmWireResponseMessage {
-  const message = Readable.from([Buffer.from(response.body)], {
-    objectMode: false,
-  }) as SimLambdaVmWireResponseMessage;
+  /**
+   * The written request, as the request the simulation is asked to answer.
+   */
+  private request(): Request {
+    const { target, scheme } = this.properties;
+    const url = new URL(
+      `${target.scheme ?? scheme}//${target.hostname}${target.path}`,
+    );
+    const body = Buffer.concat(this.chunks);
 
-  message.statusCode = response.statusCode;
-  message.statusMessage = STATUS_CODES[response.statusCode] ?? "";
-  message.headers = { ...response.headers };
-
-  return message;
+    return new Request(url, {
+      method: target.method,
+      headers: target.headers,
+      ...(!bodilessMethods.has(target.method.toUpperCase()) && { body }),
+    });
+  }
 }

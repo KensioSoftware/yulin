@@ -26,10 +26,3 @@ export interface SimSdkWireResponse {
   readonly headers: Readonly<Record<string, string>>;
   readonly body: Uint8Array;
 }
-
-/**
- * Answer an AWS API request from a simulated AWS environment.
- */
-export type SimSdkWireHandler = (
-  request: SimSdkWireRequest,
-) => Promise<SimSdkWireResponse>;

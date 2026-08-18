@@ -25,6 +25,7 @@ import {
 import { assertNonNullable } from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
+import { SimAwsHttp } from "../../src/serve/http/sim-aws-http.js";
 import type { SimCognitoIdentityProvider } from "../../src/service/cognito/index.js";
 
 /**
@@ -53,6 +54,12 @@ export interface SimCognitoHostedSetUp {
   readonly userPoolId: string;
   readonly clientId: string;
   readonly clientSecret: string | undefined;
+
+  /**
+   * The hostname the pool's domain is served on, whichever kind of domain the
+   * pool was given.
+   */
+  readonly domainHost: string;
 }
 
 export interface SimCognitoHostedSetUpOptions {
@@ -180,7 +187,41 @@ export async function simCognitoHosted(
     userPoolId,
     clientId: client.UserPoolClient.ClientId,
     clientSecret: client.UserPoolClient.ClientSecret,
+    domainHost: domain.includes(".")
+      ? domain
+      : `${domain}.auth.eu-west-2.amazoncognito.com`,
   };
+}
+
+/**
+ * Sign a user in at the pool's Google provider and give back the
+ * authorization code the browser carried to the callback.
+ */
+export async function simCognitoAuthorizationCode(
+  setUp: SimCognitoHostedSetUp,
+  extra: Record<string, string> = {},
+): Promise<string> {
+  simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
+    email: "someone@example.com",
+  });
+
+  const parameters = new URLSearchParams({
+    response_type: "code",
+    client_id: setUp.clientId,
+    redirect_uri: simCognitoCallbackUrl,
+    identity_provider: "Google",
+    ...extra,
+  });
+  const response = await new SimAwsHttp({ simAws: setUp.simAws }).fetch(
+    `https://${setUp.domainHost}/oauth2/authorize?${parameters.toString()}`,
+  );
+  const location = response.headers.get("location");
+  assertNonNullable(location);
+
+  const code = new URL(location).searchParams.get("code");
+  assertNonNullable(code);
+
+  return code;
 }
 
 /**

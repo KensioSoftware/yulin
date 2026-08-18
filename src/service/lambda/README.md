@@ -274,6 +274,44 @@ code never has its `Date` replaced at all: `Date` is a much busier global than `
 `getRemainingTimeInMillis()` reads the same clock (`sim-lambda-invoke-context-builder.ts`), so a
 stopped clock leaves a handler with a constant budget.
 
+### The HTTP clients function code reaches for
+
+`function/outbound/` owns what happens when function code makes an HTTP request.
+
+`SimLambdaOutboundHttp` is the seam, and it asks two questions rather than one. `serves(hostname)`
+decides whether the simulation is answering, and `fetch(request)` answers. They are separate
+because a client decides before it has a request to send. `http.request` hands back a stream that
+is written to long before there is a body, and the hostname is all there is to decide on.
+
+`makeSimLambdaOutboundHttp` (`sim-lambda-outbound-http.factory.ts`) builds the one a `SimAws`
+gives its functions, and it answers for two kinds of hostname. A hostname simulated Route53
+resolves goes through `SimAwsHttp`, the same in-process entry point a request arriving on localhost
+takes, which is what makes a Cognito user pool domain, an HTTP API and a load balancer all reachable
+without Lambda knowing which of them it is. An AWS service API endpoint goes to
+`SimSdkWireDispatcher` (`SimLambdaAwsApiOutbound`), because that request carries a serialized
+Command. Resolution is asked first, since a load balancer's own `.elb.amazonaws.com` name ends in a
+service API suffix while naming something served over HTTP.
+
+The factory is a module of its own for the reason `makeSimCfCustomOriginDispatcher` is: `SimAwsHttp`
+reaches every simulated service, and the service that reaches it back is wired from
+`src/service/aws/factory/`.
+
+Three clients reach that seam. `makeSimLambdaHttpModule` replaces `request` and `get` on a
+`node:http` or `node:https` module, keeping everything else the module exports, and
+`makeSimLambdaOutboundFetch` wraps a `fetch`. Where they are installed follows the same split as
+the clock and the environment variables. Sandboxed zip code is handed all three by the sandbox
+(`makeSimLambdaVmContext` for `fetch`, `SimSdkLambdaVmModuleProvider` for the transport modules).
+A real in-process handler reads the process globals, so `invoke/sim-lambda-process-outbound.ts`
+holds the invocation's outbound HTTP in an `AsyncLocalStorage` store and
+`invoke/sim-lambda-outbound-clients.ts` patches `globalThis.fetch` and the two transport modules to
+resolve through it. Both patches are installed on the first invocation of an in-process handler and
+report no served hostname while the store is empty, which leaves the process as it was for
+everything else. `syncBuiltinESMExports()` follows the module patch, so a handler that imported
+`request` by name rather than the module reaches the patched one.
+
+`invoke/sim-lambda-host-scope.ts` is where the clock and the outbound HTTP are applied together,
+since `SimLambdaExecutableCode.runsInHostScope` decides both.
+
 ### Execution role
 
 Creating a function requires an execution `Role` ARN, as on real AWS. While a handler runs,
@@ -603,7 +641,9 @@ the CloudFormation engine with an "Unsupported" diagnostic.
 - `UpdateFunctionCode`, `DeleteFunction`, function listing, versions, aliases and qualifiers
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
-  variables" above), and the same limitation for a time read there
+  variables" above), and the same limitation for a time read there or a request made there
+- outbound HTTP from any client other than `fetch`, `node:http` and `node:https`, and following a
+  redirect the simulation answered with
 - timers: `setTimeout` inside a handler is a host timer, not one the simulation's clock releases
 - timeouts interrupting handler execution
 - asynchronous invocation retries and failure destinations

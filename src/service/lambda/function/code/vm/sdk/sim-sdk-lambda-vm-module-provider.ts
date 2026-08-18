@@ -2,13 +2,15 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { SimSdkModuleClientInterceptor } from "../../../../../../sdk/module/sim-sdk-module-client-interceptor.js";
 import { SimSdkCommandDispatcher } from "../../../../../../sdk/sim-sdk-command-dispatcher.js";
-import { SimSdkWireDispatcher } from "../../../../../../sdk/wire/sim-sdk-wire-dispatcher.js";
 import type { AwsRegionName } from "../../../../../aws/sim-aws-region.js";
 import type { SimAws } from "../../../../../aws/sim-aws.js";
+import { SimLambdaAwsApiOutbound } from "../../../outbound/sim-lambda-aws-api-outbound.js";
 import {
-  isSimLambdaVmHttpModuleSpecifier,
-  makeSimLambdaVmHttpModule,
-} from "../http/sim-lambda-vm-http-module.js";
+  isSimLambdaHttpModuleSpecifier,
+  makeSimLambdaHttpModule,
+  simLambdaHttpModuleScheme,
+} from "../../../outbound/sim-lambda-http-module.js";
+import type { SimLambdaOutboundHttp } from "../../../outbound/sim-lambda-outbound-http.js";
 import {
   awsSdkPackagePrefix,
   type SimLambdaVmSdkModuleProvider,
@@ -25,6 +27,13 @@ interface SimSdkLambdaVmModuleProviderProperties {
    * package layouts that do not hoist dependencies.
    */
   readonly requireModule?: ((specifier: string) => unknown) | undefined;
+  /**
+   * Where a request the transport modules carry is answered. The AWS service
+   * API endpoints alone by default, which is what this provider can reach on
+   * its own; a provider built beside a whole simulated environment is given
+   * one that answers for everything that environment serves.
+   */
+  readonly outboundHttp?: SimLambdaOutboundHttp | undefined;
 }
 
 /**
@@ -39,13 +48,13 @@ interface SimSdkLambdaVmModuleProviderProperties {
  * A deployment package that bundles the SDK asks for no SDK module at all, so
  * there is nothing there to intercept. Such a package still gets its HTTP
  * transport from the runtime, and the modules provided for it answer requests
- * to AWS API endpoints from the same simulation, by the same routing. Which of
- * the two paths a function takes is then only a question of how it was
+ * the simulation serves from the same simulation, by the same routing. Which
+ * of the two paths a function takes is then only a question of how it was
  * packaged, rather than of whether it works.
  */
 export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvider {
   private readonly interceptor: SimSdkModuleClientInterceptor;
-  private readonly wireDispatcher: SimSdkWireDispatcher;
+  private readonly outboundHttp: SimLambdaOutboundHttp;
   private readonly requireModule: (specifier: string) => unknown;
   private readonly providedModules = new Map<string, unknown>();
 
@@ -56,10 +65,8 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
         dispatcher.dispatch(command, client, undefined),
       defaultRegionName: properties.regionName,
     });
-    this.wireDispatcher = new SimSdkWireDispatcher(
-      properties.simAws,
-      properties.regionName,
-    );
+    this.outboundHttp =
+      properties.outboundHttp ?? new SimLambdaAwsApiOutbound(properties);
     this.requireModule = properties.requireModule ?? requireHostModule;
   }
 
@@ -68,7 +75,7 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
    * undefined for other specifiers.
    */
   provideModule(specifier: string): unknown {
-    const isTransport = isSimLambdaVmHttpModuleSpecifier(specifier);
+    const isTransport = isSimLambdaHttpModuleSpecifier(specifier);
     if (!isTransport && !specifier.startsWith(awsSdkPackagePrefix)) {
       return undefined;
     }
@@ -80,10 +87,11 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
 
     const hostExports = this.hostModuleExports(specifier);
     const module = isTransport
-      ? makeSimLambdaVmHttpModule(
-          hostExports as Record<string, unknown>,
-          async (request) => await this.wireDispatcher.dispatch(request),
-        )
+      ? makeSimLambdaHttpModule({
+          hostModule: hostExports as Record<string, unknown>,
+          outbound: this.outboundHttp,
+          scheme: simLambdaHttpModuleScheme(specifier),
+        })
       : this.interceptor.interceptModule(hostExports);
     this.providedModules.set(specifier, module);
     return module;
