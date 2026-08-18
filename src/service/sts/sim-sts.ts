@@ -11,7 +11,7 @@ import { AssumeRoleCommandHandler } from "./command/assume-role/assume-role.hand
 import { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import { SimStsSdkCommandRouter } from "./sdk/sim-sts-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
@@ -47,7 +47,7 @@ export class SimSts {
   async assumeRole(
     command: SimAssumeRoleCommand,
     options?: {
-      caller?: SimAwsPrincipal;
+      caller?: SimAwsCaller;
     },
   ): Promise<SimAssumeRoleCommandOutput> {
     const handler = new AssumeRoleCommandHandler({

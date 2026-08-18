@@ -14,7 +14,7 @@ import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role
 import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
 import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
 interface AssumeRoleCommandHandlerProperties {
@@ -71,7 +71,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   async handle(
     command: SimAssumeRoleCommand,
     options?: {
-      caller?: SimAwsPrincipal;
+      caller?: SimAwsCaller;
     },
   ): Promise<SimAssumeRoleCommandOutput> {
     const request = this.requestParser.parse(command);
