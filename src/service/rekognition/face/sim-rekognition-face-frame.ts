@@ -81,7 +81,11 @@ export class SimRekognitionFaceFrame {
    */
   public readonly confidence: number;
 
-  private readonly boundingBox: SimRekognitionBoundingBoxOutput | undefined;
+  /**
+   * Where this face is, when a box was declared for it.
+   */
+  public readonly boundingBox: SimRekognitionBoundingBoxOutput | undefined;
+
   private readonly pose: SimRekognitionPoseOutput | undefined;
   private readonly quality: SimRekognitionImageQualityOutput | undefined;
 

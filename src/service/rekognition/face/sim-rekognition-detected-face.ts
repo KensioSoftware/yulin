@@ -1,4 +1,5 @@
 import type { SimRekognitionFaceDetailOutput } from "../command/detect-faces/detect-faces.command.js";
+import type { SimRekognitionBoundingBoxOutput } from "../image/sim-rekognition-bounding-box.js";
 import { SimRekognitionDeclaredConfidence } from "../rule/sim-rekognition-declared-confidence.js";
 import { SimRekognitionFaceAgeAndGender } from "./sim-rekognition-face-age-and-gender.js";
 import type { SimRekognitionFaceAttributes } from "./sim-rekognition-face-attributes.js";
@@ -63,6 +64,20 @@ export class SimRekognitionDetectedFace {
       confidence,
       declared.eyeDirection,
     );
+  }
+
+  /**
+   * How sure the detection is that this is a face.
+   */
+  confidence(): number {
+    return this.frame.confidence;
+  }
+
+  /**
+   * Where this face is, when a box was declared for it.
+   */
+  boundingBox(): SimRekognitionBoundingBoxOutput | undefined {
+    return this.frame.boundingBox;
   }
 
   /**

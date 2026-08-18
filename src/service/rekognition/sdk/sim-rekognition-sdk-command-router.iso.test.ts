@@ -19,6 +19,10 @@ describe("SimRekognitionSdkCommandRouter", () => {
       "DetectModerationLabelsCommand",
       "DetectLabelsCommand",
       "DetectFacesCommand",
+      "IndexFacesCommand",
+      "ListFacesCommand",
+      "SearchFacesByImageCommand",
+      "DeleteFacesCommand",
     ]);
   });
 
