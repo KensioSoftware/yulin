@@ -85,6 +85,19 @@ describe("reading a Query protocol request", () => {
     assertUndefined(fields.binary("Missing"));
   });
 
+  it("reads a number back out of its text", () => {
+    // Given a numeric member and some text that names no number at all
+    const fields = fieldsOf("DurationSeconds=900&Attempts=&Limit=some");
+
+    // When each is read as a number
+    // Then the numeric one arrived, and the other two are absent rather than
+    // NaN, so the simulated service sees a member nobody stated
+    assertIdentical(fields.number("DurationSeconds"), 900);
+    assertUndefined(fields.number("Attempts"));
+    assertUndefined(fields.number("Limit"));
+    assertUndefined(fields.number("Missing"));
+  });
+
   it("orders list members by their subscript rather than by field order", () => {
     // Given a list whose tenth member was written before its second
     const fields = fieldsOf(
