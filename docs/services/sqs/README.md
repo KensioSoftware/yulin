@@ -48,7 +48,7 @@ await sqs.deleteMessage(
 ```
 
 A queue URL is `https://sqs.<region>.amazonaws.com/<account-id>/<name>`, and the ARN is
-`arn:aws:sqs:<region>:<account-id>:<name>`. An SQS ARN has no resource type in it, so the queue name
+`arn:aws:sqs:<region>:<account-id>:<name>`. An SQS ARN has no resource type in it. The queue name
 follows the account id directly.
 
 `CreateQueue` is idempotent, as it is on real AWS. A second request for the same name returns the
@@ -58,9 +58,9 @@ differ. A request naming no attributes always matches.
 ## Visibility timeouts
 
 A received message is hidden from other consumers for the queue's visibility timeout, 30 seconds by
-default. Nothing is scheduled to release it: the message records the instant it is hidden until, and it
-becomes receivable again once simulated time reaches that instant. Advancing the clock is therefore all
-a test needs to watch an undeleted message come back.
+default. The message records the instant it is hidden until. It becomes receivable again once
+simulated time reaches that instant. Advancing the clock is all a test needs to watch an undeleted
+message come back.
 
 ```typescript sim-sqs-visibility-timeout
 /**
@@ -112,20 +112,20 @@ console.log(again.Messages?.[0]?.Attributes?.["ApproximateReceiveCount"]); // "2
 ```
 
 A receive request can override the timeout for the messages it takes with `VisibilityTimeout`, and a
-consumer part way through a slow handler can ask for more time with `ChangeMessageVisibility`. The new
-timeout runs from the moment of the change rather than from the receive, as it does on real AWS, and
-a timeout of zero gives the message straight back to the queue.
+consumer part way through a slow handler can ask for more time with `ChangeMessageVisibility`. The
+new timeout runs from the moment of the change rather than from the receive, as it does on real AWS.
+A timeout of zero gives the message straight back to the queue.
 
-`ChangeMessageVisibility` on a message whose timeout has already lapsed fails with `MessageNotInflight`,
-which is what real SQS answers: there is no timeout left to change.
+`ChangeMessageVisibility` on a message whose timeout has already lapsed fails with
+`MessageNotInflight`. There is no timeout left to change, and real SQS answers the same way.
 
 See [simulated time](../../time/ "Simulated time docs") for what else the clock can do.
 
 ## Receipt handles
 
 Every receive issues a fresh receipt handle, and a delete has to use the handle from the most recent
-receive of that message. A handle from an earlier receive is accepted and deletes nothing, which is
-exactly what real SQS does with one.
+receive of that message. A handle from an earlier receive is accepted and deletes nothing. Real SQS
+accepts one too, and promises only that the message might not be deleted.
 
 That is the failure a consumer slower than its visibility timeout hits. Its message went back on the
 queue, someone else took it, and its own delete quietly does nothing.
@@ -189,8 +189,8 @@ still the most recent one, so deleting with it works. A handle the queue never i
 
 A `RedrivePolicy` says where a message goes once a consumer has had enough attempts at it. Once a
 message has been received `maxReceiveCount` times without being deleted, the next lapse of its
-visibility timeout moves it to the queue named by `deadLetterTargetArn` rather than making it
-receivable again. Advancing the clock is what drives the move, as it drives the timeout itself.
+visibility timeout moves it to the queue named by `deadLetterTargetArn`. Advancing the clock drives
+the move, as it drives the timeout itself.
 
 ```typescript sim-sqs-dead-letter-queue
 /**
@@ -260,23 +260,23 @@ const dead = await sqs.receiveMessage(
 console.log(dead.Messages?.[0]?.Body); // "order-1"
 ```
 
-The message arrives with its `MessageId`, body and message attributes unchanged, so a test can
-identify it. `ApproximateNumberOfMessages` on both queues reflects the move. A message deleted before
-its attempts run out never gets there, and a message still inside its visibility timeout has not moved
+The message keeps its `MessageId`, body and message attributes, and a test can identify it by any of
+them. `ApproximateNumberOfMessages` on both queues reflects the move. A message deleted before its
+attempts run out never gets there, and a message still inside its visibility timeout has not moved
 yet, because the consumer holding it may still delete it.
 
 `SentTimestamp` is unchanged by the move, as it is on a real standard queue. The dead-letter queue's
-`MessageRetentionPeriod` therefore runs from when the message was first sent rather than restarting,
-which is why AWS suggests giving a dead-letter queue a longer retention period than the queue feeding
-it. `ApproximateReceiveCount` starts again from one, since a receive count counts receives from one
-queue and the message has not been received from this one yet. A moved message also reports
+`MessageRetentionPeriod` therefore runs from when the message was first sent. That is why AWS
+suggests giving a dead-letter queue a longer retention period than the queue feeding it.
+`ApproximateReceiveCount` starts again from one, since a receive count counts receives from one queue
+and the message has not been received from this one yet. A moved message also reports
 `DeadLetterQueueSourceArn`, naming the queue it came from.
 
-The policy is validated when it is set, whether by `CreateQueue` or `SetQueueAttributes`. It has to be
-a JSON object with both a `deadLetterTargetArn` and a `maxReceiveCount` between 1 and 1000, carried as
-a JSON number or as a string holding one. The `deadLetterTargetArn` has to name a queue that already
-exists in the same account and region, as real SQS requires, so a policy pointing at nothing fails
-there and then rather than quietly losing messages later. Anything else fails with
+The policy is validated when it is set, whether by `CreateQueue` or `SetQueueAttributes`. It has to
+be a JSON object with both a `deadLetterTargetArn` and a `maxReceiveCount` between 1 and 1000,
+carried as a JSON number or as a string holding one. The `deadLetterTargetArn` has to name a queue
+that already exists in the same account and region, as real SQS requires. A policy pointing at
+nothing fails there and then, before a message has been lost to it. Anything else fails with
 `InvalidParameterValue`.
 
 `GetQueueAttributes` reports `RedrivePolicy` back as the string it was set with.
@@ -325,14 +325,14 @@ const late = await sqs.receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
 console.log(late.Messages?.[0]?.Body); // "order-1"
 ```
 
-`MessageRetentionPeriod` works on the same clock. A message on the queue longer than the retention
-period, four days by default, is gone rather than kept indefinitely.
+`MessageRetentionPeriod` works on the same clock. A message on the queue for longer than the
+retention period (four days by default) is gone.
 
 ## Message attributes
 
-Message attributes round-trip, and both digests are real: `MD5OfMessageBody` is an MD5 of the body, and
-`MD5OfMessageAttributes` uses the length-prefixed encoding real SQS digests attributes with. A consumer
-checking either against its own digest is checking something real.
+Message attributes round-trip, and both digests are computed. `MD5OfMessageBody` is an MD5 of the
+body, and `MD5OfMessageAttributes` uses the length-prefixed encoding real SQS digests attributes
+with. A consumer checking either against its own digest is checking a real MD5.
 
 A receive returns no attributes unless it names them, as on real AWS. `All` or `.*` selects every
 attribute, a bare name selects one, and a name ending in `.*` selects a prefix.
@@ -378,9 +378,10 @@ console.log(message?.MD5OfMessageAttributes === sent.MD5OfMessageAttributes); //
 console.log(message?.MD5OfBody === sent.MD5OfMessageBody); // true
 ```
 
-The name and data type rules are the real ones. A name using a reserved `AWS.` or `Amazon.` prefix, a
-data type that is not `String`, `Number` or `Binary`, or a value that does not match its data type is
-refused here rather than on AWS.
+The name and data type rules are the real ones. A data type is `String`, `Number` or `Binary`, and
+each takes a custom label after a dot, so `Number.int` is a number as far as the rules go. A
+reserved `AWS.` or `Amazon.` prefix on a name, a data type built on none of the three, or a value
+that disagrees with its data type is refused. A test finds any of those without going near AWS.
 
 The message system attributes are asked for separately, with `MessageSystemAttributeNames`, or with
 the discontinued `AttributeNames` that means the same thing. `SentTimestamp`,
@@ -389,7 +390,7 @@ the discontinued `AttributeNames` that means the same thing. `SentTimestamp`,
 ## Queue attributes
 
 `GetQueueAttributes` returns only the attributes a request names, as real SQS does, and `All` names
-every attribute this simulation holds. The defaults are the AWS ones: `VisibilityTimeout` 30,
+every attribute this simulation holds. The defaults are the AWS ones. `VisibilityTimeout` is 30,
 `DelaySeconds` 0, `MessageRetentionPeriod` 345600, `MaximumMessageSize` 262144 and
 `ReceiveMessageWaitTimeSeconds` 0.
 
@@ -440,24 +441,23 @@ console.log(read.Attributes?.["ApproximateNumberOfMessagesNotVisible"]); // "1"
 console.log(read.Attributes?.["QueueArn"]); // "arn:aws:sqs:us-east-1:888888888888:orders"
 ```
 
-The other two settable attributes are JSON documents: `RedrivePolicy`, covered under
-[dead-letter queues](#dead-letter-queues) above, and `Policy`, covered under
+The other two settable attributes are JSON documents. `RedrivePolicy` is covered under
+[dead-letter queues](#dead-letter-queues) above and `Policy` under
 [queue policies](#queue-policies) below. Both are reported back as the string they were set with.
 
 An attribute real SQS reports and this simulation does not model, `RedriveAllowPolicy` for one, is
-left out of a response rather than refused, since that is what real SQS does with an attribute a queue
-has no value for. Setting one is refused, because a queue that appeared to accept it would behave
-differently here than on AWS.
+left out of a response. Real SQS leaves out an attribute a queue has no value for in the same way.
+Setting one is refused, because a queue that appeared to accept it would behave differently here than
+on AWS.
 
 `PurgeQueue` deletes everything on a queue, hidden messages included.
 
 ## IAM permissions
 
 Every operation is authorized against the queue's ARN, which carries the queue name with no resource
-type in front of it. Two details are worth knowing, because both are real SQS behaviour that a policy
-can get wrong:
+type in front of it. Two details of real SQS trip policies up:
 
-- `ListQueues` has no resource type at all, so a policy allowing it names `*`. A policy naming one
+- `ListQueues` has no resource type at all. A policy allowing it names `*`. A policy naming one
   queue, or every queue in the Account and Region, grants no listing.
 - The batch operations are authorized as their singular action. There is no `sqs:SendMessageBatch`,
   `sqs:DeleteMessageBatch` or `sqs:ChangeMessageVisibilityBatch` action for a policy to name.
@@ -545,8 +545,9 @@ try {
 ## Queue policies
 
 A queue's `Policy` attribute is its resource policy, and simulated IAM evaluates it as one. It is
-what admits a caller that has no identity policy of its own: a principal from another account, or a
-service principal such as `s3.amazonaws.com`, which owns no identity policies anywhere.
+what admits a service principal such as `s3.amazonaws.com`, which owns no identity policies
+anywhere. It is also half of what admits a principal from another account, which needs an identity
+policy in its own account as well.
 
 The policy is set with `CreateQueue` or `SetQueueAttributes` and read back with
 `GetQueueAttributes`.
@@ -615,22 +616,21 @@ try {
 ```
 
 `sourceArn` is what a request says it is being made on behalf of, and `sourceAccount` is the Account
-owning that resource, supplied as `aws:SourceAccount`. A request that does not carry one leaves the
-key out rather than supplying an empty string, so a statement conditioned on it does not match at
-all.
+owning that resource, supplied as `aws:SourceAccount`. A request that omits one leaves the key out
+entirely, and a statement conditioned on it matches nothing.
 
-A simulated S3 Bucket notifying a queue supplies both, so the `ArnLike aws:SourceArn` condition CDK
+A simulated S3 Bucket notifying a queue supplies both. The `ArnLike aws:SourceArn` condition CDK
 writes and the `StringEquals aws:SourceAccount` guard AWS documents are each enough on their own.
 See [Event notifications](../s3/#event-notifications) on the S3 page for the whole chain.
 
-A caller from another account needs both sides to allow the request, as it does on real AWS: the
-queue policy naming the principal, and that principal's own account allowing the action. Either one
-on its own is a denial.
+A caller from another account needs both sides to allow the request, as it does on real AWS. The
+queue policy has to name the principal, and that principal's own account has to allow the action.
+Either one on its own is a denial.
 
-The policy is validated when it is set, by `CreateQueue` or `SetQueueAttributes`, so a malformed
-document fails there rather than the first time something is authorized against it. It has to be a
-JSON policy document whose statements each carry an `Effect` of `Allow` or `Deny`, an `Action` or
-`NotAction`, and a `Resource` or `NotResource`. Anything else fails with `InvalidAttributeValue`.
+The policy is validated when it is set, by `CreateQueue` or `SetQueueAttributes`. A malformed
+document fails there, before anything has been authorized against it. It has to be a JSON policy
+document whose statements each carry an `Effect` of `Allow` or `Deny`, an `Action` or `NotAction`,
+and a `Resource` or `NotResource`. Anything else fails with `InvalidAttributeValue`.
 
 `GetQueueAttributes` reports `Policy` back as the string it was set with.
 
@@ -678,9 +678,9 @@ console.log(sent.Failed?.[0]?.Code); // "InvalidParameterValue"
 
 ## Deleting a queue
 
-`DeleteQueue` removes the queue and everything on it. The name is not free straight away: real SQS
-holds a deleted queue's name for 60 seconds, and so does this. Advancing simulated time past it frees
-the name, which is what a redeployed stack depends on.
+`DeleteQueue` removes the queue and everything on it. Real SQS holds a deleted queue's name for 60
+seconds, and so does this. Advancing simulated time past the hold frees the name. A stack redeployed
+in the same test depends on that.
 
 ```typescript sim-sqs-delete-queue
 /**
@@ -719,8 +719,7 @@ console.log(recreated.QueueUrl === QueueUrl); // true
 ## Scoping
 
 Queues belong to an account and a region, as they do on real AWS. A queue name is unique within one
-account and region and nowhere wider, so the same name can be used in two regions for two different
-queues.
+account and region and nowhere wider. The same name can name two different queues in two regions.
 
 ```typescript sim-sqs-scoping
 /**
@@ -861,8 +860,8 @@ console.log(Buffer.from(invoked.Payload ?? []).toString("utf8")); // "\"order-1\
 ```
 
 See [simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles
-work. The same applies to `SimSdk` interception: intercepting `SQSClient` routes ordinary SDK code into
-the simulation with nothing touching the network. See
+work. `SimSdk` interception works the same way. Intercepting `SQSClient` routes ordinary SDK code
+into the simulation with nothing touching the network, covered under
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
 
 ## Triggering a Lambda from a queue
@@ -871,7 +870,7 @@ A Lambda event source mapping delivers messages from a queue to a function witho
 `ReceiveMessage` itself. Messages sent to the queue arrive at the handler as an SQS event, in
 batches of up to `BatchSize`.
 
-Delivery runs on the simulation's background scheduler, so a test waits for it with
+Delivery runs on the simulation's background scheduler. A test waits for it with
 `simAws.backgroundTasksComplete()`.
 
 ```typescript sim-sqs-lambda-event-source
@@ -978,8 +977,8 @@ console.log(remaining.Messages); // undefined
 
 A handler that throws leaves the whole batch on the queue instead. The messages stay hidden until
 their visibility timeout lapses, come back after that, and eventually move to the dead-letter queue
-if the queue has a `RedrivePolicy`. That is the same path any other failing consumer takes, so
-advancing the clock is what drives it:
+if the queue has a `RedrivePolicy`. That is the path any other failing consumer takes, and advancing
+the clock is what drives it:
 
 ```typescript
 await simAws.clock().advanceBy({ seconds: 31 });
@@ -992,10 +991,10 @@ source mapping docs") for the event shape, partial batch failures, and the
 ## Deploying a queue from CloudFormation
 
 Simulated CloudFormation creates a queue from an `AWS::SQS::Queue` resource, in the stack's account
-and region. The queue is created through `CreateQueue`, so a template-created queue is the same thing
-an SDK caller would get: the same name validation, the same attribute ranges, the same ARN and URL.
+and region. The queue is created through `CreateQueue`. A template-created queue gets the same name
+validation, the same attribute ranges and the same ARN and URL as one an SDK caller creates.
 
-`Ref` on the resource gives the queue URL rather than its name or ARN, as it does on real AWS, so it
+`Ref` on the resource gives the queue URL rather than its name or ARN, as it does on real AWS, and it
 can be handed straight to `SendMessage`. `Fn::GetAtt … Arn`, `Fn::GetAtt … QueueName` and
 `Fn::GetAtt … QueueUrl` give those.
 
@@ -1051,30 +1050,30 @@ console.log(stack.outputs.get("OrdersQueueArn")?.value);
 
 The properties applied to the queue are `VisibilityTimeout`, `DelaySeconds`,
 `MessageRetentionPeriod`, `MaximumMessageSize` and `ReceiveMessageWaitTimeSeconds`. Each is passed to
-`CreateQueue`, so a value outside the range real SQS accepts fails the resource.
+`CreateQueue`, and a value outside the range real SQS accepts fails the resource.
 
-A queue with no `QueueName` is named from the stack name and the logical ID, so the queue above with
-its name left out would be `orders-stack-OrdersQueue`. Real CloudFormation adds random characters to
+A queue with no `QueueName` is named from the stack name and the logical ID. The queue above with its
+name left out would be `orders-stack-OrdersQueue`. Real CloudFormation adds random characters to
 that, which a template cannot predict either way. The generated name is trimmed to the 80 characters
 a queue name allows, ending in a hash of the untrimmed name so two long names that start the same
 stay apart.
 
 `FifoQueue: true` fails the resource. Only standard queues are simulated, and a FIFO queue is named
-`<name>.fifo`, which simulated SQS refuses to an SDK caller as well, so there is no queue to create
+`<name>.fifo`, a name simulated SQS refuses to an SDK caller as well. There is no queue to create
 under the name the template gave it.
 
-The properties with behaviour that is not simulated are a different case: the queue is created
-without them and each one is recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
-so a stack full of queues still deploys. Those are `RedrivePolicy`, `RedriveAllowPolicy`,
+The properties this simulation has no behaviour for are a different case. The queue is created without
+them and each one is recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+A stack full of queues still deploys. Those properties are `RedrivePolicy`, `RedriveAllowPolicy`,
 `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`,
 `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property
-`AWS::SQS::Queue` does not have is recorded the same way.
+outside the `AWS::SQS::Queue` schema is recorded the same way.
 
 `AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
 `SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
 one set through the SDK, and a document SQS would refuse fails the resource. `Queues` carries queue
-URLs, which is what `Ref` on an `AWS::SQS::Queue` gives.
+URLs, and `Ref` on an `AWS::SQS::Queue` gives one.
 
 ```typescript
 {
@@ -1133,53 +1132,54 @@ Current documented limitations:
 - Standard queues only. A queue name ending in `.fifo` is refused, as are `MessageGroupId`,
   `MessageDeduplicationId` and `ReceiveRequestAttemptId`.
 - Ordering and duplicates are stricter here than AWS promises. Messages come back oldest first, and a
-  message is handed out to one consumer at a time. Real standard queues make no ordering promise and
-  guarantee at-least-once delivery, so there a copy of a message can arrive twice and messages can
-  arrive out of order. Redelivery after a visibility timeout lapses is simulated, since that follows
-  from the timeout; a duplicate arriving on its own is not.
-- Long polling does not wait. `WaitTimeSeconds` and `ReceiveMessageWaitTimeSeconds` are accepted and
-  validated, and a receive returns at once. Nothing else is running in process that could send a
-  message during the wait, so waiting could only ever time out.
+  message is handed out to one consumer at a time. Real standard queues promise no ordering at all
+  and guarantee at-least-once delivery, so a copy of a message can arrive twice there and messages
+  can arrive out of order. Redelivery after a visibility timeout lapses is simulated, since that
+  follows from the timeout. A duplicate arriving on its own is left out.
+- Long polling answers at once. `WaitTimeSeconds` and `ReceiveMessageWaitTimeSeconds` are accepted
+  and validated, and a receive returns immediately. The whole simulation runs in the calling process,
+  where a wait could only ever time out.
 - `DeleteQueue` and `PurgeQueue` take effect immediately, where real SQS may take up to 60 seconds
-  over either. The 60 second hold on a deleted queue's name is simulated, so recreating a queue
+  over either. The 60-second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
 - Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
   them. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it
-  is recorded and the queue created without it, so a dead-letter queue cannot restrict which queues
-  may redrive to it either way. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
-  dead-letter queue back to its source are not supported, so a redriven message is moved back by a
-  test sending it again.
+  is recorded and the queue created without it. A dead-letter queue cannot restrict which queues may
+  redrive to it either way. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for
+  draining a dead-letter queue back to its source are absent. A test moves a redriven message back by
+  sending it again.
 - `ApproximateReceiveCount` starting again from one on a dead-letter queue is this simulation's
-  reading of SQS rather than something AWS documents. A receive count counts receives from one queue,
-  and the moved message has not been received from the dead-letter queue yet. `SentTimestamp` being
-  unchanged by the move is documented AWS behaviour, and is simulated as such.
-- The `RedrivePolicy` property on `AWS::SQS::Queue` is not simulated, so a dead-letter queue is
-  configured by an SDK call rather than by a template. The queue is created without the property and
-  the omission is recorded in `stack.ignoredProperties`.
+  reading of SQS, and AWS documents no answer either way. A receive count counts receives from one
+  queue, and the moved message has not been received from the dead-letter queue yet. `SentTimestamp`
+  being unchanged by the move is documented AWS behaviour, and is simulated as such.
+- The `RedrivePolicy` property on `AWS::SQS::Queue` is left out, and an SDK call is what configures a
+  dead-letter queue. The queue is created without the property and the omission is recorded in
+  `stack.ignoredProperties`.
 - A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
-  which are shorthands for writing one statement of it, are not supported.
+  shorthands for writing one statement of it, are absent.
 - `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
-  and adds an `Id` and a `Sid` to it, so what comes back there is not byte for byte what went in.
+  and adds an `Id` and a `Sid` to it, so what comes back there differs from what went in.
 - A request naming a `QueueOwnerAWSAccountId` other than the scope's own account is refused. A queue
-  policy admits another account's principal to a queue here; it does not make another account's
-  queues reachable through this one.
-- Encryption is not simulated. `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds` and
-  `SqsManagedSseEnabled` are recorded rather than applied on an `AWS::SQS::Queue`, and message bodies
-  are held in process memory as they were sent. That is not a security boundary: anything sharing the process can reach them.
-- Tags are not simulated. `TagQueue`, `UntagQueue` and `ListQueueTags` are not supported, and
-  `CreateQueue` refuses a `tags` parameter rather than dropping it.
-- `SenderId` is not reported, because a simulated caller has no user or role id to report it as.
-  `AWSTraceHeader` is not reported either, and `MessageSystemAttributes` on a send are refused. Asking
-  for any of them is accepted, as real SQS accepts a request for an attribute a message has no value
-  for, and they are left out of the response.
-- SQS condition keys are not derived, so a policy relying on them will not match. Ordinary condition
+  policy admits another account's principal to a queue here, and leaves that account's own queues
+  unreachable from this one.
+- Encryption is left out. `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds` and
+  `SqsManagedSseEnabled` are recorded on an `AWS::SQS::Queue` and applied to nothing, and message
+  bodies are held in process memory as they were sent. Anything sharing the process can read them.
+- Tags are left out. `TagQueue`, `UntagQueue` and `ListQueueTags` are absent, and `CreateQueue`
+  refuses a `tags` parameter rather than dropping it.
+- `SenderId` is left out, because a simulated caller has no user or role id to report it as.
+  `AWSTraceHeader` is left out too, and `MessageSystemAttributes` on a send are refused. Asking for
+  any of them is accepted, as real SQS accepts a request for an attribute a message has no value for,
+  and they are absent from the response.
+- SQS condition keys are left out, and a policy relying on one matches nothing. Ordinary condition
   operators on values sim IAM does supply work as usual.
-- `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are not supported.
+- `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are absent.
 - A Lambda event source mapping polls one batch at a time. Real Lambda runs several pollers at once
-  and scales them with the queue, so nothing here shows what that concurrency does to ordering. See
+  and scales them with the queue, and what that concurrency does to ordering is invisible here. See
   [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
 source mapping docs") for the rest of the mapping limitations.
 - `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` are the SQS resource types CloudFormation creates.
-  Any other is skipped, and the queue properties this simulation has no behaviour for fail the
-  resource rather than being dropped.
+  Any other is reported as unsupported and skipped. A queue attribute outside the range real SQS
+  accepts fails the resource, and a property it has no behaviour for is recorded and the queue
+  created without it.
 - SQS is not served as an HTTP API by `serveSimAws`.
