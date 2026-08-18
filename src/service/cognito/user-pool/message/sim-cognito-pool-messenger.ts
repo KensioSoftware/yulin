@@ -60,9 +60,13 @@ export class SimCognitoPoolMessenger {
    * `CustomMessage` trigger first so that a handler can write its own.
    *
    * A pool with nowhere to write to sends nothing, as one does on real
-   * Cognito, rather than recording a message addressed to no one.
+   * Cognito, rather than recording a message addressed to no one. Where a
+   * message did go out, the answer says where, because an operation reporting
+   * `CodeDeliveryDetails` has nowhere else to read that from.
    */
-  async send(request: SimCognitoMessageRequest): Promise<void> {
+  async send(
+    request: SimCognitoMessageRequest,
+  ): Promise<SimCognitoMessageDelivery | undefined> {
     const delivery = SimCognitoMessageDelivery.forOccasion(
       request.pool,
       request.user,
@@ -70,7 +74,7 @@ export class SimCognitoPoolMessenger {
     );
 
     if (delivery === undefined) {
-      return;
+      return undefined;
     }
 
     const { medium } = delivery;
@@ -106,5 +110,7 @@ export class SimCognitoPoolMessenger {
         sentDate: this.clock.now(),
       }),
     );
+
+    return delivery;
   }
 }

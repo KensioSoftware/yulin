@@ -498,15 +498,149 @@ with `NotAuthorizedException`, as a real one does. That value is what a CDK `Use
 `selfSignUpEnabled` emits. A project testing its registration flow gets the same answer here that
 the deployed pool would give. A pool created without the setting allows sign-up, the AWS default.
 
+## Resetting a forgotten password
+
+A user that cannot get in asks for a code with `ForgotPassword` and sets a new password with
+`ConfirmForgotPassword`. Both name an app client, and neither is authorized by an IAM policy. They
+are the pair an application calls when it has built its own sign-in screens.
+
+The code goes to the same place a sign-up code goes, and is read back the same way, through
+`confirmationCode` on the pool object. `ForgotPassword` answers with `CodeDeliveryDetails` naming
+the medium and a masked destination, which an application prints to say where the user should go
+and look.
+
+```typescript sim-cognito-forgot-password
+/**
+ * Resetting a forgotten password with the code the pool issued.
+ */
+
+import {
+  ConfirmForgotPasswordCommand,
+  ConfirmSignUpCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  ForgotPasswordCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AutoVerifiedAttributes: ["email"],
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+await cognito.confirmSignUp(
+  new ConfirmSignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    ConfirmationCode: cognito.userPool(userPoolId).confirmationCode("alice"),
+  }),
+);
+
+// The user has forgotten the password it chose at sign-up.
+const asked = await cognito.forgotPassword(
+  new ForgotPasswordCommand({ ClientId: clientId, Username: "alice" }),
+);
+
+console.log(asked.CodeDeliveryDetails?.DeliveryMedium); // "EMAIL"
+console.log(asked.CodeDeliveryDetails?.Destination); // "a***@e***.com"
+
+// Real Cognito sends this to the user and never reports it, as with a sign-up
+// code. The pool hands it over instead.
+const code = cognito.userPool(userPoolId).confirmationCode("alice");
+
+await cognito.confirmForgotPassword(
+  new ConfirmForgotPasswordCommand({
+    ClientId: clientId,
+    Username: "alice",
+    ConfirmationCode: code,
+    Password: "Ev3nBetter!",
+  }),
+);
+
+// The user is CONFIRMED, and the new password is the one that signs it in.
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Ev3nBetter!" },
+  }),
+);
+
+console.log(signedIn.AuthenticationResult?.AccessToken !== undefined); // true
+```
+
+The user reaches `CONFIRMED` once the reset lands, which also confirms one that never confirmed its
+sign-up. The password it had before stops working.
+
+A wrong code is refused with `CodeMismatchException`, and the user keeps the code it was issued for
+a second attempt. A spent code is refused with `ExpiredCodeException`. That is what real Cognito
+calls a code it will no longer take. The new password is held to the pool's password policy, and one the policy refuses raises
+`InvalidPasswordException` (the same refusal `AdminSetUserPassword` gives).
+
+Asking twice issues a second code and the first one stops working, the way `ResendConfirmationCode`
+replaces a sign-up code.
+
+`ForgotPassword` sends its code to an attribute the pool verifies automatically, preferring `email`
+over `phone_number`. A user the pool can reach at neither is refused with
+`InvalidParameterException`, in the words real Cognito refuses with. A user still holding a
+temporary password is refused with `NotAuthorizedException` and belongs at the
+`NEW_PASSWORD_REQUIRED` challenge.
+
+An app client's `PreventUserExistenceErrors` decides what a reset naming an unknown user gets. A
+client left on the `LEGACY` default answers `UserNotFoundException`. A client set to `ENABLED`
+answers as though a code had gone out, with a made-up destination. That closes the operation as a
+way of finding out who has an account.
+
+An app client created with a secret has its `SECRET_HASH` checked on both operations, computed over
+the username and the client id the way the sign-in operations compute it.
+
+### Resetting a password as an administrator
+
+`AdminResetUserPassword` takes a user's password away and leaves it in `RESET_REQUIRED`. It names
+the pool and the user, and is authorized by IAM the way the other admin operations are. From there
+the user is refused at sign-in with `PasswordResetRequiredException` until it answers
+`ConfirmForgotPassword` with the code the reset issued. The pool records the message carrying that
+code, under the `ForgotPassword` occasion.
+
+A federated user has no password in the pool, and both the user's own reset and the administrator's
+are refused for one.
+
 ## Messages a pool would have sent
 
 Nothing here delivers an email or a text message. A pool records what it would have sent instead,
 and `sentMessages` on the pool object hands the record over. Each message carries the recipient, the
 medium, the subject, the body and the occasion it was sent on.
 
-A message is recorded on three occasions. Those are a `SignUp`, a `ResendConfirmationCode`, and an
-`AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`. The verification wording is the
-pool's own, and `{####}` is replaced with the code the user was issued. A sign-up a `PreSignUp`
+A message is recorded on five occasions. Those are a `SignUp`, a `ResendConfirmationCode`, an
+`AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`, an MFA code sent by text message,
+and a password reset the user or an administrator started. The verification wording is the pool's
+own, and `{####}` is replaced with the code the user was issued. A sign-up a `PreSignUp`
 handler auto-confirmed records none. That user has no code to answer with, and real Cognito sends it
 nothing.
 
@@ -595,8 +729,9 @@ handler writes into `response.emailSubject`, `response.emailMessage` and `respon
 replaces the pool's own wording. The handler writes `request.codeParameter` into its message where
 the code belongs, as it does on real Cognito, and the code goes in afterwards.
 
-`triggerSource` names the occasion: `CustomMessage_SignUp`, `CustomMessage_ResendCode` or
-`CustomMessage_AdminCreateUser`. The invitation carries `request.usernameParameter` as well.
+`triggerSource` names the occasion: `CustomMessage_SignUp`, `CustomMessage_ResendCode`,
+`CustomMessage_AdminCreateUser`, `CustomMessage_Authentication` or `CustomMessage_ForgotPassword`.
+The invitation carries `request.usernameParameter` as well.
 
 ```typescript sim-cognito-custom-message
 /**
@@ -1740,19 +1875,22 @@ that only the matching `code_verifier` exchanges. `plain` is refused, as it is b
 A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up, a sign-in or
 a message. Each one is given the real event and has to return it, changed or not.
 
-| Trigger              | Fires                                                                  | `triggerSource`                        |
-| -------------------- | ---------------------------------------------------------------------- | -------------------------------------- |
-| `PreSignUp`          | `SignUp`, before the pool takes the new user                           | `PreSignUp_SignUp`                     |
-| `PreSignUp`          | `AdminCreateUser`, before the pool takes the new user                  | `PreSignUp_AdminCreateUser`            |
-| `PostConfirmation`   | `ConfirmSignUp` and `AdminConfirmSignUp`, once the user is `CONFIRMED` | `PostConfirmation_ConfirmSignUp`       |
-| `PreAuthentication`  | a sign-in, once the user is known and before its password is checked   | `PreAuthentication_Authentication`     |
-| `PreTokenGeneration` | a sign-in, where the claims of its tokens are settled                  | `TokenGeneration_Authentication`       |
-| `PreTokenGeneration` | the sign-in that finishes by answering the new password challenge      | `TokenGeneration_NewPasswordChallenge` |
-| `PreTokenGeneration` | a `REFRESH_TOKEN_AUTH` refresh, over the tokens it reissues            | `TokenGeneration_RefreshTokens`        |
-| `PostAuthentication` | a sign-in, once the tokens have been issued                            | `PostAuthentication_Authentication`    |
-| `CustomMessage`      | `SignUp`, before the verification message is recorded                  | `CustomMessage_SignUp`                 |
-| `CustomMessage`      | `ResendConfirmationCode`, before the message is recorded               | `CustomMessage_ResendCode`             |
-| `CustomMessage`      | `AdminCreateUser`, before the invitation is recorded                   | `CustomMessage_AdminCreateUser`        |
+| Trigger              | Fires                                                                         | `triggerSource`                          |
+| -------------------- | ----------------------------------------------------------------------------- | ---------------------------------------- |
+| `PreSignUp`          | `SignUp`, before the pool takes the new user                                  | `PreSignUp_SignUp`                       |
+| `PreSignUp`          | `AdminCreateUser`, before the pool takes the new user                         | `PreSignUp_AdminCreateUser`              |
+| `PostConfirmation`   | `ConfirmSignUp` and `AdminConfirmSignUp`, once the user is `CONFIRMED`        | `PostConfirmation_ConfirmSignUp`         |
+| `PostConfirmation`   | `ConfirmForgotPassword`, once the reset has confirmed the user                | `PostConfirmation_ConfirmForgotPassword` |
+| `PreAuthentication`  | a sign-in, once the user is known and before its password is checked          | `PreAuthentication_Authentication`       |
+| `PreTokenGeneration` | a sign-in, where the claims of its tokens are settled                         | `TokenGeneration_Authentication`         |
+| `PreTokenGeneration` | the sign-in that finishes by answering the new password challenge             | `TokenGeneration_NewPasswordChallenge`   |
+| `PreTokenGeneration` | a `REFRESH_TOKEN_AUTH` refresh, over the tokens it reissues                   | `TokenGeneration_RefreshTokens`          |
+| `PostAuthentication` | a sign-in, once the tokens have been issued                                   | `PostAuthentication_Authentication`      |
+| `CustomMessage`      | `SignUp`, before the verification message is recorded                         | `CustomMessage_SignUp`                   |
+| `CustomMessage`      | `ResendConfirmationCode`, before the message is recorded                      | `CustomMessage_ResendCode`               |
+| `CustomMessage`      | `AdminCreateUser`, before the invitation is recorded                          | `CustomMessage_AdminCreateUser`          |
+| `CustomMessage`      | an MFA code, before the text message is recorded                              | `CustomMessage_Authentication`           |
+| `CustomMessage`      | `ForgotPassword` and `AdminResetUserPassword`, before the message is recorded | `CustomMessage_ForgotPassword`           |
 
 `CustomMessage` is the one whose response is read for more than a flag, and it is covered in
 [The CustomMessage trigger](#the-custommessage-trigger) above. The rest are here.
@@ -2665,10 +2803,10 @@ for anything, and a client created with `disableOAuth` emits two on `AWS::Cognit
 Most of them are simulated: `AdminCreateUserConfig` decides whether `SignUp` works against the pool,
 and the four verification wording properties are what a recorded message says.
 
-`AccountRecoverySetting` is the exception. There is no `ForgotPassword` here, so no recovery is ever
-started and no mechanism is ever chosen. The pool records the mechanisms it was asked for
-and `DescribeUserPool` reports them back, so what a template declared stays visible. The two app
-client properties are accepted at one value each instead.
+`AccountRecoverySetting` is the exception. `ForgotPassword` sends its code to an attribute the pool
+verifies automatically, so the mechanisms a pool ranked decide nothing here. The pool records the
+mechanisms it was asked for and `DescribeUserPool` reports them back, so what a template declared
+stays visible. The two app client properties are accepted at one value each instead.
 
 ```typescript sim-cognito-cdk-defaults
 /**
@@ -3455,6 +3593,9 @@ Sim Cognito currently supports:
 - `SignUpCommand`, `ConfirmSignUpCommand` and `ResendConfirmationCodeCommand`, authorized by no IAM
   policy as they are on real Cognito, and `AdminConfirmSignUpCommand`, authorized like the other
   admin operations
+- `ForgotPasswordCommand` and `ConfirmForgotPasswordCommand`, authorized by no IAM policy either,
+  with the reset code read back off the pool and the masked `CodeDeliveryDetails` reported, and
+  `AdminResetUserPasswordCommand`, which leaves a user in `RESET_REQUIRED`
 - The `PreSignUp` and `PostConfirmation` Lambda triggers, with `autoConfirmUser`, `autoVerifyEmail`
   and `autoVerifyPhone` applied, and with the `ValidationData` and `ClientMetadata` a request
   carries reaching the handler
@@ -3515,7 +3656,8 @@ Sim Cognito currently supports:
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, in which an admin-created user stays in `FORCE_CHANGE_PASSWORD`
-  until it has a permanent password, and a signed-up user stays in `UNCONFIRMED` until it confirms
+  until it has a permanent password, a signed-up user stays in `UNCONFIRMED` until it confirms, and
+  a user an administrator reset stays in `RESET_REQUIRED` until it sets a password of its own
 - Group membership, and the precedence order the `cognito:groups` claim uses
 - App client authentication flows, token lifetimes, generated client secrets and
   `PreventUserExistenceErrors`
@@ -3567,18 +3709,30 @@ Current documented limitations:
   Those are the two Cognito can send a code to.
 - `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool lacks whatever the app
   client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
-- Password reset is outside the simulation. `ForgotPassword`, `ConfirmForgotPassword` and
-  `ChangePassword` are unimplemented, leaving the `RESET_REQUIRED` status unreachable.
+- A reset code never expires either, where a real one lasts an hour. A second `ForgotPassword`
+  replaces it, and answering with it spends it. A spent code is refused with `ExpiredCodeException`.
+  That is what real Cognito calls a code it will no longer take.
+- `ForgotPassword` sends its code to an attribute the pool verifies automatically, and refuses a
+  user the pool can reach at neither `email` nor `phone_number`. Real Cognito chooses by the pool's
+  `AccountRecoverySetting`, which is recorded here and read by nothing, so a pool that recovers by
+  email alone behaves here exactly as one that recovers by phone number would.
+- The destination `ForgotPassword` reports is masked in real Cognito's shape rather than in a shape
+  read back from a live account. Assert that a destination came back and which medium carried it.
+- `ChangePassword` is unimplemented. It is the signed-in user replacing a password it still knows,
+  and it belongs to a different flow.
 - Unsimulated sign-up inputs are refused rather than ignored: `AnalyticsMetadata` and
-  `UserContextData` on the three client-side operations, and `ForceAliasCreation` and `Session` on
-  `ConfirmSignUp`. `ClientMetadata` is absent from that list, because each reaches a trigger that
-  runs here.
+  `UserContextData` on the three client-side operations and on the two password reset ones, and
+  `ForceAliasCreation` and `Session` on `ConfirmSignUp`. `ClientMetadata` is absent from that list,
+  because each reaches a trigger that runs here.
 - No message is ever delivered. A pool records what it would have sent and `sentMessages` reads it
   back, which real Cognito reports to nobody. Nothing leaves the simulation, and no
-  `CodeDeliveryDetails` is reported by `SignUp` or `ResendConfirmationCode`.
-- A message is recorded on three occasions, being `SignUp`, `ResendConfirmationCode` and
-  `AdminCreateUser`. Password reset, MFA and the account-taken-over notices are occasions real
-  Cognito sends on and this simulation never reaches.
+  `CodeDeliveryDetails` is reported by `SignUp` or `ResendConfirmationCode`. `ForgotPassword`
+  reports one, as real Cognito does.
+- A message is recorded on five occasions, being `SignUp`, `ResendConfirmationCode`,
+  `AdminCreateUser`, `Authentication` (an MFA code sent by text message) and `ForgotPassword`, which
+  covers the reset an administrator starts as well as the one the user asks for. Attribute
+  verification and the account-taken-over notices are occasions real Cognito sends on and this
+  simulation never reaches.
 - A verification message is recorded only for an attribute the pool verifies automatically. A pool
   with no `AutoVerifiedAttributes` records none, and only for a user that has to confirm. One a
   `PreSignUp` handler auto-confirmed is sent nothing, as on real Cognito. An invitation is recorded
@@ -3701,8 +3855,9 @@ Current documented limitations:
 - `AdminCreateUser` leaves `PostConfirmation` unfired, here and on real Cognito. It is the tempting
   place to hang the trigger and the wrong one. A project relying on it would pass here and write no
   record in production.
-- `PostConfirmation_ConfirmForgotPassword` goes unreached, because password reset is outside the
-  simulation. `PostConfirmation_ConfirmSignUp` is the only source the trigger reports.
+- `PostConfirmation` reports two sources, being `PostConfirmation_ConfirmSignUp` and
+  `PostConfirmation_ConfirmForgotPassword`. A handler that hangs a profile record off the first
+  confirmation sees the second one too.
 - A `PreSignUp` handler asking to verify an attribute the sign-up did not carry refuses the sign-up
   with `InvalidParameterException`. Real Cognito refuses it too, and what it names the error has not
   been checked against a live account.
@@ -3735,18 +3890,18 @@ Current documented limitations:
   `AdminRespondToAuthChallenge` alone, as it does on real Cognito. A refresh accepts one and it
   reaches nothing.
 - A `CustomMessage` event reports `CLIENT_ID_NOT_APPLICABLE` as its `callerContext.clientId` for an
-  `AdminCreateUser`, as real Cognito does for an admin operation, and names the app client for the
-  two occasions that come through one.
+  `AdminCreateUser` and an `AdminResetUserPassword`, as real Cognito does for an admin operation,
+  and names the app client for the occasions that come through one.
 - Unsimulated `CreateUserPool` inputs are refused, never ignored: `AliasAttributes`,
   `UsernameConfiguration`, `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`,
   `KeyConfiguration`, `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
   `PasswordHistorySize`.
 - `AccountRecoverySetting` is recorded and reported back by `DescribeUserPool`, and no code reads
-  it, because there is no `ForgotPassword`. Any mechanisms Cognito has are accepted, in any order,
-  and a setting outside the shape Cognito states is refused. A pool that recovers by email alone
-  therefore behaves here exactly as one that recovers by phone number would, which only shows in a
-  recovery neither of them can start.
+  it. Any mechanisms Cognito has are accepted, in any order, and a setting outside the shape Cognito
+  states is refused. `ForgotPassword` picks its destination from the pool's `AutoVerifiedAttributes`
+  (`email` before `phone_number`), so a pool that recovers by email alone behaves here exactly as
+  one that recovers by phone number would.
 - `AdminCreateUserConfig.AllowAdminCreateUserOnly` is acted on, and the two keys beside it are
   refused. `InviteMessageTemplate` is the wording of the invitation, and a pool cannot set its own
   yet, leaving an invitation recorded at Cognito's default wording. `UnusedAccountValidityDays`
@@ -3784,8 +3939,8 @@ Current documented limitations:
 - A hosted sign-in that real managed login would answer with a further page is refused. That is a
   user which has registered a second factor, and a user holding a temporary password. Both
   challenges are simulated at `InitiateAuth` and `AdminInitiateAuth`, which is where a test drives
-  them. Password reset is unsimulated on either side, so `ForgotPassword` and
-  `ConfirmForgotPassword` are unimplemented and no page asks for a reset code.
+  them. No page asks for a reset code either. `ForgotPassword` and `ConfirmForgotPassword` are
+  simulated at the API, which is where a test drives a reset.
 - The implicit grant is refused, and so is the client credentials grant, which needs resource
   servers.
 - The served OpenID configuration names its `authorization_endpoint`, `token_endpoint` and

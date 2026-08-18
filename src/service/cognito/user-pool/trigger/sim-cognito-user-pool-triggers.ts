@@ -55,9 +55,15 @@ export class SimCognitoUserPoolTriggers {
    * request without undoing the confirmation: the user stays confirmed, exactly
    * as on real Cognito. `AdminCreateUser` never reaches here, as it never
    * reaches it on real Cognito.
+   *
+   * The occasion is what tells a sign-up being confirmed from a password being
+   * reset, which real Cognito reports as two sources of the one trigger.
    */
-  async postConfirmation(context: SimCognitoTriggerContext): Promise<void> {
-    await this.invocation.run(SimCognitoTriggerOccasion.confirmSignUp, context);
+  async postConfirmation(
+    occasion: SimCognitoTriggerOccasion,
+    context: SimCognitoTriggerContext,
+  ): Promise<void> {
+    await this.invocation.run(occasion, context);
   }
 
   /**

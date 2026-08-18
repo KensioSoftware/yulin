@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-identity.js";
 import { SimCognitoUserMfa } from "./mfa/sim-cognito-user-mfa.js";
 import { SimCognitoUserConfirmation } from "./sim-cognito-user-confirmation.js";
+import { SimCognitoUserPasswordReset } from "./sim-cognito-user-password-reset.js";
 import type {
   SimCognitoAttributeType,
   SimCognitoUserAttributes,
@@ -52,6 +53,7 @@ export class SimCognitoUser {
   private readonly userAttributes: SimCognitoUserAttributes;
   private readonly confirmation: SimCognitoUserConfirmation;
   private readonly userMfa: SimCognitoUserMfa;
+  private readonly reset: SimCognitoUserPasswordReset;
   private readonly federatedIdentity: SimCognitoFederatedIdentity | undefined;
   private userStatus: SimCognitoUserStatus;
   private userPassword: SimCognitoUserPassword | undefined;
@@ -72,6 +74,19 @@ export class SimCognitoUser {
     this.modifiedDate = this.creationDate;
     this.userMfa = new SimCognitoUserMfa({
       attributes: this.userAttributes.values,
+      changed: (): void => {
+        this.touch();
+      },
+    });
+    this.reset = new SimCognitoUserPasswordReset({
+      confirmation: this.confirmation,
+      status: (): SimCognitoUserStatus => this.userStatus,
+      moved: (status): void => {
+        this.moveTo(status);
+      },
+      chosen: (password): void => {
+        this.setPassword(password, true);
+      },
       changed: (): void => {
         this.touch();
       },
@@ -113,7 +128,7 @@ export class SimCognitoUser {
   get attributes(): readonly SimCognitoAttributeType[] {
     return [
       { Name: "sub", Value: this.sub },
-      ...this.identityAttribute(),
+      ...(this.federatedIdentity?.attributes() ?? []),
       ...this.userAttributes.entries,
     ];
   }
@@ -140,12 +155,13 @@ export class SimCognitoUser {
   }
 
   /**
-   * The confirmation code this user has outstanding, if it has one.
+   * The code this user has outstanding, if it has one.
    *
    * Real Cognito sends the code to the user and never reports it back. Nothing
    * here delivers a message, so a test reads the code from the pool instead,
-   * which is the divergence that makes a sign-up flow testable at all. A
-   * confirmed user has none: a code is single use, and confirming spends it.
+   * which is the divergence that makes a sign-up flow testable at all. A user
+   * with nothing outstanding has none: a code settles one sign-up or one
+   * password reset, and settling it spends it.
    */
   get confirmationCode(): string | undefined {
     return this.confirmation.code;
@@ -158,6 +174,14 @@ export class SimCognitoUser {
    */
   get mfa(): SimCognitoUserMfa {
     return this.userMfa;
+  }
+
+  /**
+   * The password reset this user can go through, which is what a forgotten
+   * password is replaced by and what an administrator can force.
+   */
+  get passwordReset(): SimCognitoUserPasswordReset {
+    return this.reset;
   }
 
   /**
@@ -256,30 +280,16 @@ export class SimCognitoUser {
   }
 
   /**
-   * Move the user to a status, and let its confirmation follow.
+   * Move the user to a status, and let the code it holds follow.
    *
-   * A code confirms one sign-up and no more, so it goes as soon as the user
-   * leaves `UNCONFIRMED`, whether it was `ConfirmSignUp` or an admin setting a
-   * permanent password that took it there.
+   * A code settles one thing and no more, so it goes as soon as the user
+   * leaves the status that issued it, and a user an administrator has sent to
+   * `RESET_REQUIRED` is issued the one it resets with on the way in.
    */
   private moveTo(status: SimCognitoUserStatus): void {
     this.userStatus = status;
     this.confirmation.settle(status);
     this.touch();
-  }
-
-  /**
-   * The `identities` attribute a federated user reports, which a local user
-   * does not have at all.
-   */
-  private identityAttribute(): readonly SimCognitoAttributeType[] {
-    if (this.federatedIdentity === undefined) {
-      return [];
-    }
-
-    return [
-      { Name: "identities", Value: this.federatedIdentity.toAttributeValue() },
-    ];
   }
 
   private touch(): void {

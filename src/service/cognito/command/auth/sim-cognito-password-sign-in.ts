@@ -1,5 +1,6 @@
 import {
   requireSimCognitoConfirmed,
+  requireSimCognitoPasswordSet,
   requireSimCognitoSignIn,
   requireSimCognitoSignInUser,
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
@@ -86,6 +87,7 @@ export class SimCognitoPasswordSignIn {
 
     requireSimCognitoSignIn(user, parameters.require("PASSWORD"));
     requireSimCognitoConfirmed(user);
+    requireSimCognitoPasswordSet(user);
 
     if (user.status.mustChangePassword) {
       return this.challenge.issue({ pool, clientId: client.id, user });

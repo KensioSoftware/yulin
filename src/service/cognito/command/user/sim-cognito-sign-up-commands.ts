@@ -133,12 +133,15 @@ export class SimCognitoSignUpCommands {
 
     if (preSignUp.autoConfirmUser) {
       user.confirm();
-      await this.triggers.postConfirmation({
-        pool,
-        client,
-        user,
-        clientMetadata: input.ClientMetadata,
-      });
+      await this.triggers.postConfirmation(
+        SimCognitoTriggerOccasion.confirmSignUp,
+        {
+          pool,
+          client,
+          user,
+          clientMetadata: input.ClientMetadata,
+        },
+      );
     } else {
       await this.messenger.send({
         pool,
@@ -178,12 +181,15 @@ export class SimCognitoSignUpCommands {
     user.confirmSignUp(input.ConfirmationCode);
     user.verifyAttributes(pool.settings.autoVerifiedAttributes.names);
 
-    await this.triggers.postConfirmation({
-      pool,
-      client,
-      user,
-      clientMetadata: input.ClientMetadata,
-    });
+    await this.triggers.postConfirmation(
+      SimCognitoTriggerOccasion.confirmSignUp,
+      {
+        pool,
+        client,
+        user,
+        clientMetadata: input.ClientMetadata,
+      },
+    );
 
     return { $metadata: {} };
   }
@@ -248,11 +254,14 @@ export class SimCognitoSignUpCommands {
 
     user.confirm();
 
-    await this.triggers.postConfirmation({
-      pool,
-      user,
-      clientMetadata: input.ClientMetadata,
-    });
+    await this.triggers.postConfirmation(
+      SimCognitoTriggerOccasion.confirmSignUp,
+      {
+        pool,
+        user,
+        clientMetadata: input.ClientMetadata,
+      },
+    );
 
     return { $metadata: {} };
   }

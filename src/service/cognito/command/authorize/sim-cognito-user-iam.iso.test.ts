@@ -3,6 +3,7 @@ import {
   AdminInitiateAuthCommand,
   AdminGetUserCommand,
   AdminSetUserMFAPreferenceCommand,
+  AdminResetUserPasswordCommand,
   AdminSetUserPasswordCommand,
   CreateUserPoolCommand,
   ListUsersCommand,
@@ -187,6 +188,59 @@ describe("sim Cognito user IAM authorization", () => {
 
     // Then it is denied.
     assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("denies resetting a user's password without the permission", async () => {
+    // Given a Role allowed to read users but not to reset their passwords.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: "cognito-idp:AdminGetUser",
+      Resource: userPoolArn("*"),
+    });
+
+    // When that Role resets a user's password.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cognitoIdentityProvider().adminResetUserPassword(
+        new AdminResetUserPasswordCommand({
+          UserPoolId: userPoolId,
+          Username: "alice",
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is denied: the reset has an IAM action of its own.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("allows resetting a user's password with the permission", async () => {
+    // Given a Role allowed to reset passwords and read users.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: [
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminResetUserPassword",
+      ],
+      Resource: userPoolArn("*"),
+    });
+    const cognito = simAws.cognitoIdentityProvider();
+
+    // When that Role resets a user's password.
+    await cognito.adminResetUserPassword(
+      new AdminResetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+      }),
+      { caller },
+    );
+
+    // Then the user is waiting to set another one.
+    const read = await cognito.adminGetUser(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+      { caller },
+    );
+
+    assertIdentical(read.UserStatus, "RESET_REQUIRED");
   });
 
   it("denies setting a user's MFA preference without the permission", async () => {

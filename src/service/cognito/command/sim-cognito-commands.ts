@@ -23,6 +23,7 @@ import { SimCognitoGroupMembershipCommands } from "./group/sim-cognito-group-mem
 import { SimCognitoListGroups } from "./group/sim-cognito-list-groups.js";
 import { SimCognitoUserPoolClientCommands } from "./client/sim-cognito-user-pool-client-commands.js";
 import { SimCognitoListUsers } from "./user/sim-cognito-list-users.js";
+import { SimCognitoPasswordResetCommands } from "./user/sim-cognito-password-reset-commands.js";
 import { SimCognitoSignUpCommands } from "./user/sim-cognito-sign-up-commands.js";
 import { SimCognitoTokenUser } from "./user/sim-cognito-token-user.js";
 import { SimCognitoUserCommands } from "./user/sim-cognito-user-commands.js";
@@ -58,6 +59,7 @@ export class SimCognitoCommands {
   public readonly users: SimCognitoUserCommands;
   public readonly userMfa: SimCognitoUserMfaCommands;
   public readonly signUp: SimCognitoSignUpCommands;
+  public readonly passwordReset: SimCognitoPasswordResetCommands;
   public readonly userUpdates: SimCognitoUserUpdateCommands;
   public readonly listUsers: SimCognitoListUsers;
   public readonly groups: SimCognitoGroupCommands;
@@ -123,6 +125,12 @@ export class SimCognitoCommands {
       authResolver,
       resolver,
       userFactory,
+      triggers,
+      messenger,
+    });
+    this.passwordReset = new SimCognitoPasswordResetCommands({
+      authResolver,
+      resolver,
       triggers,
       messenger,
     });

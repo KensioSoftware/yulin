@@ -5,9 +5,9 @@ which exchange a token for AWS credentials, are a separate service and are not s
 
 The pool, the app client, the users and groups in it, self-service sign-up, the second factors a
 user registers, the sign-in flows on both sides of the API, the domain and identity providers a
-federated sign-in runs through, the messages it would have sent, the tokens it issues and the
-authorizer are all here. SRP, managed login's own pages, password resets and device tracking are
-not.
+federated sign-in runs through, the password reset a user goes through when it cannot sign in, the
+messages it would have sent, the tokens it issues and the authorizer are all here. SRP, managed
+login's own pages and device tracking are not.
 
 ## Entry points
 
@@ -80,8 +80,8 @@ ARN of its own.
 `SimCognitoPasswordPolicy` applies the defaults real Cognito applies when a request says nothing:
 eight characters, with an uppercase letter, a lowercase letter, a number and a symbol each required.
 `SimCognitoPasswordCheck` is what applies it to a password. The two are separate because the policy
-is part of the pool's state and the checking is not, and because both `AdminCreateUser` and
-`AdminSetUserPassword` need the same check.
+is part of the pool's state and the checking is not, and because `AdminCreateUser`,
+`AdminSetUserPassword` and `ConfirmForgotPassword` all need the same check.
 
 `SimCognitoExplicitAuthFlows` validates the authentication flows an app client supports. The values
 are checked rather than stored as written, because a typo in a flow name would otherwise turn into a
@@ -134,11 +134,19 @@ against the pool's policy when it is set, and held as a `SimCognitoUserPassword`
 whether a candidate matches and exposes nothing, the same modelling choice simulated KMS key
 material makes.
 
-`SimCognitoUserStatus` holds the three statuses this simulation can reach, and the transitions
-between them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent
-password reaches `CONFIRMED`. `SignUp` leaves a user in `UNCONFIRMED`, and `ConfirmSignUp`,
-`AdminConfirmSignUp` or a permanent password reaches `CONFIRMED` from there. The rest of the real
-statuses belong to password resets and federation, neither of which is simulated.
+`SimCognitoUserStatus` holds the statuses this simulation can reach, and the transitions between
+them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent password
+reaches `CONFIRMED`. `SignUp` leaves a user in `UNCONFIRMED`, and `ConfirmSignUp`,
+`AdminConfirmSignUp` or a permanent password reaches `CONFIRMED` from there.
+`AdminResetUserPassword` leaves a user in `RESET_REQUIRED`, and `ConfirmForgotPassword` is the way
+out. `ARCHIVED`, `COMPROMISED` and `UNKNOWN` belong to threat protection and to retired accounts. Neither
+is simulated.
+
+`SimCognitoUserPasswordReset` under `user-pool/user/` is the reset one user can go through. It
+issues the code, checks the code and moves the user, working through callbacks the user hands it,
+the way `SimCognitoUserMfa` does. The code it issues is the one `SimCognitoUserConfirmation` holds,
+because a user has one code outstanding at a time and a reset code and a sign-up code are the same
+six digits.
 
 `SimCognitoUserMfa` under `user-pool/user/mfa/` is the second factors one user has registered: the
 software token secret it is registering, the one it has registered, which factors are enabled and
@@ -153,9 +161,10 @@ authenticator library handed the `SecretCode` produces codes this accepts, and a
 registration is refused. A code either side of the current thirty-second step is accepted, which is
 what stops a code computed a moment before the request being refused for crossing a step boundary.
 
-`SimCognitoConfirmationCode` is the six-digit code a signed-up user is issued. A user gets one when
-it is constructed `UNCONFIRMED`, spends it when it leaves that status, and `ResendConfirmationCode`
-replaces it with another rather than sending the same one again. The code is readable, through
+`SimCognitoConfirmationCode` is the six-digit code a user is issued. A user gets one when it is
+constructed `UNCONFIRMED` and when it is moved to `RESET_REQUIRED`, spends it when it leaves that
+status, and `ResendConfirmationCode` and `ForgotPassword` each replace it with another rather than
+sending the same one again. The code is readable, through
 `SimCognitoUserPool.confirmationCode`, which real Cognito never allows: nothing here delivers a
 message, so a test would otherwise have nowhere to read it from. That accessor is the one place this
 simulation knowingly tells a caller something real Cognito would not.
@@ -408,9 +417,10 @@ its request set.
 
 `AccountRecoverySetting` is read rather than compared. `SimCfnCognitoAccountRecovery` parses the
 template's mechanisms and `SimCognitoAccountRecovery` holds them on the pool, refusing a setting
-outside the shape Cognito states for it. Nothing reads them back out: there is no `ForgotPassword` here, so the
-refusal that would have to choose a mechanism has nowhere to live yet, and the pool records what it
-was asked for so a described pool reports it.
+outside the shape Cognito states for it. Nothing reads them back out. `ForgotPassword` picks its
+destination from the pool's `AutoVerifiedAttributes` (the address a sign-up code goes to), leaving
+the mechanisms a pool ranked with nothing to decide. The pool records what it was asked for, and a
+described pool reports it.
 
 `UserPoolName` and `ClientName` are both optional, and a CDK `UserPool` construct emits neither,
 while both creation Commands require a name. `SimCfnCognitoGeneratedName` generates one from the
@@ -588,8 +598,9 @@ command instances.
   actions no resource-level permissions, so a policy naming individual pool ARNs grants nothing.
 
 `InitiateAuth`, `RespondToAuthChallenge`, `GlobalSignOut`, `SignUp`, `ConfirmSignUp`,
-`ResendConfirmationCode`, `GetUser`, `AssociateSoftwareToken`, `VerifySoftwareToken` and
-`SetUserMFAPreference` authorize nothing, and read no caller. What the last four and `GlobalSignOut`
+`ResendConfirmationCode`, `ForgotPassword`, `ConfirmForgotPassword`, `GetUser`,
+`AssociateSoftwareToken`, `VerifySoftwareToken` and `SetUserMFAPreference` authorize nothing, and
+read no caller. What the last four and `GlobalSignOut`
 do check is the access token's own scope, in `requireSimCognitoSelfService`: real Cognito refuses an
 operation a user performs on itself unless the token carries
 `aws.cognito.signin.user.admin`, which a hosted sign-in has only where the app client asked for it. Real Cognito evaluates no IAM policy
@@ -614,8 +625,14 @@ resource, here or on real AWS.
   record and the wrong one.
 - A confirmation code never expires, where a real one lasts 24 hours. `ResendConfirmationCode` is
   what replaces one.
-- `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword` are not implemented, so
-  `RESET_REQUIRED` is a status no user here reaches.
+- A reset code never expires either, where a real one lasts an hour. A second `ForgotPassword`
+  replaces it, and answering with it spends it. A spent code is refused as `ExpiredCodeException`.
+  That is what real Cognito calls one.
+- `ForgotPassword` sends its code to an attribute the pool verifies automatically, and refuses a
+  user with none. Real Cognito chooses by the pool's `AccountRecoverySetting`, which is held here
+  and read by nothing.
+- `ChangePassword` is not implemented. It is the signed-in user replacing a password it still
+  knows, which is a different flow from the reset.
 - A client-side sign-up operation naming a user the pool does not hold reports it, whatever the app
   client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
 - Every unsimulated `CreateUserPool`, `UpdateUserPool`, `CreateUserPoolClient` and

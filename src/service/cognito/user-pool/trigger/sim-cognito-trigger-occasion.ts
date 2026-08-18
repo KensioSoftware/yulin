@@ -47,6 +47,18 @@ export class SimCognitoTriggerOccasion {
   );
 
   /**
+   * A user reaching `CONFIRMED` by finishing a password reset.
+   *
+   * Real Cognito runs `PostConfirmation` for `ConfirmForgotPassword` as well
+   * as for a sign-up, under a source of its own, so a handler that creates a
+   * profile record on first confirmation can tell the two apart.
+   */
+  public static readonly confirmForgotPassword = new SimCognitoTriggerOccasion(
+    "PostConfirmation",
+    "PostConfirmation_ConfirmForgotPassword",
+  );
+
+  /**
    * A sign-in, before the user's password is checked.
    */
   public static readonly preAuthentication = new SimCognitoTriggerOccasion(
@@ -120,6 +132,18 @@ export class SimCognitoTriggerOccasion {
     );
 
   /**
+   * The code a user resetting a forgotten password is sent.
+   *
+   * `AdminResetUserPassword` reports this source too, because real Cognito has
+   * none of its own for the reset an administrator starts.
+   */
+  public static readonly customMessageForgotPassword =
+    new SimCognitoTriggerOccasion(
+      "CustomMessage",
+      "CustomMessage_ForgotPassword",
+    );
+
+  /**
    * The code a sign-in challenged for a second factor is sent.
    */
   public static readonly customMessageAuthentication =
@@ -158,6 +182,9 @@ export class SimCognitoTriggerOccasion {
       }
       case "Authentication": {
         return this.customMessageAuthentication;
+      }
+      case "ForgotPassword": {
+        return this.customMessageForgotPassword;
       }
     }
   }
