@@ -155,6 +155,101 @@ Which to reach for:
 Both go through the same authentication, routing and service code. A request answered one way is
 answered the same way the other.
 
+## Pointing an AWS SDK or the CLI at the simulation
+
+A served environment answers the general AWS service APIs on the same port it serves everything else. Give any AWS SDK, in any language, the server's own URL as its endpoint and it reaches the simulation.
+
+```typescript sim-serve-aws-api-endpoint
+/**
+ * Reaching simulated DynamoDB with an ordinary SDK client over a port.
+ */
+
+import {
+  CreateTableCommand,
+  DynamoDBClient,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import {
+  CreateAccessKeyCommand,
+  CreateUserCommand,
+  PutUserPolicyCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "widgets",
+    AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+// A served request is authorized as whoever signed it, so the client needs
+// credentials simulated IAM issued.
+const simIam = simAws.iam();
+await simIam.createUser(new CreateUserCommand({ UserName: "Widgets" }));
+await simIam.putUserPolicy(
+  new PutUserPolicyCommand({
+    UserName: "Widgets",
+    PolicyName: "WriteWidgets",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "dynamodb:*", Resource: "*" },
+    }),
+  }),
+);
+const created = await simIam.createAccessKey(
+  new CreateAccessKeyCommand({ UserName: "Widgets" }),
+);
+
+const srv = await serveSimAws({ simAws, port: 8787 });
+
+const client = new DynamoDBClient({
+  region: simAws.defaultRegionName,
+  endpoint: `http://localhost:${srv.port}`,
+  credentials: {
+    accessKeyId: created.AccessKey.AccessKeyId,
+    secretAccessKey: created.AccessKey.SecretAccessKey,
+  },
+});
+
+await client.send(
+  new PutItemCommand({
+    TableName: "widgets",
+    Item: { id: { S: "w1" } },
+  }),
+);
+
+await srv.close();
+```
+
+One endpoint URL covers every service. A client sends `Host: localhost:<port>` whichever service it is talking to, which leaves no hostname to route on. Routing is on the service and Region named in the request's SigV4 credential scope, and a client cannot change either without invalidating its signature.
+
+The same URL works for anything that speaks the AWS APIs, which includes the real `aws` CLI:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+export AWS_ACCESS_KEY_ID=<key from simulated IAM>
+export AWS_SECRET_ACCESS_KEY=<secret from simulated IAM>
+aws dynamodb put-item --table-name widgets --item '{"id":{"S":"w1"}}'
+```
+
+### Who a served request is
+
+Whoever signed it. The endpoint verifies the signature against simulated IAM and runs the operation as the principal behind the access key. An IAM policy applies exactly as it does in process, and an assumed-role session is authorized against the Role behind it.
+
+A request carrying no signature is anonymous and reaches nothing. In process an omitted caller means "whoever owns this simulation", and over a port the same default would hand administrator rights to anyone who could reach it.
+
+### Which services answer
+
+The services that speak the AWS JSON protocol: DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+
+A request to any other service is refused with `501 Not Implemented` and a body saying why. S3 and STS are the ones worth naming, since they speak REST-XML and Query. Simulated S3 still answers its own hostname-routed endpoints, covered above, and every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md).
+
 ## Stopping and restarting
 
 `close()` stops serving and lets go of everything Yulin was holding, leaving the process free to
@@ -658,3 +753,5 @@ it is without watch mode.
 - Simulated state is not carried across a restart. Seeding belongs in the setup script, so it runs
   again and local state stays the same as what tests and CI see.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
+- The served AWS service API covers the AWS JSON protocol only. A service speaking REST-XML, REST-JSON or Query (S3 and STS among them) is refused with `501 Not Implemented`, because reading one of those requests back into an operation needs that operation's schema.
+- A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

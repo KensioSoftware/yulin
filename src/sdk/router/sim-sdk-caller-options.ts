@@ -1,4 +1,4 @@
-import type { SimAwsPrincipal } from "../../service/aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../service/aws/caller/sim-aws-caller.js";
 import type { SimSdkCommandContext } from "./sim-sdk-command-router.type.js";
 
 /**
@@ -8,7 +8,7 @@ import type { SimSdkCommandContext } from "./sim-sdk-command-router.type.js";
  * such as SimS3RequestOptions and SimDynamoDbRequestOptions.
  */
 export interface SimSdkCallerOptions {
-  readonly caller: SimAwsPrincipal;
+  readonly caller: SimAwsCaller;
 }
 
 /**

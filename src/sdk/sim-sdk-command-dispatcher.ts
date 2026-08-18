@@ -1,5 +1,8 @@
 import { SimAwsCallerResolver } from "../service/aws/caller/sim-aws-caller-resolver.js";
-import type { SimAwsPrincipal } from "../service/aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsPrincipal,
+} from "../service/aws/caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "../service/aws/caller/sim-aws-run-as-context.js";
 import type { SimAws } from "../service/aws/sim-aws.js";
 import {
@@ -28,11 +31,17 @@ export class SimSdkCommandDispatcher {
 
   /**
    * Route one intercepted SDK Command to a simulated service operation.
+   *
+   * A caller authenticated somewhere else, such as by the SigV4 signature on a
+   * served request, is passed in and takes precedence over the ambient one. It
+   * carries the identity whose policies apply alongside the principal the
+   * request is attributed to, which the ambient caller has no way to express.
    */
   async dispatch(
     command: object,
     client: unknown,
     commandNames: ReadonlySet<string> | undefined,
+    authenticatedCaller?: SimAwsCaller,
   ): Promise<unknown> {
     const commandName = command.constructor.name;
     if (commandNames !== undefined && !commandNames.has(commandName)) {
@@ -43,7 +52,7 @@ export class SimSdkCommandDispatcher {
     }
 
     const serviceId = simSdkClientServiceId(client);
-    const caller = this.ambientCaller();
+    const caller = authenticatedCaller ?? this.ambientCaller();
     const accountId = callerAccountId(caller) ?? this.simAws.defaultAccountId;
     const regionName = await simSdkClientRegionName(
       client,
@@ -84,12 +93,19 @@ export class SimSdkCommandDispatcher {
 
 /**
  * Resolve the AWS Account a caller belongs to, when it identifies one.
+ *
+ * Bare credentials name no Account without the IAM registry that would
+ * authenticate them, so they resolve to none here and the default Account
+ * applies, as it does for a Command sent with no caller at all.
  */
-function callerAccountId(
-  caller: SimAwsPrincipal | undefined,
-): string | undefined {
-  if (caller === undefined) {
+function callerAccountId(caller: SimAwsCaller | undefined): string | undefined {
+  if (caller === undefined || caller.kind === "credentials") {
     return undefined;
   }
-  return new SimAwsCallerResolver().resolve(caller, caller).accountId;
+
+  // The default principal is unreachable: a resolved caller carries its own,
+  // and a bare principal is its own.
+  const anonymous: SimAwsPrincipal = { kind: "anonymous" };
+
+  return new SimAwsCallerResolver().resolve(caller, anonymous).accountId;
 }

@@ -1,4 +1,4 @@
-import type { SimAwsPrincipal } from "../../service/aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../service/aws/caller/sim-aws-caller.js";
 
 /**
  * Minimal structural SDK Command shape as received by interception.
@@ -17,8 +17,13 @@ export interface SimSdkCommandContext {
    * Routes pass it through to the simulated service operation so IAM
    * authorization applies to the caller rather than the Account root
    * default.
+   *
+   * A caller authenticated elsewhere, such as the SigV4 signature on a served
+   * request, arrives already resolved and carries the identity whose policies
+   * apply alongside the principal the request is attributed to. An assumed-role
+   * session needs that split, because its session ARN owns no policies.
    */
-  readonly caller?: SimAwsPrincipal | undefined;
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**

@@ -2,6 +2,7 @@ import { SimAwsServiceControllerContainer } from "../controller/container/sim-aw
 import { SimAws } from "../../service/aws/sim-aws.js";
 import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
 import { isSimAwsRequestAuthFailure } from "../../service/iam/request/error/sim-aws-request-auth.error.js";
+import { SimAwsApiEndpoint } from "./api/sim-aws-api-endpoint.js";
 import { SimAwsRequestAuthenticator } from "./request/sim-aws-request-authenticator.js";
 import { SimAwsAuthFailureResponse } from "./response/sim-aws-auth-failure-response.js";
 import { SimAwsResponseHints } from "./response/sim-aws-response-hints.js";
@@ -17,6 +18,7 @@ export class SimAwsHttp {
   private readonly simAws: SimAws;
   private readonly controllers: SimAwsServiceControllerContainer;
   private readonly authenticator: SimAwsRequestAuthenticator;
+  private readonly apiEndpoint: SimAwsApiEndpoint;
   private readonly authFailureResponse = new SimAwsAuthFailureResponse();
   private readonly hints = new SimAwsResponseHints();
 
@@ -25,6 +27,7 @@ export class SimAwsHttp {
     this.simAws = simAws;
     this.controllers = new SimAwsServiceControllerContainer({ simAws });
     this.authenticator = new SimAwsRequestAuthenticator({ simAws });
+    this.apiEndpoint = new SimAwsApiEndpoint({ simAws });
   }
 
   /**
@@ -62,6 +65,13 @@ export class SimAwsHttp {
 
       const target = this.simAws.route53().resolveHttpHost(hostname);
       if (target === undefined) {
+        // A signed AWS API request names its service in its credential scope
+        // and needs no hostname to route on.
+        const apiResponse = await this.apiEndpoint.handle(request);
+        if (apiResponse !== undefined) {
+          return apiResponse;
+        }
+
         return new Response(`Unknown simulated AWS host ${hostname} \n`, {
           status: 501,
           headers: {

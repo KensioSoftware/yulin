@@ -1,3 +1,4 @@
+import type { SimAwsCaller } from "../../service/aws/caller/sim-aws-caller.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 import { SimSdkCommandDispatcher } from "../sim-sdk-command-dispatcher.js";
@@ -9,7 +10,6 @@ import { readSimSdkWireInput } from "./sim-sdk-wire-json.js";
 import {
   readSimSdkWireCredentialScope,
   readSimSdkWireOperation,
-  type SimSdkWireOperation,
 } from "./sim-sdk-wire-operation.js";
 import {
   simSdkWireErrorResponse,
@@ -56,44 +56,43 @@ export class SimSdkWireDispatcher {
    * it back into the exception the calling code expects to catch. Only a
    * request that cannot be routed at all is thrown, since there is no response
    * that would mean what happened.
+   *
+   * A caller is passed when something has already authenticated the request,
+   * as a served endpoint does by verifying its signature. Without one the
+   * ambient run-as caller applies, which is what a sim Lambda's outbound call
+   * relies on.
    */
-  async dispatch(request: SimSdkWireRequest): Promise<SimSdkWireResponse> {
+  async dispatch(
+    request: SimSdkWireRequest,
+    caller?: SimAwsCaller,
+  ): Promise<SimSdkWireResponse> {
     const operation = readSimSdkWireOperation(request);
     if (operation === undefined) {
       throw simSdkUnbridgedWireRequest(request);
     }
 
+    // The operation runs in the Region it was signed for or, unsigned, the
+    // Region of the code that sent it.
+    const scope = readSimSdkWireCredentialScope(request);
     const contentType = request.headers["content-type"];
+
     try {
-      return simSdkWireOutputResponse(
-        await this.route(request, operation),
-        contentType,
+      const output = await this.dispatcher.dispatch(
+        makeSimSdkWireCommand(
+          operation.commandName,
+          readSimSdkWireInput(request.body),
+        ),
+        makeSimSdkWireClient(
+          operation.serviceId,
+          scope?.regionName ?? this.regionName,
+        ),
+        undefined,
+        caller,
       );
+
+      return simSdkWireOutputResponse(output, contentType);
     } catch (error) {
       return simSdkWireErrorResponse(error, contentType);
     }
-  }
-
-  /**
-   * Route a request to the operation it names, in the Region it was signed
-   * for or, unsigned, the Region of the code that sent it.
-   */
-  private async route(
-    request: SimSdkWireRequest,
-    operation: SimSdkWireOperation,
-  ): Promise<unknown> {
-    const scope = readSimSdkWireCredentialScope(request);
-
-    return await this.dispatcher.dispatch(
-      makeSimSdkWireCommand(
-        operation.commandName,
-        readSimSdkWireInput(request.body),
-      ),
-      makeSimSdkWireClient(
-        operation.serviceId,
-        scope?.regionName ?? this.regionName,
-      ),
-      undefined,
-    );
   }
 }
