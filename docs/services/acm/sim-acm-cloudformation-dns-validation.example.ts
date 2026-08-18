@@ -44,4 +44,4 @@ await stack.waitForDeployComplete();
 
 // The hosted zone, the validation record and the issued certificate, from one
 // template deploy.
-console.log(stack.outputs.get("CertificateStatus")?.value); // ISSUED
+console.log(stack.output("CertificateStatus")); // ISSUED

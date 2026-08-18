@@ -1412,7 +1412,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("TaskDefinition")?.value);
+console.log(stack.output("TaskDefinition"));
 // "arn:aws:ecs:us-east-1:888888888888:task-definition/orders-worker:1"
 
 // Running a task from the deployed task definition runs the bound handler.
@@ -1585,9 +1585,9 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-console.log(stack.outputs.get("Service")?.value);
+console.log(stack.output("Service"));
 // "arn:aws:ecs:us-east-1:888888888888:service/orders/orders-worker"
-console.log(stack.outputs.get("ServiceName")?.value); // "orders-worker"
+console.log(stack.output("ServiceName")); // "orders-worker"
 
 const service = simAws.ecs().service("orders-worker", "orders");
 

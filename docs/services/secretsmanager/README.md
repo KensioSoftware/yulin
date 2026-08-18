@@ -420,7 +420,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 // Ref resolves to the ARN including its suffix, so it works as a SecretId.
-const secretArn = stack.outputs.get("DbSecretArn")?.value as string;
+const secretArn = stack.output("DbSecretArn");
 
 const read = await simAws
   .secretsManager()

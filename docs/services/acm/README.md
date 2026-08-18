@@ -629,7 +629,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
   },
 });
 
-const certificateArn = stack.outputs.get("CertificateArn")?.value;
+const certificateArn = stack.output("CertificateArn");
 if (typeof certificateArn !== "string")
   throw new Error("No CertificateArn Output");
 
@@ -643,7 +643,7 @@ const describeOutput = await simAws.acm().describeCertificate(
   }),
 );
 
-console.log(stack.outputs.get("CertificateStatus")?.value);
+console.log(stack.output("CertificateStatus"));
 console.log(listOutput.CertificateSummaryList?.[0]?.DomainName);
 console.log(describeOutput.Certificate?.Status);
 ```
@@ -701,7 +701,7 @@ await stack.waitForDeployComplete();
 
 // The hosted zone, the validation record and the issued certificate, from one
 // template deploy.
-console.log(stack.outputs.get("CertificateStatus")?.value); // ISSUED
+console.log(stack.output("CertificateStatus")); // ISSUED
 ```
 
 `HostedZoneId` accepts a `Ref` to an `AWS::Route53::HostedZone` in the same template, or the literal ID of a zone created outside the stack.

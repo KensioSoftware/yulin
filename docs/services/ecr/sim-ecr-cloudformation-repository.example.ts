@@ -28,7 +28,7 @@ const platformStack = await simAws.cloudFormation().deployTemplate({
 
 await platformStack.waitForDeployComplete();
 
-const repositoryUri = platformStack.outputs.get("RepositoryUri")?.value;
+const repositoryUri = platformStack.output("RepositoryUri");
 
 if (typeof repositoryUri !== "string") {
   throw new TypeError("No RepositoryUri Output");

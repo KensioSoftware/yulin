@@ -37,5 +37,5 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("HostedZoneId")?.value);
+console.log(stack.output("HostedZoneId"));
 console.log(stack.outputs.get("HostedZoneNameServers")?.value);

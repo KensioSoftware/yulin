@@ -71,8 +71,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("RoleArn")?.value);
-console.log(stack.outputs.get("PolicyArn")?.value);
+console.log(stack.output("RoleArn"));
+console.log(stack.output("PolicyArn"));
 
 const roleOut = await simAws.iam().getRole(
   new GetRoleCommand({

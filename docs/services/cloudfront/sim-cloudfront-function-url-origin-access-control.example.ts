@@ -129,7 +129,7 @@ try {
 
   await stack.waitForDeployComplete();
 
-  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const siteHostname = stack.output("SiteHostname");
   const greeting = await fetch(srv.localUrl(`http://${siteHostname}/greeting`));
 
   console.log(await greeting.text()); // Hello from behind CloudFront

@@ -57,9 +57,9 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-console.log(stack.outputs.get("Service")?.value);
+console.log(stack.output("Service"));
 // "arn:aws:ecs:us-east-1:888888888888:service/orders/orders-worker"
-console.log(stack.outputs.get("ServiceName")?.value); // "orders-worker"
+console.log(stack.output("ServiceName")); // "orders-worker"
 
 const service = simAws.ecs().service("orders-worker", "orders");
 

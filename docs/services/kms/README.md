@@ -569,7 +569,7 @@ const decrypted = await kms.decrypt(
 );
 
 console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter2"
-console.log(stack.outputs.get("KeyArn")?.value); // "arn:aws:kms:...:key/..."
+console.log(stack.output("KeyArn")); // "arn:aws:kms:...:key/..."
 ```
 
 A property asking for behaviour Yulin leaves out still deploys. The key is created without it, and

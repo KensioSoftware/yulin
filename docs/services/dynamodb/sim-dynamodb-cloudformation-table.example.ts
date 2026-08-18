@@ -32,7 +32,7 @@ await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
 // Ref resolves to the table name, so it works as a PutItem TableName.
-const tableName = stack.outputs.get("OrdersTableName")?.value as string;
+const tableName = stack.output("OrdersTableName");
 
 console.log(tableName);
 // "orders-stack-OrdersTable"
@@ -43,5 +43,5 @@ await simAws
     new PutItemCommand({ TableName: tableName, Item: { id: { S: "1" } } }),
   );
 
-console.log(stack.outputs.get("OrdersTableArn")?.value);
+console.log(stack.output("OrdersTableArn"));
 // "arn:aws:dynamodb:us-east-1:888888888888:table/orders-stack-OrdersTable"

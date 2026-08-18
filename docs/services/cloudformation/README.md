@@ -597,10 +597,10 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("AlarmRef")?.value);
+console.log(stack.output("AlarmRef"));
 // "AlarmRule"
 
-console.log(stack.outputs.get("AlarmArn")?.value);
+console.log(stack.output("AlarmArn"));
 // "AlarmRule.Arn"
 
 for (const skipped of stack.skippedResources) {
@@ -1718,6 +1718,63 @@ different AWS-like scoping behaviour.
 An Account ID can always be written as a plain string, as above. Code that wants to name the type
 can get a `SimAwsAccountId` from `simAwsAccountId("111111111111")`, which refuses anything other than
 a 12-digit AWS Account ID.
+
+## Reading stack Outputs
+
+A deployed stack resolves its template `Outputs` once its resources exist. `stack.output(key)`
+answers one of them as a string.
+
+```typescript sim-cloudformation-stack-output
+/**
+ * Reading a resolved Stack Output as a string.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "output-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "output-site-bucket",
+        },
+      },
+    },
+    Outputs: {
+      SiteBucketName: {
+        Description: "The bucket the site is served from",
+        Value: {
+          Ref: "SiteBucket",
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const bucketName = stack.output("SiteBucketName");
+
+console.log(bucketName); // "output-site-bucket"
+```
+
+`output` throws where the template declares no such Output, naming the stack, the key asked for and
+the keys it does declare. It throws again where the Output resolved to something other than a
+string, since `DescribeStacks` types an `OutputValue` as a string and a template's Output `Value` is
+a string field.
+
+`stack.outputs` holds every resolved Output whole, keyed by name, and is where to go for the
+description, the export name, or a value that is not a string. Yulin resolves a few attributes as
+the lists and booleans they are, and `Fn::GetAtt` on `AWS::Route53::HostedZone` `NameServers` is the
+one that reaches an Output in these docs.
+
+```typescript
+const nameServers = stack.outputs.get("HostedZoneNameServers")?.value;
+```
 
 ## Inspecting stacks and resources
 

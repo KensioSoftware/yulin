@@ -105,7 +105,7 @@ try {
     }),
   );
 
-  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const siteHostname = stack.output("SiteHostname");
   const home = await fetch(srv.localUrl(`http://${siteHostname}/`));
 
   console.log(await home.text()); // <h1>Home</h1>

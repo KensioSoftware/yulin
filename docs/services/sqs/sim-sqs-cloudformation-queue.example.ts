@@ -35,7 +35,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 // Ref resolves to the queue URL, so it works as a SendMessage QueueUrl.
-const queueUrl = stack.outputs.get("OrdersQueueUrl")?.value as string;
+const queueUrl = stack.output("OrdersQueueUrl");
 
 await simAws
   .sqs()
@@ -43,5 +43,5 @@ await simAws
     new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
   );
 
-console.log(stack.outputs.get("OrdersQueueArn")?.value);
+console.log(stack.output("OrdersQueueArn"));
 // "arn:aws:sqs:us-east-1:888888888888:orders"

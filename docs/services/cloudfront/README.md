@@ -1073,8 +1073,7 @@ try {
     }),
   );
 
-  const domainName = stack.outputs.get("DistributionDomainName")
-    ?.value as string;
+  const domainName = stack.output("DistributionDomainName");
   const response = await fetch(srv.localUrl(`http://${domainName}/`));
 
   console.log(response.headers.get("cache-control"));
@@ -1255,7 +1254,7 @@ try {
     }),
   );
 
-  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const siteHostname = stack.output("SiteHostname");
   const home = await fetch(srv.localUrl(`http://${siteHostname}/`));
 
   console.log(await home.text()); // <h1>Home</h1>
@@ -1436,7 +1435,7 @@ try {
 
   await stack.waitForDeployComplete();
 
-  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const siteHostname = stack.output("SiteHostname");
   const greeting = await fetch(srv.localUrl(`http://${siteHostname}/greeting`));
 
   console.log(await greeting.text()); // Hello from behind CloudFront

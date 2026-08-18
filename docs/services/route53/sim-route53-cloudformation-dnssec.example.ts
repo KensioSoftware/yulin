@@ -45,7 +45,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 await stack.waitForDeployComplete();
 
-const hostedZoneId = stack.outputs.get("ZoneId")?.value;
+const hostedZoneId = stack.output("ZoneId");
 
 if (typeof hostedZoneId !== "string") {
   throw new TypeError("The stack did not output a hosted zone ID");
