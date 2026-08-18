@@ -8,6 +8,11 @@ import type {
   SimAssumeRoleCommandOutput,
 } from "./command/assume-role/assume-role.command.js";
 import { AssumeRoleCommandHandler } from "./command/assume-role/assume-role.handler.js";
+import type {
+  SimGetCallerIdentityCommand,
+  SimGetCallerIdentityCommandOutput,
+} from "./command/get-caller-identity/get-caller-identity.command.js";
+import { GetCallerIdentityCommandHandler } from "./command/get-caller-identity/get-caller-identity.handler.js";
 import { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
@@ -55,6 +60,23 @@ export class SimSts {
       iamResolver: this.iamResolver,
       background: this.background,
     });
+    return await handler.handle(command, options);
+  }
+
+  /**
+   * Handle a GetCallerIdentityCommand from the SDK.
+   */
+  async getCallerIdentity(
+    command: SimGetCallerIdentityCommand,
+    options?: {
+      caller?: SimAwsCaller;
+    },
+  ): Promise<SimGetCallerIdentityCommandOutput> {
+    const handler = new GetCallerIdentityCommandHandler({
+      sourceAccountId: this.accountRegionScope.accountId,
+      iamResolver: this.iamResolver,
+    });
+
     return await handler.handle(command, options);
   }
 

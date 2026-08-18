@@ -246,9 +246,27 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-S3, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, STS, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
-A request to any other service is refused with `501 Not Implemented` and a body saying why. STS is the one worth naming, since it speaks the Query protocol. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
+A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
+
+### Checking who the simulator thinks you are
+
+`sts get-caller-identity` reports the principal behind the credentials that signed the request, which is the quickest way to confirm an endpoint and a set of credentials are wired up as expected:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws sts get-caller-identity
+{
+    "UserId": "AIDAM7J2TJYHV8BHEVIO",
+    "Account": "888888888888",
+    "Arn": "arn:aws:iam::888888888888:user/Widgets"
+}
+```
+
+An assumed-role session reports its own session ARN, as it does in real AWS, and its user id joins the Role's id to the session name. A caller with no identity is refused, since there is nothing to answer with.
+
+`GetCallerIdentity` is the only STS operation served. `AssumeRole` works in process and through SDK interception.
 
 ### S3 over the endpoint
 
@@ -779,7 +797,8 @@ it is without watch mode.
 - Simulated state is not carried across a restart. Seeding belongs in the setup script, so it runs
   again and local state stays the same as what tests and CI see.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
-- The served AWS service API covers S3 and the AWS JSON protocol services. A service speaking REST-JSON or Query, STS among them, is refused with `501 Not Implemented`.
+- The served AWS service API covers S3, STS and the AWS JSON protocol services. A service speaking REST-JSON, or Query other than STS, is refused with `501 Not Implemented`.
+- `GetCallerIdentity` is the only STS operation served. `AssumeRole` over a port would mean the temporary credentials it issues have to sign the calls that follow, which is its own piece of work.
 - `aws s3 ls` with no Bucket fails, because simulated S3 records no creation date for a Bucket and the CLI reads one from every entry. `aws s3api list-buckets` and `aws s3 ls s3://bucket/` both work.
 - Simulated S3 implements no `HeadObject` or `HeadBucket`, so both are refused. `aws s3 cp` reads an Object with `HeadObject` before copying it, which puts that out of reach too.
 - A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

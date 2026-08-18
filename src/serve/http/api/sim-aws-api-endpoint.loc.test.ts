@@ -18,7 +18,7 @@ import {
   ListQueuesCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
+import { LambdaClient, ListFunctionsCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
   assertStringIncludes,
@@ -244,18 +244,18 @@ describe("Serving the general AWS API on one endpoint", () => {
   });
 
   it("refuses a protocol it cannot read without asking the client to retry", async () => {
-    // Given a request signed for STS, which speaks the Query protocol rather
-    // than the AWS JSON protocol this endpoint reads
-    const client = new STSClient({
+    // Given a request signed for the Lambda control plane, which speaks
+    // REST-JSON rather than any protocol this endpoint reads
+    const client = new LambdaClient({
       region: simAws.defaultRegionName,
       endpoint,
       credentials,
       maxAttempts: 1,
     });
 
-    // When it asks for something only the Query protocol could express
+    // When it asks for something only REST-JSON could express
     const error = await assertThrowsErrorAsync(
-      async () => await client.send(new GetCallerIdentityCommand({})),
+      async () => await client.send(new ListFunctionsCommand({})),
     );
 
     // Then it is refused as unimplemented, which an SDK does not retry, and

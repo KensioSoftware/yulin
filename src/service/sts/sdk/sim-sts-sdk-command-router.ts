@@ -4,6 +4,7 @@ import {
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.command.js";
+import type { SimGetCallerIdentityCommand } from "../command/get-caller-identity/get-caller-identity.command.js";
 import type { SimSts } from "../sim-sts.js";
 
 /**
@@ -14,6 +15,14 @@ export class SimStsSdkCommandRouter implements SimSdkCommandRouter {
 
   constructor(simSts: SimSts) {
     this.routes = new Map<string, SimSdkCommandRoute>([
+      [
+        "GetCallerIdentityCommand",
+        async (command, context): Promise<unknown> =>
+          await simSts.getCallerIdentity(
+            command as SimGetCallerIdentityCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
       [
         "AssumeRoleCommand",
         async (command, context): Promise<unknown> =>
