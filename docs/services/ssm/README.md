@@ -351,7 +351,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 // Ref resolves to the parameter name, so it works as a GetParameter Name.
-const parameterName = stack.outputs.get("DbHostParameter")?.value as string;
+const parameterName = stack.output("DbHostParameter");
 
 const read = await simAws
   .ssm()

@@ -60,8 +60,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("FunctionName")?.value);
-console.log(stack.outputs.get("FunctionArn")?.value);
+console.log(stack.output("FunctionName"));
+console.log(stack.output("FunctionArn"));
 
 const output = await simAws.lambda().invoke(
   new InvokeCommand({

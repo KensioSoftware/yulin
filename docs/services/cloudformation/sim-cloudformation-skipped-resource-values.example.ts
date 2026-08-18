@@ -23,10 +23,10 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("AlarmRef")?.value);
+console.log(stack.output("AlarmRef"));
 // "AlarmRule"
 
-console.log(stack.outputs.get("AlarmArn")?.value);
+console.log(stack.output("AlarmArn"));
 // "AlarmRule.Arn"
 
 for (const skipped of stack.skippedResources) {

@@ -61,7 +61,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 
 // Ref on a topic resolves to its ARN, so it works as a Publish TopicArn.
-const topicArn = stack.outputs.get("OrdersTopicArn")?.value as string;
+const topicArn = stack.output("OrdersTopicArn");
 
 await simAws
   .sns()
@@ -70,7 +70,7 @@ await simAws
 // Delivery happens after the publish is answered, as it does on real SNS.
 await simAws.backgroundTasksComplete();
 
-const QueueUrl = stack.outputs.get("FulfilmentQueueUrl")?.value as string;
+const QueueUrl = stack.output("FulfilmentQueueUrl");
 const { Messages } = await simAws
   .sqs()
   .receiveMessage(new ReceiveMessageCommand({ QueueUrl }));

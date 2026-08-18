@@ -50,11 +50,11 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 await stack.waitForDeployComplete();
 
-const userPoolId = stack.outputs.get("UserPoolId")?.value as string;
-const clientId = stack.outputs.get("ClientId")?.value as string;
+const userPoolId = stack.output("UserPoolId");
+const clientId = stack.output("ClientId");
 
 console.log(userPoolId); // "eu-west-2_aBcDeFgHi"
-console.log(stack.outputs.get("ProviderUrl")?.value);
+console.log(stack.output("ProviderUrl"));
 // "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_aBcDeFgHi"
 
 // The deployed pool, client and group are what the test then works with.

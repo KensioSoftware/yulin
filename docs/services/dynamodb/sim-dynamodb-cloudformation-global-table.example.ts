@@ -38,7 +38,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-const tableName = stack.outputs.get("OrdersTableName")?.value as string;
+const tableName = stack.output("OrdersTableName");
 
 console.log(tableName);
 // "orders"

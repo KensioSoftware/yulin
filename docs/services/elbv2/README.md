@@ -1528,10 +1528,10 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-const dnsName = stack.outputs.get("DnsName")?.value as string;
+const dnsName = stack.output("DnsName");
 
 console.log(dnsName); // "shop-alb-0000000001.us-east-1.elb.amazonaws.com"
-console.log(stack.outputs.get("FullName")?.value);
+console.log(stack.output("FullName"));
 // "app/shop-alb/0000000001"
 
 const claimed = await simElbV2Fetch(simAws, `http://${dnsName}/checkout/42`);
@@ -1623,7 +1623,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-const listenerArn = stack.outputs.get("ListenerArn")?.value as string;
+const listenerArn = stack.output("ListenerArn");
 
 const described = await simAws
   .elbV2()

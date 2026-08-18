@@ -1803,7 +1803,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 // https://<api-id>.execute-api.us-east-1.amazonaws.com
-const apiEndpoint = stack.outputs.get("ApiEndpoint")?.value as string;
+const apiEndpoint = stack.output("ApiEndpoint");
 
 const srv = await serveSimAws({ simAws });
 

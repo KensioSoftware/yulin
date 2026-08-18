@@ -58,7 +58,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 await stack.waitForDeployComplete();
 
-const functionUrl = stack.outputs.get("GreeterFunctionUrl")?.value as string;
+const functionUrl = stack.output("GreeterFunctionUrl");
 const srv = await serveSimAws({ simAws });
 
 try {

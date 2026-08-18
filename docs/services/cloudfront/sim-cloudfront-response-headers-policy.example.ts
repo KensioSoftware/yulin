@@ -100,8 +100,7 @@ try {
     }),
   );
 
-  const domainName = stack.outputs.get("DistributionDomainName")
-    ?.value as string;
+  const domainName = stack.output("DistributionDomainName");
   const response = await fetch(srv.localUrl(`http://${domainName}/`));
 
   console.log(response.headers.get("cache-control"));

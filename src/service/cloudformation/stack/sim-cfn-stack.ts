@@ -16,6 +16,7 @@ import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operatio
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
+import { SimCfnStackOutputLookup } from "./output/sim-cfn-stack-output-lookup.js";
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
 import { SimCfnStackOperationStatus } from "./status/sim-cfn-stack-operation-status.js";
 import { validateSimCfnExecutableResourceBindings } from "../bind/validate/sim-cfn-exec-binding-validator.js";
@@ -226,6 +227,24 @@ export class SimCfnStack {
    */
   getResource(logicalId: string): SimCfnResource | undefined {
     return new SimCfnStackResourceLookup(this.resources).find(logicalId);
+  }
+
+  /**
+   * Get one Stack Output's resolved value, as the string it is.
+   *
+   * The `outputs` map holds every resolved Output whole, including its
+   * description and its export name, typed as the union a parsed template can
+   * hold. A caller after the value alone wants the string CloudFormation would
+   * have answered with, and this hands it over already narrowed.
+   *
+   * An Output the template never declared throws, as does one that resolved to
+   * something other than a string.
+   */
+  output(outputKey: string): string {
+    return new SimCfnStackOutputLookup({
+      stackName: this.stackName,
+      outputs: this.outputs,
+    }).value(outputKey);
   }
 
   /** Resources skipped because their sim implementation is not available. */

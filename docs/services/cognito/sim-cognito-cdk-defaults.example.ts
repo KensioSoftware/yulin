@@ -53,7 +53,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 });
 await stack.waitForDeployComplete();
 
-const userPoolId = stack.outputs.get("PoolId")?.value as string;
+const userPoolId = stack.output("PoolId");
 
 // The pool is named after the stack and the logical id, as the template named
 // neither it nor the client.

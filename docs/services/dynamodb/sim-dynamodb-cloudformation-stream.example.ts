@@ -42,7 +42,7 @@ await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
 // The Output holds the ARN of the stream the deployed table captures on.
-const streamArn = stack.outputs.get("OrdersStreamArn")?.value as string;
+const streamArn = stack.output("OrdersStreamArn");
 
 console.log(streamArn.includes("/stream/")); // true
 

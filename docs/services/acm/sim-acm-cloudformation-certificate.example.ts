@@ -51,7 +51,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
   },
 });
 
-const certificateArn = stack.outputs.get("CertificateArn")?.value;
+const certificateArn = stack.output("CertificateArn");
 if (typeof certificateArn !== "string")
   throw new Error("No CertificateArn Output");
 
@@ -65,6 +65,6 @@ const describeOutput = await simAws.acm().describeCertificate(
   }),
 );
 
-console.log(stack.outputs.get("CertificateStatus")?.value);
+console.log(stack.output("CertificateStatus"));
 console.log(listOutput.CertificateSummaryList?.[0]?.DomainName);
 console.log(describeOutput.Certificate?.Status);

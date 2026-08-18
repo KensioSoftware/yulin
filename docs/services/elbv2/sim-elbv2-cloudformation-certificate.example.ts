@@ -70,7 +70,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 await simAws.backgroundTasksComplete();
 
-const listenerArn = stack.outputs.get("ListenerArn")?.value as string;
+const listenerArn = stack.output("ListenerArn");
 
 const described = await simAws
   .elbV2()

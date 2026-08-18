@@ -55,7 +55,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("TaskDefinition")?.value);
+console.log(stack.output("TaskDefinition"));
 // "arn:aws:ecs:us-east-1:888888888888:task-definition/orders-worker:1"
 
 // Running a task from the deployed task definition runs the bound handler.
