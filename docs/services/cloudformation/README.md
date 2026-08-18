@@ -1756,6 +1756,51 @@ console.log(bucketResource?.simResource);
 This is useful in tests when you want to assert that a specific template resource created the
 expected simulated service resource.
 
+### Looking a Resource up by CDK construct ID
+
+`getResource` takes the CDK construct ID as well as the synthesized logical ID. A construct named
+`UploadsBucket` synthesizes as `UploadsBucket9F8E7D6C`, and either name answers with that Resource.
+The construct ID is the identifier a [binding](#lambda-function-bindings) takes. A test that bound a
+handler by construct ID can ask the Stack what it bound, without reading the synthesized template
+for the hash.
+
+```typescript sim-cloudformation-construct-id-resource
+/**
+ * Finding a synthesized Resource by the CDK construct ID it came from.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "construct-id-stack",
+  template: {
+    Resources: {
+      // As CDK synthesizes it, with a hash on the logical ID and the construct
+      // path in Metadata.
+      UploadsBucket9F8E7D6C: {
+        Type: "AWS::S3::Bucket",
+        Metadata: {
+          "aws:cdk:path": "UploadsStack/UploadsBucket/Resource",
+        },
+        Properties: {
+          BucketName: "construct-id-uploads",
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.getResource("UploadsBucket")?.logicalId);
+// "UploadsBucket9F8E7D6C"
+```
+
+A logical ID that matches exactly is answered first. A template naming its own Resources resolves
+the way it always has. An identifier no Resource carries either way answers `undefined`.
+
 `stack.skippedResources` lists the Resources the deployment did not create. Each one carries a
 `skippedReason` saying why that Resource was skipped. A test that expected a resource to exist can
 find out why it is missing.

@@ -2,6 +2,7 @@ import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertArrayLength,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -9,6 +10,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimLambdaFunction } from "../function/sim-lambda-function.js";
 
 function parsePayload(payload: Uint8Array | undefined): unknown {
   assertNonNullable(payload);
@@ -161,7 +163,7 @@ describe("Lambda CloudFormation Function bindings", () => {
     const simAws = new SimAws();
 
     // When the template is deployed with the binding.
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "cdk-bound-stack",
       template: {
         Resources: {
@@ -188,11 +190,15 @@ describe("Lambda CloudFormation Function bindings", () => {
       ],
     });
 
-    // Then the bound handler backs the function created under the hashed
-    // logical ID.
+    // Then the Stack answers for the construct the binding named, and the
+    // bound handler backs the function it created, without the hash CDK
+    // appended being written down anywhere.
+    const reader = stack.getResource("ReaderFunction")?.simResource;
+    assertInstanceOf(reader, SimLambdaFunction);
+
     const output = await simAws
       .lambda()
-      .invoke(new InvokeCommand({ FunctionName: "ReaderFunction2A1B3C4D" }));
+      .invoke(new InvokeCommand({ FunctionName: reader.name }));
 
     assertIdentical(parsePayload(output.Payload), "bound via construct id");
 
