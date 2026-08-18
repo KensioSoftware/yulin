@@ -634,7 +634,8 @@ resource, here or on real AWS.
 - `ChangePassword` is not implemented. It is the signed-in user replacing a password it still
   knows, which is a different flow from the reset.
 - A client-side sign-up operation naming a user the pool does not hold reports it, whatever the app
-  client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
+  client's `PreventUserExistenceErrors` says. The sign-ins and the two password reset operations
+  honour the setting.
 - Every unsimulated `CreateUserPool`, `UpdateUserPool`, `CreateUserPoolClient` and
   `UpdateUserPoolClient` input is refused rather than ignored.
 - A pool created with `UsernameAttributes` stores a generated UUID as each user's username and

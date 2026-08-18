@@ -3708,7 +3708,8 @@ Current documented limitations:
 - `AutoVerifiedAttributes` is accepted at `email` and `phone_number`, and anything else is refused.
   Those are the two Cognito can send a code to.
 - `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool lacks whatever the app
-  client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
+  client's `PreventUserExistenceErrors` says. The sign-ins and the two password reset operations
+  honour the setting.
 - A reset code never expires either, where a real one lasts an hour. A second `ForgotPassword`
   replaces it, and answering with it spends it. A spent code is refused with `ExpiredCodeException`.
   That is what real Cognito calls a code it will no longer take.
