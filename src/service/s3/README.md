@@ -11,7 +11,11 @@ familiar AWS SDK command shapes, CloudFormation resources, and local HTTP reques
 
 ## Entry points
 
-- `sim-s3.ts` is the main in-memory S3 service object for one account/region scope.
+- `sim-s3.ts` is the main in-memory S3 service object for one account/region scope. It holds the
+  simulator-only controls, the members with no AWS equivalent. The endpoint and website URLs, the
+  Bucket lookups, the filesystem mounts, `configureMaxKeysPerPage` and `close` are all here.
+- `sim-s3-operations.ts` holds the AWS operations, one delegation per SDK Command. `SimS3` extends
+  it. A caller reaches both kinds on the one service object.
 - `index.ts` exports the public S3 simulator API for `@kensio/yulin/s3`.
 - `sim-s3-global-registry.ts` records Bucket ownership across account/region scopes inside one
   simulated AWS instance.
@@ -33,7 +37,7 @@ and integration with other simulated services.
 
 ## Service and Bucket state model
 
-`SimS3` owns a local map of buckets:
+`SimS3` builds a local map of buckets and hands it to the collaborators it constructs:
 
 - the map contains only buckets in that `SimS3` instance's account/region scope
 - each Bucket is represented by `SimS3Bucket`
@@ -45,7 +49,7 @@ simulated AWS instance: it is still encapsulated state and can be freely recreat
 
 Bucket creation updates both places:
 
-1. the account/region-local `SimS3.buckets` map
+1. the account/region-local Bucket map
 2. the shared `SimS3GlobalRegistry`
 
 This lets direct SDK-style operations use local Bucket state while HTTP routing and cross-service
@@ -61,8 +65,8 @@ Each supported command has its own directory containing:
 - a handler that validates input and applies state changes
 - tests for expected simulator behaviour
 
-The main `SimS3` class delegates command execution to handlers rather than keeping command logic
-inline. For example, `SimS3.putObject()` calls `commands.objects.put()`, which creates a
+`SimS3Operations` delegates command execution to handlers rather than keeping command logic inline.
+For example, `SimS3.putObject()` calls `commands.objects.put()`, which creates a
 `PutObjectCommandHandler` with the Bucket map and background scheduler, then calls `handle()`.
 
 Supported command areas currently include:
