@@ -3,6 +3,7 @@ import {
   xmlBoolean,
   xmlChild,
   xmlChildren,
+  xmlNumber,
   xmlText,
 } from "../../../../util/xml/xml-document.js";
 
@@ -27,6 +28,23 @@ export function readSimS3DeleteRequest(body: string): object {
       ...defined("Key", xmlText(object, "Key")),
     })),
     ...defined("Quiet", quiet),
+  };
+}
+
+/**
+ * Read a CompleteMultipartUpload body, which names the parts to join.
+ *
+ * A part carries the ETag its upload answered with, quotes and all, and the
+ * number it was uploaded under.
+ */
+export function readSimS3CompletedUpload(body: Uint8Array): object {
+  const root = parseXmlDocument(Buffer.from(body).toString("utf8"));
+
+  return {
+    Parts: xmlChildren(root, "Part").map((part) => ({
+      ...defined("PartNumber", xmlNumber(part, "PartNumber")),
+      ...defined("ETag", xmlText(part, "ETag")),
+    })),
   };
 }
 

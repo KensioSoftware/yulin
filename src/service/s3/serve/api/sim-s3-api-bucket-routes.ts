@@ -11,6 +11,7 @@ import {
   listObjectsInput,
   listObjectsV2Input,
 } from "./sim-s3-api-input.js";
+import { listMultipartUploadsInput } from "./sim-s3-api-multipart-input.js";
 import type { SimS3ApiRoute } from "./sim-s3-api-route.type.js";
 
 /**
@@ -52,6 +53,13 @@ export const simS3BucketApiRoutes: readonly SimS3ApiRoute[] = [
     subResource: "notification",
     commandName: "GetBucketNotificationConfigurationCommand",
     input: bucketInput,
+  },
+  {
+    method: "GET",
+    target: "bucket",
+    subResource: "uploads",
+    commandName: "ListMultipartUploadsCommand",
+    input: listMultipartUploadsInput,
   },
   {
     method: "GET",

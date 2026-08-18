@@ -62,17 +62,14 @@ describe("AWS::S3::Bucket NotificationConfiguration refusals", () => {
     const error = await deployFailing(simAws, {
       LambdaConfigurations: [
         {
-          Event: "s3:ObjectCreated:CompleteMultipartUpload",
+          Event: "s3:ObjectRestore:Completed",
           Function: { "Fn::GetAtt": ["Handler", "Arn"] },
         },
       ],
     });
 
     // Then the Stack fails with the command's own refusal.
-    assertStringIncludes(
-      error.message,
-      "s3:ObjectCreated:CompleteMultipartUpload",
-    );
+    assertStringIncludes(error.message, "s3:ObjectRestore:Completed");
 
     // And the Bucket the Resource would have created is not left behind.
     const stack = simAws.cloudFormation().getStackByName("uploads-stack");

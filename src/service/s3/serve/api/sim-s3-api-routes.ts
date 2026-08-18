@@ -16,6 +16,8 @@ const servedSubResources: readonly string[] = [
   "publicAccessBlock",
   "notification",
   "delete",
+  "uploads",
+  "uploadId",
 ];
 
 /**
@@ -51,7 +53,6 @@ const knownSubResources: ReadonlySet<string> = new Set([
   "select",
   "tagging",
   "torrent",
-  "uploads",
   "versioning",
   "versions",
 ]);

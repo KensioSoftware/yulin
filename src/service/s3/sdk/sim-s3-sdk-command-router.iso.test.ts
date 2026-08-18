@@ -273,7 +273,7 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 20);
+    assertArrayLength(supported, 26);
     assertArrayIncludes(supported, "GetObjectCommand");
     assertArrayIncludes(supported, "ListObjectsV2Command");
     assertArrayIncludes(supported, "DeleteBucketCommand");
@@ -286,6 +286,12 @@ describe("simulated S3 SDK Command routing", () => {
     assertArrayIncludes(supported, "PutPublicAccessBlockCommand");
     assertArrayIncludes(supported, "HeadObjectCommand");
     assertArrayIncludes(supported, "HeadBucketCommand");
+    assertArrayIncludes(supported, "CreateMultipartUploadCommand");
+    assertArrayIncludes(supported, "UploadPartCommand");
+    assertArrayIncludes(supported, "CompleteMultipartUploadCommand");
+    assertArrayIncludes(supported, "AbortMultipartUploadCommand");
+    assertArrayIncludes(supported, "ListMultipartUploadsCommand");
+    assertArrayIncludes(supported, "ListPartsCommand");
     assertUndefined(router.route("GetBucketAclCommand"));
   });
 

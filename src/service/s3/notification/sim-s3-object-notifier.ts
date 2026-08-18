@@ -48,12 +48,12 @@ export class SimS3ObjectNotifier {
   }
 
   /**
-   * Raise an Object creation.
+   * Raise an Object creation, as whichever kind of creation it was.
    */
   objectCreated(input: SimS3ObjectCreatedInput): void {
     this.schedule.matching(
       input.bucket,
-      "s3:ObjectCreated:Put",
+      input.eventName,
       input.object.key,
       () => this.events.forCreated(input),
     );

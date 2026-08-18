@@ -1,5 +1,6 @@
-import type { Readable } from "node:stream";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3WriteBody } from "../../object/s3-write-body.js";
+import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
 
 /**
  * Minimal structural sim S3 PutObject command.
@@ -11,23 +12,14 @@ export interface SimPutObjectCommand {
 /**
  * Minimal structural sim S3 PutObject input.
  *
- * The fields below `Metadata` are the system metadata headers S3 remembers
- * about an Object and returns on a read. There is one for every entry in
- * `simS3SystemMetadataHeaders`, which is what the builder reads them by, so a
- * header added to that list without a field here fails to compile. `Expires` is
- * a `Date` because the SDK takes one and formats it as an HTTP date.
+ * The metadata members it carries are the ones every write that describes an
+ * Object carries, which is why they are declared once in
+ * `SimS3ObjectWriteMetadata` and shared with `CreateMultipartUpload`.
  */
-export interface SimPutObjectCommandInput {
+export interface SimPutObjectCommandInput extends SimS3ObjectWriteMetadata {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   readonly Body?: SimPutObjectBody;
-  readonly Metadata?: Record<string, string> | undefined;
-  readonly CacheControl?: string | undefined;
-  readonly ContentDisposition?: string | undefined;
-  readonly ContentEncoding?: string | undefined;
-  readonly ContentLanguage?: string | undefined;
-  readonly ContentType?: string | undefined;
-  readonly Expires?: Date | undefined;
 }
 
 /**
@@ -43,14 +35,5 @@ export interface SimPutObjectCommandOutput {
 
 /**
  * Minimal supported sim S3 PutObject body type.
- * This allows for different types that Body could be in the real SDK command,
- * even though we will just use Readable internally.
  */
-export type SimPutObjectBody =
-  | string
-  | Uint8Array
-  | Buffer
-  | Blob
-  | Readable
-  | ReadableStream<Uint8Array>
-  | undefined;
+export type SimPutObjectBody = SimS3WriteBody;

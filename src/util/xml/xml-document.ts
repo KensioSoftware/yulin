@@ -112,6 +112,24 @@ export function xmlBoolean(
   return text === undefined ? undefined : text === "true";
 }
 
+/**
+ * The number a named child states, if the element has one that is a number.
+ */
+export function xmlNumber(
+  element: XmlElement | undefined,
+  name: string,
+): number | undefined {
+  const text = xmlText(element, name);
+
+  if (text === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(text);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 const entities: ReadonlyMap<string, string> = new Map([
   ["amp", "&"],
   ["lt", "<"],

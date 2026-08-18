@@ -12,6 +12,7 @@ import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
 import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
+import { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
@@ -41,6 +42,7 @@ export class SimS3Bucket {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
+  private readonly multipartUploads = new SimS3MultipartUploads();
   private storage: SimS3BucketStorage;
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
@@ -103,6 +105,17 @@ export class SimS3Bucket {
    */
   async deleteObject(key: string): Promise<boolean> {
     return await this.storage.deleteObject(key);
+  }
+
+  /**
+   * The multipart uploads this Bucket has in progress.
+   *
+   * Kept apart from storage because the parts of an unfinished upload are not
+   * Objects: nothing that lists or reads a Bucket can see them, and only
+   * completing the upload puts anything under a key.
+   */
+  getMultipartUploads(): SimS3MultipartUploads {
+    return this.multipartUploads;
   }
 
   /**

@@ -12,6 +12,11 @@ interface SimS3ObjectProperties {
   readonly body?: Buffer;
   readonly metadata?: SimS3ObjectMetadata;
   readonly lastModified?: Date;
+  /**
+   * The ETag S3 gave these bytes, for an Object whose ETag is not the MD5 of
+   * them. Only a multipart upload produces one.
+   */
+  readonly etag?: string;
 }
 
 /**
@@ -23,6 +28,7 @@ export class SimS3Object {
   public readonly metadata: SimS3ObjectMetadata;
 
   private readonly writtenAt: Date;
+  private readonly givenETag: string | undefined;
 
   constructor(properties: SimS3ObjectProperties = {}) {
     const {
@@ -36,6 +42,7 @@ export class SimS3Object {
     this.body = body;
     this.metadata = metadata;
     this.writtenAt = new Date(lastModified);
+    this.givenETag = properties.etag;
   }
 
   /**
@@ -62,8 +69,12 @@ export class SimS3Object {
    * be the stored value. It is computed on each read rather than kept, since a
    * Buffer can be written to in place and an ETag remembered from before that
    * would describe bytes the Bucket no longer holds.
+   *
+   * An Object uploaded in parts is the exception, and carries the ETag it was
+   * given. That form says how many parts the bytes arrived in, which nothing
+   * about the joined bytes records, so it cannot be recomputed from them.
    */
   get etag(): string {
-    return simS3ObjectETag(this.body);
+    return this.givenETag ?? simS3ObjectETag(this.body);
   }
 }

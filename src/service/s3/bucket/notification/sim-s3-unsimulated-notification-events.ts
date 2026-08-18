@@ -17,7 +17,6 @@ export const SIM_S3_UNSIMULATED_NOTIFICATION_EVENTS: ReadonlySet<string> =
     "s3:LifecycleExpiration:DeleteMarkerCreated",
     "s3:LifecycleTransition",
     "s3:ObjectAcl:Put",
-    "s3:ObjectCreated:CompleteMultipartUpload",
     "s3:ObjectCreated:Copy",
     "s3:ObjectCreated:Post",
     "s3:ObjectRemoved:DeleteMarkerCreated",
