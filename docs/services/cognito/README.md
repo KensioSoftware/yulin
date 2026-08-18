@@ -1779,8 +1779,8 @@ so does one that signed up on the page below.
 
 ### The pages managed login serves
 
-A served domain answers three pages, so a browser in a local development server completes a whole
-sign-up and sign-in without any of it being stubbed out.
+A served domain answers five pages, so a browser in a local development server completes a whole
+sign-up, password reset and sign-in without any of it being stubbed out.
 
 `GET /oauth2/authorize` naming no `identity_provider` answers HTML holding the sign-in form. The
 form has a username field, a password field, and the authorize parameters as hidden inputs, and it
@@ -1855,12 +1855,78 @@ console.log(callbackUrl.searchParams.get("state")); // "csrf-token"
 console.log(callbackUrl.searchParams.get("code") !== null); // true
 ```
 
-A refusal a person can do something about is shown on the form they posted. A wrong password comes
-back on the sign-in form and issues no code, and a password the pool's policy turns down comes back
-on the sign-up form. A refusal the application caused, such as a `redirect_uri` the app client never
-registered, is answered the way every other authorize refusal is.
+`/forgotPassword` is the other link from the sign-in page, and it is where a person who cannot get
+in goes. Its form asks who has forgotten the password, does what `ForgotPassword` does, and sends
+the browser to `/confirmForgotPassword`. That page takes the code and a new password, does what
+`ConfirmForgotPassword` does, and sends the browser back to `/oauth2/authorize` to sign in with the
+password it has just chosen. Both paths are the ones real managed login serves these two steps at.
 
-There is no styling and no script on any of the three. Matching what real managed login looks like
+```typescript sim-cognito-managed-login-reset
+/**
+ * Resetting a forgotten password through the served pages.
+ */
+
+import type { SimAws } from "@kensio/yulin";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+const http = new SimAwsHttp({ simAws });
+const domain = "https://myapp-login.auth.eu-west-2.amazoncognito.com";
+const parameters = {
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: "https://www.example.com/user/callback",
+  scope: "openid email",
+  state: "csrf-token",
+};
+
+const posted = async (
+  path: string,
+  fields: Record<string, string>,
+): Promise<Response> =>
+  http.fetch(`${domain}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...parameters, ...fields }).toString(),
+  });
+
+// A confirmed user of the pool has forgotten its password.
+await posted("/forgotPassword", { username: "alice" });
+
+// The code the pool would have emailed is read off the pool, as a sign-up
+// code is.
+const pool = simAws.cognitoIdentityProvider().userPool(userPoolId);
+await posted("/confirmForgotPassword", {
+  username: "alice",
+  code: pool.confirmationCode("alice") ?? "",
+  password: "Ev3nBetter!",
+});
+
+// The user signs in with the new password and reaches the callback with a
+// code and the state the application began with.
+const signedIn = await posted("/oauth2/authorize", {
+  username: "alice",
+  password: "Ev3nBetter!",
+});
+const callbackUrl = new URL(signedIn.headers.get("location")!);
+console.log(callbackUrl.searchParams.get("state")); // "csrf-token"
+console.log(callbackUrl.searchParams.get("code") !== null); // true
+```
+
+A refusal a person can do something about is shown on the form they posted. A wrong password comes
+back on the sign-in form and issues no code, a password the pool's policy turns down comes back on
+the sign-up form or the new password form, and a wrong reset code comes back on the form that asked
+for it, leaving the password alone. A refusal the application caused, such as a `redirect_uri` the
+app client never registered, is answered the way every other authorize refusal is.
+
+What `/forgotPassword` shows for a username the pool lacks is the app client's
+`PreventUserExistenceErrors` decision. A client set to `ENABLED` sends the browser on to the code
+page either way, and one left on the `LEGACY` default says the user is not there.
+
+There is no styling and no script on any of the five. Matching what real managed login looks like
 would be work no test could tell apart from a bare form.
 
 ### Signing out
@@ -3647,8 +3713,9 @@ Sim Cognito currently supports:
   with PKCE and with a `refresh_token` grant
 - An authorize request naming no identity provider, signing one of the pool's own users in from a
   `username` and a `password` it carries
-- A served sign-in form at `/oauth2/authorize`, a sign-up form at `/signup` and a confirmation form
-  at `/confirm`, each carrying the authorize parameters through to the next
+- A served sign-in form at `/oauth2/authorize`, a sign-up form at `/signup`, a confirmation form at
+  `/confirm`, and the two password reset forms at `/forgotPassword` and `/confirmForgotPassword`,
+  each carrying the authorize parameters through to the next
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
@@ -3945,8 +4012,9 @@ Current documented limitations:
 - A hosted sign-in that real managed login would answer with a further page is refused. That is a
   user which has registered a second factor, and a user holding a temporary password. Both
   challenges are simulated at `InitiateAuth` and `AdminInitiateAuth`, which is where a test drives
-  them. No page asks for a reset code either. `ForgotPassword` and `ConfirmForgotPassword` are
-  simulated at the API, which is where a test drives a reset.
+  them. A user in `RESET_REQUIRED` is refused there as well, where real managed login prompts for a
+  new password at sign-in. The served reset pages are the ones a person reaches from the sign-in
+  form, and they start a reset rather than finishing one an administrator forced.
 - The implicit grant is refused, and so is the client credentials grant, which needs resource
   servers.
 - The served OpenID configuration names its `authorization_endpoint`, `token_endpoint` and
