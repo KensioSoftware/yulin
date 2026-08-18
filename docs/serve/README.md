@@ -246,7 +246,7 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-S3, STS, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, STS, SNS, CloudFormation, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
 A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
 
@@ -295,6 +295,46 @@ const client = new S3Client({
 The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `HeadObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, and the Bucket policy, website, Block Public Access and event notification configurations. `aws s3 cp` works in both directions. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
 
 Simulated S3 also answers its own Bucket hostnames, covered above. That path is unchanged, and it is what a presigned URL and a website visitor use.
+
+### SNS over the endpoint
+
+`aws sns` and an `SNSClient` reach simulated SNS through the same endpoint URL:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws sns create-topic --name orders
+aws sns publish --topic-arn arn:aws:sns:us-east-1:888888888888:orders --message hello
+```
+
+A message published here fans out to the simulated Queues and Functions subscribed to the topic, the
+same way an in-process publish does. Delivery runs on the background scheduler (as it does on real
+SNS, after the publish has been answered), so a test reading the Queue afterwards waits on
+`simAws.backgroundTasksComplete()` first.
+
+The operations served are the sixteen simulated SNS implements:
+
+- **Topics** — `CreateTopic`, `DeleteTopic`, `ListTopics`, `GetTopicAttributes`, `SetTopicAttributes`
+- **Subscriptions** — `Subscribe`, `Unsubscribe`, `ListSubscriptions`, `ListSubscriptionsByTopic`,
+  `GetSubscriptionAttributes`, `SetSubscriptionAttributes`
+- **Messages** — `Publish`, `PublishBatch`
+- **SMS** — `CheckIfPhoneNumberIsOptedOut`, `ListPhoneNumbersOptedOut`, `OptInPhoneNumber`
+
+Anything else is refused as `NotImplemented`, which an SDK raises under that name.
+
+### CloudFormation over the endpoint
+
+`aws cloudformation` deploys a template into the simulation over the same endpoint URL:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws cloudformation create-stack --stack-name site --template-body file://template.json
+aws cloudformation describe-stacks
+```
+
+The four operations simulated CloudFormation implements are `CreateStack`, `UpdateStack`,
+`DeleteStack` and `DescribeStacks`. A deployment starts in the background and the call is answered
+before the Resources exist, as real CloudFormation answers it. `describe-stacks` reports the status
+it reached, and `waitForStackDeployComplete` waits for it in process.
 
 ## Stopping and restarting
 
