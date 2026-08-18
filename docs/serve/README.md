@@ -246,9 +246,11 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-S3, STS, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, STS, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
 A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
+
+CloudWatch's windowed reads, `GetMetricStatistics` and `GetMetricData`, are the exception among the operations those services implement. The JSON protocol carries a timestamp as epoch seconds, and the endpoint passes that number through as it arrives. The simulation is handed a number where it expects a date. Both reads answer in process and through SDK interception.
 
 ### Checking who the simulator thinks you are
 

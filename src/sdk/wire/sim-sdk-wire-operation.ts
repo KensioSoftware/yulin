@@ -32,6 +32,7 @@ const jsonProtocolServiceIds: ReadonlyMap<string, string> = new Map([
   ["CertificateManager", "ACM"],
   ["DynamoDBStreams_20120810", "DynamoDB Streams"],
   ["DynamoDB_20120810", "DynamoDB"],
+  ["GraniteServiceVersion20100801", "CloudWatch"],
   ["Logs_20140328", "CloudWatch Logs"],
   ["RekognitionService", "Rekognition"],
   ["TrentService", "KMS"],
