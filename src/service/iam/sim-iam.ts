@@ -2,6 +2,7 @@ import type { SimArn } from "../aws/arn.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
+import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
 import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
 import type * as simIamCommands from "./command/sim-iam-command.types.js";
@@ -51,6 +52,15 @@ export class SimIam
 
   public readonly policies: Map<SimArn, SimIamManagedPolicy>;
   public readonly roles: Map<SimIamRoleName, SimIamRole>;
+  /**
+   * The Users this Account holds, by name.
+   *
+   * Exposed for the simulated services that report on a principal rather than
+   * authorize one, such as STS answering GetCallerIdentity with a User's own
+   * id.
+   * @internal
+   */
+  public readonly users: Map<SimIamUsername, SimIamUser>;
 
   private readonly cfnFactory: SimCfnServiceResourceFactory;
   private readonly commands: SimIamCommandHandlers;
@@ -63,6 +73,7 @@ export class SimIam
     this.accountId = parts.accountId;
     this.policies = parts.policies;
     this.roles = parts.roles;
+    this.users = parts.users;
     this.credentials = parts.credentials;
     this.sessionManager = parts.sessionManager;
     this.accountAuthZ = parts.accountAuthZ;

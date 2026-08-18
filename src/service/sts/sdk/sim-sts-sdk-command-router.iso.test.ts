@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
   AssumeRoleCommand,
-  GetCallerIdentityCommand,
+  GetSessionTokenCommand,
   STSClient,
 } from "@aws-sdk/client-sts";
 import {
@@ -72,10 +72,10 @@ describe("simulated STS SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new GetCallerIdentityCommand({}));
+      await client.send(new GetSessionTokenCommand({}));
     });
 
-    assertStringIncludes(error.message, "GetCallerIdentityCommand");
+    assertStringIncludes(error.message, "GetSessionTokenCommand");
     assertStringIncludes(error.message, "AssumeRoleCommand");
   });
 });
