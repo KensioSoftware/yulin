@@ -53,6 +53,7 @@ export class ListBucketsPageBuilder {
     return {
       Buckets: page.map((bucket) => ({
         Name: bucket.bucketName,
+        CreationDate: bucket.creationDate,
       })),
       ContinuationToken: this.nextContinuationToken(
         page,

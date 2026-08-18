@@ -4,6 +4,11 @@ import {
   xmlValue,
 } from "../../../../util/xml/xml-writer.js";
 
+interface BucketSummary {
+  readonly Name?: string | undefined;
+  readonly CreationDate?: Date | undefined;
+}
+
 interface ObjectSummary {
   readonly Key?: string | undefined;
   readonly Size?: number | undefined;
@@ -27,9 +32,7 @@ interface ListObjectsOutput {
 }
 
 interface ListBucketsOutput {
-  readonly Buckets?:
-    | readonly { readonly Name?: string | undefined }[]
-    | undefined;
+  readonly Buckets?: readonly BucketSummary[] | undefined;
   readonly ContinuationToken?: string | undefined;
   readonly Prefix?: string | undefined;
 }
@@ -39,7 +42,13 @@ interface ListBucketsOutput {
  */
 export function simS3ListBucketsXml(output: ListBucketsOutput): string {
   const buckets = (output.Buckets ?? [])
-    .map((bucket) => xmlElement("Bucket", xmlValue("Name", bucket.Name)))
+    .map((bucket) =>
+      xmlElement(
+        "Bucket",
+        xmlValue("Name", bucket.Name) +
+          xmlValue("CreationDate", bucket.CreationDate),
+      ),
+    )
     .join("");
 
   return xmlDocument(

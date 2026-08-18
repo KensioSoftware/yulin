@@ -799,6 +799,5 @@ it is without watch mode.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
 - The served AWS service API covers S3, STS and the AWS JSON protocol services. A service speaking REST-JSON, or Query other than STS, is refused with `501 Not Implemented`.
 - `GetCallerIdentity` is the only STS operation served. `AssumeRole` over a port would mean the temporary credentials it issues have to sign the calls that follow, which is its own piece of work.
-- `aws s3 ls` with no Bucket fails, because simulated S3 records no creation date for a Bucket and the CLI reads one from every entry. `aws s3api list-buckets` and `aws s3 ls s3://bucket/` both work.
 - Simulated S3 implements no `HeadObject` or `HeadBucket`, so both are refused. `aws s3 cp` reads an Object with `HeadObject` before copying it, which puts that out of reach too.
 - A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

@@ -31,4 +31,5 @@ export interface SimListBucketsCommandOutput {
  */
 export interface SimS3BucketSummary {
   readonly Name?: string | undefined;
+  readonly CreationDate?: Date | undefined;
 }
