@@ -1,98 +1,39 @@
-import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
-import { SimSdkCommandDispatcher } from "../../../sdk/sim-sdk-command-dispatcher.js";
-import {
-  makeSimSdkWireClient,
-  makeSimSdkWireCommand,
-} from "../../../sdk/wire/sim-sdk-wire-command.js";
-import { xmlValue } from "../../../util/xml/xml-writer.js";
-import type { SimGetCallerIdentityCommandOutput } from "../command/get-caller-identity/get-caller-identity.command.js";
-import { readSimStsQueryRequest } from "./sim-sts-query-request.js";
-import {
-  simStsQueryErrorResponse,
-  simStsQueryResponse,
-} from "./sim-sts-query-response.js";
+import { SimQueryApiEndpoint } from "../../../serve/http/api/query/sim-query-endpoint.js";
+import type { SimQueryOperations } from "../../../serve/http/api/query/sim-query-operation.js";
+import { queryMembers } from "../../../serve/http/api/query/sim-query-result.js";
 
 /**
- * The SDK service id simulated STS's Command router is registered under.
+ * The XML namespace real STS stamps on every response it sends.
  */
-const stsServiceId = "STS";
-
-interface SimStsApiEndpointProperties {
-  readonly simAws: SimAws;
-}
+const stsNamespace = "https://sts.amazonaws.com/doc/2011-06-15/";
 
 /**
- * Serves the STS API to a client given an endpoint URL.
+ * Serve the STS Query API to a client given an endpoint URL.
  *
- * STS speaks the Query protocol, which names its operation in a form-encoded
- * `Action` field rather than in a header or a path. The operation is resolved
- * from that field and answered from the simulation, as the other served
- * protocols are, so an HTTP caller reaches the same code an in-process caller
- * does.
+ * `GetCallerIdentity` is the only operation simulated STS implements, and it
+ * is the one a person reaches for to check that an endpoint and a set of
+ * credentials are wired up as expected. `AssumeRole` is reachable in process
+ * and through SDK interception.
  */
-export class SimStsApiEndpoint {
-  private readonly dispatcher: SimSdkCommandDispatcher;
-
-  constructor(properties: SimStsApiEndpointProperties) {
-    this.dispatcher = new SimSdkCommandDispatcher(properties.simAws);
-  }
-
-  /**
-   * Answer one STS Query request as the caller that signed it.
-   */
-  async handle(
-    request: Request,
-    body: Uint8Array,
-    caller: SimAwsCaller,
-    regionName: string,
-  ): Promise<Response> {
-    const query = readSimStsQueryRequest(request, body);
-    if (query === undefined) {
-      return simStsQueryErrorResponse(
-        400,
-        "MissingAction",
-        "The request is missing an Action field, which every AWS Query protocol request states.",
-      );
-    }
-
-    if (query.action !== "GetCallerIdentity") {
-      return simStsQueryErrorResponse(
-        501,
-        "NotImplemented",
-        `Simulated STS does not serve ${query.action}`,
-      );
-    }
-
-    try {
-      const identity = (await this.dispatcher.dispatch(
-        makeSimSdkWireCommand(`${query.action}Command`, {}),
-        makeSimSdkWireClient(stsServiceId, regionName),
-        undefined,
-        caller,
-      )) as SimGetCallerIdentityCommandOutput;
-
-      return simStsQueryResponse(query.action, callerIdentityResult(identity));
-    } catch (error) {
-      if (error instanceof SimIamAccessDenied) {
-        return simStsQueryErrorResponse(403, "AccessDenied", error.message);
-      }
-
-      throw error;
-    }
-  }
+export function simStsApiEndpoint(simAws: SimAws): SimQueryApiEndpoint {
+  return new SimQueryApiEndpoint({
+    simAws,
+    serviceId: "STS",
+    namespace: stsNamespace,
+    operations: simStsQueryOperations(),
+  });
 }
 
-/**
- * Write the members GetCallerIdentity answers with.
- */
-function callerIdentityResult(
-  identity: SimGetCallerIdentityCommandOutput,
-): string {
-  return (
-    xmlValue("UserId", identity.UserId) +
-    xmlValue("Account", identity.Account) +
-    xmlValue("Arn", identity.Arn)
-  );
+function simStsQueryOperations(): SimQueryOperations {
+  return new Map([
+    [
+      "GetCallerIdentity",
+      {
+        input: (): Record<string, unknown> => ({}),
+        result: (output): string =>
+          queryMembers(output, ["UserId", "Account", "Arn"]),
+      },
+    ],
+  ]);
 }

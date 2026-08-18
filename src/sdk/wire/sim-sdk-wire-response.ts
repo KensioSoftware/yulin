@@ -40,7 +40,7 @@ export function simSdkWireErrorResponse(
   const message = error instanceof Error ? error.message : String(error);
 
   return {
-    statusCode: errorStatusCode(error),
+    statusCode: simSdkWireErrorStatusCode(error),
     headers: {
       ...responseHeaders(contentType),
       ...Object.fromEntries([["x-amzn-errortype", errorType]]),
@@ -65,7 +65,7 @@ export function simSdkWireErrorResponse(
  * reported as InternalFailure, which real AWS answers with a server status,
  * and it means the simulator itself went wrong rather than the request.
  */
-function errorStatusCode(error: unknown): number {
+export function simSdkWireErrorStatusCode(error: unknown): number {
   if (!(error instanceof Error)) {
     return 500;
   }

@@ -3,20 +3,15 @@ import { SimSdkWireDispatcher } from "../../../sdk/wire/sim-sdk-wire-dispatcher.
 import { readSimSdkWireCredentialScope } from "../../../sdk/wire/sim-sdk-wire-operation.js";
 import type { SimSdkWireRequest } from "../../../sdk/wire/sim-sdk-wire.types.js";
 import type { SimAws } from "../../../service/aws/sim-aws.js";
-import { SimS3ApiEndpoint } from "../../../service/s3/serve/api/sim-s3-api.js";
-import { SimStsApiEndpoint } from "../../../service/sts/serve/sim-sts-api.js";
 import { SimAwsReceivedRequest } from "../request/sim-aws-received-request.js";
+import {
+  simAwsProtocolEndpoints,
+  type SimAwsProtocolEndpoint,
+} from "./sim-aws-api-protocols.js";
 
 interface SimAwsApiEndpointProperties {
   readonly simAws: SimAws;
 }
-
-/**
- * The SigV4 signing names of the services whose protocol is read by an
- * endpoint of its own rather than by the AWS JSON protocol dispatcher.
- */
-const s3SigningName = "s3";
-const stsSigningName = "sts";
 
 /**
  * The general AWS service API, served on one endpoint.
@@ -34,20 +29,18 @@ const stsSigningName = "sts";
  *
  * The scope also says which protocol to read the request with. Most simulated
  * services speak the AWS JSON protocol and name their operation in a header.
- * S3 speaks REST-XML and STS speaks Query, and each names its operation
- * somewhere else, so each is read by an endpoint of its own.
+ * The rest name it somewhere else, and each is read by an endpoint of its own,
+ * registered under its signing name.
  */
 export class SimAwsApiEndpoint {
   private readonly simAws: SimAws;
   private readonly dispatcher: SimSdkWireDispatcher;
-  private readonly s3: SimS3ApiEndpoint;
-  private readonly sts: SimStsApiEndpoint;
+  private readonly protocols: ReadonlyMap<string, SimAwsProtocolEndpoint>;
 
   constructor(properties: SimAwsApiEndpointProperties) {
     this.simAws = properties.simAws;
     this.dispatcher = new SimSdkWireDispatcher(properties.simAws);
-    this.s3 = new SimS3ApiEndpoint({ simAws: properties.simAws });
-    this.sts = new SimStsApiEndpoint({ simAws: properties.simAws });
+    this.protocols = simAwsProtocolEndpoints(properties.simAws);
   }
 
   /**
@@ -74,24 +67,11 @@ export class SimAwsApiEndpoint {
       },
     });
 
-    // S3 states its operation in the method and path, and STS in a
-    // form-encoded field, so neither can be read by the header the AWS JSON
-    // protocol names its operation in.
-    const body = received.body ?? new Uint8Array();
-
-    if (scope.signingName === s3SigningName) {
-      return await this.s3.handle(
+    const protocol = this.protocols.get(scope.signingName);
+    if (protocol !== undefined) {
+      return await protocol.handle(
         request,
-        body,
-        caller.toCaller(),
-        scope.regionName,
-      );
-    }
-
-    if (scope.signingName === stsSigningName) {
-      return await this.sts.handle(
-        request,
-        body,
+        received.body ?? new Uint8Array(),
         caller.toCaller(),
         scope.regionName,
       );
