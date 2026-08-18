@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { SimCloudFormationStackName } from "../stack/sim-cfn-stack.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
-import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
+import { jsonParse } from "../../../util/type-guard/json.js";
 import {
   loadSiblingCdkAssetsManifest,
   type SimCdkOutContext,
@@ -15,6 +14,7 @@ import {
   transformedTemplate,
   type SimCfnTemplateFileTransform,
 } from "./sim-cfn-template-file-transform.js";
+import { readTemplateFile } from "./sim-cfn-template-file-read.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
@@ -82,10 +82,8 @@ export class SimCfnTemplateFileLoader {
     // watch mode.
     simWatch.reportPath(templatePath);
 
-    // oxlint-disable-next-line security/detect-non-literal-fs-filename
-    const templateBody = await readFile(templatePath, "utf8");
     const template = transformedTemplate(
-      jsonParse(templateBody as JSONString<CfnTemplateBodyRecord>),
+      jsonParse(await readTemplateFile(templatePath)),
       deployment.transform,
     );
     // Read from the path rather than the template, so what a transform did to

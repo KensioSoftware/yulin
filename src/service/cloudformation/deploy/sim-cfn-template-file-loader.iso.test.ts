@@ -243,6 +243,46 @@ describe("SimCfnTemplateFileLoader", () => {
     );
   });
 
+  it("refuses a template path with no file at it, naming the path", async () => {
+    // Given a directory with no synthesized template in it, as a checkout that
+    // has yet to synthesize one has.
+    const temporaryDirectory = new TemporaryDirectory();
+    await temporaryDirectory.resolvePath();
+    const templatePath = temporaryDirectory.join("MissingStack.template.json");
+
+    // When the template file is loaded.
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const error = await assertThrowsErrorAsync(async () => {
+      await fileLoader.load(templatePath);
+    });
+
+    // Then the refusal names the resolved path and what was expected there,
+    // keeping the filesystem error that found it missing.
+    assertIdentical(
+      error.message,
+      `No Sim CloudFormation template file at ${path.resolve(templatePath)}`,
+    );
+    assertIdentical((error.cause as NodeJS.ErrnoException).code, "ENOENT");
+  });
+
+  it("reports the parse failure for a template file holding invalid JSON", async () => {
+    // Given a template file that is there and holds something other than JSON.
+    const temporaryDirectory = new TemporaryDirectory();
+    const templatePath = "BrokenStack.template.json";
+
+    await temporaryDirectory.writeFile(templatePath, "{ Resources: ");
+
+    // When the template file is loaded.
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const error = await assertThrowsErrorAsync(async () => {
+      await fileLoader.load(temporaryDirectory.join(templatePath));
+    });
+
+    // Then the parse failure is what comes back, leaving the missing-file
+    // refusal for a path with no file at it.
+    assertStringIncludes(error.message, "JSON");
+  });
+
   it("loads a non-CDK template filename without requiring an assets manifest", async () => {
     // Given a template file whose name does not follow the CDK template naming convention.
     const temporaryDirectory = new TemporaryDirectory();

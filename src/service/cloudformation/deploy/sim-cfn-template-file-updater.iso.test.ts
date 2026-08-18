@@ -1,7 +1,9 @@
+import { rm } from "node:fs/promises";
 import { buffer } from "node:stream/consumers";
 import {
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -67,6 +69,39 @@ describe("updating a Stack from its template file", () => {
       await simAws.cloudFormation().updateTemplateFile(templatePath);
     });
     assertIdentical(error.message, "No updates are to be performed.");
+  });
+
+  it("refuses a template file that has been deleted, leaving the Resources serving", async () => {
+    // Given a Stack deployed from a template file, holding an Object
+    const { simAws, templatePath } = await deployedFrom({
+      Resources: { Site: bucketResource("site-content") },
+    });
+
+    await simAws.s3().putObject({
+      input: {
+        Bucket: "site-content",
+        Key: "index.html",
+        Body: "<h1>Hello</h1>",
+      },
+    });
+
+    // When the template file goes away, as a cleaned `cdk.out` takes it
+    await rm(templatePath);
+
+    // Then the update is refused by naming the path
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().updateTemplateFile(templatePath);
+    });
+    assertStringIncludes(
+      error.message,
+      "No Sim CloudFormation template file at",
+    );
+
+    // And the Resources the last template deployed carry on serving
+    assertIdentical(
+      await objectBody(simAws, "site-content", "index.html"),
+      "<h1>Hello</h1>",
+    );
   });
 
   it("reads the assets manifest the template was synthesized with", async () => {
