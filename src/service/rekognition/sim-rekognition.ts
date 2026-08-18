@@ -6,6 +6,17 @@ import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-route
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimRekognitionCollections } from "./collection/sim-rekognition-collections.js";
+import { SimRekognitionFaceHandler } from "./command/face/face.handler.js";
+import type {
+  SimDeleteFacesCommand,
+  SimDeleteFacesCommandOutput,
+  SimIndexFacesCommand,
+  SimIndexFacesCommandOutput,
+  SimListFacesCommand,
+  SimListFacesCommandOutput,
+  SimSearchFacesByImageCommand,
+  SimSearchFacesByImageCommandOutput,
+} from "./command/face/face.command.js";
 import { SimRekognitionCollectionHandler } from "./command/collection/collection.handler.js";
 import type {
   SimCreateCollectionCommand,
@@ -20,21 +31,19 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimRekognitionAuthorizer } from "./command/authorize/sim-rekognition-authorizer.js";
-import { DetectFacesHandler } from "./command/detect-faces/detect-faces.handler.js";
 import type {
   SimDetectFacesCommand,
   SimDetectFacesCommandOutput,
 } from "./command/detect-faces/detect-faces.command.js";
-import { DetectLabelsHandler } from "./command/detect-labels/detect-labels.handler.js";
 import type {
   SimDetectLabelsCommand,
   SimDetectLabelsCommandOutput,
 } from "./command/detect-labels/detect-labels.command.js";
-import { DetectModerationLabelsHandler } from "./command/detect-moderation-labels/detect-moderation-labels.handler.js";
 import type {
   SimDetectModerationLabelsCommand,
   SimDetectModerationLabelsCommandOutput,
 } from "./command/detect-moderation-labels/detect-moderation-labels.command.js";
+import { SimRekognitionDetectionHandlers } from "./command/sim-rekognition-detection-handlers.js";
 import type { SimRekognitionRequestOptions } from "./command/sim-rekognition-request-options.js";
 import { SimRekognitionFaces } from "./face/sim-rekognition-faces.js";
 import {
@@ -42,6 +51,7 @@ import {
   SimRekognitionUnreachableImageObjects,
 } from "./image/sim-rekognition-image-objects.js";
 import { SimRekognitionLabels } from "./label/sim-rekognition-labels.js";
+import { SimRekognitionFaceMatches } from "./match/sim-rekognition-face-matches.js";
 import { SimRekognitionModeration } from "./moderation/sim-rekognition-moderation.js";
 import { SimRekognitionSdkCommandRouter } from "./sdk/sim-rekognition-sdk-command-router.js";
 
@@ -69,12 +79,12 @@ export class SimRekognition {
   private readonly moderationRules = new SimRekognitionModeration();
   private readonly labelRules = new SimRekognitionLabels();
   private readonly faceRules = new SimRekognitionFaces();
-  private readonly detectModerationLabelsCommand: DetectModerationLabelsHandler;
-  private readonly detectLabelsCommand: DetectLabelsHandler;
-  private readonly detectFacesCommand: DetectFacesHandler;
+  private readonly faceMatchRules = new SimRekognitionFaceMatches();
+  private readonly detections: SimRekognitionDetectionHandlers;
   private readonly sdkRouter = new SimRekognitionSdkCommandRouter(this);
   private readonly collectionStore: SimRekognitionCollections;
   private readonly collectionCommands: SimRekognitionCollectionHandler;
+  private readonly collectionFaceCommands: SimRekognitionFaceHandler;
 
   constructor(properties: SimRekognitionProperties = {}) {
     const {
@@ -94,21 +104,18 @@ export class SimRekognition {
       background,
     });
 
-    this.detectModerationLabelsCommand = new DetectModerationLabelsHandler({
+    this.collectionFaceCommands = new SimRekognitionFaceHandler({
+      collections: this.collectionStore,
+      faces: this.faceRules,
+      faceMatches: this.faceMatchRules,
+      authorizer,
+      images,
+      background,
+    });
+
+    this.detections = new SimRekognitionDetectionHandlers({
       moderation: this.moderationRules,
-      authorizer,
-      images,
-      background,
-    });
-
-    this.detectLabelsCommand = new DetectLabelsHandler({
       labels: this.labelRules,
-      authorizer,
-      images,
-      background,
-    });
-
-    this.detectFacesCommand = new DetectFacesHandler({
       faces: this.faceRules,
       authorizer,
       images,
@@ -144,6 +151,46 @@ export class SimRekognition {
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDeleteCollectionCommandOutput> {
     return await this.collectionCommands.delete(command, options);
+  }
+
+  /**
+   * Handle an IndexFacesCommand from the SDK.
+   */
+  async indexFaces(
+    command: SimIndexFacesCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimIndexFacesCommandOutput> {
+    return await this.collectionFaceCommands.index(command, options);
+  }
+
+  /**
+   * Handle a ListFacesCommand from the SDK.
+   */
+  async listFaces(
+    command: SimListFacesCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimListFacesCommandOutput> {
+    return await this.collectionFaceCommands.list(command, options);
+  }
+
+  /**
+   * Handle a SearchFacesByImageCommand from the SDK.
+   */
+  async searchFacesByImage(
+    command: SimSearchFacesByImageCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimSearchFacesByImageCommandOutput> {
+    return await this.collectionFaceCommands.search(command, options);
+  }
+
+  /**
+   * Handle a DeleteFacesCommand from the SDK.
+   */
+  async deleteFaces(
+    command: SimDeleteFacesCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimDeleteFacesCommandOutput> {
+    return await this.collectionFaceCommands.delete(command, options);
   }
 
   /**
@@ -190,6 +237,22 @@ export class SimRekognition {
   }
 
   /**
+   * The face searches this simulated Rekognition answers with.
+   *
+   * A search finds nobody until a rule says which indexed faces the image it
+   * searched with finds:
+   *
+   * ```typescript
+   * simAws.rekognition().faceMatches().onName("door/visitor.jpg", {
+   *   matches: [{ externalImageId: "ada" }],
+   * });
+   * ```
+   */
+  faceMatches(): SimRekognitionFaceMatches {
+    return this.faceMatchRules;
+  }
+
+  /**
    * Handle a DetectModerationLabels Command from the SDK.
    *
    * Background sequencing happens inside the command rather than here,
@@ -200,7 +263,7 @@ export class SimRekognition {
     command: SimDetectModerationLabelsCommand,
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDetectModerationLabelsCommandOutput> {
-    return await this.detectModerationLabelsCommand.handle(command, options);
+    return await this.detections.moderationLabels.handle(command, options);
   }
 
   /**
@@ -210,7 +273,7 @@ export class SimRekognition {
     command: SimDetectLabelsCommand,
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDetectLabelsCommandOutput> {
-    return await this.detectLabelsCommand.handle(command, options);
+    return await this.detections.labels.handle(command, options);
   }
 
   /**
@@ -220,7 +283,7 @@ export class SimRekognition {
     command: SimDetectFacesCommand,
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDetectFacesCommandOutput> {
-    return await this.detectFacesCommand.handle(command, options);
+    return await this.detections.faces.handle(command, options);
   }
 
   /**

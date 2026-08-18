@@ -3,6 +3,7 @@ import {
   SimRekognitionResourceAlreadyExistsException,
   SimRekognitionResourceNotFoundException,
 } from "../error/sim-rekognition.error.js";
+import { SimRekognitionCollectionFaces } from "./sim-rekognition-collection-faces.js";
 import {
   simRekognitionFaceModelVersion,
   type SimRekognitionCollection,
@@ -65,8 +66,30 @@ export class SimRekognitionCollections {
       arn: this.arnFor(collectionId),
       faceModelVersion: simRekognitionFaceModelVersion,
       createdAt,
+      faces: new SimRekognitionCollectionFaces(),
     };
     this.collections.set(id, collection);
+
+    return collection;
+  }
+
+  /**
+   * The collection of this name, refusing one that was never created.
+   *
+   * Every operation that works on the faces in a collection needs this, and
+   * real Rekognition reports a collection it does not hold the same way
+   * whichever operation asked for it.
+   */
+  require(collectionId: string): SimRekognitionCollection {
+    const collection = this.collections.get(
+      collectionId as SimRekognitionCollectionId,
+    );
+
+    if (collection === undefined) {
+      throw new SimRekognitionResourceNotFoundException(
+        `Rekognition collection ${collectionId} does not exist`,
+      );
+    }
 
     return collection;
   }
@@ -82,16 +105,9 @@ export class SimRekognitionCollections {
    * Remove a collection, refusing one that was never created.
    */
   remove(collectionId: string): SimRekognitionCollection {
-    const id = collectionId as SimRekognitionCollectionId;
-    const collection = this.collections.get(id);
+    const collection = this.require(collectionId);
 
-    if (collection === undefined) {
-      throw new SimRekognitionResourceNotFoundException(
-        `Rekognition collection ${collectionId} does not exist`,
-      );
-    }
-
-    this.collections.delete(id);
+    this.collections.delete(collection.collectionId);
 
     return collection;
   }

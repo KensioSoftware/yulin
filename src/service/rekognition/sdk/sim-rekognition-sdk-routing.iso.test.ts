@@ -1,8 +1,11 @@
 import {
+  CreateCollectionCommand,
   DetectFacesCommand,
   DetectLabelsCommand,
   DetectModerationLabelsCommand,
+  IndexFacesCommand,
   RekognitionClient,
+  SearchFacesByImageCommand,
 } from "@aws-sdk/client-rekognition";
 import {
   assertArrayLength,
@@ -91,5 +94,41 @@ describe("Rekognition SDK interception", () => {
     // Then the declared result comes back, with nothing touching the network.
     assertArrayLength(detected.FaceDetails ?? [], 2);
     assertTrue(detected.FaceDetails?.[0]?.Smile?.Value);
+  });
+
+  it("routes an intercepted indexing and search to simulated Rekognition", async () => {
+    // Given an intercepted Rekognition SDK client, with a search declared to
+    // find the face an application indexes.
+    using simSdk = new SimSdk();
+    simSdk.intercept(RekognitionClient);
+    simSdk.simAws
+      .rekognition()
+      .faceMatches()
+      .byDefault({ matches: [{ externalImageId: "ada" }] });
+
+    const rekognition = new RekognitionClient({ region: "us-east-1" });
+
+    // When ordinary SDK code registers a face and later searches for it.
+    await rekognition.send(
+      new CreateCollectionCommand({ CollectionId: "staff" }),
+    );
+    await rekognition.send(
+      new IndexFacesCommand({
+        CollectionId: "staff",
+        Image: { Bytes: redPngBytes },
+        ExternalImageId: "ada",
+      }),
+    );
+    const found = await rekognition.send(
+      new SearchFacesByImageCommand({
+        CollectionId: "staff",
+        Image: { Bytes: redPngBytes },
+      }),
+    );
+
+    // Then it recognises the same person twice, with nothing touching the
+    // network.
+    assertArrayLength(found.FaceMatches ?? [], 1);
+    assertIdentical(found.FaceMatches?.[0]?.Face?.ExternalImageId, "ada");
   });
 });

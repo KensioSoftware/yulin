@@ -8,6 +8,12 @@ import type {
   SimDeleteCollectionCommand,
   SimListCollectionsCommand,
 } from "../command/collection/collection.command.js";
+import type {
+  SimDeleteFacesCommand,
+  SimIndexFacesCommand,
+  SimListFacesCommand,
+  SimSearchFacesByImageCommand,
+} from "../command/face/face.command.js";
 import type { SimDetectFacesCommand } from "../command/detect-faces/detect-faces.command.js";
 import type { SimDetectLabelsCommand } from "../command/detect-labels/detect-labels.command.js";
 import type { SimDetectModerationLabelsCommand } from "../command/detect-moderation-labels/detect-moderation-labels.command.js";
@@ -43,6 +49,38 @@ export class SimRekognitionSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simRekognition.deleteCollection(
             command as SimDeleteCollectionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "IndexFacesCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.indexFaces(
+            command as SimIndexFacesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListFacesCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.listFaces(
+            command as SimListFacesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "SearchFacesByImageCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.searchFacesByImage(
+            command as SimSearchFacesByImageCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteFacesCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.deleteFaces(
+            command as SimDeleteFacesCommand,
             simSdkCallerOptions(context),
           ),
       ],

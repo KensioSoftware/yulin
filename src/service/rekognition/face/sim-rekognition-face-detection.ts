@@ -36,6 +36,17 @@ export class SimRekognitionFaceDetection {
   }
 
   /**
+   * The faces this result holds, in the order they were declared.
+   *
+   * Indexing works from these rather than from the details, because a face
+   * put in a collection is read back later at attributes the request that
+   * indexed it never asked for.
+   */
+  detected(): readonly SimRekognitionDetectedFace[] {
+    return this.faces;
+  }
+
+  /**
    * The face details to report for this result, as one request asked for
    * them.
    */

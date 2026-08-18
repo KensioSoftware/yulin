@@ -2,7 +2,8 @@
 
 This directory contains the simulated Rekognition implementation. Three image detections are
 simulated, `DetectModerationLabels`, `DetectLabels` and `DetectFaces`, each for an image supplied as
-bytes or as an S3 object.
+bytes or as an S3 object, along with the face collections that hold indexed faces and the search
+that finds them again.
 
 The guiding decision here is that no image recognition happens. Rekognition is a service where the
 interesting behaviour is not the call but what the call returns, so the simulation maintains no
@@ -16,10 +17,10 @@ IAM decision, and the taxonomy a returned label belongs to.
 - `sim-rekognition.ts` is the service facade for one account/region scope.
 - `index.ts` exports the public Rekognition simulator API for `@kensio/yulin/rekognition`.
 
-`SimRekognition` owns a `SimRekognitionModeration`, a `SimRekognitionLabels` and a
-`SimRekognitionFaces`, which own the rules the three detections answer from. Rules are grouped per
-operation rather than hung off the facade, so an operation group is added beside the others without
-the facade growing a result shape for each.
+`SimRekognition` owns a `SimRekognitionModeration`, a `SimRekognitionLabels`, a
+`SimRekognitionFaces` and a `SimRekognitionFaceMatches`, which own the rules the operations answer
+from. Rules are grouped per operation rather than hung off the facade, so an operation group is
+added beside the others without the facade growing a result shape for each.
 
 The service is scoped to an account and region because its rules are: a detection made in one Region
 is answered by the rules registered in that Region, as a real Rekognition endpoint answers for the
@@ -28,16 +29,41 @@ Region it belongs to. Face collections are scoped by that same instance. That is
 
 ## The collection model
 
-`collection/` holds the face collections one Account and Region owns, and
-`command/collection/collection.handler.ts` holds the three operations that work on them. They share
-a store and an authorization shape, which is what makes them one handler and not three.
+`collection/` holds the face collections one Account and Region owns.
+`command/collection/collection.handler.ts` holds the three lifecycle operations and
+`command/face/face.handler.ts` holds the four that work on the faces inside one. Each group shares a
+store and an authorization shape, which is what makes each of them one handler.
 
 A collection is the one Rekognition resource with an ARN, so those operations authorize against it
 where the detections authorize against `*`. That is why `SimRekognitionAuthorizer.authorize` takes an
-optional resource.
+optional resource. Every face operation authorizes before it looks the collection up. A denial and
+a missing collection stay separate, and a caller with no permission for a collection never learns
+whether it is there.
 
-Nothing is indexed into a collection yet, so what a collection is here is its identity, its ARN and
-its model version.
+The faces live on the collection record, in `SimRekognitionCollectionFaces`. Removing a collection
+removes its faces with it, as it does on AWS.
+
+`SimRekognitionIndexedFace` keeps the `SimRekognitionDetectedFace` it was indexed from. A face
+indexed from an image and a face detected in that same image are then the same face, and `ListFaces`
+reports the bounding box and confidence the `faces()` rules declared, whatever
+`DetectionAttributes` the indexing asked for.
+
+## The face search model
+
+`match/` is the fourth rule set, and it answers `SearchFacesByImage`. The decision that matters
+lives here. Nothing in this simulation compares one face with another. Which indexed faces a search
+image finds is declared, the way every other Rekognition result here is.
+
+A declared match names one indexed face, by the `ExternalImageId` it was indexed under or by the
+`FaceId` `IndexFaces` answered with. Both are carried because each covers a case the other cannot. A
+test whose own code registers the face knows the external image id in advance and can write the rule
+before anything exists. An application that keeps the generated face id has no external image id to
+name, and writes the rule after the indexing that issued it. Declaring both on one match, or
+neither, is refused where the rule is written.
+
+`SimRekognitionFaceMatchRule` resolves the declaration and leaves the lookup for the search. The
+collection being searched decides which faces a rule reaches. A deleted face then stops being found
+with the rule unchanged, and one rule covers both sides of a deletion.
 
 ## The rule mechanism
 

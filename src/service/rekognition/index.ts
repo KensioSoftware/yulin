@@ -28,6 +28,11 @@ export {
   simRekognitionLandmarkNames,
   type SimRekognitionLandmarkName,
 } from "./face/sim-rekognition-landmark-name.js";
+export { SimRekognitionFaceMatches } from "./match/sim-rekognition-face-matches.js";
+export type {
+  SimRekognitionDeclaredFaceMatch,
+  SimRekognitionFaceMatchesResult,
+} from "./match/sim-rekognition-face-match-declaration.js";
 export type { SimRekognitionDeclaredBoundingBox } from "./image/sim-rekognition-bounding-box.js";
 export { SimRekognitionLabels } from "./label/sim-rekognition-labels.js";
 export type {
@@ -62,5 +67,7 @@ export {
   SimRekognitionInvalidImageFormatException,
   SimRekognitionInvalidParameterException,
   SimRekognitionInvalidS3ObjectException,
+  SimRekognitionResourceAlreadyExistsException,
+  SimRekognitionResourceNotFoundException,
   SimRekognitionUnsimulatedInputException,
 } from "./error/sim-rekognition.error.js";

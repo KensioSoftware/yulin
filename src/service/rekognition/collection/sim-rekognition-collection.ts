@@ -1,4 +1,5 @@
 import type { Brand } from "../../../util/brand.type.js";
+import type { SimRekognitionCollectionFaces } from "./sim-rekognition-collection-faces.js";
 
 export type SimRekognitionCollectionId = Brand<
   string,
@@ -17,13 +18,14 @@ export const simRekognitionFaceModelVersion = "7.0";
 /**
  * One simulated Rekognition face collection.
  *
- * A collection holds indexed faces in real Rekognition. This simulation has no
- * faces to put in one yet, so what a collection is here is its identity, which
- * is what the operations that create, list and remove it work with.
+ * A collection is its identity and the faces indexed into it. The faces belong
+ * to the collection record rather than to a store of their own, so removing a
+ * collection removes the faces with it, as it does on AWS.
  */
 export interface SimRekognitionCollection {
   readonly collectionId: SimRekognitionCollectionId;
   readonly arn: string;
   readonly faceModelVersion: string;
   readonly createdAt: Date;
+  readonly faces: SimRekognitionCollectionFaces;
 }

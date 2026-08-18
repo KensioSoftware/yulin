@@ -306,9 +306,10 @@ excludes the chin.
 ## Declaring results
 
 Results are declared per operation. `moderation()` holds the rules `DetectModerationLabels` answers
-from, `labels()` holds the rules `DetectLabels` answers from, and `faces()` holds the rules
-`DetectFaces` answers from. All three take the same three kinds of rule, being an exact S3
-object name, an exact content hash, or anything at all.
+from, `labels()` holds the rules `DetectLabels` answers from, `faces()` holds the rules
+`DetectFaces` answers from, and `faceMatches()` holds the rules `SearchFacesByImage` answers from.
+All four take the same three kinds of rule, being an exact S3 object name, an exact content hash, or
+anything at all.
 
 ```typescript sim-rekognition-moderation-rules
 /**
@@ -353,6 +354,61 @@ detecting on it changes the digest, so hash the exact bytes the test puts throug
 A label can be declared as a name on its own, or as a name with what is to be reported alongside it.
 A moderation label declared as a name reports at a confidence of `96.68000030517578`, and a
 detection label at `97.53010559082031`.
+
+`faceMatches()` declares people where the other three declare labels. A match names one indexed
+face, by the `ExternalImageId` it was indexed under or by the `FaceId` `IndexFaces` answered with,
+and says how alike the search reports it as.
+
+```typescript sim-rekognition-face-match-rules
+/**
+ * The two ways a rule names the face a search finds.
+ */
+
+import {
+  CreateCollectionCommand,
+  IndexFacesCommand,
+} from "@aws-sdk/client-rekognition";
+import { SimAws } from "@kensio/yulin";
+import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
+
+const simAws = new SimAws();
+const simRekognition = simAws.rekognition();
+const faceMatches = simRekognition.faceMatches();
+
+// Every image starts here, finding nobody.
+faceMatches.byDefault({ matches: [] });
+
+// By the external image id the indexing request gave the face. A test can
+// write this before anything is indexed.
+faceMatches.onName("door/visitor.jpg", {
+  matches: [{ externalImageId: "ada", similarity: 98.5 }],
+});
+
+// By the id IndexFaces answered with, for an application that keeps it.
+await simRekognition.createCollection(
+  new CreateCollectionCommand({ CollectionId: "staff" }),
+);
+
+const indexed = await simRekognition.indexFaces(
+  new IndexFacesCommand({
+    CollectionId: "staff",
+    Image: { Bytes: simRekognitionSampleImages.oneFace() },
+  }),
+);
+
+faceMatches.onName("door/courier.jpg", {
+  matches: indexed.FaceRecords.map((record) => ({
+    faceId: record.Face.FaceId,
+  })),
+});
+```
+
+An `externalImageId` rule can be written before anything is indexed. That suits a test whose own
+code registers the face. A `faceId` rule is written after the indexing that issued the id, and names
+one face exactly. Where the same external image id covers several faces, each one comes back as its
+own match. A match that states no similarity reports at `99.97222137451172`, the similarity in the
+AWS `SearchFacesByImage` example response. Declaring both kinds of id on one match, or neither, is
+refused where the rule is written.
 
 ## Sample images
 
@@ -716,7 +772,7 @@ ever. Filter the notification configuration by prefix or suffix, as this one doe
 
 ## Face collections
 
-A collection is what lets an application recognise the same person twice, where a detection answers what is in one image. Simulated Rekognition holds the collections themselves.
+A collection is what lets an application recognise the same person twice, where a detection answers what is in one image.
 
 ```typescript sim-rekognition-collections
 /**
@@ -756,6 +812,115 @@ A collection belongs to one Account and Region, as it does on AWS, so a listing 
 
 Every collection reports face model version 7.0. Real Rekognition stamps a collection with the version in force when it was created, and that version moves as AWS retrains. Nothing here recognises a face, so one fixed version is stated rather than a moving one invented.
 
+## Indexing faces and finding them again
+
+`IndexFaces` puts the faces an image holds into a collection. Which faces an image holds is what the
+`faces()` rules declare, the same rules `DetectFaces` answers from. An image with one declared face
+indexes one face, at the bounding box and the confidence that rule gave it, and an image no rule
+matches indexes the built-in default face.
+
+`SearchFacesByImage` answers from the `faceMatches()` rules. They say which indexed faces one image
+finds, and an image no rule matches finds nobody.
+
+```typescript sim-rekognition-face-indexing
+/**
+ * Indexing a face into a collection and recognising the same person later.
+ */
+
+import {
+  CreateCollectionCommand,
+  DeleteFacesCommand,
+  IndexFacesCommand,
+  ListFacesCommand,
+  SearchFacesByImageCommand,
+} from "@aws-sdk/client-rekognition";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
+
+const simAws = new SimAws();
+const simRekognition = simAws.rekognition();
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "photos" }));
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "photos",
+    Key: "staff/ada.jpg",
+    Body: simRekognitionSampleImages.oneFace(),
+  }),
+);
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "photos",
+    Key: "door/visitor.jpg",
+    Body: simRekognitionSampleImages.oneFace(),
+  }),
+);
+
+await simRekognition.createCollection(
+  new CreateCollectionCommand({ CollectionId: "staff" }),
+);
+
+const indexed = await simRekognition.indexFaces(
+  new IndexFacesCommand({
+    CollectionId: "staff",
+    Image: { S3Object: { Bucket: "photos", Name: "staff/ada.jpg" } },
+    ExternalImageId: "ada",
+  }),
+);
+
+console.log(indexed.FaceRecords.map((record) => record.Face.ExternalImageId));
+// [ "ada" ]
+
+const listed = await simRekognition.listFaces(
+  new ListFacesCommand({ CollectionId: "staff" }),
+);
+
+console.log(listed.Faces.length); // 1
+
+// The visitor at the door is declared to be that member of staff.
+simRekognition
+  .faceMatches()
+  .onName("door/visitor.jpg", { matches: [{ externalImageId: "ada" }] });
+
+const found = await simRekognition.searchFacesByImage(
+  new SearchFacesByImageCommand({
+    CollectionId: "staff",
+    Image: { S3Object: { Bucket: "photos", Name: "door/visitor.jpg" } },
+  }),
+);
+
+console.log(found.FaceMatches.map((match) => match.Face.ExternalImageId));
+// [ "ada" ]
+
+const deleted = await simRekognition.deleteFaces(
+  new DeleteFacesCommand({
+    CollectionId: "staff",
+    FaceIds: listed.Faces.map((face) => face.FaceId),
+  }),
+);
+
+console.log(deleted.DeletedFaces.length); // 1
+```
+
+Each indexed face gets a `FaceId` of its own, and every face from one call shares an `ImageId`. Both
+are uuids, as they are on AWS. An application that stores a `FaceId` and looks it up later works
+here the way it works there.
+
+A declared match reaches the faces the searched collection holds. `DeleteFaces` removes one and the
+same rule then finds nobody. One rule covers both sides of a deletion. `DeletedFaces` reports the
+ids that were there, and an id the collection never held comes back in
+`UnsuccessfulFaceDeletions` as `FACE_NOT_FOUND`.
+
+`FaceMatchThreshold` filters on the similarity the rule stated and defaults to 80, as it does on
+AWS. `MaxFaces` caps how many matches come back, most alike first. A search with an image the
+`faces()` rules give no face raises `InvalidParameterException`, as real Rekognition does when there
+is no face to search with.
+
+`ListFaces` reports the faces one collection holds, in the order they were indexed, and narrows to
+the ids a request names. `MaxResults` pages the listing and the `NextToken` in the response reaches
+the next page. A listing that asks for no page size comes back whole.
+
 ## Permissions and errors
 
 Each detection is authorized as its own action against `*`, one of
@@ -763,10 +928,13 @@ Each detection is authorized as its own action against `*`, one of
 Rekognition gives the detection operations no resource-level permissions, and a policy naming an ARN
 reaches nothing, here as on AWS.
 
-A collection is the other kind. It has an ARN, so `rekognition:CreateCollection` and
-`rekognition:DeleteCollection` authorize against that collection's ARN, and a policy naming one
-collection reaches only that collection. `rekognition:ListCollections` reads them all, so it
-authorizes against `*`. A denial throws `AccessDeniedException` with a 400 status, which is
+A collection is the other kind. It has an ARN, so `rekognition:CreateCollection`,
+`rekognition:DeleteCollection`, `rekognition:IndexFaces`, `rekognition:ListFaces`,
+`rekognition:SearchFacesByImage` and `rekognition:DeleteFaces` authorize against that collection's
+ARN, and a policy naming one collection reaches only that collection. `rekognition:ListCollections`
+reads them all, so it authorizes against `*`. Each face operation is authorized before the
+collection is looked up. A caller with no permission for a collection never learns whether it is
+there. A denial throws `AccessDeniedException` with a 400 status, which is
 what real Rekognition answers with, where several other services use 403.
 
 The caller is authorized for the detection before the image is read. A caller without the Rekognition
@@ -829,16 +997,36 @@ Simulated Rekognition currently supports:
   `rekognition:DetectFaces`, with the image read from S3 as the caller
 - `CreateCollectionCommand`, `ListCollectionsCommand` and `DeleteCollectionCommand`, scoped to one
   Account and Region
-- IAM authorization on `rekognition:CreateCollection` and `rekognition:DeleteCollection` against the
-  collection's own ARN, and on `rekognition:ListCollections` against `*`
+- `IndexFacesCommand`, `ListFacesCommand`, `SearchFacesByImageCommand` and `DeleteFacesCommand`,
+  with the faces put in a collection taken from the `faces()` rules for the image they came from
+- Face searches declared through `faceMatches()`, by the external image id a face was indexed under
+  or by the face id `IndexFaces` answered with, filtered by `FaceMatchThreshold` and capped by
+  `MaxFaces`
+- `ListFaces` narrowing to named face ids, and paging on `MaxResults` and `NextToken`
+- IAM authorization on `rekognition:CreateCollection`, `rekognition:DeleteCollection`,
+  `rekognition:IndexFaces`, `rekognition:ListFaces`, `rekognition:SearchFacesByImage` and
+  `rekognition:DeleteFaces` against the collection's own ARN, and on `rekognition:ListCollections`
+  against `*`
 - SDK interception of `RekognitionClient`, including from inside a simulated Lambda function
 
 ## Limitations
 
 - `DetectText`, `CompareFaces` and the video operations are left out. An intercepted client sending
   one of those Commands is refused by name.
-- A collection holds no faces. `IndexFaces`, `SearchFacesByImage`, `ListFaces` and `DeleteFaces` are
-  left out, so what a collection is here is its identity and its lifecycle.
+- `SearchFaces`, which searches by face id, and the `SearchUsers` and user association operations are
+  left out. An intercepted client sending one of those Commands is refused by name.
+- `QualityFilter` is refused on `IndexFaces` and `SearchFacesByImage`. Real Rekognition uses it to
+  drop faces it judges too blurry or too small. Nothing here judges an image. A filter set on the
+  request would drop faces on AWS and keep them here.
+- A `MaxFaces` on `IndexFaces` takes the faces in the order they were declared, and the rest come
+  back in `UnindexedFaces` as `EXCEEDS_MAX_FACES`. Real Rekognition indexes the largest.
+- A search reports the first face declared for the image as the one it searched with. Real
+  Rekognition uses the largest, and nothing here measures a face.
+- `UserId` is refused on `ListFaces`, and `UnsuccessfulFaceDeletions` never reports
+  `ASSOCIATED_TO_AN_EXISTING_USER`. A face is never associated with a user here. A listing narrowed
+  to one would answer with the whole collection.
+- A `ListFaces` page with no `MaxResults` holds the whole collection. Real Rekognition pages at a
+  thousand faces. The two differ only for a collection larger than that.
 - A face detection reports the emotions that were declared and no others. Real `DetectFaces` returns
   all eight emotion types every time, with the ones it failed to see at a low confidence. Declare
   the emotions the code under test reads.
