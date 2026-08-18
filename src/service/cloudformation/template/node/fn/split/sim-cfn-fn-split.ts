@@ -29,16 +29,21 @@ export class SimCfnFnSplit extends SimCfnNode {
    * before Resources exist, re-emits this function in template form for a
    * later resolution pass to finish.
    *
-   * A string still holding a dynamic reference is deferred the same way. The
-   * delimiters are inside the value Parameter Store has yet to answer with,
-   * which is the whole point of splitting a `StringList` parameter, so
-   * splitting now would cut up the reference instead.
+   * A string still holding a dynamic reference is deferred the same way, on
+   * the pass that has no service to read one with. The delimiters are inside
+   * the value that service has yet to answer with, which is the whole point of
+   * splitting a `StringList` parameter, so splitting now would cut up the
+   * reference. A reference left after the reading pass belongs to a service
+   * with no resolver, and is split as the plain text it stayed.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
     const source = this.source.resolve(context);
 
     if (typeof source === "string") {
-      if (hasSimCfnDynamicReference(source)) {
+      if (
+        context.dynamicReferences === undefined &&
+        hasSimCfnDynamicReference(source)
+      ) {
         return { "Fn::Split": [this.delimiter, source] };
       }
 
