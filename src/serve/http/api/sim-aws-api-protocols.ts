@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../service/aws/caller/sim-aws-caller.js";
 import type { SimAws } from "../../../service/aws/sim-aws.js";
 import { simCloudFormationApiEndpoint } from "../../../service/cloudformation/serve/sim-cloudformation-api.js";
+import { simLambdaApiEndpoint } from "../../../service/lambda/serve/api/sim-lambda-api.js";
 import { SimS3ApiEndpoint } from "../../../service/s3/serve/api/sim-s3-api.js";
 import { simSnsApiEndpoint } from "../../../service/sns/serve/sim-sns-api.js";
 import { simStsApiEndpoint } from "../../../service/sts/serve/sim-sts-api.js";
@@ -41,6 +42,7 @@ const simAwsProtocolEndpointFactories = new Map<
   ["sts", simStsApiEndpoint],
   ["sns", simSnsApiEndpoint],
   ["cloudformation", simCloudFormationApiEndpoint],
+  ["lambda", simLambdaApiEndpoint],
 ]);
 
 /**
