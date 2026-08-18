@@ -10,7 +10,29 @@ import {
   simLambdaNoOutputSink,
   type SimLambdaOutputSink,
 } from "../../logging/sim-lambda-output-sink.js";
+import { makeSimLambdaOutboundFetch } from "../../outbound/sim-lambda-outbound-fetch.js";
+import type { SimLambdaOutboundHttp } from "../../outbound/sim-lambda-outbound-http.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
+
+/**
+ * What the sandbox a function's code runs in is built from.
+ */
+export interface SimLambdaVmContextProperties {
+  readonly environment: SimLambdaEnvironment;
+
+  /** The time the sandbox reports, the real one by default. */
+  readonly clock?: SimClock | undefined;
+
+  /** Where the sandbox's output is recorded, nowhere by default. */
+  readonly sink?: SimLambdaOutputSink | undefined;
+
+  /**
+   * Where the sandbox's `fetch` requests to hostnames the simulation serves
+   * are answered. Without one every request reaches the network, as the host
+   * `fetch` would.
+   */
+  readonly outboundHttp?: SimLambdaOutboundHttp | undefined;
+}
 
 /**
  * Create the sandbox vm context that sim Lambda function code runs in.
@@ -24,13 +46,20 @@ import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
  * Zip code needs nothing like the process.env and Date handling the
  * in-process handler path does: this sandbox already owns its globals, so
  * both the host environment and the host clock are invisible here, and
- * nothing outside the sandbox is touched to arrange that.
+ * nothing outside the sandbox is touched to arrange that. The same goes for
+ * the HTTP clients: the `fetch` in here is the sandbox's own, and it answers
+ * from the simulation for the hostnames the simulation serves.
  */
 export function makeSimLambdaVmContext(
-  environment: SimLambdaEnvironment,
-  clock: SimClock = new SimRealClock(),
-  sink: SimLambdaOutputSink = simLambdaNoOutputSink,
+  properties: SimLambdaVmContextProperties,
 ): vm.Context {
+  const {
+    environment,
+    clock = new SimRealClock(),
+    sink = simLambdaNoOutputSink,
+    outboundHttp,
+  } = properties;
+
   // Writable standard streams, as the real runtime provides. Code that builds
   // its own console over them, as AWS Lambda Powertools' logger does, throws
   // at module load without them.
@@ -67,5 +96,17 @@ export function makeSimLambdaVmContext(
     URLSearchParams,
     structuredClone,
     crypto,
+    // The Fetch API the Node.js runtime provides, with the client itself
+    // routed into the simulation. The rest are the host's own, so the objects
+    // a handler builds and the ones the simulation answers with are the same
+    // kind of thing.
+    fetch: makeSimLambdaOutboundFetch(outboundHttp),
+    Headers,
+    Request,
+    Response,
+    FormData,
+    Blob,
+    AbortController,
+    AbortSignal,
   });
 }

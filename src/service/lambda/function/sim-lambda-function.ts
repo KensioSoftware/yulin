@@ -13,7 +13,8 @@ import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-wri
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
-import { simLambdaProcessClock } from "./invoke/sim-lambda-process-clock.js";
+import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
+import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import {
   defaultLambdaHandler,
@@ -96,6 +97,13 @@ interface SimLambdaFunctionProperties {
    * only to the host streams.
    */
   logs?: SimLogsServiceWriter | undefined;
+  /**
+   * Where the HTTP requests this function's code makes to hostnames the
+   * simulation serves are answered. A function built standalone, outside a
+   * SimAws instance, has no simulation to answer them and reaches the network
+   * as any other code would.
+   */
+  outboundHttp?: SimLambdaOutboundHttp | undefined;
 }
 
 /**
@@ -132,6 +140,7 @@ export class SimLambdaFunction {
   private readonly runner = new SimLambdaHandlerRunner();
   private readonly clock: SimClock;
   private readonly logging: SimLambdaFunctionLogging;
+  private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
 
   constructor(properties: SimLambdaFunctionProperties) {
     const {
@@ -150,6 +159,7 @@ export class SimLambdaFunction {
       runAsOwner = this,
       clock = new SimRealClock(),
       logs,
+      outboundHttp,
     } = properties;
     this.clock = clock;
     this.name = name as SimLambdaFunctionName;
@@ -170,6 +180,7 @@ export class SimLambdaFunction {
         memorySizeMb,
       });
     this.runAsOwner = runAsOwner;
+    this.outboundHttp = outboundHttp;
     this.logging = new SimLambdaFunctionLogging({
       functionName: name,
       logs,
@@ -256,7 +267,7 @@ export class SimLambdaFunction {
       async () =>
         await this.environment.runWith(
           async () =>
-            await this.runWithSimulatedTime(
+            await this.runInHostScope(
               async () =>
                 await this.logging.around(
                   async () =>
@@ -272,17 +283,17 @@ export class SimLambdaFunction {
   }
 
   /**
-   * Run an invocation with this simulation's time as the current time.
-   *
-   * Only code running in the host scope needs this. Zip code reads the Date
-   * its own vm sandbox was given, so a function backed by one leaves the
-   * global Date alone entirely.
+   * Run an invocation with the process globals host-scope code reads bridged
+   * to this simulation: the current time, and the HTTP clients it reaches for.
    */
-  private async runWithSimulatedTime<T>(run: () => Promise<T>): Promise<T> {
+  private async runInHostScope<T>(run: () => Promise<T>): Promise<T> {
     if (!this.code.runsInHostScope) {
       return await run();
     }
 
-    return await simLambdaProcessClock.run(this.clock, run);
+    return await runSimLambdaInHostScope(
+      { clock: this.clock, outboundHttp: this.outboundHttp },
+      run,
+    );
   }
 }

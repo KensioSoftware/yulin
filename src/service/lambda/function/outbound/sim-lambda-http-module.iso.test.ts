@@ -7,11 +7,8 @@ import {
   assertStringIncludes,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import type {
-  SimSdkWireRequest,
-  SimSdkWireResponse,
-} from "../../../../../../sdk/wire/sim-sdk-wire.types.js";
-import { makeSimLambdaVmHttpModule } from "./sim-lambda-vm-http-module.js";
+import { makeSimLambdaHttpModule } from "./sim-lambda-http-module.js";
+import type { SimLambdaOutboundHttp } from "./sim-lambda-outbound-http.js";
 
 /**
  * A host module stub, so what the wrapper passes through is observable without
@@ -32,18 +29,24 @@ function hostModuleStub(calls: unknown[][]): Record<string, unknown> {
   };
 }
 
-function respondWith(
-  requests: SimSdkWireRequest[],
+/**
+ * A simulation serving one hostname, recording what it was asked for.
+ */
+function servingSimulation(
+  requests: Request[],
   body = '{"answered":true}',
-): (request: SimSdkWireRequest) => Promise<SimSdkWireResponse> {
-  return (request): Promise<SimSdkWireResponse> => {
-    requests.push(request);
+): SimLambdaOutboundHttp {
+  return {
+    serves: (hostname): boolean => hostname === "orders.example.test",
+    fetch: (request): Promise<Response> => {
+      requests.push(request);
 
-    return Promise.resolve({
-      statusCode: 200,
-      headers: Object.fromEntries([["content-type", "application/json"]]),
-      body: Buffer.from(body),
-    });
+      return Promise.resolve(
+        new Response(body, {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    },
   };
 }
 
@@ -56,13 +59,13 @@ async function readResponse(message: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString();
 }
 
-describe("sim Lambda vm HTTP module", () => {
+describe("sim Lambda HTTP transport module", () => {
   it("keeps everything the host module exports", () => {
     // Given a wrapped host module.
-    const module = makeSimLambdaVmHttpModule(
-      hostModuleStub([]),
-      respondWith([]),
-    );
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub([]),
+      outbound: servingSimulation([]),
+    });
 
     // Then what a client library reaches for besides the request functions is
     // the host module's own.
@@ -72,39 +75,44 @@ describe("sim Lambda vm HTTP module", () => {
     );
   });
 
-  it("answers a request to an AWS endpoint from the simulation", async () => {
+  it("answers a request the simulation serves from the simulation", async () => {
     // Given a wrapped module over a simulation that answers.
-    const dispatched: SimSdkWireRequest[] = [];
+    const answered: Request[] = [];
     const calls: unknown[][] = [];
-    const module = makeSimLambdaVmHttpModule(
-      hostModuleStub(calls),
-      respondWith(dispatched),
-    );
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub(calls),
+      outbound: servingSimulation(answered),
+    });
     const request = module["request"] as (...a: unknown[]) => Writable;
 
-    // When a request to an AWS endpoint is made and its body written.
+    // When a request to that hostname is made and its body written.
     const response = await new Promise<IncomingMessage>((resolve) => {
       const outgoing = request(
         {
-          host: "dynamodb.eu-west-2.amazonaws.com",
+          host: "orders.example.test",
           method: "POST",
-          path: "/",
+          path: "/oauth2/token",
           headers: Object.fromEntries([
-            ["x-amz-target", "DynamoDB_20120810.GetItem"],
+            ["content-type", "application/x-www-form-urlencoded"],
           ]),
         },
         resolve,
       );
-      outgoing.end('{"TableName":"orders"}');
+      outgoing.end("grant_type=authorization_code");
     });
 
     // Then the simulation received the request as it was written.
-    assertArrayLength(dispatched, 1);
-    const [dispatchedRequest] = dispatched;
-    assertNonNullable(dispatchedRequest);
+    assertArrayLength(answered, 1);
+    const [answeredRequest] = answered;
+    assertNonNullable(answeredRequest);
+    assertIdentical(answeredRequest.method, "POST");
     assertIdentical(
-      Buffer.from(dispatchedRequest.body).toString(),
-      '{"TableName":"orders"}',
+      answeredRequest.url,
+      "https://orders.example.test/oauth2/token",
+    );
+    assertIdentical(
+      await answeredRequest.text(),
+      "grant_type=authorization_code",
     );
 
     // And the answer reads back as an HTTP response.
@@ -116,17 +124,47 @@ describe("sim Lambda vm HTTP module", () => {
     assertArrayLength(calls, 0);
   });
 
+  it("makes the request with the scheme the module carries", async () => {
+    // Given the module standing in for `node:http`.
+    const answered: Request[] = [];
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub([]),
+      outbound: servingSimulation(answered),
+      scheme: "http:",
+    });
+
+    // When a request naming no scheme of its own is made.
+    await new Promise<IncomingMessage>((resolve) => {
+      const outgoing = (module["request"] as (...a: unknown[]) => Writable)(
+        { host: "orders.example.test", method: "POST", path: "/" },
+        resolve,
+      );
+      outgoing.end("{}");
+    });
+
+    // Then the module's own scheme is the one the simulation is asked with.
+    const [answeredRequest] = answered;
+    assertNonNullable(answeredRequest);
+    assertIdentical(answeredRequest.url, "http://orders.example.test/");
+  });
+
   it("fails the request when the simulation cannot route it", async () => {
     // Given a wrapped module over a simulation that refuses.
-    const module = makeSimLambdaVmHttpModule(hostModuleStub([]), async () => {
-      await Promise.resolve();
-      throw new Error("Cannot route this");
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub([]),
+      outbound: {
+        serves: (): boolean => true,
+        fetch: async (): Promise<Response> => {
+          await Promise.resolve();
+          throw new Error("Cannot route this");
+        },
+      },
     });
     const request = module["request"] as (...a: unknown[]) => Writable;
 
-    // When a request to an AWS endpoint is made.
+    // When a request the simulation serves is made.
     const error = await new Promise<Error>((resolve) => {
-      const outgoing = request({ host: "sqs.eu-west-2.amazonaws.com" });
+      const outgoing = request({ host: "orders.example.test" });
       outgoing.on("error", resolve);
       outgoing.end();
     });
@@ -137,12 +175,12 @@ describe("sim Lambda vm HTTP module", () => {
 
   it("accepts the socket controls a client sets on a request", () => {
     // Given a request the simulation will answer.
-    const module = makeSimLambdaVmHttpModule(
-      hostModuleStub([]),
-      respondWith([]),
-    );
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub([]),
+      outbound: servingSimulation([]),
+    });
     const outgoing = (module["request"] as (...a: unknown[]) => Writable)({
-      host: "kms.eu-west-2.amazonaws.com",
+      host: "orders.example.test",
     }) as Writable & {
       setTimeout: () => unknown;
       setNoDelay: () => unknown;
@@ -160,12 +198,13 @@ describe("sim Lambda vm HTTP module", () => {
   it("leaves requests to anywhere else to the host module", () => {
     // Given a wrapped module.
     const calls: unknown[][] = [];
-    const module = makeSimLambdaVmHttpModule(
-      hostModuleStub(calls),
-      respondWith([]),
-    );
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub(calls),
+      outbound: servingSimulation([]),
+    });
 
-    // When requests to a non-AWS host are made both ways.
+    // When requests to a hostname the simulation serves nothing at are made
+    // both ways.
     const requested = (module["request"] as (...a: unknown[]) => unknown)({
       host: "api.example.com",
     });
@@ -182,32 +221,24 @@ describe("sim Lambda vm HTTP module", () => {
 
   it("ends the body of a simulated get, as the host module does", async () => {
     // Given a wrapped module over a simulation that answers.
-    const dispatched: SimSdkWireRequest[] = [];
-    const module = makeSimLambdaVmHttpModule(
-      hostModuleStub([]),
-      respondWith(dispatched),
-    );
+    const answered: Request[] = [];
+    const module = makeSimLambdaHttpModule({
+      hostModule: hostModuleStub([]),
+      outbound: servingSimulation(answered),
+    });
 
-    // When a get to an AWS endpoint is made with nothing written to it.
+    // When a get to that hostname is made with nothing written to it.
     await new Promise<IncomingMessage>((resolve) => {
       (module["get"] as (...a: unknown[]) => unknown)(
-        "https://logs.eu-west-2.amazonaws.com/",
-        Object.fromEntries([
-          [
-            "headers",
-            Object.fromEntries([
-              ["x-amz-target", "Logs_20140328.PutLogEvents"],
-            ]),
-          ],
-        ]),
+        "https://orders.example.test/.well-known/jwks.json",
         resolve,
       );
     });
 
     // Then it was answered without the caller ending it.
-    assertArrayLength(dispatched, 1);
-    const [dispatchedRequest] = dispatched;
-    assertNonNullable(dispatchedRequest);
-    assertIdentical(dispatchedRequest.method, "GET");
+    assertArrayLength(answered, 1);
+    const [answeredRequest] = answered;
+    assertNonNullable(answeredRequest);
+    assertIdentical(answeredRequest.method, "GET");
   });
 });

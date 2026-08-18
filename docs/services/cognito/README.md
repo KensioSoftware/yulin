@@ -1557,6 +1557,11 @@ console.log(claims["cognito:username"]); // "Google_108412093487519382745"
 console.log(claims["email"]); // "someone@example.com"
 ```
 
+A simulated Lambda reaches the same token endpoint. A handler that exchanges the code with `fetch`
+or `node:https` is answered by the simulated domain on the hostname its own code already names, so
+the callback the whole of a site's sign-in passes through can be tested as it is deployed. See
+[the HTTP requests function code makes](../lambda/#the-http-requests-function-code-makes "Simulated Lambda usage docs").
+
 The pool creates a user of its own for each external subject the first time it signs in, exactly as
 real Cognito does. The username is the provider name and the subject with an underscore between
 them, the status is `EXTERNAL_PROVIDER`, and the provider's claims reach the user through the

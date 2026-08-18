@@ -17,6 +17,7 @@ import type { SimLambdaContainerImages } from "../../function/code/image/sim-lam
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
+import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import { SimLambdaEnvironment } from "../../function/environment/sim-lambda-environment.js";
 import {
@@ -47,6 +48,7 @@ interface CreateFunctionCommandHandlerProperties {
   vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
   environmentConflicts?: SimLambdaEnvironmentConflicts;
   logs?: SimLogsServiceWriter | undefined;
+  outboundHttp?: SimLambdaOutboundHttp | undefined;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -70,6 +72,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly codeResolver: SimLambdaCodeResolver;
   private readonly environmentConflicts: SimLambdaEnvironmentConflicts;
   private readonly logs: SimLogsServiceWriter | undefined;
+  private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
@@ -83,6 +86,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       vmSdkModuleProvider,
       environmentConflicts = new SimLambdaEnvironmentConflicts(),
       logs,
+      outboundHttp,
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
@@ -93,12 +97,14 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       codeStore,
       containerImages,
       vmSdkModuleProvider,
+      outboundHttp,
       // The background scheduler is this simulation's clock, and the same one
       // the created function is given.
       clock: background,
     });
     this.environmentConflicts = environmentConflicts;
     this.logs = logs;
+    this.outboundHttp = outboundHttp;
   }
 
   /**
@@ -144,6 +150,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       runAsOwner: this.runAsOwner,
       clock: this.background,
       logs: this.logs,
+      outboundHttp: this.outboundHttp,
     });
 
     this.functions.set(simFunction.name, simFunction);

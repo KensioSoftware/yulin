@@ -27,6 +27,7 @@ import {
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLogsServiceWriter } from "../logs/write/sim-logs-service-writer.js";
+import type { SimLambdaOutboundHttp } from "./function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
 import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import { SimLambdaFunctionLookup } from "./function/url/sim-lambda-function-lookup.js";
@@ -45,6 +46,13 @@ export interface SimLambdaProperties {
   readonly containerImages?: SimLambdaContainerImages;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
   readonly logs?: SimLogsServiceWriter | undefined;
+  /**
+   * Where the HTTP requests this simulated Lambda's function code makes to
+   * hostnames the simulation serves are answered. A standalone SimLambda has
+   * no simulated environment to answer them, so its functions reach the
+   * network as any other code would.
+   */
+  readonly outboundHttp?: SimLambdaOutboundHttp;
   readonly urlRegistry?: SimLambdaUrlRegistry;
   readonly eventSourceQueues?: SimSqsPollQueues;
   readonly eventSourceStreams?: SimLambdaEventSourceStreams;
@@ -86,6 +94,7 @@ export class SimLambdaCommands {
       codeStore,
       vmSdkModuleProvider,
       logs,
+      outboundHttp,
       // A standalone SimLambda is not reachable over HTTP, so its own registry
       // is enough; a SimAws-created one shares the environment-wide registry
       // the serving layer routes with.
@@ -150,6 +159,7 @@ export class SimLambdaCommands {
       containerImages,
       vmSdkModuleProvider,
       logs,
+      outboundHttp,
     });
   }
 }

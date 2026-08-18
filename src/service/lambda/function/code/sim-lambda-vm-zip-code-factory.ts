@@ -5,9 +5,11 @@ import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.
 import type { SimLambdaCodeResolveContext } from "./sim-lambda-code-resolver.js";
 import { SimLambdaVmZipCode } from "./sim-lambda-vm-zip-code.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 
 interface SimLambdaVmZipCodeFactoryProperties {
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  readonly outboundHttp?: SimLambdaOutboundHttp | undefined;
   readonly clock?: SimClock | undefined;
 }
 
@@ -22,10 +24,12 @@ export class SimLambdaVmZipCodeFactory {
   private readonly vmSdkModuleProvider:
     | SimLambdaVmSdkModuleProvider
     | undefined;
+  private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
   private readonly clock: SimClock | undefined;
 
   constructor(properties: SimLambdaVmZipCodeFactoryProperties) {
     this.vmSdkModuleProvider = properties.vmSdkModuleProvider;
+    this.outboundHttp = properties.outboundHttp;
     this.clock = properties.clock;
   }
 
@@ -46,6 +50,7 @@ export class SimLambdaVmZipCodeFactory {
       handlerName: context.handlerName,
       environment: context.environment,
       sdkModuleProvider: this.vmSdkModuleProvider,
+      outboundHttp: this.outboundHttp,
       clock: this.clock,
     });
   }

@@ -3,6 +3,8 @@ import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs
 import { SimEcrLambdaContainerImages } from "../../lambda/function/code/image/sim-ecr-lambda-container-images.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
+import { makeSimLambdaOutboundHttp } from "../../lambda/function/outbound/sim-lambda-outbound-http.factory.js";
+import type { SimLambdaOutboundHttp } from "../../lambda/function/outbound/sim-lambda-outbound-http.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
@@ -27,6 +29,7 @@ interface SimAwsLambdaCollaborators {
   readonly eventSourceQueues: SimSqsEventSourceQueues;
   readonly eventSourceStreams: SimDynamoDbEventSourceStreams;
   readonly vmSdkModuleProvider: SimSdkLambdaVmModuleProvider;
+  readonly outboundHttp: SimLambdaOutboundHttp;
   readonly logs: SimLogsServiceWriter;
 }
 
@@ -50,13 +53,24 @@ interface SimAwsLambdaCollaborators {
  * Handler output is recorded to the same Account/Region scope's simulated
  * CloudWatch Logs, since that is where `/aws/lambda/<name>` lives for a
  * function in this scope.
+ *
+ * The HTTP requests function code makes are answered by this whole SimAws
+ * rather than by this scope, because a hostname says which Account and Region
+ * serves it: an AWS API request carries the Region it was signed for, and
+ * every other hostname is resolved by simulated Route53, which is
+ * simulation-wide.
  */
 export function simAwsLambdaCollaborators(
   properties: SimAwsLambdaCollaboratorsProperties,
 ): SimAwsLambdaCollaborators {
   const { simAws, scope } = properties;
+  const outboundHttp = makeSimLambdaOutboundHttp({
+    simAws,
+    regionName: scope.accountRegionScope.regionName,
+  });
 
   return {
+    outboundHttp,
     runAsOwner: simAws,
     logs: scope.logs().serviceWriter(),
     urlRegistry: properties.urlRegistry,
@@ -71,6 +85,7 @@ export function simAwsLambdaCollaborators(
     vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
       simAws,
       regionName: scope.accountRegionScope.regionName,
+      outboundHttp,
     }),
   };
 }

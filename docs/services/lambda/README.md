@@ -412,9 +412,105 @@ Values the JSON protocols encode travel in their encoded form: a binary attribut
 bundled SDK is stored base64-encoded and decodes correctly when the same path reads it back, but an
 in-process intercepted client reading it sees the encoded string rather than the bytes.
 
-Only service API endpoints are answered this way. A request to the endpoint of one resource, such
-as a Lambda Function URL or an API Gateway HTTP API, is an ordinary HTTP request rather than a
-serialized Command, and goes wherever it was addressed.
+Only service API endpoints are answered as Commands. The endpoint of one resource, such as a Lambda
+Function URL or an API Gateway HTTP API, carries an ordinary HTTP request. Those are routed by
+hostname, along with everything else a handler asks for over HTTP.
+
+## The HTTP requests function code makes
+
+A request from a handler to a hostname the simulation serves is answered by the simulation. It
+never leaves the process. `fetch`, `node:http` and `node:https` all reach it, so it makes no
+difference which client the handler was written with.
+
+Two kinds of hostname are served. The AWS service API endpoints are answered as Commands, which is
+what the section above covers. Everything simulated Route53 resolves is answered over the same
+in-process HTTP entry point a browser on localhost reaches, which covers a
+[Cognito user pool domain](../cognito/ "Simulated Cognito usage docs") in both of its forms
+(`<prefix>.auth.<region>.amazoncognito.com` and a custom domain such as `auth.example.com`), an
+[API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway usage docs"), a
+[load balancer](../elbv2/ "Simulated ELBv2 usage docs") and anything a hosted-zone record points at
+one of those.
+
+A hostname the simulation serves nothing at goes where it was addressed. A handler calling a
+payment API or a webhook reaches the network as it always did.
+
+The authorization code grant is the request this exists for. Cognito issues an authorization code
+to the browser and the application exchanges it for tokens from its own server, and there is no SDK
+operation for that exchange. It is a POST to `/oauth2/token` on the pool's domain, which is a
+hostname the simulation now serves:
+
+```typescript sim-lambda-outbound-token-exchange
+/**
+ * A simulated Lambda exchanging an authorization code for tokens at the
+ * simulated Cognito user pool domain that issued it.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+// The pool's domain, the app client the callback authenticates as, and the
+// code the browser carried to it.
+declare const domainHost: string;
+declare const clientId: string;
+declare const clientSecret: string;
+declare const callbackUrl: string;
+declare const authorizationCode: string;
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "user",
+    Role: "arn:aws:iam::111111111111:role/UserRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(async (event: { code: string }) => {
+        const credentials = `${clientId}:${clientSecret}`;
+        const response = await fetch(`https://${domainHost}/oauth2/token`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: `Basic ${Buffer.from(credentials).toString("base64")}`,
+          },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: event.code,
+            redirect_uri: callbackUrl,
+          }).toString(),
+        });
+
+        return await response.json();
+      }),
+    },
+  }),
+);
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "user",
+    Payload: JSON.stringify({ code: authorizationCode }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+
+// The id, access and refresh tokens the pool issued.
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+Zip-packaged code takes its three clients from the sandbox the vm runtime builds around it, and
+nothing outside that sandbox is touched. A handler function reference is a closure over your own
+module scope and reads the same globals as the rest of the test run, so those globals are bridged
+for the length of an invocation, in the way `process.env` and `Date` are (see
+[Read environment variables inside the handler](#read-environment-variables-inside-the-handler)).
+With no invocation running they behave as they always did, which leaves a request a handler module
+makes while it is being imported going to the network.
+
+A response comes back from the simulation as it was answered. A redirect arrives as the `302` it
+is, where the host `fetch` would have followed it.
 
 ## Invocation types
 
@@ -2220,6 +2316,8 @@ Sim Lambda currently supports:
 - Per-function environment variables with `Environment.Variables`
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment
+- `fetch`, `node:http` and `node:https` requests from function code, answered by the simulation for
+  every hostname it serves, including a Cognito user pool domain's OAuth endpoints
 - Execution roles, evaluated against simulated IAM
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
@@ -2277,6 +2375,14 @@ Current documented limitations:
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value
   instead. See [Environment variables](#environment-variables).
+- Outbound HTTP is routed for `fetch`, `node:http` and `node:https` only. A handler using another
+  client, or a request made from a handler module while it is being imported, reaches the network.
+  A routed response is returned as the simulation answered it, with redirects left for the caller
+  to follow. See [The HTTP requests function code makes](#the-http-requests-function-code-makes).
+- The AWS service API endpoints answered as Commands are the ones a request can be read back from,
+  and the hostnames answered over HTTP are the ones simulated Route53 resolves. The endpoints AWS
+  issues for one resource, a Lambda Function URL and an API Gateway HTTP API, resolve under the
+  hostnames the simulator serves them on rather than under `.on.aws` and `.amazonaws.com`.
 - `Timeout` is recorded but does not interrupt handler execution.
 - Timers inside a handler are host timers: `setTimeout` waits in real time, and advancing the
   simulation's clock does not release a sleeping handler.

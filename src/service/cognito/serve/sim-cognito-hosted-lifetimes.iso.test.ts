@@ -9,10 +9,10 @@ import { describe, it } from "vitest";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import {
+  simCognitoAuthorizationCode,
   simCognitoCallbackUrl,
   simCognitoDomainHost,
   simCognitoHosted,
-  simCognitoSignedInAtGoogle,
   type SimCognitoHostedSetUp,
 } from "../../../../test/cognito/federation-fixture.js";
 
@@ -20,29 +20,6 @@ function hostedUrl(path: string, query = ""): string {
   return new SimAwsLocalUrl({
     input: `https://${simCognitoDomainHost}${path}${query}`,
   }).toString();
-}
-
-async function signedInCode(setUp: SimCognitoHostedSetUp): Promise<string> {
-  simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
-    email: "someone@example.com",
-  });
-
-  const parameters = new URLSearchParams({
-    response_type: "code",
-    client_id: setUp.clientId,
-    redirect_uri: simCognitoCallbackUrl,
-    identity_provider: "Google",
-  });
-  const response = await new SimAwsHttp({ simAws: setUp.simAws }).fetch(
-    hostedUrl("/oauth2/authorize", `?${parameters.toString()}`),
-  );
-  const location = response.headers.get("location");
-  assertNonNullable(location);
-
-  const code = new URL(location).searchParams.get("code");
-  assertNonNullable(code);
-
-  return code;
 }
 
 async function exchange(
@@ -70,7 +47,7 @@ describe("How long a sim Cognito hosted grant lasts", () => {
     // Given an authorization code, which lasts the five minutes real Cognito
     // gives one.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
 
     // When it is exchanged six minutes later.
     await setUp.simAws.clock().advanceBy({ minutes: 6 });
@@ -84,7 +61,7 @@ describe("How long a sim Cognito hosted grant lasts", () => {
   it("refuses a grant for a user the pool no longer holds", async () => {
     // Given an authorization code for a user that is then deleted.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
     await setUp.cognito.adminDeleteUser({
       input: {
         UserPoolId: setUp.userPoolId,
@@ -103,7 +80,7 @@ describe("How long a sim Cognito hosted grant lasts", () => {
   it("ignores a client authentication header it cannot read", async () => {
     // Given a public app client, which has no secret to present.
     const setUp = await simCognitoHosted();
-    const code = await signedInCode(setUp);
+    const code = await simCognitoAuthorizationCode(setUp);
 
     // When the request carries an authorization header with no client id and
     // secret in it.
