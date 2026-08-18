@@ -5,6 +5,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -41,4 +42,11 @@ export interface SimCloudFormationStackProperties {
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+
+  /**
+   * The export names published in the Account and Region this Stack deploys
+   * into. This Stack publishes its own Outputs here and reads the ones its
+   * `Fn::ImportValue` expressions name.
+   */
+  readonly exports?: SimCfnExports | undefined;
 }

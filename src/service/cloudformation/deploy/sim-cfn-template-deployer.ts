@@ -26,6 +26,7 @@ import type {
 import type { SimCreateStackCommandOutput } from "../command/create-stack/create-stack.command.js";
 import { CreateStackCommandHandler } from "../command/create-stack/create-stack.handler.js";
 import { faker } from "@faker-js/faker";
+import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 
 export interface SimCloudFormationCreateStackProperties {
   readonly stackName?: SimCloudFormationStackName | string;
@@ -51,6 +52,7 @@ interface SimCloudFormationTemplateDeployerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -68,6 +70,7 @@ export class SimCloudFormationTemplateDeployer {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
+  private readonly exports: SimCfnExports | undefined;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
   private readonly templateFileUpdater: SimCfnTemplateFileUpdater;
   private readonly watches: SimCfnTemplateFileWatches;
@@ -77,6 +80,7 @@ export class SimCloudFormationTemplateDeployer {
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
+    this.exports = properties.exports;
     this.templateFileUpdater = new SimCfnTemplateFileUpdater({
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
@@ -210,6 +214,7 @@ export class SimCloudFormationTemplateDeployer {
       background: this.background,
       cdkOutContext,
       bindings,
+      exports: this.exports,
     });
 
     return await handler.handle(command);

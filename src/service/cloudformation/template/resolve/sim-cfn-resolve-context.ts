@@ -3,6 +3,7 @@ import type { SimCfnResourceRefResolver as SimCfnResourceReferenceResolver } fro
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 import type { SimCfnConditions } from "../condition/sim-cfn-conditions.js";
+import { SimCfnExports } from "../../export/sim-cfn-exports.js";
 
 interface SimCfnResolveContextProperties {
   readonly parameters: SimCfnParameters;
@@ -10,6 +11,7 @@ interface SimCfnResolveContextProperties {
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
   readonly mappings?: SimCfnMappings | undefined;
   readonly conditions?: SimCfnConditions | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -21,6 +23,14 @@ export class SimCfnResolveContext {
   public readonly pseudoParameters: SimCfnPseudoParameters | undefined;
   public readonly mappings: SimCfnMappings | undefined;
   public readonly conditions: SimCfnConditions | undefined;
+  /**
+   * The export names a Stack deployed here can import.
+   *
+   * An empty set stands in where a caller resolves a template outside a
+   * simulation. An `Fn::ImportValue` there fails the lookup and is refused by
+   * export name.
+   */
+  public readonly exports: SimCfnExports;
 
   constructor(properties: SimCfnResolveContextProperties) {
     this.parameters = properties.parameters;
@@ -28,5 +38,6 @@ export class SimCfnResolveContext {
     this.pseudoParameters = properties.pseudoParameters;
     this.mappings = properties.mappings;
     this.conditions = properties.conditions;
+    this.exports = properties.exports ?? new SimCfnExports();
   }
 }

@@ -6,10 +6,12 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
 import type { SimCfnStackOutput } from "./sim-cfn-stack-output.js";
+import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 
 interface SimCfnStackOutputResolverProperties {
   readonly template: SimCfnTemplate;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -22,10 +24,12 @@ interface SimCfnStackOutputResolverProperties {
 export class SimCfnStackOutputResolver {
   private readonly template: SimCfnTemplate;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
+  private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: SimCfnStackOutputResolverProperties) {
     this.template = properties.template;
     this.resources = properties.resources;
+    this.exports = properties.exports;
   }
 
   /**
@@ -72,6 +76,7 @@ export class SimCfnStackOutputResolver {
     const resolver = new SimCfnTemplateValueResolver({
       parameters: this.template.parameters,
       pseudoParameters: this.template.pseudoParameters(),
+      exports: this.exports,
       resources: {
         has: (id): boolean => this.resources.has(id),
         refValue: (id): SimCfnTemplateValue => {

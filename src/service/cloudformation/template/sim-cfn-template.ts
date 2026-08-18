@@ -17,6 +17,7 @@ import type {
   SimCfnConditionsSection,
 } from "./condition/sim-cfn-conditions.js";
 import { SimCfnResourceConditions } from "./condition/sim-cfn-resource-conditions.js";
+import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -51,12 +52,14 @@ interface SimCfnTemplateProperties {
   readonly parameters?: SimCfnParameters | undefined;
   readonly stackName?: string | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 interface SimCfnTemplateFromJsonProperties {
   readonly stackName?: string | undefined;
   readonly parameters?: SimCfnParameters | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -68,15 +71,19 @@ export class SimCfnTemplate {
   public readonly template: CfnTemplateBodyRecord;
   public readonly stackName: string | undefined;
   public readonly parameters: SimCfnParameters;
+  /** The export names a Stack deployed from this template can import. */
+  public readonly exports: SimCfnExports | undefined;
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
   private evaluatedConditions: SimCfnConditions | undefined;
 
   constructor(properties: SimCfnTemplateProperties) {
-    const { template, parameters, stackName, accountRegionScope } = properties;
+    const { template, parameters, stackName, accountRegionScope, exports } =
+      properties;
 
     this.template = template;
     this.stackName = stackName;
     this.accountRegionScope = accountRegionScope;
+    this.exports = exports;
 
     const validator = new SimCfnTemplateBodyValidator({ template, stackName });
     validator.validate();
@@ -111,6 +118,7 @@ export class SimCfnTemplate {
       parameters: properties.parameters,
       stackName: properties.stackName,
       accountRegionScope: properties.accountRegionScope,
+      exports: properties.exports,
     });
   }
 
@@ -197,6 +205,7 @@ export class SimCfnTemplate {
         parameters: this.parameters,
         pseudoParameters: this.pseudoParameters(),
         mappings: this.template.Mappings,
+        exports: this.exports,
       }),
     }).evaluate();
 
@@ -209,6 +218,7 @@ export class SimCfnTemplate {
       pseudoParameters: this.pseudoParameters(),
       mappings: this.template.Mappings,
       conditions: this.conditions(),
+      exports: this.exports,
     });
   }
 }

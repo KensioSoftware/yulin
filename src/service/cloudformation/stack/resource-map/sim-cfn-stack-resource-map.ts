@@ -34,6 +34,7 @@ export function makeSimCfnStackResourceMap(
         template: resourceTemplate.template,
         parameters: template.parameters,
         resourceLogicalIds,
+        exports: template.exports,
       }),
     );
   }

@@ -15,7 +15,7 @@ import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deploymen
 import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
-import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
+import { SimCfnStackOutputs } from "./output/sim-cfn-stack-outputs.js";
 import { SimCfnStackOutputLookup } from "./output/sim-cfn-stack-output-lookup.js";
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
 import { SimCfnStackOperationStatus } from "./status/sim-cfn-stack-operation-status.js";
@@ -54,6 +54,7 @@ export class SimCfnStack {
   private readonly background: BackgroundScheduler;
   private readonly operations: SimCfnStackResourceOperations;
   private readonly operationStatus: SimCfnStackOperationStatus;
+  private readonly stackOutputs: SimCfnStackOutputs;
   private cfnTemplate: SimCfnTemplate;
 
   constructor(properties: SimCloudFormationStackProperties) {
@@ -65,10 +66,12 @@ export class SimCfnStack {
       template,
       cdkOutContext,
       bindings,
+      exports,
     } = properties;
 
     this.background = background;
     this.stackName = stackName;
+    this.stackOutputs = new SimCfnStackOutputs({ stackName, exports });
     this.cfnTemplate = template;
     this.template = this.cfnTemplate.template;
     this.resources = makeSimCfnStackResourceMap({
@@ -215,6 +218,7 @@ export class SimCfnStack {
    */
   async teardown(): Promise<void> {
     await this.operations.deleteAll(this.resources);
+    this.stackOutputs.release();
   }
 
   /**
@@ -282,10 +286,7 @@ export class SimCfnStack {
   }
 
   private resolveOutputs(): void {
-    this.outputs = new SimCfnStackOutputResolver({
-      template: this.cfnTemplate,
-      resources: this.resources,
-    }).resolve();
+    this.outputs = this.stackOutputs.resolve(this.cfnTemplate, this.resources);
   }
 }
 

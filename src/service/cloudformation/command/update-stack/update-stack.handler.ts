@@ -17,6 +17,7 @@ import {
 } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
+import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 import type {
   SimUpdateStackCommand,
   SimUpdateStackCommandOutput,
@@ -32,6 +33,9 @@ interface UpdateStackCommandHandlerProperties {
    * applied from a template file rather than from an SDK Command.
    */
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+
+  /** The export names published in this Account and Region. */
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -47,12 +51,14 @@ export class UpdateStackCommandHandler implements CommandHandler<
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: UpdateStackCommandHandlerProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
     this.cdkOutContext = properties.cdkOutContext;
+    this.exports = properties.exports;
   }
 
   /**
@@ -97,6 +103,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
           stackName,
           parameters: SimCfnParameters.fromInput(command.input, { stackName }),
           accountRegionScope: this.accountRegionScope,
+          exports: this.exports,
         },
       ),
       { cdkOutContext: this.cdkOutContext },

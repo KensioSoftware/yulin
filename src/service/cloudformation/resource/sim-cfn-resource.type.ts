@@ -7,6 +7,7 @@ import type { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimCfnResource } from "./sim-cfn-resource.js";
+import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 
 export interface SimCloudFormationResourceProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -17,6 +18,7 @@ export interface SimCloudFormationResourceProperties {
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
   readonly parameters?: SimCfnParameters | undefined;
   readonly resourceLogicalIds?: ReadonlySet<string> | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
