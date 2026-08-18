@@ -6,6 +6,12 @@ import type { SimS3ApiRoute } from "./sim-s3-api-route.type.js";
  */
 export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
   {
+    method: "HEAD",
+    target: "object",
+    commandName: "HeadObjectCommand",
+    input: objectInput,
+  },
+  {
     method: "GET",
     target: "object",
     commandName: "GetObjectCommand",

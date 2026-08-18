@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import {
   CreateBucketCommand,
   GetObjectCommand,
-  HeadObjectCommand,
+  GetBucketAclCommand,
   ListBucketsCommand,
   PutObjectCommand,
   S3Client,
@@ -234,12 +234,10 @@ describe("simulated AWS SDK", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(
-        new HeadObjectCommand({ Bucket: "bucket-a", Key: "foo.txt" }),
-      );
+      await client.send(new GetBucketAclCommand({ Bucket: "bucket-a" }));
     });
 
-    assertStringIncludes(error.message, "HeadObjectCommand");
+    assertStringIncludes(error.message, "GetBucketAclCommand");
     assertStringIncludes(error.message, "GetObjectCommand");
   });
 

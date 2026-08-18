@@ -137,6 +137,12 @@ console.log(listBucketsOutput.Buckets?.map((bucket) => bucket.Name));
 console.log(listBucketsOutput.Buckets?.[0]?.CreationDate);
 ```
 
+## Asking whether something is there
+
+`HeadObjectCommand` reports what a read would say about an Object without returning the Object, and `HeadBucketCommand` reports whether a Bucket is there and reachable. Both answer `NotFound` when it is absent, which is what real S3 answers a HEAD with. A read answers `NoSuchKey`, which a HEAD has no body to carry.
+
+`HeadObject` authorizes against `s3:GetObject` and `HeadBucket` against `s3:ListBucket`, as real S3 does, so knowing something is there needs the permission to read it.
+
 ## Listing Objects
 
 Use `ListObjectsV2Command` to list the Objects in a Bucket. The simulator supports `Prefix`,

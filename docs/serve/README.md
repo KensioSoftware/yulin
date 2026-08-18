@@ -290,7 +290,7 @@ const client = new S3Client({
 });
 ```
 
-The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, and the Bucket policy, website, Block Public Access and event notification configurations. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
+The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `HeadObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, and the Bucket policy, website, Block Public Access and event notification configurations. `aws s3 cp` works in both directions. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
 
 Simulated S3 also answers its own Bucket hostnames, covered above. That path is unchanged, and it is what a presigned URL and a website visitor use.
 
@@ -799,5 +799,4 @@ it is without watch mode.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
 - The served AWS service API covers S3, STS and the AWS JSON protocol services. A service speaking REST-JSON, or Query other than STS, is refused with `501 Not Implemented`.
 - `GetCallerIdentity` is the only STS operation served. `AssumeRole` over a port would mean the temporary credentials it issues have to sign the calls that follow, which is its own piece of work.
-- Simulated S3 implements no `HeadObject` or `HeadBucket`, so both are refused. `aws s3 cp` reads an Object with `HeadObject` before copying it, which puts that out of reach too.
 - A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

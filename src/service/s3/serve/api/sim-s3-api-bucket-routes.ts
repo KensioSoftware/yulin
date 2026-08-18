@@ -21,6 +21,12 @@ import type { SimS3ApiRoute } from "./sim-s3-api-route.type.js";
  */
 export const simS3BucketApiRoutes: readonly SimS3ApiRoute[] = [
   {
+    method: "HEAD",
+    target: "bucket",
+    commandName: "HeadBucketCommand",
+    input: bucketInput,
+  },
+  {
     method: "GET",
     target: "service",
     commandName: "ListBucketsCommand",

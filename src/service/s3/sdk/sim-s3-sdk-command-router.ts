@@ -9,6 +9,8 @@ import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
 } from "../command/get-object/get-object.command.js";
+import type { SimHeadBucketCommand } from "../command/head-bucket/head-bucket.command.js";
+import type { SimHeadObjectCommand } from "../command/head-object/head-object.command.js";
 import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.command.js";
 import type { SimListObjectsCommand } from "../command/list-objects/list-objects.command.js";
 import type { SimListObjectsV2Command } from "../command/list-objects-v2/list-objects-v2.command.js";
@@ -80,6 +82,22 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simS3.getBucketPolicy(
             command as SimGetBucketPolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "HeadBucketCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.headBucket(
+            command as SimHeadBucketCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "HeadObjectCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.headObject(
+            command as SimHeadObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],

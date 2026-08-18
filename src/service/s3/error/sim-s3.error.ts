@@ -40,6 +40,22 @@ export class SimS3NoSuchKey extends SimS3Error {
 }
 
 /**
+ * Simulated S3 NotFound error.
+ *
+ * This is what a HEAD answers with, for a Bucket and for an Object alike. A
+ * HEAD response carries no body, so there is no error document to read a code
+ * out of, and real S3 answers the one status for both rather than the
+ * NoSuchBucket and NoSuchKey a GET distinguishes.
+ */
+export class SimS3NotFound extends SimS3Error {
+  public override readonly name = "NotFound";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
  * Simulated S3 NoSuchBucketPolicy error.
  *
  * Real S3 distinguishes a Bucket that does not exist from a Bucket that exists

@@ -2,6 +2,7 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import { CreateBucketCommandHandler } from "../create-bucket/create-bucket.handler.js";
 import { DeleteBucketCommandHandler } from "../delete-bucket/delete-bucket.handler.js";
+import { HeadBucketCommandHandler } from "../head-bucket/head-bucket.handler.js";
 import { ListBucketsCommandHandler } from "../list-buckets/list-buckets.handler.js";
 import { PutBucketWebsiteCommandHandler } from "../put-bucket-website/put-bucket-website.handler.js";
 import type { SimS3BucketCommandState } from "../sim-s3-bucket-command-state.js";
@@ -56,6 +57,16 @@ export class SimS3BucketCommands {
   /**
    * List the Buckets this scope owns.
    */
+  async head(
+    command: simS3Commands.SimHeadBucketCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimHeadBucketCommandOutput> {
+    return await new HeadBucketCommandHandler(this.properties).handle(
+      command,
+      options,
+    );
+  }
+
   async list(
     command: simS3Commands.SimListBucketsCommand,
     options?: SimS3RequestOptions,
