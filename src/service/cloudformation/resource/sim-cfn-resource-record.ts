@@ -55,6 +55,7 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
       template = {},
       parameters,
       resourceLogicalIds = new Set(),
+      exports,
     } = properties;
 
     this.accountRegionScope = accountRegionScope;
@@ -62,7 +63,10 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
     this.stackName = stackName;
     this.template = template;
     this.resourceTemplateReader = new SimCfnResourceTemplateReader(template);
-    this.propertyResolver = new SimCfnResourcePropertyResolver({ parameters });
+    this.propertyResolver = new SimCfnResourcePropertyResolver({
+      parameters,
+      exports,
+    });
     this.resourceLogicalIds = resourceLogicalIds;
   }
 

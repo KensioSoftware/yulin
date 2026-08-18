@@ -1,13 +1,10 @@
 import type { SimCfnNode } from "../../node/sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../value/sim-cfn-template-value.js";
-import { SimCfnFnGetAttParser as SimCfnFunctionGetAttParser } from "./get-att/sim-cfn-fn-get-att-parser.js";
-import { SimCfnFnJoinParser as SimCfnFunctionJoinParser } from "./join/sim-cfn-fn-join-parser.js";
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
-import { SimCfnFnSubParser as SimCfnFunctionSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
-import { SimCfnFnFindInMapParser as SimCfnFunctionFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
-import { SimCfnFnIfParser as SimCfnFunctionIfParser } from "./if/sim-cfn-fn-if-parser.js";
-import { SimCfnFnSplitParser as SimCfnFunctionSplitParser } from "./split/sim-cfn-fn-split-parser.js";
-import { SimCfnFnSelectParser as SimCfnFunctionSelectParser } from "./select/sim-cfn-fn-select-parser.js";
+import {
+  makeSimCfnFunctionParsers,
+  type SimCfnFunctionValueParser,
+} from "./sim-cfn-function-parsers.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
@@ -20,27 +17,21 @@ import { assertDefined } from "../../../../../util/type-guard/defined.js";
  * - an object with a non-intrinsic first key but an Fn::* sibling is malformed;
  * - function-specific value validation belongs to function-specific parsers.
  *
+ * Which functions are supported, and what parses each one, is the table in
+ * sim-cfn-function-parsers.ts.
+ *
  * It does not parse arbitrary template values. SimCfnNodeParser owns the full
  * recursive tree parse and passes itself in as SimCfnValueParser for functions
  * that need child values parsed recursively.
  */
 export class SimCfnFunctionParser {
-  private readonly fnGetAttParser: SimCfnFunctionGetAttParser;
-  private readonly fnFindInMapParser: SimCfnFunctionFindInMapParser;
-  private readonly fnJoinParser: SimCfnFunctionJoinParser;
-  private readonly fnSubParser: SimCfnFunctionSubParser;
-  private readonly fnIfParser: SimCfnFunctionIfParser;
-  private readonly fnSplitParser: SimCfnFunctionSplitParser;
-  private readonly fnSelectParser: SimCfnFunctionSelectParser;
+  private readonly functionParsers: ReadonlyMap<
+    string,
+    SimCfnFunctionValueParser
+  >;
 
   constructor(valueParser: SimCfnValueParser) {
-    this.fnGetAttParser = new SimCfnFunctionGetAttParser();
-    this.fnFindInMapParser = new SimCfnFunctionFindInMapParser(valueParser);
-    this.fnJoinParser = new SimCfnFunctionJoinParser(valueParser);
-    this.fnSubParser = new SimCfnFunctionSubParser(valueParser);
-    this.fnIfParser = new SimCfnFunctionIfParser(valueParser);
-    this.fnSplitParser = new SimCfnFunctionSplitParser(valueParser);
-    this.fnSelectParser = new SimCfnFunctionSelectParser(valueParser);
+    this.functionParsers = makeSimCfnFunctionParsers(valueParser);
   }
 
   /**
@@ -74,32 +65,10 @@ export class SimCfnFunctionParser {
     functionName: string,
     value: SimCfnTemplateValue,
   ): SimCfnNode {
-    if (functionName === "Fn::Join") {
-      return this.fnJoinParser.parse(value);
-    }
+    const functionParser = this.functionParsers.get(functionName);
 
-    if (functionName === "Fn::Sub") {
-      return this.fnSubParser.parse(value);
-    }
-
-    if (functionName === "Fn::GetAtt") {
-      return this.fnGetAttParser.parse(value);
-    }
-
-    if (functionName === "Fn::FindInMap") {
-      return this.fnFindInMapParser.parse(value);
-    }
-
-    if (functionName === "Fn::If") {
-      return this.fnIfParser.parse(value);
-    }
-
-    if (functionName === "Fn::Split") {
-      return this.fnSplitParser.parse(value);
-    }
-
-    if (functionName === "Fn::Select") {
-      return this.fnSelectParser.parse(value);
+    if (functionParser !== undefined) {
+      return functionParser.parse(value);
     }
 
     throw new Error(

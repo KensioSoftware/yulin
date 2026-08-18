@@ -37,6 +37,7 @@ import {
 import type { SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
 import type { SimCfnDeployBinding } from "./bind/sim-cfn-deploy-binding.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimCfnExports } from "./export/sim-cfn-exports.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
@@ -69,6 +70,7 @@ export class SimCloudFormation {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
+  private readonly exports = new SimCfnExports();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
   private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
   private readonly authorization: SimCloudFormationAuthorization;
@@ -93,6 +95,7 @@ export class SimCloudFormation {
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
+      exports: this.exports,
     });
   }
 
@@ -143,6 +146,7 @@ export class SimCloudFormation {
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
+      exports: this.exports,
     });
     return await handler.handle(command);
   }
@@ -289,6 +293,7 @@ export class SimCloudFormation {
       background: this.background,
       cdkOutContext,
       bindings,
+      exports: this.exports,
     });
     return await handler.handle(command);
   }

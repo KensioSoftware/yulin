@@ -6,10 +6,12 @@ import type {
 } from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCfnResourceResolveContext } from "../../sim-cfn-resource.type.js";
 import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
+import type { SimCfnExports } from "../../../export/sim-cfn-exports.js";
 
 interface SimCfnResourcePropertyResolverProperties {
   readonly parameters?: SimCfnParameters | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -28,10 +30,12 @@ interface SimCfnResourcePropertyResolverProperties {
 export class SimCfnResourcePropertyResolver {
   private readonly parameters: SimCfnParameters | undefined;
   private readonly pseudoParameters: SimCfnPseudoParameters | undefined;
+  private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: SimCfnResourcePropertyResolverProperties = {}) {
     this.parameters = properties.parameters;
     this.pseudoParameters = properties.pseudoParameters;
+    this.exports = properties.exports;
   }
 
   /**
@@ -52,6 +56,7 @@ export class SimCfnResourcePropertyResolver {
     const resolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters ?? new SimCfnParameters(),
       pseudoParameters: this.pseudoParameters,
+      exports: this.exports,
       resources: {
         has: (id): boolean => context.resources.has(id),
         refValue: (id): SimCfnTemplateValue => {

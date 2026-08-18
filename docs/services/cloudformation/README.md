@@ -853,6 +853,74 @@ but a list all fail the deployment, as they are all templates AWS rejects. The e
 resource and the property path the value sat at, for example
 `Sim CloudFormation Resource LogsBucket value at Properties.BucketName`.
 
+### `Fn::ImportValue`
+
+`Fn::ImportValue` reads a value another Stack exported. A Stack exports one by giving an Output an
+`Export.Name`, and a Stack in the same Account and Region imports it by that name.
+
+CDK writes both halves on its own. Referencing a resource in another Stack of the same app puts an
+`Export` on the producer and an `Fn::ImportValue` on the consumer, with no opt-in.
+
+```typescript sim-cloudformation-fn-import-value
+/**
+ * Sharing a value between two simulated CloudFormation Stacks.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cloudFormation = simAws.cloudFormation();
+
+await cloudFormation.deployTemplate({
+  stackName: "producer-stack",
+  template: {
+    Resources: {
+      Uploads: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "shared-uploads" },
+      },
+    },
+    Outputs: {
+      UploadsBucket: {
+        Value: { Ref: "Uploads" },
+        Export: { Name: "producer-stack:UploadsBucket" },
+      },
+    },
+  },
+});
+
+const consumer = await cloudFormation.deployTemplate({
+  stackName: "consumer-stack",
+  template: {
+    Resources: {
+      UploadsTopic: {
+        Type: "AWS::SNS::Topic",
+        Properties: {
+          TopicName: "uploads-topic",
+          DisplayName: { "Fn::ImportValue": "producer-stack:UploadsBucket" },
+        },
+      },
+    },
+  },
+});
+
+await consumer.waitForDeployComplete();
+
+// shared-uploads, read from the export the producer Stack published
+console.log(consumer.resources.get("UploadsTopic")?.properties["DisplayName"]);
+```
+
+Deploy the producer first. An export is published once the producer's Outputs have resolved, which
+happens after its Resources have been created. A consumer deployed ahead of its producer has
+nothing to import.
+
+An import naming an export no Stack has published fails with `No export named <name> found`, the
+way CloudFormation refuses one. A Stack exporting a name another Stack already holds fails to
+deploy. A deleted Stack releases its export names, leaving them free for the next Stack.
+
+Exports are scoped per Account and Region, as they are on AWS. A Stack in one Region reads only the
+exports published in that Region.
+
 ## Conditions
 
 A template `Conditions` section names boolean expressions over the stack's parameter values. A

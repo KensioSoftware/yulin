@@ -28,6 +28,8 @@ familiar CloudFormation/CDK outputs.
   template files.
 - `template/` contains template body validation, template value parsing, intrinsic-function nodes,
   condition evaluation, and value resolution.
+- `export/` contains the export names published in one Account and Region. An `Fn::ImportValue`
+  reads them.
 - `parameters/` contains parameter input/default handling.
 - `resource/` contains the runtime CloudFormation resource model, resource type parsing, dependency
   extraction, property resolution, and service factory resolution.
@@ -261,6 +263,7 @@ Supported intrinsic-function areas currently include:
 - `Fn::If`
 - `Fn::Split`
 - `Fn::Select`
+- `Fn::ImportValue`
 
 Resolution happens in two phases:
 
@@ -287,6 +290,22 @@ resource template, which also keeps the logical ID visible to implicit dependenc
 
 Most intrinsic functions resolve to a string. `Fn::Split` resolves to a list, and `Fn::Select`
 resolves to whatever the list entry it picks holds, which may be a list or an object.
+
+### Exports and Fn::ImportValue
+
+A `SimCloudFormation` holds one `SimCfnExports`. Exports are therefore scoped per Account and
+Region, the way CloudFormation scopes them.
+
+A Stack publishes to that registry once its Outputs have resolved, which happens after its
+Resources have been created. An `Fn::ImportValue` reads what is published there.
+
+Deployment order is the constraint a caller works with. Stacks go in one at a time, with a
+producer finishing before a consumer that imports from it starts. An import naming an export no
+Stack has published is refused with `No export named <name> found`. A Stack exporting a name
+another Stack already holds fails to deploy.
+
+A Stack releases its export names when it is torn down. The name is then free for the next Stack
+that wants it.
 
 ### Naming the value that failed
 
@@ -889,6 +908,7 @@ Useful areas:
   - `Fn::If`
   - `Fn::Split`
   - `Fn::Select`
+  - `Fn::ImportValue`
   - literal/list/object node resolution
 
 - `template/condition/*.iso.test.ts`

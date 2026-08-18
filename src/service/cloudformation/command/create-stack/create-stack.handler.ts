@@ -23,6 +23,7 @@ import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 
 interface CreateStackCommandHandlerProperties {
   readonly simAws: SimAws;
@@ -31,6 +32,7 @@ interface CreateStackCommandHandlerProperties {
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly exports?: SimCfnExports | undefined;
 }
 
 /**
@@ -48,6 +50,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
+  private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: CreateStackCommandHandlerProperties) {
     const {
@@ -57,6 +60,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       background,
       cdkOutContext,
       bindings,
+      exports,
     } = properties;
 
     this.simAws = simAws;
@@ -65,6 +69,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     this.background = background;
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
+    this.exports = exports;
   }
 
   /**
@@ -100,6 +105,7 @@ export class CreateStackCommandHandler implements CommandHandler<
           stackName,
         }),
         accountRegionScope: this.accountRegionScope,
+        exports: this.exports,
       },
     );
 
@@ -111,6 +117,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       template,
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
+      exports: this.exports,
     });
 
     this.stacks.set(stack.stackName, stack);
