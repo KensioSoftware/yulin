@@ -1562,15 +1562,17 @@ for `AWS_IAM` leaves a URL later switched to `NONE` closed.
 
 `SourceArn` becomes an `ArnLike` condition on `AWS:SourceArn`, and `SourceAccount` a `StringEquals`
 condition on `AWS:SourceAccount`. Both are evaluated when another simulated service invokes the
-function. That is a simulated API Gateway HTTP API invoking it through a Lambda proxy integration or
-as a `REQUEST` authorizer, a simulated S3 Bucket delivering an event notification, or a simulated
-Cognito user pool running a Lambda trigger. The source ARN is what that service is invoking the
-function for (the API, the Bucket or the user pool) and the source Account is that service's
-resource's own. See
+function on a resource's behalf, and every simulated service that does so supplies them. That covers
+a simulated API Gateway HTTP API invoking it through a Lambda proxy integration or as a `REQUEST`
+authorizer, a simulated S3 Bucket delivering an event notification, a simulated SNS topic delivering
+a message, a simulated Cognito user pool running a Lambda trigger, and an EventBridge or ELBv2
+target. The source ARN is what that service is invoking the function for, and the source Account is
+that service's resource's own. See
 [Granting the API permission to invoke the function](../apigatewayv2/README.md#granting-the-api-permission-to-invoke-the-function)
-and [Lambda triggers](../cognito/README.md#lambda-triggers).
-A direct `Invoke`, a Function URL request and an SQS event source mapping supply no value for
-either, and a statement carrying one of them matches none of the three.
+and [Lambda triggers](../cognito/README.md#lambda-triggers). A served Function URL request carries a
+source ARN when it says what it is being made for, which is how a CloudFront origin access control
+reaches one. A direct `Invoke` and an SQS event source mapping supply no value for either, and a
+statement carrying one matches no request of theirs.
 
 `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
 the grant that was made. No value is supplied for them at request time, and a statement carrying one
@@ -2240,11 +2242,12 @@ Current documented limitations:
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
 - `lambda:FunctionUrlAuthType`, `AWS:SourceArn` and `AWS:SourceAccount` are the only condition keys
-  given a value at request time, the first when a Function URL is invoked and the other two when a
-  simulated API Gateway HTTP API invokes the function. `PrincipalOrgID` and `InvokedViaFunctionUrl`
-  are written into the statement so `GetPolicy` reports the grant that was made, and no value is
-  supplied for them, so a statement carrying one never matches. The same goes for a `SourceArn` or
-  `SourceAccount` statement on a request from anything but an HTTP API.
+  given a value at request time. The first is supplied when a Function URL is invoked, and the other
+  two when another simulated service invokes the function on a resource's behalf. See
+  [Resource-based policies](#resource-based-policies) for which paths those are.
+  `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
+  the grant that was made, and no value is supplied for them, so a statement carrying one never
+  matches.
 - `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are left out, along
   with versions and aliases.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the

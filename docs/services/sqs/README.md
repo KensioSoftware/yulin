@@ -125,7 +125,7 @@ See [simulated time](../../time/ "Simulated time docs") for what else the clock 
 
 Every receive issues a fresh receipt handle, and a delete has to use the handle from the most recent
 receive of that message. A handle from an earlier receive is accepted and deletes nothing. Real SQS
-treats a stale handle the same way.
+accepts one too, and promises only that the message might not be deleted.
 
 That is the failure a consumer slower than its visibility timeout hits. Its message went back on the
 queue, someone else took it, and its own delete quietly does nothing.
@@ -378,9 +378,10 @@ console.log(message?.MD5OfMessageAttributes === sent.MD5OfMessageAttributes); //
 console.log(message?.MD5OfBody === sent.MD5OfMessageBody); // true
 ```
 
-The name and data type rules are the real ones. A reserved `AWS.` or `Amazon.` prefix on a name, a
-data type outside `String`, `Number` and `Binary`, or a value that disagrees with its data type is
-refused. A test finds any of those without going near AWS.
+The name and data type rules are the real ones. A data type is `String`, `Number` or `Binary`, and
+each takes a custom label after a dot, so `Number.int` is a number as far as the rules go. A
+reserved `AWS.` or `Amazon.` prefix on a name, a data type built on none of the three, or a value
+that disagrees with its data type is refused. A test finds any of those without going near AWS.
 
 The message system attributes are asked for separately, with `MessageSystemAttributeNames`, or with
 the discontinued `AttributeNames` that means the same thing. `SentTimestamp`,
@@ -544,8 +545,9 @@ try {
 ## Queue policies
 
 A queue's `Policy` attribute is its resource policy, and simulated IAM evaluates it as one. It is
-what admits a caller that has no identity policy of its own. A principal from another account is one,
-and so is a service principal such as `s3.amazonaws.com`, which owns no identity policies anywhere.
+what admits a service principal such as `s3.amazonaws.com`, which owns no identity policies
+anywhere. It is also half of what admits a principal from another account, which needs an identity
+policy in its own account as well.
 
 The policy is set with `CreateQueue` or `SetQueueAttributes` and read back with
 `GetQueueAttributes`.
@@ -1066,7 +1068,7 @@ them and each one is recorded in
 A stack full of queues still deploys. Those properties are `RedrivePolicy`, `RedriveAllowPolicy`,
 `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`,
 `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property
-`AWS::SQS::Queue` never had is recorded the same way.
+outside the `AWS::SQS::Queue` schema is recorded the same way.
 
 `AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
 `SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
@@ -1138,7 +1140,7 @@ Current documented limitations:
   and validated, and a receive returns immediately. The whole simulation runs in the calling process,
   where a wait could only ever time out.
 - `DeleteQueue` and `PurgeQueue` take effect immediately, where real SQS may take up to 60 seconds
-  over either. The 60 second hold on a deleted queue's name is simulated, so recreating a queue
+  over either. The 60-second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
 - Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
   them. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it

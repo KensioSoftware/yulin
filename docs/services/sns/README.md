@@ -148,9 +148,10 @@ const published = await sns.publish(
 console.log(published.MessageId !== undefined); // true
 ```
 
-The name and data type rules are the real ones. A reserved `AWS.` or `Amazon.` prefix on a name, a
-data type outside `String`, `String.Array`, `Number` and `Binary`, or a value that disagrees with its
-data type is refused. A test finds any of those without going near AWS. The two reserved names real
+The name and data type rules are the real ones. A data type is `String`, `String.Array`, `Number` or
+`Binary`, and each takes a custom label after a dot, so `Number.int` is a number as far as the rules
+go. A reserved `AWS.` or `Amazon.` prefix on a name, a data type built on none of the four, or a
+value that disagrees with its data type is refused. A test finds any of those without going near AWS. The two reserved names real
 SNS defines for SMS, `AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType`, are the exception.
 [Sending an SMS](#sending-an-sms) covers those.
 
@@ -1209,8 +1210,9 @@ try {
 ## Topic policies
 
 A topic's `Policy` attribute is its resource policy, and simulated IAM evaluates it as one. It is
-what admits a caller that has no identity policy of its own. A principal from another account is one,
-and so is a service principal such as `s3.amazonaws.com`, which owns no identity policies anywhere.
+what admits a service principal such as `s3.amazonaws.com`, which owns no identity policies
+anywhere. It is also half of what admits a principal from another account, which needs an identity
+policy in its own account as well.
 
 The policy is set with `CreateTopic` or `SetTopicAttributes` and read back with `GetTopicAttributes`.
 
