@@ -1,7 +1,4 @@
-import type { SimAws } from "../../aws/sim-aws.js";
-import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
-import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
 import type { SimCfnIgnoredProperty } from "../resource/ignore/sim-cfn-ignored-property.type.js";
 import type {
@@ -13,53 +10,21 @@ import {
   type SimCfnStackDeleteProperties,
 } from "./teardown/sim-cfn-stack-deletion-lifecycle.js";
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
+import { SimCfnStackResourceLookup } from "./resource-map/sim-cfn-stack-resource-lookup.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
-import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
 import { SimCfnStackOperationStatus } from "./status/sim-cfn-stack-operation-status.js";
 import { validateSimCfnExecutableResourceBindings } from "../bind/validate/sim-cfn-exec-binding-validator.js";
-
-export type SimCloudFormationStackName = Brand<
-  string,
-  "SimCloudFormationStackName"
->;
-
-export type SimCloudFormationStackStatus =
-  | "REVIEW_IN_PROGRESS"
-  | "CREATE_IN_PROGRESS"
-  | "CREATE_COMPLETE"
-  | "CREATE_FAILED"
-  | "UPDATE_IN_PROGRESS"
-  | "UPDATE_COMPLETE"
-  | "UPDATE_FAILED"
-  | "DELETE_IN_PROGRESS"
-  | "DELETE_COMPLETE"
-  | "DELETE_FAILED";
-
-export interface SimCfnStackUpdateProperties {
-  /**
-   * The CDK cloud assembly the new template was synthesized into, when it came
-   * from a template file that has been synthesized again. The Stack reads
-   * assets from it from then on, since the manifest it was deployed with
-   * describes the assembly the previous template came from.
-   */
-  readonly cdkOutContext?: SimCdkOutContext | undefined;
-}
-
-interface SimCloudFormationStackProperties {
-  readonly simAws: SimAws;
-  readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly background: BackgroundScheduler;
-  readonly stackName: SimCloudFormationStackName;
-  readonly template: SimCfnTemplate;
-  readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
-}
+import type {
+  SimCloudFormationStackProperties,
+  SimCloudFormationStackStatus,
+  SimCfnStackUpdateProperties,
+  SimCloudFormationStackName,
+} from "./sim-cfn-stack.type.js";
 
 /**
  * Lightweight simulated CloudFormation Stack.
@@ -251,9 +216,16 @@ export class SimCfnStack {
     await this.operations.deleteAll(this.resources);
   }
 
-  /** Get a Stack Resource by logical ID. */
+  /**
+   * Get a Stack Resource by logical ID, or by the CDK construct ID a
+   * synthesized logical ID was generated from.
+   *
+   * The construct ID is the identifier a binding takes. A caller that bound a
+   * handler by construct ID can ask the Stack what it bound, without holding
+   * the hash CDK appended.
+   */
   getResource(logicalId: string): SimCfnResource | undefined {
-    return this.resources.get(logicalId);
+    return new SimCfnStackResourceLookup(this.resources).find(logicalId);
   }
 
   /** Resources skipped because their sim implementation is not available. */
@@ -297,3 +269,9 @@ export class SimCfnStack {
     }).resolve();
   }
 }
+
+export {
+  type SimCfnStackUpdateProperties,
+  type SimCloudFormationStackName,
+  type SimCloudFormationStackStatus,
+} from "./sim-cfn-stack.type.js";

@@ -2275,6 +2275,67 @@ path. A binding that resolves to no template resource fails the deploy with the 
 named for diagnosis. Where two bindings could both back the same function, the one listed first is
 the one that backs it.
 
+### Invoking a function bound by construct ID
+
+A CDK function usually leaves `FunctionName` out of the template, and sim Lambda creates it under
+the synthesized logical ID. `stack.getResource` takes the construct ID the binding named. The
+Resource it answers with carries that logical ID, and it is the name to invoke. The hash CDK
+generated stays out of the test.
+
+```typescript sim-lambda-construct-id-invoke
+/**
+ * Invoking a Lambda function bound by its CDK construct ID.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "uploads-stack",
+  template: {
+    Resources: {
+      UploadFunction8A7B6C5D: {
+        Type: "AWS::Lambda::Function",
+        Metadata: {
+          "aws:cdk:path": "UploadsStack/UploadFunction/Resource",
+        },
+        Properties: {
+          Role: "arn:aws:iam::111111111111:role/UploadFunctionRole",
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "UploadFunction",
+      handler: (event: { key: string }): string => `stored ${event.key}`,
+    },
+  ],
+});
+
+const upload = stack.getResource("UploadFunction");
+if (upload === undefined) throw new Error("No UploadFunction Resource");
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: upload.logicalId,
+    Payload: JSON.stringify({ key: "receipt.pdf" }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+// "stored receipt.pdf"
+
+await simAws.backgroundTasksComplete();
+```
+
+A function with a `FunctionName` in the template is invoked by that name. The caller wrote it and
+already holds it.
+
 ### Binding by container image repository
 
 `imageRepository` matches any function whose resolved `Code.ImageUri` names that repository. One

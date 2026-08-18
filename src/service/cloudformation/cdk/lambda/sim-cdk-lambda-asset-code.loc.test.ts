@@ -87,7 +87,9 @@ app.synth();
     await simAws.backgroundTasksComplete();
 
     // Then the function is deployed rather than skipped, with its asset code.
-    const functionResource = stack.getResource("AssetFunctionA633A7D1");
+    // The Stack answers for the construct ID, so the hash CDK synthesized on
+    // to the logical ID is not written down here to go stale.
+    const functionResource = stack.getResource("AssetFunction");
     assertNonNullable(functionResource);
     assertUndefined(functionResource.skippedReason);
 
