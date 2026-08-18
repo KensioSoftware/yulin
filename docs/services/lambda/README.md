@@ -418,14 +418,19 @@ A request from a handler to a hostname the simulation serves is answered by the 
 never leaves the process. `fetch`, `node:http` and `node:https` all reach it, so it makes no
 difference which client the handler was written with.
 
-Two kinds of hostname are served. The AWS service API endpoints are answered as Commands, which is
-what the section above covers. Everything simulated Route53 resolves is answered over the same
-in-process HTTP entry point a browser on localhost reaches, which covers a
+Two kinds of hostname are served. Everything simulated Route53 resolves is answered over the same
+in-process HTTP entry point a browser on localhost reaches. That covers a
 [Cognito user pool domain](../cognito/ "Simulated Cognito usage docs") in both of its forms
 (`<prefix>.auth.<region>.amazoncognito.com` and a custom domain such as `auth.example.com`), an
 [API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway usage docs"), a
 [load balancer](../elbv2/ "Simulated ELBv2 usage docs") and anything a hosted-zone record points at
 one of those.
+
+The AWS service API endpoints are the other kind, and a request to one is read for what it carries.
+A serialized Command goes to the simulated operation it names (the section above). A request
+carrying no operation header and no signature is an ordinary HTTP request, and the endpoint serves
+it the way the local hostname does. That is how a pool's JWKS is read at
+`cognito-idp.<region>.amazonaws.com` by a client holding no credentials.
 
 A hostname the simulation serves nothing at goes where it was addressed. A handler calling a
 payment API or a webhook reaches the network as it always did.
@@ -507,6 +512,78 @@ makes while it is being imported going to the network.
 
 A response comes back from the simulation as it was answered. A redirect arrives as the `302` it
 is, where the host `fetch` would have followed it.
+
+### Verifying a Cognito token in a handler
+
+An API that takes a bearer token verifies it against the keys the pool publishes.
+`CognitoJwtVerifier` from `aws-jwt-verify` builds the JWKS URL from the pool id
+(`https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/jwks.json`) and accepts no
+other, and fetches it with `node:https` the first time it verifies anything. Both of those are the
+simulation's to answer inside a handler, so the verifier in the deployed code verifies a simulated
+pool's token with no cache primed and no setup around it:
+
+```typescript sim-lambda-verify-cognito-token
+/**
+ * A simulated Lambda verifying a Cognito access token, with a verifier that
+ * goes and fetches the pool's JWKS for itself.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+// The pool the API trusts, the app client its tokens are issued to, and the
+// token a caller presented.
+declare const userPoolId: string;
+declare const clientId: string;
+declare const accessToken: string;
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "api",
+    Role: "arn:aws:iam::111111111111:role/ApiRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(async (event: { token: string }) => {
+        const verifier = CognitoJwtVerifier.create({
+          userPoolId,
+          tokenUse: "access",
+          clientId,
+        });
+
+        return await verifier.verify(event.token);
+      }),
+    },
+  }),
+);
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "api",
+    Payload: JSON.stringify({ token: accessToken }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+
+// The claims of the access token, read by the verifier the API ships with.
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+The pool's OpenID configuration is served at the same endpoint, at
+`/<userPoolId>/.well-known/openid-configuration`. Its `issuer` and `jwks_uri` name the local
+hostname the simulation answered on, and a handler that discovered the document can fetch the keys
+it points at. See
+[serving a pool's JWKS](../cognito/#serving-a-pools-jwks-on-localhost "Simulated Cognito usage docs").
+
+A Command the same function sends still reaches simulated Cognito. An SDK bundled into the
+deployment package addresses `cognito-idp.<region>.amazonaws.com` as well, and its requests carry
+the operation header that says so.
 
 ## Invocation types
 
@@ -2316,7 +2393,8 @@ Sim Lambda currently supports:
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment
 - `fetch`, `node:http` and `node:https` requests from function code, answered by the simulation for
-  every hostname it serves, including a Cognito user pool domain's OAuth endpoints
+  every hostname it serves, including a Cognito user pool domain's OAuth endpoints and the JWKS a
+  token verifier fetches from the regional Cognito endpoint
 - Execution roles, evaluated against simulated IAM
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
@@ -2385,6 +2463,9 @@ Current documented limitations:
   issues for one resource, a Lambda Function URL and an API Gateway HTTP API, resolve under the
   hostnames the simulator serves them on. A request to the AWS form of one of those reaches the
   network.
+- An unsigned request to a service API endpoint is served over HTTP when the simulation serves that
+  endpoint, which today means Cognito's regional endpoint and the S3 endpoints. Anywhere else it is
+  read as a Command and refused as one.
 - `Timeout` is recorded and never interrupts handler execution.
 - Timers inside a handler are host timers. `setTimeout` waits in real time, and advancing the
   simulation's clock leaves a sleeping handler asleep.

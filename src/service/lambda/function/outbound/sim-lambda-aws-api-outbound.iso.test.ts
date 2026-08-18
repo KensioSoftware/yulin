@@ -9,9 +9,22 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
+  isSimAwsApiRequest,
   isSimAwsEndpointHostname,
   SimLambdaAwsApiOutbound,
 } from "./sim-lambda-aws-api-outbound.js";
+
+/**
+ * The credential scope of a request signed for a service, as the Authorization
+ * header carries it.
+ */
+function signedFor(signingName: string): string {
+  return (
+    `AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260818/eu-west-2/` +
+    `${signingName}/aws4_request, SignedHeaders=host;x-amz-date, ` +
+    "Signature=0000000000000000000000000000000000000000000000000000000000000000"
+  );
+}
 
 /**
  * A simulated table holding one order.
@@ -63,6 +76,37 @@ describe("The AWS service API a sim Lambda's requests reach", () => {
     assertFalse(
       isSimAwsEndpointHostname("abc123.execute-api.eu-west-2.amazonaws.com"),
     );
+  });
+
+  it("tells an API call apart from a document published at the same endpoint", () => {
+    // Given a serialized Command, which says which operation it is.
+    const command = new Request(
+      "https://cognito-idp.eu-west-2.amazonaws.com/",
+      {
+        method: "POST",
+        headers: {
+          "x-amz-target": "AWSCognitoIdentityProviderService.GetUser",
+        },
+      },
+    );
+
+    // And a signed request naming an operation nowhere, since only an SDK
+    // holds credentials to sign with.
+    const signed = new Request(
+      "https://data.s3.eu-west-2.amazonaws.com/greeting.txt",
+      { headers: { authorization: signedFor("s3") } },
+    );
+
+    // And a JWKS fetch, which a token verifier makes holding neither.
+    const published = new Request(
+      "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_aBcDeFgHi/.well-known/jwks.json",
+    );
+
+    // Then the two an SDK sent are API calls and the published document is
+    // not.
+    assertTrue(isSimAwsApiRequest(command));
+    assertTrue(isSimAwsApiRequest(signed));
+    assertFalse(isSimAwsApiRequest(published));
   });
 
   it("answers a Command an SDK addressed to a service endpoint", async () => {

@@ -288,9 +288,18 @@ gives its functions, and it answers for two kinds of hostname. A hostname simula
 resolves goes through `SimAwsHttp`, the same in-process entry point a request arriving on localhost
 takes, which is what makes a Cognito user pool domain, an HTTP API and a load balancer all reachable
 without Lambda knowing which of them it is. An AWS service API endpoint goes to
-`SimSdkWireDispatcher` (`SimLambdaAwsApiOutbound`), because that request carries a serialized
+`SimSdkWireDispatcher` (`SimLambdaAwsApiOutbound`) for the requests that carry a serialized
 Command. Resolution is asked first, since a load balancer's own `.elb.amazonaws.com` name ends in a
 service API suffix while naming something served over HTTP.
+
+A service API endpoint also serves documents over plain HTTP, and a user pool's JWKS is the one a
+handler asks for. `isSimAwsApiRequest` is the test that separates the two, on the operation header
+of the AWS JSON protocol and the SigV4 credential scope, since a client fetching a published
+document carries neither. What is left goes to `SimAwsHttp` under the local hostname
+`SimAwsLocalUrl` rewrites the endpoint to, which is the name simulated Route53 knows it by. An
+endpoint nothing resolves for falls back to the wire dispatcher. A request that cannot be routed is
+then refused with `SimSdkUnbridgedWireRequestError`, in place of a 501 naming a local hostname
+nobody asked for.
 
 The factory is a module of its own for the reason `makeSimCfCustomOriginDispatcher` is: `SimAwsHttp`
 reaches every simulated service, and the service that reaches it back is wired from

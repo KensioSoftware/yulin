@@ -39,6 +39,16 @@ const jsonProtocolServiceIds: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
+ * The part of a wire request the two readers below need.
+ *
+ * An AWS API request says which operation it is and what it was signed for in
+ * its headers, so neither question needs the body. That leaves both of them
+ * answerable for a request whose body has not been read, which is what a
+ * client holding an outgoing request has.
+ */
+type SimSdkWireRequestHeaders = Pick<SimSdkWireRequest, "headers">;
+
+/**
  * Which simulated service operation a wire request is asking for.
  */
 export interface SimSdkWireOperation {
@@ -56,7 +66,7 @@ export interface SimSdkWireOperation {
  * neither can be answered from the simulation.
  */
 export function readSimSdkWireOperation(
-  request: SimSdkWireRequest,
+  request: SimSdkWireRequestHeaders,
 ): SimSdkWireOperation | undefined {
   // oxlint-disable-next-line security/detect-object-injection -- this module's own fixed header name.
   const target = request.headers[operationHeaderName];
@@ -97,7 +107,7 @@ export interface SimSdkWireCredentialScope {
  * an unsupported request can still say which service it was for.
  */
 export function readSimSdkWireCredentialScope(
-  request: SimSdkWireRequest,
+  request: SimSdkWireRequestHeaders,
 ): SimSdkWireCredentialScope | undefined {
   const authorization = request.headers["authorization"];
   const credential = /Credential=[^/]*\/(?<scope>[^,\s]+)/.exec(

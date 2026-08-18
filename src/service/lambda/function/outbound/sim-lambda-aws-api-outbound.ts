@@ -1,4 +1,8 @@
 import { SimSdkWireDispatcher } from "../../../../sdk/wire/sim-sdk-wire-dispatcher.js";
+import {
+  readSimSdkWireCredentialScope,
+  readSimSdkWireOperation,
+} from "../../../../sdk/wire/sim-sdk-wire-operation.js";
 import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimLambdaOutboundHttp } from "./sim-lambda-outbound-http.js";
@@ -46,6 +50,26 @@ export function isSimAwsEndpointHostname(hostname: string): boolean {
   }
 
   return awsEndpointSuffixes.some((suffix) => name.endsWith(suffix));
+}
+
+/**
+ * Whether a request to an AWS service API endpoint is an API call, or an
+ * ordinary HTTP request to the same hostname.
+ *
+ * A service API endpoint answers both. What an SDK sends carries the operation
+ * header of the AWS JSON protocol, or the SigV4 credentials it was signed
+ * with, or both, and the wire dispatcher answers it. A token verifier fetching
+ * from the same hostname carries neither, because it holds nothing to sign
+ * with. A user pool publishes its JWKS and its OpenID configuration to whoever
+ * asks, and both are read over plain HTTP.
+ */
+export function isSimAwsApiRequest(request: Request): boolean {
+  const wireRequest = { headers: Object.fromEntries(request.headers) };
+
+  return (
+    readSimSdkWireOperation(wireRequest) !== undefined ||
+    readSimSdkWireCredentialScope(wireRequest) !== undefined
+  );
 }
 
 interface SimLambdaAwsApiOutboundProperties {

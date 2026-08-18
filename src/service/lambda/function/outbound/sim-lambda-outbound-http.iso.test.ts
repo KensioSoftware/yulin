@@ -1,4 +1,10 @@
-import { assertFalse, assertIdentical, assertTrue } from "@kensio/smartass";
+import {
+  assertFalse,
+  assertIdentical,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+  assertTrue,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { simCognitoHosted } from "../../../../../test/cognito/federation-fixture.js";
@@ -49,6 +55,65 @@ describe("What a simulated environment answers its functions for", () => {
       ((await response.json()) as { error: string }).error,
       "invalid_client",
     );
+  });
+
+  it("serves a document an AWS service API endpoint publishes", async () => {
+    // Given a simulation with a user pool.
+    const setUp = await simCognitoHosted();
+    const outbound = makeSimLambdaOutboundHttp({ simAws: setUp.simAws });
+
+    // When a request arrives for the pool's JWKS at the regional Cognito
+    // endpoint, carrying no Command and nothing to sign it with.
+    const response = await outbound.fetch(
+      new Request(
+        `https://cognito-idp.eu-west-2.amazonaws.com/${setUp.userPoolId}/.well-known/jwks.json`,
+      ),
+    );
+
+    // Then the pool published it, as it publishes it to a browser.
+    assertIdentical(response.status, 200);
+  });
+
+  it("leaves a signed request to a service endpoint to be routed as a Command", async () => {
+    // Given a simulation, and a signed request to a service whose endpoint it
+    // does serve over HTTP.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const outbound = makeSimLambdaOutboundHttp({ simAws });
+
+    // When it arrives.
+    const error = await assertThrowsErrorAsync(async () =>
+      outbound.fetch(
+        new Request("https://data.s3.eu-west-2.amazonaws.com/greeting.txt", {
+          headers: {
+            authorization:
+              "AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260818/eu-west-2/" +
+              "s3/aws4_request, SignedHeaders=host, Signature=00",
+          },
+        }),
+      ),
+    );
+
+    // Then it was read as the AWS API request it is, and refused as one, so
+    // that a bundled SDK is told what to do about the protocol its requests
+    // cannot be routed back from.
+    assertStringIncludes(error.message, "request to s3");
+    assertStringIncludes(error.message, "AWS JSON protocol");
+  });
+
+  it("refuses an endpoint it serves nothing at with what a Command would say", async () => {
+    // Given a simulation, and an unsigned request to a service endpoint
+    // nothing in it answers for.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const outbound = makeSimLambdaOutboundHttp({ simAws });
+
+    // When it arrives.
+    const error = await assertThrowsErrorAsync(async () =>
+      outbound.fetch(new Request("https://sts.eu-west-2.amazonaws.com/")),
+    );
+
+    // Then the refusal names the endpoint and says why, rather than reporting
+    // a local hostname the request never named.
+    assertStringIncludes(error.message, "sts.eu-west-2.amazonaws.com");
   });
 
   it("prefers a hostname it resolves to the AWS suffix that hostname ends with", async () => {
