@@ -17,3 +17,4 @@ await simS3.createBucket(
 const listBucketsOutput = await simS3.listBuckets(new ListBucketsCommand());
 
 console.log(listBucketsOutput.Buckets?.map((bucket) => bucket.Name));
+console.log(listBucketsOutput.Buckets?.[0]?.CreationDate);

@@ -112,7 +112,7 @@ all tests, as you prefer.
 
 ## Listing Buckets
 
-Use `ListBucketsCommand` to inspect Buckets in the selected simulated S3 scope.
+Use `ListBucketsCommand` to inspect Buckets in the selected simulated S3 scope. Each Bucket reports the instant it was created, taken from [simulated time](../../time/README.md) rather than the host clock.
 
 ```typescript sim-s3-list-buckets
 /**
@@ -134,6 +134,7 @@ await simS3.createBucket(
 const listBucketsOutput = await simS3.listBuckets(new ListBucketsCommand());
 
 console.log(listBucketsOutput.Buckets?.map((bucket) => bucket.Name));
+console.log(listBucketsOutput.Buckets?.[0]?.CreationDate);
 ```
 
 ## Listing Objects

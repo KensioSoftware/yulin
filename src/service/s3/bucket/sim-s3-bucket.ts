@@ -1,3 +1,4 @@
+import { BackgroundTasks } from "../../../util/background/background.js";
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
@@ -22,6 +23,13 @@ interface SimS3BucketProperties {
   readonly policy?: SimIamPolicyDocument | undefined;
   readonly publicAccessBlock?: SimS3PublicAccessBlock;
   readonly notifications?: SimS3NotificationConfiguration;
+  /**
+   * When the Bucket came into being, in simulated time.
+   *
+   * Real S3 reports this on every Bucket a listing returns, and the `aws` CLI
+   * reads it from each entry, so a Bucket without one cannot be listed.
+   */
+  readonly creationDate?: Date;
 }
 
 /**
@@ -29,6 +37,7 @@ interface SimS3BucketProperties {
  */
 export class SimS3Bucket {
   public readonly bucketName: SimS3BucketName;
+  public readonly creationDate: Date;
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
@@ -47,6 +56,7 @@ export class SimS3Bucket {
       policy,
       publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
       notifications = SimS3NotificationConfiguration.empty(),
+      creationDate = new BackgroundTasks().now(),
     } = properties;
 
     validateS3BucketName(bucketName);
@@ -58,6 +68,7 @@ export class SimS3Bucket {
     this.policy = policy;
     this.publicAccessBlock = publicAccessBlock;
     this.notifications = notifications;
+    this.creationDate = creationDate;
   }
 
   /**
