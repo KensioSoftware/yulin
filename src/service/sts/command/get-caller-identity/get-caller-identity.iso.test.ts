@@ -50,6 +50,30 @@ describe("Simulated STS GetCallerIdentity", () => {
     assertIdentical(identity.UserId, created.User.UserId);
   });
 
+  it("reports a User held at a path, whose ARN carries the path before the name", async () => {
+    // Given a User created under a path, which real IAM allows and which puts
+    // the path into the User's own ARN
+    const simAws = new SimAws();
+    const accountId = simAws.defaultAccountId;
+    const created = await simAws
+      .iam()
+      .createUser(
+        new CreateUserCommand({ UserName: "Widgets", Path: "/engineering/" }),
+      );
+
+    const arn = created.User.Arn;
+    assertIdentical(arn, `arn:aws:iam::${accountId}:user/engineering/Widgets`);
+
+    // When that User asks who it is
+    const identity = await simAws
+      .sts()
+      .getCallerIdentity({}, { caller: { kind: "arn", arn } });
+
+    // Then the name was read from the end of the ARN rather than the start,
+    // so the User was found and reported with its own id
+    assertIdentical(identity.UserId, created.User.UserId);
+  });
+
   it("reports the Account id as the user id for the Account root", async () => {
     // Given the Account root asking who it is
     const simAws = new SimAws();

@@ -32,16 +32,30 @@ export function simStsCallerUserId(
     return {};
   }
 
-  const [kind, name, sessionName] = resource.split("/", 3);
+  const [kind, ...segments] = resource.split("/");
 
-  if (kind === "user" && name !== undefined) {
-    const userId = iam.users.get(name as SimIamUsername)?.userId;
+  if (kind === "user") {
+    // A User ARN carries the User's path before its name, so the name is the
+    // last segment rather than the first. `user/engineering/Widgets` is the
+    // User `Widgets` at path `/engineering/`, and simulated IAM keys Users by
+    // name alone.
+    const username = segments.at(-1);
+    const userId =
+      username === undefined
+        ? undefined
+        : iam.users.get(username as SimIamUsername)?.userId;
 
     return userId === undefined ? {} : { UserId: userId };
   }
 
-  if (kind === "assumed-role" && name !== undefined) {
-    const roleId = iam.roles.get(name as SimIamRoleName)?.roleId;
+  if (kind === "assumed-role") {
+    // A session ARN names the Role and then the session, and carries no path,
+    // which is why these two are read by position.
+    const [roleName, sessionName] = segments;
+    const roleId =
+      roleName === undefined
+        ? undefined
+        : iam.roles.get(roleName as SimIamRoleName)?.roleId;
 
     return roleId === undefined
       ? {}
