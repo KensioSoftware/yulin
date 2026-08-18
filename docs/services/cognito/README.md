@@ -3059,6 +3059,11 @@ client that discovers the document can go on to fetch the keys it points at. The
 real `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` in `iss`, what a verifier built from
 a pool id checks against. The two disagree here where they agree on real Cognito.
 
+A [simulated Lambda](../lambda/#verifying-a-cognito-token-in-a-handler "Simulated Lambda usage docs")
+reads both documents at the real regional endpoint, with no local server and no URL rewriting. A
+`CognitoJwtVerifier` inside a handler fetches the pool's JWKS for itself and verifies the token,
+which is the verifier setup the deployed code already has.
+
 ## Intercepting the SDK client
 
 Code that builds its own `CognitoIdentityProviderClient` needs no changes. Intercepting the client

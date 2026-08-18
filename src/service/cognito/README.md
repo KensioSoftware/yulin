@@ -440,6 +440,11 @@ serving layer dispatches to, `SimCognitoOpenIdConfiguration` builds the discover
 `SimCognitoEndpointResponse` builds the responses. The Cognito API itself is not served: an SDK
 client reaches the simulator through `SimSdk`.
 
+The same two documents answer a simulated Lambda that asks for them at
+`cognito-idp.<region>.amazonaws.com`, which is the URL `CognitoJwtVerifier` builds from a pool id.
+Sim Lambda's outbound HTTP rewrites that endpoint to the local hostname and routes the request here
+(see `src/service/lambda/README.md`).
+
 `serve/page/` under it is the managed login pages. `SimCognitoPageMarkup` is the HTML they are built
 from, `SimCognitoPageForm` is one request read as the form it fetched or posted, and
 `SimCognitoManagedLogin` is what `SimCognitoDomainEndpoints` hands a page request to. The three
