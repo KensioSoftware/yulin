@@ -5,6 +5,10 @@ import {
   publicAccessBlockXml,
 } from "./sim-s3-api-configuration-output.js";
 import {
+  simS3HeadBucketResponse,
+  simS3HeadObjectResponse,
+} from "./sim-s3-api-head-output.js";
+import {
   simS3ListBucketsXml,
   simS3ListObjectsXml,
 } from "./sim-s3-api-listing.js";
@@ -58,11 +62,10 @@ export async function simS3ApiResponse(
       return xml(deleteResultXml(value));
     }
     case "HeadObjectCommand": {
-      return headObjectResponse(value);
+      return simS3HeadObjectResponse(value);
     }
     case "HeadBucketCommand": {
-      // The Bucket is there and reachable, which the status alone says.
-      return new Response(undefined, { status: 200 });
+      return simS3HeadBucketResponse(value);
     }
     case "PutObjectCommand": {
       return new Response(undefined, {
@@ -103,25 +106,6 @@ async function getObjectResponse(
     headers: simS3ObjectResponseHeaders({
       metadata: output["Metadata"] as Record<string, string> | undefined,
       bodyLength: body.length,
-      etag: output["ETag"] as string | undefined,
-      lastModified: output["LastModified"] as Date | undefined,
-    }),
-  });
-}
-
-/**
- * Answer a HEAD with what a read would have said and none of the Object.
- *
- * HTTP forbids a body on a HEAD response, so everything the caller learns is
- * in the headers, `content-length` included. That length describes the Object
- * rather than the response, which is what makes a HEAD worth sending.
- */
-function headObjectResponse(output: Record<string, unknown>): Response {
-  return new Response(undefined, {
-    status: 200,
-    headers: simS3ObjectResponseHeaders({
-      metadata: output["Metadata"] as Record<string, string> | undefined,
-      bodyLength: (output["ContentLength"] as number | undefined) ?? 0,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,
     }),

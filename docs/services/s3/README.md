@@ -139,7 +139,9 @@ console.log(listBucketsOutput.Buckets?.[0]?.CreationDate);
 
 ## Asking whether something is there
 
-`HeadObjectCommand` reports what a read would say about an Object without returning the Object, and `HeadBucketCommand` reports whether a Bucket is there and reachable. Both answer `NotFound` when it is absent, which is what real S3 answers a HEAD with. A read answers `NoSuchKey`, which a HEAD has no body to carry.
+`HeadObjectCommand` reports what a read would say about an Object without returning the Object, and `HeadBucketCommand` reports whether a Bucket is there and reachable. `HeadBucket` also reports the Region it was found in.
+
+A HEAD response carries no body, so there is no document for an error code to travel in. Real S3 answers one of a few generic statuses and leaves the SDK to name the failure. The simulator answers `404` for an absent Bucket and an absent Object alike, which an SDK client raises as `NotFound`. A read distinguishes `NoSuchBucket` from `NoSuchKey`, because a read has a body to say which.
 
 `HeadObject` authorizes against `s3:GetObject` and `HeadBucket` against `s3:ListBucket`, as real S3 does, so knowing something is there needs the permission to read it.
 

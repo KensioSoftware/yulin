@@ -321,11 +321,13 @@ describe("Serving the simulated S3 REST API on an endpoint URL", () => {
     // Then the length describes the Object, which is the point of a HEAD
     assertIdentical(head.ContentLength, 12);
 
-    // And the Bucket answers one too
+    // And the Bucket answers one too, reporting the Region it was found in.
+    // That travels in a header, since a HEAD has no body to put it in.
     const bucket = await client.send(
       new HeadBucketCommand({ Bucket: "heads" }),
     );
     assertIdentical(bucket.$metadata.httpStatusCode, 200);
+    assertIdentical(bucket.BucketRegion, simAws.defaultRegionName);
   });
 
   it("answers a HEAD for something absent with 404 and no body to read", async () => {
