@@ -9,7 +9,7 @@ import type { SimS3Object } from "./s3-object.js";
  * listing that leaves it out reads as an Object of unknown class, which is a
  * different thing from a Standard one.
  */
-const defaultStorageClass = "STANDARD";
+export const simS3DefaultStorageClass = "STANDARD";
 
 /**
  * One Object as a listing describes it.
@@ -39,7 +39,7 @@ export function simS3ObjectSummary(object: SimS3Object): SimS3ObjectSummary {
     Size: object.body.length,
     ETag: simS3QuotedETag(object.etag),
     LastModified: object.lastModified,
-    StorageClass: defaultStorageClass,
+    StorageClass: simS3DefaultStorageClass,
   };
 }
 

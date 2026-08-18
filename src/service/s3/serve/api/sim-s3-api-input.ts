@@ -31,10 +31,17 @@ export function bucketBodyInput<T>(
  * them.
  */
 export function putObjectInput(request: SimS3ApiRequest): object {
+  return { ...createMultipartUploadInput(request), Body: request.body };
+}
+
+/**
+ * The input of a request that describes an Object without carrying its bytes,
+ * which is what starting a multipart upload is.
+ */
+export function createMultipartUploadInput(request: SimS3ApiRequest): object {
   return {
     Bucket: request.bucketName,
     Key: request.objectKey,
-    Body: request.body,
     ...optional("ContentType", request.headers.get("content-type")),
     ...optional("CacheControl", request.headers.get("cache-control")),
     ...optional(

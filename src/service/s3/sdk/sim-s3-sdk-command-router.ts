@@ -4,7 +4,13 @@ import type {
   SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import { simSdkCallerOptions, simSdkStreamBody } from "../../../sdk/index.js";
+import type { SimAbortMultipartUploadCommand } from "../command/abort-multipart-upload/abort-multipart-upload.command.js";
+import type { SimCompleteMultipartUploadCommand } from "../command/complete-multipart-upload/complete-multipart-upload.command.js";
 import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.command.js";
+import type { SimCreateMultipartUploadCommand } from "../command/create-multipart-upload/create-multipart-upload.command.js";
+import type { SimListMultipartUploadsCommand } from "../command/list-multipart-uploads/list-multipart-uploads.command.js";
+import type { SimListPartsCommand } from "../command/list-parts/list-parts.command.js";
+import type { SimUploadPartCommand } from "../command/upload-part/upload-part.command.js";
 import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
@@ -195,6 +201,54 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simS3.putObject(
             command as SimPutObjectCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateMultipartUploadCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.createMultipartUpload(
+            command as SimCreateMultipartUploadCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UploadPartCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.uploadPart(
+            command as SimUploadPartCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CompleteMultipartUploadCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.completeMultipartUpload(
+            command as SimCompleteMultipartUploadCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AbortMultipartUploadCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.abortMultipartUpload(
+            command as SimAbortMultipartUploadCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListMultipartUploadsCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.listMultipartUploads(
+            command as SimListMultipartUploadsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListPartsCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.listParts(
+            command as SimListPartsCommand,
             simSdkCallerOptions(context),
           ),
       ],

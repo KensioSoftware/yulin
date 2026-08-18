@@ -88,3 +88,30 @@ export type {
   SimPutPublicAccessBlockCommand,
   SimPutPublicAccessBlockCommandOutput,
 } from "./put-public-access-block/put-public-access-block.command.js";
+export type {
+  SimAbortMultipartUploadCommand,
+  SimAbortMultipartUploadCommandOutput,
+} from "./abort-multipart-upload/abort-multipart-upload.command.js";
+export type {
+  SimCompleteMultipartUploadCommand,
+  SimCompleteMultipartUploadCommandOutput,
+  SimCompletedUploadPart,
+} from "./complete-multipart-upload/complete-multipart-upload.command.js";
+export type {
+  SimCreateMultipartUploadCommand,
+  SimCreateMultipartUploadCommandOutput,
+} from "./create-multipart-upload/create-multipart-upload.command.js";
+export type {
+  SimListMultipartUploadsCommand,
+  SimListMultipartUploadsCommandOutput,
+  SimMultipartUploadSummary,
+} from "./list-multipart-uploads/list-multipart-uploads.command.js";
+export type {
+  SimListPartsCommand,
+  SimListPartsCommandOutput,
+  SimUploadPartSummary,
+} from "./list-parts/list-parts.command.js";
+export type {
+  SimUploadPartCommand,
+  SimUploadPartCommandOutput,
+} from "./upload-part/upload-part.command.js";

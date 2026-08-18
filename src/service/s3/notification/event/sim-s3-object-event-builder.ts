@@ -15,7 +15,21 @@ export interface SimS3ObjectCreatedInput {
   readonly bucket: SimS3Bucket;
   readonly object: SimS3Object;
   readonly caller: SimAwsResolvedCaller;
+  /**
+   * How the Object came to be there, which real S3 distinguishes: an Object
+   * assembled from parts arrives as `s3:ObjectCreated:CompleteMultipartUpload`
+   * rather than as a Put.
+   */
+  readonly eventName: SimS3ObjectCreatedEvent;
 }
+
+/**
+ * The ways an Object can be created that simulated S3 raises an event for.
+ */
+export type SimS3ObjectCreatedEvent = Extract<
+  SimS3NotificationEvent,
+  `s3:ObjectCreated:${string}`
+>;
 
 /**
  * An Object key a command has just removed.
@@ -66,7 +80,7 @@ export class SimS3ObjectEventBuilder {
   forCreated(input: SimS3ObjectCreatedInput): SimS3ObjectEvent {
     return this.build({
       bucket: input.bucket,
-      eventName: "s3:ObjectCreated:Put",
+      eventName: input.eventName,
       key: input.object.key,
       caller: input.caller,
       size: input.object.body.length,

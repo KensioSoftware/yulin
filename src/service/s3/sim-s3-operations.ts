@@ -171,4 +171,52 @@ export abstract class SimS3Operations {
   ): Promise<simS3Commands.SimListObjectsV2CommandOutput> {
     return await this.commands.objects.listV2(command, options);
   }
+
+  /** Handle a Create Multipart Upload Command from the SDK. */
+  async createMultipartUpload(
+    command: simS3Commands.SimCreateMultipartUploadCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimCreateMultipartUploadCommandOutput> {
+    return await this.commands.multipartUploads.create(command, options);
+  }
+
+  /** Handle an Upload Part Command from the SDK. */
+  async uploadPart(
+    command: simS3Commands.SimUploadPartCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimUploadPartCommandOutput> {
+    return await this.commands.multipartUploads.uploadPart(command, options);
+  }
+
+  /** Handle a Complete Multipart Upload Command from the SDK. */
+  async completeMultipartUpload(
+    command: simS3Commands.SimCompleteMultipartUploadCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimCompleteMultipartUploadCommandOutput> {
+    return await this.commands.multipartUploads.complete(command, options);
+  }
+
+  /** Handle an Abort Multipart Upload Command from the SDK. */
+  async abortMultipartUpload(
+    command: simS3Commands.SimAbortMultipartUploadCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimAbortMultipartUploadCommandOutput> {
+    return await this.commands.multipartUploads.abort(command, options);
+  }
+
+  /** Handle a List Multipart Uploads Command from the SDK. */
+  async listMultipartUploads(
+    command: simS3Commands.SimListMultipartUploadsCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimListMultipartUploadsCommandOutput> {
+    return await this.commands.multipartUploads.list(command, options);
+  }
+
+  /** Handle a List Parts Command from the SDK. */
+  async listParts(
+    command: simS3Commands.SimListPartsCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimListPartsCommandOutput> {
+    return await this.commands.multipartUploads.listParts(command, options);
+  }
 }

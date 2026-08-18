@@ -292,7 +292,7 @@ const client = new S3Client({
 });
 ```
 
-The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `HeadObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, and the Bucket policy, website, Block Public Access and event notification configurations. `aws s3 cp` works in both directions. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
+The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `HeadObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, the six multipart upload operations, and the Bucket policy, website, Block Public Access and event notification configurations. `aws s3 cp` works in both directions, and for a file above the CLI's 8MB multipart threshold. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
 
 Simulated S3 also answers its own Bucket hostnames, covered above. That path is unchanged, and it is what a presigned URL and a website visitor use.
 

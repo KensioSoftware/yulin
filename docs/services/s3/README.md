@@ -409,6 +409,134 @@ for (const object of listedObjects) {
 An event notification record carries the same value unquoted, in its `eTag` field, as real S3
 reports it there.
 
+An Object uploaded in parts gets a different form. See
+[Uploading an Object in parts](#uploading-an-object-in-parts).
+
+## Uploading an Object in parts
+
+`aws s3 cp` switches to a multipart upload above eight megabytes, and `@aws-sdk/lib-storage` uploads
+in parts whatever the size. Sim S3 answers the six operations that path is made of, over the SDK and
+over a served endpoint alike.
+
+```bash
+aws s3 cp ./big.bin s3://widgets/big.bin   # 12MB, multipart under the covers
+aws s3 ls s3://widgets/                    # reports the whole 12MB Object
+```
+
+An upload is started, the parts are sent under the id it issues, and completing it stores one
+Object. The parts can be sent in any order.
+
+```typescript sim-s3-multipart-upload
+/**
+ * Uploading a simulated S3 Object in parts.
+ */
+
+import {
+  CompleteMultipartUploadCommand,
+  CreateBucketCommand,
+  CreateMultipartUploadCommand,
+  GetObjectCommand,
+  UploadPartCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "uploads-bucket" }));
+
+const started = await simS3.createMultipartUpload(
+  new CreateMultipartUploadCommand({
+    Bucket: "uploads-bucket",
+    Key: "report.csv",
+    ContentType: "text/csv",
+  }),
+);
+
+const second = await simS3.uploadPart(
+  new UploadPartCommand({
+    Bucket: "uploads-bucket",
+    Key: "report.csv",
+    UploadId: started.UploadId,
+    PartNumber: 2,
+    Body: "2,two\n",
+  }),
+);
+
+const first = await simS3.uploadPart(
+  new UploadPartCommand({
+    Bucket: "uploads-bucket",
+    Key: "report.csv",
+    UploadId: started.UploadId,
+    PartNumber: 1,
+    Body: "id,name\n1,one\n",
+  }),
+);
+
+const completed = await simS3.completeMultipartUpload(
+  new CompleteMultipartUploadCommand({
+    Bucket: "uploads-bucket",
+    Key: "report.csv",
+    UploadId: started.UploadId,
+    MultipartUpload: {
+      Parts: [
+        { PartNumber: 1, ETag: first.ETag },
+        { PartNumber: 2, ETag: second.ETag },
+      ],
+    },
+  }),
+);
+
+// The parts joined in part-number order, whichever order they arrived in.
+console.log(completed.ETag);
+
+const objectOut = await simS3.getObject(
+  new GetObjectCommand({ Bucket: "uploads-bucket", Key: "report.csv" }),
+);
+
+console.log(objectOut.Body);
+```
+
+The completed Object is an ordinary one. Every operation that reads an Object reads it, and the
+system metadata the upload was started with (`ContentType` above) travels with it.
+
+### The multipart ETag
+
+Real S3 gives an Object uploaded in parts the ETag `<md5-of-the-part-md5s>-<partCount>`, and sim S3
+gives it the same. A tool comparing content hashes checks for that `-N` suffix before trusting an
+ETag. An Object assembled from parts therefore cannot report the MD5 of the joined bytes. The two
+are different values.
+
+`PutObject`, `GetObject`, `HeadObject` and both list operations all report the same one.
+
+### Abandoning an upload
+
+`AbortMultipartUploadCommand` discards the parts. Nothing was ever under the key, and the Bucket is
+left as the upload found it. An unfinished upload puts no Object anywhere, and its parts are
+invisible to a listing.
+
+`ListMultipartUploadsCommand` reports what a Bucket has in flight, and `ListPartsCommand` reports the
+parts stored against one upload. Both are how a cleanup finds an upload that stalled.
+
+### Event notifications
+
+A completed upload raises `s3:ObjectCreated:CompleteMultipartUpload`. A single-request upload raises
+`s3:ObjectCreated:Put`, and real S3 keeps the two apart. `s3:ObjectCreated:*` covers both. See
+[Event notifications](#event-notifications).
+
+### Limitations
+
+- `UploadPartCopy` is left out. It copies a byte range from another Object, and `CopyObject` is left
+  out too.
+- Parts are held in memory, whatever storage the Bucket uses. A Bucket backed by a mounted directory
+  writes whole files and has nowhere to put half of one.
+- Real S3 requires every part except the last to be at least five megabytes, and answers
+  `EntityTooSmall` for one that is not. Sim S3 takes a part of any size.
+- A listing of uploads or of parts comes back on one page. `MaxUploads`, `MaxParts`, the markers that
+  page them, and `Delimiter` are all left out.
+- An upload has no expiry, and nothing abandons one on its own. A lifecycle rule expiring incomplete
+  uploads is left out along with the rest of lifecycle configuration.
+
 ## Deleting Objects
 
 Use `DeleteObjectCommand` to remove one Object, and `DeleteObjectsCommand` to remove several in one
@@ -1179,11 +1307,12 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 - A destination goes where the group it was declared in says, and its ARN has no say. A queue ARN
   under `LambdaFunctionConfigurations` is refused for failing to be a function ARN, and never
   delivered to as a queue.
-- Only `s3:ObjectCreated:Put` and `s3:ObjectRemoved:Delete` are raised. `Copy`, `Post`,
-  `CompleteMultipartUpload`, `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`,
-  `LifecycleExpiration:*` and `ObjectTagging:*` families, `LifecycleTransition`,
-  `IntelligentTiering`, `ObjectAcl:Put` and `ReducedRedundancyLostObject` are refused by name.
-  `s3:ObjectCreated:*` and `s3:ObjectRemoved:*` therefore expand to one member each.
+- Three event types are raised: `s3:ObjectCreated:Put`,
+  `s3:ObjectCreated:CompleteMultipartUpload` and `s3:ObjectRemoved:Delete`. `Copy`, `Post`,
+  `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`, `LifecycleExpiration:*` and
+  `ObjectTagging:*` families, `LifecycleTransition`, `IntelligentTiering`, `ObjectAcl:Put` and
+  `ReducedRedundancyLostObject` are refused by name. `s3:ObjectCreated:*` expands to the two
+  creations and `s3:ObjectRemoved:*` to the one removal.
 - `userIdentity.principalId` carries the caller's ARN rather than the `AIDA...` unique id real S3
   puts there. Simulated IAM has no unique-id namespace to draw one from, and an ARN is what a test
   would assert on. `requestParameters.sourceIPAddress` is the loopback address, because the request
@@ -1757,9 +1886,11 @@ const s3Client = new S3Client({
 
 ### Limitations
 
-- `GET`, `HEAD`, `PUT` and `DELETE` of an Object are served over the REST endpoint. Bucket operations
-  and multipart uploads are refused with `501`. `DeleteObjects` is a `POST` to the Bucket, so it is
-  available through the SDK and unavailable over HTTP.
+- `GET`, `HEAD`, `PUT` and `DELETE` of an Object are served over a Bucket's own REST endpoint, which
+  is what a presigned URL addresses. Bucket operations and multipart uploads there are refused with
+  `501`. `DeleteObjects` is a `POST` to the Bucket, so it is available through the SDK and
+  unavailable over a presigned URL. The shared endpoint `serveSimAws` binds serves all of them. See
+  [Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost).
 - `createPresignedPost` and SigV4A presigning are left out.
 - Checksums are verified for CRC32, SHA1 and SHA256. An upload stating a CRC32C or CRC64NVME checksum
   is refused, and never stored unchecked.
@@ -2282,6 +2413,9 @@ Sim S3 currently supports:
 - `CreateBucketCommand` and `ListBucketsCommand`
 - `PutObjectCommand`, `GetObjectCommand`, `ListObjectsV2Command` and `ListObjectsCommand`, with an
   ETag and a last-modified time on every Object
+- `CreateMultipartUploadCommand`, `UploadPartCommand`, `CompleteMultipartUploadCommand`,
+  `AbortMultipartUploadCommand`, `ListMultipartUploadsCommand` and `ListPartsCommand`, so `aws s3 cp`
+  and `@aws-sdk/lib-storage` can upload a file of real size
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS
@@ -2293,7 +2427,8 @@ Sim S3 currently supports:
 - Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the Bucket
   opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
 - Serving static website requests on localhost with `serveSimAws`
-- Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM
+- Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM,
+  and the `?uploads` and `?uploadId` sub-resources a multipart upload is made of
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
 - Object system metadata set by a `PutObjectCommand` and returned on a read, over every endpoint
   that serves an Object
@@ -2316,8 +2451,6 @@ These apply across the page. The sections above each list what is specific to th
 
 - Object versioning is left out. There are no version ids, no delete markers and no `VersionId` on
   any request or response.
-- Multipart uploads are left out. An Object is stored by one `PutObject`, and an ETag is always the
-  MD5 of the whole body, never carrying the `-N` part-count suffix real S3 gives a multipart Object.
 - A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
   left out, and every Object is in that one.
 - `Delimiter` and `CommonPrefixes` are left out, and a listing cannot be walked as a folder tree.

@@ -10,6 +10,7 @@ import {
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3BucketCommands } from "./command/bucket/sim-s3-bucket-commands.js";
 import { SimS3BucketPolicyCommands } from "./command/bucket-policy/sim-s3-bucket-policy-commands.js";
+import { SimS3MultipartCommands } from "./command/multipart/sim-s3-multipart-commands.js";
 import { SimS3NotificationCommands } from "./command/notification/sim-s3-notification-commands.js";
 import { SimS3ObjectCommands } from "./command/object/sim-s3-object-commands.js";
 import { SimS3PublicAccessBlockCommands } from "./command/public-access-block/sim-s3-public-access-block-commands.js";
@@ -62,6 +63,7 @@ export class SimS3Commands {
   public readonly publicAccessBlocks: SimS3PublicAccessBlockCommands;
   public readonly notifications: SimS3NotificationCommands;
   public readonly objects: SimS3ObjectCommands;
+  public readonly multipartUploads: SimS3MultipartCommands;
   public readonly objectNotifier: SimS3ObjectNotifier;
 
   constructor(properties: SimS3CommandsProperties) {
@@ -94,5 +96,6 @@ export class SimS3Commands {
     this.publicAccessBlocks = new SimS3PublicAccessBlockCommands(state);
     this.notifications = new SimS3NotificationCommands(state);
     this.objects = new SimS3ObjectCommands(state);
+    this.multipartUploads = new SimS3MultipartCommands(state);
   }
 }

@@ -97,7 +97,12 @@ export class PutObjectCommandHandler implements CommandHandler<
 
     // Every write path funnels through here, so this one call covers the SDK,
     // an intercepted SDK client and the REST endpoint alike.
-    this.notifications.objectCreated({ bucket, object, caller });
+    this.notifications.objectCreated({
+      bucket,
+      object,
+      caller,
+      eventName: "s3:ObjectCreated:Put",
+    });
 
     return {
       ETag: simS3QuotedETag(object.etag),

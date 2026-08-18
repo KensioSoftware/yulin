@@ -1,6 +1,7 @@
 import {
   assertIdentical,
   assertObjectEquals,
+  assertObjectMatches,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -63,6 +64,84 @@ describe("Resolving an S3 REST operation from a request", () => {
     assertIdentical(route("POST", "/widgets?delete"), "DeleteObjectsCommand");
   });
 
+  it("routes the six operations of a multipart upload", () => {
+    // Given the requests an upload in parts is made of, which share their
+    // method and path with the single-part operations and are told apart by
+    // the `uploads` and `uploadId` sub-resources alone.
+    assertIdentical(
+      route("POST", "/widgets/big.bin?uploads"),
+      "CreateMultipartUploadCommand",
+    );
+    assertIdentical(
+      route("PUT", "/widgets/big.bin?uploadId=U1&partNumber=2"),
+      "UploadPartCommand",
+    );
+    assertIdentical(
+      route("POST", "/widgets/big.bin?uploadId=U1"),
+      "CompleteMultipartUploadCommand",
+    );
+    assertIdentical(
+      route("DELETE", "/widgets/big.bin?uploadId=U1"),
+      "AbortMultipartUploadCommand",
+    );
+    assertIdentical(
+      route("GET", "/widgets/big.bin?uploadId=U1"),
+      "ListPartsCommand",
+    );
+    assertIdentical(
+      route("GET", "/widgets?uploads"),
+      "ListMultipartUploadsCommand",
+    );
+
+    // And the single-part operations they share a method and path with are
+    // still reached by a request naming no sub-resource.
+    assertIdentical(route("PUT", "/widgets/big.bin"), "PutObjectCommand");
+    assertIdentical(route("GET", "/widgets/big.bin"), "GetObjectCommand");
+    assertIdentical(route("DELETE", "/widgets/big.bin"), "DeleteObjectCommand");
+  });
+
+  it("reads which part of which upload a request carries", () => {
+    // Given a part upload, whose bytes travel as the body and whose number and
+    // upload travel in the query string.
+    const read = input(
+      "PUT",
+      "/widgets/big.bin?uploadId=U1&partNumber=3",
+      "the third part",
+    ) as Record<string, unknown>;
+
+    assertObjectMatches(read, {
+      Bucket: "widgets",
+      Key: "big.bin",
+      UploadId: "U1",
+      PartNumber: 3,
+    });
+    assertIdentical(
+      Buffer.from(read["Body"] as Uint8Array).toString("utf8"),
+      "the third part",
+    );
+  });
+
+  it("reads the parts a completion names out of its XML body", () => {
+    // Given the document the `aws` CLI sends to finish an upload.
+    const body =
+      `<CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+      `<Part><ETag>"aaa"</ETag><PartNumber>1</PartNumber></Part>` +
+      `<Part><ETag>"bbb"</ETag><PartNumber>2</PartNumber></Part>` +
+      `</CompleteMultipartUpload>`;
+
+    assertObjectEquals(input("POST", "/widgets/big.bin?uploadId=U1", body), {
+      Bucket: "widgets",
+      Key: "big.bin",
+      UploadId: "U1",
+      MultipartUpload: {
+        Parts: [
+          { PartNumber: 1, ETag: '"aaa"' },
+          { PartNumber: 2, ETag: '"bbb"' },
+        ],
+      },
+    });
+  });
+
   it("names no operation for a method S3 does not use here", () => {
     assertUndefined(route("PATCH", "/widgets"));
     assertUndefined(route("POST", "/widgets/one.txt"));
@@ -118,6 +197,8 @@ describe("Resolving an S3 REST operation from a request", () => {
 
     // And the ones it does serve are not mistaken for it
     assertUndefined(unserved("/widgets?policy"));
+    assertUndefined(unserved("/widgets?uploads"));
+    assertUndefined(unserved("/widgets/big.bin?uploadId=U1"));
   });
 
   it("reads a parameter left empty as a value rather than a sub-resource", () => {

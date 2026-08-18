@@ -230,19 +230,27 @@ Objects are represented as `SimS3Object` instances. In normal command flow,
 - `Uint8Array` body is converted with `Buffer.from`
 - other body types currently throw an error
 
-Metadata is stored separately from the object body. `PutObjectCommandHandler` combines:
+Metadata is stored separately from the object body. `object/s3-write-metadata.ts` combines:
 
 - `input.Metadata`
 - the system metadata request fields, mapped to their lowercase header names by
   `object/s3-system-metadata.ts`
 
+`PutObject` and `CreateMultipartUpload` both go through it, because both are the request that says
+what the Object is. `object/s3-write-body.ts` does the same for the body forms an upload can carry,
+which `PutObject` and `UploadPart` share.
+
 `GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
 metadata through `Metadata`, alongside the Object's `ETag` and `LastModified`.
 
 `object/s3-object-etag.ts` computes an Object's ETag as the MD5 of its body and quotes it for a
-response. The digest is what `SimS3Object` holds, computed on demand and kept, because the two
-surfaces disagree about the quotes: an SDK response and an HTTP header carry them, and the `eTag` of
-an Object event notification record does not.
+response. The digest is what `SimS3Object` holds, computed on demand, because the two surfaces
+disagree about the quotes. An SDK response and an HTTP header carry them, and the `eTag` of an Object
+event notification record does not.
+
+An Object uploaded in parts is the exception. `simS3MultipartETag` builds
+`<md5-of-the-part-md5s>-<partCount>`, and the Object carries that value rather than computing one,
+because the part count is a fact about how the bytes arrived that the joined bytes do not record.
 
 `object/s3-system-metadata.ts` holds the list of headers S3 remembers about an Object, pairing the
 request field a write sets each one with against the lowercase key it is stored under. Both sides
@@ -479,6 +487,39 @@ A batch deletion is not all or nothing. `DeleteObjectsOutcome` turns a `SimIamAc
 `AccessDenied` entry and any other `SimS3Error` into an entry carrying its error name, while the rest
 of the batch is still deleted. Anything else is re-raised, so a bug in the simulation cannot arrive
 as a per-key AWS error.
+
+## Multipart uploads
+
+Sim S3 usage docs:
+[`../../../docs/services/s3/README.md#uploading-an-object-in-parts`](../../../docs/services/s3/README.md#uploading-an-object-in-parts)
+
+`upload/` holds the model. `SimS3MultipartUpload` is one upload in progress, holding its key, the
+system metadata it was started with, and its parts under their numbers. `SimS3MultipartUploads` is
+the collection a Bucket holds, reached through `bucket.getMultipartUploads()`. A Bucket keeps it
+beside its storage. The parts of an unfinished upload are not Objects. Nothing that lists or reads a
+Bucket can see them, and only completing the upload puts anything under a key. Parts stay in memory
+whatever storage the Bucket uses, since a mounted directory writes whole files.
+
+`upload/sim-s3-completed-upload.ts` turns a completion into the `SimS3Object` to store. It joins the
+parts the request names, in the order it names them, and refuses a completion it cannot honour in
+full. A part that was never uploaded is `SimS3InvalidPart`, an ETag other than the one it stored is
+the same, and a list that does not ascend is `SimS3InvalidPartOrder`. Assembling from whatever
+happened to arrive would store an Object silently missing its middle.
+
+`command/multipart/` holds what the six operations share. `SimS3MultipartAccess` is the preamble all
+of them run. It finds the Bucket or answers `SimS3NoSuchBucket`, sequences the request, authorizes
+it, and finds the upload or answers `SimS3NoSuchUpload`. `SimS3MultipartAuthorizer` authorizes every one of
+them as `PutObject` is authorized, against the Object ARN under `s3:PutObject`. A role written to let
+a caller put an Object therefore lets it put a large one. `ListMultipartUploads` names no Object and
+authorizes against the Bucket.
+
+The six handlers live in a directory each, as the other commands do:
+`create-multipart-upload/`, `upload-part/`, `complete-multipart-upload/`,
+`abort-multipart-upload/`, `list-multipart-uploads/` and `list-parts/`.
+
+Over the served endpoint, S3 states these six in the `?uploads` and `?uploadId` sub-resources.
+`serve/api/sim-s3-api-multipart-input.ts` reads their inputs and
+`serve/api/sim-s3-api-multipart-output.ts` builds their responses.
 
 ## Event notifications
 

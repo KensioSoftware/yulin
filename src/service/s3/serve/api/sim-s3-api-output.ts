@@ -1,4 +1,3 @@
-import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-headers.js";
 import {
   deleteResultXml,
   notificationConfigurationXml,
@@ -12,6 +11,8 @@ import {
   simS3ListBucketsXml,
   simS3ListObjectsXml,
 } from "./sim-s3-api-listing.js";
+import { simS3MultipartResponse } from "./sim-s3-api-multipart-output.js";
+import { simS3GetObjectResponse } from "./sim-s3-api-object-output.js";
 
 const xmlContentType = { "content-type": "application/xml" };
 
@@ -40,7 +41,7 @@ export async function simS3ApiResponse(
       return xml(simS3ListObjectsXml(value, 2));
     }
     case "GetObjectCommand": {
-      return await getObjectResponse(value);
+      return await simS3GetObjectResponse(value);
     }
     case "GetBucketPolicyCommand": {
       // A Bucket policy is a JSON document, and real S3 answers this one
@@ -67,7 +68,8 @@ export async function simS3ApiResponse(
     case "HeadBucketCommand": {
       return simS3HeadBucketResponse(value);
     }
-    case "PutObjectCommand": {
+    case "PutObjectCommand":
+    case "UploadPartCommand": {
       return new Response(undefined, {
         status: 200,
         headers: etagHeader(value["ETag"]),
@@ -77,8 +79,12 @@ export async function simS3ApiResponse(
       return new Response(undefined, { status: 200 });
     }
     default: {
-      // The writes and removals that answer with a status and nothing else.
-      return new Response(undefined, { status: emptyStatus(commandName) });
+      // The writes and removals that answer with a status and nothing else,
+      // and the multipart operations, which answer in documents of their own.
+      return (
+        simS3MultipartResponse(commandName, value) ??
+        new Response(undefined, { status: emptyStatus(commandName) })
+      );
     }
   }
 }
@@ -87,47 +93,14 @@ export async function simS3ApiResponse(
  * The status an operation with no response body answers with.
  *
  * Real S3 answers a removal `204 No Content` and a configuration write `200`,
- * and a client reads the difference, so the two are kept apart here.
+ * and a client reads the difference, so the two are kept apart here. Abandoning
+ * a multipart upload is a removal, whatever its name starts with.
  */
 function emptyStatus(commandName: string): number {
-  return commandName.startsWith("Delete") ? 204 : 200;
-}
-
-/**
- * Answer a read with the Object itself, headers and all.
- */
-async function getObjectResponse(
-  output: Record<string, unknown>,
-): Promise<Response> {
-  const body = await objectBodyBytes(output["Body"]);
-
-  return new Response(body, {
-    status: 200,
-    headers: simS3ObjectResponseHeaders({
-      metadata: output["Metadata"] as Record<string, string> | undefined,
-      bodyLength: body.length,
-      etag: output["ETag"] as string | undefined,
-      lastModified: output["LastModified"] as Date | undefined,
-    }),
-  });
-}
-
-/**
- * Read a GetObject body into the bytes an HTTP response carries.
- */
-async function objectBodyBytes(body: unknown): Promise<Buffer> {
-  /* v8 ignore if -- the loader always answers with a body */
-  if (body === undefined || body === null) {
-    return Buffer.alloc(0);
-  }
-
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of body as AsyncIterable<Uint8Array>) {
-    chunks.push(Buffer.from(chunk));
-  }
-
-  return Buffer.concat(chunks);
+  return commandName === "AbortMultipartUploadCommand" ||
+    commandName.startsWith("Delete")
+    ? 204
+    : 200;
 }
 
 /**
