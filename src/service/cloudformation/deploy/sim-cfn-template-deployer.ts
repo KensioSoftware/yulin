@@ -14,6 +14,10 @@ import {
   type SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties,
 } from "./sim-cfn-template-file-loader.js";
 import { SimCfnTemplateFileUpdater } from "./sim-cfn-template-file-updater.js";
+import {
+  SimCfnCdkOutDeployer,
+  type SimCloudFormationDeployCdkOutProperties,
+} from "./sim-cfn-cdk-out-deployer.js";
 import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
 import { SimCfnTemplateFileWatches } from "../watch/sim-cfn-template-file-watches.js";
 import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
@@ -73,6 +77,7 @@ export class SimCloudFormationTemplateDeployer {
   private readonly exports: SimCfnExports | undefined;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
   private readonly templateFileUpdater: SimCfnTemplateFileUpdater;
+  private readonly cdkOutDeployer: SimCfnCdkOutDeployer;
   private readonly watches: SimCfnTemplateFileWatches;
 
   constructor(properties: SimCloudFormationTemplateDeployerProperties) {
@@ -88,6 +93,10 @@ export class SimCloudFormationTemplateDeployer {
     });
     this.watches = new SimCfnTemplateFileWatches({
       updater: this.templateFileUpdater,
+    });
+    this.cdkOutDeployer = new SimCfnCdkOutDeployer({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
     });
   }
 
@@ -128,6 +137,15 @@ export class SimCloudFormationTemplateDeployer {
     this.watches.watchIfAsked(deployment);
 
     return stack;
+  }
+
+  /**
+   * Deploy the Stacks a synthesized CDK cloud assembly holds.
+   */
+  async deployCdkOut(
+    properties: SimCloudFormationDeployCdkOutProperties | string,
+  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+    return await this.cdkOutDeployer.deploy(properties);
   }
 
   /**
