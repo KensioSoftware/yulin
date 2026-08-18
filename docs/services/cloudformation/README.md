@@ -1037,6 +1037,10 @@ await stack.waitForDeployComplete();
 This is useful for local integration tests where you want CDK to produce the template, then Yulin to
 create the simulated resources from that synthesized output template.
 
+A template path with no file at it is refused with
+`No Sim CloudFormation template file at <path>`, naming the resolved path. A synthesized template
+is build output, and a checkout that has yet to synthesize one meets this on the first run.
+
 ## Editing a synthesized template before deploying it
 
 Sometimes a synthesized template needs a change before Yulin will deploy it, such as dropping a
