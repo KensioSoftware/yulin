@@ -818,6 +818,8 @@ Sim SSM currently supports:
 - The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
 - `{{resolve:ssm:...}}` dynamic references in CloudFormation resource properties, by version or by
   current value, embedded in a longer string and inside `Fn::Sub`
+- `StringList` parameters read through a dynamic reference as the comma-separated string `Fn::Split`
+  then splits
 - Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
