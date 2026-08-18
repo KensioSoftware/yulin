@@ -107,8 +107,8 @@ await scopedS3.createBucket(
 Within one `SimAws` instance, Bucket names are globally registered across Accounts and Regions.
 Creating a Bucket with a name already used in another simulated Region or Account throws an error.
 
-Each `SimAws` instance has its own isolated state, so you can create a fresh `SimAws` instance per
-test or share one across all tests as you prefer.
+Each `SimAws` instance has its own isolated state. Create a fresh one per test or share one across
+all tests, as you prefer.
 
 ## Listing Buckets
 
@@ -192,14 +192,14 @@ Listings are sorted by key, and a page holds at most 1,000 keys, as in real S3. 
 is lowered to it, and the response reports the page size that was actually used. A `MaxKeys` of zero
 returns no keys and completes the listing, and a negative one is refused with `InvalidArgument`.
 
-A listing that found no keys has no `Contents` at all rather than an empty one, which is why the
-example reaches for `Contents ?? []`. `KeyCount` is the count either way.
+A listing that found no keys has no `Contents` at all, and the example reaches for `Contents ?? []`
+for that reason. `KeyCount` is the count either way.
 
 ### Walking a truncated listing
 
 A truncated response carries `NextContinuationToken`, which the next request passes as
-`ContinuationToken`. The token is opaque, as it is in real S3: pass it back unchanged rather than
-reading anything out of it, and simulated S3 refuses one it did not issue.
+`ContinuationToken`. The token is opaque, as it is in real S3. Pass it back unchanged, read nothing
+out of it, and simulated S3 refuses one it did not issue.
 
 ```typescript sim-s3-list-objects-v2-pagination
 /**
@@ -252,9 +252,9 @@ do {
 console.log(allKeys);
 ```
 
-Code that never names `MaxKeys` never continues a listing in a test small enough to be readable, so
+Code that never names `MaxKeys` never continues a listing in a test small enough to be readable, and
 its pagination goes unexercised. `configureMaxKeysPerPage` lowers the page size for a whole simulated
-S3 instead, which makes a Bucket of two Objects enough to make the caller walk a continuation:
+S3 instead. A Bucket of two Objects is then enough to make the caller walk a continuation:
 
 ```typescript sim-s3-list-page-size
 /**
@@ -346,15 +346,15 @@ for (const object of objectContentItems) {
 }
 ```
 
-The marker is exclusive and lexicographic, so a listing resumes after the key it names whether or not
+The marker is exclusive and lexicographic. A listing resumes after the key it names whether or not
 the Bucket still holds it.
 
 ## Object ETags
 
-Every Object has an ETag, which is the MD5 of its body in hex, quoted, as real S3 gives it for a
+Every Object has an ETag, the MD5 of its body in hex and quoted, as real S3 gives it for a
 single-part upload. `PutObject`, `GetObject`, both list operations and the S3 REST endpoint all
-report the same one, so a tool can compare what a Bucket holds against a local file without reading
-the Object back.
+report the same one. A tool can compare what a Bucket holds against a local file without reading the
+Object back.
 
 ```typescript sim-s3-object-etag
 /**
@@ -397,14 +397,14 @@ for (const object of listedObjects) {
 }
 ```
 
-An event notification record carries the same value unquoted, in its `eTag` field, which is how real
-S3 reports it there.
+An event notification record carries the same value unquoted, in its `eTag` field, as real S3
+reports it there.
 
 ## Deleting Objects
 
 Use `DeleteObjectCommand` to remove one Object, and `DeleteObjectsCommand` to remove several in one
-request. Both are authorized against `s3:DeleteObject` on the Object ARN, so a caller allowed to read
-a Bucket cannot empty it.
+request. Both are authorized against `s3:DeleteObject` on the Object ARN. A caller allowed to read a
+Bucket cannot empty it.
 
 ```typescript sim-s3-delete-object
 /**
@@ -465,8 +465,8 @@ for (const refused of refusedObjects) {
 }
 ```
 
-Deletion is idempotent, as it is in real S3. Deleting a key that is not in the Bucket succeeds, and
-`DeleteObjects` reports it among the keys it deleted. Deleting from a Bucket that does not exist
+Deletion is idempotent, as it is in real S3. Deleting a key the Bucket never held succeeds, and
+`DeleteObjects` reports it among the keys it deleted. Deleting from a Bucket that was never created
 raises `NoSuchBucket`.
 
 `DeleteObjects` authorizes each key on its own and carries on through the batch. A key the caller may
@@ -476,8 +476,8 @@ failures come back.
 
 ### Limitations
 
-- Object versioning is not simulated, so deletion removes the Object rather than writing a delete
-  marker, and neither `VersionId` nor `MFA` is read from the request.
+- Object versioning is left out. Deletion removes the Object rather than writing a delete marker,
+  and `VersionId` and `MFA` are both ignored on the request.
 - A request naming no Objects, or more than the thousand S3 accepts, is refused with `MalformedXML`
   before anything is deleted.
 - A Bucket using filesystem-backed storage refuses deletion. See
@@ -490,9 +490,9 @@ SNS topic when an Object is created or removed. The configuration is applied wit
 `PutBucketNotificationConfigurationCommand` and read back with
 `GetBucketNotificationConfigurationCommand`.
 
-The destination's own policy decides whether S3 may reach it: the function's resource policy, the
-queue's `Policy` attribute, or the topic's. That is checked when the configuration is applied, and
-again for every event, as real S3 does.
+The destination's own policy decides whether S3 may reach it. That is the function's resource
+policy, the queue's `Policy` attribute, or the topic's. It is checked when the configuration is
+applied, and again for every event, as real S3 does.
 
 ```typescript sim-s3-event-notifications
 /**
@@ -581,7 +581,7 @@ A configuration can filter on an object key prefix, a suffix, or both. Two confi
 an event type and whose filters could both match the same key are refused with `InvalidArgument`, as
 real S3 refuses them. Overlapping prefixes are fine when the suffixes do not overlap, so one function
 can take the `.jpg` files under a prefix while another takes the `.png` files under the same one.
-The rule applies across the destination groups, so a function and a queue that both want the same
+The rule applies across the destination groups. A function and a queue that both want the same
 event are refused as readily as two functions.
 
 `PutBucketNotificationConfigurationCommand` replaces the whole configuration rather than adding to
@@ -604,11 +604,11 @@ are the real IAM action names, and they do not match the API names.
 ### To an SQS queue
 
 A `QueueConfigurations` entry names a queue by ARN. The whole `Records` document arrives as one
-message body, so a consumer parses `record.body` to get at the event. Put a Lambda event source
+message body, and a consumer parses `record.body` to get at the event. Put a Lambda event source
 mapping on the queue and the chain runs end to end after one `backgroundTasksComplete()`.
 
 The queue's `Policy` attribute has to allow `sqs:SendMessage` for the `s3.amazonaws.com` service
-principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`, so the `ArnLike` condition CDK's
+principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`. The `ArnLike` condition CDK's
 `SqsDestination` writes and the `StringEquals aws:SourceAccount` guard AWS documents are both
 satisfied.
 
@@ -761,12 +761,12 @@ its own policy and its own Account's IAM are what admit the Bucket. A FIFO queue
 ### To an SNS topic
 
 A `TopicConfigurations` entry names a topic by ARN. The whole `Records` document is published as the
-SNS `Message`, with a `Subject` of `Amazon S3 Notification`, which is what real S3 publishes. A queue
-subscribed to the topic therefore has two envelopes to reach through: parse the message body for the
+SNS `Message`, with a `Subject` of `Amazon S3 Notification`, as real S3 publishes it. A queue
+subscribed to the topic therefore has two envelopes to reach through. Parse the message body for the
 SNS envelope, then parse its `Message` for the S3 event.
 
 The topic's `Policy` attribute has to allow `sns:Publish` for the `s3.amazonaws.com` service
-principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`, so the `ArnLike` condition CDK's
+principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`. The `ArnLike` condition CDK's
 `SnsDestination` writes and the `StringEquals aws:SourceAccount` guard AWS documents are both
 satisfied.
 
@@ -908,21 +908,21 @@ console.log(event.Records[0].s3.object.key); // "raw/cat.jpg"
 The topic has to be in the Bucket's Region, as real S3 requires. It can be in another Account, since
 its own policy and its own Account's IAM are what admit the Bucket. A FIFO topic is refused by name.
 
-The publish goes through the ordinary `Publish` path, so the topic's own subscriptions take it from
+The publish goes through the ordinary `Publish` path, and the topic's own subscriptions take it from
 there. That means a topic destination reaches everything the topic reaches, and a subscribed queue is
 two hops from the Object that was written. One `backgroundTasksComplete()` covers both.
 
 ### From a CloudFormation template
 
 The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the same
-`PutBucketNotificationConfiguration` path, so a template and an SDK caller get identical validation.
-CloudFormation names the same configuration differently in several places: `LambdaConfigurations`
-rather than `LambdaFunctionConfigurations`, a single `Event` string rather than an `Events` list,
-`Function` rather than `LambdaFunctionArn`, `Queue` rather than `QueueArn`, `Topic` rather than
-`TopicArn`, and `Filter.S3Key.Rules` rather than `Filter.Key.FilterRules`. `QueueConfigurations` and
-`TopicConfigurations` are the names both spell the same way. Yulin reads the CloudFormation names and
-refuses the others, so a template using the SDK spelling fails the stack rather than deploying an
-unfiltered configuration.
+`PutBucketNotificationConfiguration` path, and a template and an SDK caller get identical validation.
+CloudFormation names the same configuration differently in several places. It writes
+`LambdaConfigurations` where the SDK writes `LambdaFunctionConfigurations`, a single `Event` string
+where the SDK takes an `Events` list, `Function` for `LambdaFunctionArn`, `Queue` for `QueueArn`,
+`Topic` for `TopicArn`, and `Filter.S3Key.Rules` for `Filter.Key.FilterRules`. `QueueConfigurations`
+and `TopicConfigurations` are the names both spell the same way. Yulin reads the CloudFormation names
+and refuses the others, so a template using the SDK spelling fails the stack. An unfiltered
+configuration would deploy otherwise.
 
 ```typescript sim-s3-cfn-event-notification
 /**
@@ -1010,32 +1010,32 @@ await simAws.backgroundTasksComplete();
 ```
 
 Two things in that template are there because real CloudFormation needs them, and simulated
-CloudFormation needs them for the same reasons. The Bucket names itself rather than letting
-CloudFormation name it, and the permission names the Bucket by ARN literal rather than by
-`Fn::GetAtt`. Written the other way round, the Bucket needs the function's ARN and the permission
-needs the Bucket's, which is a circular dependency. The `DependsOn` then puts the permission in place
-before S3 validates the destination the notification names.
+CloudFormation needs them for the same reasons. The Bucket names itself, where CloudFormation would
+otherwise name it, and the permission names the Bucket by ARN literal, where `Fn::GetAtt` would
+otherwise give it. Written the other way round, the Bucket needs the function's ARN and the
+permission needs the Bucket's, a circular dependency. The `DependsOn` then puts the permission in
+place before S3 validates the destination the notification names.
 
 S3 generates the configuration id, because CloudFormation has no property for stating one. Read it
 back with `GetBucketNotificationConfigurationCommand` if a test needs it.
 
 ### From a CDK app
 
-`bucket.addEventNotification(...)` deploys through simulated CloudFormation. CDK does not write the
-`AWS::S3::Bucket` `NotificationConfiguration` property for it. It writes a
-`Custom::S3BucketNotifications` resource carrying the same request
+`bucket.addEventNotification(...)` deploys through simulated CloudFormation. CDK writes a
+`Custom::S3BucketNotifications` resource for it rather than the `AWS::S3::Bucket`
+`NotificationConfiguration` property. The resource carries the same request
 `PutBucketNotificationConfigurationCommand` takes, alongside the `AWS::Lambda::Permission` that lets
 S3 invoke the function. Yulin applies that request through the same command path an SDK caller
-reaches, so a configuration is validated the same way whichever it arrives by.
+reaches, and a configuration is validated the same way whichever it arrives by.
 
 `SqsDestination` and `SnsDestination` write their entry into the same resource, alongside the
 `AWS::SQS::QueuePolicy` or `AWS::SNS::TopicPolicy` that grants S3 access. Both of those deploy, as
-does the `AWS::SNS::Topic` beside them, so a stack whose Bucket notifies a topic needs nothing set
-up by hand.
+does the `AWS::SNS::Topic` beside them. A stack whose Bucket notifies a topic needs nothing set up
+by hand.
 
 Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
-on the permission CDK writes beside the notification is a synth-time literal, so a stack deployed
-into another Account leaves S3 unable to validate the destination, and the stack fails.
+on the permission CDK writes beside the notification is a synth-time literal. A stack deployed into
+another Account leaves S3 unable to validate the destination, and the stack fails.
 
 ```typescript sim-s3-cdk-event-notification
 /**
@@ -1072,8 +1072,8 @@ is read and ignored.
 
 A resource carrying `Managed: false` is refused, and the stack fails. CDK writes it for a Bucket the
 app imported rather than declared. It asks S3 to merge the configuration with the configurations
-already on the Bucket instead of replacing them, and simulated S3 only replaces, so applying it as
-written would drop configurations that survive on real AWS. Declare the Bucket in the same stack to
+already on the Bucket, where simulated S3 only replaces, so applying it as written would drop
+configurations that survive on real AWS. Declare the Bucket in the same stack to
 get a managed notification configuration.
 
 ### What arrives at the destination
@@ -1081,17 +1081,17 @@ get a managed notification configuration.
 A function is invoked with the `Records` document real S3 sends. A queue gets the same document as
 one message body, and a topic gets it as the published `Message`. One event produces one record.
 
-Creation records carry the Object's `size` and its `eTag`, which is the MD5 of the bytes as it is for
-an Object real S3 stored in one part. Removal records carry neither, because the Object they describe
+Creation records carry the Object's `size` and its `eTag`, the MD5 of the bytes as it is for an
+Object real S3 stored in one part. Removal records leave both out, because the Object they describe
 is gone. Both carry a `sequencer`, which orders the events for one object key. The object key is
 form-URL-encoded, so `red flower.jpg` arrives as `red+flower.jpg`.
 
-`eventTime` comes from the simulation's clock, so a frozen clock produces a fixed timestamp.
+`eventTime` comes from the simulation's clock, and a frozen clock produces a fixed timestamp.
 
-The document is typed as `SimS3Event`, with `SimS3EventRecord` for one record, so a handler can be
-written against it. It is not assignable to the `aws-lambda` typings package's `S3Event`, and that
-is deliberate: that package declares `Records` mutable and requires `s3.object.size` and `eTag`,
-which a removal record does not carry. A handler typed against `S3Event` still receives this
+The document is typed as `SimS3Event`, with `SimS3EventRecord` for one record, and a handler can be
+written against it. Assigning it to the `aws-lambda` typings package's `S3Event` fails,
+deliberately. That package declares `Records` mutable and requires `s3.object.size` and `eTag`, which a
+removal record leaves out. A handler typed against `S3Event` still receives this
 document at runtime, and typing it as `SimS3Event` is what describes what actually arrives.
 
 ### Making an event notification without a Bucket
@@ -1133,20 +1133,20 @@ const objectRemovedFactory = new VariantFactory(s3NotificationEventFactory, {
 console.log(thumbnailKeys(objectRemovedFactory.make()));
 ```
 
-The default is the single record one Object event produces, which is all real S3 delivers to a
-function at once. What a record says in more than one place is computed from the rest: the Bucket
-ARN is the ARN of the Bucket named, and a removal carries no `size` and no `eTag` while a creation
-carries both. The key is carried as a record carries it, form-URL-encoded, so a key with a space in
-it goes in as `red+flower.jpg`.
+The default is the single record one Object event produces, all real S3 delivers to a function at
+once. What a record says in more than one place is computed from the rest. The Bucket ARN is the ARN
+of the Bucket named, and a removal carries no `size` and no `eTag` where a creation carries both.
+The key is carried as a record carries it, form-URL-encoded, and a key with a space in it goes in as
+`red+flower.jpg`.
 
 The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
 covers what these have in common with the factories for the other event shapes.
 
 ### When delivery fails
 
-Real S3 tells the caller who wrote the Object nothing about a delivery, and neither does the
-simulator: a handler that throws does not fail the `PutObject` and does not reject
-`backgroundTasksComplete()`. The outcome is still readable:
+Real S3 tells the caller who wrote the Object nothing about a delivery, and the simulator says as
+little. A handler that throws leaves the `PutObject` successful and `backgroundTasksComplete()`
+resolved. The outcome is still readable:
 
 ```typescript
 for (const failure of simAws.s3().getNotificationDeliveryFailures()) {
@@ -1159,17 +1159,17 @@ destination that refused the event, because its resource policy no longer admits
 recorded without a warning.
 
 A handler that writes back into the Bucket that triggered it notifies itself forever, and in process
-there is nothing to slow it down. Filter the configuration by prefix or suffix so the handler's own
-writes do not match it. Without that, the simulation stops after a thousand deliveries and
+there is nothing to slow it down. Filter the configuration by prefix or suffix, so the handler's own
+writes fall outside it. Without that, the simulation stops after a thousand deliveries and
 `backgroundTasksComplete()` raises an error naming the Bucket.
 
 ### Limitations
 
 - A Lambda function, an SQS queue and an SNS topic are the destinations. EventBridge is refused by
   name.
-- A destination goes where the group it was declared in says, not where its ARN says: a queue ARN
-  under `LambdaFunctionConfigurations` is refused for not being a function ARN rather than delivered
-  to as a queue.
+- A destination goes where the group it was declared in says, and its ARN has no say. A queue ARN
+  under `LambdaFunctionConfigurations` is refused for failing to be a function ARN, and never
+  delivered to as a queue.
 - Only `s3:ObjectCreated:Put` and `s3:ObjectRemoved:Delete` are raised. `Copy`, `Post`,
   `CompleteMultipartUpload`, `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`,
   `LifecycleExpiration:*` and `ObjectTagging:*` families, `LifecycleTransition`,
@@ -1181,28 +1181,30 @@ writes do not match it. Without that, the simulation stops after a thousand deli
   was made in this process, and the `responseElements` request ids are generated per event and match
   nothing.
 - `eventVersion` is the version the S3 event message structure page documents now. AWS increments the
-  minor version whenever it adds a field, so compare the major for equality rather than asserting on
-  the whole string.
-- `versionId` is absent from every record, which is what real S3 does for a Bucket without
-  versioning. Versioning is not simulated.
+  minor version whenever it adds a field, so compare the major for equality and leave the whole
+  string alone.
+- `versionId` is absent from every record, as it is on real S3 for a Bucket without versioning.
+  Versioning is left out.
 - A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
   notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
   simulated S3 through `SimAws` instead.
 - An `EventBridgeConfiguration` in an `AWS::S3::Bucket` `NotificationConfiguration` is refused by
   name, as it is for an SDK caller.
-- `Managed: false` on a `Custom::S3BucketNotifications` resource is refused rather than approximated,
-  and an EventBridge destination in one is refused by name as it is for an SDK caller.
+- `Managed: false` on a `Custom::S3BucketNotifications` resource is refused outright, and an
+  EventBridge destination in one is refused by name as it is for an SDK caller.
 - A FIFO queue destination is refused by name, as real S3 refuses one. Simulated SQS has no FIFO
-  queues either, and neither does simulated SNS, so a FIFO topic destination is refused the same way.
-- The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is not acted on.
-  Queue encryption is not simulated.
+  queues either, and simulated SNS has no FIFO topics, so a FIFO topic destination is refused the
+  same way.
+- The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is ignored.
+  Queue encryption is left out.
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
-  rather than putting Objects, so neither raises anything, whereas real CDK `BucketDeployment` fires
-  one `ObjectCreated:Put` per file.
-- A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
+  rather than putting Objects, and neither raises an event. Real CDK `BucketDeployment` fires one
+  `ObjectCreated:Put` per file.
+- A function ARN naming a version or an alias is refused, since simulated Lambda has no versions or
+  aliases.
 - A topic destination publishes with no message attributes, since real S3 publishes none. The only
   thing on the message besides the event document is the `Amazon S3 Notification` subject.
-- `s3:TestEvent` is not sent. Real S3 puts one on a queue or topic when a configuration naming it is
+- `s3:TestEvent` is left out. Real S3 puts one on a queue or topic when a configuration naming it is
   applied, carrying a flat `{Service, Event, Time, Bucket, RequestId, HostId}` document with no
   `Records` in it. Sending it here would make the simplest test two messages long and hand a
   consumer a body it cannot parse as an event. What the message exists to prove, that S3 may reach
@@ -1210,43 +1212,43 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 
 ## Buckets from CloudFormation
 
-An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on: `BucketName`,
+An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on. Those are `BucketName`,
 `NotificationConfiguration`, `PublicAccessBlockConfiguration` and `WebsiteConfiguration`. Without
-`BucketName` the Bucket is named after the resource's logical id, lowercased, rather than the
-generated name real CloudFormation invents.
+`BucketName` the Bucket is named after the resource's logical id, lowercased, where real
+CloudFormation invents a generated name.
 
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
-so the Bucket is created and the stack carries on. That matters because a Bucket deployed without the
-lifecycle rules, versioning or CORS configuration its template asked for looks configured and behaves
-as though it were not, and the failure that causes turns up somewhere else entirely. The record is
-where a test checks which of those it is standing on. A property name `AWS::S3::Bucket` does not have
-is recorded the same way, rather than a stack failing over a typo.
+and the Bucket is created and the stack carries on. That matters because a Bucket deployed without
+the lifecycle rules, versioning or CORS configuration its template asked for looks configured and
+behaves as though it were bare, and the failure that causes turns up somewhere else entirely. The
+record is where a test checks which of those it is standing on. A property name `AWS::S3::Bucket`
+never had is recorded the same way, and a typo leaves the stack standing.
 
-One of the four that is there but is not the shape it should be still fails the stack, rather than
-being read as absent, and so does a `BucketName` that is not a string: there is no Bucket to create
-under a name nothing else in the template refers to.
+One of the four given in the wrong shape still fails the stack, and so does a `BucketName` that is
+something other than a string. There is no Bucket to create under a name nothing else in the
+template refers to.
 
-`BucketEncryption` and `Tags` are read, ignored and not recorded, because nothing this simulator
-models can tell the difference: there is no simulated KMS, Object bytes are stored as they arrive,
-and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it synthesizes, and
+`BucketEncryption` and `Tags` are read, ignored and left out of the record, because nothing this
+simulator models can tell the difference. There is no simulated KMS, Object bytes are stored as they
+arrive, and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it synthesizes, and
 listing a difference no test could observe would only bury the ones that matter.
 
 ## Bucket policies
 
 A Bucket policy is a resource policy stored on the Bucket. Sim IAM evaluates it alongside the
-caller's identity policies whenever an Object command is authorized, so a policy can grant access to
-a principal that holds no identity policy at all, including an anonymous caller.
+caller's identity policies whenever an Object command is authorized. A policy can grant access to a
+principal that holds no identity policy at all, including an anonymous caller.
 
 Apply one with `PutBucketPolicyCommand`, read it back with `GetBucketPolicyCommand`, and remove it
 with `DeleteBucketPolicyCommand`. Each is authorized in its own right, against `s3:PutBucketPolicy`,
 `s3:GetBucketPolicy` and `s3:DeleteBucketPolicy`.
 
 In a CloudFormation template, a Bucket policy is a separate `AWS::S3::BucketPolicy` resource rather
-than a property of `AWS::S3::Bucket`. This is what CDK synthesizes for `bucket.grantRead(...)`,
-`grantPut(...)` and `addToResourcePolicy(...)`, so a template reaches it whether or not the app
+than a property of `AWS::S3::Bucket`. CDK synthesizes one for `bucket.grantRead(...)`,
+`grantPut(...)` and `addToResourcePolicy(...)`, and a template reaches it whether or not the app
 mentions a Bucket policy itself. Sim CloudFormation attaches it through the same `PutBucketPolicy`
-path an SDK call takes, so the document is validated and enforced identically either way.
+path an SDK call takes, and the document is validated and enforced identically either way.
 
 ```typescript sim-s3-bucket-policy
 /**
@@ -1334,17 +1336,17 @@ const policyOut = await simS3.getBucketPolicy(
 console.log(policyOut.Policy);
 ```
 
-`GetBucketPolicyCommand` throws `NoSuchBucketPolicy` when the Bucket exists but has no policy, which
-is how real S3 distinguishes that from a Bucket that does not exist. `DeleteBucketPolicyCommand`
-succeeds either way, matching S3's idempotent behaviour.
+`GetBucketPolicyCommand` throws `NoSuchBucketPolicy` when the Bucket exists but has no policy, as
+real S3 separates that from a missing Bucket. `DeleteBucketPolicyCommand` succeeds either way,
+matching S3's idempotent behaviour.
 
 A Bucket policy granting `Principal: "*"` is refused by default. See
 [Block Public Access](#block-public-access) below.
 
 ### Where a request came from
 
-A request can say what it is being made for, which is what a simulated service supplies when it
-reaches a Bucket on a resource's behalf. `sourceArn` and `sourceAccount` go alongside the caller and
+A request can say what it is being made for, and a simulated service supplies that when it reaches a
+Bucket on a resource's behalf. `sourceArn` and `sourceAccount` go alongside the caller and
 reach IAM as the `aws:SourceArn` and `aws:SourceAccount` condition keys:
 
 ```typescript
@@ -1358,18 +1360,18 @@ await simS3.getObject(
 ```
 
 That is the condition a Bucket policy granting a service principal usually carries, since a service
-principal is shared by every resource of that service. A request carrying neither leaves the key out
-rather than supplying an empty string, so a statement conditioned on it fails to match. Condition
-key names are matched case insensitively, so CDK's `AWS:SourceArn` spelling matches the same key.
+principal is shared by every resource of that service. A request carrying no such value leaves the
+key out entirely, and a statement conditioned on it fails to match. Condition key names are matched
+case insensitively, so CDK's `AWS:SourceArn` spelling matches the same key.
 
-Sim CloudFront supplies both when a Distribution's S3 Origin has an origin access control, which is
-[how it serves a private Bucket](../cloudfront/README.md#origin-access-controls).
+Sim CloudFront supplies both when a Distribution's S3 Origin has an origin access control, and that
+is [how it serves a private Bucket](../cloudfront/README.md#origin-access-controls).
 
 ## Block Public Access
 
 Real S3 turns on all four Block Public Access settings for every new Bucket, and `BlockPublicPolicy`
-makes `PutBucketPolicy` reject a policy that allows public access. Sim S3 does the same, so a Bucket
-starts closed and a public Bucket policy is refused with `AccessDenied` until the Bucket opts out:
+makes `PutBucketPolicy` reject a policy that allows public access. Sim S3 does the same. A Bucket
+starts closed, and a public Bucket policy is refused with `AccessDenied` until the Bucket opts out:
 
 ```typescript
 await simS3.putPublicAccessBlock(
@@ -1380,13 +1382,12 @@ await simS3.putPublicAccessBlock(
 );
 ```
 
-The configuration you supply replaces the previous one wholesale, so a setting you leave out of it
-is off rather than kept. That matches CDK: `BlockPublicAccess.BLOCK_ACLS` names only the two ACL
-settings, and pairing it with `publicReadAccess: true` is the usual way to build a public website
-Bucket.
+The configuration you supply replaces the previous one wholesale, and a setting you leave out of it
+is off. That matches CDK. `BlockPublicAccess.BLOCK_ACLS` names only the two ACL settings, and pairing
+it with `publicReadAccess: true` is the usual way to build a public website Bucket.
 
-`GetPublicAccessBlockCommand` reads the settings back and `DeletePublicAccessBlockCommand` removes
-them, which returns the Bucket to fully blocked rather than leaving it open. In a CloudFormation
+`GetPublicAccessBlockCommand` reads the settings back, and `DeletePublicAccessBlockCommand` removes
+them, which returns the Bucket to fully blocked. In a CloudFormation
 template the settings are the `PublicAccessBlockConfiguration` property of `AWS::S3::Bucket`, and a
 Stack whose `AWS::S3::BucketPolicy` is public without that opt-out fails to deploy, exactly as the
 real deployment would.
@@ -1404,25 +1405,25 @@ does in real S3. A `Service` principal is never a wildcard, and a `Deny` stateme
 
 ### Limitations
 
-Only `BlockPublicPolicy` changes behaviour. The other three settings are stored and reported but do
-nothing: `BlockPublicAcls` and `IgnorePublicAcls` govern ACLs, which are not modelled, and
+Only `BlockPublicPolicy` changes behaviour. The other three settings are stored and reported, and go
+no further. `BlockPublicAcls` and `IgnorePublicAcls` govern ACLs, which this simulator leaves out.
 `RestrictPublicBuckets` changes how an existing public policy is evaluated for cross-account callers
-rather than rejecting a write, which is not yet simulated.
+rather than rejecting a write, and that evaluation is absent so far.
 
-Anything the simulator cannot classify confidently counts as public and is refused, so it can be
-stricter than real S3. A `NotPrincipal` statement, a statement with no `Principal`, and a
+Anything the simulator cannot classify confidently counts as public and is refused, which makes it
+stricter than real S3 in places. A `NotPrincipal` statement, a statement with no `Principal`, and a
 `Condition` on `aws:SourceIp` all count as public here. Real S3 accepts a sufficiently narrow
-`aws:SourceIp` CIDR range as non-public; the simulator does not judge range breadth.
+`aws:SourceIp` CIDR range as non-public, where the simulator judges no range breadth at all.
 
 Account-level and organisation-level Block Public Access, access points, and `GetBucketPolicyStatus`
-are not simulated.
+are left out.
 
 The static website endpoint authorizes a request that names a principal as that principal, where a
 real S3 website endpoint supports only publicly readable content and authenticates nothing. The
-simulator is looser here, so a website reachable in a test as a named principal can be unreachable
-in the same way against real S3.
+simulator is looser here. A website reachable in a test as a named principal can be unreachable in
+the same way against real S3.
 
-Bucket ACLs and Object ownership settings are not modelled and are not planned. Object Ownership
+Bucket ACLs and Object ownership settings are left out, and stay that way by choice. Object Ownership
 defaults to Bucket owner enforced on new Buckets, which disables ACLs, and AWS recommends keeping
 them disabled in favour of policies.
 
@@ -1430,16 +1431,16 @@ them disabled in favour of policies.
 
 Configure Bucket website hosting with `PutBucketWebsiteCommand`.
 
-Website hosting settles which Object answers a request, not who may read it. A browser asking for a
-page is anonymous, and anonymous holds nothing unless a Bucket policy grants it, so a site with no
-Bucket policy answers `403` to every ordinary visitor, as it does on real S3. See
-[Block Public Access](#block-public-access) for the two commands a public site needs; the localhost
+Website hosting settles which Object answers a request. Who may read it is a separate question. A
+browser asking for a page is anonymous, and anonymous holds nothing unless a Bucket policy grants
+it. A site with no Bucket policy answers `403` to every ordinary visitor, as it does on real S3. See
+[Block Public Access](#block-public-access) for the two commands a public site needs. The localhost
 serving example below shows them in place. The examples in this section configure hosting without
-serving it, so they leave that out.
+serving it, and leave that out.
 
 A request that does name a principal, through a signature or the `x-sim-aws-caller` header, is
-authorized as that principal, so an identity policy granting `s3:GetObject` reaches the website
-endpoint too. Real S3 has no such thing: its website endpoint supports only publicly readable
+authorized as that principal, and an identity policy granting `s3:GetObject` reaches the website
+endpoint too. Real S3 has no such thing. Its website endpoint supports only publicly readable
 content and never authenticates a request. This is a deliberate simulator affordance, in keeping
 with the other simulated services that serve HTTP, and it means a website test driven as a named
 principal proves less than one driven as a browser would be.
@@ -1503,8 +1504,8 @@ With an index document configured:
 - `/docs/` resolves to `docs/index.html`
 - `/docs` redirects to `/docs/` when `docs/index.html` exists
 
-Static website hosting must be enabled before the sim Bucket can be served over HTTP. If it is not
-enabled, the localhost server returns `403`.
+Static website hosting must be enabled before the sim Bucket can be served over HTTP. The localhost
+server returns `403` until it is.
 
 ## Serve simulated S3 on localhost
 
@@ -1605,11 +1606,11 @@ server while preserving the simulated S3 website hostname.
 
 Sim S3 serves a REST API endpoint alongside the website endpoint, and it accepts presigned URLs
 built by the real AWS presigner, `getSignedUrl` from `@aws-sdk/s3-request-presigner`. Nothing about
-the signing is simulated: an `S3Client` is pointed at the simulated endpoint and signs as it would
+the signing is simulated. An `S3Client` is pointed at the simulated endpoint and signs as it would
 against real S3, and sim IAM verifies the signature it produced.
 
-Presigning is entirely client-side, so this works whether or not the URL is ever fetched over a real
-socket. Install the presigner alongside the SDK:
+Presigning is entirely client-side, and this works whether or not the URL is ever fetched over a
+real socket. Install the presigner alongside the SDK:
 
 ```bash
 npm install --save-dev @aws-sdk/s3-request-presigner
@@ -1703,13 +1704,13 @@ try {
 ```
 
 A presigned URL grants exactly what the principal who signed it holds. Sim IAM resolves that
-principal from the signature and authorizes `s3:GetObject` as them, so a user without permission
-cannot presign around it. Temporary credentials from an STS `AssumeRoleCommand` work the same way,
+principal from the signature and authorizes `s3:GetObject` as them. A user without permission cannot
+presign around it. Temporary credentials from an STS `AssumeRoleCommand` work the same way,
 carrying their session token in the URL.
 
-A request to the REST endpoint that neither presents a signature nor names a principal in the
+A request to the REST endpoint presenting no signature and naming no principal in the
 `x-sim-aws-caller` header is anonymous, and anonymous holds nothing unless a Bucket policy says
-otherwise. That header is always enabled and wins over a signature, so a request driven by hand can
+otherwise. That header is always enabled and wins over a signature, and a request driven by hand can
 be any principal without signing anything, exactly as it can against the other simulated services
 that serve HTTP. See
 [the sim IAM docs](../iam/README.md#what-the-simulator-reports-back) for the whole boundary.
@@ -1731,7 +1732,7 @@ const response = await fetch(url); // 403
 ### Uploads and checksums
 
 Presigned `PutObjectCommand` URLs work in the same way, with one thing to watch. The AWS SDK computes
-a checksum when it presigns, which is before there is a body to hash, and hoists it into the signed
+a checksum when it presigns, before there is a body to hash, and hoists it into the signed
 URL. Uploading anything else through that URL then fails against real S3, and fails here too, with
 `XAmzContentChecksumMismatch`. Build the client with
 `requestChecksumCalculation: "WHEN_REQUIRED"` to presign upload URLs that accept a body:
@@ -1748,13 +1749,13 @@ const s3Client = new S3Client({
 ### Limitations
 
 - `GET`, `HEAD`, `PUT` and `DELETE` of an Object are served over the REST endpoint. Bucket operations
-  and multipart uploads are not, and are refused with `501` rather than answered. `DeleteObjects` is
-  a `POST` to the Bucket, so it is available through the SDK but not over HTTP.
-- `createPresignedPost` and SigV4A presigning are not simulated.
+  and multipart uploads are refused with `501`. `DeleteObjects` is a `POST` to the Bucket, so it is
+  available through the SDK and unavailable over HTTP.
+- `createPresignedPost` and SigV4A presigning are left out.
 - Checksums are verified for CRC32, SHA1 and SHA256. An upload stating a CRC32C or CRC64NVME checksum
-  is refused rather than stored unchecked.
-- Responses carry the Object's `ETag` and `Last-Modified`, but no conditional request is honoured:
-  `If-None-Match` and `If-Modified-Since` are ignored and the Object is served in full.
+  is refused, and never stored unchecked.
+- Responses carry the Object's `ETag` and `Last-Modified`, and no conditional request is honoured.
+  `If-None-Match` and `If-Modified-Since` are ignored, and the Object is served in full.
 
 ## Error documents
 
@@ -1898,8 +1899,8 @@ await simS3.putBucketWebsite(
 );
 ```
 
-The first matching routing rule is used. A rule can match by `KeyPrefixEquals`,
-`HttpErrorCodeReturnedEquals`, both, or neither. Redirects support configured host, protocol,
+The first matching routing rule is used. A rule can match by `KeyPrefixEquals`, by
+`HttpErrorCodeReturnedEquals`, by both, or by no condition at all. Redirects support configured host, protocol,
 replacement key, replacement key prefix, and redirect status code.
 
 ## Filesystem-backed Bucket storage
@@ -1937,8 +1938,8 @@ After mounting, Object reads and writes for that Bucket use the filesystem direc
 
 ### Reloading the browser when the directory changes
 
-The Bucket is reading the files, so a rebuild needs nothing copying into it. All that is left is
-telling the browser. Give the mount somewhere to reload and it watches the directory for you:
+The Bucket is reading the files, and a rebuild copies nothing into it. All that is left is telling
+the browser. Give the mount somewhere to reload and it watches the directory for you:
 
 ```typescript sim-s3-mount-reload
 /**
@@ -1961,8 +1962,8 @@ simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
 });
 ```
 
-A build writing a whole tree of files is one reload, not one per file: the writes are held until
-they stop arriving. `settleMs` is how long that wait is, in milliseconds, for a generator that
+A build writing a whole tree of files is one reload, and never one per file. The writes are held
+until they stop arriving. `settleMs` is how long that wait is, in milliseconds, for a generator that
 pauses part way through a build:
 
 ```typescript sim-s3-mount-reload-settle
@@ -1987,18 +1988,18 @@ simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "dist"), {
 });
 ```
 
-Anything with a `reload()` method will do, so a test can watch a mount without serving anything.
+Anything with a `reload()` method will do, and a test can watch a mount without serving anything.
 
-The watch is recursive, and holds an open filesystem handle, which keeps the process alive. A dev
+The watch is recursive, and holds an open filesystem handle that keeps the process alive. A dev
 process wants exactly that. Anything with an end, such as a test, calls
 `simAws.s3().stopWatchingMountedDirectories()` when it is done.
 `simAws.s3().watchedMountedDirectories()` says which directories are being watched.
-[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that does not need
-naming a service or a scope: it lets go of the mounted directory watches along with everything else
-the environment is holding, and a served environment gets that from `srv.close()`.
+[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that names no service
+and no scope. It lets go of the mounted directory watches along with everything else the environment
+is holding, and a served environment gets that from `srv.close()`.
 
 Under [`yulin watch`](../../serve/README.md#restarting-on-a-file-change), a mount that reloads for
-itself is left alone by the supervisor: a rebuild reloads the page rather than restarting the
+itself is left alone by the supervisor. A rebuild reloads the page rather than restarting the
 process and taking every simulated Bucket, Table and Stack with it. A mount without a reload target
 is still reported to the supervisor as a directory to watch, and a change in it restarts the
 process.
@@ -2010,30 +2011,30 @@ Filesystem storage is somewhat restrictive to make it slightly safer:
 - The directory must not be the user's home directory
 - The path must not contain `..`
 - Object keys must not be absolute paths or contain `..`
-- Only files whose extension is on a cautious list are served; see below
+- Only files whose extension is on a cautious list are served (see below)
 - Symlinks are ignored when listing Objects
-- Deletion is refused rather than unlinking a real file
+- Deletion is refused, and never unlinks a real file
 
 `DeleteObject` against a filesystem-backed Bucket raises `NotImplemented`, and `DeleteObjects`
-reports the same code for every key. This is stricter than real S3, deliberately: the directory a
+reports the same code for every key. This is stricter than real S3, deliberately. The directory a
 Bucket is mounted on is an ordinary directory of yours, and removing files from it because a test
-called `DeleteObject` is not a reasonable default. Leave a Bucket on the default in-memory storage
+called `DeleteObject` would be a poor default. Leave a Bucket on the default in-memory storage
 when a test needs deletion to work.
 
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
 file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.xml`, and common
-font and image formats. A served file whose extension is not one of those gets
-`application/octet-stream`, which is what S3 reports for an object whose type it was never told.
-That only comes up for an extension a mount named itself, below: no other file is served at all,
-with or without a type.
+font and image formats. A served file whose extension falls outside that set gets
+`application/octet-stream`, as S3 reports for an object whose type it was never told. That only
+comes up for an extension a mount named itself, below. No other file is served at all, with or
+without a type.
 
 ### Serving a file extension of your own
 
-A mounted Bucket only serves files whose extension is on a cautious list — the web's own types, and
-nothing else — so that pointing a Bucket at a directory cannot be talked into reading whatever else
-happens to be in it. A file with any other extension is not served, and a `GetObject` for it comes
-back as though the file were not there. That is the right default and the wrong answer for a site
-with a data file of its own, so a mount can name the extensions it needs:
+A mounted Bucket only serves files whose extension is on a cautious list (the web's own types, and
+nothing else) so that pointing a Bucket at a directory cannot be talked into reading whatever else
+happens to be in it. A file with any other extension goes unserved, and a `GetObject` for it comes
+back as though the file were absent. That is the right default and the wrong answer for a site with
+a data file of its own. A mount can name the extensions it needs:
 
 ```typescript sim-s3-mount-file-extensions
 /**
@@ -2061,7 +2062,7 @@ leading dot is optional. Everything not named is still refused.
 ### Metadata a file cannot carry
 
 A stored Object holds what S3 was told when it was written. A file holds its bytes and its name, so
-a mounted Bucket has only the extension to go on, and reports a `content-type` and nothing else.
+a mounted Bucket has only the extension to go on, and reports a `content-type` and no more.
 Anything a deployment would have set is either inherited from the deployment, below, or declared on
 the mount, for the Objects under a key prefix.
 
@@ -2092,16 +2093,16 @@ simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
 
 The fields are the ones a [`PutObjectCommand`](#object-system-metadata) sets, and every value is a
 string, including `Expires`. Every declaration whose prefix the key starts with applies, in the
-order they were given, so a later one wins where two name the same header. An empty prefix is every
+order they were given, and a later one wins where two name the same header. An empty prefix is every
 Object in the Bucket. A declared `ContentType` replaces the one guessed from the extension.
 
 ### Inheriting what the deployment set
 
-A mount usually does not need to declare any of that, because something in the same simulated account
-has already said it. A CDK [`BucketDeployment`](../cloudformation/README.md#cdk-s3-bucketdeployment)
+A mount rarely has to declare any of that, because something in the same simulated account has
+already said it. A CDK [`BucketDeployment`](../cloudformation/README.md#cdk-s3-bucketdeployment)
 sets these headers through its own `SystemMetadata`, and says so on the destination Bucket as well as
 setting them on the Objects it copies. Mounting a directory over that Bucket replaces the Objects and
-inherits what the Bucket was told about them, so the files on disk are served as the deployed ones
+inherits what the Bucket was told about them. The files on disk are then served as the deployed ones
 were:
 
 ```typescript sim-s3-mount-deployed-system-metadata
@@ -2128,17 +2129,17 @@ simAws
   .mountBucketFilesystem("site-bucket", path.join(process.cwd(), "public"));
 ```
 
-The order does not matter: a directory can be mounted into a Bucket before the Stack describing it is
+The order is free. A directory can be mounted into a Bucket before the Stack describing it is
 deployed, and the mount answers with whatever the Bucket has been told by the time an Object is read.
 
-What a deployment published is what it is sure of, so a file it copied is described exactly. A file a
-later build wrote is described by the rule the deployment would have published it under — its
-destination key prefix and its filters — as long as only one deployment claims it. Where two
+What a deployment published is what it is sure of, and a file it copied is described exactly. A file
+a later build wrote is described by the rule the deployment would have published it under (its
+destination key prefix and its filters) as long as only one deployment claims it. Where two
 deployments into one Bucket could both have published a file that neither did, nothing is inherited
-for it, because serving a page as another deployment's brotli breaks it in a way serving the file as
-it is on disk does not. Declare those on the mount.
+for it. Serving a page as another deployment's brotli breaks it, where serving the file as it is on
+disk leaves it readable. Declare those on the mount.
 
-Anything declared on the mount goes over the top of all of it, one header at a time, which is how a
+Anything declared on the mount goes over the top of all of it, one header at a time. That is how a
 mount answers differently on purpose. A deployed site caching its assets for a year is the usual
 reason:
 
@@ -2167,9 +2168,9 @@ simAws
   });
 ```
 
-Pages served with [live reload](../../serve/README.md) are already sent `no-store`, so an HTML
-document is never what a stale cache is holding on to. Assets a build rewrites in place are, which is
-what a declaration like this one is for.
+Pages served with [live reload](../../serve/README.md) are already sent `no-store`, and an HTML
+document is never what a stale cache is holding on to. Assets a build rewrites in place are, and a
+declaration like this one is what they need.
 
 ## Object system metadata
 
@@ -2178,10 +2179,10 @@ Sim S3 stores and returns `cache-control`, `content-disposition`, `content-encod
 `content-language`, `content-type` and `expires`, alongside a `content-length` describing the body
 being served.
 
-Every path that serves an Object goes through the same mapping, so the REST endpoint, the
+Every path that serves an Object goes through the same mapping. The REST endpoint, the
 [website endpoint](#static-website-hosting) and a CloudFront S3 Origin all report the same headers
-for it. `content-encoding` is the one that matters most: bytes served without it are bytes no client
-can decode, so an Object stored as brotli is only usable if the header comes back with it.
+for it. `content-encoding` is the one that matters most. Bytes served without it are bytes no client
+can decode, and an Object stored as brotli is only usable if the header comes back with it.
 
 `PutObjectCommand` sets them, one request field per header.
 
@@ -2224,9 +2225,9 @@ console.log(objectOut.Metadata?.["content-encoding"]); // br
 console.log(objectOut.Metadata?.["expires"]); // Sat, 02 Jan 2027 03:04:05 GMT
 ```
 
-A header the write says nothing about is left unset rather than stored empty, so a read does not
-report it. `Expires` is the one field that is not a string: the SDK takes a `Date`, which is stored
-as the HTTP date a read hands back.
+A header the write says nothing about is left unset, and never stored empty, so a read leaves it
+out. `Expires` is the one field that takes something other than a string. The SDK takes a `Date`,
+stored as the HTTP date a read hands back.
 
 A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
 [CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment). A
@@ -2262,8 +2263,8 @@ await simS3.putObject(
 );
 ```
 
-A standalone `SimS3` instance has its own isolated state and is not connected to a wider `SimAws`
-environment.
+A standalone `SimS3` instance has its own isolated state, with no wider `SimAws` environment behind
+it.
 
 ## Available functionality
 
@@ -2296,7 +2297,7 @@ Sim S3 currently supports:
   CDK `BucketDeployment` into the same Bucket published, alongside anything the mount declares for a
   key prefix itself
 
-The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
+The simulator aims at useful behaviour for tests and local development, short of full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
 needs them to model the requested behaviour.
 
@@ -2304,26 +2305,25 @@ needs them to model the requested behaviour.
 
 These apply across the page. The sections above each list what is specific to them.
 
-- Object versioning is not simulated. There are no version ids, no delete markers and no
-  `VersionId` on any request or response.
-- Multipart uploads are not simulated. An Object is stored by one `PutObject`, so an ETag is always
-  the MD5 of the whole body and never carries the `-N` part-count suffix real S3 gives a multipart
-  Object.
-- A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are not
-  simulated, so nothing can be stored in another one.
-- `Delimiter` and `CommonPrefixes` are not simulated, so a listing cannot be walked as a folder tree.
+- Object versioning is left out. There are no version ids, no delete markers and no `VersionId` on
+  any request or response.
+- Multipart uploads are left out. An Object is stored by one `PutObject`, and an ETag is always the
+  MD5 of the whole body, never carrying the `-N` part-count suffix real S3 gives a multipart Object.
+- A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
+  left out, and every Object is in that one.
+- `Delimiter` and `CommonPrefixes` are left out, and a listing cannot be walked as a folder tree.
   `EncodingType` is ignored, and keys come back unencoded.
-- Object tags, ACLs, lifecycle rules, replication and server-side encryption are not simulated.
+- Object tags, ACLs, lifecycle rules, replication and server-side encryption are left out.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
-  notifications, because it swaps the whole storage backend rather than putting Objects.
+  notifications, because it swaps the whole storage backend in place of putting Objects.
 - `GetObjectCommand` returns system metadata through `Metadata`, under the header name it is stored
   as, rather than through the `ContentType`, `CacheControl` and other response fields real S3 uses.
   See [Object system metadata](#object-system-metadata).
-- `HeadObjectCommand` is not one of the Commands simulated S3 answers, so it is not routed by SDK
-  interception either. A `HEAD` over the S3 REST endpoint is served, answering with the Object's
-  headers and no body, which is what a presigned `HEAD` URL uses.
-- An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, so a
-  presigned `PUT` cannot set the rest. A `PutObjectCommand` through the SDK keeps all of them.
+- `HeadObjectCommand` is absent from the Commands simulated S3 answers, and SDK interception leaves
+  it alone. A `HEAD` over the S3 REST endpoint is served, answering with the Object's headers and no
+  body, as a presigned `HEAD` URL uses.
+- An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
+  a presigned `PUT` unable to set the rest. A `PutObjectCommand` through the SDK keeps all of them.
 - A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other
   `response-*` parameters that override a response header in real S3. An Object is served with the
   system metadata it was written with.
