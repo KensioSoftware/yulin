@@ -158,8 +158,9 @@ describe("Serving simulated CloudWatch on an endpoint URL", () => {
         ),
     );
 
-    // Then the SDK raises it by name, rather than leaving the client to read a
-    // response it cannot parse
+    // Then the refusal comes back as an error the SDK raises under the name
+    // the endpoint gave it, naming the operation it turned down
+    assertIdentical(error.name, "SimSdkUnsupportedCommandError");
     assertStringIncludes(error.message, "DisableAlarmActionsCommand");
     assertStringIncludes(error.message, "Simulated CloudWatch");
   });
