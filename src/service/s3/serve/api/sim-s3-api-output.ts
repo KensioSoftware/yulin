@@ -5,6 +5,10 @@ import {
   publicAccessBlockXml,
 } from "./sim-s3-api-configuration-output.js";
 import {
+  simS3HeadBucketResponse,
+  simS3HeadObjectResponse,
+} from "./sim-s3-api-head-output.js";
+import {
   simS3ListBucketsXml,
   simS3ListObjectsXml,
 } from "./sim-s3-api-listing.js";
@@ -56,6 +60,12 @@ export async function simS3ApiResponse(
     }
     case "DeleteObjectsCommand": {
       return xml(deleteResultXml(value));
+    }
+    case "HeadObjectCommand": {
+      return simS3HeadObjectResponse(value);
+    }
+    case "HeadBucketCommand": {
+      return simS3HeadBucketResponse(value);
     }
     case "PutObjectCommand": {
       return new Response(undefined, {

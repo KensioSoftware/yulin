@@ -1,6 +1,7 @@
 import { DeleteObjectCommandHandler } from "../delete-object/delete-object.handler.js";
 import { DeleteObjectsCommandHandler } from "../delete-objects/delete-objects.handler.js";
 import { GetObjectCommandHandler } from "../get-object/get-object.handler.js";
+import { HeadObjectCommandHandler } from "../head-object/head-object.handler.js";
 import { ListObjectsCommandHandler } from "../list-objects/list-objects.handler.js";
 import { ListObjectsV2CommandHandler } from "../list-objects-v2/list-objects-v2.handler.js";
 import { PutObjectCommandHandler } from "../put-object/put-object.handler.js";
@@ -46,6 +47,19 @@ export class SimS3ObjectCommands {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimGetObjectCommandOutput> {
     return await new GetObjectCommandHandler(this.state).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Report what a read of an Object would say about it, without the Object.
+   */
+  async head(
+    command: simS3Commands.SimHeadObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimHeadObjectCommandOutput> {
+    return await new HeadObjectCommandHandler(this.state).handle(
       command,
       options,
     );

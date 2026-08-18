@@ -6,6 +6,16 @@
  */
 
 export type {
+  SimHeadBucketCommand,
+  SimHeadBucketCommandInput,
+  SimHeadBucketCommandOutput,
+} from "./head-bucket/head-bucket.command.js";
+export type {
+  SimHeadObjectCommand,
+  SimHeadObjectCommandInput,
+  SimHeadObjectCommandOutput,
+} from "./head-object/head-object.command.js";
+export type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
 } from "./create-bucket/create-bucket.command.js";

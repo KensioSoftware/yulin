@@ -733,6 +733,17 @@
       }
     },
     {
+      // A service facade is one delegation per operation the service supports,
+      // so it grows with the service rather than with any complexity of its
+      // own. Simulated S3 supports the most operations and passed 300 lines
+      // first. The facade is due a split between the AWS operations and the
+      // simulator-only controls, and this holds until then.
+      "files": ["src/service/s3/sim-s3.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", 340]
+      }
+    },
+    {
       "files": ["scripts/**/*.mts"],
       "rules": {
         "eslint/no-await-in-loop": "off",

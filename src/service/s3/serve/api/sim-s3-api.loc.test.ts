@@ -7,6 +7,7 @@ import {
   CreateBucketCommand,
   GetBucketPolicyCommand,
   PutBucketPolicyCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -301,27 +302,51 @@ describe("Serving the simulated S3 REST API on an endpoint URL", () => {
     assertStringIncludes(error.message, "s3:PutObject");
   });
 
-  it("refuses an operation whose method it has no route for", async () => {
+  it("answers a HEAD with the Object's headers and no body", async () => {
     // Given a Bucket holding an Object
-    await client.send(new CreateBucketCommand({ Bucket: "no-route" }));
+    await client.send(new CreateBucketCommand({ Bucket: "heads" }));
     await client.send(
-      new PutObjectCommand({ Bucket: "no-route", Key: "one", Body: "1" }),
+      new PutObjectCommand({
+        Bucket: "heads",
+        Key: "one",
+        Body: "twelve chars",
+      }),
     );
 
-    // When a HEAD is asked for, which simulated S3 has no operation behind
+    // When it is asked about rather than read
+    const head = await client.send(
+      new HeadObjectCommand({ Bucket: "heads", Key: "one" }),
+    );
+
+    // Then the length describes the Object, which is the point of a HEAD
+    assertIdentical(head.ContentLength, 12);
+
+    // And the Bucket answers one too, reporting the Region it was found in.
+    // That travels in a header, since a HEAD has no body to put it in.
+    const bucket = await client.send(
+      new HeadBucketCommand({ Bucket: "heads" }),
+    );
+    assertIdentical(bucket.$metadata.httpStatusCode, 200);
+    assertIdentical(bucket.BucketRegion, simAws.defaultRegionName);
+  });
+
+  it("answers a HEAD for something absent with 404 and no body to read", async () => {
+    // Given a Bucket with nothing under the key asked for
+    await client.send(new CreateBucketCommand({ Bucket: "absent-heads" }));
+
+    // When an absent Object is asked about
     const error = await assertThrowsErrorAsync(
       async () =>
         await client.send(
-          new HeadObjectCommand({ Bucket: "no-route", Key: "one" }),
+          new HeadObjectCommand({ Bucket: "absent-heads", Key: "gone" }),
         ),
     );
 
-    // Then it is refused rather than answered from a route meant for a
-    // different method
+    // Then the status is all there is, since HTTP forbids a body here
     assertIdentical(
       (error as { $metadata?: { httpStatusCode?: number } }).$metadata
         ?.httpStatusCode,
-      501,
+      404,
     );
   });
 

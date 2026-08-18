@@ -54,13 +54,18 @@ describe("Resolving an S3 REST operation from a request", () => {
     assertIdentical(route("PUT", "/widgets"), "CreateBucketCommand");
   });
 
+  it("routes a HEAD to the operation that describes without reading", () => {
+    assertIdentical(route("HEAD", "/widgets"), "HeadBucketCommand");
+    assertIdentical(route("HEAD", "/widgets/one.txt"), "HeadObjectCommand");
+  });
+
   it("routes a multi-Object removal, which is the one POST", () => {
     assertIdentical(route("POST", "/widgets?delete"), "DeleteObjectsCommand");
   });
 
   it("names no operation for a method S3 does not use here", () => {
-    assertUndefined(route("HEAD", "/widgets/one.txt"));
     assertUndefined(route("PATCH", "/widgets"));
+    assertUndefined(route("POST", "/widgets/one.txt"));
   });
 
   it("reads a key that contains slashes as one key", () => {

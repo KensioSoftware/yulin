@@ -53,6 +53,22 @@ export class SimS3 {
     return await this.commands.buckets.create(command, options);
   }
 
+  /** Handle a Head Bucket Command from the SDK. */
+  async headBucket(
+    command: simS3Commands.SimHeadBucketCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimHeadBucketCommandOutput> {
+    return await this.commands.buckets.head(command, options);
+  }
+
+  /** Handle a Head Object Command from the SDK. */
+  async headObject(
+    command: simS3Commands.SimHeadObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimHeadObjectCommandOutput> {
+    return await this.commands.objects.head(command, options);
+  }
+
   /** Handle a Delete Bucket Command from the SDK. */
   async deleteBucket(
     command: simS3Commands.SimDeleteBucketCommand,

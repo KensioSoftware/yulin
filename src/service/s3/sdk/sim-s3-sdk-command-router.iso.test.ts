@@ -273,7 +273,7 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 18);
+    assertArrayLength(supported, 20);
     assertArrayIncludes(supported, "GetObjectCommand");
     assertArrayIncludes(supported, "ListObjectsV2Command");
     assertArrayIncludes(supported, "DeleteBucketCommand");
@@ -284,7 +284,9 @@ describe("simulated S3 SDK Command routing", () => {
     assertArrayIncludes(supported, "GetBucketPolicyCommand");
     assertArrayIncludes(supported, "DeleteBucketPolicyCommand");
     assertArrayIncludes(supported, "PutPublicAccessBlockCommand");
-    assertUndefined(router.route("HeadObjectCommand"));
+    assertArrayIncludes(supported, "HeadObjectCommand");
+    assertArrayIncludes(supported, "HeadBucketCommand");
+    assertUndefined(router.route("GetBucketAclCommand"));
   });
 
   it("passes through a GetObject output without a Body", async () => {
