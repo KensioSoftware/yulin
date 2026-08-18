@@ -7,7 +7,9 @@ import type {
 type SimRekognitionFaceDetailMember = keyof SimRekognitionFaceDetailOutput;
 
 type SimRekognitionMutableFaceDetail = {
-  -readonly [TMember in SimRekognitionFaceDetailMember]?: SimRekognitionFaceDetailOutput[TMember];
+  -readonly [
+    TMember in SimRekognitionFaceDetailMember
+  ]?: SimRekognitionFaceDetailOutput[TMember];
 };
 
 /**
