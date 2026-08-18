@@ -8,7 +8,9 @@ import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayEquals,
   assertArrayLength,
+  assertIdentical,
   assertNonNullable,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -45,6 +47,8 @@ function indexing(
     ExternalImageId: externalImageId,
   });
 }
+
+const absentFaceId = "3b0b5b0e-0000-4000-8000-000000000000";
 
 describe("Reading and removing the faces of a simulated Rekognition collection", () => {
   it("lists the faces of one collection and misses those of another", async () => {
@@ -139,12 +143,18 @@ describe("Reading and removing the faces of a simulated Rekognition collection",
     const deleted = await rekognition.deleteFaces(
       new DeleteFacesCommand({
         CollectionId: "staff",
-        FaceIds: [removing.Face.FaceId, "3b0b5b0e-0000-4000-8000-000000000000"],
+        FaceIds: [removing.Face.FaceId, absentFaceId],
       }),
     );
 
-    // Then only the one that was there is reported as removed
+    // Then only the one that was there is reported as removed, and the other
+    // is answered for rather than dropped
     assertArrayEquals(deleted.DeletedFaces, [removing.Face.FaceId]);
+
+    const [unsuccessful] = deleted.UnsuccessfulFaceDeletions;
+    assertNonNullable(unsuccessful);
+    assertIdentical(unsuccessful.FaceId, absentFaceId);
+    assertArrayEquals(unsuccessful.Reasons, ["FACE_NOT_FOUND"]);
 
     const listed = await rekognition.listFaces(
       new ListFacesCommand({ CollectionId: "staff" }),
@@ -153,5 +163,25 @@ describe("Reading and removing the faces of a simulated Rekognition collection",
       listed.Faces.map((face) => face.ExternalImageId),
       ["grace"],
     );
+  });
+
+  it("refuses a face id that is not the shape Rekognition issues", async () => {
+    // Given a collection to remove a face from
+    const simAws = await simAwsWithPhoto();
+
+    // When a request names an id in another shape
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.rekognition().deleteFaces(
+          new DeleteFacesCommand({
+            CollectionId: "staff",
+            FaceIds: ["the-face-of-ada"],
+          }),
+        ),
+    );
+
+    // Then it is a malformed request, as it is on AWS, rather than a face the
+    // collection turns out not to hold
+    assertIdentical(error.name, "InvalidParameterException");
   });
 });

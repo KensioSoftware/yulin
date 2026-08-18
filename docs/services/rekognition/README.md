@@ -378,7 +378,8 @@ const faceMatches = simRekognition.faceMatches();
 // Every image starts here, finding nobody.
 faceMatches.byDefault({ matches: [] });
 
-// By the id the indexing chose. A test can write this before the face exists.
+// By the external image id the indexing request gave the face. A test can
+// write this before anything is indexed.
 faceMatches.onName("door/visitor.jpg", {
   matches: [{ externalImageId: "ada", similarity: 98.5 }],
 });
@@ -908,7 +909,8 @@ here the way it works there.
 
 A declared match reaches the faces the searched collection holds. `DeleteFaces` removes one and the
 same rule then finds nobody. One rule covers both sides of a deletion. `DeletedFaces` reports the
-ids that were there, and an id the collection never held is left out of it.
+ids that were there, and an id the collection never held comes back in
+`UnsuccessfulFaceDeletions` as `FACE_NOT_FOUND`.
 
 `FaceMatchThreshold` filters on the similarity the rule stated and defaults to 80, as it does on
 AWS. `MaxFaces` caps how many matches come back, most alike first. A search with an image the
@@ -1020,9 +1022,9 @@ Simulated Rekognition currently supports:
   back in `UnindexedFaces` as `EXCEEDS_MAX_FACES`. Real Rekognition indexes the largest.
 - A search reports the first face declared for the image as the one it searched with. Real
   Rekognition uses the largest, and nothing here measures a face.
-- `UserId` is refused on `ListFaces` and `UnsuccessfulFaceDeletions` is always empty. A face is
-  never associated with a user here. A listing narrowed to one would answer with the whole
-  collection.
+- `UserId` is refused on `ListFaces`, and `UnsuccessfulFaceDeletions` never reports
+  `ASSOCIATED_TO_AN_EXISTING_USER`. A face is never associated with a user here. A listing narrowed
+  to one would answer with the whole collection.
 - A `ListFaces` page with no `MaxResults` holds the whole collection. Real Rekognition pages at a
   thousand faces. The two differ only for a collection larger than that.
 - A face detection reports the emotions that were declared and no others. Real `DetectFaces` returns

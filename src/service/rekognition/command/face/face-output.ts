@@ -40,6 +40,26 @@ export interface SimRekognitionUnindexedFaceOutput {
 }
 
 /**
+ * Why real Rekognition could not delete a face a request named.
+ *
+ * The other reason it reports is `ASSOCIATED_TO_AN_EXISTING_USER`, which
+ * nothing here produces, since a face is never associated with a user.
+ */
+export const simRekognitionFaceNotFound = "FACE_NOT_FOUND";
+
+/**
+ * One face DeleteFaces did not remove, and why.
+ *
+ * `UserId` is left out, because nothing here associates a face with a user.
+ *
+ * https://docs.aws.amazon.com/rekognition/latest/APIReference/API_UnsuccessfulFaceDeletion.html
+ */
+export interface SimRekognitionUnsuccessfulFaceDeletionOutput {
+  readonly FaceId: string;
+  readonly Reasons: readonly string[];
+}
+
+/**
  * One face a search found, and how alike the search says it is.
  *
  * https://docs.aws.amazon.com/rekognition/latest/APIReference/API_FaceMatch.html

@@ -7,6 +7,7 @@ import type { SimRekognitionFaceMatches } from "../../match/sim-rekognition-face
 import type { SimRekognitionAuthorizer } from "../authorize/sim-rekognition-authorizer.js";
 import type { SimRekognitionRequestOptions } from "../sim-rekognition-request-options.js";
 import { DeleteFacesRequest } from "./delete-faces-request.js";
+import { simRekognitionFaceNotFound } from "./face-output.js";
 import { SimRekognitionFaceIndexer } from "./face-indexer.js";
 import { SimRekognitionFaceListing } from "./face-listing.js";
 import { SimRekognitionFaceSearcher } from "./face-searcher.js";
@@ -137,9 +138,14 @@ export class SimRekognitionFaceHandler {
       options,
     );
 
+    const removal = collection.faces.remove(request.faceIds);
+
     return {
-      DeletedFaces: collection.faces.remove(request.faceIds),
-      UnsuccessfulFaceDeletions: [],
+      DeletedFaces: removal.removed,
+      UnsuccessfulFaceDeletions: removal.missing.map((faceId) => ({
+        FaceId: faceId,
+        Reasons: [simRekognitionFaceNotFound],
+      })),
       $metadata: {},
     };
   }

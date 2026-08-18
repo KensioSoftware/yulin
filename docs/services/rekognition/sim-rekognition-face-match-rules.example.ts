@@ -16,7 +16,8 @@ const faceMatches = simRekognition.faceMatches();
 // Every image starts here, finding nobody.
 faceMatches.byDefault({ matches: [] });
 
-// By the id the indexing chose. A test can write this before the face exists.
+// By the external image id the indexing request gave the face. A test can
+// write this before anything is indexed.
 faceMatches.onName("door/visitor.jpg", {
   matches: [{ externalImageId: "ada", similarity: 98.5 }],
 });

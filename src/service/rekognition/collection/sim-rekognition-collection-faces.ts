@@ -1,6 +1,14 @@
 import type { SimRekognitionIndexedFace } from "./sim-rekognition-indexed-face.js";
 
 /**
+ * What one removal reached, and what it asked for and did not find.
+ */
+export interface SimRekognitionFaceRemoval {
+  readonly removed: readonly string[];
+  readonly missing: readonly string[];
+}
+
+/**
  * The faces one collection holds.
  *
  * They are kept in the order they were indexed, which is the order a listing
@@ -57,15 +65,26 @@ export class SimRekognitionCollectionFaces {
   }
 
   /**
-   * Remove the faces with these ids, answering with the ids that were held.
+   * Remove the faces with these ids.
+   *
+   * An id this collection does not hold is reported back rather than dropped,
+   * because real Rekognition answers for every id a request named. A request
+   * naming the same id twice is one removal, since the second one would
+   * otherwise be reported as a face that could not be found.
    */
-  remove(faceIds: readonly string[]): readonly string[] {
-    const removed = this.withIds(faceIds).map((face) => face.faceId);
+  remove(faceIds: readonly string[]): SimRekognitionFaceRemoval {
+    const removed: string[] = [];
+    const missing: string[] = [];
+    const wanted = new Set(faceIds);
 
-    for (const faceId of removed) {
-      this.faces.delete(faceId);
+    for (const faceId of wanted) {
+      if (this.faces.delete(faceId)) {
+        removed.push(faceId);
+      } else {
+        missing.push(faceId);
+      }
     }
 
-    return removed;
+    return { removed, missing };
   }
 }

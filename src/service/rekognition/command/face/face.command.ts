@@ -6,6 +6,7 @@ import type {
   SimRekognitionFaceOutput,
   SimRekognitionFaceRecordOutput,
   SimRekognitionUnindexedFaceOutput,
+  SimRekognitionUnsuccessfulFaceDeletionOutput,
 } from "./face-output.js";
 
 /**
@@ -110,11 +111,14 @@ export interface SimDeleteFacesCommandInput {
 /**
  * The DeleteFaces response.
  *
- * `UnsuccessfulFaceDeletions` is always empty. Real Rekognition reports a face
- * there when it is associated with a user, and nothing here associates one.
+ * A face id the collection does not hold comes back in
+ * `UnsuccessfulFaceDeletions` as `FACE_NOT_FOUND`, as it does on AWS. The other
+ * reason real Rekognition reports there is
+ * `ASSOCIATED_TO_AN_EXISTING_USER`, and nothing here associates a face with a
+ * user.
  */
 export interface SimDeleteFacesCommandOutput {
   readonly DeletedFaces: readonly string[];
-  readonly UnsuccessfulFaceDeletions: readonly string[];
+  readonly UnsuccessfulFaceDeletions: readonly SimRekognitionUnsuccessfulFaceDeletionOutput[];
   readonly $metadata: SimResponseMetadata;
 }

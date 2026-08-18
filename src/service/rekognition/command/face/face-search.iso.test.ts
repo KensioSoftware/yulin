@@ -203,7 +203,7 @@ describe("Searching a simulated Rekognition collection by image", () => {
     assertIdentical(error.name, "InvalidParameterException");
   });
 
-  it("answers a search in every Region the rule was registered in", async () => {
+  it("misses a collection made in another Region", async () => {
     // Given a rule and a collection in one Region
     const simAws = await simAwsWithIndexedFace();
     simAws
