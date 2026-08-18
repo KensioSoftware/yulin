@@ -148,7 +148,11 @@ There is no resource policy support, so cross-account access to a parameter cann
   as new ones are made.
 - Every deployment of an `AWS::SSM::Parameter` is a create, because sim CloudFormation has no stack
   updates. A name another stack already used is refused rather than overwritten.
-- There is no `{{resolve:ssm:...}}` support and no `AWS::SSM::Parameter::Value<String>` template
-  parameter type. Both are CloudFormation engine features rather than Parameter Store ones.
+- `{{resolve:ssm:...}}` dynamic references resolve here. `cfn/dynamic/` holds the resolver the
+  CloudFormation engine reaches through `SimSsm.cfnDynamicReferenceResolver()`. A reference this
+  store cannot answer resolves to a stand-in value and is recorded, which is the same best-effort
+  answer an unsupported property gets.
+- `{{resolve:ssm-secure:...}}` and the `AWS::SSM::Parameter::Value<String>` template parameter type
+  are still absent.
 
 The full list is in [docs/services/ssm](../../../docs/services/ssm/).

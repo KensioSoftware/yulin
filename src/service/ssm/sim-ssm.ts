@@ -19,6 +19,7 @@ import { SimSsmGetParametersByPath } from "./command/parameter/sim-ssm-get-param
 import { SimSsmPutParameter } from "./command/parameter/sim-ssm-put-parameter.js";
 import type * as simSsmCommands from "./command/sim-ssm-command.types.js";
 import { SimSsmCfnResourceFactory } from "./cfn/sim-cfn-ssm-resource-factory.js";
+import { SimCfnSsmDynamicReferenceResolver } from "./cfn/dynamic/sim-cfn-ssm-dynamic-reference-resolver.js";
 import type { SimSsmParameter } from "./parameter/sim-ssm-parameter.js";
 import { SimSsmParameterEncryption } from "./parameter/sim-ssm-parameter-encryption.js";
 import type { SimSsmKmsCrypto } from "./parameter/sim-ssm-kms-crypto.js";
@@ -202,6 +203,13 @@ export class SimSsm {
    */
   cfnResourceFactory(): SimSsmCfnResourceFactory {
     return this.cfnFactory;
+  }
+
+  /**
+   * Get the resolver for `{{resolve:ssm:...}}` dynamic references.
+   */
+  cfnDynamicReferenceResolver(): SimCfnSsmDynamicReferenceResolver {
+    return new SimCfnSsmDynamicReferenceResolver({ ssm: this });
   }
 
   /**

@@ -4,6 +4,7 @@ import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pse
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 import type { SimCfnConditions } from "../condition/sim-cfn-conditions.js";
 import { SimCfnExports } from "../../export/sim-cfn-exports.js";
+import type { SimCfnDynamicReferences } from "../dynamic/sim-cfn-dynamic-references.js";
 
 interface SimCfnResolveContextProperties {
   readonly parameters: SimCfnParameters;
@@ -12,6 +13,7 @@ interface SimCfnResolveContextProperties {
   readonly mappings?: SimCfnMappings | undefined;
   readonly conditions?: SimCfnConditions | undefined;
   readonly exports?: SimCfnExports | undefined;
+  readonly dynamicReferences?: SimCfnDynamicReferences | undefined;
 }
 
 /**
@@ -32,6 +34,14 @@ export class SimCfnResolveContext {
    */
   public readonly exports: SimCfnExports;
 
+  /**
+   * The services answering `{{resolve:...}}` references in resolved strings.
+   *
+   * Absent on the template-wide pass, which runs before any Resource exists
+   * and so before a reference could be read as the Stack would read it.
+   */
+  public readonly dynamicReferences: SimCfnDynamicReferences | undefined;
+
   constructor(properties: SimCfnResolveContextProperties) {
     this.parameters = properties.parameters;
     this.resources = properties.resources;
@@ -39,5 +49,6 @@ export class SimCfnResolveContext {
     this.mappings = properties.mappings;
     this.conditions = properties.conditions;
     this.exports = properties.exports ?? new SimCfnExports();
+    this.dynamicReferences = properties.dynamicReferences;
   }
 }

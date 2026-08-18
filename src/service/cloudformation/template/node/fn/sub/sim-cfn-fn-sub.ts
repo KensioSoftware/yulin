@@ -57,9 +57,15 @@ export class SimCfnFnSub extends SimCfnNode {
       return this.unresolvedValue.toTemplateValue(resolvedVariables);
     }
 
-    return this.subTemplate.substitute(
+    const substituted = this.subTemplate.substitute(
       this.variableResolver.stringVariables(resolvedVariables),
     );
+
+    // A dynamic reference can name a parameter through a Sub variable, as in
+    // `{{resolve:ssm:/app/${Environment}/host}}`. Reading it before the
+    // variables are in would look up a name still holding `${...}`, so the
+    // reference is read from the finished string.
+    return context.dynamicReferences?.substitute(substituted) ?? substituted;
   }
 
   /**
