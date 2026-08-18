@@ -1,3 +1,4 @@
+import { escapeXmlText } from "../../../util/xml/xml-writer.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { SimS3Error } from "../error/sim-s3.error.js";
 import { SimS3ChecksumMismatch } from "../error/sim-s3-checksum.error.js";
@@ -51,14 +52,25 @@ export class SimS3RestErrorResponse {
     throw error;
   }
 
+  /**
+   * Refuse an operation simulated S3 does not serve.
+   *
+   * `NotImplemented` is the code real S3 answers with for an operation it does
+   * not recognise, so a client reads this as an S3 failure rather than as a
+   * broken endpoint.
+   */
+  notImplemented(message: string): Response {
+    return this.xml(501, "NotImplemented", message);
+  }
+
   private xml(status: number, code: string, message: string): Response {
     const body = [
       `<?xml version="1.0" encoding="UTF-8"?>`,
       `<Error>`,
-      `  <Code>${escapeXml(code)}</Code>`,
-      `  <Message>${escapeXml(message)}</Message>`,
-      `  <BucketName>${escapeXml(this.bucketName)}</BucketName>`,
-      `  <Key>${escapeXml(this.objectKey)}</Key>`,
+      `  <Code>${escapeXmlText(code)}</Code>`,
+      `  <Message>${escapeXmlText(message)}</Message>`,
+      `  <BucketName>${escapeXmlText(this.bucketName)}</BucketName>`,
+      `  <Key>${escapeXmlText(this.objectKey)}</Key>`,
       `</Error>`,
       ``,
     ].join("\n");
@@ -70,11 +82,4 @@ export class SimS3RestErrorResponse {
       },
     });
   }
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }
