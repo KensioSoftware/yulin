@@ -29,13 +29,12 @@ import type {
   SimUpdateStackCommandOutput,
 } from "./command/update-stack/update-stack.command.js";
 import { UpdateStackCommandHandler } from "./command/update-stack/update-stack.handler.js";
-import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {
   type SimCloudFormationCreateStackProperties as SimCloudFormationCreateStackProperties,
   SimCloudFormationTemplateDeployer,
 } from "./deploy/sim-cfn-template-deployer.js";
 import type { SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
-import type { SimCfnDeployBinding } from "./bind/sim-cfn-deploy-binding.js";
+import type { SimCloudFormationDeployCdkOutProperties } from "./deploy/sim-cfn-cdk-out-deployer.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimCfnExports } from "./export/sim-cfn-exports.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
@@ -116,7 +115,14 @@ export class SimCloudFormation {
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimCreateStackCommandOutput> {
     this.authorization.createStack(command.input.StackName, options?.caller);
-    return await this.createStackWithContext(command);
+
+    return await new CreateStackCommandHandler({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+      exports: this.exports,
+    }).handle(command);
   }
 
   /**
@@ -223,6 +229,16 @@ export class SimCloudFormation {
   }
 
   /**
+   * Convenience wrapper method to deploy the Stacks a synthesized CDK cloud
+   * assembly holds, each into the region its own environment names.
+   */
+  async deployCdkOut(
+    properties: SimCloudFormationDeployCdkOutProperties | string,
+  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+    return await this.templateDeployer.deployCdkOut(properties);
+  }
+
+  /**
    * Convenience wrapper method to apply a synthesized CDK template file to the
    * simulated CloudFormation Stack it was deployed as.
    *
@@ -279,22 +295,5 @@ export class SimCloudFormation {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
-  }
-
-  private async createStackWithContext(
-    command: SimCreateStackCommand,
-    cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnDeployBinding[],
-  ): Promise<SimCreateStackCommandOutput> {
-    const handler = new CreateStackCommandHandler({
-      simAws: this.simAws,
-      accountRegionScope: this.accountRegionScope,
-      stacks: this.stacks,
-      background: this.background,
-      cdkOutContext,
-      bindings,
-      exports: this.exports,
-    });
-    return await handler.handle(command);
   }
 }
