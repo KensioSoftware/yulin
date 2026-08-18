@@ -246,9 +246,35 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-The services that speak the AWS JSON protocol: DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
-A request to any other service is refused with `501 Not Implemented` and a body saying why. S3 and STS are the ones worth naming, since they speak REST-XML and Query. Simulated S3 still answers its own hostname-routed endpoints, covered above, and every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md).
+A request to any other service is refused with `501 Not Implemented` and a body saying why. STS is the one worth naming, since it speaks the Query protocol. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
+
+### S3 over the endpoint
+
+`aws s3` and an `S3Client` reach simulated S3 through the same endpoint URL:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws s3api create-bucket --bucket widgets
+aws s3api put-object --bucket widgets --key one.txt --body ./one.txt
+aws s3 ls s3://widgets/
+```
+
+An SDK client needs `forcePathStyle`, because a virtual-host request puts the Bucket in the hostname and this endpoint routes on the credential scope rather than the host:
+
+```typescript
+const client = new S3Client({
+  region: "us-east-1",
+  endpoint: `http://localhost:${srv.port}`,
+  forcePathStyle: true,
+  credentials,
+});
+```
+
+The operations served are the ones simulated S3 implements: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`, `GetObject`, `PutObject`, `DeleteObject`, `DeleteObjects`, and the Bucket policy, website, Block Public Access and event notification configurations. Anything else is refused as `NotImplemented`, which an SDK raises under that name rather than leaving a client to guess.
+
+Simulated S3 also answers its own Bucket hostnames, covered above. That path is unchanged, and it is what a presigned URL and a website visitor use.
 
 ## Stopping and restarting
 
@@ -753,5 +779,7 @@ it is without watch mode.
 - Simulated state is not carried across a restart. Seeding belongs in the setup script, so it runs
   again and local state stays the same as what tests and CI see.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
-- The served AWS service API covers the AWS JSON protocol only. A service speaking REST-XML, REST-JSON or Query (S3 and STS among them) is refused with `501 Not Implemented`, because reading one of those requests back into an operation needs that operation's schema.
+- The served AWS service API covers S3 and the AWS JSON protocol services. A service speaking REST-JSON or Query, STS among them, is refused with `501 Not Implemented`.
+- `aws s3 ls` with no Bucket fails, because simulated S3 records no creation date for a Bucket and the CLI reads one from every entry. `aws s3api list-buckets` and `aws s3 ls s3://bucket/` both work.
+- Simulated S3 implements no `HeadObject` or `HeadBucket`, so both are refused. `aws s3 cp` reads an Object with `HeadObject` before copying it, which puts that out of reach too.
 - A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

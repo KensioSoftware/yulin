@@ -3,11 +3,17 @@ import { SimSdkWireDispatcher } from "../../../sdk/wire/sim-sdk-wire-dispatcher.
 import { readSimSdkWireCredentialScope } from "../../../sdk/wire/sim-sdk-wire-operation.js";
 import type { SimSdkWireRequest } from "../../../sdk/wire/sim-sdk-wire.types.js";
 import type { SimAws } from "../../../service/aws/sim-aws.js";
+import { SimS3ApiEndpoint } from "../../../service/s3/serve/api/sim-s3-api.js";
 import { SimAwsReceivedRequest } from "../request/sim-aws-received-request.js";
 
 interface SimAwsApiEndpointProperties {
   readonly simAws: SimAws;
 }
+
+/**
+ * The SigV4 signing name S3 requests carry.
+ */
+const s3SigningName = "s3";
 
 /**
  * The general AWS service API, served on one endpoint.
@@ -22,14 +28,21 @@ interface SimAwsApiEndpointProperties {
  *
  * So this endpoint routes on the credential scope. One endpoint URL then
  * serves every simulated service, which is the shape `--endpoint-url` wants.
+ *
+ * The scope also says which protocol to read the request with. Most simulated
+ * services speak the AWS JSON protocol and name their operation in a header.
+ * S3 speaks REST-XML and names its operation in the method and path, so it is
+ * read by an endpoint of its own.
  */
 export class SimAwsApiEndpoint {
   private readonly simAws: SimAws;
   private readonly dispatcher: SimSdkWireDispatcher;
+  private readonly s3: SimS3ApiEndpoint;
 
   constructor(properties: SimAwsApiEndpointProperties) {
     this.simAws = properties.simAws;
     this.dispatcher = new SimSdkWireDispatcher(properties.simAws);
+    this.s3 = new SimS3ApiEndpoint({ simAws: properties.simAws });
   }
 
   /**
@@ -55,6 +68,17 @@ export class SimAwsApiEndpoint {
         regionName: scope.regionName,
       },
     });
+
+    // S3 is the one served service that states its operation in the method and
+    // path rather than in a header, so it is read by its own endpoint.
+    if (scope.signingName === s3SigningName) {
+      return await this.s3.handle(
+        request,
+        received.body ?? new Uint8Array(),
+        caller.toCaller(),
+        scope.regionName,
+      );
+    }
 
     let response;
     try {
