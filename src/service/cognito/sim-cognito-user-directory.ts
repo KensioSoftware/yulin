@@ -82,6 +82,41 @@ export abstract class SimCognitoUserDirectory extends SimCognitoUserFactors {
   }
 
   /**
+   * Handle a ForgotPassword Command from the SDK.
+   *
+   * No caller is read, because real Cognito authorizes this operation with no
+   * IAM policy at all: it is what an application calls for someone who cannot
+   * sign in and holds no AWS credentials.
+   */
+  async forgotPassword(
+    command: simCognitoCommands.SimForgotPasswordCommand,
+  ): Promise<simCognitoCommands.SimForgotPasswordCommandOutput> {
+    await this.background.sequence();
+    return this.commands.passwordReset.forgotPassword(command);
+  }
+
+  /**
+   * Handle a ConfirmForgotPassword Command from the SDK.
+   */
+  async confirmForgotPassword(
+    command: simCognitoCommands.SimConfirmForgotPasswordCommand,
+  ): Promise<simCognitoCommands.SimConfirmForgotPasswordCommandOutput> {
+    await this.background.sequence();
+    return this.commands.passwordReset.confirmForgotPassword(command);
+  }
+
+  /**
+   * Handle an AdminResetUserPassword Command from the SDK.
+   */
+  async adminResetUserPassword(
+    command: simCognitoCommands.SimAdminResetUserPasswordCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminResetUserPasswordCommandOutput> {
+    await this.background.sequence();
+    return this.commands.passwordReset.adminResetUserPassword(command, options);
+  }
+
+  /**
    * Handle an AdminGetUser Command from the SDK.
    */
   async adminGetUser(

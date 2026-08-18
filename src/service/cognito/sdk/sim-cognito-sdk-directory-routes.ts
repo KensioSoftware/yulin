@@ -17,6 +17,11 @@ import type {
 } from "../command/group/group.command.js";
 import type { SimListUsersCommand } from "../command/user/list-users.command.js";
 import type {
+  SimAdminResetUserPasswordCommand,
+  SimConfirmForgotPasswordCommand,
+  SimForgotPasswordCommand,
+} from "../command/user/password-reset.command.js";
+import type {
   SimAdminConfirmSignUpCommand,
   SimConfirmSignUpCommand,
   SimResendConfirmationCodeCommand,
@@ -43,11 +48,12 @@ import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provide
 /**
  * The SDK Command routes for the users and groups in a pool.
  *
- * The three sign-up routes read no caller from the SDK context, because real
- * Cognito authorizes them with no IAM policy: they are what an application
- * calls on behalf of someone signing themselves up, holding no AWS credentials
- * at all. `AdminConfirmSignUp` is the admin side of the same thing, and does
- * read one.
+ * The three sign-up routes and the two password reset ones read no caller from
+ * the SDK context, because real Cognito authorizes them with no IAM policy:
+ * they are what an application calls on behalf of someone signing themselves
+ * up or unable to sign in, holding no AWS credentials at all.
+ * `AdminConfirmSignUp` and `AdminResetUserPassword` are the admin sides of the
+ * same two things, and do read one.
  */
 export function simCognitoSdkDirectoryRoutes(
   simCognito: SimCognitoIdentityProvider,
@@ -75,6 +81,26 @@ export function simCognitoSdkDirectoryRoutes(
       async (command, context): Promise<unknown> =>
         await simCognito.adminConfirmSignUp(
           command as SimAdminConfirmSignUpCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "ForgotPasswordCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.forgotPassword(command as SimForgotPasswordCommand),
+    ],
+    [
+      "ConfirmForgotPasswordCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.confirmForgotPassword(
+          command as SimConfirmForgotPasswordCommand,
+        ),
+    ],
+    [
+      "AdminResetUserPasswordCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.adminResetUserPassword(
+          command as SimAdminResetUserPasswordCommand,
           simSdkCallerOptions(context),
         ),
     ],

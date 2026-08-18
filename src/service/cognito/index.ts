@@ -50,6 +50,7 @@ export { SimCognitoFederation } from "./sim-cognito-federation.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
 export { SimCognitoConfirmationCode } from "./user-pool/user/sim-cognito-confirmation-code.js";
+export { SimCognitoUserPasswordReset } from "./user-pool/user/sim-cognito-user-password-reset.js";
 export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
 export {
   SimCognitoUserStatus,
@@ -143,10 +144,12 @@ export {
   SimCognitoDuplicateProviderException,
   SimCognitoEnableSoftwareTokenMfaException,
   SimCognitoError,
+  SimCognitoExpiredCodeException,
   SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,
   SimCognitoInvalidPasswordException,
   SimCognitoNotAuthorizedException,
+  SimCognitoPasswordResetRequiredException,
   SimCognitoResourceNotFoundException,
   SimCognitoSoftwareTokenMfaNotFoundException,
   SimCognitoUsernameExistsException,

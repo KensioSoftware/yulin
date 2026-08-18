@@ -2,6 +2,7 @@ import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.err
 import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-login.error.js";
 import {
   requireSimCognitoConfirmed,
+  requireSimCognitoPasswordSet,
   requireSimCognitoSignIn,
   requireSimCognitoSignInUser,
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
@@ -47,6 +48,7 @@ export class SimCognitoHostedPasswordSignIn {
 
     requireSimCognitoSignIn(user, password);
     requireSimCognitoConfirmed(user);
+    requireSimCognitoPasswordSet(user);
 
     this.requireNoFurtherPage(pool, user);
 

@@ -53,6 +53,18 @@ export type {
   SimListUserPoolClientsCommandOutput,
 } from "./client/list-user-pool-clients.command.js";
 export type {
+  SimAdminResetUserPasswordCommand,
+  SimAdminResetUserPasswordCommandInput,
+  SimAdminResetUserPasswordCommandOutput,
+  SimCognitoCodeDeliveryDetailsType,
+  SimCognitoPasswordResetCommandInput,
+  SimConfirmForgotPasswordCommand,
+  SimConfirmForgotPasswordCommandInput,
+  SimConfirmForgotPasswordCommandOutput,
+  SimForgotPasswordCommand,
+  SimForgotPasswordCommandOutput,
+} from "./user/password-reset.command.js";
+export type {
   SimAdminCreateUserCommand,
   SimAdminCreateUserCommandInput,
   SimAdminCreateUserCommandOutput,

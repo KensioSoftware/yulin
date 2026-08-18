@@ -1,3 +1,5 @@
+import type { SimCognitoAttributeType } from "../user/sim-cognito-user-attributes.js";
+
 /**
  * One entry of a user's `identities`, in the shape an id token carries it.
  *
@@ -82,5 +84,17 @@ export class SimCognitoFederatedIdentity {
    */
   toAttributeValue(): string {
     return JSON.stringify([this.toClaim()]);
+  }
+
+  /**
+   * The `identities` attribute a federated user reports, as the one entry a
+   * described user carries it in.
+   *
+   * A local user has no such attribute at all, so this is a list rather than a
+   * single attribute: the user spreads whichever it has into the attributes it
+   * reports.
+   */
+  attributes(): readonly SimCognitoAttributeType[] {
+    return [{ Name: "identities", Value: this.toAttributeValue() }];
   }
 }

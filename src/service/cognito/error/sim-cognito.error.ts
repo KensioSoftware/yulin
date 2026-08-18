@@ -203,3 +203,34 @@ export class SimCognitoSoftwareTokenMfaNotFoundException extends SimCognitoError
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated Cognito ExpiredCodeException error.
+ *
+ * Real Cognito reports a code it will no longer take this way, whether the
+ * code was spent or its lifetime ran out. Only the first of those happens
+ * here, because nothing ages a code out.
+ */
+export class SimCognitoExpiredCodeException extends SimCognitoError {
+  public override readonly name = "ExpiredCodeException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito PasswordResetRequiredException error.
+ *
+ * Real Cognito reports a sign-in by a user whose password an administrator
+ * reset this way. The password was right: what is missing is the reset, so an
+ * application knows to send the user to `ConfirmForgotPassword` rather than
+ * back to the password field.
+ */
+export class SimCognitoPasswordResetRequiredException extends SimCognitoError {
+  public override readonly name = "PasswordResetRequiredException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

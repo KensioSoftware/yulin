@@ -5,14 +5,17 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   AdminGetUserCommand,
+  AdminResetUserPasswordCommand,
   AdminSetUserMFAPreferenceCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   AssociateSoftwareTokenCommand,
   CognitoIdentityProviderClient,
+  ConfirmForgotPasswordCommand,
   ConfirmSignUpCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
+  ForgotPasswordCommand,
   GetUserCommand,
   InitiateAuthCommand,
   ListUsersCommand,
@@ -172,6 +175,86 @@ describe("Cognito user SDK interception", () => {
           attribute.Name === "email_verified" && attribute.Value === "true",
       ),
     );
+  });
+
+  it("routes every password reset Command through the intercepted client", async () => {
+    // Given an intercepted Cognito SDK client with a confirmed user.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    using simSdk = new SimSdk({ simAws });
+    simSdk.intercept(CognitoIdentityProviderClient);
+
+    const client = new CognitoIdentityProviderClient({ region: "eu-west-2" });
+    const pool = await client.send(
+      new CreateUserPoolCommand({
+        PoolName: "myapp-users",
+        AutoVerifiedAttributes: ["email"],
+      }),
+    );
+    const userPoolId = pool.UserPool?.Id;
+    assertTypeString(userPoolId);
+
+    const appClient = await client.send(
+      new CreateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientName: "web",
+        ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+      }),
+    );
+
+    await client.send(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+      }),
+    );
+    await client.send(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+        Password: "Sup3rSecret!",
+        Permanent: true,
+      }),
+    );
+
+    // When ordinary SDK code takes a user through a password reset.
+    await client.send(
+      new AdminResetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+      }),
+    );
+
+    const reset = await client.send(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+    const asked = await client.send(
+      new ForgotPasswordCommand({
+        ClientId: appClient.UserPoolClient?.ClientId,
+        Username: "alice",
+      }),
+    );
+
+    await client.send(
+      new ConfirmForgotPasswordCommand({
+        ClientId: appClient.UserPoolClient?.ClientId,
+        Username: "alice",
+        ConfirmationCode: simAws
+          .cognitoIdentityProvider()
+          .userPool(userPoolId)
+          .confirmationCode("alice"),
+        Password: "Ev3nBetter!",
+      }),
+    );
+
+    const confirmed = await client.send(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+
+    // Then each Command reached simulated Cognito.
+    assertIdentical(reset.UserStatus, "RESET_REQUIRED");
+    assertIdentical(asked.CodeDeliveryDetails?.DeliveryMedium, "EMAIL");
+    assertIdentical(confirmed.UserStatus, "CONFIRMED");
   });
 
   it("routes every MFA registration Command through the intercepted client", async () => {

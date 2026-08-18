@@ -1,5 +1,6 @@
 import {
   SimCognitoNotAuthorizedException,
+  SimCognitoPasswordResetRequiredException,
   SimCognitoUserNotConfirmedException,
 } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
@@ -61,6 +62,22 @@ export function requireSimCognitoEnabled(user: SimCognitoUser): void {
 export function requireSimCognitoConfirmed(user: SimCognitoUser): void {
   if (user.status.isUnconfirmed) {
     throw new SimCognitoUserNotConfirmedException("User is not confirmed.");
+  }
+}
+
+/**
+ * Refuse a sign-in by a user whose password an administrator has reset.
+ *
+ * This is checked alongside the confirmation, and for the same reason: the
+ * user is told what is actually missing, so an application can send it to
+ * `ConfirmForgotPassword` with the code the reset issued rather than back to
+ * the password field.
+ */
+export function requireSimCognitoPasswordSet(user: SimCognitoUser): void {
+  if (user.status.mustResetPassword) {
+    throw new SimCognitoPasswordResetRequiredException(
+      "Password reset required for the user.",
+    );
   }
 }
 
