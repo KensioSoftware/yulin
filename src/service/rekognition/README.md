@@ -23,7 +23,21 @@ the facade growing a result shape for each.
 
 The service is scoped to an account and region because its rules are: a detection made in one Region
 is answered by the rules registered in that Region, as a real Rekognition endpoint answers for the
-Region it belongs to.
+Region it belongs to. Face collections are scoped by that same instance. That is what leaves
+`collection/sim-rekognition-collections.ts` an ordinary map, with no scope to check per call.
+
+## The collection model
+
+`collection/` holds the face collections one Account and Region owns, and
+`command/collection/collection.handler.ts` holds the three operations that work on them. They share
+a store and an authorization shape, which is what makes them one handler and not three.
+
+A collection is the one Rekognition resource with an ARN, so those operations authorize against it
+where the detections authorize against `*`. That is why `SimRekognitionAuthorizer.authorize` takes an
+optional resource.
+
+Nothing is indexed into a collection yet, so what a collection is here is its identity, its ARN and
+its model version.
 
 ## The rule mechanism
 

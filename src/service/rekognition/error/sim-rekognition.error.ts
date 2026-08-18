@@ -84,6 +84,34 @@ export class SimRekognitionAccessDeniedException extends SimRekognitionError {
 }
 
 /**
+ * Simulated Rekognition ResourceAlreadyExistsException error.
+ *
+ * Real Rekognition refuses a second collection under a name it already holds
+ * rather than answering with the one that is there.
+ */
+export class SimRekognitionResourceAlreadyExistsException extends SimRekognitionError {
+  public override readonly name = "ResourceAlreadyExistsException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Rekognition ResourceNotFoundException error.
+ *
+ * Real Rekognition reports a collection it does not hold this way, whichever
+ * operation asked for it.
+ */
+export class SimRekognitionResourceNotFoundException extends SimRekognitionError {
+  public override readonly name = "ResourceNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Rekognition error for a request input this simulation does not
  * model.
  *

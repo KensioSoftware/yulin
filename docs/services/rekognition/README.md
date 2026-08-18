@@ -714,12 +714,59 @@ await simAws.backgroundTasksComplete();
 A handler that writes a moderated copy back into the Bucket that triggered it will notify itself for
 ever. Filter the notification configuration by prefix or suffix, as this one does.
 
+## Face collections
+
+A collection is what lets an application recognise the same person twice, where a detection answers what is in one image. Simulated Rekognition holds the collections themselves.
+
+```typescript sim-rekognition-collections
+/**
+ * Creating, listing and removing a Rekognition face collection.
+ */
+
+import {
+  CreateCollectionCommand,
+  DeleteCollectionCommand,
+  ListCollectionsCommand,
+} from "@aws-sdk/client-rekognition";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simRekognition = simAws.rekognition();
+
+const created = await simRekognition.createCollection(
+  new CreateCollectionCommand({ CollectionId: "staff" }),
+);
+
+console.log(created.CollectionArn);
+// arn:aws:rekognition:us-east-1:888888888888:collection/staff
+
+const listed = await simRekognition.listCollections(
+  new ListCollectionsCommand({}),
+);
+
+console.log(listed.CollectionIds); // ["staff"]
+console.log(listed.FaceModelVersions); // ["7.0"]
+
+await simRekognition.deleteCollection(
+  new DeleteCollectionCommand({ CollectionId: "staff" }),
+);
+```
+
+A collection belongs to one Account and Region, as it does on AWS, so a listing in another Region misses it. Creating one under a name already held raises `ResourceAlreadyExistsException`, and removing one that was never created raises `ResourceNotFoundException`.
+
+Every collection reports face model version 7.0. Real Rekognition stamps a collection with the version in force when it was created, and that version moves as AWS retrains. Nothing here recognises a face, so one fixed version is stated rather than a moving one invented.
+
 ## Permissions and errors
 
 Each detection is authorized as its own action against `*`, one of
 `rekognition:DetectModerationLabels`, `rekognition:DetectLabels` and `rekognition:DetectFaces`. Real
 Rekognition gives the detection operations no resource-level permissions, and a policy naming an ARN
-reaches nothing, here as on AWS. A denial throws `AccessDeniedException` with a 400 status, which is
+reaches nothing, here as on AWS.
+
+A collection is the other kind. It has an ARN, so `rekognition:CreateCollection` and
+`rekognition:DeleteCollection` authorize against that collection's ARN, and a policy naming one
+collection reaches only that collection. `rekognition:ListCollections` reads them all, so it
+authorizes against `*`. A denial throws `AccessDeniedException` with a 400 status, which is
 what real Rekognition answers with, where several other services use 403.
 
 The caller is authorized for the detection before the image is read. A caller without the Rekognition
@@ -780,12 +827,18 @@ Simulated Rekognition currently supports:
 - PNG and JPEG format detection from the image bytes
 - IAM authorization on `rekognition:DetectModerationLabels`, `rekognition:DetectLabels` and
   `rekognition:DetectFaces`, with the image read from S3 as the caller
+- `CreateCollectionCommand`, `ListCollectionsCommand` and `DeleteCollectionCommand`, scoped to one
+  Account and Region
+- IAM authorization on `rekognition:CreateCollection` and `rekognition:DeleteCollection` against the
+  collection's own ARN, and on `rekognition:ListCollections` against `*`
 - SDK interception of `RekognitionClient`, including from inside a simulated Lambda function
 
 ## Limitations
 
-- `DetectText`, `CompareFaces`, the face collection operations and the video operations are left
-  out. An intercepted client sending one of those Commands is refused by name.
+- `DetectText`, `CompareFaces` and the video operations are left out. An intercepted client sending
+  one of those Commands is refused by name.
+- A collection holds no faces. `IndexFaces`, `SearchFacesByImage`, `ListFaces` and `DeleteFaces` are
+  left out, so what a collection is here is its identity and its lifecycle.
 - A face detection reports the emotions that were declared and no others. Real `DetectFaces` returns
   all eight emotion types every time, with the ones it failed to see at a low confidence. Declare
   the emotions the code under test reads.
