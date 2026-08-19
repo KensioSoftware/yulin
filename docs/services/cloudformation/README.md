@@ -1982,9 +1982,9 @@ its own `Role` runs as that role, and gets no expanded one.
 
 ### Function events
 
-`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi`,
-`Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this covers. An event of any other type
-is left where it is, and the function deploys with nothing in front of it.
+`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi`, `SQS`,
+`DynamoDB`, `SNS`, `S3`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this covers. An
+event of any other type is left where it is, and the function deploys with nothing in front of it.
 
 An `HttpApi` event becomes an `AWS::ApiGatewayV2::Integration`, an `AWS::ApiGatewayV2::Route` and the
 `AWS::Lambda::Permission` the API invokes the function under. `Path` and `Method` become the route
@@ -2132,6 +2132,108 @@ once, and a failed one is recorded by the rule or the schedule that made it.
 A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
 for a function called `Rates`. `AuthType` and `InvokeMode` carry over. `Cors` is left out (the
 simulated Function URL answers no preflight request).
+
+### Queue, stream, topic and bucket events
+
+These four event types point the function at something the template already has. Expanding one never
+creates the queue, table, topic or bucket it names.
+
+An `SQS` event becomes an `AWS::Lambda::EventSourceMapping` polling the queue its `Queue` ARN names,
+and a `DynamoDB` event becomes one reading the stream its `Stream` ARN names. Both are named after
+the function and the event (`OrdersWorkEventSourceMapping` for an event called `Work` on a function
+called `Orders`). Whatever else the event states goes onto the mapping under the same name, so
+`BatchSize`, `StartingPosition`, `Enabled` and `FilterCriteria` all carry across. A property the
+mapping has no meaning for is refused by name.
+
+The expanded execution role gains the policy it polls the source under, the way SAM attaches one of
+its own. Lambda refuses a mapping whose role cannot poll. A function naming its own `Role` runs as
+that role and keeps whatever the template granted it.
+
+```typescript sim-cloudformation-sam-queue-event
+/**
+ * A SAM function fed by the queue its SQS event names.
+ */
+
+import { GetQueueUrlCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const received: string[][] = [];
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Resources: {
+      OrdersQueue: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "orders" },
+      },
+      Orders: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Events: {
+            Work: {
+              Type: "SQS",
+              Properties: {
+                Queue: { "Fn::GetAtt": ["OrdersQueue", "Arn"] },
+                BatchSize: 5,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Orders",
+      handler: (event: { Records: readonly { body: string }[] }): string[] => {
+        const bodies = event.Records.map((record) => record.body);
+        received.push(bodies);
+
+        return bodies;
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .getQueueUrl(new GetQueueUrlCommand({ QueueName: "orders" }));
+
+await simAws
+  .sqs()
+  .sendMessage(new SendMessageCommand({ QueueUrl, MessageBody: "order-1" }));
+
+await simAws.backgroundTasksComplete();
+
+console.log(received);
+```
+
+An `SNS` event becomes an `AWS::SNS::Subscription` on the `lambda` protocol, together with the
+`AWS::Lambda::Permission` the topic invokes the function under. `Topic` is the topic's ARN.
+`FilterPolicy` and `FilterPolicyScope` carry across as the subscription attributes of those names.
+
+An `S3` event is the one with no resource of its own. In CloudFormation a bucket carries its own
+notifications, so the event adds a `LambdaConfigurations` entry to the `NotificationConfiguration` of
+the bucket its `Bucket` names, and brings the permission S3 invokes the function under. `Bucket` is a
+logical ID here rather than an ARN, and the bucket has to be one the template declares. `Events`
+states one event name or a list of them, and each one becomes a configuration of its own with the
+event's `Filter` on it. Notifications the bucket already declared are kept, and so are the ones
+another function's event put there.
+
+Two shapes are refused rather than expanded. A bucket writing its `NotificationConfiguration` or its
+`LambdaConfigurations` as an intrinsic such as `Fn::If` is one, because there is no appending to a
+list CloudFormation has not resolved yet, and adding the event's own entries would drop whatever the
+intrinsic resolved to. The other is a function the template conditions out, which real CloudFormation
+refuses for the same reason SAM cannot fix it: the notification belongs to the bucket, the bucket is
+not conditioned, and nothing can condition one entry of somebody else's property. Condition the
+bucket along with the function, or declare the notification on the bucket yourself.
 
 ### Simple tables
 

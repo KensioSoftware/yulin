@@ -5,7 +5,10 @@ import {
   samHttpApiResources,
   samHttpApiType,
 } from "./api/sim-cfn-sam-http-api.js";
+import type { SamResourceEdit } from "./function/event/sim-cfn-sam-resource-edit.js";
+import { samEditedResources } from "./function/event/sim-cfn-sam-resource-edit.js";
 import {
+  samFunctionResourceEdits,
   samFunctionResources,
   samFunctionType,
 } from "./function/sim-cfn-sam-function.js";
@@ -48,15 +51,44 @@ export function samExpandedTemplate(
   }
 
   const globals = samTemplateGlobals(template);
+  const resources = Object.entries(template.Resources);
 
   return {
     ...withoutSamSections(template),
-    Resources: Object.fromEntries(
-      Object.entries(template.Resources).flatMap(([logicalId, resource]) =>
-        Object.entries(expandedResource(logicalId, resource, globals)),
+    Resources: samEditedResources(
+      Object.fromEntries(
+        resources.flatMap(([logicalId, resource]) =>
+          Object.entries(expandedResource(logicalId, resource, globals)),
+        ),
+      ),
+      resources.flatMap(([logicalId, resource]) =>
+        resourceEdits(logicalId, resource, globals),
       ),
     ),
   };
+}
+
+/**
+ * The changes one template Resource makes to Resources it did not make.
+ *
+ * They are collected across the whole template and applied to the expanded
+ * Resources afterwards, because a Resource being edited may be expanded from a
+ * SAM Resource of its own and may not have been read yet.
+ */
+function resourceEdits(
+  logicalId: string,
+  resource: SimCfnTemplateValue,
+  globals: SamTemplateGlobals,
+): readonly SamResourceEdit[] {
+  if (!isSamTemplateRecord(resource) || resource["Type"] !== samFunctionType) {
+    return [];
+  }
+
+  return samFunctionResourceEdits({
+    logicalId,
+    resource,
+    globals: globals.forFunction,
+  });
 }
 
 /**

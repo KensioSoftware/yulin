@@ -325,13 +325,16 @@ describe("SAM HttpApi event expansion", () => {
 
     // When it is deployed
     const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "queued-rates-stack",
+      stackName: "streamed-rates-stack",
       template: simCfnSamFunctionTemplateFactory.make({
         functionProperties: {
           Events: {
             Work: {
-              Type: "SQS",
-              Properties: { Queue: "arn:aws:sqs:eu-west-2:111111111111:work" },
+              Type: "Kinesis",
+              Properties: {
+                Stream: "arn:aws:kinesis:eu-west-2:111111111111:stream/work",
+                StartingPosition: "LATEST",
+              },
             },
           },
         },
