@@ -30,6 +30,17 @@ export const simWatchConfig = {
   // takes, so it is a backstop for a stream that will not stop rather than
   // something a build runs into.
   settleMaxWaitMs: 5000,
+  // How often a watched file's metadata is read, behind the events for it.
+  // macOS delivers a process's filesystem events over one FSEvents stream,
+  // which libuv rebuilds whenever any watch in the process starts or stops, and
+  // a write that lands during the rebuild reaches nothing. Reading the file
+  // says the same thing without depending on the stream.
+  //
+  // Well inside `settleMs`, so an event and a read noticing the same save fall
+  // in one burst and are one change rather than two. That is also what it costs:
+  // a read landing inside the window pushes the window back, so a save the
+  // events did report is acted on up to one interval later than it would be.
+  filePollMs: 100,
   // How long the supervisor waits for a process to say it has told its browsers
   // a reload is coming. A process not running Yulin's runtime never answers, so
   // this is a short wait rather than a requirement.
