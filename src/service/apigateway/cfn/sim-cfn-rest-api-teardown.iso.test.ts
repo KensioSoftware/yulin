@@ -15,7 +15,7 @@ import type { SimRestApi } from "../api/sim-rest-api.js";
 import {
   simCfnRestApiMethodLogicalId,
   simCfnRestApiResourceLogicalId,
-} from "./sim-cfn-rest-api-template-parts.js";
+} from "./sim-cfn-rest-api-template-ids.js";
 import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factory.js";
 
 describe("REST API CloudFormation Resource teardown", () => {

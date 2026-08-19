@@ -5,7 +5,7 @@ import {
   assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   deployRestApi,
@@ -73,6 +73,31 @@ describe("API Gateway REST API CloudFormation refusals", () => {
       error.message,
       "PutIntegration type 'MOCK' is not simulated",
     );
+  });
+
+  it("takes the method back out when its integration is refused", async () => {
+    // Given the same mock integration, whose method PutMethod has already
+    // declared by the time the integration is read
+    const simAws = simAwsInEuWest2();
+    await deployRestApiFailure(
+      simAws,
+      simCfnRestApiTemplateFactory.make({
+        integrationProperties: { Type: "MOCK", Uri: undefined },
+      }),
+    );
+
+    // When the API the failed stack created is read back
+    const { items } = await simAws.apiGateway().getRestApis({ input: {} });
+    const [created] = items;
+    assertNonNullable(created);
+    const restApi = simAws.apiGateway().findRestApi(created.id);
+
+    // Then the resource carries no method. The corrected template deploys
+    // rather than being refused for a method that already exists.
+    assertNonNullable(restApi);
+    expect(
+      restApi.resources.findByPath("/orders")?.listMethods(),
+    ).toStrictEqual([]);
   });
 
   it("refuses a path part real API Gateway would refuse", async () => {

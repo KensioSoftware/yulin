@@ -11,6 +11,10 @@ import {
 } from "../../../../test/apigateway/cfn-deploy.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
+import {
+  simCfnRestApiMethodLogicalId,
+  simCfnRestApiResourceLogicalId,
+} from "./sim-cfn-rest-api-template-ids.js";
 import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factory.js";
 
 /**
@@ -169,12 +173,25 @@ describe("API Gateway REST API CloudFormation deployment", () => {
             Value: { "Fn::GetAtt": ["Api", "RootResourceId"] },
           },
           OrdersResourceId: {
-            Value: { "Fn::GetAtt": ["Resourceorders", "ResourceId"] },
+            Value: {
+              "Fn::GetAtt": [
+                simCfnRestApiResourceLogicalId(["orders"]),
+                "ResourceId",
+              ],
+            },
           },
           DeploymentId: {
             Value: { "Fn::GetAtt": ["Deployment", "DeploymentId"] },
           },
           StageName: { Value: { Ref: "Stage" } },
+          MethodRef: {
+            Value: {
+              Ref: simCfnRestApiMethodLogicalId({
+                httpMethod: "GET",
+                path: ["orders"],
+              }),
+            },
+          },
         },
       }),
     );
@@ -200,6 +217,13 @@ describe("API Gateway REST API CloudFormation deployment", () => {
       stack.getResource("Deployment")?.refValue,
     );
     assertIdentical(stack.outputs.get("StageName")?.value, "prod");
+
+    // And a method answers with its logical id, since a REST API method has no
+    // id of its own and CloudFormation's own fallback is what answers
+    assertIdentical(
+      stack.outputs.get("MethodRef")?.value,
+      simCfnRestApiMethodLogicalId({ httpMethod: "GET", path: ["orders"] }),
+    );
   });
 
   it("carries the stage variables and descriptions the template gave", async () => {
@@ -275,6 +299,7 @@ describe("API Gateway REST API CloudFormation deployment", () => {
     const apiId = stack.getResource("Api")?.refValue;
     assertTypeString(apiId);
     const deploymentId = stack.getResource("Deployment")?.refValue;
+    assertTypeString(deploymentId);
 
     // When the API is read back and both stages are requested
     const restApi = simAws.apiGateway().findRestApi(apiId);

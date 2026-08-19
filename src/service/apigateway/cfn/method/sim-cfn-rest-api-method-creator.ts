@@ -40,12 +40,7 @@ export class SimCfnRestApiMethodCreator {
     await this.apiGateway.putMethod({
       input: methodProperties.putMethodInput(),
     });
-
-    const integrationInput = methodProperties.putIntegrationInput();
-
-    if (integrationInput !== undefined) {
-      await this.apiGateway.putIntegration({ input: integrationInput });
-    }
+    await this.putIntegration(methodProperties);
 
     const method = this.apiGateway
       .findRestApi(methodProperties.restApiId())
@@ -58,5 +53,36 @@ export class SimCfnRestApiMethodCreator {
     );
 
     return method;
+  }
+
+  /**
+   * Declare what the method does with a request, taking the method back out
+   * again where the block cannot be applied.
+   *
+   * `PutMethod` has already left a method on the resource by this point, and
+   * an integration real API Gateway refuses would leave that method behind on
+   * a Resource CloudFormation reports as failed. The next deployment of the
+   * corrected template would then be refused for a method that already exists.
+   */
+  private async putIntegration(
+    methodProperties: SimCfnRestApiMethodProperties,
+  ): Promise<void> {
+    try {
+      const integrationInput = methodProperties.putIntegrationInput();
+
+      if (integrationInput !== undefined) {
+        await this.apiGateway.putIntegration({ input: integrationInput });
+      }
+    } catch (error) {
+      await this.apiGateway.deleteMethod({
+        input: {
+          restApiId: methodProperties.restApiId(),
+          resourceId: methodProperties.resourceId(),
+          httpMethod: methodProperties.httpMethod(),
+        },
+      });
+
+      throw error;
+    }
   }
 }

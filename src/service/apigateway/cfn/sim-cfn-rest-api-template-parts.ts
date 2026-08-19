@@ -1,8 +1,9 @@
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type {
-  SimCfnRestApiTemplateInput,
-  SimCfnRestApiTemplateMethod,
-} from "./sim-cfn-rest-api-template.factory.js";
+import type { SimCfnRestApiTemplateInput } from "./sim-cfn-rest-api-template.factory.js";
+import {
+  simCfnRestApiMethodLogicalId,
+  simCfnRestApiResourceLogicalId,
+} from "./sim-cfn-rest-api-template-ids.js";
 
 /**
  * The Resources under the API in the template test factory, and the logical
@@ -12,27 +13,6 @@ import type {
  * spells one path over several Resources. The factory beside this holds the
  * Resources every template carries whatever its methods are.
  */
-
-/**
- * The logical ID of the Resource carrying one path of the template's tree.
- *
- * A test asserting on a node names it through here, so the naming stays in one
- * place. The path spells the ID, so two methods under one path name one node.
- */
-export function simCfnRestApiResourceLogicalId(
-  path: readonly string[],
-): string {
-  return `Resource${path.map(pathPartLabel).join("")}`;
-}
-
-/**
- * The logical ID of the Resource carrying one method of the template's API.
- */
-export function simCfnRestApiMethodLogicalId(
-  method: SimCfnRestApiTemplateMethod,
-): string {
-  return `Method${method.httpMethod}${method.path.map(pathPartLabel).join("")}`;
-}
 
 /**
  * One AWS::ApiGateway::Resource per node the template's methods need, each
@@ -123,12 +103,4 @@ function resourceIdValue(path: readonly string[]): SimCfnTemplateValueRecord {
  */
 export function methodLogicalIds(input: SimCfnRestApiTemplateInput): string[] {
   return input.methods.map((method) => simCfnRestApiMethodLogicalId(method));
-}
-
-/**
- * One path segment as part of a logical ID, with the braces of a path
- * parameter taken out, since a logical ID is alphanumeric.
- */
-function pathPartLabel(pathPart: string): string {
-  return pathPart.replaceAll(/[^a-zA-Z0-9]/g, "");
 }

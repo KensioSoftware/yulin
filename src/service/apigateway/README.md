@@ -108,6 +108,7 @@ SimApiGatewayCfnResourceFactory              which creator answers a Resource ty
 ├── sim-cfn-api-gateway-property-parser.ts   the allow-list of properties
 ├── sim-cfn-api-gateway-scalar-values.ts     the value shapes each may take
 ├── sim-cfn-rest-api-template.factory.ts     the template tests deploy
+├── sim-cfn-rest-api-template-ids.ts         the logical IDs a test names it by
 ├── sim-cfn-rest-api-part-deleter.ts         what a teardown deletes an API's parts by
 ├── api/         RestApi
 ├── resource/    Resource
@@ -124,7 +125,9 @@ every request.
 
 A method is one Resource and two commands, because the REST API declares a method and what it does
 with a request separately. The template writes both as one entry, with the integration as a block of
-the method, so `PutMethod` and `PutIntegration` go together or neither does.
+the method, and `PutMethod` and `PutIntegration` go together or neither does. An integration real
+API Gateway refuses takes the method back out again, because the next deployment of the corrected
+template would otherwise be refused for a method that already exists.
 
 A teardown deletes each part through the command that removes it, and the API last. A deployment is
 the exception. API Gateway deletes one and nothing here does. The Resource is reported as a deletion

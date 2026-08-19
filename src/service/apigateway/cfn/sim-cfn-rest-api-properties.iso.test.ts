@@ -13,7 +13,17 @@ import {
   ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/apigateway/cfn-deploy.js";
+import { simCfnRestApiMethodLogicalId } from "./sim-cfn-rest-api-template-ids.js";
 import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factory.js";
+
+/**
+ * The logical ID of the one method the default template carries, which a
+ * message about a malformed property names.
+ */
+const methodLogicalId = simCfnRestApiMethodLogicalId({
+  httpMethod: "GET",
+  path: ["orders"],
+});
 
 describe("API Gateway REST API CloudFormation property shapes", () => {
   it("refuses a property that has to be a string and is not", async () => {
@@ -69,7 +79,8 @@ describe("API Gateway REST API CloudFormation property shapes", () => {
     // Then the stack fails saying what the block has to be
     assertStringIncludes(
       error.message,
-      "Invalid AWS::ApiGateway::Method MethodGETorders: Integration must be an object",
+      `Invalid AWS::ApiGateway::Method ${methodLogicalId}: ` +
+        `Integration must be an object`,
     );
   });
 
@@ -223,5 +234,42 @@ describe("API Gateway REST API CloudFormation properties left out", () => {
       "MethodSettings",
       "TracingEnabled",
     ]);
+  });
+});
+
+describe("API Gateway REST API CloudFormation template logical IDs", () => {
+  it("gives two paths that differ only in punctuation their own Resources", async () => {
+    // Given methods on a literal `proxy` node, a `{proxy}` parameter and a
+    // greedy `{proxy+}`, which spell one path part three ways
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const stack = await deployRestApi(
+      simAws,
+      simCfnRestApiTemplateFactory.make({
+        methods: [
+          { httpMethod: "GET", path: ["orders", "proxy"] },
+          { httpMethod: "GET", path: ["orders", "{proxy}"] },
+          { httpMethod: "GET", path: ["{proxy+}"] },
+        ],
+      }),
+    );
+
+    // Then each is its own node of the tree, rather than one node three
+    // Resources overwrote in turn
+    const apiId = stack.getResource("Api")?.refValue;
+    assertTypeString(apiId);
+    const { resources } = simAws.apiGateway().findRestApi(apiId) ?? {};
+    assertNonNullable(resources);
+    const paths = resources.list().map((resource) => resource.path);
+    expect(new Set(paths)).toStrictEqual(
+      new Set([
+        "/",
+        "/orders",
+        "/orders/proxy",
+        "/orders/{proxy}",
+        "/{proxy+}",
+      ]),
+    );
   });
 });
