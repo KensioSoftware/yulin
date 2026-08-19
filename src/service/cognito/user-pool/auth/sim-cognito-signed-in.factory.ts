@@ -21,6 +21,8 @@ export interface SimCognitoSignedInInput {
  */
 export interface SimCognitoSignedIn {
   readonly userPoolId: string;
+  /** The ARN of that pool, which is how another service names it. */
+  readonly userPoolArn: string;
   readonly clientId: string;
   readonly username: string;
   readonly accessToken: string;
@@ -123,6 +125,7 @@ export const simCognitoSignedInFactory = new AsyncMappedFactory<
 
     return {
       userPoolId,
+      userPoolArn: userPool.arn.value,
       clientId,
       username: input.username,
       accessToken,

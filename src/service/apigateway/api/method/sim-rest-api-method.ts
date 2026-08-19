@@ -2,6 +2,7 @@ import type {
   SimRestApiIntegration,
   SimRestApiIntegrationView,
 } from "./sim-rest-api-integration.js";
+import { SimRestApiMethodScopes } from "./sim-rest-api-method-scopes.js";
 
 /**
  * The method matching any HTTP method the client used, where no method of that
@@ -13,13 +14,17 @@ export const simRestApiAnyMethod = "ANY";
  * The authorization types simulated so far.
  *
  * `NONE` is an open method, `CUSTOM` sends the request through the Lambda
- * authorizer the method names, and `AWS_IAM` asks IAM whether the caller the
- * request was attributed to may invoke the method. `COGNITO_USER_POOLS` is a
- * separate piece of work, and a method asking for it is refused when it is
- * created. A method served open where AWS would have gated it lets a test pass
- * on a request real AWS rejects.
+ * authorizer the method names, `AWS_IAM` asks IAM whether the caller the
+ * request was attributed to may invoke the method, and `COGNITO_USER_POOLS`
+ * verifies the token against the user pools its authorizer names. A method
+ * served open where AWS would have gated it lets a test pass on a request
+ * real AWS rejects.
  */
-export type SimRestApiAuthorizationType = "NONE" | "CUSTOM" | "AWS_IAM";
+export type SimRestApiAuthorizationType =
+  | "NONE"
+  | "CUSTOM"
+  | "AWS_IAM"
+  | "COGNITO_USER_POOLS";
 
 interface SimRestApiMethodProperties {
   readonly httpMethod: string;
@@ -27,6 +32,7 @@ interface SimRestApiMethodProperties {
   readonly apiKeyRequired: boolean;
   readonly operationName?: string | undefined;
   readonly authorizerId?: string | undefined;
+  readonly authorizationScopes?: SimRestApiMethodScopes | undefined;
 }
 
 /**
@@ -38,6 +44,7 @@ export interface SimRestApiMethodView {
   apiKeyRequired: boolean;
   operationName?: string;
   authorizerId?: string;
+  authorizationScopes?: string[];
   methodIntegration?: SimRestApiIntegrationView;
 }
 
@@ -61,6 +68,13 @@ export class SimRestApiMethod {
   public readonly authorizerId?: string | undefined;
 
   /**
+   * The scopes a `COGNITO_USER_POOLS` method asks the token for, which are
+   * the method's own rather than its authorizer's. A method of any other type
+   * asks for none.
+   */
+  public readonly authorizationScopes: SimRestApiMethodScopes;
+
+  /**
    * What this method does with a request. A method with none declared is a
    * method real API Gateway answers 500 for, and it is what `PutMethod`
    * leaves behind until `PutIntegration` follows it.
@@ -73,6 +87,8 @@ export class SimRestApiMethod {
     this.apiKeyRequired = properties.apiKeyRequired;
     this.operationName = properties.operationName;
     this.authorizerId = properties.authorizerId;
+    this.authorizationScopes =
+      properties.authorizationScopes ?? new SimRestApiMethodScopes();
   }
 
   /**
@@ -91,6 +107,10 @@ export class SimRestApiMethod {
 
     if (this.authorizerId !== undefined) {
       view.authorizerId = this.authorizerId;
+    }
+
+    if (!this.authorizationScopes.isEmpty) {
+      view.authorizationScopes = [...this.authorizationScopes.values];
     }
 
     if (this.integration !== undefined) {

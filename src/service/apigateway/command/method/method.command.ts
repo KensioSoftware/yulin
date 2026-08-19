@@ -17,6 +17,7 @@ export interface SimPutMethodCommandInput {
   readonly httpMethod?: string | undefined;
   readonly authorizationType?: string | undefined;
   readonly authorizerId?: string | undefined;
+  readonly authorizationScopes?: readonly string[] | undefined;
   readonly apiKeyRequired?: boolean | undefined;
   readonly operationName?: string | undefined;
 }

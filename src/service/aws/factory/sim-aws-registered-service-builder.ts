@@ -5,6 +5,7 @@ import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import {
   simAwsAcmDnsRecords,
   simAwsHttpApiJwtIssuerKeys,
+  simAwsRestApiUserPools,
 } from "./sim-aws-cross-account-collaborators.js";
 import { SimEcr } from "../../ecr/index.js";
 import { SimElbV2 } from "../../elbv2/index.js";
@@ -65,6 +66,7 @@ export class SimAwsRegisteredServiceBuilder {
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
       registry: this.registries.restApi,
+      userPools: simAwsRestApiUserPools(this.registries),
     });
   }
 

@@ -1,4 +1,7 @@
-import type { SimPayload1LambdaAuthorizer } from "../../../../serve/payload-1/sim-payload-1-event.type.js";
+import type {
+  SimPayload1CognitoAuthorizer,
+  SimPayload1LambdaAuthorizer,
+} from "../../../../serve/payload-1/sim-payload-1-event.type.js";
 import type { SimAwsRequestCaller } from "../../../iam/request/sim-aws-request-caller.js";
 
 /**
@@ -24,13 +27,18 @@ interface SimRestApiAdmittedProperties {
   readonly lambda?: SimPayload1LambdaAuthorizer | undefined;
   /** The principal an `AWS_IAM` method allowed the request. */
   readonly caller?: SimAwsRequestCaller | undefined;
+  /**
+   * The claims of the token a `COGNITO_USER_POOLS` method's authorizer
+   * accepted.
+   */
+  readonly cognito?: SimPayload1CognitoAuthorizer | undefined;
 }
 
 /**
  * A request the method admitted, and what its authorization knows about the
  * caller.
  *
- * Both members are absent on a method that authorizes nobody, since there is
+ * Every member is absent on a method that authorizes nobody, since there is
  * no caller to describe. That is what leaves `requestContext.authorizer` out of
  * the event entirely and every `requestContext.identity` field describing a
  * principal `null`. Which one is present says which kind of authorization
@@ -40,10 +48,12 @@ export class SimRestApiAdmitted {
   public readonly admitted = true as const;
   public readonly lambda: SimPayload1LambdaAuthorizer | undefined;
   public readonly caller: SimAwsRequestCaller | undefined;
+  public readonly cognito: SimPayload1CognitoAuthorizer | undefined;
 
   constructor(properties: SimRestApiAdmittedProperties = {}) {
     this.lambda = properties.lambda;
     this.caller = properties.caller;
+    this.cognito = properties.cognito;
   }
 }
 

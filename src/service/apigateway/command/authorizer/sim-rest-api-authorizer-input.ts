@@ -1,9 +1,13 @@
+import { SimRestApiIdentitySourceParser } from "../../api/authorizer/identity/sim-rest-api-identity-source-parser.js";
 import { SimRestApiIdentitySources } from "../../api/authorizer/identity/sim-rest-api-identity-sources.js";
-import {
+import type {
   SimRestApiAuthorizer,
-  type SimRestApiAuthorizerId,
-  type SimRestApiAuthorizerType,
+  SimRestApiAuthorizerId,
+  SimRestApiAuthorizerType,
 } from "../../api/authorizer/sim-rest-api-authorizer.js";
+import { SimRestApiCognitoAuthorizer } from "../../api/authorizer/sim-rest-api-cognito-authorizer.js";
+import { SimRestApiLambdaAuthorizer } from "../../api/authorizer/sim-rest-api-lambda-authorizer.js";
+import { SimRestApiUserPoolProviders } from "../../api/authorizer/sim-rest-api-user-pool-providers.js";
 import { SimRestApiLambdaUri } from "../../api/method/sim-rest-api-lambda-uri.js";
 import { SimApiGatewayBadRequest } from "../../error/sim-api-gateway.error.js";
 import type { SimCreateAuthorizerCommandInput } from "./authorizer.command.js";
@@ -15,12 +19,13 @@ interface SimRestApiAuthorizerInputProperties {
 }
 
 /**
- * Reads the inputs a Lambda authorizer is created from.
+ * Reads the inputs an authorizer is created from.
  *
- * The function and the identity source are both required by real
- * `CreateAuthorizer` for either type, and neither has a value worth guessing.
- * An authorizer naming no function has nothing to ask, and one naming nowhere
- * to look would be invoked for every request including one carrying nothing.
+ * The identity source is required by real `CreateAuthorizer` for every type,
+ * and an authorizer naming nowhere to look would read nothing on every
+ * request. What decides then differs: a Lambda authorizer requires the
+ * function it asks, and a `COGNITO_USER_POOLS` one requires the pools it
+ * verifies against. Neither has a value worth guessing.
  */
 export class SimRestApiAuthorizerInput {
   private readonly input: SimCreateAuthorizerCommandInput;
@@ -35,9 +40,23 @@ export class SimRestApiAuthorizerInput {
    * The authorizer this input asks for.
    */
   read(authorizerId: SimRestApiAuthorizerId): SimRestApiAuthorizer {
-    return new SimRestApiAuthorizer({
+    const name = this.input.name ?? "";
+
+    if (this.type === "COGNITO_USER_POOLS") {
+      return new SimRestApiCognitoAuthorizer({
+        authorizerId,
+        name,
+        providers: SimRestApiUserPoolProviders.parse(this.providerArns()),
+        identitySource: new SimRestApiIdentitySourceParser().header(
+          this.identitySource(),
+          this.type,
+        ),
+      });
+    }
+
+    return new SimRestApiLambdaAuthorizer({
       authorizerId,
-      name: this.input.name ?? "",
+      name,
       type: this.type,
       lambdaUri: this.lambdaUri(),
       identitySources: this.identitySources(),
@@ -45,7 +64,7 @@ export class SimRestApiAuthorizerInput {
   }
 
   /**
-   * The function this authorizer invokes.
+   * The function a Lambda authorizer invokes.
    *
    * An `authorizerUri` is written in the same wrapped form an integration URI
    * is, so it is read by the same parser and refused for the same reasons.
@@ -59,18 +78,51 @@ export class SimRestApiAuthorizerInput {
       );
     }
 
+    if (this.input.providerARNs !== undefined) {
+      throw new SimApiGatewayBadRequest(
+        `CreateAuthorizer providerARNs is set on a ${this.type} authorizer, ` +
+          `which decides by invoking its function rather than by verifying a ` +
+          `user pool token`,
+      );
+    }
+
     return SimRestApiLambdaUri.parse(uri);
   }
 
   /**
-   * Where the authorizer looks for what identifies a caller, which real
-   * `CreateAuthorizer` requires for both simulated types.
+   * The user pools a `COGNITO_USER_POOLS` authorizer accepts tokens from.
+   */
+  private providerArns(): readonly string[] {
+    if (this.input.authorizerUri !== undefined) {
+      throw new SimApiGatewayBadRequest(
+        "CreateAuthorizer authorizerUri is set on a COGNITO_USER_POOLS " +
+          "authorizer, which verifies the token itself and invokes nothing",
+      );
+    }
+
+    return this.input.providerARNs ?? [];
+  }
+
+  /**
+   * Where a Lambda authorizer looks for what identifies a caller.
    *
    * A `TOKEN` authorizer names one header. A `REQUEST` authorizer names as
    * many headers and query string parameters as it likes, written as one
    * comma-separated string.
    */
   private identitySources(): SimRestApiIdentitySources {
+    const identitySource = this.identitySource();
+
+    return this.type === "TOKEN"
+      ? SimRestApiIdentitySources.token(identitySource)
+      : SimRestApiIdentitySources.request(identitySource);
+  }
+
+  /**
+   * The identity source as it was written, which real `CreateAuthorizer`
+   * requires for every type.
+   */
+  private identitySource(): string {
     const identitySource = this.input.identitySource;
 
     if (identitySource === undefined || identitySource.length === 0) {
@@ -80,8 +132,6 @@ export class SimRestApiAuthorizerInput {
       );
     }
 
-    return this.type === "TOKEN"
-      ? SimRestApiIdentitySources.token(identitySource)
-      : SimRestApiIdentitySources.request(identitySource);
+    return identitySource;
   }
 }

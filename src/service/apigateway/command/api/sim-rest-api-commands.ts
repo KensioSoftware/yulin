@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimRestApiUserPools } from "../../api/authorizer/sim-rest-api-user-pools.js";
 import type { SimRestApiStore } from "../../api/sim-rest-api-store.js";
 import { SimRestApi } from "../../api/sim-rest-api.js";
 import type { SimRestApiRegistry } from "../../registry/sim-rest-api-registry.js";
@@ -32,6 +33,7 @@ interface SimRestApiCommandsProperties {
   readonly access: SimRestApiAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
+  readonly userPools: SimRestApiUserPools;
 }
 
 /**
@@ -43,6 +45,7 @@ export class SimRestApiCommands {
   private readonly access: SimRestApiAccess;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: SimClock;
+  private readonly userPools: SimRestApiUserPools;
 
   constructor(properties: SimRestApiCommandsProperties) {
     this.apis = properties.apis;
@@ -50,6 +53,7 @@ export class SimRestApiCommands {
     this.access = properties.access;
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
+    this.userPools = properties.userPools;
   }
 
   /**
@@ -74,6 +78,7 @@ export class SimRestApiCommands {
       name,
       accountRegionScope: this.accountRegionScope,
       createdDate: this.clock.now(),
+      userPools: this.userPools,
       description: input.description,
       disableExecuteApiEndpoint: input.disableExecuteApiEndpoint,
     });

@@ -1,4 +1,5 @@
 import { SimApiGatewayBadRequest } from "../../../error/sim-api-gateway.error.js";
+import type { SimRestApiAuthorizerType } from "../sim-rest-api-authorizer.js";
 import {
   SimRestApiHeaderIdentitySource,
   simRestApiHeaderIdentityPrefix,
@@ -25,18 +26,22 @@ const httpFieldName = /^[!#$%&'*+.^_`|~\w-]+$/u;
  * `method.request.path`, `context` and `stageVariables`, which a `REQUEST`
  * authorizer may also name on AWS.
  *
- * A `TOKEN` authorizer reads one header and nothing else, which is the rule
- * real API Gateway holds one to, so it parses with `header`.
+ * A `TOKEN` and a `COGNITO_USER_POOLS` authorizer each read one header and
+ * nothing else, which is the rule real API Gateway holds both to, so they
+ * parse with `header`.
  */
 export class SimRestApiIdentitySourceParser {
   /**
-   * Read the one header a `TOKEN` authorizer takes its token from.
+   * Read the one header an authorizer of this kind takes its token from.
    */
-  header(expression: string): SimRestApiIdentitySource {
+  header(
+    expression: string,
+    authorizerType: SimRestApiAuthorizerType,
+  ): SimRestApiIdentitySource {
     if (!expression.startsWith(simRestApiHeaderIdentityPrefix)) {
       throw new SimApiGatewayBadRequest(
-        `identitySource '${expression}' is not simulated: a TOKEN ` +
-          `authorizer reads one header, written as ` +
+        `identitySource '${expression}' is not simulated: a ` +
+          `${authorizerType} authorizer reads one header, written as ` +
           `'${simRestApiHeaderIdentityPrefix}<name>'`,
       );
     }

@@ -15,6 +15,7 @@ export interface SimCreateAuthorizerCommandInput {
   readonly name?: string | undefined;
   readonly type?: string | undefined;
   readonly authorizerUri?: string | undefined;
+  readonly providerARNs?: readonly string[] | undefined;
   readonly identitySource?: string | undefined;
 }
 

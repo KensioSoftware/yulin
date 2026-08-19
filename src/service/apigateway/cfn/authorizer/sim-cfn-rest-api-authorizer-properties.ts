@@ -6,7 +6,7 @@ import { SimCfnApiGatewayPropertyParser } from "../sim-cfn-api-gateway-property-
 /**
  * The AWS::ApiGateway::Authorizer properties this simulation deploys.
  *
- * `AuthorizerResultTtlInSeconds`, `ProviderARNs`, `AuthorizerCredentials`,
+ * `AuthorizerResultTtlInSeconds`, `AuthorizerCredentials`,
  * `IdentityValidationExpression` and `AuthType` are left out, so a template
  * carrying one has it recorded against the Resource. Each belongs to a piece
  * of work outside this one, and what an authorizer of a given `Type` requires
@@ -17,6 +17,7 @@ const simulatedProperties = [
   "Name",
   "Type",
   "AuthorizerUri",
+  "ProviderARNs",
   "IdentitySource",
 ];
 
@@ -59,13 +60,14 @@ export class SimCfnRestApiAuthorizerProperties {
   /**
    * The CreateAuthorizer input this Resource asks for.
    *
-   * Everything but the shape of each value is passed through, so a
-   * `COGNITO_USER_POOLS` authorizer, one naming no function and one whose
-   * identity source names somewhere this simulation reads nothing from are all
-   * refused by CreateAuthorizer with the reason it refuses them.
+   * Everything but the shape of each value is passed through, so an
+   * authorizer naming no function or no user pool, and one whose identity
+   * source names somewhere this simulation reads nothing from, are refused by
+   * CreateAuthorizer with the reason it refuses them.
    *
    * `IdentitySource` is one comma-separated string, which is how a REST API
    * writes a list where an HTTP API takes one.
+>>>>>>> d71bc9d5 (feat: gate a REST API method with a user pool)
    *
    * `AuthorizerUri` arrives as the wrapped
    * `arn:aws:apigateway:<region>:lambda:path/...` form CDK builds with
@@ -88,6 +90,11 @@ export class SimCfnRestApiAuthorizerProperties {
         this.resource,
         this.properties["AuthorizerUri"],
         "AuthorizerUri",
+      ),
+      providerARNs: this.propertyParser.optionalStringList(
+        this.resource,
+        this.properties["ProviderARNs"],
+        "ProviderARNs",
       ),
       identitySource: this.propertyParser.optionalString(
         this.resource,

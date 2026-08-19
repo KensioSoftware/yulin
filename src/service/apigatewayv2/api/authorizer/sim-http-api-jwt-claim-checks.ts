@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimJwtClaims } from "../../../../util/jwt/sim-jwt-claims.js";
+import { SimJwtTimeClaims } from "../../../../util/jwt/sim-jwt-time-claims.js";
 import { SimHttpApiRefused } from "./sim-http-api-authorization.js";
 import type { SimHttpApiJwtConfiguration } from "./sim-http-api-jwt-configuration.js";
 
@@ -29,10 +30,10 @@ interface SimHttpApiJwtClaimChecksProperties {
  * request into a refused one with nothing else changed.
  */
 export class SimHttpApiJwtClaimChecks {
-  private readonly clock: SimClock;
+  private readonly times: SimJwtTimeClaims;
 
   constructor(properties: SimHttpApiJwtClaimChecksProperties) {
-    this.clock = properties.clock;
+    this.times = new SimJwtTimeClaims({ clock: properties.clock });
   }
 
   /**
@@ -51,7 +52,9 @@ export class SimHttpApiJwtClaimChecks {
       return SimHttpApiRefused.unauthorized(simHttpApiInvalidAudience);
     }
 
-    return this.checkTimes(claims);
+    return this.times.hold(claims)
+      ? undefined
+      : SimHttpApiRefused.unauthorized();
   }
 
   /**
@@ -71,39 +74,5 @@ export class SimHttpApiJwtClaimChecks {
     const clientId = claims.text("client_id");
 
     return clientId === undefined ? [] : [clientId];
-  }
-
-  /**
-   * Check `exp`, `nbf` and `iat` against the simulation's clock.
-   *
-   * A token with no `exp` is refused rather than treated as one that never
-   * expires: real Cognito always sets it, and admitting a token nothing can
-   * expire is the divergence worth failing on.
-   */
-  private checkTimes(claims: SimJwtClaims): SimHttpApiRefused | undefined {
-    const now = Math.floor(this.clock.now().getTime() / 1000);
-    const expiresAt = claims.number("exp");
-
-    if (expiresAt === undefined || now >= expiresAt) {
-      return SimHttpApiRefused.unauthorized();
-    }
-
-    if (this.isBefore(now, claims.number("nbf"))) {
-      return SimHttpApiRefused.unauthorized();
-    }
-
-    if (this.isBefore(now, claims.number("iat"))) {
-      return SimHttpApiRefused.unauthorized();
-    }
-
-    return undefined;
-  }
-
-  /**
-   * Whether now is earlier than a time claim the token carries. A claim the
-   * token does not carry is nothing to be earlier than.
-   */
-  private isBefore(now: number, claimed: number | undefined): boolean {
-    return claimed !== undefined && now < claimed;
   }
 }

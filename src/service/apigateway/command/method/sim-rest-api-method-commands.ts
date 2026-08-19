@@ -20,6 +20,7 @@ const acceptedPutOptions = [
   ...simRestApiMethodOptions,
   "authorizationType",
   "authorizerId",
+  "authorizationScopes",
   "apiKeyRequired",
   "operationName",
 ];
@@ -63,11 +64,12 @@ export class SimRestApiMethodCommands {
       httpMethod: target.httpMethod,
       apiKeyRequired: false,
       operationName: input.operationName,
-      ...new SimRestApiMethodAuthorizationInput(input).read(
-        target.restApi,
-        target.resource,
-        target.httpMethod,
-      ),
+      ...new SimRestApiMethodAuthorizationInput({
+        input,
+        restApi: target.restApi,
+        resource: target.resource,
+        httpMethod: target.httpMethod,
+      }).read(),
     });
     target.resource.addMethod(method);
 

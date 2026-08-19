@@ -69,6 +69,7 @@ export class SimRestApiIntegrationInvocation {
         {
           lambda: input.authorization.lambda,
           caller: input.authorization.caller,
+          cognito: input.authorization.cognito,
         },
       );
       const result = await target.simFunction.invoke(event);

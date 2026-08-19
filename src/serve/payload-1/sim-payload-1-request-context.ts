@@ -5,6 +5,7 @@ import { simProxyEventTime } from "../proxy/sim-proxy-event-time.js";
 import type { SimPayload1Endpoint } from "./sim-payload-1-endpoint.js";
 import { SimPayload1IamCaller } from "./sim-payload-1-iam-caller.js";
 import type {
+  SimPayload1CognitoAuthorizer,
   SimPayload1Identity,
   SimPayload1LambdaAuthorizer,
   SimPayload1RequestContext,
@@ -14,7 +15,7 @@ import type {
  * What the endpoint's authorization knows about the caller, if it authorized
  * one.
  *
- * A method admitting anybody supplies neither, which is what leaves the
+ * A method admitting anybody supplies none of them, which is what leaves the
  * authorizer block out of the event and every identity field describing a
  * principal `null`.
  */
@@ -23,6 +24,8 @@ export interface SimPayload1Authorization {
   readonly lambda?: SimPayload1LambdaAuthorizer | undefined;
   /** The caller an `AWS_IAM` method allowed the request. */
   readonly caller?: SimAwsRequestCaller | undefined;
+  /** The claims of the token a Cognito authorizer accepted. */
+  readonly cognito?: SimPayload1CognitoAuthorizer | undefined;
 }
 
 interface SimPayload1RequestContextInput {
@@ -68,10 +71,13 @@ export class SimPayload1RequestContextBuilder {
       stage: endpoint.stage,
     };
 
-    const { lambda } = input.authorization ?? {};
+    const { lambda, cognito } = input.authorization ?? {};
+    const authorizer = lambda ?? cognito;
 
-    if (lambda !== undefined) {
-      requestContext.authorizer = lambda;
+    if (authorizer !== undefined) {
+      // Copied rather than carried over, so the one block a handler reads
+      // holds whichever kind of authorizer ran.
+      requestContext.authorizer = { ...authorizer };
     }
 
     return requestContext;

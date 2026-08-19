@@ -8,11 +8,9 @@ import { SimCfnRestApiIntegrationProperties } from "./sim-cfn-rest-api-integrati
 /**
  * The AWS::ApiGateway::Method properties this simulation deploys.
  *
- * `AuthorizationScopes`, `RequestParameters`, `RequestModels`,
- * `RequestValidatorId` and `MethodResponses` are left out, so a template
- * carrying one has it recorded against the Resource. Scopes belong to a
- * `COGNITO_USER_POOLS` method, which `AuthorizationType` refuses before they
- * matter.
+ * `RequestParameters`, `RequestModels`, `RequestValidatorId` and
+ * `MethodResponses` are left out, so a template carrying one has it recorded
+ * against the Resource.
  */
 const simulatedProperties = [
   "RestApiId",
@@ -20,6 +18,7 @@ const simulatedProperties = [
   "HttpMethod",
   "AuthorizationType",
   "AuthorizerId",
+  "AuthorizationScopes",
   "ApiKeyRequired",
   "OperationName",
   "Integration",
@@ -110,11 +109,11 @@ export class SimCfnRestApiMethodProperties {
   /**
    * The PutMethod input this Resource asks for.
    *
-   * `AuthorizationType`, `AuthorizerId` and `ApiKeyRequired` are passed
-   * through as the template wrote them, so a method asking for an
-   * authorization type this simulation does not enforce, for an authorizer the
-   * API has not got, or for an API key is refused by PutMethod with the reason
-   * it refuses it.
+   * `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes` and
+   * `ApiKeyRequired` are passed through as the template wrote them, so a
+   * method asking for an authorization type this simulation does not enforce,
+   * for an authorizer the API has not got, for scopes nothing checks, or for
+   * an API key is refused by PutMethod with the reason it refuses it.
    */
   putMethodInput(): SimPutMethodCommandInput {
     return {
@@ -130,6 +129,11 @@ export class SimCfnRestApiMethodProperties {
         this.resource,
         this.properties["AuthorizerId"],
         "AuthorizerId",
+      ),
+      authorizationScopes: this.propertyParser.optionalStringList(
+        this.resource,
+        this.properties["AuthorizationScopes"],
+        "AuthorizationScopes",
       ),
       apiKeyRequired: this.propertyParser.optionalBoolean(
         this.resource,

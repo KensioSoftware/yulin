@@ -6,7 +6,7 @@ import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { declaredMethods } from "./sim-rest-api-declared-method.js";
 import {
-  simRestApiProxyAuthorizer,
+  simRestApiProxyAuthorization,
   type SimRestApiProxyAuthorizerInput,
 } from "./sim-rest-api-proxy-authorizer.js";
 import {
@@ -24,11 +24,6 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
   /** The function code every method of the API hands its requests to. */
   readonly handler: (event: SimPayload1Event) => unknown;
   readonly disableExecuteApiEndpoint: boolean;
-  /**
-   * Whether every method is authorized by IAM, which is what an `AWS_IAM`
-   * method asks for. An API asking for this names no authorizer.
-   */
-  readonly iamAuthorization: boolean;
   /**
    * The resource paths the API declares, written as templates such as
    * `/orders/{orderId}` or `/{proxy+}`. Each one gets the method below.
@@ -63,7 +58,9 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
  * Supplying an `authorizerHandler` puts a `TOKEN` authorizer in front of every
  * method, invoking a second simulated function of its own. A
  * `requestAuthorizerHandler` puts a `REQUEST` authorizer there instead, and
- * asking for `iamAuthorization` puts every method behind IAM.
+ * `cognitoUserPoolArns` puts a `COGNITO_USER_POOLS` authorizer there, which
+ * invokes nothing and verifies the token itself. Asking for
+ * `iamAuthorization` puts every method behind IAM.
  *
  * ```typescript
  * const restApi = await simRestApiLambdaProxyFactory.make(
@@ -91,6 +88,8 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
     handler: (): unknown => ({ statusCode: 200, body: "hello" }),
     authorizerHandler: undefined,
     requestAuthorizerHandler: undefined,
+    cognitoUserPoolArns: undefined,
+    authorizationScopes: [],
     authorizerIdentitySource: "method.request.header.Authorization",
     authorizerInvokePermission: true,
     disableExecuteApiEndpoint: false,
@@ -117,8 +116,11 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
       rootResourceId: created.rootResourceId,
       httpMethod: input.httpMethod,
       functionArn,
-      authorizerId: await simRestApiProxyAuthorizer(simAws, input, restApiId),
-      iamAuthorization: input.iamAuthorization,
+      authorization: await simRestApiProxyAuthorization(
+        simAws,
+        input,
+        restApiId,
+      ),
     });
 
     if (input.invokePermission) {
