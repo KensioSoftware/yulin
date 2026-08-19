@@ -1,6 +1,6 @@
 {
   "name": "@kensio/yulin",
-  "version": "1.16.3",
+  "version": "1.17.0",
   "description": "AWS system behaviour simulation for isolated unit testing",
   "repository": "https://github.com/KensioSoftware/yulin",
   "homepage": "https://yulinsim.dev/",
