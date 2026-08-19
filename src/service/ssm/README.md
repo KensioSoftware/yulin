@@ -152,7 +152,10 @@ There is no resource policy support, so cross-account access to a parameter cann
   CloudFormation engine reaches through `SimSsm.cfnDynamicReferenceResolver()`. A reference this
   store cannot answer resolves to a stand-in value and is recorded, which is the same best-effort
   answer an unsupported property gets.
-- `{{resolve:ssm-secure:...}}` and the `AWS::SSM::Parameter::Value<String>` template parameter type
-  are still absent.
+- An `AWS::SSM::Parameter::Value<...>` template parameter is read here too.
+  `cfn/parameter/sim-cfn-ssm-parameter-value-reader.ts` holds the reader the CloudFormation engine
+  reaches through `SimSsm.cfnParameterValueReader()`, and a name this store cannot answer gets the
+  same recorded stand-in value a dynamic reference does.
+- `{{resolve:ssm-secure:...}}` is still absent.
 
 The full list is in [docs/services/ssm](../../../docs/services/ssm/).

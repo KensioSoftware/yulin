@@ -1,6 +1,10 @@
-import { isRecord } from "../../../util/type-guard/record.js";
+import { simCfnParameterDefinitions } from "./sim-cfn-parameter-definitions.js";
+import { simCfnParameterInputValues } from "./sim-cfn-parameter-input-values.js";
+import { SimCfnParameterValues } from "./sim-cfn-parameter-values.js";
+import type { SimCfnIgnoredProperty } from "../resource/ignore/sim-cfn-ignored-property.type.js";
 import type {
   SimCfnParameterDefinition,
+  SimCfnParametersContext,
   SimCfnParametersProperties as SimCfnParametersProperties,
   SimCloudFormationParameterInput,
   SimCloudFormationParameterValue,
@@ -14,53 +18,36 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
  * This class keeps the template Parameter definitions and the runtime Parameter
  * values together. Values supplied by command input take precedence, then any
  * missing values are filled from string defaults in the template definitions.
+ *
+ * A Parameter declared as an `AWS::SSM::Parameter::Value<...>` type is given a
+ * parameter name either way, and the value it resolves to is the one simulated
+ * Parameter Store holds under that name.
  */
 export class SimCfnParameters {
-  private readonly definitions = new Map<string, SimCfnParameterDefinition>();
-  private readonly values = new Map<string, SimCloudFormationParameterValue>();
-  private readonly stackName: string | undefined;
+  private readonly definitions: ReadonlyMap<string, SimCfnParameterDefinition>;
+  private readonly values: SimCfnParameterValues;
+  private readonly properties: SimCfnParametersProperties;
 
   constructor(properties: SimCfnParametersProperties = {}) {
-    const { definitions, values = {}, stackName } = properties;
-
-    this.stackName = stackName;
-
-    this.recordDefinitions(definitions);
-    this.recordValues(values);
-    this.recordDefaultValues();
+    this.properties = properties;
+    this.definitions = simCfnParameterDefinitions(properties);
+    this.values = new SimCfnParameterValues({
+      definitions: this.definitions,
+      supplied: properties.values ?? {},
+      store: properties.parameterStore,
+    });
   }
 
   /**
    * Create Parameters from a CloudFormation command-like input object.
-   *
-   * AWS command inputs carry Parameters as an array of key/value objects, while
-   * this wrapper stores values in a map keyed by Parameter name. Incomplete
-   * array entries are ignored because they cannot contribute a usable runtime value.
    */
   static fromInput(
     input: SimCloudFormationParameterInput,
-    properties: Pick<
-      SimCfnParametersProperties,
-      "definitions" | "stackName"
-    > = {},
+    properties: SimCfnParametersContext = {},
   ): SimCfnParameters {
-    const values: SimCloudFormationParameterValues = {};
-
-    const inputParameters = input.Parameters ?? [];
-    for (const parameter of inputParameters) {
-      if (
-        parameter.ParameterKey === undefined ||
-        parameter.ParameterValue === undefined
-      ) {
-        continue;
-      }
-
-      values[parameter.ParameterKey] = parameter.ParameterValue;
-    }
-
     return new SimCfnParameters({
       ...properties,
-      values,
+      values: simCfnParameterInputValues(input),
     });
   }
 
@@ -73,10 +60,7 @@ export class SimCfnParameters {
    */
   static fromValues(
     values: SimCloudFormationParameterValues,
-    properties: Pick<
-      SimCfnParametersProperties,
-      "definitions" | "stackName"
-    > = {},
+    properties: SimCfnParametersContext = {},
   ): SimCfnParameters {
     return new SimCfnParameters({
       ...properties,
@@ -95,11 +79,7 @@ export class SimCfnParameters {
   withDefinitions(
     definitions: Record<string, SimCfnParameterDefinition> | undefined,
   ): SimCfnParameters {
-    return new SimCfnParameters({
-      definitions,
-      values: Object.fromEntries(this.values),
-      stackName: this.stackName,
-    });
+    return new SimCfnParameters({ ...this.properties, definitions });
   }
 
   /**
@@ -115,62 +95,29 @@ export class SimCfnParameters {
   /**
    * Resolve the runtime value for a declared or referenced Parameter.
    *
-   * The returned value may have come from command input or from a string
-   * Default in the template definition. Missing values are treated as
-   * template/runtime errors because a Ref to a Parameter must resolve to a
-   * concrete value.
+   * The returned value may have come from command input, from a string Default
+   * in the template definition, or from simulated Parameter Store. Missing
+   * values are treated as template/runtime errors because a Ref to a Parameter
+   * must resolve to a concrete value.
    */
   value(parameterName: string): SimCloudFormationParameterValue {
     const value = this.values.get(parameterName);
     assertDefined(
       value,
-      `Sim CloudFormation Stack ${this.stackNameLabel()} parameter ${parameterName} is missing a value`,
+      `Sim CloudFormation Stack ${this.properties.stackName ?? "unknown"} parameter ${parameterName} is missing a value`,
     );
 
     return value;
   }
 
-  private recordDefinitions(
-    definitions: Record<string, SimCfnParameterDefinition> | undefined,
-  ): void {
-    if (definitions === undefined) {
-      return;
-    }
-
-    for (const [parameterName, parameterDefinition] of Object.entries(
-      definitions,
-    )) {
-      if (!isRecord(parameterDefinition)) {
-        throw new Error(
-          `Sim CloudFormation Stack ${this.stackNameLabel()} parameter ${parameterName} definition must be an object`,
-        );
-      }
-
-      this.definitions.set(parameterName, parameterDefinition);
-    }
-  }
-
-  private recordValues(values: SimCloudFormationParameterValues): void {
-    for (const [parameterName, parameterValue] of Object.entries(values)) {
-      this.values.set(parameterName, parameterValue);
-    }
-  }
-
-  private recordDefaultValues(): void {
-    for (const [parameterName, parameterDefinition] of this.definitions) {
-      if (this.values.has(parameterName)) {
-        continue;
-      }
-
-      const defaultValue = parameterDefinition.Default;
-
-      if (typeof defaultValue === "string") {
-        this.values.set(parameterName, defaultValue);
-      }
-    }
-  }
-
-  private stackNameLabel(): string {
-    return this.stackName ?? "unknown";
+  /**
+   * Every Parameter that resolved to a stand-in value, and why.
+   *
+   * A Stack reports these alongside the properties its Resources were created
+   * without, since a Parameter holding a stand-in leaves every Resource that
+   * reads it configured with a value the template never asked for.
+   */
+  public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
+    return this.values.ignoredProperties;
   }
 }

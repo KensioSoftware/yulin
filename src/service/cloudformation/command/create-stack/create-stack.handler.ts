@@ -20,6 +20,7 @@ import {
   SimCfnTemplate,
 } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
+import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
@@ -97,13 +98,19 @@ export class CreateStackCommandHandler implements CommandHandler<
       );
     }
 
+    const parameters = SimCfnParameters.fromInput(command.input, {
+      stackName,
+      parameterStore: makeSimCfnParameterStore({
+        simAws: this.simAws,
+        accountRegionScope: this.accountRegionScope,
+      }),
+    });
+
     const template = SimCfnTemplate.fromJson(
       command.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
       {
         stackName,
-        parameters: SimCfnParameters.fromInput(command.input, {
-          stackName,
-        }),
+        parameters,
         accountRegionScope: this.accountRegionScope,
         exports: this.exports,
       },

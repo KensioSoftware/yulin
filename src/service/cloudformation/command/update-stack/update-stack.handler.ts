@@ -5,6 +5,7 @@ import type {
   BackgroundScheduler,
 } from "../../../../util/background/background.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
+import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type {
@@ -16,6 +17,7 @@ import {
   SimCfnTemplate,
 } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
+import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 import type {
@@ -24,6 +26,7 @@ import type {
 } from "./update-stack.command.js";
 
 interface UpdateStackCommandHandlerProperties {
+  readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
@@ -47,6 +50,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
   SimUpdateStackCommand,
   SimUpdateStackCommandOutput
 > {
+  private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
@@ -54,6 +58,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: UpdateStackCommandHandlerProperties) {
+    this.simAws = properties.simAws;
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
@@ -96,12 +101,20 @@ export class UpdateStackCommandHandler implements CommandHandler<
       );
     }
 
+    const parameters = SimCfnParameters.fromInput(command.input, {
+      stackName,
+      parameterStore: makeSimCfnParameterStore({
+        simAws: this.simAws,
+        accountRegionScope: this.accountRegionScope,
+      }),
+    });
+
     await stack.update(
       SimCfnTemplate.fromJson(
         command.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
         {
           stackName,
-          parameters: SimCfnParameters.fromInput(command.input, { stackName }),
+          parameters,
           accountRegionScope: this.accountRegionScope,
           exports: this.exports,
         },
