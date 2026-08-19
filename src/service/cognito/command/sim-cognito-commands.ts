@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimCognitoUserPoolClientFactory } from "../user-pool/client/sim-cognito-user-pool-client-factory.js";
 import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-factory.js";
+import { SimCognitoRegistrations } from "../user-pool/sim-cognito-registrations.js";
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
 import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-messenger.js";
@@ -70,6 +71,12 @@ export class SimCognitoCommands {
   public readonly identityProviders: SimCognitoIdentityProviderCommands;
   public readonly hosted: SimCognitoHostedCommands;
 
+  /**
+   * The pools and app clients this simulation is told already exist, which no
+   * AWS operation creates.
+   */
+  public readonly registrations: SimCognitoRegistrations;
+
   constructor(properties: SimCognitoCommandsProperties) {
     const { accountRegionScope, iam, clock, pools, domains, triggerFunctions } =
       properties;
@@ -92,21 +99,32 @@ export class SimCognitoCommands {
     // the access token is what says which pool the request is for.
     const tokenUser = new SimCognitoTokenUser({ pools, clock });
 
+    // One factory each serves the create commands and the registrations, so a
+    // pool the simulation is told about is built the same way as one it made.
+    const poolFactory = new SimCognitoUserPoolFactory({
+      accountRegionScope,
+      pools,
+      clock,
+    });
+    const clientFactory = new SimCognitoUserPoolClientFactory({ clock });
+
     this.userPools = new SimCognitoUserPoolCommands({
       pools,
-      poolFactory: new SimCognitoUserPoolFactory({
-        accountRegionScope,
-        pools,
-        clock,
-      }),
+      poolFactory,
       authorizer,
     });
     this.userPoolMfa = new SimCognitoUserPoolMfaCommands({ pools, authorizer });
     this.listUserPools = new SimCognitoListUserPools({ pools, authorizer });
     this.clients = new SimCognitoUserPoolClientCommands({
       pools,
-      clientFactory: new SimCognitoUserPoolClientFactory({ clock }),
+      clientFactory,
       authorizer,
+    });
+    this.registrations = new SimCognitoRegistrations({
+      regionName: accountRegionScope.regionName,
+      pools,
+      poolFactory,
+      clientFactory,
     });
     this.listClients = new SimCognitoListUserPoolClients({ pools, authorizer });
     this.users = new SimCognitoUserCommands({

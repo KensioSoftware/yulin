@@ -17,7 +17,12 @@ import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-reg
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
 import { SimCognitoAppClients } from "./sim-cognito-app-clients.js";
 import type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
+import type { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
+import type {
+  SimCognitoUserPoolClientRegistration,
+  SimCognitoUserPoolRegistration,
+} from "./user-pool/sim-cognito-registration.types.js";
 
 import type { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
 import {
@@ -159,6 +164,38 @@ export class SimCognitoIdentityProvider extends SimCognitoAppClients {
    */
   userPool(userPoolId: string): SimCognitoUserPool {
     return this.pools.require(requireSimCognitoUserPoolId(userPoolId));
+  }
+
+  /**
+   * Register a user pool the simulation is told already exists, under a chosen
+   * pool id.
+   *
+   * `CreateUserPool` allocates its own id, as real Cognito does, and takes
+   * none from you. This is for the pool something else already decided the id
+   * of, such as one a CDK app creates in another stack and names in this one
+   * as a literal string.
+   *
+   * The pool is the same thing a creation would have made. Its ARN, issuer
+   * URL, `iss` claim and `ProviderName` all follow from the id, and it is in
+   * the registry that serves its JWKS and OpenID configuration.
+   */
+  registerUserPool(
+    registration: SimCognitoUserPoolRegistration,
+  ): SimCognitoUserPool {
+    return this.commands.registrations.userPool(registration);
+  }
+
+  /**
+   * Register an app client of a pool, under a chosen client id.
+   *
+   * The pool is named by id and has to exist, whether it was registered or
+   * created. A client id is pinned alongside the pool id it belongs to, which
+   * is why this is here as well as `registerUserPool`.
+   */
+  registerUserPoolClient(
+    registration: SimCognitoUserPoolClientRegistration,
+  ): SimCognitoUserPoolClient {
+    return this.commands.registrations.userPoolClient(registration);
   }
 
   /**

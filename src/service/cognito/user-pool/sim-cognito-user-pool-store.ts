@@ -140,6 +140,27 @@ export class SimCognitoUserPoolStore {
    * from.
    */
   requireClient(clientId: SimCognitoUserPoolClientId): SimCognitoClientInPool {
+    const found = this.findClient(clientId);
+
+    if (found === undefined) {
+      throw new SimCognitoResourceNotFoundException(
+        `App client ${clientId} does not exist.`,
+      );
+    }
+
+    return found;
+  }
+
+  /**
+   * Find an app client by id alone, and the pool holding it.
+   *
+   * This is the same search `requireClient` makes, for a caller that has
+   * something to do with the absence. Registering a client under a chosen id
+   * uses it to keep one client id out of two pools.
+   */
+  findClient(
+    clientId: SimCognitoUserPoolClientId,
+  ): SimCognitoClientInPool | undefined {
     for (const pool of this.all) {
       const client = pool.findClient(clientId);
 
@@ -148,9 +169,7 @@ export class SimCognitoUserPoolStore {
       }
     }
 
-    throw new SimCognitoResourceNotFoundException(
-      `App client ${clientId} does not exist.`,
-    );
+    return undefined;
   }
 
   /**

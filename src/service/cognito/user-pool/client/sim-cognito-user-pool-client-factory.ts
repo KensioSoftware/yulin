@@ -2,7 +2,10 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { makeSimCognitoClientSecret } from "./sim-cognito-client-secret.js";
 import { SimCognitoUserPoolClient } from "./sim-cognito-user-pool-client.js";
-import { makeSimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
+import {
+  makeSimCognitoUserPoolClientId,
+  type SimCognitoUserPoolClientId,
+} from "./sim-cognito-user-pool-client-id.js";
 import type { SimCognitoUserPoolClientSettings } from "./sim-cognito-user-pool-client-settings.js";
 
 interface SimCognitoUserPoolClientFactoryProperties {
@@ -13,6 +16,15 @@ interface SimCognitoMakeUserPoolClientProperties {
   readonly pool: SimCognitoUserPool;
   readonly generateSecret?: boolean | undefined;
   readonly settings: SimCognitoUserPoolClientSettings;
+
+  /**
+   * The id the client takes, where something else already decided it.
+   *
+   * `CreateUserPoolClient` leaves this out and gets an allocated id, as real
+   * Cognito allocates one. A registration passes the id it was given, having
+   * checked that no pool in this simulated Cognito holds it.
+   */
+  readonly id?: SimCognitoUserPoolClientId | undefined;
 }
 
 /**
@@ -38,7 +50,7 @@ export class SimCognitoUserPoolClientFactory {
     const { pool } = properties;
 
     return new SimCognitoUserPoolClient({
-      id: makeSimCognitoUserPoolClientId(pool.clientIds),
+      id: properties.id ?? makeSimCognitoUserPoolClientId(pool.clientIds),
       userPoolId: pool.id,
       secret: this.secretFor(properties.generateSecret),
       settings: properties.settings,

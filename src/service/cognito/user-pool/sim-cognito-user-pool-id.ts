@@ -69,6 +69,32 @@ export function requireSimCognitoUserPoolId(
 }
 
 /**
+ * Read a requested user pool id that has to belong to one Region.
+ *
+ * A pool id carries the Region its pool lives in, and a pool's ARN carries the
+ * Region of the simulated Cognito holding it. Registering a pool under an id
+ * from another Region would name two Regions in one pool, which no real pool
+ * does.
+ */
+export function requireSimCognitoUserPoolIdInRegion(
+  value: string | undefined,
+  regionName: string,
+): SimCognitoUserPoolId {
+  const userPoolId = requireSimCognitoUserPoolId(value);
+  const idRegionName = simCognitoUserPoolRegionName(userPoolId);
+
+  if (idRegionName !== regionName) {
+    throw new SimCognitoInvalidParameterException(
+      `UserPoolId '${userPoolId}' names Region ${idRegionName}, and this ` +
+        `simulated Cognito is ${regionName}. Register the pool on the ` +
+        `simulated Cognito of Region ${idRegionName}.`,
+    );
+  }
+
+  return userPoolId;
+}
+
+/**
  * The Region a pool lives in, which its id names.
  *
  * This is where SDK code and token verifiers get it from too: splitting the id

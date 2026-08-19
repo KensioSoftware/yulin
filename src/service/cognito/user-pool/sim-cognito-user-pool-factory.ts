@@ -3,7 +3,10 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { SimCognitoName } from "./sim-cognito-name.js";
 import { SimCognitoUserPool } from "./sim-cognito-user-pool.js";
 import { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
-import { makeSimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import {
+  makeSimCognitoUserPoolId,
+  type SimCognitoUserPoolId,
+} from "./sim-cognito-user-pool-id.js";
 import {
   SimCognitoUserPoolSettings,
   type SimCognitoUserPoolSettingsInput,
@@ -23,6 +26,15 @@ interface SimCognitoMakeUserPoolProperties {
    * The `CreateUserPool` request the pool's settings are read out of.
    */
   readonly settings: SimCognitoUserPoolSettingsInput;
+
+  /**
+   * The id the pool takes, where something else already decided it.
+   *
+   * `CreateUserPool` leaves this out and gets an allocated id, as real Cognito
+   * allocates one. A registration passes the id it was given, having checked
+   * that it is free and that it names this scope's region.
+   */
+  readonly id?: SimCognitoUserPoolId | undefined;
 }
 
 /**
@@ -47,10 +59,12 @@ export class SimCognitoUserPoolFactory {
    * Make a new pool with no app clients yet.
    */
   make(properties: SimCognitoMakeUserPoolProperties): SimCognitoUserPool {
-    const userPoolId = makeSimCognitoUserPoolId(
-      this.accountRegionScope.regionName,
-      this.pools.ids,
-    );
+    const userPoolId =
+      properties.id ??
+      makeSimCognitoUserPoolId(
+        this.accountRegionScope.regionName,
+        this.pools.ids,
+      );
 
     return new SimCognitoUserPool({
       id: userPoolId,
