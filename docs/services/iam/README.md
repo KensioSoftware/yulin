@@ -798,7 +798,7 @@ Group membership is a gap. A `Groups` entry fails the Resource. An empty list st
 leaves `Groups` out of the template for a User that belongs to no group.
 
 Deleting the Stack deletes the User. Its inline policies and managed policy attachments come off
-first, the way a Role's do, and the User name is free for the same template to deploy again.
+first, as they do for a Role, and the User name is free for the same template to deploy again.
 
 ```typescript sim-iam-cloudformation-user
 /**
@@ -1087,9 +1087,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   fails too
 - Permissions boundaries, session policies, and service control policies are not evaluated
 - Managed Policies have a single version, and the policy version commands are absent
-- A User's policies only come off with the User. `DeleteUserPolicy` and `DetachUserPolicy` are
-  absent, along with `DeleteAccessKey` and `DeleteLoginProfile`. CloudFormation teardown clears a
-  User's policies itself before deleting it
+- `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
+  `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
+  CloudFormation teardown clears a User's policies before deleting it
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
