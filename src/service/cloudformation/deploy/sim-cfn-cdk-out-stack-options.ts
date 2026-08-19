@@ -1,17 +1,37 @@
 import type { SimCdkAssemblyStack } from "../cdk/sim-cdk-assembly-manifest.js";
 import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transform.js";
+
+/**
+ * Adapts one Stack's parsed template, with the Stacks the same call has already
+ * deployed to hand.
+ *
+ * A synthesized template names the real account's resources as literals, and a
+ * simulation allocates its own identifiers for them. The deployed Stacks are
+ * keyed by Stack name, and a value one of them created is reached through
+ * `output(...)` or `getResource(...)`.
+ *
+ * A transform taking the template alone is this type too, since the deployed
+ * Stacks are the second argument.
+ */
+export type SimCfnCdkOutTemplateTransform = (
+  template: CfnTemplateBodyRecord,
+  deployed: ReadonlyMap<string, SimCfnStack>,
+) => CfnTemplateBodyRecord;
 
 /**
  * What one Stack in a cloud assembly is deployed with.
  *
  * These are the per-template options `deployTemplateFile` takes, for the one
- * Stack they are keyed against.
+ * Stack they are keyed against. The transform sees more than that one does,
+ * because a Stack in an assembly has Stacks in front of it.
  */
 export interface SimCfnCdkOutStackOptions {
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
-  readonly transform?: SimCfnTemplateFileTransform | undefined;
+  readonly transform?: SimCfnCdkOutTemplateTransform | undefined;
 }
 
 export type SimCfnCdkOutStackOptionsByName = Record<
@@ -29,6 +49,25 @@ export function cdkOutOptionsFor(
   return (
     optionsByName?.[stack.stackName] ?? optionsByName?.[stack.artifactId] ?? {}
   );
+}
+
+/**
+ * Bind a Stack's transform to the Stacks deployed ahead of it.
+ *
+ * The deployment is copied on the way in, so a transform holding on to the map
+ * keeps the deployment it was handed while the call goes on deploying.
+ */
+export function cdkOutBoundTransform(
+  transform: SimCfnCdkOutTemplateTransform | undefined,
+  deployed: ReadonlyMap<string, SimCfnStack>,
+): SimCfnTemplateFileTransform | undefined {
+  if (transform === undefined) {
+    return undefined;
+  }
+
+  const deployedSoFar = new Map(deployed);
+
+  return (template) => transform(template, deployedSoFar);
 }
 
 /**

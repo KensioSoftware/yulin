@@ -1188,6 +1188,10 @@ console.log(stacks.keys().toArray());
 
 Naming a Stack the assembly lacks fails the call, listing the Stacks it does hold.
 
+The order the Stacks are named in is the order they deploy in. A Stack the manifest says another
+depends on still goes first, whatever order the two are named in, and an assembly deployed whole
+keeps the order its own manifest holds.
+
 ### Bindings and transforms for one Stack
 
 A call naming a directory has no single template to attach bindings to, so `stackOptions` keys them
@@ -1220,6 +1224,59 @@ console.log(stacks.get("ApiStack")?.stackName);
 
 An options key matching no Stack being deployed fails the call, so a renamed Stack takes its
 bindings with it rather than quietly losing them.
+
+### Transforming a Stack with an earlier Stack's values
+
+A `stackOptions` transform is handed the Stacks the same call has already deployed, keyed by Stack
+name. A CDK app that creates a certificate in one Stack and uses it in another passes the ARN across
+as a plain string, and the ARN the synthesized template carries belongs to the real account.
+Simulated ACM issues its own. Reading it back off the Stack that created it keeps both Stacks in one
+`deployCdkOut` call.
+
+```typescript sim-cloudformation-cdk-out-stack-transform
+import { SimAws } from "@kensio/yulin";
+import type { CfnTemplateBodyRecord } from "@kensio/yulin/cloudformation";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+/** The ARN the CDK app pins, because the Stack that issues it is another one. */
+const synthesizedCertificateArn =
+  "arn:aws:acm:us-east-1:111122223333:certificate/11111111-2222-3333-4444-555555555555";
+
+/** Put the ARN simulated ACM issued wherever the synthesized one is named. */
+function withSimulatedCertificate(
+  template: CfnTemplateBodyRecord,
+  certificateArn: string,
+): CfnTemplateBodyRecord {
+  return JSON.parse(
+    JSON.stringify(template).replaceAll(
+      synthesizedCertificateArn,
+      () => certificateArn,
+    ),
+  ) as CfnTemplateBodyRecord;
+}
+
+const stacks = await simAws.cloudFormation().deployCdkOut({
+  directoryPath: "cdk.out",
+  stackNames: ["DnsStack", "SiteStack"],
+  stackOptions: {
+    SiteStack: {
+      transform: (template, deployed): CfnTemplateBodyRecord =>
+        withSimulatedCertificate(
+          template,
+          deployed.get("DnsStack")?.output("SiteCertificateArn") ?? "",
+        ),
+    },
+  },
+});
+
+console.log(stacks.get("SiteStack")?.stackName);
+```
+
+The map holds the Stacks deployed ahead of this one and nothing else. The first Stack to deploy is
+handed an empty one. Naming the Stacks in the order they have to go in is what puts the certificate
+there in time, since two Stacks passing a plain string between them declare no dependency for the
+manifest to carry.
 
 ## Editing a synthesized template before deploying it
 

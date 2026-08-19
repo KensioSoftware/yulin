@@ -1,7 +1,10 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
-import { cdkOutOptionsFor } from "./sim-cfn-cdk-out-stack-options.js";
+import {
+  cdkOutBoundTransform,
+  cdkOutOptionsFor,
+} from "./sim-cfn-cdk-out-stack-options.js";
 import {
   planCdkOutDeployment,
   type SimCfnCdkOutPlan,
@@ -9,7 +12,10 @@ import {
   type SimCloudFormationDeployCdkOutProperties,
 } from "./sim-cfn-cdk-out-plan.js";
 
-export type { SimCfnCdkOutStackOptions } from "./sim-cfn-cdk-out-stack-options.js";
+export type {
+  SimCfnCdkOutStackOptions,
+  SimCfnCdkOutTemplateTransform,
+} from "./sim-cfn-cdk-out-stack-options.js";
 export type { SimCloudFormationDeployCdkOutProperties } from "./sim-cfn-cdk-out-plan.js";
 
 interface SimCfnCdkOutDeployerProperties {
@@ -39,7 +45,7 @@ export class SimCfnCdkOutDeployer {
 
     for (const stack of plan.stacks) {
       // oxlint-disable-next-line no-await-in-loop -- one Stack at a time, since a later one may depend on an earlier one
-      const deployedStack = await this.deployStack(stack, plan);
+      const deployedStack = await this.deployStack(stack, plan, deployed);
 
       deployed.set(stack.stackName, deployedStack);
     }
@@ -50,8 +56,13 @@ export class SimCfnCdkOutDeployer {
   private async deployStack(
     stack: SimCfnCdkOutPlannedStack,
     plan: SimCfnCdkOutPlan,
+    deployed: ReadonlyMap<string, SimCfnStack>,
   ): Promise<SimCfnStack> {
     const { simAws, accountRegionScope } = this.scope;
+    const { transform, ...options } = cdkOutOptionsFor(
+      stack,
+      plan.stackOptions,
+    );
 
     return await simAws
       .accountRegionScope(accountRegionScope.accountId, stack.regionName)
@@ -59,7 +70,8 @@ export class SimCfnCdkOutDeployer {
       .deployTemplateFile({
         templatePath: stack.templatePath,
         stackName: stack.stackName,
-        ...cdkOutOptionsFor(stack, plan.stackOptions),
+        ...options,
+        transform: cdkOutBoundTransform(transform, deployed),
       });
   }
 }

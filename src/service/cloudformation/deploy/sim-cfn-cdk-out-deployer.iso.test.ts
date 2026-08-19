@@ -108,6 +108,79 @@ describe("Deploying a CDK cloud assembly [iso]", () => {
     );
   });
 
+  it("deploys the named Stacks in the order they are named", async () => {
+    // Given an assembly holding two Stacks with no dependency between them.
+    const directory = await simCdkCloudAssemblyFactory.make({
+      stacks: [
+        { artifactId: "SiteStack", regionName: "eu-west-2" },
+        { artifactId: "DnsStack", regionName: "us-east-1" },
+      ],
+    });
+
+    // When they are named the other way round to the manifest.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+    const stacks = await simAws.cloudFormation().deployCdkOut({
+      directoryPath: directory.join("cdk.out"),
+      stackNames: ["DnsStack", "SiteStack"],
+    });
+
+    // Then they deployed in the order they were named.
+    assertArrayEquals(stacks.keys().toArray(), ["DnsStack", "SiteStack"]);
+  });
+
+  it("deploys a depended-on Stack first however the two are named", async () => {
+    // Given an assembly whose manifest says one Stack comes after another.
+    const directory = await simCdkCloudAssemblyFactory.make({
+      stacks: [
+        {
+          artifactId: "ConsumerStack",
+          regionName: "eu-west-2",
+          dependencies: ["ProducerStack"],
+        },
+        { artifactId: "ProducerStack", regionName: "eu-west-2" },
+      ],
+    });
+
+    // When the consumer is named first.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+    const stacks = await simAws.cloudFormation().deployCdkOut({
+      directoryPath: directory.join("cdk.out"),
+      stackNames: ["ConsumerStack", "ProducerStack"],
+    });
+
+    // Then the manifest dependency still went first.
+    assertArrayEquals(stacks.keys().toArray(), [
+      "ProducerStack",
+      "ConsumerStack",
+    ]);
+  });
+
+  it("deploys a Stack once when it is named twice", async () => {
+    // Given an assembly holding a Stack whose name and artifact ID differ.
+    const directory = await simCdkCloudAssemblyFactory.make({
+      stacks: [
+        {
+          artifactId: "SiteStackArtifact",
+          stackName: "SiteStack",
+          regionName: "eu-west-2",
+        },
+      ],
+    });
+
+    // When it is named by both.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+    const stacks = await simAws.cloudFormation().deployCdkOut({
+      directoryPath: directory.join("cdk.out"),
+      stackNames: ["SiteStack", "SiteStackArtifact"],
+    });
+
+    // Then it deployed once.
+    assertArrayEquals(stacks.keys().toArray(), ["SiteStack"]);
+  });
+
   it("deploys an environment-agnostic Stack into the region it is asked in", async () => {
     // Given an assembly whose Stack was synthesized with no `env`.
     const directory = await simCdkCloudAssemblyFactory.make({

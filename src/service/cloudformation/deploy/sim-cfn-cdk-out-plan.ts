@@ -21,6 +21,10 @@ export interface SimCloudFormationDeployCdkOutProperties {
    * Every Stack in the assembly is deployed when this is left out, which is
    * rarely what a test wants of an app that also synthesizes a deployment
    * pipeline.
+   *
+   * The order they are named is the order they deploy in. A Stack the manifest
+   * says another depends on still goes first, whatever order the two are named
+   * in.
    */
   readonly stackNames?: readonly string[] | undefined;
 

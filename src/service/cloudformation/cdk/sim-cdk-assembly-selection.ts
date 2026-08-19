@@ -8,6 +8,10 @@ import type { SimCdkAssemblyStack } from "./sim-cdk-assembly-manifest.js";
  * Stage deploys a Stack whose artifact ID is not what the Stack is called.
  * Naming nothing takes every Stack in the assembly.
  *
+ * The Stacks come back in the order they were named, which is the order they
+ * deploy in wherever the manifest declares no dependency between them. Naming
+ * one twice takes it once, under the first name it was given.
+ *
  * Throws naming the Stacks the assembly does hold, which is what a caller who
  * has just renamed one needs to see.
  */
@@ -22,13 +26,13 @@ export function selectCdkAssemblyStacks(properties: {
     return stacks;
   }
 
-  const selected = new Set(
-    stackNames.map((stackName) =>
-      selectOne({ stacks, stackName, directoryPath }),
+  return [
+    ...new Set(
+      stackNames.map((stackName) =>
+        selectOne({ stacks, stackName, directoryPath }),
+      ),
     ),
-  );
-
-  return stacks.filter((stack) => selected.has(stack));
+  ];
 }
 
 function selectOne(properties: {
