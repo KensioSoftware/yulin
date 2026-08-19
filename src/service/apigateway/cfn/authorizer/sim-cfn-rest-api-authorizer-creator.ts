@@ -13,9 +13,9 @@ interface SimCfnRestApiAuthorizerCreatorProperties {
  * Creates simulated authorizers from AWS::ApiGateway::Authorizer Resources.
  *
  * The authorizer goes through the ordinary CreateAuthorizer command, so a
- * `Type` other than `TOKEN`, a missing `AuthorizerUri` and an `IdentitySource`
- * naming something other than a header are all refused here with the reason
- * the command gives.
+ * `Type` other than `TOKEN` or `REQUEST`, a missing `AuthorizerUri` and an
+ * `IdentitySource` naming somewhere this simulation reads nothing from are all
+ * refused here with the reason the command gives.
  */
 export class SimCfnRestApiAuthorizerCreator {
   private readonly apiGateway: SimApiGateway;

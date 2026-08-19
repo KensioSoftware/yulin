@@ -53,6 +53,26 @@ export class SimApiGatewayUnsimulatedInput {
   }
 
   /**
+   * Refuse an input set to anything but the values this simulation models.
+   */
+  refuseUnlessOneOf(
+    option: string,
+    value: string,
+    simulated: readonly string[],
+    feature: string,
+  ): void {
+    if (simulated.includes(value)) {
+      return;
+    }
+
+    throw new SimApiGatewayBadRequest(
+      `${this.operation} ${option} '${value}' is not simulated: ` +
+        `${feature}. Only ${simulated.map((one) => `'${one}'`).join(" and ")} ` +
+        `are supported.`,
+    );
+  }
+
+  /**
    * Refuse an option this simulation ignores, where it was asked for.
    */
   refuseEnabled(

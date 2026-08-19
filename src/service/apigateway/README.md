@@ -109,6 +109,15 @@ An `AWS_IAM` method asks the IAM of the Account that owns the API about the call
 boundary resolved. The caller travels on with the admission, and `src/serve/payload-1/` describes it
 to the handler under `requestContext.identity`.
 
+A `CUSTOM` method goes to `SimRestApiAuthorizerInvocation`, and the two kinds of Lambda authorizer
+part company at the event and nowhere else. A `TOKEN` authorizer is handed the one value the request
+carried at its identity source, and a `REQUEST` authorizer is handed a copy of the request as a
+payload format 1.0 event. Everything downstream of the answer is shared.
+
+`api/authorizer/identity/` reads the identity source expressions. A REST API writes them as one
+comma-separated string where an HTTP API takes a list, so the splitting lives here and the
+per-expression parsing mirrors `apigatewayv2/api/authorizer/identity/`.
+
 The method ARN is the one part with no HTTP API equivalent worth copying. A REST API authorizer is
 handed the ARN of the request the client made, with the concrete path in it, and the policy it
 answers is evaluated against that same ARN. `SimRestApiExecuteApiArn` builds it, and builds the two

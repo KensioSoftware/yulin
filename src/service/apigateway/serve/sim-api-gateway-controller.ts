@@ -44,11 +44,12 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
   constructor(properties: SimApiGatewayServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimApiGatewayRouter({ simAws });
-    this.methodAuthorizer = new SimRestApiMethodAuthorizer({
-      functions: this.router,
-    });
     // The clock is taken from the router rather than from properties, so a
     // supplied router and the event timestamps belong to the same simulation.
+    this.methodAuthorizer = new SimRestApiMethodAuthorizer({
+      functions: this.router,
+      clock: this.router.simAws,
+    });
     this.integration = new SimRestApiIntegrationInvocation({
       router: this.router,
       clock: this.router.simAws,

@@ -1,25 +1,34 @@
+import { SimRestApiIdentitySources } from "../../api/authorizer/identity/sim-rest-api-identity-sources.js";
 import {
   SimRestApiAuthorizer,
   type SimRestApiAuthorizerId,
+  type SimRestApiAuthorizerType,
 } from "../../api/authorizer/sim-rest-api-authorizer.js";
-import { SimRestApiIdentitySource } from "../../api/authorizer/sim-rest-api-identity-source.js";
 import { SimRestApiLambdaUri } from "../../api/method/sim-rest-api-lambda-uri.js";
 import { SimApiGatewayBadRequest } from "../../error/sim-api-gateway.error.js";
 import type { SimCreateAuthorizerCommandInput } from "./authorizer.command.js";
 
+interface SimRestApiAuthorizerInputProperties {
+  readonly input: SimCreateAuthorizerCommandInput;
+  /** The type the command settled, which decides how the rest is read. */
+  readonly type: SimRestApiAuthorizerType;
+}
+
 /**
- * Reads the inputs a `TOKEN` authorizer is created from.
+ * Reads the inputs a Lambda authorizer is created from.
  *
- * The function and the header are both required by real `CreateAuthorizer` for
- * this type, and neither has a value worth guessing. An authorizer naming no
- * function has nothing to ask, and one naming no header would send an empty
- * token to whatever it did name.
+ * The function and the identity source are both required by real
+ * `CreateAuthorizer` for either type, and neither has a value worth guessing.
+ * An authorizer naming no function has nothing to ask, and one naming nowhere
+ * to look would be invoked for every request including one carrying nothing.
  */
 export class SimRestApiAuthorizerInput {
   private readonly input: SimCreateAuthorizerCommandInput;
+  private readonly type: SimRestApiAuthorizerType;
 
-  constructor(input: SimCreateAuthorizerCommandInput) {
-    this.input = input;
+  constructor(properties: SimRestApiAuthorizerInputProperties) {
+    this.input = properties.input;
+    this.type = properties.type;
   }
 
   /**
@@ -29,8 +38,9 @@ export class SimRestApiAuthorizerInput {
     return new SimRestApiAuthorizer({
       authorizerId,
       name: this.input.name ?? "",
+      type: this.type,
       lambdaUri: this.lambdaUri(),
-      identitySource: SimRestApiIdentitySource.parse(this.identitySource()),
+      identitySources: this.identitySources(),
     });
   }
 
@@ -45,7 +55,7 @@ export class SimRestApiAuthorizerInput {
 
     if (uri === undefined || uri.length === 0) {
       throw new SimApiGatewayBadRequest(
-        "CreateAuthorizer with type TOKEN requires authorizerUri",
+        `CreateAuthorizer with type ${this.type} requires authorizerUri`,
       );
     }
 
@@ -53,19 +63,25 @@ export class SimRestApiAuthorizerInput {
   }
 
   /**
-   * The header carrying the token, which real `CreateAuthorizer` requires for
-   * this type.
+   * Where the authorizer looks for what identifies a caller, which real
+   * `CreateAuthorizer` requires for both simulated types.
+   *
+   * A `TOKEN` authorizer names one header. A `REQUEST` authorizer names as
+   * many headers and query string parameters as it likes, written as one
+   * comma-separated string.
    */
-  private identitySource(): string {
+  private identitySources(): SimRestApiIdentitySources {
     const identitySource = this.input.identitySource;
 
     if (identitySource === undefined || identitySource.length === 0) {
       throw new SimApiGatewayBadRequest(
-        "CreateAuthorizer with type TOKEN requires identitySource, such as " +
-          "method.request.header.Authorization",
+        `CreateAuthorizer with type ${this.type} requires identitySource, ` +
+          `such as method.request.header.Authorization`,
       );
     }
 
-    return identitySource;
+    return this.type === "TOKEN"
+      ? SimRestApiIdentitySources.token(identitySource)
+      : SimRestApiIdentitySources.request(identitySource);
   }
 }

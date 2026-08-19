@@ -61,8 +61,9 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
  * one at a time instead.
  *
  * Supplying an `authorizerHandler` puts a `TOKEN` authorizer in front of every
- * method, invoking a second simulated function of its own, and asking for
- * `iamAuthorization` puts every method behind IAM instead.
+ * method, invoking a second simulated function of its own. A
+ * `requestAuthorizerHandler` puts a `REQUEST` authorizer there instead, and
+ * asking for `iamAuthorization` puts every method behind IAM.
  *
  * ```typescript
  * const restApi = await simRestApiLambdaProxyFactory.make(
@@ -89,6 +90,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
     roleArn: "arn:aws:iam::111111111111:role/OrdersRole",
     handler: (): unknown => ({ statusCode: 200, body: "hello" }),
     authorizerHandler: undefined,
+    requestAuthorizerHandler: undefined,
     authorizerIdentitySource: "method.request.header.Authorization",
     authorizerInvokePermission: true,
     disableExecuteApiEndpoint: false,

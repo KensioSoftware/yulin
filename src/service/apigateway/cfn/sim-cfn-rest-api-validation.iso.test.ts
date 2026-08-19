@@ -197,7 +197,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
   });
 
   it("refuses an authorizer of a kind nothing here invokes", async () => {
-    // Given a template declaring a REQUEST authorizer
+    // Given a template declaring a Cognito authorizer
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -210,7 +210,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
             Properties: {
               RestApiId: { Ref: "Api" },
               Name: "session-cookie",
-              Type: "REQUEST",
+              Type: "COGNITO_USER_POOLS",
             },
           },
         },
@@ -221,7 +221,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
     // authorizer that decides nothing
     assertStringIncludes(
       error.message,
-      "CreateAuthorizer type 'REQUEST' is not simulated",
+      "CreateAuthorizer type 'COGNITO_USER_POOLS' is not simulated",
     );
   });
 });
