@@ -675,9 +675,11 @@ that never mentions IAM keeps working.
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
 `AWS::IAM::ManagedPolicy`, and `AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each
-Role named in `Roles` as an inline policy. That is the shape CDK grants such as
-`bucket.grantRead(fn)` synthesize as a "DefaultPolicy" resource. A `Users` or `Groups` property on
-an `AWS::IAM::Policy` fails the creation outright.
+Role named in `Roles` and each User named in `Users` as an inline policy. That is the shape CDK
+grants such as `bucket.grantRead(fn)` and `bucket.grantRead(user)` synthesize as a "DefaultPolicy"
+resource. Every entry names a Role or a User in the Stack's Account. An entry naming no simulated
+principal fails the resource, and so does a policy naming no principal at all. A `Groups` property
+still fails the resource.
 
 An `AWS::IAM::ManagedPolicy` also carries `Roles`, and attaches itself to each Role it names as it
 is created (the attachment `AttachRolePolicy` records). A name no simulated Role in the Account
@@ -788,6 +790,9 @@ User name and `Fn::GetAtt` supports `Arn` and `UserId`.
 `CreateLoginProfile`. The profile records the password, its creation date and
 `PasswordResetRequired`. Real IAM never reads a password back, and neither does the simulator. A
 test asserting on the password reads the User record from `SimIam.users`.
+
+A separate `AWS::IAM::Policy` naming the User in `Users` puts its document onto the User as another
+inline policy. That is what a CDK grant against a User synthesizes.
 
 Group membership is a gap. A `Groups` entry fails the Resource. An empty list still deploys, and CDK
 leaves `Groups` out of the template for a User that belongs to no group.
