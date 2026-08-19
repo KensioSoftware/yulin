@@ -537,6 +537,82 @@ A completed upload raises `s3:ObjectCreated:CompleteMultipartUpload`. A single-r
 - An upload has no expiry, and nothing abandons one on its own. A lifecycle rule expiring incomplete
   uploads is left out along with the rest of lifecycle configuration.
 
+## Reading part of an Object
+
+`GetObjectCommand` takes a `Range` and answers with the bytes it names. A client downloading a large
+Object asks for its pieces at once and writes each response at the offset it asked for. `aws s3 cp`
+downloads that way above eight megabytes.
+
+```typescript sim-s3-ranged-read
+/**
+ * Reading part of a simulated S3 Object.
+ */
+
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "reports-bucket" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "reports-bucket",
+    Key: "quarter.csv",
+    Body: "region,revenue\neu-west-2,1200\n",
+  }),
+);
+
+const header = await simS3.getObject(
+  new GetObjectCommand({
+    Bucket: "reports-bucket",
+    Key: "quarter.csv",
+    Range: "bytes=0-13",
+  }),
+);
+
+// The first fourteen bytes, which are "region,revenue".
+console.log(header.Body);
+// 14
+console.log(header.ContentLength);
+// "bytes 0-13/30"
+console.log(header.ContentRange);
+```
+
+`ContentLength` counts the bytes being sent, and `ContentRange` says which bytes of the Object they
+are, in the `bytes <start>-<end>/<size>` form real S3 answers with. The `ETag` is the whole Object's.
+A client reading an Object in pieces compares it across them to see whether the Object changed
+underneath it.
+
+Three forms are read:
+
+- `bytes=0-499` takes the first five hundred bytes.
+- `bytes=500-` takes everything from byte 500 to the end.
+- `bytes=-500` takes the last five hundred bytes.
+
+A range running past the end of the Object stops at the last byte, and a client that guessed the
+size gets what there is. A range starting past the end raises `InvalidRange`, under the name and the
+416 status real S3 gives it. A `Range` sim S3 cannot read (several ranges at once, or a unit other
+than bytes) is ignored, and the whole Object comes back under a `200`.
+
+Over a served endpoint, a ranged read answers `206 Partial Content` with a `content-range` header.
+Both the S3 REST endpoint and an endpoint URL a client is pointed at answer the same way. See
+[Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost).
+
+### Limitations
+
+- `Range` on `HeadObject` is left out. A HEAD describes the whole Object however it is asked about,
+  over the SDK and over a served endpoint alike.
+- `If-Range` is left out. A ranged read is answered without comparing the Object against the entity
+  tag or the date the client held.
+- `PartNumber` is left out. A read names the bytes it wants, and the part they were uploaded in is
+  not something it can ask for.
+
 ## Deleting Objects
 
 Use `DeleteObjectCommand` to remove one Object, and `DeleteObjectsCommand` to remove several in one
@@ -2416,6 +2492,8 @@ Sim S3 currently supports:
 - `CreateMultipartUploadCommand`, `UploadPartCommand`, `CompleteMultipartUploadCommand`,
   `AbortMultipartUploadCommand`, `ListMultipartUploadsCommand` and `ListPartsCommand`, so `aws s3 cp`
   and `@aws-sdk/lib-storage` can upload a file of real size
+- `Range` on `GetObjectCommand`, answering with the bytes asked for and `206 Partial Content` over a
+  served endpoint, so `aws s3 cp` downloads a file of real size unchanged
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS

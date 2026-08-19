@@ -136,6 +136,35 @@ describe("Serving the simulated S3 REST API on an endpoint URL", () => {
     assertIdentical(read.ContentType, "text/plain");
   });
 
+  it("reads part of an Object, and says which part it is", async () => {
+    // Given an Object of known bytes on the served endpoint
+    await client.send(new CreateBucketCommand({ Bucket: "ranged" }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: "ranged",
+        Key: "digits",
+        Body: "0123456789",
+      }),
+    );
+
+    // When some of its bytes are asked for, as a client downloading a large
+    // Object in pieces at once asks for each of them
+    const read = await client.send(
+      new GetObjectCommand({
+        Bucket: "ranged",
+        Key: "digits",
+        Range: "bytes=2-5",
+      }),
+    );
+
+    // Then that slice comes back as partial content, described by where in the
+    // Object it is, rather than the whole Object under a 200
+    assertIdentical(read.$metadata.httpStatusCode, 206);
+    assertIdentical(await read.Body?.transformToString(), "2345");
+    assertIdentical(read.ContentLength, 4);
+    assertIdentical(read.ContentRange, "bytes 2-5/10");
+  });
+
   it("lists Objects with their sizes, and filters by prefix", async () => {
     // Given a Bucket holding Objects under two prefixes
     await client.send(new CreateBucketCommand({ Bucket: "listing" }));

@@ -219,3 +219,20 @@ export class SimS3InvalidPartOrder extends SimS3Error {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated S3 InvalidRange error.
+ *
+ * A read whose `Range` names bytes the Object does not hold, which real S3
+ * refuses with `416 Range Not Satisfiable` rather than answering with the
+ * bytes it does hold. A client that asked for a range it cannot have has
+ * misjudged the Object's size, and reading a different slice than the one it
+ * asked for would leave it assembling a file out of the wrong pieces.
+ */
+export class SimS3InvalidRange extends SimS3Error {
+  public override readonly name = "InvalidRange";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 416 });
+  }
+}
