@@ -1122,6 +1122,95 @@ A template path with no file at it is refused with
 `No Sim CloudFormation template file at <path>`, naming the resolved path. A synthesized template
 is build output, and a checkout that has yet to synthesize one meets this on the first run.
 
+## Deploying a whole cloud assembly
+
+`deployCdkOut(...)` deploys the Stacks a `cdk.out` directory holds, each into the region its own
+environment names. The assembly's `manifest.json` is where that comes from, so an app synthesizing
+several Stacks across several regions needs no loop of its own and no region constants beside it.
+
+```typescript sim-cloudformation-cdk-out-assembly
+/**
+ * Deploying every Stack a synthesized CDK cloud assembly holds.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+const stacks = await simAws
+  .cloudFormation()
+  .deployCdkOut(path.join(process.cwd(), "cdk.out"));
+
+const siteStack = stacks.get("SiteStack");
+const dnsStack = stacks.get("DnsStack");
+
+console.log(siteStack?.getResource("SiteBucket")?.simResource);
+console.log(dnsStack?.getResource("SiteRecord")?.simResource);
+```
+
+A Stack synthesized with `env: { region: "us-east-1" }` deploys into simulated us-east-1, whatever
+region the call was made in. A Stack synthesized without `env` takes the region of the scope it was
+asked through, and every Stack takes that scope's Account.
+
+Stacks deploy in an order their manifest dependencies allow, so a Stack that consumes another
+Stack's export goes second. The deployed Stacks come back keyed by name, each one the same
+`SimCfnStack` `deployTemplateFile(...)` answers with.
+
+### Deploying part of an assembly
+
+Most apps synthesize Stacks a test has no use for, a deployment pipeline among them. `stackNames`
+picks the ones to deploy, naming each by Stack name or by CDK artifact ID.
+
+```typescript sim-cloudformation-cdk-out-stack-names
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+const stacks = await simAws.cloudFormation().deployCdkOut({
+  directoryPath: "cdk.out",
+  stackNames: ["SiteStack", "DnsStack"],
+});
+
+console.log(stacks.keys().toArray());
+```
+
+Naming a Stack the assembly lacks fails the call, listing the Stacks it does hold.
+
+### Bindings and transforms for one Stack
+
+A call naming a directory has no single template to attach bindings to, so `stackOptions` keys them
+by Stack. Each entry takes the `bindings`, `parameters` and `transform` that
+`deployTemplateFile(...)` takes for one template.
+
+```typescript sim-cloudformation-cdk-out-stack-options
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+const stacks = await simAws.cloudFormation().deployCdkOut({
+  directoryPath: "cdk.out",
+  stackNames: ["ApiStack"],
+  stackOptions: {
+    ApiStack: {
+      parameters: { Stage: "test" },
+      bindings: [
+        {
+          logicalId: "UploadFunction",
+          handler: (): { statusCode: number } => ({ statusCode: 200 }),
+        },
+      ],
+    },
+  },
+});
+
+console.log(stacks.get("ApiStack")?.stackName);
+```
+
+An options key matching no Stack being deployed fails the call, so a renamed Stack takes its
+bindings with it rather than quietly losing them.
+
 ## Editing a synthesized template before deploying it
 
 Sometimes a synthesized template needs a change before Yulin will deploy it, such as dropping a
