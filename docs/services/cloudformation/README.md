@@ -2083,10 +2083,11 @@ part of an identifier). `AccessLogSettings`, `DefaultRouteSettings`, `RouteSetti
 `StageVariables` and `Tags` go on the stage, and the rest of the API's properties on the API.
 
 A `DefinitionBody` reaches the API as its OpenAPI `Body`, and the routes, integrations and
-authorizers the document declares are created from it. An API declaring its routes as
-`AWS::ApiGatewayV2::Route` resources of their own has them name the API by `ApiId`, with `Ref` on
-the SAM logical ID. An API naming a `DefinitionUri` is recorded as unsupported, because nothing here
-reads a document off disk or out of S3.
+authorizers the document declares are created from it. Routes declared outside the document name the
+API by `ApiId`, with `Ref` on the SAM logical ID. That is how an `HttpApi` event on a function
+reaches an API the template declared, and how an `AWS::ApiGatewayV2::Route` resource of its own
+does. An API naming a `DefinitionUri` is recorded as unsupported, because nothing here reads a
+document off disk or out of S3.
 
 The API is deployed without `Auth` and `Domain`. SAM writes an `Auth` block into the document it
 generates, and deploys a `Domain` as a custom domain name resource, and neither is expanded here.

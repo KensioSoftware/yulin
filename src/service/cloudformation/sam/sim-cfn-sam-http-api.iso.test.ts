@@ -264,4 +264,53 @@ describe("SAM Serverless HttpApi expansion", () => {
     assertUndefined(stack.getResource(samHttpApiTemplateLogicalId));
     assertUndefined(stack.getResource(samHttpApiTemplateStageLogicalId));
   });
+
+  it("serves a function whose HttpApi event names the API by ApiId", async () => {
+    // Given a function routed to the API the template declared, which is how a
+    // SAM template puts a function behind an API of its own
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await deployHttpApi(simAws, {
+      Transform: "AWS::Serverless-2016-10-31",
+      Resources: {
+        Orders: { Type: "AWS::Serverless::HttpApi" },
+        Handler: {
+          Type: "AWS::Serverless::Function",
+          Properties: {
+            Handler: "index.handler",
+            Runtime: "nodejs22.x",
+            InlineCode: `
+exports.handler = async (event) => ({
+  statusCode: 200,
+  headers: { "content-type": "text/plain" },
+  body: event.routeKey + " " + event.requestContext.stage,
+});
+`,
+            Events: {
+              Get: {
+                Type: "HttpApi",
+                Properties: {
+                  ApiId: { Ref: samHttpApiTemplateLogicalId },
+                  Path: "/orders",
+                  Method: "GET",
+                },
+              },
+            },
+          },
+        },
+      },
+      Outputs: {
+        ApiEndpoint: {
+          Value: { "Fn::GetAtt": [samHttpApiTemplateLogicalId, "ApiEndpoint"] },
+        },
+      },
+    });
+
+    // Then the event's route is served from the expanded API's stage
+    const response = await requestApi(simAws, stack, "/orders");
+
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), "GET /orders $default");
+  });
 });
