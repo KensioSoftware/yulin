@@ -141,6 +141,27 @@ Current behaviour:
 
 Listing order follows the map insertion order.
 
+## Registered certificates
+
+`registerSimAcmCertificate` stands up a certificate under an ARN the caller chose, for a template that
+names a certificate some other stack created. This is setup, and it lives outside `command/` for that
+reason. `SimAcm.registerCertificate` is its only entry point, with `SimRoute53.registerHostedZone` as
+the precedent.
+
+Three registrations are refused, all as `InvalidArgsException`. An ARN another certificate holds, a
+string that parses as no ACM certificate ARN, and an ARN outside this ACM's own account and Region.
+That last refusal keeps the two views of a certificate together. `SimAcmRegistry` resolves an ARN
+through the account and Region inside it, and a certificate registered elsewhere would answer commands
+here while every service looking it up missed it.
+
+A registered certificate is `ISSUED` by default and holds no domain validation options. The
+validation flow leaves it alone. `status` overrides the default for a test that wants an expired or
+revoked certificate.
+
+`RequestCertificate` allocates ARNs from the size of the certificate Map, and a registered certificate
+can sit on the sequence number that count reaches. `makeUntakenCertificate` in the command handler
+steps past a taken ARN, keeping an allocation from replacing a registration.
+
 ## CloudFormation support
 
 ACM CloudFormation support lives under `cfn/`.

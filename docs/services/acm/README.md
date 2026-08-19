@@ -556,6 +556,87 @@ await scopedAcm.requestCertificate(
 
 Each `SimAws` instance has its own isolated state. Create a fresh instance per test or share one across related local setup.
 
+## Register a certificate with a chosen ARN
+
+`RequestCertificateCommand` allocates its own certificate ARN, as real ACM does, and takes none from
+you. When something else already decided the ARN, register the certificate as part of your test setup
+instead.
+
+The usual reason is a CDK app that creates its certificate in one stack and uses it in another. The
+ARN crosses between the two as a plain string, and the stack using it carries that ARN into its
+synthesized template. Simulated CloudFront checks the certificate before it creates a Distribution,
+so registering the certificate first lets the template deploy as it is, with no rewriting.
+
+```typescript sim-acm-register-certificate
+/**
+ * Registering a simulated ACM certificate with a chosen certificate ARN.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// The certificate ARN a CDK app carried into the template of the stack using it.
+const certificateArn =
+  "arn:aws:acm:us-east-1:111122223333:certificate/3b82191c-b029-4e5f-a94f-038f98a53ede";
+
+// Register it in the account and region the ARN itself names.
+simAws
+  .account("111122223333")
+  .region("us-east-1")
+  .acm()
+  .registerCertificate({
+    arn: certificateArn,
+    domainName: "example.test",
+    subjectAlternativeNames: ["www.example.test"],
+  });
+
+const stack = await simAws
+  .account("111122223333")
+  .region("us-east-1")
+  .cloudFormation()
+  .deployTemplate({
+    stackName: "site-stack",
+    template: {
+      Resources: {
+        SiteDistribution: {
+          Type: "AWS::CloudFront::Distribution",
+          Properties: {
+            DistributionConfig: {
+              CallerReference: "site-distribution",
+              Enabled: true,
+              Aliases: ["www.example.test"],
+              DefaultCacheBehavior: {
+                TargetOriginId: "origin",
+                ViewerProtocolPolicy: "redirect-to-https",
+              },
+              ViewerCertificate: {
+                AcmCertificateArn: certificateArn,
+                SslSupportMethod: "sni-only",
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+await stack.waitForDeployComplete();
+
+console.log(stack.getResource("SiteDistribution")?.status);
+```
+
+A registered certificate behaves like any other. It answers `DescribeCertificateCommand`, appears in
+`ListCertificatesCommand` under an `ISSUED` status filter, and satisfies the certificate lookups
+simulated CloudFront and ELBv2 make. It is `ISSUED` from the moment it is registered, since the
+simulation was told it already exists, and it carries no DNS validation records.
+
+Pass `status` to register a certificate in some other state, such as `EXPIRED`, to see what a
+Distribution does with it. An ARN that another certificate already holds is refused with
+`InvalidArgsException`, as is a string that is no ACM certificate ARN. So is an ARN naming an account
+or region other than the ACM's own, since other services find a certificate through the account and
+region inside its ARN.
+
 ## Create a certificate with CloudFormation
 
 Simulated CloudFormation can create ACM certificates from `AWS::CertificateManager::Certificate`.
@@ -721,6 +802,7 @@ Simulated ACM supports:
 - Subject alternative names
 - Certificate tags, up to the ACM limit of 50
 - Deterministic certificate ARNs scoped to account and region
+- Certificates registered under a caller-chosen ARN, for a template naming one another stack created
 - Deterministic DNS validation CNAME records
 - Background certificate issuance from `PENDING_VALIDATION` to `ISSUED`
 - Per-domain validation status for multi-domain certificates
