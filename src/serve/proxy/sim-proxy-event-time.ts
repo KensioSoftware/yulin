@@ -20,13 +20,15 @@ function twoDigits(value: number): string {
 }
 
 /**
- * Format the time payload format 2.0 carries in requestContext.time.
+ * Format the time a proxy integration event carries.
  *
  * This is the Common Log Format stamp real events use, such as
- * `12/Mar/2020:19:03:58 +0000`, always in UTC. The event's timeEpoch field is
- * the same instant in milliseconds, for handlers that want to compute with it.
+ * `12/Mar/2020:19:03:58 +0000`, always in UTC. Payload format 2.0 puts it in
+ * `requestContext.time` and format 1.0 in `requestContext.requestTime`, and
+ * both carry the same instant in milliseconds beside it for handlers that want
+ * to compute with it.
  */
-export function simPayload2EventTime(at: Date): string {
+export function simProxyEventTime(at: Date): string {
   const month = months[at.getUTCMonth()];
   assertDefined(month, `Month name for ${at.toISOString()}`);
 

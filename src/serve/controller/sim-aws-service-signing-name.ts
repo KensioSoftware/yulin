@@ -27,9 +27,10 @@ export function simAwsServiceSigningName(
     case "cognitoIdentityProvider": {
       return "cognito-idp";
     }
-    case "apiGatewayV2": {
-      // The generated API endpoint signs as execute-api, not as the
-      // apigateway control plane that created the API.
+    case "executeApi": {
+      // Both API kinds are issued a generated endpoint under this one host,
+      // and it signs as execute-api rather than as the apigateway control
+      // plane that created the API.
       return "execute-api";
     }
     case "elbV2": {

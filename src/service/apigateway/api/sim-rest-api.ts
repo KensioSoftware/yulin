@@ -4,6 +4,12 @@ import { SimRestApiResourceStore } from "./resource/sim-rest-api-resource-store.
 import type { SimRestApiResource } from "./resource/sim-rest-api-resource.js";
 import { SimApiGatewayNotFound } from "../error/sim-api-gateway.error.js";
 import { SimRestApiStageStore } from "./stage/sim-rest-api-stage-store.js";
+import {
+  type SimRestApiMatch,
+  SimRestApiMatcher,
+  type SimRestApiMiss,
+} from "./match/sim-rest-api-match.js";
+import type { SimRestApiRequest } from "./match/sim-rest-api-request.js";
 import { simRestApiHost } from "./sim-rest-api-host.js";
 import type { SimRestApiId } from "./sim-rest-api-id.js";
 import { simRestApiView, type SimRestApiView } from "./sim-rest-api-view.js";
@@ -43,6 +49,8 @@ export class SimRestApi {
   public readonly deployments = new SimRestApiDeploymentStore();
   public readonly stages = new SimRestApiStageStore();
 
+  private readonly matcher = new SimRestApiMatcher();
+
   constructor(properties: SimRestApiProperties) {
     this.apiId = properties.apiId;
     this.name = properties.name;
@@ -79,6 +87,13 @@ export class SimRestApi {
    */
   invokeUrl(stageName: string): string {
     return `https://${this.hostname}/${stageName}`;
+  }
+
+  /**
+   * Find what should handle one request to this API, or why nothing does.
+   */
+  match(request: SimRestApiRequest): SimRestApiMatch | SimRestApiMiss {
+    return this.matcher.match(this, request);
   }
 
   /**

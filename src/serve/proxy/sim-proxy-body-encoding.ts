@@ -7,12 +7,13 @@ const textContentTypes: ReadonlySet<string> = new Set([
 
 /**
  * Decides how a request or response body crosses the boundary between HTTP
- * bytes and the string a payload format 2.0 event carries.
+ * bytes and the string a Lambda proxy integration event carries.
  *
  * Real AWS passes text bodies through as UTF-8 strings and base64-encodes
  * everything else, telling the handler which happened with isBase64Encoded.
+ * Both payload formats do it the same way, so both read the rules from here.
  */
-export class SimPayload2BodyEncoding {
+export class SimProxyBodyEncoding {
   /**
    * Whether a content type's body is passed to the handler as text.
    *

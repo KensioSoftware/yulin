@@ -3,7 +3,7 @@ import {
   simAwsProxiedSourceIp,
   simAwsProxiedTraceId,
 } from "../http/sim-aws-proxied-connection.js";
-import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
+import { SimProxyBodyEncoding } from "../proxy/sim-proxy-body-encoding.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
 import type { SimPayload2Event } from "./sim-payload-2-event.type.js";
 import {
@@ -37,7 +37,7 @@ interface SimPayload2EventBuilderProperties {
  * is always present, as an empty string when there was no query.
  */
 export class SimPayload2EventBuilder {
-  private readonly bodyEncoding = new SimPayload2BodyEncoding();
+  private readonly bodyEncoding = new SimProxyBodyEncoding();
   private readonly requestParts = new SimPayload2RequestParts();
   private readonly requestContext = new SimPayload2RequestContextBuilder();
   private readonly clock: SimClock;

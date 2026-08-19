@@ -8,7 +8,7 @@ import type {
   SimPayload2LambdaAuthorizer,
   SimPayload2RequestContext,
 } from "./sim-payload-2-event.type.js";
-import { simPayload2EventTime } from "./sim-payload-2-event-time.js";
+import { simProxyEventTime } from "../proxy/sim-proxy-event-time.js";
 import {
   simPayload2AnonymousAccountId,
   SimPayload2IamCaller,
@@ -75,7 +75,7 @@ export class SimPayload2RequestContextBuilder {
       requestId: randomUUID(),
       routeKey: endpoint.routeKey,
       stage: endpoint.stage,
-      time: simPayload2EventTime(at),
+      time: simProxyEventTime(at),
       timeEpoch: at.getTime(),
     };
 

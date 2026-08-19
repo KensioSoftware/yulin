@@ -63,7 +63,7 @@ export class SimElbV2Router {
 
   constructor(properties: SimElbV2RouterProperties) {
     this.simAws = properties.simAws;
-    this.registry = this.simAws.serviceFactory.elbV2Registry;
+    this.registry = this.simAws.serviceFactory.registries.elbV2;
   }
 
   /**

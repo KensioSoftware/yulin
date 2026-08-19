@@ -1,4 +1,4 @@
-import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
+import { SimProxyBodyEncoding } from "../proxy/sim-proxy-body-encoding.js";
 import type {
   SimPayload2Result,
   SimPayload2StructuredResult,
@@ -19,7 +19,7 @@ const jsonContentType = "application/json";
  * AWS.
  */
 export class SimPayload2ResponseBuilder {
-  private readonly bodyEncoding = new SimPayload2BodyEncoding();
+  private readonly bodyEncoding = new SimProxyBodyEncoding();
 
   /**
    * Build the HTTP response for one handler result.

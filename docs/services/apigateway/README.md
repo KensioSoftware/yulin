@@ -9,9 +9,8 @@ This is the v1 service. HTTP APIs are v2, on a separate SDK client, and they are
 [API Gateway HTTP APIs](../apigatewayv2/). The two hold separate state. A REST API created here
 stays out of `simAws.apiGatewayV2()`.
 
-What this covers is building an API and reading it back. That is enough for a test asserting on the
-shape of the API a CDK or SAM stack produces. Serving a request through one is a separate piece of
-work, still to come.
+A handler behind a REST API can be tested against a real HTTP request, with no hand-built event to
+keep in step.
 
 ## Creating a REST API
 
@@ -255,10 +254,108 @@ reaches no client until another deployment is created. Here a stage serves the A
 resources. A test that edits a method sees the change straight away, with no redeployment in
 between. That is the one place this departs from AWS.
 
+## Serving a request
+
+A request to the stage's invoke URL walks the resource tree to a method and invokes that method's
+integration, and the handler's response becomes the HTTP response.
+
+```typescript sim-apigateway-serve
+/**
+ * Serving a request through a REST API to its Lambda proxy integration.
+ *
+ * The handler reads the payload format 1.0 event a REST API sends, which is
+ * the older of the two formats and the only one a REST API uses.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders/{orderId}"],
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "text/plain" },
+      body: `order ${event.pathParameters?.["orderId"] ?? "none"}`,
+    }),
+  },
+  simAws,
+);
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(
+  srv.localUrl(`${restApi.invokeUrl("prod")}/orders/6`),
+);
+
+console.log(response.status);
+// 200
+
+console.log(await response.text());
+// "order 6"
+
+await srv.close();
+```
+
+`simRestApiLambdaProxyFactory` builds the function, the resources, the method, the integration, the
+invoke permission and the deployment in one call. A test about serving wants all of them and is
+about none of them. A test about the commands themselves sends them one at a time.
+
+### The event a handler receives
+
+A REST API sends payload format 1.0. It carries both a single-value and a multi-value map for the
+headers and the query string, and it sends `null` for an empty map where format 2.0 omits the field:
+
+| Field                                                      | Empty case |
+| ---------------------------------------------------------- | ---------- |
+| `queryStringParameters`, `multiValueQueryStringParameters` | `null`     |
+| `pathParameters`, `stageVariables`                         | `null`     |
+| `body`                                                     | `null`     |
+
+`resource` is the template the path matched, such as `/orders/{orderId}`, and `path` is the path the
+client asked for, stage segment and all. A handler behind a `{proxy+}` reads `resource` to tell which
+template caught its request.
+
+Each format's handler reads the other format's event wrongly. One function behind both an HTTP API
+and a REST API therefore has to pick a side.
+
+### The response a handler returns
+
+A REST API proxy integration takes one shape. A result carrying a numeric `statusCode` becomes the
+response, and `multiValueHeaders` sends a header more than once. Anything else is a 502 with
+`Internal server error`. That is what real API Gateway answers when it cannot read the integration
+response. Payload format 2.0 is the lenient one, wrapping an unrecognised value in a 200, and a
+handler relying on that behaves differently here for the same reason it does on AWS.
+
+### Answers when the request matches nothing
+
+| Case                                          | Answer                             |
+| --------------------------------------------- | ---------------------------------- |
+| A stage the API does not serve                | 403 `Forbidden`                    |
+| A path or method the stage has no entry for   | 403 `Missing Authentication Token` |
+| The generated endpoint switched off           | 403 `Forbidden`                    |
+| No integration, no function, or no permission | 502 `Internal server error`        |
+| The handler threw                             | 502 `Internal server error`        |
+
+`Missing Authentication Token` is the wording real API Gateway is well known for. It answers a path
+that matched nothing just as much as one that needed credentials.
+
+### The invoke permission
+
+A method's integration runs once the function's resource policy allows
+`apigateway.amazonaws.com` to invoke it, exactly as on AWS. The method the request matched is
+supplied as `AWS:SourceArn`, in the form
+`arn:aws:execute-api:{region}:{account}:{apiId}/{stage}/{METHOD}/{resourcePath}`. A permission
+granted for one method therefore leaves the others closed. CDK wildcards the stage, method and path segments,
+which admits every method of the API.
+
 ## Intercepting an SDK client
 
 `SimSdk` routes `@aws-sdk/client-api-gateway` commands to the simulation. Code under test builds its
-own client and reaches simulated API Gateway through it, with nothing handed in.
+own client and reaches simulated API Gateway through it.
 
 ```typescript sim-apigateway-sdk-interception
 /**
@@ -328,7 +425,9 @@ and behave differently deployed. The refusals worth knowing about:
 
 ## Limitations
 
-- Serving a request through a simulated REST API is still to come. An integrated Lambda function is
-  recorded here and never invoked.
 - CloudFormation and CDK deployment of `AWS::ApiGateway::*` resources is still to come.
+- A repeated request header reaches the handler as one joined value in `multiValueHeaders`, because
+  that is the form the platform's `Headers` hands over. Real API Gateway reports each separately.
+- Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
+  A response body is still base64 decoded when the handler says `isBase64Encoded`.
 - WebSocket APIs are outside this and outside the v2 service.
