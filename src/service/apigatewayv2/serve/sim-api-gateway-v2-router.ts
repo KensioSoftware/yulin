@@ -36,7 +36,7 @@ export class SimApiGatewayV2Router {
 
   constructor(properties: SimApiGatewayV2RouterProperties = {}) {
     this.simAws = properties.simAws ?? new SimAws();
-    this.registry = this.simAws.serviceFactory.httpApiRegistry;
+    this.registry = this.simAws.serviceFactory.registries.httpApi;
   }
 
   /**

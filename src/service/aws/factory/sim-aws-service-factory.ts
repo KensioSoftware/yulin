@@ -7,7 +7,6 @@ import type { SimAws } from "../sim-aws.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
 import type { SimApiGateway } from "../../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
-import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import type { SimCloudFormation } from "../../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
@@ -21,7 +20,6 @@ import type { SimRoute53 } from "../../route53/index.js";
 import type { SimS3 } from "../../s3/sim-s3.js";
 import type { SimScheduler } from "../../scheduler/index.js";
 import type { SimElbV2 } from "../../elbv2/index.js";
-import type { SimElbV2Registry } from "../../elbv2/registry/sim-elbv2-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../../kms/index.js";
@@ -101,8 +99,14 @@ export class SimAwsServiceFactory {
 
   /**
    * The registries this simulation's scoped services share between them.
+   *
+   * A serving layer reaching a resource by a name that carries no scope starts
+   * here: an API id in an `execute-api` hostname, a load balancer's DNS name,
+   * the registry host of an image URI. Each of them resolves to the Account
+   * and Region scope holding the resource.
+   * @internal
    */
-  private readonly registries = new SimAwsScopedServiceRegistries();
+  public readonly registries = new SimAwsScopedServiceRegistries();
 
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly accountRegionServices: SimAwsAccountRegionServiceBuilder;
@@ -138,30 +142,6 @@ export class SimAwsServiceFactory {
     this.selfContainedServices = new SimAwsSelfContainedServiceBuilder({
       accountServices: this.accountServices,
     });
-  }
-
-  /**
-   * Shared simulated API Gateway HTTP API registry.
-   *
-   * This maps API ids to the Accounts that own them, so the localhost serving
-   * layer routes a request to the right Account/Region scope from the request
-   * host name alone.
-   * @internal
-   */
-  get httpApiRegistry(): SimHttpApiRegistry {
-    return this.registries.httpApi;
-  }
-
-  /**
-   * Shared simulated ELBv2 registry.
-   *
-   * This maps load balancer DNS names to the Accounts that own them, so a
-   * request reaching a load balancer is routed to the right Account/Region
-   * scope from the host name alone.
-   * @internal
-   */
-  get elbV2Registry(): SimElbV2Registry {
-    return this.registries.elbV2;
   }
 
   /** Create simulated ACM for an Account Region scope. */

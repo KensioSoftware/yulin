@@ -35,6 +35,25 @@ export {
 } from "./api/method/sim-rest-api-integration.js";
 export { SimRestApiLambdaUri } from "./api/method/sim-rest-api-lambda-uri.js";
 export {
+  isSimRestApiMatch,
+  type SimRestApiMatch,
+  SimRestApiMatcher,
+  type SimRestApiMiss,
+} from "./api/match/sim-rest-api-match.js";
+export { SimRestApiRequest } from "./api/match/sim-rest-api-request.js";
+export { SimRestApiExecuteApiArn } from "./api/sim-rest-api-execute-api-arn.js";
+export {
+  simRestApiLambdaProxyFactory,
+  type SimRestApiLambdaProxyInput,
+} from "./api/sim-rest-api-lambda-proxy.factory.js";
+export { SimApiGatewayServiceController } from "./serve/sim-api-gateway-controller.js";
+export { SimApiGatewayRouter } from "./serve/sim-api-gateway-router.js";
+export {
+  simApiGatewayServicePrincipal,
+  SimRestApiIntegrationInvocation,
+} from "./serve/sim-rest-api-integration-invocation.js";
+export type { SimRestApiFunctionTarget } from "./serve/sim-rest-api-function-target.js";
+export {
   makeSimRestApiDeploymentId,
   SimRestApiDeployment,
   type SimRestApiDeploymentId,

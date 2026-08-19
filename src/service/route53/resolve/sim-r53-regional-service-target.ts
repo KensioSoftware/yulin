@@ -105,7 +105,7 @@ export class SimRoute53RegionalServiceTargets {
     }
 
     if (service === executeApiHostLabel) {
-      return "apiGatewayV2";
+      return "executeApi";
     }
 
     return undefined;

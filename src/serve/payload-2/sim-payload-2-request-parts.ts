@@ -1,39 +1,7 @@
-/**
- * What AWS knows about a request it proxied, beyond the request itself.
- */
-export interface SimPayload2ProxiedConnection {
-  /** The AWS-shaped hostname of the endpoint the request reached. */
-  readonly domainName: string;
-  readonly traceId: string;
-  readonly sourceIp: string;
-}
-
-interface SimPayload2ProxiedRequest extends SimPayload2ProxiedConnection {
-  readonly request: Request;
-}
-
-/**
- * The headers AWS sets itself on a request it proxies to a function.
- *
- * These are set rather than merged: AWS terminates the connection itself and
- * rewrites them before the handler sees them, so whatever a client sent under
- * those names does not survive.
- */
-export function simPayload2ProxyHeaders(
-  proxied: SimPayload2ProxiedConnection,
-): Record<string, string> {
-  return {
-    // The endpoint's own hostname, not the localhost one the request arrived
-    // at, because that is the hostname the request named on real AWS.
-    host: proxied.domainName,
-    "x-amzn-trace-id": proxied.traceId,
-    "x-forwarded-for": proxied.sourceIp,
-    // Simulated endpoints are reached over plain localhost HTTP, while a real
-    // one is only reachable over HTTPS, so these describe the AWS endpoint.
-    "x-forwarded-port": "443",
-    "x-forwarded-proto": "https",
-  };
-}
+import {
+  simProxyHeaders,
+  type SimProxiedRequest,
+} from "../proxy/sim-proxy-headers.js";
 
 /**
  * Collect query string parameters, joining repeated keys with commas as
@@ -67,7 +35,7 @@ export class SimPayload2RequestParts {
    * Cookies are left out because they travel in their own event field, and the
    * headers AWS rewrites itself land on top of whatever the client sent.
    */
-  headers(proxied: SimPayload2ProxiedRequest): Record<string, string> {
+  headers(proxied: SimProxiedRequest): Record<string, string> {
     // Fetch API header names are already lowercased, which is the case
     // payload format 2.0 delivers them in, and repeats are already joined.
     const headers = new Map<string, string>();
@@ -78,7 +46,7 @@ export class SimPayload2RequestParts {
 
     return {
       ...Object.fromEntries(headers),
-      ...simPayload2ProxyHeaders(proxied),
+      ...simProxyHeaders(proxied),
     };
   }
 

@@ -2,18 +2,16 @@ import { faker } from "@faker-js/faker";
 import { DynamicFactory, type ItemFactory } from "@kensio/part-factory";
 
 import { simAwsProxiedTraceId } from "../http/sim-aws-proxied-connection.js";
+import { simProxyHeaders } from "../proxy/sim-proxy-headers.js";
 import type { SimPayload2EndpointStyle } from "./sim-payload-2-endpoint-style.js";
-import { simPayload2EventTime } from "./sim-payload-2-event-time.js";
+import { simProxyEventTime } from "../proxy/sim-proxy-event-time.js";
 import {
   type SimPayload2EventRequest,
   simPayload2EventRequest,
 } from "./sim-payload-2-event-request.js";
 import type { SimPayload2Event } from "./sim-payload-2-event.type.js";
 import { simPayload2AnonymousAccountId } from "./sim-payload-2-iam-caller.js";
-import {
-  simPayload2ProxyHeaders,
-  simPayload2QueryStringParameters,
-} from "./sim-payload-2-request-parts.js";
+import { simPayload2QueryStringParameters } from "./sim-payload-2-request-parts.js";
 
 /**
  * Build the factory making the invocation events of one kind of payload format
@@ -58,7 +56,7 @@ function eventHeaders(
   return {
     accept: "*/*",
     "user-agent": request.userAgent,
-    ...simPayload2ProxyHeaders({
+    ...simProxyHeaders({
       domainName: request.domainName,
       traceId: simAwsProxiedTraceId(request.at),
       sourceIp: request.sourceIp,
@@ -86,7 +84,7 @@ function eventRequestContext(
     requestId: faker.string.uuid(),
     routeKey: request.routeKey,
     stage: request.stage,
-    time: simPayload2EventTime(request.at),
+    time: simProxyEventTime(request.at),
     timeEpoch: request.at.getTime(),
   };
 }

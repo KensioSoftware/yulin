@@ -57,8 +57,12 @@ id and nothing else, and `CreateResource` names its parent by id. Each resource 
 full path its place in the tree gives it, which `CreateResource` computes and hands back.
 
 A greedy `{proxy+}` part matches the rest of the request path. A resource carrying one therefore
-takes no children. Walking a request path against this tree belongs to the serving layer, and that
-layer is still to be built.
+takes no children.
+
+`api/match/` walks a request path against this tree. At each segment the children are tried in the
+order real API Gateway resolves them, an exact literal first, then a single-segment `{name}`, then a
+greedy `{name+}`. That order is what makes `/orders/new` reach a literal `new` resource where an
+`{orderId}` sibling would otherwise have caught it.
 
 ## Stages and deployments
 
@@ -74,6 +78,26 @@ into it, and an edit made afterwards reaches no client until another deployment 
 stage serves the API's current resources. A test that edits a method sees the change straight away,
 with no redeployment between the edit and the assertion about it. That is the one place this
 departs from AWS.
+
+## Serving a request
+
+`serve/` answers a request to the generated endpoint:
+
+```text
+SimApiGatewayServiceController   the entry point, and what a miss is answered with
+├── SimApiGatewayRouter          an API id to its scope, an integration URI to its function
+└── SimRestApiIntegrationInvocation   the invoke permission, the event, the response
+```
+
+The event and response shapes live in `src/serve/payload-1/`, beside the payload format 2.0 ones an
+HTTP API and a Lambda Function URL use. The two formats share their body encoding, their proxy
+headers and their time format, which are in `src/serve/proxy/`, and differ in everything else.
+
+Both API kinds are issued endpoints under one hostname shape, and a REST API id looks exactly like
+an HTTP API id. `src/serve/execute-api/` is what tells them apart, by asking which service allocated
+the id. That split is made when the request is routed rather than while the hostname is resolved,
+for the same reason a load balancer's DNS name resolves before anything asks whether a load balancer
+still answers on it.
 
 ## What is refused
 
