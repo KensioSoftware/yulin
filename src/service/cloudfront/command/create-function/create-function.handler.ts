@@ -22,6 +22,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
 import { CreateFunctionKeyValueStoreAssociation } from "./create-function-kvs-association.js";
+import { assertCffCodeWithinSizeLimit } from "./create-function-code-size.js";
 import { SimCloudFrontKeyValueStoreRegistry } from "../../key-value-store/sim-cf-key-value-store-registry.js";
 
 export type SimCloudFrontFunctionMap = Map<
@@ -93,6 +94,11 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     this.authorizer.authorize(command.input.Name, options?.caller);
+
+    assertCffCodeWithinSizeLimit(
+      command.input.Name,
+      command.input.FunctionCode,
+    );
 
     const keyValueStore = this.keyValueStoreAssociation.resolve(
       command.input.Name,
