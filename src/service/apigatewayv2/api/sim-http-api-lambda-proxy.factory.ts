@@ -2,10 +2,10 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 
 import type { SimPayload2Event } from "../../../serve/payload-2/sim-payload-2-event.type.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import { simApiGatewayServicePrincipal } from "../../apigateway/sim-api-gateway-service-principal.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
-import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-invoke-authorizer.js";
 import type { SimHttpApi } from "./sim-http-api.js";
 import {
   simHttpApiProxyAuthorization,
