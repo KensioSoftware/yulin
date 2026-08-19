@@ -2867,6 +2867,78 @@ Cognito allows if the two are longer than that together. Real CloudFormation add
 on the end and this adds none. The name is the same on every deployment of the same template, and a
 test can assert it.
 
+## Registering a pool with a chosen pool id
+
+`CreateUserPoolCommand` allocates its own pool id, as real Cognito does, and takes none from you.
+`CreateUserPoolClientCommand` allocates the app client id the same way. When something else already
+decided either, register the pool and the app client as part of your test setup.
+
+The usual reason is a CDK app whose pool lives in one stack and whose Lambda function lives in
+another, with the two deliberately not joined by a CloudFormation export. Both ids reach the
+synthesized template as literal strings, the pool id in the function's environment and the pool ARN
+in its execution role's policy. Registering the pool and the client first lets that template deploy
+as it is, with no rewriting.
+
+```typescript sim-cognito-register-user-pool
+/**
+ * Registering a simulated Cognito user pool and app client with chosen ids.
+ */
+
+import { DescribeUserPoolClientCommand } from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+
+// The ids the CDK app pins, the stack that creates the pool being another one.
+cognito.registerUserPool({
+  id: "eu-west-2_aBcDeFgHi",
+  name: "myapp-users",
+  settings: { Policies: { PasswordPolicy: { MinimumLength: 12 } } },
+});
+
+cognito.registerUserPoolClient({
+  userPoolId: "eu-west-2_aBcDeFgHi",
+  id: "examplewebclient0000000000",
+  name: "web",
+  settings: { ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"] },
+});
+
+const described = await cognito.describeUserPoolClient(
+  new DescribeUserPoolClientCommand({
+    UserPoolId: "eu-west-2_aBcDeFgHi",
+    ClientId: "examplewebclient0000000000",
+  }),
+);
+
+console.log(described.UserPoolClient?.ClientName);
+```
+
+A registered pool behaves like any other. It answers `DescribeUserPoolCommand` and
+`ListUserPoolsCommand`, holds users, groups and app clients, and serves its JWKS and OpenID
+configuration on localhost. Everything written against a pool id follows from the id it was
+registered under: its ARN, its issuer URL, the `iss` claim of its tokens and its `ProviderName`. A
+policy naming `arn:aws:cognito-idp:eu-west-2:111111111111:userpool/eu-west-2_aBcDeFgHi` authorizes
+the handler that reads the pool, which is what a template carrying the id in two places needs.
+
+`registerUserPool` takes the same optional `settings` as `CreateUserPoolCommand`, and
+`registerUserPoolClient` the same optional `settings` as `CreateUserPoolClientCommand`, with
+`ClientName` given as `name`. A registered app client signs users in through `InitiateAuthCommand`,
+which names no pool and finds one from the client id alone.
+
+Registration is refused rather than allowed to produce a pool no real Cognito matches:
+
+- A pool id another pool holds, whether it was registered or created, gives
+  `UserPoolAlreadyExists`.
+- A client id another pool in the simulation holds gives `UserPoolClientAlreadyExists`. That lookup
+  from a client id to a pool is what `InitiateAuth` makes, and two pools sharing a client id would
+  make it ambiguous.
+- A value that is no pool id or client id gives `InvalidParameterException`.
+- A pool id naming another Region gives `InvalidParameterException`, saying which simulated Cognito
+  to register it on. A pool id carries the Region its pool lives in, and the ARN carries the Region
+  of the simulated Cognito holding it, so crossing the two would name two Regions in one pool.
+
 ## Properties accepted without being simulated
 
 A CDK `UserPool` construct emits six properties on `AWS::Cognito::UserPool` before it has been asked
@@ -3731,6 +3803,8 @@ Sim Cognito currently supports:
   `AWS::Cognito::UserPoolDomain` and `AWS::Cognito::UserPoolIdentityProvider` deployed from a
   CloudFormation template, with the `Ref` and `Fn::GetAtt` values real CloudFormation returns
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
+- `registerUserPool` and `registerUserPoolClient`, which stand a pool and an app client up under
+  chosen ids, for a template that names ids another stack allocated
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, in which an admin-created user stays in `FORCE_CHANGE_PASSWORD`
   until it has a permanent password, a signed-up user stays in `UNCONFIRMED` until it confirms, and

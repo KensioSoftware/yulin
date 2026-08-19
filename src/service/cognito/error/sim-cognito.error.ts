@@ -234,3 +234,33 @@ export class SimCognitoPasswordResetRequiredException extends SimCognitoError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * A user pool registered under an id something else already holds.
+ *
+ * Real Cognito allocates a pool id and has no error for a duplicate, so this
+ * one belongs to the simulator's own registration and never reaches an SDK
+ * caller.
+ */
+export class SimCognitoUserPoolAlreadyExists extends SimCognitoError {
+  public override readonly name = "UserPoolAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
+ * An app client registered under an id another pool in this simulated Cognito
+ * already holds.
+ *
+ * A client id is what `InitiateAuth` finds a pool from, and it names no pool
+ * itself, so two pools sharing one would make that lookup ambiguous.
+ */
+export class SimCognitoUserPoolClientAlreadyExists extends SimCognitoError {
+  public override readonly name = "UserPoolClientAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}

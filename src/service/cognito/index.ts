@@ -3,6 +3,10 @@ export {
   type SimCognitoIdentityProviderRequestOptions,
 } from "./sim-cognito-identity-provider.js";
 export { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
+export type {
+  SimCognitoUserPoolClientRegistration,
+  SimCognitoUserPoolRegistration,
+} from "./user-pool/sim-cognito-registration.types.js";
 export {
   SimCognitoUserPoolArn,
   cognitoUserPoolArnPrefix,
@@ -155,4 +159,6 @@ export {
   SimCognitoUsernameExistsException,
   SimCognitoUserNotConfirmedException,
   SimCognitoUserNotFoundException,
+  SimCognitoUserPoolAlreadyExists,
+  SimCognitoUserPoolClientAlreadyExists,
 } from "./error/sim-cognito.error.js";
