@@ -4,7 +4,10 @@ import type {
 } from "../../../template/value/sim-cfn-template-value.js";
 import { isSamTemplateRecord } from "../../sim-cfn-sam-record.js";
 import { samConditionAttribute } from "../sim-cfn-sam-function-properties.js";
+import { samEventBridgeRuleEventResources } from "./sim-cfn-sam-event-bridge-rule-event.js";
 import { samHttpApiEventResources } from "./sim-cfn-sam-http-api-event.js";
+import { samScheduleEventResources } from "./sim-cfn-sam-schedule-event.js";
+import { samScheduleV2EventResources } from "./sim-cfn-sam-schedule-v2-event.js";
 
 interface SamFunctionEventsProperties {
   /** The logical ID of the SAM function whose events these are. */
@@ -57,7 +60,12 @@ export type SamFunctionEventExpansion = (
  * template deploys a function nothing calls, and the deployment stands.
  */
 const eventExpansions: ReadonlyMap<string, SamFunctionEventExpansion> = new Map(
-  [["HttpApi", samHttpApiEventResources]],
+  [
+    ["EventBridgeRule", samEventBridgeRuleEventResources],
+    ["HttpApi", samHttpApiEventResources],
+    ["Schedule", samScheduleEventResources],
+    ["ScheduleV2", samScheduleV2EventResources],
+  ],
 );
 
 /**
