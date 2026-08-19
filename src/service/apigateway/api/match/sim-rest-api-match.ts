@@ -17,6 +17,15 @@ export interface SimRestApiMatch {
   readonly resource: SimRestApiResource;
   readonly method: SimRestApiMethod;
   readonly pathParameters: Readonly<Record<string, string>>;
+  /**
+   * The request path with the stage segment taken off and no leading
+   * separator, such as `orders/6`. A request to the stage root leaves it
+   * empty.
+   *
+   * This is the path a Lambda authorizer's `methodArn` names, which is the
+   * path the client asked for rather than the resource template it matched.
+   */
+  readonly pathAfterStage: string;
 }
 
 /**
@@ -60,7 +69,7 @@ export class SimRestApiMatcher {
       return "route";
     }
 
-    return this.matched(stage, reached, request) ?? "route";
+    return this.matched(stage, reached, request, segments.join("/")) ?? "route";
   }
 
   /**
@@ -73,12 +82,15 @@ export class SimRestApiMatcher {
     stage: SimRestApiStage,
     reached: SimRestApiResourceMatch,
     request: SimRestApiRequest,
+    pathAfterStage: string,
   ): SimRestApiMatch | undefined {
     const method =
       reached.resource.findMethod(request.method) ??
       reached.resource.findMethod(simRestApiAnyMethod);
 
-    return method === undefined ? undefined : { stage, method, ...reached };
+    return method === undefined
+      ? undefined
+      : { stage, method, pathAfterStage, ...reached };
   }
 }
 

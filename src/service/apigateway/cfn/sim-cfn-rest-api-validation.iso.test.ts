@@ -15,8 +15,28 @@ import {
 import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factory.js";
 
 describe("API Gateway REST API CloudFormation refusals", () => {
-  it("refuses a method asking to be authorized", async () => {
-    // Given a method declaring a Lambda authorizer
+  it("refuses a method asking for an authorization type nothing enforces", async () => {
+    // Given a method behind IAM authorization
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const error = await deployRestApiFailure(
+      simAws,
+      simCfnRestApiTemplateFactory.make({
+        methodProperties: { AuthorizationType: "AWS_IAM" },
+      }),
+    );
+
+    // Then PutMethod refuses it, rather than serving open a method real AWS
+    // would have gated
+    assertStringIncludes(
+      error.message,
+      "PutMethod authorizationType 'AWS_IAM' is not simulated",
+    );
+  });
+
+  it("refuses a CUSTOM method naming no authorizer", async () => {
+    // Given a method gated by an authorizer it does not name
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -27,11 +47,11 @@ describe("API Gateway REST API CloudFormation refusals", () => {
       }),
     );
 
-    // Then PutMethod refuses it, rather than serving open a method real AWS
-    // would have gated
+    // Then PutMethod refuses it, since a method with nothing to ask would
+    // refuse every request for a reason that reads like a signing problem
     assertStringIncludes(
       error.message,
-      "PutMethod authorizationType 'CUSTOM' is not simulated",
+      "PutMethod with authorizationType CUSTOM requires authorizerId",
     );
   });
 
@@ -176,12 +196,12 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
     assertIdentical(account.status, "CREATE_COMPLETE");
   });
 
-  it("records an authorizer as a Resource nothing created", async () => {
-    // Given a template declaring a Lambda authorizer
+  it("refuses an authorizer of a kind nothing here invokes", async () => {
+    // Given a template declaring a REQUEST authorizer
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
-    const stack = await deployRestApi(
+    const error = await deployRestApiFailure(
       simAws,
       simCfnRestApiTemplateFactory.make({
         resources: {
@@ -197,14 +217,11 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
       }),
     );
 
-    // Then the rest of the stack deploys and the authorizer is reported
-    const authorizer = stack.resources.get("Authorizer");
-    assertNonNullable(authorizer);
-    assertTrue(authorizer.skipped);
+    // Then CreateAuthorizer refuses it, rather than leaving a method behind an
+    // authorizer that decides nothing
     assertStringIncludes(
-      authorizer.skippedReason ?? "",
-      "Unsupported sim API Gateway CloudFormation Resource Authorizer, " +
-        "because authorizing a method is not simulated",
+      error.message,
+      "CreateAuthorizer type 'REQUEST' is not simulated",
     );
   });
 });

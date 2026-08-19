@@ -352,6 +352,175 @@ supplied as `AWS:SourceArn`, in the form
 granted for one method therefore leaves the others closed. CDK wildcards the stage, method and path segments,
 which admits every method of the API.
 
+## Authorizing a method
+
+A method is open unless it names an authorizer. `CreateAuthorizerCommand` creates one, and
+`PutMethodCommand` binds it to a method with `authorizationType: "CUSTOM"` and the `authorizerId` the
+API allocated.
+
+A `TOKEN` authorizer reads one header and sends its value to a Lambda function of its own. That
+function answers an IAM policy document, which is evaluated for `execute-api:Invoke` against the ARN
+of the request being made. Whatever `context` it returns reaches the handler.
+
+```typescript sim-apigateway-token-authorizer
+/**
+ * Gating a REST API method with a TOKEN Lambda authorizer.
+ *
+ * The authorizer reads the Authorization header, and the policy it answers is
+ * evaluated against the ARN of the request being made.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders"],
+    authorizerHandler: (event) => ({
+      principalId: "user-6",
+      context: { tenantId: "acme" },
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Action: "execute-api:Invoke",
+            Effect:
+              event.authorizationToken === "Bearer valid" ? "Allow" : "Deny",
+            Resource: event.methodArn,
+          },
+        ],
+      },
+    }),
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(event.requestContext.authorizer),
+    }),
+  },
+  simAws,
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders`);
+
+const admitted = await fetch(url, {
+  headers: { authorization: "Bearer valid" },
+});
+
+console.log(admitted.status);
+// 200
+
+console.log(await admitted.text());
+// '{"tenantId":"acme","principalId":"user-6"}'
+
+const refused = await fetch(url, {
+  headers: { authorization: "Bearer stale" },
+});
+
+console.log(refused.status);
+// 403
+
+const anonymous = await fetch(url);
+
+console.log(anonymous.status);
+// 401
+
+await srv.close();
+```
+
+`simRestApiLambdaProxyFactory` builds the authorizer's function, the authorizer, its invoke
+permission and the methods bound to it when it is given an `authorizerHandler`.
+
+### The event the authorizer receives
+
+A `TOKEN` authorizer sees three fields and no more.
+
+| Field                | What it carries                                                          |
+| -------------------- | ------------------------------------------------------------------------ |
+| `type`               | The literal `TOKEN`                                                      |
+| `authorizationToken` | The value the request carried at the identity source                     |
+| `methodArn`          | `arn:aws:execute-api:{region}:{account}:{apiId}/{stage}/{METHOD}/{path}` |
+
+The `methodArn` names the path the client asked for rather than the resource template it matched. A
+request to `/orders/6` behind an `/orders/{orderId}` resource is named as `GET/orders/6`.
+
+The identity source is one header, written as `method.request.header.Authorization`. An expression
+naming anywhere else is refused by `CreateAuthorizer`, because an authorizer that looks where the
+request never carries anything refuses everyone. That refusal reads like a signing problem when the
+configuration is what went wrong.
+
+### Answering with a policy
+
+A REST API authorizer always answers a policy. An HTTP API authorizer may answer a boolean instead.
+A function written for one is read wrongly by the other.
+
+```json
+{
+  "principalId": "user-6",
+  "context": { "tenantId": "acme" },
+  "policyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Resource": "arn:aws:execute-api:eu-west-2:111111111111:a1b2c3d4e5/prod/GET/orders"
+      }
+    ]
+  }
+}
+```
+
+The document goes to simulated IAM and is evaluated for `execute-api:Invoke` on the `methodArn`. A
+policy naming one method leaves the others unauthorized, and an authorizer wanting to open the whole
+API wildcards the resource the way any IAM policy does.
+
+`principalId` is a name the authorizer chose for the caller. It identifies that caller in the
+authorizer's own logs, and IAM never sees it.
+
+### The context the handler receives
+
+`context` reaches the handler under `requestContext.authorizer`, flattened alongside `principalId`.
+Payload format 2.0 keeps the context in a block of its own, so a handler moved between a REST API and
+an HTTP API reads a different shape.
+
+An open method has no caller to describe, and leaves `requestContext.authorizer` out of the event
+altogether.
+
+### What a refused request gets back
+
+| Case                                                         | Answer                                                                     |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| No value at the identity source                              | 401 `Unauthorized`                                                         |
+| The authorizer returned `{ "errorMessage": "Unauthorized" }` | 401 `Unauthorized`                                                         |
+| A Deny statement matched the method                          | 403 `User is not authorized to access this resource with an explicit deny` |
+| The policy allowed nothing covering the method               | 403 `User is not authorized to access this resource`                       |
+| The authorizer failed, or answered a shape AWS cannot read   | 500 `Internal server error`                                                |
+
+A request carrying nothing at the identity source is refused before the function is invoked. An
+authorizer counting its own invocations never sees one.
+
+The 401 body member is `message` and the 403 one is `Message`. Real API Gateway is inconsistent about
+the two and this follows it.
+
+A function that throws is an authorizer failure, and gets the 500. Real Lambda turns a thrown error
+into a payload carrying `errorMessage`, while simulated Lambda rejects with the error itself.
+Returning the value is the way to ask for a 401.
+
+### The authorizer's invoke permission
+
+The authorizer's function needs a grant of its own, under an ARN naming the authorizer:
+
+```text
+arn:aws:execute-api:{region}:{account}:{apiId}/authorizers/{authorizerId}
+```
+
+That ARN names no stage. A function used both as an integration and as an authorizer needs two
+permissions, as it does on AWS. CDK's `TokenAuthorizer` writes this one.
+
 ## Intercepting an SDK client
 
 `SimSdk` routes `@aws-sdk/client-api-gateway` commands to the simulation. Code under test builds its
@@ -595,9 +764,10 @@ behaves differently to the template. The simulated properties are:
 
 - `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`
 - `Resource`: `RestApiId`, `ParentId`, `PathPart`
-- `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `ApiKeyRequired`,
-  `OperationName`, `Integration`
+- `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `AuthorizerId`,
+  `ApiKeyRequired`, `OperationName`, `Integration`
 - A method's `Integration` block: `Type`, `IntegrationHttpMethod`, `Uri`
+- `Authorizer`: `RestApiId`, `Name`, `Type`, `AuthorizerUri`, `IdentitySource`
 - `Deployment`: `RestApiId`, `Description`, `StageName`
 - `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`
 
@@ -623,12 +793,16 @@ method on the root and another on a `{proxy+}` resource, both in front of one fu
 `AWS::Lambda::Permission` each needs. `restApi.url` and `restApi.urlForPath` resolve to the local
 hostname through `AWS::URLSuffix`.
 
+`TokenAuthorizer` deploys too, with the `AWS::Lambda::Permission` it writes for its own function.
+Give it `resultsCacheTtl: Duration.seconds(0)`, since CDK holds a decision for five minutes by
+default and `AuthorizerResultTtlInSeconds` is one of the recorded properties.
+
 CDK also writes an `AWS::ApiGateway::Account` and a CloudWatch role beside a default `RestApi`.
 Neither is simulated. The `Account` Resource is recorded in
 [`stack.skippedResources`](../cloudformation/README.md#inspecting-stacks-and-resources) and the rest of the
 stack deploys.
 
-`Authorizer`, `ApiKey`, `UsagePlan`, `UsagePlanKey`, `RequestValidator`, `Model`, `DomainName` and
+`ApiKey`, `UsagePlan`, `UsagePlanKey`, `RequestValidator`, `Model`, `DomainName` and
 `BasePathMapping` are recorded there too, each naming the reason. A method under one of them is
 refused by `PutMethod`, because a method that looked gated to the template and answered every
 request here is worse than a failed deployment.
@@ -649,8 +823,11 @@ nothing on real AWS.
 An input outside what this simulates is refused. Dropping it would let a request look applied here
 and behave differently deployed. The refusals worth knowing about:
 
-- **Authorizers.** `authorizationType` other than `NONE` is refused. `TOKEN`, `REQUEST`,
-  `COGNITO_USER_POOLS` and `AWS_IAM` methods are a separate piece of work.
+- **Authorizer kinds.** `TOKEN` is the one simulated. A `REQUEST` or `COGNITO_USER_POOLS`
+  authorizer is refused by `CreateAuthorizer`, and an `AWS_IAM` method by `PutMethod`. Each is a
+  separate piece of work.
+- **Holding an authorizer's decision.** `authorizerResultTtlInSeconds` is refused. The function is
+  invoked once per request reaching the method.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
   `HTTP_PROXY` and the non-proxy `AWS` type each answer a request from somewhere this cannot reach.
 - **API keys and usage plans.** `apiKeyRequired: true` is refused, because a method requiring a key
@@ -665,12 +842,13 @@ and behave differently deployed. The refusals worth knowing about:
 | ------------ | ------------------------------------------------------------------------------ |
 | REST APIs    | `CreateRestApi`, `GetRestApi`, `GetRestApis`, `UpdateRestApi`, `DeleteRestApi` |
 | Resources    | `CreateResource`, `GetResource`, `GetResources`, `DeleteResource`              |
+| Authorizers  | `CreateAuthorizer`, `GetAuthorizer`, `GetAuthorizers`, `DeleteAuthorizer`      |
 | Methods      | `PutMethod`, `GetMethod`, `DeleteMethod`                                       |
 | Integrations | `PutIntegration`, `GetIntegration`                                             |
 | Publishing   | `CreateDeployment`, `CreateStage`, `GetStage`, `GetStages`, `DeleteStage`      |
 
-CloudFormation deploys `AWS::ApiGateway::RestApi`, `Resource`, `Method`, `Deployment` and `Stage`,
-including the template CDK synthesizes from a `RestApi` or a `LambdaRestApi`. See
+CloudFormation deploys `AWS::ApiGateway::RestApi`, `Resource`, `Method`, `Authorizer`, `Deployment`
+and `Stage`, including the template CDK synthesizes from a `RestApi` or a `LambdaRestApi`. See
 [Deploying from CloudFormation and CDK](#deploying-from-cloudformation-and-cdk).
 
 ## Limitations
@@ -680,6 +858,8 @@ including the template CDK synthesizes from a `RestApi` or a `LambdaRestApi`. Se
   `stack.skippedResourceDeletions` and the deployment goes with its API a moment later.
 - A repeated request header reaches the handler as one joined value in `multiValueHeaders`, because
   that is the form the platform's `Headers` hands over. Real API Gateway reports each separately.
+- A Lambda authorizer's `context` reaches the handler as the authorizer returned it. AWS accepts a
+  string, a number or a boolean for each value, and how it renders them is not published.
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
   A response body is still base64 decoded when the handler says `isBase64Encoded`.
 - WebSocket APIs are outside this and outside the v2 service.

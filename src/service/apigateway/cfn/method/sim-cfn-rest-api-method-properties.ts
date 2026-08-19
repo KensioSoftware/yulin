@@ -8,17 +8,18 @@ import { SimCfnRestApiIntegrationProperties } from "./sim-cfn-rest-api-integrati
 /**
  * The AWS::ApiGateway::Method properties this simulation deploys.
  *
- * `AuthorizerId`, `AuthorizationScopes`, `RequestParameters`,
- * `RequestModels`, `RequestValidatorId` and `MethodResponses` are left out, so
- * a template carrying one has it recorded against the Resource. A method
- * asking to be authorized is refused by `AuthorizationType` before any of them
- * matters.
+ * `AuthorizationScopes`, `RequestParameters`, `RequestModels`,
+ * `RequestValidatorId` and `MethodResponses` are left out, so a template
+ * carrying one has it recorded against the Resource. Scopes belong to a
+ * `COGNITO_USER_POOLS` method, which `AuthorizationType` refuses before they
+ * matter.
  */
 const simulatedProperties = [
   "RestApiId",
   "ResourceId",
   "HttpMethod",
   "AuthorizationType",
+  "AuthorizerId",
   "ApiKeyRequired",
   "OperationName",
   "Integration",
@@ -88,9 +89,11 @@ export class SimCfnRestApiMethodProperties {
   /**
    * The PutMethod input this Resource asks for.
    *
-   * `AuthorizationType` and `ApiKeyRequired` are passed through as the
-   * template wrote them, so a method asking for an authorizer or an API key is
-   * refused by PutMethod with the reason it refuses it.
+   * `AuthorizationType`, `AuthorizerId` and `ApiKeyRequired` are passed
+   * through as the template wrote them, so a method asking for an
+   * authorization type this simulation does not enforce, for an authorizer the
+   * API has not got, or for an API key is refused by PutMethod with the reason
+   * it refuses it.
    */
   putMethodInput(): SimPutMethodCommandInput {
     return {
@@ -101,6 +104,11 @@ export class SimCfnRestApiMethodProperties {
         this.resource,
         this.properties["AuthorizationType"],
         "AuthorizationType",
+      ),
+      authorizerId: this.propertyParser.optionalString(
+        this.resource,
+        this.properties["AuthorizerId"],
+        "AuthorizerId",
       ),
       apiKeyRequired: this.propertyParser.optionalBoolean(
         this.resource,

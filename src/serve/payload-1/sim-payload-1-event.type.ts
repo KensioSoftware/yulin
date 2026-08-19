@@ -23,11 +23,29 @@ export interface SimPayload1Identity {
 }
 
 /**
+ * What a Lambda authorizer passed on to the handler.
+ *
+ * `principalId` is the name the authorizer chose for the caller, and every
+ * other member is one the authorizer's own `context` carried. A REST API
+ * flattens the two together, where payload format 2.0 keeps the context in a
+ * block of its own.
+ */
+export interface SimPayload1LambdaAuthorizer {
+  principalId?: string;
+  [contextKey: string]: unknown;
+}
+
+/**
  * What payload format 1.0 says about the request beyond the request itself.
  */
 export interface SimPayload1RequestContext {
   accountId: string;
   apiId: string;
+  /**
+   * What the method's authorizer knows about the caller. It is absent on a
+   * method that authorizes nobody, which is what real API Gateway sends.
+   */
+  authorizer?: SimPayload1LambdaAuthorizer;
   domainName: string;
   domainPrefix: string;
   extendedRequestId: string;

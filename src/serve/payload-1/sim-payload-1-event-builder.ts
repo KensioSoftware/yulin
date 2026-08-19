@@ -5,7 +5,10 @@ import {
 } from "../http/sim-aws-proxied-connection.js";
 import type { SimPayload1Endpoint } from "./sim-payload-1-endpoint.js";
 import type { SimPayload1Event } from "./sim-payload-1-event.type.js";
-import { SimPayload1RequestContextBuilder } from "./sim-payload-1-request-context.js";
+import {
+  type SimPayload1Authorization,
+  SimPayload1RequestContextBuilder,
+} from "./sim-payload-1-request-context.js";
 import { simPayload1Body } from "./sim-payload-1-body.js";
 import {
   orNull,
@@ -41,10 +44,15 @@ export class SimPayload1EventBuilder {
 
   /**
    * Build the invocation event for one request to an endpoint.
+   *
+   * An authorization is supplied only when the method authorized a caller,
+   * which is what makes the authorizer block present for an authorized
+   * invocation and absent for an open one.
    */
   async build(
     request: Request,
     endpoint: SimPayload1Endpoint,
+    authorization?: SimPayload1Authorization,
   ): Promise<SimPayload1Event> {
     const url = new URL(request.url);
     const at = this.clock.now();
@@ -76,6 +84,7 @@ export class SimPayload1EventBuilder {
         endpoint,
         sourceIp: simAwsProxiedSourceIp,
         at,
+        authorization,
       }),
       ...body,
     };

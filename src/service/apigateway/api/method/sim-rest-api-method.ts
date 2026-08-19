@@ -10,17 +10,22 @@ import type {
 export const simRestApiAnyMethod = "ANY";
 
 /**
- * The only authorization type simulated so far. Authorizers are a separate
- * piece of work, and a method asking for one is refused rather than served
- * open, which would let a test pass on a request real AWS would reject.
+ * The authorization types simulated so far.
+ *
+ * `NONE` is an open method, and `CUSTOM` sends the request through the Lambda
+ * authorizer the method names. `COGNITO_USER_POOLS` and `AWS_IAM` are
+ * separate pieces of work, and a method asking for either is refused when it
+ * is created. A method served open where AWS would have gated it lets a test
+ * pass on a request real AWS rejects.
  */
-export type SimRestApiAuthorizationType = "NONE";
+export type SimRestApiAuthorizationType = "NONE" | "CUSTOM";
 
 interface SimRestApiMethodProperties {
   readonly httpMethod: string;
   readonly authorizationType: SimRestApiAuthorizationType;
   readonly apiKeyRequired: boolean;
   readonly operationName?: string | undefined;
+  readonly authorizerId?: string | undefined;
 }
 
 /**
@@ -31,6 +36,7 @@ export interface SimRestApiMethodView {
   authorizationType: SimRestApiAuthorizationType;
   apiKeyRequired: boolean;
   operationName?: string;
+  authorizerId?: string;
   methodIntegration?: SimRestApiIntegrationView;
 }
 
@@ -48,6 +54,12 @@ export class SimRestApiMethod {
   public readonly operationName?: string | undefined;
 
   /**
+   * The authorizer of this API a `CUSTOM` method sends its requests through.
+   * An open method names none.
+   */
+  public readonly authorizerId?: string | undefined;
+
+  /**
    * What this method does with a request. A method with none declared is a
    * method real API Gateway answers 500 for, and it is what `PutMethod`
    * leaves behind until `PutIntegration` follows it.
@@ -59,6 +71,7 @@ export class SimRestApiMethod {
     this.authorizationType = properties.authorizationType;
     this.apiKeyRequired = properties.apiKeyRequired;
     this.operationName = properties.operationName;
+    this.authorizerId = properties.authorizerId;
   }
 
   /**
@@ -73,6 +86,10 @@ export class SimRestApiMethod {
 
     if (this.operationName !== undefined) {
       view.operationName = this.operationName;
+    }
+
+    if (this.authorizerId !== undefined) {
+      view.authorizerId = this.authorizerId;
     }
 
     if (this.integration !== undefined) {

@@ -9,9 +9,11 @@ import {
 } from "../api/match/sim-rest-api-match.js";
 import { SimRestApiRequest } from "../api/match/sim-rest-api-request.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
+import { SimRestApiMethodAuthorizer } from "./auth/sim-rest-api-method-authorizer.js";
 import { SimApiGatewayErrorResponse } from "./sim-api-gateway-error-response.js";
 import { SimApiGatewayRouter } from "./sim-api-gateway-router.js";
 import { SimRestApiIntegrationInvocation } from "./sim-rest-api-integration-invocation.js";
+import { SimRestApiRefusalResponse } from "./sim-rest-api-refusal-response.js";
 
 interface SimApiGatewayServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -26,18 +28,24 @@ interface SimApiGatewayServiceControllerProperties {
  * simulated Lambda function with a payload format 1.0 event. The function runs
  * as its execution Role, as it does for any other invocation.
  *
- * Authorizing a method is a separate piece of work. Every method served here
- * is open, and a method declaring an authorizer is refused when it is created
- * rather than served without one.
+ * A method that authorizes anybody is checked before any of that. Its
+ * authorizer's Lambda function has to allow the request, or the request is
+ * refused and the integration is never invoked. Whether the API may invoke a
+ * function is a separate question, and the API's own rather than the client's.
  */
 export class SimApiGatewayServiceController implements SimAwsServiceController {
   private readonly router: SimApiGatewayRouter;
+  private readonly methodAuthorizer: SimRestApiMethodAuthorizer;
   private readonly integration: SimRestApiIntegrationInvocation;
   private readonly errorResponse = new SimApiGatewayErrorResponse();
+  private readonly refusalResponse = new SimRestApiRefusalResponse();
 
   constructor(properties: SimApiGatewayServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimApiGatewayRouter({ simAws });
+    this.methodAuthorizer = new SimRestApiMethodAuthorizer({
+      functions: this.router,
+    });
     // The clock is taken from the router rather than from properties, so a
     // supplied router and the event timestamps belong to the same simulation.
     this.integration = new SimRestApiIntegrationInvocation({
@@ -83,7 +91,25 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
       return this.missResponse(match);
     }
 
-    return await this.integration.invoke({ restApi, match, request });
+    // The client's own authorization comes first: a request with no
+    // credentials is refused whether or not the integration behind the method
+    // would work.
+    const authorization = await this.methodAuthorizer.authorize({
+      restApi,
+      match,
+      request,
+    });
+
+    if (!authorization.admitted) {
+      return this.refusalResponse.build(authorization);
+    }
+
+    return await this.integration.invoke({
+      restApi,
+      match,
+      request,
+      authorization,
+    });
   }
 
   /**

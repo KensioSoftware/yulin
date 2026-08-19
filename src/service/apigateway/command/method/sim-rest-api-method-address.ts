@@ -1,5 +1,6 @@
 import type { SimRestApiMethod } from "../../api/method/sim-rest-api-method.js";
 import type { SimRestApiResource } from "../../api/resource/sim-rest-api-resource.js";
+import type { SimRestApi } from "../../api/sim-rest-api.js";
 import type { SimApiGatewayRequestOptions } from "../sim-api-gateway-request-options.js";
 import { SimApiGatewayUnsimulatedInput } from "../sim-api-gateway-unsimulated-input.js";
 import type { SimRestApiAccess } from "../sim-rest-api-access.js";
@@ -28,6 +29,7 @@ export interface SimRestApiMethodAddressInput {
  * The resource and HTTP method a command addressed.
  */
 export interface SimRestApiMethodTarget {
+  readonly restApi: SimRestApi;
   readonly resource: SimRestApiResource;
   readonly httpMethod: string;
 }
@@ -84,7 +86,11 @@ export class SimRestApiMethodAddress {
       caller: options?.caller,
     });
 
-    return { resource: restApi.requireResource(resourceId), httpMethod };
+    return {
+      restApi,
+      resource: restApi.requireResource(resourceId),
+      httpMethod,
+    };
   }
 
   /**

@@ -11,6 +11,7 @@ import {
 import { SimRestApiStore } from "./api/sim-rest-api-store.js";
 import { SimRestApiCommands } from "./command/api/sim-rest-api-commands.js";
 import { SimApiGatewayAuthorizer } from "./command/authorize/sim-api-gateway-authorizer.js";
+import { SimRestApiAuthorizerCommands } from "./command/authorizer/sim-rest-api-authorizer-commands.js";
 import { SimRestApiDeploymentCommands } from "./command/deployment/sim-rest-api-deployment-commands.js";
 import { SimRestApiIntegrationCommands } from "./command/integration/sim-rest-api-integration-commands.js";
 import { SimRestApiMethodCommands } from "./command/method/sim-rest-api-method-commands.js";
@@ -41,6 +42,7 @@ export class SimApiGatewayCommands {
   public readonly apis = new SimRestApiStore();
   public readonly api: SimRestApiCommands;
   public readonly resources: SimRestApiResourceCommands;
+  public readonly authorizers: SimRestApiAuthorizerCommands;
   public readonly methods: SimRestApiMethodCommands;
   public readonly integrations: SimRestApiIntegrationCommands;
   public readonly deployments: SimRestApiDeploymentCommands;
@@ -69,6 +71,7 @@ export class SimApiGatewayCommands {
       clock: background,
     });
     this.resources = new SimRestApiResourceCommands({ access });
+    this.authorizers = new SimRestApiAuthorizerCommands({ access });
     this.methods = new SimRestApiMethodCommands({ access });
     this.integrations = new SimRestApiIntegrationCommands({ access });
     this.deployments = new SimRestApiDeploymentCommands({

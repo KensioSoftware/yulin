@@ -26,6 +26,7 @@ SimRestApi
 ├── SimRestApiResourceStore     the path tree, keyed by allocated resource id
 │   └── SimRestApiResource      each node owns its methods, keyed by HTTP method
 │       └── SimRestApiMethod    each method owns its integration
+├── SimRestApiAuthorizerStore   authorizers, keyed by allocated id
 ├── SimRestApiDeploymentStore   deployments, keyed by allocated id
 └── SimRestApiStageStore        stages, keyed by stage name
 ```
@@ -86,8 +87,29 @@ departs from AWS.
 ```text
 SimApiGatewayServiceController   the entry point, and what a miss is answered with
 ├── SimApiGatewayRouter          an API id to its scope, an integration URI to its function
+├── SimRestApiMethodAuthorizer   what the client may have, in serve/auth/
 └── SimRestApiIntegrationInvocation   the invoke permission, the event, the response
 ```
+
+The client's own authorization runs first. A request presenting no credentials is refused whether or
+not the integration behind the method would have worked. Whether the API may invoke a function is a
+separate question, asked afterwards, and it is the API's rather than the client's.
+
+`serve/auth/` holds one authorization type, and the pieces are the ones a `TOKEN` authorizer needs:
+
+```text
+SimRestApiMethodAuthorizer            which type the method asks for
+└── SimRestApiAuthorizerInvocation    the invoke permission, the event, the answer
+    ├── SimRestApiAuthorizerResponse  the principal, the context, the policy
+    └── SimRestApiAuthorizerPolicy    that policy, put to IAM against the method ARN
+```
+
+The method ARN is the one part with no HTTP API equivalent worth copying. A REST API authorizer is
+handed the ARN of the request the client made, with the concrete path in it, and the policy it
+answers is evaluated against that same ARN. `SimRestApiExecuteApiArn` builds it, and builds the two
+other forms beside it. One is the resource template form an integration's invoke permission is
+matched against. The other is the `<apiId>/authorizers/<authorizerId>` form the authorizer's own
+function is invoked under, which names no stage.
 
 The event and response shapes live in `src/serve/payload-1/`, beside the payload format 2.0 ones an
 HTTP API and a Lambda Function URL use. The two formats share their body encoding, their proxy
@@ -112,6 +134,7 @@ SimApiGatewayCfnResourceFactory              which creator answers a Resource ty
 ├── sim-cfn-rest-api-part-deleter.ts         what a teardown deletes an API's parts by
 ├── api/         RestApi
 ├── resource/    Resource
+├── authorizer/  Authorizer
 ├── method/      Method, and the Integration block it carries
 ├── deployment/  Deployment
 └── stage/       Stage
@@ -141,6 +164,12 @@ answers a `Ref` with the logical ID.
 ## What is refused
 
 `command/sim-api-gateway-unsimulated-input.ts` refuses every input outside the accepted set of each
-command. Authorizers, API keys, usage plans, request validators, models, mapping templates and every
-integration type other than `AWS_PROXY` are all refused there, so a request naming one fails here
-and would have been applied on real AWS.
+command. API keys, usage plans, request validators, models, mapping templates and every integration
+type other than `AWS_PROXY` are all refused there, so a request naming one fails here and would have
+been applied on real AWS.
+
+Authorization is refused the same way, in the two commands that carry it.
+`CreateAuthorizer` takes `TOKEN` and refuses the other two kinds, and `PutMethod` takes `NONE` and
+`CUSTOM` and refuses the other two types. A method served open where AWS would have gated it lets a
+test pass on a request real AWS rejects, so a template asking for one of them fails to deploy rather
+than deploying around it.

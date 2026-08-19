@@ -2,6 +2,7 @@ import { SimPayload1EventBuilder } from "../../../serve/payload-1/sim-payload-1-
 import { SimPayload1ResponseBuilder } from "../../../serve/payload-1/sim-payload-1-response-builder.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import { SimLambdaServiceInvokeAuthorizer } from "../../lambda/command/authorize/sim-lambda-service-invoke-authorizer.js";
+import type { SimRestApiAdmitted } from "../api/authorizer/sim-rest-api-authorization.js";
 import type { SimRestApiMatch } from "../api/match/sim-rest-api-match.js";
 import { SimRestApiExecuteApiArn } from "../api/sim-rest-api-execute-api-arn.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
@@ -21,11 +22,17 @@ interface SimRestApiIntegrationInvocationInput {
   readonly restApi: SimRestApi;
   readonly match: SimRestApiMatch;
   readonly request: Request;
+  /** What the method's authorization knows about the caller. */
+  readonly authorization: SimRestApiAdmitted;
 }
 
 /**
  * Invokes the Lambda function behind the matched method's integration, and
  * turns what it returns into the HTTP response.
+ *
+ * Whether the API may invoke the function is asked here, and is the API's own
+ * question rather than the client's. The client's was already answered by the
+ * method's authorization.
  *
  * A method with no integration, one naming a function that is not there, one
  * the API may not invoke, and one whose handler threw are all the same 502 on
@@ -59,6 +66,7 @@ export class SimRestApiIntegrationInvocation {
       const event = await this.eventBuilder.build(
         input.request,
         simRestApiEndpoint(input.restApi, input.match),
+        { lambda: input.authorization.lambda },
       );
       const result = await target.simFunction.invoke(event);
 

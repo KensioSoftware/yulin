@@ -6,6 +6,7 @@ import {
   SimRestApiMethodAddress,
   simRestApiMethodOptions,
 } from "./sim-rest-api-method-address.js";
+import { SimRestApiMethodAuthorizationInput } from "./sim-rest-api-method-authorization.js";
 import type {
   SimDeleteMethodCommand,
   SimDeleteMethodCommandOutput,
@@ -15,16 +16,13 @@ import type {
   SimPutMethodCommandOutput,
 } from "./method.command.js";
 
-const simulatedAuthorizationType = "NONE";
-
 const acceptedPutOptions = [
   ...simRestApiMethodOptions,
   "authorizationType",
+  "authorizerId",
   "apiKeyRequired",
   "operationName",
 ];
-
-const authorizerRefusal = "authorizing a method is not simulated yet";
 
 const apiKeyRefusal =
   "API keys and usage plans are not simulated, and a method requiring one " +
@@ -54,15 +52,6 @@ export class SimRestApiMethodCommands {
     const { input } = command;
     const unsimulated = new SimApiGatewayUnsimulatedInput("PutMethod");
     unsimulated.refuseUnaccepted(input, acceptedPutOptions);
-    // Real PutMethod requires it, and defaulting an absent one to NONE here
-    // would declare an open method for a request AWS rejects outright.
-    unsimulated.require("authorizationType", input.authorizationType);
-    unsimulated.refuseUnless(
-      "authorizationType",
-      input.authorizationType,
-      simulatedAuthorizationType,
-      authorizerRefusal,
-    );
     unsimulated.refuseEnabled(
       "apiKeyRequired",
       input.apiKeyRequired,
@@ -72,9 +61,13 @@ export class SimRestApiMethodCommands {
     const target = this.address.target("PUT", "PutMethod", input, options);
     const method = new SimRestApiMethod({
       httpMethod: target.httpMethod,
-      authorizationType: simulatedAuthorizationType,
       apiKeyRequired: false,
       operationName: input.operationName,
+      ...new SimRestApiMethodAuthorizationInput(input).read(
+        target.restApi,
+        target.resource,
+        target.httpMethod,
+      ),
     });
     target.resource.addMethod(method);
 
