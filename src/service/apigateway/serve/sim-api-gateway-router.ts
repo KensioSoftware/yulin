@@ -2,6 +2,7 @@ import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimRestApiLambdaUri } from "../api/method/sim-rest-api-lambda-uri.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
 import type { SimRestApiRegistry } from "../registry/sim-rest-api-registry.js";
@@ -51,6 +52,18 @@ export class SimApiGatewayRouter {
       .accountRegionScope(accountId, target.regionName)
       .apiGateway()
       .findRestApi(target.resourceName);
+  }
+
+  /**
+   * The IAM that decides an `AWS_IAM` method of one API.
+   *
+   * It is the IAM of the Account that owns the API, which is where the
+   * policies allowing a caller `execute-api:Invoke` on its methods live.
+   */
+  iamFor(restApi: SimRestApi): SimIamInterServiceAuthZ {
+    const { accountId, regionName } = restApi.accountRegionScope;
+
+    return this.simAws.accountRegionScope(accountId, regionName).iam();
   }
 
   /**

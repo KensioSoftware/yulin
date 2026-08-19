@@ -18,12 +18,27 @@ const unsimulatedTypes = new Map([
     "COGNITO_USER_POOLS",
     "verifying a user pool token against a method is not simulated",
   ],
-  [
-    "AWS_IAM",
-    "authorizing a signed request against the caller's identity policy is " +
-      "not simulated for a method",
-  ],
 ]);
+
+/**
+ * The authorization types `PutMethod` takes here, each of which something
+ * enforces when a request reaches the method.
+ */
+const simulatedTypes = new Set<string>(["NONE", "CUSTOM", "AWS_IAM"]);
+
+function isSimulatedType(
+  declared: string,
+): declared is SimRestApiAuthorizationType {
+  return simulatedTypes.has(declared);
+}
+
+/**
+ * An authorization type that decides a request without asking an authorizer.
+ */
+type SimRestApiAuthorizerlessType = Exclude<
+  SimRestApiAuthorizationType,
+  "CUSTOM"
+>;
 
 /**
  * What a method's authorization type and authorizer id come to.
@@ -36,9 +51,10 @@ export interface SimRestApiMethodAuthorization {
 /**
  * Reads the authorization a `PutMethod` input asks for.
  *
- * A method is open or it names one of the API's authorizers. Every other
- * pairing is refused, because a method that looked gated to the caller that
- * declared it and answered every request here is worse than a refused command.
+ * A method is open, decided by IAM, or it names one of the API's authorizers.
+ * Every other pairing is refused, because a method that looked gated to the
+ * caller that declared it and answered every request here is worse than a
+ * refused command.
  */
 export class SimRestApiMethodAuthorizationInput {
   private readonly input: SimPutMethodCommandInput;
@@ -61,16 +77,16 @@ export class SimRestApiMethodAuthorizationInput {
   ): SimRestApiMethodAuthorization {
     const authorizationType = this.authorizationType();
 
-    if (authorizationType === "NONE") {
-      this.refuseAuthorizerId(resource, httpMethod);
-
-      return { authorizationType };
+    if (authorizationType === "CUSTOM") {
+      return {
+        authorizationType,
+        authorizerId: this.authorizerId(restApi, resource, httpMethod),
+      };
     }
 
-    return {
-      authorizationType,
-      authorizerId: this.authorizerId(restApi, resource, httpMethod),
-    };
+    this.refuseAuthorizerId(authorizationType, resource, httpMethod);
+
+    return { authorizationType };
   }
 
   /**
@@ -86,7 +102,7 @@ export class SimRestApiMethodAuthorizationInput {
       throw new SimApiGatewayBadRequest("PutMethod requires authorizationType");
     }
 
-    if (declared === "NONE" || declared === "CUSTOM") {
+    if (isSimulatedType(declared)) {
       return declared;
     }
 
@@ -94,8 +110,8 @@ export class SimRestApiMethodAuthorizationInput {
 
     throw new SimApiGatewayBadRequest(
       `PutMethod authorizationType '${declared}' is not simulated` +
-        `${reason === undefined ? "" : `: ${reason}`}. NONE and CUSTOM are ` +
-        `supported.`,
+        `${reason === undefined ? "" : `: ${reason}`}. NONE, CUSTOM and ` +
+        `AWS_IAM are supported.`,
     );
   }
 
@@ -130,18 +146,28 @@ export class SimRestApiMethodAuthorizationInput {
   }
 
   /**
-   * Refuse an authorizer named by a method that authorizes nobody.
+   * Refuse an authorizer named by a method that has none to name.
+   *
+   * A method whose type takes no authorizer would ignore the id, leaving the
+   * caller that wrote it reading a gate the method has not got.
    */
   private refuseAuthorizerId(
+    authorizationType: SimRestApiAuthorizerlessType,
     resource: SimRestApiResource,
     httpMethod: string,
   ): void {
-    if (this.input.authorizerId !== undefined) {
-      throw new SimApiGatewayBadRequest(
-        `PutMethod authorizerId is set on ${httpMethod} ${resource.path} ` +
-          `with authorizationType NONE, and an open method sends its ` +
-          `requests through nothing`,
-      );
+    if (this.input.authorizerId === undefined) {
+      return;
     }
+
+    const reason =
+      authorizationType === "NONE"
+        ? "an open method sends its requests through nothing"
+        : "an AWS_IAM method is decided by IAM rather than by a function";
+
+    throw new SimApiGatewayBadRequest(
+      `PutMethod authorizerId is set on ${httpMethod} ${resource.path} with ` +
+        `authorizationType ${authorizationType}, and ${reason}`,
+    );
   }
 }

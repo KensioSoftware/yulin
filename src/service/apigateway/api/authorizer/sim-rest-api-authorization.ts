@@ -1,4 +1,5 @@
 import type { SimPayload1LambdaAuthorizer } from "../../../../serve/payload-1/sim-payload-1-event.type.js";
+import type { SimAwsRequestCaller } from "../../../iam/request/sim-aws-request-caller.js";
 
 /**
  * Why a method refused a request, which decides the response it gets.
@@ -21,22 +22,28 @@ interface SimRestApiAdmittedProperties {
    * absent on a method admitting anybody.
    */
   readonly lambda?: SimPayload1LambdaAuthorizer | undefined;
+  /** The principal an `AWS_IAM` method allowed the request. */
+  readonly caller?: SimAwsRequestCaller | undefined;
 }
 
 /**
- * A request the method admitted, and what its authorizer knows about the
+ * A request the method admitted, and what its authorization knows about the
  * caller.
  *
- * `lambda` is absent on a method that authorizes nobody, since there is no
- * caller to describe. That absence is what leaves `requestContext.authorizer`
- * out of the event entirely.
+ * Both members are absent on a method that authorizes nobody, since there is
+ * no caller to describe. That is what leaves `requestContext.authorizer` out of
+ * the event entirely and every `requestContext.identity` field describing a
+ * principal `null`. Which one is present says which kind of authorization
+ * admitted the request.
  */
 export class SimRestApiAdmitted {
   public readonly admitted = true as const;
   public readonly lambda: SimPayload1LambdaAuthorizer | undefined;
+  public readonly caller: SimAwsRequestCaller | undefined;
 
   constructor(properties: SimRestApiAdmittedProperties = {}) {
     this.lambda = properties.lambda;
+    this.caller = properties.caller;
   }
 }
 

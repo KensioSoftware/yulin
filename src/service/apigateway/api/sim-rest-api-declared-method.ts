@@ -1,3 +1,4 @@
+import type { SimPutMethodCommandInput } from "../command/method/method.command.js";
 import type { SimApiGateway } from "../sim-api-gateway.js";
 
 interface SimRestApiDeclaredMethodInput {
@@ -8,6 +9,8 @@ interface SimRestApiDeclaredMethodInput {
   readonly functionArn: string;
   /** The authorizer every method is gated by, where the API has one. */
   readonly authorizerId: string | undefined;
+  /** Whether every method is decided by IAM instead. */
+  readonly iamAuthorization: boolean;
 }
 
 /**
@@ -49,9 +52,7 @@ async function declaredMethod(
       restApiId,
       resourceId,
       httpMethod,
-      ...(input.authorizerId === undefined
-        ? { authorizationType: "NONE" }
-        : { authorizationType: "CUSTOM", authorizerId: input.authorizerId }),
+      ...declaredAuthorization(input),
     },
   });
   await apiGateway.putIntegration({
@@ -64,6 +65,24 @@ async function declaredMethod(
       uri: input.functionArn,
     },
   });
+}
+
+/**
+ * The authorization every method of the API is declared with.
+ *
+ * An `AWS_IAM` method names no authorizer, so a test asking for both is asking
+ * for something PutMethod refuses, and gets that refusal.
+ */
+function declaredAuthorization(
+  input: SimRestApiDeclaredMethodInput,
+): Pick<SimPutMethodCommandInput, "authorizationType" | "authorizerId"> {
+  if (input.authorizerId !== undefined) {
+    return { authorizationType: "CUSTOM", authorizerId: input.authorizerId };
+  }
+
+  return {
+    authorizationType: input.iamAuthorization ? "AWS_IAM" : "NONE",
+  };
 }
 
 /**

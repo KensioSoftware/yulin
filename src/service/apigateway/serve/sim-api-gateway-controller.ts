@@ -28,9 +28,10 @@ interface SimApiGatewayServiceControllerProperties {
  * simulated Lambda function with a payload format 1.0 event. The function runs
  * as its execution Role, as it does for any other invocation.
  *
- * A method that authorizes anybody is checked before any of that. Its
- * authorizer's Lambda function has to allow the request, or the request is
- * refused and the integration is never invoked. Whether the API may invoke a
+ * A method that authorizes anybody is checked before any of that. An `AWS_IAM`
+ * method's caller has to be allowed `execute-api:Invoke` on the method, and a
+ * `CUSTOM` method's Lambda authorizer has to allow the request, or the request
+ * is refused and the integration is never invoked. Whether the API may invoke a
  * function is a separate question, and the API's own rather than the client's.
  */
 export class SimApiGatewayServiceController implements SimAwsServiceController {
@@ -98,6 +99,8 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
       restApi,
       match,
       request,
+      caller: serviceRequest.caller,
+      iam: this.router.iamFor(restApi),
     });
 
     if (!authorization.admitted) {
