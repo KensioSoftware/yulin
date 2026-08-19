@@ -1085,8 +1085,8 @@ is ready.
 
 ## Deploying synthesized CDK templates
 
-Use `deployTemplateFile(...)` to deploy a JSON template file, including templates produced by CDK
-synthesis.
+Use `deployTemplateFile(...)` to deploy a template file, including the JSON templates CDK synthesis
+produces.
 
 ```typescript sim-cloudformation-cdk-template-file
 /**
@@ -1131,6 +1131,57 @@ create the simulated resources from that synthesized output template.
 A template path with no file at it is refused with
 `No Sim CloudFormation template file at <path>`, naming the resolved path. A synthesized template
 is build output, and a checkout that has yet to synthesize one meets this on the first run.
+
+## Deploying a template written as YAML
+
+CloudFormation takes a template in JSON or in YAML, and a template written by hand is usually YAML.
+`deployTemplateFile(...)` reads a `.yaml` or `.yml` file as YAML.
+
+```yaml
+Resources:
+  WorkQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-work"
+Outputs:
+  QueueArn:
+    Value: !GetAtt WorkQueue.Arn
+```
+
+```typescript sim-cloudformation-yaml-template-file
+/**
+ * Deploying a hand-written YAML template file into simulated AWS.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws
+  .cloudFormation()
+  .deployTemplateFile(
+    path.join(process.cwd(), "infrastructure", "work-stack.yaml"),
+  );
+
+await stack.waitForDeployComplete();
+
+console.log(stack.stackName); // "work-stack"
+```
+
+The Stack name comes from the file name with the extension dropped, the way a synthesized name drops
+`.template.json`.
+
+Short-form tags resolve to what their long forms resolve to. `!GetAtt WorkQueue.Arn` and
+`Fn::GetAtt: [WorkQueue, Arn]` are the same Output. The tags Yulin reads are `!Ref`, `!GetAtt`,
+`!Join`, `!Sub`, `!FindInMap`, `!If`, `!Split`, `!Select`, `!ImportValue`, `!And`, `!Equals`, `!Not`,
+`!Or` and `!Condition`. A tag for an intrinsic Yulin has no behaviour for, such as `!Base64`, fails
+the deployment by name. Nothing deploys holding the bare value the tag was written against.
+
+A file that does not parse is refused by naming the resolved path, along with the line and column the
+parser stopped at. `updateTemplateFile(...)` and watching read the file the same way, and a saved
+YAML template updates its Stack in place.
 
 ## Deploying a whole cloud assembly
 
@@ -2369,7 +2420,8 @@ Sim CloudFormation currently supports:
 - The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
-- `deployTemplateFile(...)` for synthesized JSON template files
+- `deployTemplateFile(...)` for template files, written as JSON or as YAML with short-form
+  intrinsic tags
 - `updateTemplateFile(...)` for applying a synthesized template file to the stack it was deployed as
 - Watching a deployed template file, updating its stack in place whenever the file changes
 - Template `Parameters` with supplied values and defaults
@@ -2413,8 +2465,8 @@ Each service's own docs describe what its resource types support.
 
 ## Limitations
 
-- `TemplateBody` must be JSON when using `CreateStackCommand` or `UpdateStackCommand`. YAML parsing
-  is outside the CloudFormation service for now.
+- `TemplateBody` must be JSON when using `CreateStackCommand` or `UpdateStackCommand`. A template
+  file deployed with `deployTemplateFile(...)` may be JSON or YAML.
 - Only supported resource types create simulated service resources. An unsupported resource may be
   skipped or may fail the stack, depending on how safely the simulator can model it. A skipped
   resource answers `Ref` and `Fn::GetAtt` with

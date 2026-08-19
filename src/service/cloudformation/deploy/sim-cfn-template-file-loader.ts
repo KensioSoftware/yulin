@@ -1,7 +1,6 @@
 import path from "node:path";
 import type { SimCloudFormationStackName } from "../stack/sim-cfn-stack.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
-import { jsonParse } from "../../../util/type-guard/json.js";
 import {
   loadSiblingCdkAssetsManifest,
   type SimCdkOutContext,
@@ -15,6 +14,7 @@ import {
   type SimCfnTemplateFileTransform,
 } from "./sim-cfn-template-file-transform.js";
 import { readTemplateFile } from "./sim-cfn-template-file-read.js";
+import { parseTemplateFileBody } from "./sim-cfn-template-file-parse.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
@@ -83,7 +83,7 @@ export class SimCfnTemplateFileLoader {
     simWatch.reportPath(templatePath);
 
     const template = transformedTemplate(
-      jsonParse(await readTemplateFile(templatePath)),
+      parseTemplateFileBody(templatePath, await readTemplateFile(templatePath)),
       deployment.transform,
     );
     // Read from the path rather than the template, so what a transform did to
@@ -105,5 +105,8 @@ function stackNameFromTemplatePath(
 ): SimCloudFormationStackName {
   return path
     .basename(templatePath)
-    .replace(/\.template\.json$/u, "") as SimCloudFormationStackName;
+    .replace(
+      /\.template\.json$|(?:\.template)?\.ya?ml$/u,
+      "",
+    ) as SimCloudFormationStackName;
 }

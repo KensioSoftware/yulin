@@ -1,10 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { JSONString } from "../../../util/type-guard/json.js";
-import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 
 /**
- * Read the synthesized template file a deployment names.
+ * Read the template file a deployment names.
  *
  * A path with no file at it is refused by naming the resolved path and what
  * was expected there. A template under `cdk.out` is build output that a fresh
@@ -12,14 +10,10 @@ import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
  * the path failed to open, which is what leaves callers writing their own
  * guard in front of the deployment.
  */
-export async function readTemplateFile(
-  templatePath: string,
-): Promise<JSONString<CfnTemplateBodyRecord>> {
+export async function readTemplateFile(templatePath: string): Promise<string> {
   try {
     // oxlint-disable-next-line security/detect-non-literal-fs-filename
-    const templateBody = await readFile(templatePath, "utf8");
-
-    return templateBody as JSONString<CfnTemplateBodyRecord>;
+    return await readFile(templatePath, "utf8");
   } catch (error) {
     if (isMissingPathError(error)) {
       throw new Error(

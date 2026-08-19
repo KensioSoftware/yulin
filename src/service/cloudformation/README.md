@@ -148,7 +148,7 @@ or drain broader simulator background tasks when appropriate.
 `SimCloudFormation` also exposes helper methods for tests and local tooling:
 
 - `deployTemplate(...)`, for a parsed template object
-- `deployTemplateFile(...)`, for a synthesized CDK template file
+- `deployTemplateFile(...)`, for a template file, synthesized or written by hand
 - `updateTemplateFile(...)`, for applying such a file to the stack it was deployed as
 
 The first two are wrappers around the same stack creation machinery, and the third around the same
@@ -175,6 +175,16 @@ reading an `AWS::ECS::TaskDefinition`, and no service's schema belongs in the en
 
 The important design point is that these helpers do not bypass stack/resource lifecycle. They feed
 additional context into the normal CloudFormation creation pipeline.
+
+`SimCfnTemplateFileLoader` reads the file, and `parseTemplateFileBody` parses it in the format the
+file name gives it. A `.yaml` or `.yml` file goes to `parseSimCfnTemplateYaml` in `template/yaml/`,
+which parses the document under a tag schema covering CloudFormation's short-form intrinsics.
+`!GetAtt Bucket.Arn` becomes `{ "Fn::GetAtt": "Bucket.Arn" }` before anything downstream sees it.
+The node parser and the rest of the template model read one template shape, whichever format the
+file was written in. A tag outside that schema, such as `!Base64`, fails the parse by name, the way
+the long form of an intrinsic the simulator has no parser for fails the template. Any other file
+name is read as JSON, which is what CDK synthesizes. The Stack name a path is taken from drops
+`.template.json`, `.yaml` and `.yml` alike.
 
 `SimCfnTemplateFileUpdater` is the update half of the same idea. It reads the file with the same
 `SimCfnTemplateFileLoader` a deployment reads it with, and submits an `UpdateStackCommand`, so an
@@ -213,8 +223,9 @@ it would throw away the simulated state that updating in place exists to keep.
 
 `SimCfnTemplate` wraps a parsed CloudFormation template object.
 
-Yulin accepts parsed template objects in helper APIs and JSON strings for `CreateStackCommand`
-`TemplateBody`. It does not implement a YAML parser in the CloudFormation service.
+Yulin accepts parsed template objects in helper APIs, and JSON or YAML template files through
+`deployTemplateFile(...)`. `CreateStackCommand` and `UpdateStackCommand` take a JSON `TemplateBody`
+only.
 
 A valid simulated template must contain a usable `Resources` section. The template may also contain
 `Parameters` and other CloudFormation sections, but only the implemented parts affect deployment.
