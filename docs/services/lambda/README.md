@@ -204,10 +204,65 @@ of this.
 written to, and stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format. The hash identifies
 the execution environment rather than the request. Match the shape, and leave the value alone.
 
-Only zip-packaged code is recorded. A function backed by a handler function reference, including one
-bound to a container image, is an ordinary function closing over the test's own module scope. Its
-`console.log` reaches the host console directly, and intercepting that would mean patching a global
-the whole test run shares. Capturing the host stream is still the way to assert on one of those.
+A function backed by a handler function reference is recorded too, whether the handler arrived
+through `Code.ZipFile`, through a CloudFormation stack binding, or as the image of a simulated ECR
+repository. Such a handler is a closure over your own module scope and prints through the same
+console and standard streams as the rest of the test run, and both are bridged to the function's log
+group for the length of an invocation, in the way `process.env` and `Date` are. `console.log`,
+`console.info`, `console.debug`, `console.warn` and `console.error` all arrive, along with anything
+written to `process.stdout` or `process.stderr`, so a logging library building its own console over
+the process streams is recorded as well. Printing with no invocation running reaches the host
+console alone.
+
+A test that binds its handler for a breakpoint, or so the handler can close over its own state, can
+still assert on the lines it logged:
+
+```typescript sim-lambda-bound-handler-output
+/**
+ * Asserting on what a bound in-process Lambda handler printed.
+ */
+
+import { FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { orderId: string }) => {
+        console.log(`ERROR ${event.orderId} has no items`);
+
+        return "rejected";
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    Payload: JSON.stringify({ orderId: "order-1" }),
+  }),
+);
+
+const logged = await simAws.logs().filterLogEvents(
+  new FilterLogEventsCommand({
+    logGroupName: "/aws/lambda/orders",
+    filterPattern: "ERROR",
+  }),
+);
+
+// [ 'ERROR order-1 has no items' ]
+console.log(logged.events?.map((event) => event.message));
+
+await simAws.backgroundTasksComplete();
+```
 
 ## Function code from S3
 
@@ -2498,10 +2553,10 @@ Current documented limitations:
 - Function versions, aliases, and qualifiers are left out (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
   has yet to land.
-- Only zip-packaged code has its output recorded into a log group. A function backed by a handler
-  function reference, including a container image binding, writes to the host console directly and
-  goes unrecorded, so a test asserting on its output still has to capture the host stream. See
-  [What a handler prints](#what-a-handler-prints).
+- A handler function reference is recorded through the process console and the process standard
+  streams, both of which a test runner is free to replace. `console.trace` and `console.dir`
+  decorate what they print, and either one reaches the log group only where the host console passes
+  it on to `process.stdout`. See [What a handler prints](#what-a-handler-prints).
 - The platform `START`, `END` and `REPORT` lines a real log stream carries are left out, and
   execution environments are never recycled, so a function keeps one log stream for as long as it
   exists.

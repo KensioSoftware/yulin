@@ -210,8 +210,9 @@ console.log(
 
 ## Lambda handler output
 
-A zip-packaged Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs.
-A test can then assert on what a handler logged by searching its log group.
+A Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs, whether its
+code is a zip archive or a real in-process handler. A test can then assert on what a handler logged
+by searching its log group.
 
 ```typescript sim-logs-lambda-output
 /**
@@ -548,6 +549,7 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   differently in an account.
 - **Per-stream `storedBytes`.** Always zero, matching real CloudWatch Logs, which stopped reporting
   the figure per stream in 2019. `DescribeLogGroups` reports the bytes a group holds.
-- **Log capture from anything but zip-packaged Lambda code.** A function backed by a handler
-  function reference, including a container image binding, writes to the host console directly and
-  is not recorded. See the Lambda docs for why.
+- **Log capture from a handler function reference.** Recorded through the process console and the
+  process standard streams, both of which a test runner is free to replace. `console.trace` and
+  `console.dir` reach the log group only where the host console passes them on to `process.stdout`.
+  See the Lambda docs for the detail.

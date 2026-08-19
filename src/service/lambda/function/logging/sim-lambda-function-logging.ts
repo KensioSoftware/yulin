@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
+import type { SimLambdaOutputSink } from "./sim-lambda-output-sink.js";
 import type { SimLambdaExecutableCode } from "../code/sim-lambda-executable-code.js";
 import { SimLambdaLogWriter } from "./sim-lambda-log-writer.js";
 import {
@@ -72,6 +73,18 @@ export class SimLambdaFunctionLogging {
     if (writer !== undefined) {
       code.recordOutputTo(writer);
     }
+  }
+
+  /**
+   * Where this function's output goes, once its execution environment has
+   * cold started.
+   *
+   * Code with streams of its own is given this through recordFrom. Host-scope
+   * code has none, and its invocation runs with this as the sink the process
+   * console and standard streams tee into.
+   */
+  outputSink(): SimLambdaOutputSink | undefined {
+    return this.#writer;
   }
 
   /**
