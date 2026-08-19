@@ -964,6 +964,72 @@ constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs
 refusals in the editor, ahead of publication. See
 [Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
 
+### Calling a Function handler without a Distribution
+
+A test of the handler on its own, with no Distribution in front of it, still has to pass it a whole
+event. `cloudFrontViewerRequestEventFactory` and `cloudFrontViewerResponseEventFactory` make the
+two, so such a test says what the request or the response was and leaves the rest alone:
+
+```typescript sim-cloudfront-function-event-factory
+/**
+ * Making a CloudFront Functions event to call a handler with.
+ */
+
+import { VariantFactory } from "@kensio/part-factory";
+
+import {
+  cloudFrontViewerResponseEventFactory,
+  type CloudFrontFunction,
+} from "@kensio/yulin/cloudfront";
+
+function securityHeadersHandler(
+  event: CloudFrontFunction.ViewerResponseEvent,
+): CloudFrontFunction.Response {
+  const response = event.response;
+  const contentType = response.headers["content-type"]?.value ?? "";
+
+  if (contentType.startsWith("text/html")) {
+    response.headers["x-frame-options"] = { value: "DENY" };
+  }
+
+  return response;
+}
+
+// A response carrying a page. Those are the ones the policy is about.
+const documentResponseFactory = new VariantFactory(
+  cloudFrontViewerResponseEventFactory,
+  {
+    response: {
+      headers: { "content-type": { value: "text/html; charset=utf-8" } },
+    },
+  },
+);
+
+const page = securityHeadersHandler(documentResponseFactory.make());
+
+// DENY
+console.log(page.headers["x-frame-options"]?.value);
+
+// One response, for a test about a single asset. Everything else about it, down
+// to the request that asked for it, is filled in as a served response's is.
+const asset = securityHeadersHandler(
+  cloudFrontViewerResponseEventFactory.make({
+    response: { headers: { "content-type": { value: "text/css" } } },
+  }),
+);
+
+// undefined
+console.log(asset.headers["x-frame-options"]?.value);
+```
+
+The defaults describe a request for `/cloudfront/` reaching the Distribution, with a `host` of
+`yulin.test`, a session cookie and a viewer address. A viewer-response event carries the request
+that asked for it as well as the response, and the response's own defaults are a status code and no
+headers.
+
+The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+covers what the factories have in common.
+
 ## Response headers policies
 
 A response headers policy sets headers on everything a cache Behavior serves. Declare one as
