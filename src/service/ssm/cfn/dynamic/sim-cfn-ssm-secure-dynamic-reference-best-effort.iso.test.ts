@@ -120,6 +120,22 @@ describe("SSM CloudFormation ssm-secure dynamic references the simulation cannot
     assertStringIncludes(dynamicReferenceRecord(stack).reason, "version 4");
   });
 
+  it("deploys with a stand-in value where the reference names no parameter", async () => {
+    // Given a reference whose body is empty.
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed.
+    const stack = await deployConsoleUser(simAws, "{{resolve:ssm-secure:}}");
+
+    // Then it deploys, saying the body names no parameter.
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(consolePassword(stack), "dummy-value-for-");
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "parameter name",
+    );
+  });
+
   it("deploys with a stand-in value where the reference body is malformed", async () => {
     // Given a reference whose version is not an integer.
     const simAws = simAwsInEuWest2();

@@ -86,10 +86,13 @@ export class SimCfnSsmSecureDynamicReferenceResolver implements SimCfnDynamicRef
         input: { Name: selector, WithDecryption: true },
       });
 
-      assertDefined(read.Parameter, `Parameter Store read of '${name}'`);
-      requireSecureStringParameter(name, read.Parameter);
+      const parameter = read.Parameter;
 
-      return { value: read.Parameter.Value ?? "" };
+      assertDefined(parameter, `the parameter read for '${name}'`);
+      requireSecureStringParameter(name, parameter);
+      assertDefined(parameter.Value, `the value read for '${name}'`);
+
+      return { value: parameter.Value };
     } catch (error) {
       if (!(error instanceof SimSsmError)) {
         throw error;
