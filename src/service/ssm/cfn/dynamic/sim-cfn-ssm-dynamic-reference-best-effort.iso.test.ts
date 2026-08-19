@@ -160,17 +160,14 @@ describe("SSM CloudFormation dynamic references the simulation cannot answer", (
   });
 
   it("leaves a reference to a service with no resolver as it was written", async () => {
-    // Given a reference to a service this simulation does not resolve yet.
+    // Given a reference naming a service this simulation has no resolver for.
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed.
-    const stack = await deployReading(
-      simAws,
-      "{{resolve:ssm-secure:/myapp/token}}",
-    );
+    const stack = await deployReading(simAws, "{{resolve:vault:/myapp/token}}");
 
     // Then the reference is untouched and nothing is recorded about it.
-    assertIdentical(readValue(simAws), "{{resolve:ssm-secure:/myapp/token}}");
+    assertIdentical(readValue(simAws), "{{resolve:vault:/myapp/token}}");
     assertArrayLength(stack.ignoredProperties, 0);
   });
 });

@@ -18,6 +18,12 @@ interface SimCfnResourcePropertyResolverProperties {
   readonly exports?: SimCfnExports | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
   readonly propertyIgnorer?: SimCfnPropertyIgnorer | undefined;
+
+  /**
+   * The type of the Resource these properties belong to, which an
+   * `ssm-secure` dynamic reference is accepted or refused by.
+   */
+  readonly resourceType?: string | undefined;
 }
 
 /**
@@ -39,6 +45,7 @@ export class SimCfnResourcePropertyResolver {
   private readonly exports: SimCfnExports | undefined;
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
   private readonly propertyIgnorer: SimCfnPropertyIgnorer | undefined;
+  private readonly resourceType: string | undefined;
 
   constructor(properties: SimCfnResourcePropertyResolverProperties = {}) {
     this.parameters = properties.parameters;
@@ -46,6 +53,7 @@ export class SimCfnResourcePropertyResolver {
     this.exports = properties.exports;
     this.accountRegionScope = properties.accountRegionScope;
     this.propertyIgnorer = properties.propertyIgnorer;
+    this.resourceType = properties.resourceType;
   }
 
   /**
@@ -128,6 +136,7 @@ export class SimCfnResourcePropertyResolver {
       simAws,
       accountRegionScope: this.accountRegionScope,
       propertyIgnorer: this.propertyIgnorer,
+      resourceType: this.resourceType,
     });
   }
 }

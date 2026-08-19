@@ -12,6 +12,12 @@ import type {
 interface SimCfnDynamicReferencesProperties {
   readonly resolvers: ReadonlyMap<string, SimCfnDynamicReferenceResolver>;
   readonly propertyIgnorer?: SimCfnPropertyIgnorer | undefined;
+
+  /**
+   * The type of the Resource whose properties are being resolved, which a
+   * service restricting where its references may be written needs.
+   */
+  readonly resourceType?: string | undefined;
 }
 
 /**
@@ -34,11 +40,14 @@ export class SimCfnDynamicReferences {
 
   private readonly propertyIgnorer: SimCfnPropertyIgnorer | undefined;
 
+  private readonly resourceType: string | undefined;
+
   private readonly awaited = new SimCfnAwaitedDynamicReferences();
 
   constructor(properties: SimCfnDynamicReferencesProperties) {
     this.resolvers = properties.resolvers;
     this.propertyIgnorer = properties.propertyIgnorer;
+    this.resourceType = properties.resourceType;
   }
 
   /**
@@ -56,13 +65,17 @@ export class SimCfnDynamicReferences {
         return;
       }
 
-      const resolution = resolver.resolve(reference);
+      const path = currentSimCfnValuePath();
+      const resolution = resolver.resolve(reference, {
+        resourceType: this.resourceType,
+        propertyPath: path,
+      });
 
       if (resolution instanceof Promise) {
-        return this.awaited.hold(resolution, currentSimCfnValuePath());
+        return this.awaited.hold(resolution, path);
       }
 
-      return this.answer(resolution, currentSimCfnValuePath());
+      return this.answer(resolution, path);
     });
   }
 

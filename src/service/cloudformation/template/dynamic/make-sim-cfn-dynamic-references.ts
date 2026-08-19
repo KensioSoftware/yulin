@@ -8,6 +8,7 @@ interface MakeSimCfnDynamicReferencesProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly propertyIgnorer?: SimCfnPropertyIgnorer | undefined;
+  readonly resourceType?: string | undefined;
 }
 
 /**
@@ -16,7 +17,8 @@ interface MakeSimCfnDynamicReferencesProperties {
 export function makeSimCfnDynamicReferences(
   properties: MakeSimCfnDynamicReferencesProperties,
 ): SimCfnDynamicReferences {
-  const { simAws, accountRegionScope, propertyIgnorer } = properties;
+  const { simAws, accountRegionScope, propertyIgnorer, resourceType } =
+    properties;
 
   const scopedAws = simAws.accountRegionScope(
     accountRegionScope.accountId,
@@ -25,6 +27,7 @@ export function makeSimCfnDynamicReferences(
 
   return new SimCfnDynamicReferences({
     propertyIgnorer,
+    resourceType,
     resolvers: new Map(
       simCfnDynamicReferenceResolvers
         .entries()

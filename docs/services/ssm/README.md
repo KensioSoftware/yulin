@@ -440,8 +440,10 @@ Real CloudFormation makes no dependency out of a dynamic reference, and neither 
 parameter another resource of the same stack creates is only there in time when the template says
 `DependsOn`.
 
-`{{resolve:ssm-secure:...}}` and `{{resolve:secretsmanager:...}}` are left in the template as
-written. Neither is resolved yet.
+A `SecureString` parameter is read through `{{resolve:ssm-secure:...}}`, which the next section
+covers. `{{resolve:secretsmanager:...}}` reads a secret, and
+[simulated Secrets Manager](../secretsmanager/README.md#reading-a-secret-with-a-dynamic-reference)
+covers that one.
 
 ### A reference the simulation cannot answer
 
@@ -454,6 +456,104 @@ The substitution is recorded on
 naming the property that held the reference and why the value is a stand-in. A version the parameter
 never had, a `SecureString`, and a body that is not a name and an optional integer version are all
 recorded the same way.
+
+## Reading a SecureString with an ssm-secure reference
+
+`{{resolve:ssm-secure:name}}` reads a `SecureString` parameter and resolves to its decrypted value.
+`{{resolve:ssm-secure:name:3}}` reads version 3. The string scanning is the one plain `ssm`
+references use, so a reference can sit inside a longer value and inside `Fn::Sub`.
+
+Decryption goes to simulated KMS under the key the parameter was written with, as the caller
+deploying the stack. A caller lacking `kms:Decrypt` on that key fails the resource with the
+`AccessDenied` a decrypting `GetParameter` raises (see
+[A customer managed key needs its own permission](#a-customer-managed-key-needs-its-own-permission)).
+
+CDK writes one of these from `SecretValue.ssmSecure`, from
+`ssm.StringParameter.fromSecureStringParameterAttributes` and from the deprecated
+`valueForSecureStringParameter`.
+
+### Where a reference is accepted
+
+Real CloudFormation reads an `ssm-secure` reference in eleven resource properties and refuses it in
+every other one. Simulated CloudFormation holds a template to the same list.
+
+| Resource                               | Property                                    |
+| -------------------------------------- | ------------------------------------------- |
+| `AWS::DirectoryService::MicrosoftAD`   | `Password`                                  |
+| `AWS::DirectoryService::SimpleAD`      | `Password`                                  |
+| `AWS::ElastiCache::ReplicationGroup`   | `AuthToken`                                 |
+| `AWS::IAM::User`                       | `LoginProfile.Password`                     |
+| `AWS::KinesisFirehose::DeliveryStream` | `RedshiftDestinationConfiguration.Password` |
+| `AWS::OpsWorks::App`                   | `Source.Password`                           |
+| `AWS::OpsWorks::Stack`                 | `CustomCookbooksSource.Password`            |
+| `AWS::OpsWorks::Stack`                 | `RdsDbInstances.DbPassword`                 |
+| `AWS::RDS::DBCluster`                  | `MasterUserPassword`                        |
+| `AWS::RDS::DBInstance`                 | `MasterUserPassword`                        |
+| `AWS::Redshift::Cluster`               | `MasterUserPassword`                        |
+
+A reference anywhere else fails the resource, naming the property that held it. A template breaking
+this rule is broken on real CloudFormation too.
+
+`AWS::IAM::User` `LoginProfile.Password` is the pair a simulated resource holds today, and it is
+where CDK writes `SecretValue.ssmSecure`. The other ten name resource types this simulation has yet
+to reach.
+
+```typescript sim-ssm-secure-dynamic-reference
+/**
+ * Reading a SecureString parameter into a resource property from a template.
+ */
+
+import { PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/console-password",
+    Type: "SecureString",
+    Value: "hunter2",
+  }),
+);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "console-stack",
+  template: {
+    Resources: {
+      ConsoleUser: {
+        Type: "AWS::IAM::User",
+        Properties: {
+          UserName: "ConsoleUser",
+          LoginProfile: {
+            Password: "{{resolve:ssm-secure:/myapp/prod/console-password}}",
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const user = simAws
+  .iam()
+  .users.values()
+  .find((each) => each.userName === "ConsoleUser");
+
+console.log(user?.loginProfile?.password); // "hunter2"
+```
+
+A reference naming a `String` or a `StringList` parameter fails the resource, as real CloudFormation
+fails it. Read a parameter stored in the clear with a plain `{{resolve:ssm:...}}` reference.
+
+### An ssm-secure reference the simulation cannot answer
+
+The best-effort path is the one plain `ssm` references take. A reference naming a parameter that was
+never created, or a version the parameter never had, resolves to `dummy-value-for-<name>` and the
+stack carries on deploying. So does a body that is not a name and an optional integer version. Each
+substitution is recorded on
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
 
 ## Reading a parameter through a template Parameter
 
@@ -896,6 +996,8 @@ Sim SSM currently supports:
 - The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
 - `{{resolve:ssm:...}}` dynamic references in CloudFormation resource properties, by version or by
   current value, embedded in a longer string and inside `Fn::Sub`
+- `{{resolve:ssm-secure:...}}` dynamic references, decrypting the `SecureString` through the KMS key
+  it was written under, in the eleven resource properties CloudFormation reads one in
 - `StringList` parameters read through a dynamic reference as the comma-separated string `Fn::Split`
   then splits
 - `AWS::SSM::Parameter::Value<String>` template parameters, resolving `Ref` to the stored value
@@ -951,11 +1053,12 @@ Current documented limitations:
 - The value a template parameter resolves to goes unvalidated against the inner type. The
   `AWS::EC2::*` and `AWS::Route53::HostedZone::Id` inner types name EC2 and Route53 resources, which
   this simulation holds none of.
-- `{{resolve:ssm-secure:...}}` dynamic references are absent. Reading a `SecureString` into a
-  template means decrypting it, which the CloudFormation engine has no route to yet.
-- A `{{resolve:ssm:...}}` reference naming a parameter, or a version, that simulated Parameter Store
-  has never held resolves to `dummy-value-for-<name>` and records the substitution. Real
-  CloudFormation fails the stack. A template parameter naming one gets the same stand-in value.
+- A `{{resolve:ssm:...}}` or `{{resolve:ssm-secure:...}}` reference naming a parameter, or a
+  version, that simulated Parameter Store has never held resolves to `dummy-value-for-<name>` and
+  records the substitution. Real CloudFormation fails the stack. A template parameter naming one
+  gets the same stand-in value.
+- An `ssm-secure` reference reads the stack's own account and region. A parameter in another account
+  is out of reach on real CloudFormation as well.
 - Public parameters under `/aws/service/...` do not exist, and names under the reserved `aws` and
   `ssm` prefixes are refused, as they are on real AWS.
 - The Parameters and Secrets Lambda extension HTTP endpoint is absent. Handler code has to use the
