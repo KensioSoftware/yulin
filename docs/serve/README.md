@@ -457,7 +457,7 @@ aws lambda create-function --function-name orders \
   --zip-file fileb://orders.zip
 ```
 
-The operations served are the sixteen simulated Lambda implements:
+The operations served are sixteen of the ones simulated Lambda implements:
 
 - **Functions** — `CreateFunction`, `GetFunction`, `DeleteFunction`, `Invoke`
 - **Function URLs** — `CreateFunctionUrlConfig`, `GetFunctionUrlConfig`,
@@ -465,6 +465,9 @@ The operations served are the sixteen simulated Lambda implements:
 - **Permissions** — `AddPermission`, `RemovePermission`, `GetPolicy`
 - **Event source mappings** — `CreateEventSourceMapping`, `GetEventSourceMapping`,
   `ListEventSourceMappings`, `DeleteEventSourceMapping`
+
+The version and alias operations have no route here yet, and reach the simulation through `SimAws`
+or SDK interception instead.
 
 Anything else is refused as `NotImplemented`, which an SDK raises under that name. The refusal names
 the path it arrived at. `aws lambda list-functions` reports that `GET /2015-03-31/functions` is

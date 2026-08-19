@@ -4,7 +4,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.command.js";
 import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-import { simLambdaFunctionArn } from "../../function/sim-lambda-function.js";
+import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
 import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";
 import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-properties-parser.js";
 

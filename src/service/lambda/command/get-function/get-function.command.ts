@@ -3,7 +3,7 @@
  */
 
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function.js";
+import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function-configuration.js";
 
 /**
  * Minimal structural sim Lambda GetFunction command.
@@ -17,6 +17,7 @@ export interface SimGetFunctionCommand {
  */
 export interface SimGetFunctionCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Qualifier?: string | undefined;
 }
 
 /**

@@ -101,8 +101,8 @@ describe("Serving the simulated Lambda control plane", () => {
       routes: [
         {
           method: "POST",
-          path: "/2015-03-31/functions/{FunctionName}/versions",
-          commandName: "PublishVersionCommand",
+          path: "/2015-03-31/functions/{FunctionName}/code",
+          commandName: "UpdateFunctionCodeCommand",
           input: (input) => ({ FunctionName: input.label("FunctionName") }),
         },
       ],
@@ -111,7 +111,7 @@ describe("Serving the simulated Lambda control plane", () => {
     // When it is asked for
     const response = await served.handle(
       new Request(
-        `${servedLambdaApiEndpoint}/2015-03-31/functions/orders/versions`,
+        `${servedLambdaApiEndpoint}/2015-03-31/functions/orders/code`,
         { method: "POST" },
       ),
       new Uint8Array(),
@@ -122,6 +122,6 @@ describe("Serving the simulated Lambda control plane", () => {
     // Then the endpoint says so rather than answering with a server error
     assertIdentical(response.status, 501);
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
-    assertStringIncludes(await response.text(), "PublishVersionCommand");
+    assertStringIncludes(await response.text(), "UpdateFunctionCodeCommand");
   });
 });

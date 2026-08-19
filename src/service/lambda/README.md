@@ -53,10 +53,13 @@ Current command areas include:
   `update-function-url-config/`, `delete-function-url-config/`,
   `list-function-url-configs/`
 - `add-permission/`, `remove-permission/`, `get-policy/`
+- `publish-version/`, `list-versions-by-function/`
+- `create-alias/`, `update-alias/`, `get-alias/`, `list-aliases/`, `delete-alias/`
 - `event-source-mapping/`
 
 Commands sharing a set of collaborators are grouped behind one class per area — `command/function/`,
-`command/function-url/`, `command/permission/`, `command/event-source-mapping/` — so the `SimLambda`
+`command/function-url/`, `command/permission/`, `command/version/`, `command/alias/`,
+`command/event-source-mapping/` — so the `SimLambda`
 facade stays a delegation rather than repeating the same wiring block per command.
 `command/sim-lambda-command.types.ts` gathers the command types for the same reason.
 
@@ -333,6 +336,38 @@ execution roles.
 
 A standalone `SimLambda` (constructed directly rather than through `SimAws`) is its own run-as
 owner, keeping its ambient callers isolated.
+
+## Versions and aliases
+
+`function/version/` holds what `PublishVersion` and the alias commands act on.
+
+A published version is a copy of the function as it stood, made by
+`SimLambdaFunction.publishedAs(...)`. The copy carries the same code, handler, timeout, memory and
+environment, under a version number and a qualified ARN. It is a copy rather than a second reference to the function so
+that a later change to the function leaves what was published running what it was published as,
+which is the whole point of publishing one.
+
+Versions and aliases live in `SimLambdaFunctionVersionStore` and `SimLambdaFunctionAliasStore`,
+beside the function map rather than on the function itself. That is what keeps a bare function name
+resolving to `$LATEST` for every caller that passes no qualifier, which is most of them.
+`DeleteFunction` forgets both, as deleting a function on AWS takes its versions and aliases with it.
+
+A request names the version to act on in one of two places. It carries a `Qualifier` of its own, or
+a qualifier appended to the `FunctionName`, which may be a name or a function ARN.
+`simLambdaQualifiedFunctionOf` reads both and refuses a request that states one of each and
+disagrees with itself, as real Lambda does. `Invoke` and `GetFunction` resolve the qualifier
+through the version store. A number is a version, anything else is an alias name, and `$LATEST` or
+nothing at all is the function. A qualifier naming neither fails with `ResourceNotFoundException`
+against the qualified ARN.
+
+An alias points at a published version and only at one: `$LATEST` is refused on the API-level
+version pattern, before anything of that name is looked for. Invoking through an alias reports the
+version number it resolved to as `ExecutedVersion`, not the alias name, and the handler's context
+carries the same number and the qualified ARN.
+
+Authorization stays against the function's own ARN for now. Qualified statements in a function's
+resource policy are their own piece of work, so a permission granted on the function admits an
+invocation of any of its versions.
 
 ## Event source mappings
 
@@ -647,7 +682,10 @@ the CloudFormation engine with an "Unsupported" diagnostic.
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
-- `UpdateFunctionCode`, `DeleteFunction`, function listing, versions, aliases and qualifiers
+- `UpdateFunctionCode` and function listing
+- `Qualifier` on the permission commands, qualified Function URLs, alias `RoutingConfig` weights,
+  provisioned concurrency, and `RevisionId`
+- version and alias operations over the served HTTP API endpoint, which routes the other sixteen
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

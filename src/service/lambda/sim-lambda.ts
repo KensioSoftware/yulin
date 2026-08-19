@@ -26,6 +26,10 @@ export interface SimLambdaRequestOptions {
 
 /**
  * Simulated Lambda. Handles SDK commands. Emulates AWS behaviour and state.
+ *
+ * Each command below carries a one line doc comment rather than a block. This
+ * file grows by one delegating method per simulated operation and is close to
+ * the max-lines limit, which is the same reason `SimDynamoDb` reads that way.
  */
 export class SimLambda {
   private readonly functions: SimLambdaFunctionMap = new Map();
@@ -60,9 +64,7 @@ export class SimLambda {
     return this.commands.containerImages;
   }
 
-  /**
-   * Handle a Create Function Command from the SDK.
-   */
+  /** Handle a Create Function Command from the SDK. */
   async createFunction(
     command: simLambdaCommands.SimCreateFunctionCommand,
     options?: SimLambdaRequestOptions,
@@ -70,9 +72,7 @@ export class SimLambda {
     return await this.commands.functions.create(command, options);
   }
 
-  /**
-   * Handle a Get Function Command from the SDK.
-   */
+  /** Handle a Get Function Command from the SDK. */
   async getFunction(
     command: simLambdaCommands.SimGetFunctionCommand,
     options?: SimLambdaRequestOptions,
@@ -80,9 +80,7 @@ export class SimLambda {
     return await this.commands.functions.get(command, options);
   }
 
-  /**
-   * Handle a Delete Function Command from the SDK.
-   */
+  /** Handle a Delete Function Command from the SDK. */
   async deleteFunction(
     command: simLambdaCommands.SimDeleteFunctionCommand,
     options?: SimLambdaRequestOptions,
@@ -90,9 +88,7 @@ export class SimLambda {
     return await this.commands.functions.delete(command, options);
   }
 
-  /**
-   * Handle an Invoke Command from the SDK.
-   */
+  /** Handle an Invoke Command from the SDK. */
   async invoke(
     command: simLambdaCommands.SimInvokeCommand,
     options?: SimLambdaRequestOptions,
@@ -100,9 +96,63 @@ export class SimLambda {
     return await this.commands.functions.invoke(command, options);
   }
 
-  /**
-   * Handle a Create Function Url Config Command from the SDK.
-   */
+  /** Handle a Publish Version Command from the SDK. */
+  async publishVersion(
+    command: simLambdaCommands.SimPublishVersionCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimPublishVersionCommandOutput> {
+    return await this.commands.versions.publish(command, options);
+  }
+
+  /** Handle a List Versions By Function Command from the SDK. */
+  async listVersionsByFunction(
+    command: simLambdaCommands.SimListVersionsByFunctionCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimListVersionsByFunctionCommandOutput> {
+    return await this.commands.versions.list(command, options);
+  }
+
+  /** Handle a Create Alias Command from the SDK. */
+  async createAlias(
+    command: simLambdaCommands.SimCreateAliasCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimCreateAliasCommandOutput> {
+    return await this.commands.aliases.create(command, options);
+  }
+
+  /** Handle an Update Alias Command from the SDK. */
+  async updateAlias(
+    command: simLambdaCommands.SimUpdateAliasCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimUpdateAliasCommandOutput> {
+    return await this.commands.aliases.update(command, options);
+  }
+
+  /** Handle a Get Alias Command from the SDK. */
+  async getAlias(
+    command: simLambdaCommands.SimGetAliasCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimGetAliasCommandOutput> {
+    return await this.commands.aliases.get(command, options);
+  }
+
+  /** Handle a List Aliases Command from the SDK. */
+  async listAliases(
+    command: simLambdaCommands.SimListAliasesCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimListAliasesCommandOutput> {
+    return await this.commands.aliases.list(command, options);
+  }
+
+  /** Handle a Delete Alias Command from the SDK. */
+  async deleteAlias(
+    command: simLambdaCommands.SimDeleteAliasCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimDeleteAliasCommandOutput> {
+    return await this.commands.aliases.delete(command, options);
+  }
+
+  /** Handle a Create Function Url Config Command from the SDK. */
   async createFunctionUrlConfig(
     command: simLambdaCommands.SimCreateFunctionUrlConfigCommand,
     options?: SimLambdaRequestOptions,
@@ -110,9 +160,7 @@ export class SimLambda {
     return await this.commands.functionUrls.create(command, options);
   }
 
-  /**
-   * Handle a Get Function Url Config Command from the SDK.
-   */
+  /** Handle a Get Function Url Config Command from the SDK. */
   async getFunctionUrlConfig(
     command: simLambdaCommands.SimGetFunctionUrlConfigCommand,
     options?: SimLambdaRequestOptions,
@@ -120,9 +168,7 @@ export class SimLambda {
     return await this.commands.functionUrls.get(command, options);
   }
 
-  /**
-   * Handle an Update Function Url Config Command from the SDK.
-   */
+  /** Handle an Update Function Url Config Command from the SDK. */
   async updateFunctionUrlConfig(
     command: simLambdaCommands.SimUpdateFunctionUrlConfigCommand,
     options?: SimLambdaRequestOptions,
@@ -130,9 +176,7 @@ export class SimLambda {
     return await this.commands.functionUrls.update(command, options);
   }
 
-  /**
-   * Handle a Delete Function Url Config Command from the SDK.
-   */
+  /** Handle a Delete Function Url Config Command from the SDK. */
   async deleteFunctionUrlConfig(
     command: simLambdaCommands.SimDeleteFunctionUrlConfigCommand,
     options?: SimLambdaRequestOptions,
@@ -140,9 +184,7 @@ export class SimLambda {
     return await this.commands.functionUrls.delete(command, options);
   }
 
-  /**
-   * Handle a List Function Url Configs Command from the SDK.
-   */
+  /** Handle a List Function Url Configs Command from the SDK. */
   async listFunctionUrlConfigs(
     command: simLambdaCommands.SimListFunctionUrlConfigsCommand,
     options?: SimLambdaRequestOptions,
@@ -150,9 +192,7 @@ export class SimLambda {
     return await this.commands.functionUrls.list(command, options);
   }
 
-  /**
-   * Handle a Create Event Source Mapping Command from the SDK.
-   */
+  /** Handle a Create Event Source Mapping Command from the SDK. */
   async createEventSourceMapping(
     command: simLambdaCommands.SimCreateEventSourceMappingCommand,
     options?: SimLambdaRequestOptions,
@@ -160,9 +200,7 @@ export class SimLambda {
     return await this.commands.eventSourceMappings.create(command, options);
   }
 
-  /**
-   * Handle a Get Event Source Mapping Command from the SDK.
-   */
+  /** Handle a Get Event Source Mapping Command from the SDK. */
   async getEventSourceMapping(
     command: simLambdaCommands.SimGetEventSourceMappingCommand,
     options?: SimLambdaRequestOptions,
@@ -170,9 +208,7 @@ export class SimLambda {
     return await this.commands.eventSourceMappings.get(command, options);
   }
 
-  /**
-   * Handle a List Event Source Mappings Command from the SDK.
-   */
+  /** Handle a List Event Source Mappings Command from the SDK. */
   async listEventSourceMappings(
     command: simLambdaCommands.SimListEventSourceMappingsCommand,
     options?: SimLambdaRequestOptions,
@@ -180,9 +216,7 @@ export class SimLambda {
     return await this.commands.eventSourceMappings.list(command, options);
   }
 
-  /**
-   * Handle a Delete Event Source Mapping Command from the SDK.
-   */
+  /** Handle a Delete Event Source Mapping Command from the SDK. */
   async deleteEventSourceMapping(
     command: simLambdaCommands.SimDeleteEventSourceMappingCommand,
     options?: SimLambdaRequestOptions,
@@ -190,9 +224,7 @@ export class SimLambda {
     return await this.commands.eventSourceMappings.delete(command, options);
   }
 
-  /**
-   * Handle an Add Permission Command from the SDK.
-   */
+  /** Handle an Add Permission Command from the SDK. */
   async addPermission(
     command: simLambdaCommands.SimAddPermissionCommand,
     options?: SimLambdaRequestOptions,
@@ -200,9 +232,7 @@ export class SimLambda {
     return await this.commands.permissions.add(command, options);
   }
 
-  /**
-   * Handle a Remove Permission Command from the SDK.
-   */
+  /** Handle a Remove Permission Command from the SDK. */
   async removePermission(
     command: simLambdaCommands.SimRemovePermissionCommand,
     options?: SimLambdaRequestOptions,
@@ -210,9 +240,7 @@ export class SimLambda {
     return await this.commands.permissions.remove(command, options);
   }
 
-  /**
-   * Handle a Get Policy Command from the SDK.
-   */
+  /** Handle a Get Policy Command from the SDK. */
   async getPolicy(
     command: simLambdaCommands.SimGetPolicyCommand,
     options?: SimLambdaRequestOptions,
@@ -220,27 +248,21 @@ export class SimLambda {
     return await this.commands.permissions.getPolicy(command, options);
   }
 
-  /**
-   * Get a simulated event source mapping by its UUID.
-   */
+  /** Get a simulated event source mapping by its UUID. */
   getSimEventSourceMapping(
     uuid: string,
   ): SimLambdaEventSourceMapping | undefined {
     return this.commands.eventSourceMappings.find(uuid);
   }
 
-  /**
-   * Get a simulated Lambda function instance by name.
-   */
+  /** Get a simulated Lambda function instance by name. */
   getSimFunctionByName(
     functionName: SimLambdaFunctionName | string,
   ): SimLambdaFunction | undefined {
     return this.functions.get(functionName as SimLambdaFunctionName);
   }
 
-  /**
-   * Get a simulated Lambda function's Function URL, if it has one.
-   */
+  /** Get a simulated Lambda function's Function URL, if it has one. */
   getSimFunctionUrl(
     functionName: SimLambdaFunctionName | string,
   ): SimLambdaFunctionUrl | undefined {
@@ -259,16 +281,12 @@ export class SimLambda {
     return this.commands.functionUrlStore.byUrlId(urlId);
   }
 
-  /**
-   * Get this service's CloudFormation Resource factory.
-   */
+  /** Get this service's CloudFormation Resource factory. */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;
   }
 
-  /**
-   * Get this service's SDK Command router for SDK client interception.
-   */
+  /** Get this service's SDK Command router for SDK client interception. */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
   }

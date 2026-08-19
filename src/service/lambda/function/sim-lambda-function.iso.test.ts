@@ -32,6 +32,42 @@ describe("sim Lambda function model", () => {
     );
   });
 
+  it("publishes a copy of itself under a version number", async () => {
+    // Given a function with code, configuration and an environment.
+    const simFunction = new SimLambdaFunction({
+      name: "publish-test",
+      roleArn: "arn:aws:iam::111111111111:role/PublishRole",
+      accountRegionScope,
+      handlerFunction: () => "published code",
+      handlerName: "index.handler",
+      timeoutSeconds: 30,
+      memorySizeMb: 512,
+    });
+
+    // When it is published as version 1.
+    const version = simFunction.publishedAs("1");
+
+    // Then the version is a copy carrying what it was published with, and the
+    // function it came from is still $LATEST.
+    assertIdentical(version.version, "1");
+    assertIdentical(
+      version.arn,
+      "arn:aws:lambda:eu-west-2:111111111111:function:publish-test:1",
+    );
+    assertIdentical(await version.invoke({}), "published code");
+
+    const configuration = version.configuration();
+    assertIdentical(configuration.Version, "1");
+    assertIdentical(configuration.State, "Active");
+    assertIdentical(configuration.Handler, "index.handler");
+    assertIdentical(configuration.Timeout, 30);
+    assertIdentical(configuration.MemorySize, 512);
+
+    assertIdentical(simFunction.version, "$LATEST");
+    assertIdentical(simFunction.configuration().Version, "$LATEST");
+    assertIdentical(simFunction.state, "Pending");
+  });
+
   it("starts Pending with AWS-like defaults and activates to Active", async () => {
     const simFunction = new SimLambdaFunction({
       name: "defaults-test",

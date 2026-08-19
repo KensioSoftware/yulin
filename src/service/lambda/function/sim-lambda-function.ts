@@ -4,6 +4,16 @@ import { simAwsRunAsContext } from "../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import {
+  DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+  SIM_LAMBDA_LATEST_VERSION,
+  DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS,
+  type SimLambdaFunctionArn,
+  simLambdaFunctionArn,
+  type SimLambdaFunctionConfiguration,
+  type SimLambdaFunctionState,
+  simLambdaVersionQualifier,
+} from "./sim-lambda-function-configuration.js";
+import {
   type SimLambdaExecutableCode,
   SimLambdaHandlerReferenceCode,
 } from "./code/sim-lambda-executable-code.js";
@@ -23,53 +33,10 @@ import {
 
 export type SimLambdaFunctionName = Brand<string, "SimLambdaFunctionName">;
 
-export const DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS = 3;
-export const DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB = 128;
-
 export type SimLambdaFunctionMap = Map<
   SimLambdaFunctionName,
   SimLambdaFunction
 >;
-
-export type SimLambdaFunctionState =
-  | "Pending"
-  | "Active"
-  | "Inactive"
-  | "Failed";
-
-/**
- * Lambda function ARNs address the function with a colon, not a slash.
- */
-export type SimLambdaFunctionArn =
-  `arn:aws:lambda:${string}:${string}:function:${string}`;
-
-/**
- * Build the ARN a sim Lambda function has, or would have, in a scope.
- */
-export function simLambdaFunctionArn(
-  scope: SimAwsAccountRegionScope,
-  name: string,
-): SimLambdaFunctionArn {
-  return `arn:aws:lambda:${scope.regionName}:${scope.accountId}:function:${name}`;
-}
-
-/**
- * Minimal structural Lambda function configuration, as returned by
- * CreateFunction and GetFunction.
- */
-export interface SimLambdaFunctionConfiguration {
-  FunctionName: string;
-  FunctionArn: SimLambdaFunctionArn;
-  Role: string;
-  State: SimLambdaFunctionState;
-  Version: string;
-  Timeout: number;
-  MemorySize: number;
-  Handler?: string | undefined;
-  Runtime?: string | undefined;
-  Description?: string | undefined;
-  Environment?: { Variables: Record<string, string> } | undefined;
-}
 
 interface SimLambdaFunctionProperties {
   name: SimLambdaFunctionName | string;
@@ -85,6 +52,11 @@ interface SimLambdaFunctionProperties {
   memorySizeMb?: number | undefined;
   environment?: SimLambdaEnvironment | undefined;
   runAsOwner?: SimAwsRunAsOwner;
+  /**
+   * The version this is. A function is `$LATEST`, and a version published
+   * from one is a copy of it under the number it was published as.
+   */
+  version?: string | undefined;
   /**
    * Clock this function's invocations measure their remaining time against. A
    * function built standalone, outside a SimAws instance, falls back to the
@@ -124,6 +96,7 @@ export class SimLambdaFunction {
   public readonly timeoutSeconds: number;
   public readonly memorySizeMb: number;
   public readonly environment: SimLambdaEnvironment;
+  public readonly version: string;
   /**
    * This function's resource-based policy, which says who may act on it.
    *
@@ -135,6 +108,7 @@ export class SimLambdaFunction {
   public readonly resourcePolicy = new SimLambdaFunctionPolicy();
 
   #state: SimLambdaFunctionState;
+  private readonly properties: SimLambdaFunctionProperties;
   private readonly code: SimLambdaExecutableCode;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly runner = new SimLambdaHandlerRunner();
@@ -157,11 +131,14 @@ export class SimLambdaFunction {
       memorySizeMb = DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
       environment,
       runAsOwner = this,
+      version = SIM_LAMBDA_LATEST_VERSION,
       clock = new SimRealClock(),
       logs,
       outboundHttp,
     } = properties;
+    this.properties = properties;
     this.clock = clock;
+    this.version = version;
     this.name = name as SimLambdaFunctionName;
     this.roleArn = roleArn;
     this.accountRegionScope = accountRegionScope;
@@ -203,10 +180,32 @@ export class SimLambdaFunction {
   }
 
   /**
-   * Get the ARN for this sim Lambda function.
+   * Get the ARN for this sim Lambda function, qualified when it is a
+   * published version rather than the function itself.
    */
   get arn(): SimLambdaFunctionArn {
-    return simLambdaFunctionArn(this.accountRegionScope, this.name);
+    return simLambdaFunctionArn(
+      this.accountRegionScope,
+      this.name,
+      simLambdaVersionQualifier(this.version),
+    );
+  }
+
+  /**
+   * A copy of this function as it stands now, published under a version
+   * number, keeping the code, handler, timeout, memory and environment it was
+   * published with. It is Active from the start, since the code it copied is
+   * already resolved and has nothing left to become.
+   */
+  publishedAs(version: string): SimLambdaFunction {
+    return new SimLambdaFunction({
+      ...this.properties,
+      code: this.code,
+      environment: this.environment,
+      runAsOwner: this.runAsOwner,
+      state: "Active",
+      version,
+    });
   }
 
   /**
@@ -226,7 +225,7 @@ export class SimLambdaFunction {
       FunctionArn: this.arn,
       Role: this.roleArn,
       State: this.state,
-      Version: "$LATEST",
+      Version: this.version,
       Timeout: this.timeoutSeconds,
       MemorySize: this.memorySizeMb,
       Handler: this.handlerName,
@@ -251,6 +250,7 @@ export class SimLambdaFunction {
   async invoke(event: unknown): Promise<unknown> {
     const contextBuilder = new SimLambdaInvokeContextBuilder({
       functionName: this.name,
+      functionVersion: this.version,
       invokedFunctionArn: this.arn,
       timeoutSeconds: this.timeoutSeconds,
       memorySizeMb: this.memorySizeMb,

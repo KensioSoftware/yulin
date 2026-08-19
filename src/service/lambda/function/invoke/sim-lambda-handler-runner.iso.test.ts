@@ -13,6 +13,7 @@ import { SimLambdaHandlerRunner } from "./sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./sim-lambda-invoke-context-builder.js";
 
 const contextBuilder = new SimLambdaInvokeContextBuilder({
+  functionVersion: "$LATEST",
   functionName: "runner-test",
   invokedFunctionArn:
     "arn:aws:lambda:eu-west-2:111111111111:function:runner-test",

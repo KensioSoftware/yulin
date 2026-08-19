@@ -702,6 +702,88 @@ console.log(dryRunOutput.StatusCode);
 `Event` invocation handler errors are dropped. Asynchronous retries and failure destinations are
 left out so far.
 
+## Versions and aliases
+
+`PublishVersionCommand` copies a function as it stands and numbers the copy. The first is version
+`1`, and each later one counts up. The copy keeps the code, handler, timeout, memory and
+environment it was published with. `CreateAliasCommand` gives one of those versions a name, and
+`UpdateAliasCommand` moves the name to another version, so a deployment can repoint what callers
+invoke.
+
+`InvokeCommand` and `GetFunctionCommand` take a `Qualifier` naming a version number or an alias.
+The same qualifier can travel on the `FunctionName` instead, appended to the name (`orders:live`)
+or to a function ARN. `ExecutedVersion` on the invocation output is the version number that ran,
+and an invocation through an alias reports the version behind it. Inside the handler, `context`
+carries that number as `functionVersion` and the qualified ARN as `invokedFunctionArn`.
+
+```typescript sim-lambda-versions-and-aliases
+/**
+ * Publishing a simulated Lambda function version, pointing an alias at it, and
+ * invoking through the alias.
+ */
+
+import {
+  CreateAliasCommand,
+  CreateFunctionCommand,
+  InvokeCommand,
+  ListVersionsByFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => ({
+        ranAs: context.functionVersion,
+      })),
+    },
+  }),
+);
+
+const published = await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "orders" }),
+);
+console.log(published.Version);
+console.log(published.FunctionArn);
+
+await lambda.createAlias(
+  new CreateAliasCommand({
+    FunctionName: "orders",
+    Name: "live",
+    FunctionVersion: published.Version,
+  }),
+);
+
+const invoked = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "orders", Qualifier: "live" }),
+);
+console.log(invoked.ExecutedVersion);
+
+const versions = await lambda.listVersionsByFunction(
+  new ListVersionsByFunctionCommand({ FunctionName: "orders" }),
+);
+console.log(versions.Versions.map((version) => version.Version));
+```
+
+A function with no qualifier is `$LATEST`, which is what every caller that passes none reaches, and
+what `ListVersionsByFunctionCommand` lists ahead of the published versions. An alias points at a
+published version, and `$LATEST` is refused with a `ValidationException` on the version pattern, as
+it is on real Lambda. A qualifier naming no version and no alias fails with
+`ResourceNotFoundException` against the qualified ARN.
+
+`GetAliasCommand`, `ListAliasesCommand` and `DeleteAliasCommand` read and remove aliases.
+`ListAliasesCommand` takes a `FunctionVersion` to narrow the answer to the aliases on one version.
+Deleting an alias leaves the version it pointed at invokable by its number. Deleting the function
+takes its versions and aliases with it.
+
 ## Triggering a function from an SQS queue
 
 An event source mapping connects a [simulated queue](../sqs/ "Simulated SQS docs") to a function.
@@ -2512,8 +2594,12 @@ Sim Lambda currently supports:
   every hostname it serves, including a Cognito user pool domain's OAuth endpoints and the JWKS a
   token verifier fetches from the regional Cognito endpoint
 - Execution roles, evaluated against simulated IAM
+- Published versions and aliases, with `PublishVersion`, `ListVersionsByFunction`, `CreateAlias`,
+  `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke` and
+  `GetFunction`
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
-  `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
+  `lambda:GetFunction`, `lambda:InvokeFunction`, the Function URL config actions, and the version
+  and alias actions)
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
 - The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission` and
   `AWS::Lambda::EventSourceMapping` CloudFormation resources, with `Ref`/`Fn::GetAtt` support and
@@ -2526,10 +2612,10 @@ Sim Lambda currently supports:
 
 Current documented limitations:
 
-- Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, the permission commands
-  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the Function URL config
-  commands and the event source mapping commands are supported. `UpdateFunctionCode`,
-  `DeleteFunction` and function listing are absent so far.
+- Only `CreateFunctionCommand`, `GetFunctionCommand`, `DeleteFunctionCommand`, `InvokeCommand`, the
+  permission commands (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the
+  version and alias commands, the Function URL config commands and the event source mapping
+  commands are supported. `UpdateFunctionCode` and function listing are absent so far.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
@@ -2540,8 +2626,8 @@ Current documented limitations:
   `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
   the grant that was made, and no value is supplied for them, so a statement carrying one never
   matches.
-- `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are left out, along
-  with versions and aliases.
+- `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are left out. A
+  permission granted on a function admits an invocation of any of its versions.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
@@ -2550,7 +2636,15 @@ Current documented limitations:
   buffered.
 - A function has at most one Function URL, and qualified (version or alias) Function URLs are left
   out.
-- Function versions, aliases, and qualifiers are left out (`Version` is always `$LATEST`).
+- A published version keeps what it was published with, and `UpdateFunctionCode` is absent, so
+  `$LATEST` has no way to drift from it yet. The `CodeSha256` and `RevisionId` checks
+  `PublishVersion` makes are left out, along with `Description` on a published version, alias
+  `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the two
+  listings.
+- A qualified function ARN reaches simulated Lambda itself. The services that name a function
+  elsewhere (S3 notifications, SNS subscriptions, CloudWatch Logs subscriptions, Cognito triggers,
+  EventBridge targets, event source mappings and the CloudFormation target-function reader) still
+  refuse or drop a qualifier.
 - The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
   has yet to land.
 - A handler function reference is recorded through the process console and the process standard
@@ -2627,5 +2721,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- Only Function URLs are served over HTTP by `serveSimAws`. The Lambda control-plane API itself is
-  not served, and SDK commands go through `SimAws` or [SDK interception](../../sdk/) instead.
+- `serveSimAws` serves sixteen of these operations over HTTP, listed in the
+  [serving docs](../../serve/README.md#lambda-over-the-endpoint). The version and alias operations have no
+  route there yet, and reach the simulation through `SimAws` or
+  [SDK interception](../../sdk/) instead.

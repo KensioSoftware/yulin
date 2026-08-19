@@ -4,6 +4,13 @@ import {
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimAddPermissionCommand } from "../command/add-permission/add-permission.command.js";
+import type { SimCreateAliasCommand } from "../command/create-alias/create-alias.command.js";
+import type { SimDeleteAliasCommand } from "../command/delete-alias/delete-alias.command.js";
+import type { SimGetAliasCommand } from "../command/get-alias/get-alias.command.js";
+import type { SimListAliasesCommand } from "../command/list-aliases/list-aliases.command.js";
+import type { SimListVersionsByFunctionCommand } from "../command/list-versions-by-function/list-versions-by-function.command.js";
+import type { SimPublishVersionCommand } from "../command/publish-version/publish-version.command.js";
+import type { SimUpdateAliasCommand } from "../command/update-alias/update-alias.command.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
 import type {
   SimCreateEventSourceMappingCommand,
@@ -52,6 +59,62 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.invoke(
             command as SimInvokeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PublishVersionCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.publishVersion(
+            command as SimPublishVersionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListVersionsByFunctionCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.listVersionsByFunction(
+            command as SimListVersionsByFunctionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateAliasCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.createAlias(
+            command as SimCreateAliasCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateAliasCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.updateAlias(
+            command as SimUpdateAliasCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetAliasCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.getAlias(
+            command as SimGetAliasCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListAliasesCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.listAliases(
+            command as SimListAliasesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteAliasCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.deleteAlias(
+            command as SimDeleteAliasCommand,
             simSdkCallerOptions(context),
           ),
       ],

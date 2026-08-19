@@ -1,12 +1,14 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
-import {
-  type SimLambdaFunction,
-  type SimLambdaFunctionArn,
-  type SimLambdaFunctionMap,
-  type SimLambdaFunctionName,
-  simLambdaFunctionArn,
+import type {
+  SimLambdaFunction,
+  SimLambdaFunctionMap,
+  SimLambdaFunctionName,
 } from "../sim-lambda-function.js";
+import {
+  type SimLambdaFunctionArn,
+  simLambdaFunctionArn,
+} from "../sim-lambda-function-configuration.js";
 
 interface SimLambdaFunctionLookupProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;

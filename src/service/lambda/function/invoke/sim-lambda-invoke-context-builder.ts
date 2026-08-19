@@ -10,6 +10,8 @@ import {
 
 interface SimLambdaInvokeContextBuilderProperties {
   readonly functionName: string;
+  /** The version the invocation is running, which is `$LATEST` or a number. */
+  readonly functionVersion: string;
   readonly invokedFunctionArn: string;
   readonly timeoutSeconds: number;
   readonly memorySizeMb: number;
@@ -42,6 +44,7 @@ export class SimLambdaInvokeContextBuilder {
   build(callback: SimLambdaCallback): SimLambdaContext {
     const {
       functionName,
+      functionVersion,
       invokedFunctionArn,
       timeoutSeconds,
       memorySizeMb,
@@ -55,7 +58,7 @@ export class SimLambdaInvokeContextBuilder {
     return {
       callbackWaitsForEmptyEventLoop: true,
       functionName,
-      functionVersion: "$LATEST",
+      functionVersion,
       invokedFunctionArn,
       memoryLimitInMB: String(memorySizeMb),
       awsRequestId,

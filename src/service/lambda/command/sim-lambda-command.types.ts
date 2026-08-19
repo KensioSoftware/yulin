@@ -26,6 +26,10 @@ export type {
   SimListEventSourceMappingsCommandOutput,
 } from "./event-source-mapping/event-source-mapping.command.js";
 export type {
+  SimCreateAliasCommand,
+  SimCreateAliasCommandOutput,
+} from "./create-alias/create-alias.command.js";
+export type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
 } from "./create-function/create-function.command.js";
@@ -34,6 +38,10 @@ export type {
   SimCreateFunctionUrlConfigCommandOutput,
 } from "./create-function-url-config/create-function-url-config.command.js";
 export type {
+  SimDeleteAliasCommand,
+  SimDeleteAliasCommandOutput,
+} from "./delete-alias/delete-alias.command.js";
+export type {
   SimDeleteFunctionCommand,
   SimDeleteFunctionCommandOutput,
 } from "./delete-function/delete-function.command.js";
@@ -41,6 +49,10 @@ export type {
   SimDeleteFunctionUrlConfigCommand,
   SimDeleteFunctionUrlConfigCommandOutput,
 } from "./delete-function-url-config/delete-function-url-config.command.js";
+export type {
+  SimGetAliasCommand,
+  SimGetAliasCommandOutput,
+} from "./get-alias/get-alias.command.js";
 export type {
   SimGetFunctionCommand,
   SimGetFunctionCommandOutput,
@@ -58,13 +70,29 @@ export type {
   SimInvokeCommandOutput,
 } from "./invoke/invoke.command.js";
 export type {
+  SimListAliasesCommand,
+  SimListAliasesCommandOutput,
+} from "./list-aliases/list-aliases.command.js";
+export type {
   SimListFunctionUrlConfigsCommand,
   SimListFunctionUrlConfigsCommandOutput,
 } from "./list-function-url-configs/list-function-url-configs.command.js";
 export type {
+  SimListVersionsByFunctionCommand,
+  SimListVersionsByFunctionCommandOutput,
+} from "./list-versions-by-function/list-versions-by-function.command.js";
+export type {
+  SimPublishVersionCommand,
+  SimPublishVersionCommandOutput,
+} from "./publish-version/publish-version.command.js";
+export type {
   SimRemovePermissionCommand,
   SimRemovePermissionCommandOutput,
 } from "./remove-permission/remove-permission.command.js";
+export type {
+  SimUpdateAliasCommand,
+  SimUpdateAliasCommandOutput,
+} from "./update-alias/update-alias.command.js";
 export type {
   SimUpdateFunctionUrlConfigCommand,
   SimUpdateFunctionUrlConfigCommandOutput,

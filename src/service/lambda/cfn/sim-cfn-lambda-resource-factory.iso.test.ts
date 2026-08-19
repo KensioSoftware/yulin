@@ -12,11 +12,11 @@ import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCloudFormationResourceCreateContext } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { SimLambdaFunction } from "../function/sim-lambda-function.js";
 import {
   DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
   DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS,
-  SimLambdaFunction,
-} from "../function/sim-lambda-function.js";
+} from "../function/sim-lambda-function-configuration.js";
 import { SimLambdaCloudFormationResourceFactory } from "./sim-cfn-lambda-resource-factory.js";
 
 const accountRegionScope: SimAwsAccountRegionScope = {
