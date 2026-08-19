@@ -63,28 +63,49 @@ describe("SAM transform", () => {
   });
 
   it("records a SAM Resource type it does not expand as unsupported", async () => {
-    // Given a SAM template holding a function and a table
+    // Given a SAM template holding a function and a state machine, which is a
+    // SAM Resource type with no simulated service behind it
     const simAws = new SimAws();
 
     // When it is deployed
     const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "simple-table-stack",
+      stackName: "state-machine-stack",
       template: {
         Transform: "AWS::Serverless-2016-10-31",
         Resources: {
           Rates: ratesFunction,
-          RatesTable: {
-            Type: "AWS::Serverless::SimpleTable",
-            Properties: { TableName: "rates" },
+          RatesWorkflow: {
+            Type: "AWS::Serverless::StateMachine",
+            Properties: { Definition: { StartAt: "Rates" } },
           },
         },
       },
     });
 
-    // Then the function deployed, and the table is recorded the way any
-    // Resource type nothing models is
+    // Then the function deployed, and the state machine is recorded the way
+    // any Resource type nothing models is
     assertNonNullable(simAws.lambda().getSimFunctionByName("rates"));
     assertArrayLength(stack.skippedResources, 1);
-    assertIdentical(stack.skippedResources[0].logicalId, "RatesTable");
+    assertIdentical(stack.skippedResources[0].logicalId, "RatesWorkflow");
+  });
+
+  it("leaves a Resource it cannot read for the template to answer for", async () => {
+    // Given a SAM template holding a Resource written as a string, which is a
+    // Resource the expansion has no Type to read
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "malformed-stack",
+      template: {
+        Transform: "AWS::Serverless-2016-10-31",
+        Resources: { Rates: ratesFunction, Quotes: "quotes" },
+      },
+    });
+
+    // Then the function deployed, and the malformed Resource was carried
+    // through the expansion for the template body to answer for
+    assertNonNullable(simAws.lambda().getSimFunctionByName("rates"));
+    assertArrayLength(stack.skippedResources, 0);
   });
 });

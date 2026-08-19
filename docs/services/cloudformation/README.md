@@ -1908,8 +1908,10 @@ a matching binding keep their template code, running in the simulated vm runtime
 
 A template naming the `AWS::Serverless-2016-10-31` transform has its SAM resources expanded before
 the stack deploys, the way CloudFormation expands them. `AWS::Serverless::Function` becomes an
-`AWS::Lambda::Function` and the `AWS::IAM::Role` it runs as. `Globals.Function` supplies the
-defaults every function takes, and a value on the function itself wins.
+`AWS::Lambda::Function` and the `AWS::IAM::Role` it runs as. `AWS::Serverless::SimpleTable` becomes
+an `AWS::DynamoDB::Table`, and `AWS::Serverless::HttpApi` becomes an `AWS::ApiGatewayV2::Api` and
+its stage. `Globals.Function` and `Globals.HttpApi` supply the defaults every function and every API
+takes, and a value on the resource itself wins.
 
 The expanded function keeps the logical ID the SAM resource had. `Ref` and `Fn::GetAtt` against that
 name answer for the function, and a binding targeting that logical ID backs it with your real
@@ -2059,6 +2061,79 @@ await srv.close();
 A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
 for a function called `Rates`. `AuthType` and `InvokeMode` carry over. `Cors` is left out (the
 simulated Function URL answers no preflight request).
+
+### Simple tables
+
+`AWS::Serverless::SimpleTable` deploys a table with one partition key and on-demand billing.
+`PrimaryKey` names that key, and its `Type` is the SAM name for the attribute type (`String`,
+`Number` or `Binary`). A table naming no key is keyed on a string `id`, the key SAM gives it.
+`TableName`, `SSESpecification` and `ProvisionedThroughput` carry across as the template wrote them,
+and a table asking for capacity is billed for the capacity it asked for. `Tags` are stated as a map
+of one value per tag name, and reach the table as the list of `Key` and `Value` pairs DynamoDB
+takes.
+
+### HTTP APIs
+
+`AWS::Serverless::HttpApi` deploys an HTTP API and the stage that serves it. The stage is `$default`
+until `StageName` names another one, and it carries the logical ID SAM builds for it
+(`OrdersApiGatewayDefaultStage` for an API called `Orders`, and `OrdersprodStage` for the same API
+with `StageName: prod`). `AccessLogSettings`, `DefaultRouteSettings`, `RouteSettings`,
+`StageVariables` and `Tags` go on the stage, and the rest of the API's properties on the API.
+
+A `DefinitionBody` reaches the API as its OpenAPI `Body`, and the routes, integrations and
+authorizers the document declares are created from it. An API declaring its routes as
+`AWS::ApiGatewayV2::Route` resources of their own has them name the API by `ApiId`, with `Ref` on
+the SAM logical ID. An API naming a `DefinitionUri` is recorded as unsupported, because nothing here
+reads a document off disk or out of S3.
+
+The API is deployed without `Auth` and `Domain`. SAM writes an `Auth` block into the document it
+generates, and deploys a `Domain` as a custom domain name resource, and neither is expanded here.
+
+```typescript sim-cloudformation-sam-table-api
+/**
+ * Deploying a SAM AWS::Serverless::SimpleTable and AWS::Serverless::HttpApi.
+ */
+
+import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Globals: {
+      HttpApi: {
+        StageVariables: { TABLE_NAME: "orders" },
+      },
+    },
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::Serverless::SimpleTable",
+        Properties: {
+          TableName: "orders",
+          PrimaryKey: { Name: "orderId", Type: "String" },
+        },
+      },
+      Orders: {
+        Type: "AWS::Serverless::HttpApi",
+        Properties: { Name: "orders" },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+console.log(stack.getResource("Orders")?.type);
+console.log(stack.getResource("OrdersApiGatewayDefaultStage")?.type);
+
+const described = await simAws
+  .dynamoDb()
+  .describeTable(new DescribeTableCommand({ TableName: "orders" }));
+
+console.log(described.Table?.KeySchema);
+```
 
 ## Serving deployed resources on localhost
 
@@ -2639,7 +2714,9 @@ Sim CloudFormation currently supports:
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
 - SAM templates naming the `AWS::Serverless-2016-10-31` transform, with `AWS::Serverless::Function`
-  expanded into a Lambda function and its execution Role, and `Globals.Function` defaults applied
+  expanded into a Lambda function and its execution Role, `AWS::Serverless::SimpleTable` into a
+  DynamoDB table, `AWS::Serverless::HttpApi` into an HTTP API and its stage, and the
+  `Globals.Function` and `Globals.HttpApi` defaults applied
 - The `HttpApi` event of a SAM function, expanded into the API, integration, route, stage and invoke
   permission that serve it, and `FunctionUrlConfig`, expanded into a Function URL
 
