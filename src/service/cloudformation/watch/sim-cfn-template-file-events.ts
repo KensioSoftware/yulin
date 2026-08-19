@@ -47,7 +47,7 @@ export class SimCfnTemplateFileEvents {
   start(): void {
     // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const watcher = fs.watch(this.directoryPath, (_event, fileName) => {
-      if (!(fileName === this.fileName)) {
+      if (fileName !== this.fileName) {
         return;
       }
 
