@@ -931,8 +931,12 @@ inside `Fn::Sub`.
 [reading a parameter with a dynamic reference](../ssm/README.md#reading-a-parameter-with-a-dynamic-reference)
 for what they resolve to, and for what happens when Parameter Store cannot answer one.
 
-`{{resolve:ssm-secure:...}}` and `{{resolve:secretsmanager:...}}` are left in the template as
-written. Neither is resolved yet.
+`{{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}` reads a
+simulated secret. See
+[reading a secret with a dynamic reference](../secretsmanager/README.md#reading-a-secret-with-a-dynamic-reference)
+for the segments and for what a reference Secrets Manager cannot answer resolves to.
+
+`{{resolve:ssm-secure:...}}` is left in the template as written, and is not resolved yet.
 
 ## Conditions
 

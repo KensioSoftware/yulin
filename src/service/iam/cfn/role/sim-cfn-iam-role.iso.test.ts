@@ -277,9 +277,10 @@ describe("IAM CloudFormation Role", () => {
 
     assertIdentical(roleResource.refValue, "OutputRole");
 
-    const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      resources: stack.resources,
-    });
+    const resolvedWaitHandleProperties =
+      await waitHandleResource.resolvedProperties({
+        resources: stack.resources,
+      });
 
     assertIdentical(resolvedWaitHandleProperties["RoleName"], "OutputRole");
     assertIdentical(resolvedWaitHandleProperties["RoleArn"], role.arn);

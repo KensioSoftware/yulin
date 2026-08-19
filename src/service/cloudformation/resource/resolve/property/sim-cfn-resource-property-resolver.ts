@@ -8,10 +8,8 @@ import type { SimCfnResourceResolveContext } from "../../sim-cfn-resource.type.j
 import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnExports } from "../../../export/sim-cfn-exports.js";
 import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
-import {
-  makeSimCfnDynamicReferences,
-  type SimCfnDynamicReferences,
-} from "../../../template/dynamic/sim-cfn-dynamic-references.js";
+import { makeSimCfnDynamicReferences } from "../../../template/dynamic/make-sim-cfn-dynamic-references.js";
+import type { SimCfnDynamicReferences } from "../../../template/dynamic/sim-cfn-dynamic-references.js";
 import type { SimCfnPropertyIgnorer } from "../../ignore/sim-cfn-ignored-property.type.js";
 
 interface SimCfnResourcePropertyResolverProperties {
@@ -57,19 +55,25 @@ export class SimCfnResourcePropertyResolver {
    * {@link SimCfnTemplateValueResolver}. If no Parameters are available, an empty
    * Parameter resolver is used so Resource Refs can still resolve.
    *
+   * Resolution itself is synchronous, and the awaiting happens around it. A
+   * dynamic reference naming a service that has to be waited on resolves to a
+   * marker while the properties resolve, and the values replace the markers
+   * here.
+   *
    * Resource Refs are read from the creation context. If a referenced Resource
    * is unexpectedly absent, the Ref is preserved as `{ Ref: logicalId }` rather
    * than being converted to an invalid value.
    */
-  resolve(
+  async resolve(
     properties: SimCfnTemplateValueRecord,
     context: SimCfnResourceResolveContext,
-  ): SimCfnTemplateValueRecord {
+  ): Promise<SimCfnTemplateValueRecord> {
+    const dynamicReferences = this.dynamicReferences(context);
     const resolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters ?? new SimCfnParameters(),
       pseudoParameters: this.pseudoParameters,
       exports: this.exports,
-      dynamicReferences: this.dynamicReferences(context),
+      dynamicReferences,
       resources: {
         has: (id): boolean => context.resources.has(id),
         refValue: (id): SimCfnTemplateValue => {
@@ -95,7 +99,13 @@ export class SimCfnResourcePropertyResolver {
       },
     });
 
-    return resolver.resolveRecord(properties);
+    const resolved = resolver.resolveRecord(properties);
+
+    if (dynamicReferences === undefined) {
+      return resolved;
+    }
+
+    return await dynamicReferences.settle(resolved);
   }
 
   /**

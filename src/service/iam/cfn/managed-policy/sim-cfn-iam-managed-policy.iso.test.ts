@@ -221,9 +221,10 @@ describe("IAM CloudFormation ManagedPolicy", () => {
       `arn:aws:iam::${simAws.defaultAccountId}:policy/OutputPolicy`,
     );
 
-    const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      resources: stack.resources,
-    });
+    const resolvedWaitHandleProperties =
+      await waitHandleResource.resolvedProperties({
+        resources: stack.resources,
+      });
 
     assertIdentical(resolvedWaitHandleProperties["PolicyArn"], policyArn);
     assertIdentical(stack.outputs.get("PolicyArn")?.value, policyArn);

@@ -438,6 +438,135 @@ console.log(credentials.password?.length); // 24
 Generated passwords are random. A test reads the value back out of the simulation the way a deployed
 application does.
 
+## Reading a secret with a dynamic reference
+
+A template reads a secret that already exists through a `{{resolve:secretsmanager:...}}` dynamic
+reference. The reference is replaced with the secret's value as the resource holding it is created.
+CDK emits one from `SecretValue.secretsManager`.
+
+The whole form is
+`{{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}`. Only the
+secret id is required, and it takes a friendly name, a full ARN or a partial ARN. Every segment
+after it can be left empty, so `{{resolve:secretsmanager:db-credentials::::}}` reads what
+`{{resolve:secretsmanager:db-credentials}}` reads.
+
+- `secret-string` accepts `SecretString` and refuses anything else. (AWS documents the segment as
+  the field to read, and `SecretString` is the only field a dynamic reference has ever read.)
+- `json-key` names one key of a secret holding a JSON object. Omitting it reads the whole secret
+  string.
+- `version-stage` and `version-id` select a version, defaulting to `AWSCURRENT`. A reference carries
+  one or the other, and giving both is refused.
+
+```typescript sim-secrets-manager-dynamic-reference
+/**
+ * A CloudFormation template reading a secret into a Lambda function's
+ * environment.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { CreateSecretCommand } from "@aws-sdk/client-secrets-manager";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.secretsManager().createSecret(
+  new CreateSecretCommand({
+    Name: "db-credentials",
+    SecretString: JSON.stringify({ username: "app", password: "hunter2" }),
+  }),
+);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "api-stack",
+  template: {
+    Resources: {
+      ApiRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "ApiRole",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+        },
+      },
+      ApiFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "api",
+          Role: { "Fn::GetAtt": ["ApiRole", "Arn"] },
+          Handler: "index.handler",
+          Runtime: "nodejs20.x",
+          Environment: {
+            Variables: {
+              DB_USERNAME:
+                "{{resolve:secretsmanager:db-credentials:SecretString:username}}",
+              DB_PASSWORD:
+                "{{resolve:secretsmanager:db-credentials:SecretString:password}}",
+            },
+          },
+          Code: {
+            ZipFile: "exports.handler = async () => process.env.DB_USERNAME;",
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// The function was created holding the values the references resolved to.
+const output = await simAws
+  .lambda()
+  .invoke(new InvokeCommand({ FunctionName: "api" }));
+
+const username = JSON.parse(
+  Buffer.from(output.Payload ?? []).toString(),
+) as string;
+
+console.log(username); // "app"
+
+await simAws.backgroundTasksComplete();
+```
+
+A reference can sit inside a longer string, where only the reference itself is replaced. One written
+inside `Fn::Sub` is read after the variables around it are substituted.
+
+A full ARN naming another account is read from that account's simulated Secrets Manager, as real
+CloudFormation reads it. A friendly name and a partial ARN both name a secret in the stack's own
+account and region.
+
+The value is decrypted through simulated KMS on the way out, the same as `GetSecretValue` decrypts
+it. A secret under a customer managed key that the simulation cannot decrypt resolves to a stand-in
+value.
+
+Real CloudFormation makes no dependency out of a dynamic reference, and neither does this. A secret
+another resource of the same stack creates is only there in time when the template says `DependsOn`.
+
+Resource properties are reported as they resolved, including this one. Real CloudFormation keeps a
+resolved secret out of its own logs and events, and sim CloudFormation has no such protection.
+
+### A reference the simulation cannot answer
+
+Simulated CloudFormation deploys what it can. A reference naming a secret that was never created
+resolves to `dummy-value-for-<secret-id>`, and the stack carries on deploying. A template reading a
+secret a test does not care about is still worth deploying for everything else in it.
+
+The substitution is recorded on
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+naming the property that held the reference and why the value is a stand-in. A `json-key` the secret
+has no value for, a version stage no version carries, a `secret-string` segment other than
+`SecretString`, and a reference naming both a version stage and a version id are all recorded the
+same way.
+
 `SecretStringTemplate` and `GenerateStringKey` go together. The generated password is added to the
 template's JSON object under that key. Without them, the whole secret value is the generated
 password. That is what an empty `GenerateSecretString: {}` produces, and it is the property CDK
@@ -481,6 +610,9 @@ Sim Secrets Manager currently supports:
   managed key
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - The `AWS::SecretsManager::Secret` CloudFormation resource, including `GenerateSecretString`
+- `{{resolve:secretsmanager:...}}` dynamic references in CloudFormation resource properties, by
+  JSON key, by staging label and by version id
+- A dynamic reference carrying a full ARN reading the account that ARN names
 
 ## Limitations
 
@@ -505,8 +637,10 @@ Current documented limitations:
   secret with no version is outside this simulation.
 - `ExcludeCharacters` that removes every character of an included type is refused. Generating a
   password missing a type it was told to include would be worse.
-- `{{resolve:secretsmanager:...}}` dynamic references are absent. That is a CloudFormation engine
-  feature rather than a Secrets Manager one. Pass the ARN from `Ref` instead.
+- A `{{resolve:secretsmanager:...}}` dynamic reference resolves to a marker while the rest of the
+  resource's properties resolve around it, and the value replaces the marker once Secrets Manager
+  has answered. An intrinsic function reading the string in between, such as an `Fn::Split` over a
+  reference, sees the marker.
 - Resource policies (`PutResourcePolicy`, `GetResourcePolicy`, `DeleteResourcePolicy`,
   `ValidateResourcePolicy`) are left out, and cross-account access to a secret cannot be granted.
 - Replica regions are left out. `AddReplicaRegions`, `ReplicateSecretToRegions` and

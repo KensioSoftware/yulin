@@ -141,6 +141,17 @@ generated value reads it back out of the simulation, as a deployed application d
 carries the random suffix, which is what makes a `Ref` into an IAM policy resource behave here the
 way it does on real AWS.
 
+`cfn/dynamic/` answers `{{resolve:secretsmanager:...}}` references. The resolver reads through the
+ordinary `GetSecretValue` command. The version is decrypted through KMS as any other read decrypts
+it, and the answer comes back as a promise. That promise is why a CloudFormation dynamic reference
+resolver may return one at all. A reference resolves to a marker while a resource's properties
+resolve around it, and the value replaces the marker afterwards.
+
+`sim-cfn-secrets-manager-reference-body.ts` reads a reference body by shape, because splitting on
+every colon over-splits it. A secret ARN carries six colons of its own and the four segments after
+the secret id carry none. An ARN is therefore taken as seven parts, and whatever is left is the
+segments.
+
 ## Divergences worth knowing
 
 - A `KmsKeyId` is checked when a version is written under it, not when it is set on its own. An
@@ -155,5 +166,7 @@ way it does on real AWS.
   and refusing is the fail-closed reading.
 - `ExcludeCharacters` that empties an included character type is refused rather than generating a
   password quietly missing a type it was told to include.
+- A `{{resolve:secretsmanager:...}}` reference is a marker in the resolved string until Secrets
+  Manager answers. An `Fn::Split` over one splits the marker.
 
 The full list is in [docs/services/secretsmanager](../../../docs/services/secretsmanager/).
