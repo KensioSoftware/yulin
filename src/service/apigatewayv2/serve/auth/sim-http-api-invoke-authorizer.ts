@@ -3,11 +3,10 @@ import type {
   SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaServiceInvokeAuthorizer } from "../../../lambda/command/authorize/sim-lambda-service-invoke-authorizer.js";
-import type { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
 import type { SimHttpApiRequestAuthorizer } from "../../api/authorizer/sim-http-api-request-authorizer.js";
 import { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
 import type { SimHttpApi } from "../../api/sim-http-api.js";
-import type { SimHttpApiFunctionTarget } from "../sim-api-gateway-v2-router.js";
+import type { SimHttpApiFunctionTarget } from "../sim-http-api-function-target.js";
 
 /**
  * The service principal API Gateway invokes a Lambda function as, whether that
@@ -21,7 +20,8 @@ interface SimHttpApiInvokeAuthorizerProperties {
 
 interface SimHttpApiInvokeAuthorizationInput {
   readonly api: SimHttpApi;
-  readonly simFunction: SimLambdaFunction;
+  /** The function to invoke, and the resource the grant was made on. */
+  readonly target: SimHttpApiFunctionTarget;
   readonly sourceArn: SimHttpApiExecuteApiArn;
 }
 
@@ -59,12 +59,16 @@ export class SimHttpApiInvokeAuthorizer {
    * usable as an authorizer. The API's own Account is supplied as
    * `AWS:SourceAccount`, which is the Account the source ARN names rather than
    * the one owning the function.
+   *
+   * A URI ending in a version or an alias is decided against that resource and
+   * its own policy. An integration on `orders:live` needs a grant made on
+   * `live`.
    */
   authorize(
     input: SimHttpApiInvokeAuthorizationInput,
   ): SimIamAuthorizationDecision {
     return this.lambdaAuthorizer.authorize({
-      resource: input.simFunction,
+      resource: input.target.resource,
       servicePrincipal: simApiGatewayServicePrincipal,
       sourceArn: input.sourceArn.toString(),
       sourceAccount: input.api.accountRegionScope.accountId,
@@ -86,7 +90,7 @@ export function simHttpApiMayNotInvokeAuthorizer(
 ): boolean {
   return new SimHttpApiInvokeAuthorizer({ iam: target.iam }).authorize({
     api,
-    simFunction: target.simFunction,
+    target,
     sourceArn: SimHttpApiExecuteApiArn.forAuthorizer(
       api,
       authorizer.authorizerId,

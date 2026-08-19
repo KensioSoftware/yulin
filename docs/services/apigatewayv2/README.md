@@ -193,6 +193,147 @@ value at request time. The request is refused with the same 500.
 AWS documents neither the method nor the path as the value API Gateway supplies. Both are inferred
 from the permission patterns AWS and CDK write. The code that builds the ARN records that.
 
+## Routing to a published version or an alias
+
+An integration URI may end in a version number or an alias name, in either of the two forms:
+
+```text
+arn:aws:lambda:eu-west-2:111111111111:function:orders:live
+arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-2:111111111111:function:orders:live/invocations
+```
+
+A Lambda `REQUEST` authorizer's `AuthorizerUri` takes the same qualifier.
+
+The qualifier is read when the request arrives. A route built on the alias `live` runs whichever
+version `live` points at now, and `UpdateAliasCommand` carries the route to another version with the
+API untouched. (That is how a deployment behind an HTTP API usually moves on AWS.)
+
+The invoke permission is granted on the qualifier as well. An alias holds a resource policy of its
+own, and a grant made on the function admits an unqualified call and says nothing about `live`. Pass
+`Qualifier` to `AddPermissionCommand` with the same `SourceArn` an unqualified grant carries.
+
+```typescript sim-apigatewayv2-lambda-alias
+/**
+ * Serving an HTTP API route from a Lambda alias, and moving the alias.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateAliasCommand,
+  CreateFunctionCommand,
+  PublishVersionCommand,
+  UpdateAliasCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+const { FunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `served by version ${context.functionVersion}`,
+      })),
+    },
+  }),
+);
+
+await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "orders" }),
+);
+await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "orders" }),
+);
+
+await lambda.createAlias(
+  new CreateAliasCommand({
+    FunctionName: "orders",
+    Name: "live",
+    FunctionVersion: "1",
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: `${FunctionArn}:live`,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "$default",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+// The grant names the alias. One made on the function alone leaves this call
+// refused with a 500.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    Qualifier: "live",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+const first = await fetch(srv.localUrl(ApiEndpoint));
+console.log(await first.text());
+
+await lambda.updateAlias(
+  new UpdateAliasCommand({
+    FunctionName: "orders",
+    Name: "live",
+    FunctionVersion: "2",
+  }),
+);
+
+const second = await fetch(srv.localUrl(ApiEndpoint));
+console.log(await second.text());
+
+await srv.close();
+```
+
+```text
+served by version 1
+served by version 2
+```
+
+A qualifier belonging to no version and no alias surfaces at the request, the way a function that
+was never created does. The endpoint answers 500 and the handler never runs.
+
 ## Route keys
 
 A route key is either the literal `$default` or an upper-case HTTP method and a path separated by one
@@ -1962,6 +2103,9 @@ the simulation without being given one. See the
   payload format 2.0 event and turning its result back into an HTTP response
 - The invoke permission of an integration's function and of an authorizer's, each evaluated against
   that function's resource policy with its own `AWS:SourceArn`
+- An integration URI or `AuthorizerUri` ending in a published version number or an alias name, read
+  at each request so a route follows its alias, with the invoke permission decided against the
+  qualified resource
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
   one JWT or Lambda `REQUEST` authorizer per security scheme an operation names
@@ -1987,11 +2131,12 @@ Current documented limitations:
   created.
 - `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any
   other option `CreateStage` takes and this one lacks.
-- `AWS_PROXY` is the only integration type, and its URI must name an unqualified Lambda function
-  ARN, written either as that ARN or as the
+- `AWS_PROXY` is the only integration type, and its URI must name a Lambda function ARN, written
+  either as that ARN or as the
   `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.
   Both reach the same function, and `GetIntegrations` answers with the function ARN whichever was
-  written. A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP
+  written. A version or alias qualifier on the end is kept and resolved at each request (see
+  [Routing to a published version or an alias](#routing-to-a-published-version-or-an-alias)). HTTP
   proxy integrations and AWS service integrations are outside the simulation.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields absent from a 2.0
   event, so treating one as the other would pass here and fail on AWS.

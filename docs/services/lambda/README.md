@@ -2791,9 +2791,9 @@ Current documented limitations:
   `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the two
   listings.
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
-  CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets and event source mappings.
-  API Gateway integration and authorizer URIs and the CloudFormation target-function reader still
-  refuse or drop a qualifier.
+  CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
+  API Gateway integration and authorizer URIs. The CloudFormation target-function reader still
+  refuses or drops a qualifier.
 - The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
   has yet to land.
 - A handler function reference is recorded through the process console and the process standard

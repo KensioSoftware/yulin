@@ -112,18 +112,53 @@ describe("Sim API Gateway v2 integration commands", () => {
         new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
       );
 
-    // When an integration names a published function version, which simulated
-    // Lambda has no notion of
-    // Then it is refused rather than invoking the unpublished function
+    // When an integration names an HTTP endpoint, which is what an HTTP_PROXY
+    // integration points at
+    // Then it is refused rather than created with nothing to invoke
     await expect(
       simAws.apiGatewayV2().createIntegration(
         new CreateIntegrationCommand({
           ApiId: apiId,
           IntegrationType: "AWS_PROXY",
-          IntegrationUri: `${functionArn}:PROD`,
+          IntegrationUri: "https://orders.example.com/intake",
           PayloadFormatVersion: "2.0",
         }),
       ),
     ).rejects.toThrow(SimApiGatewayV2BadRequest);
+  });
+
+  it("creates an integration on a version or an alias", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const { ApiId: apiId } = await simAws
+      .apiGatewayV2()
+      .createApi(
+        new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+      );
+
+    // When one integration names an alias and another names a version number,
+    // written in the API Gateway path form
+    const alias = await simAws.apiGatewayV2().createIntegration(
+      new CreateIntegrationCommand({
+        ApiId: apiId,
+        IntegrationType: "AWS_PROXY",
+        IntegrationUri: `${functionArn}:live`,
+        PayloadFormatVersion: "2.0",
+      }),
+    );
+    const version = await simAws.apiGatewayV2().createIntegration(
+      new CreateIntegrationCommand({
+        ApiId: apiId,
+        IntegrationType: "AWS_PROXY",
+        IntegrationUri:
+          `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
+          `${functionArn}:3/invocations`,
+        PayloadFormatVersion: "2.0",
+      }),
+    );
+
+    // Then each is created, and each keeps the qualifier it was given
+    assertIdentical(alias.IntegrationUri, `${functionArn}:live`);
+    assertIdentical(version.IntegrationUri, `${functionArn}:3`);
   });
 });

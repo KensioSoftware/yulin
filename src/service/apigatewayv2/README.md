@@ -234,7 +234,12 @@ fails the stack rather than deploying a template written two ways at once.
 1. `sim-api-gateway-v2-router.ts` finds the API from the request hostname, through the registry, and
    the integrated function from the integration's ARN. The function is looked up in the Account and
    Region its own ARN names, which need not be the API's, and the router hands back that Account's
-   IAM alongside the function.
+   IAM alongside the function. A version or alias qualifier on the ARN is resolved here, once per
+   request, by `SimLambda.getSimFunctionTarget`, which is what every simulated service delivering to
+   a qualified function ARN goes through. That is what lets a route follow an alias after
+   `UpdateAlias` moves it. A qualified URI gives the router two things. One is the version to
+   invoke. The other is the resource the invoke permission is decided against. For an alias the two
+   differ, and the permission belongs to the alias.
 2. `serve/auth/sim-http-api-route-authorizer.ts` asks whether the client may have the matched route.
    This comes first, before the integration is even looked up: a request presenting no credentials is
    refused whether or not the integration behind the route would have worked. It settles which kind
@@ -272,8 +277,10 @@ fails the stack rather than deploying a template written two ways at once.
    simulated service invoking a function goes through. This supplies the part API Gateway knows: the
    service principal `apigateway.amazonaws.com`, `AWS:SourceArn` from
    `api/sim-http-api-execute-api-arn.ts`, and the API's own Account as `AWS:SourceAccount`, which is
-   the Account the source ARN names rather than the one owning the function. A function with no
-   matching permission answers 500 and is never invoked, as it is on real AWS. Both an integration's
+   the Account the source ARN names rather than the one owning the function. A URI ending in a
+   version or an alias is decided against that resource and its own policy. An integration on
+   `orders:live` needs a grant made on `live`. A function with no matching permission answers 500
+   and is never invoked, as it is on real AWS. Both an integration's
    function and an authorizer's go through this, under different ARNs: the route for one,
    `<apiId>/authorizers/<authorizerId>` for the other. That ARN builder carries the reasoning for
    what the method and path segments of the ARN hold, since neither is documented by AWS.
@@ -341,8 +348,8 @@ simulation exists to avoid:
 - a `WEBSOCKET` protocol type, and the `RouteKey`/`Target` quick-create shorthand
 - `CorsConfiguration` and `Tags`
 - payload format `1.0`, which builds a different event
-- an integration type other than `AWS_PROXY`, and an integration URI that is not an unqualified
-  Lambda function ARN
+- an integration type other than `AWS_PROXY`, and an integration URI that is not a Lambda function
+  ARN, with or without a version or alias qualifier
 - a malformed route key, refused at `CreateRoute`, which is where real API Gateway refuses it
 - an `AuthorizerId` or `AuthorizationScopes` on a route that has no use for either, and an
   `AuthorizerId` naming an authorizer of the kind the route's authorization type does not take
