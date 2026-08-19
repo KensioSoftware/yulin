@@ -3,7 +3,11 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
 import { samMergedFunctionProperties } from "../sim-cfn-sam-globals.js";
-import { samFunctionEventResources } from "./event/sim-cfn-sam-function-events.js";
+import {
+  samFunctionEventEdits,
+  samFunctionEventResources,
+} from "./event/sim-cfn-sam-function-events.js";
+import type { SamResourceEdit } from "./event/sim-cfn-sam-resource-edit.js";
 import {
   samCarriedAttributes,
   samCarriedProperties,
@@ -76,4 +80,28 @@ export function samFunctionResources(
     ...samFunctionUrlResources({ logicalId, functionProperties, condition }),
     ...samFunctionEventResources({ logicalId, functionProperties, condition }),
   };
+}
+
+/**
+ * The changes the `Events` of one AWS::Serverless::Function make to Resources
+ * the template already declares.
+ *
+ * An `S3` event notifies a Bucket the template declares elsewhere, and a
+ * polled event grants the function's own execution Role the permission to
+ * poll. Neither can be keyed by the logical ID it changes. That key is already
+ * taken, and the expanded Resources are merged last write wins.
+ */
+export function samFunctionResourceEdits(
+  properties: SamFunctionExpansionProperties,
+): readonly SamResourceEdit[] {
+  const { logicalId, resource, globals } = properties;
+
+  return samFunctionEventEdits({
+    logicalId,
+    functionProperties: samMergedFunctionProperties(
+      globals,
+      samResourceProperties(resource),
+    ),
+    condition: resource["Condition"],
+  });
 }
