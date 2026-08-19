@@ -15,13 +15,9 @@ import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
 } from "./create-stack.command.js";
-import {
-  type CfnTemplateBodyRecord,
-  SimCfnTemplate,
-} from "../../template/sim-cfn-template.js";
+import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
-import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
@@ -106,8 +102,8 @@ export class CreateStackCommandHandler implements CommandHandler<
       }),
     });
 
-    const template = SimCfnTemplate.fromJson(
-      command.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
+    const template = SimCfnTemplate.fromTemplateBody(
+      command.input.TemplateBody,
       {
         stackName,
         parameters,
