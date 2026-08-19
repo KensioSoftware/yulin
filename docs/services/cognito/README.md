@@ -1926,8 +1926,11 @@ What `/forgotPassword` shows for a username the pool lacks is the app client's
 `PreventUserExistenceErrors` decision. A client set to `ENABLED` sends the browser on to the code
 page either way, and one left on the `LEGACY` default says the user is not there.
 
-There is no styling and no script on any of the five. Matching what real managed login looks like
-would be work no test could tell apart from a bare form.
+All five carry a small inline stylesheet that approximates real managed login. A card centred on the
+page, a bold heading, labels above full-width fields, and a full-width blue submit button. The
+stylesheet is part of the page. Nothing else is fetched to render one. There is no script on any of
+them, and no close match to what real managed login looks like. Real managed login is built on
+Cloudscape and draws components these pages have no equivalent for.
 
 ### Signing out
 
@@ -4173,12 +4176,13 @@ Current documented limitations:
 - A pool's schema is settled when the pool is created. `AddCustomAttributes` is unimplemented, and
   an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
   such input.
-- The managed login pages are bare forms with no styling and no script, and
-  `AWS::Cognito::ManagedLoginBranding` is an unsupported resource type. They are also at paths of
-  this simulation's own. Real managed login serves its sign-in form at `/login` and confirms a
-  sign-up within `/signup`, where here the authorize endpoint answers with the form itself and
-  `/confirm` is a page. `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML
-  endpoints go unserved.
+- The managed login pages approximate what real managed login looks like and go no closer. Their
+  stylesheet is a few dozen lines held inline, where real managed login is built on Cloudscape.
+  There is no script on them, and `AWS::Cognito::ManagedLoginBranding` is an unsupported resource
+  type. They are also at paths of this simulation's own. Real managed login serves its sign-in form
+  at `/login` and confirms a sign-up within `/signup`, where here the authorize endpoint answers
+  with the form itself and `/confirm` is a page. `/oauth2/userInfo`, `/oauth2/revoke`,
+  `/oauth2/idpresponse` and the SAML endpoints go unserved.
 - The pages hold no session and set no cookie, so each of them carries the authorize parameters in
   hidden inputs instead. Real managed login keeps a session cookie, which is what signs a returning
   browser straight back in without the form.

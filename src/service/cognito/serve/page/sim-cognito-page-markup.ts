@@ -1,3 +1,5 @@
+import { simCognitoPageStyle } from "./sim-cognito-page-style.js";
+
 /**
  * The parameters a managed login page carries from one step to the next.
  *
@@ -18,10 +20,10 @@ const escapes = new Map([
 /**
  * The HTML the simulated managed login pages are built from.
  *
- * There is no styling and there is no script. The pages exist so that a
- * browser in a local development server can complete a sign-up and a sign-in,
- * and so that a test can post the same forms. Matching what real managed login
- * looks like would be work no test could tell apart from this.
+ * The pages exist so that a browser in a local development server can complete
+ * a sign-up and a sign-in, and so that a test can post the same forms. Every
+ * page carries `simCognitoPageStyle`, which approximates what real managed
+ * login looks like. There is no script on any of them.
  *
  * Every value that reaches the page goes through `escaped`. A `state` is
  * whatever the application put in it, and it is written back into a hidden
@@ -35,9 +37,11 @@ export class SimCognitoPageMarkup {
   page(title: string, body: string): Response {
     const html =
       `<!doctype html>\n<html lang="en">\n<head>\n` +
-      `<meta charset="utf-8">\n<title>${this.escaped(title)}</title>\n` +
-      `</head>\n<body>\n<h1>${this.escaped(title)}</h1>\n${body}\n` +
-      `</body>\n</html>\n`;
+      `<meta charset="utf-8">\n` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1">\n` +
+      `<title>${this.escaped(title)}</title>\n${simCognitoPageStyle}\n` +
+      `</head>\n<body>\n<main>\n<h1>${this.escaped(title)}</h1>\n${body}\n` +
+      `</main>\n</body>\n</html>\n`;
 
     return new Response(html, {
       status: 200,
