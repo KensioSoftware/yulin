@@ -1,3 +1,4 @@
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertNonNullable,
@@ -11,6 +12,9 @@ import {
 } from "../../../../test/apigateway/cfn-deploy.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
+import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
+import { simAwsCallerHeaderName } from "../../iam/request/sim-aws-caller-header.js";
+import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import {
   simCfnRestApiMethodLogicalId,
   simCfnRestApiResourceLogicalId,
@@ -258,6 +262,68 @@ describe("API Gateway REST API CloudFormation deployment", () => {
       restApi.deployments.find(stage.deploymentId)?.description,
       "deployed by the stack",
     );
+  });
+
+  it("gates a deployed method with the IAM authorization it declares", async () => {
+    // Given a template whose one method is authorized by IAM
+    const simAws = simAwsInEuWest2();
+    const stack = await deployRestApi(
+      simAws,
+      simCfnRestApiTemplateFactory.make({
+        handlerSource: routeReportingHandler,
+        methods: [{ httpMethod: "GET", path: ["orders"] }],
+        methodProperties: { AuthorizationType: "AWS_IAM" },
+      }),
+    );
+
+    // And a Role of the API's Account allowed to invoke that one method
+    const apiId = stack.getResource("Api")?.refValue;
+    assertTypeString(apiId);
+    const iam = simAws.iam();
+    await iam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Reporter",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: {
+              AWS: `arn:aws:iam::${DEFAULT_SIM_AWS_ACCOUNT_ID}:root`,
+            },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await iam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Reporter",
+        PolicyName: "InvokeOrders",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "execute-api:Invoke",
+            Resource:
+              `arn:aws:execute-api:eu-west-2:${DEFAULT_SIM_AWS_ACCOUNT_ID}:` +
+              `${apiId}/prod/GET/orders`,
+          },
+        }),
+      }),
+    );
+
+    // When the deployed endpoint is requested with and without that Role
+    const apiUrl = stack.outputs.get("ApiUrl")?.value;
+    assertTypeString(apiUrl);
+    const http = new SimAwsHttp({ simAws });
+    const anonymous = await http.fetch(localUrl(apiUrl, "orders"));
+    const reporter = await http.fetch(localUrl(apiUrl, "orders"), {
+      headers: {
+        [simAwsCallerHeaderName]: `arn:aws:iam::${DEFAULT_SIM_AWS_ACCOUNT_ID}:role/Reporter`,
+      },
+    });
+
+    // Then the template deployed a method IAM decides, closed to a request
+    // carrying no identity and open to the Role that was allowed it
+    assertIdentical(anonymous.status, 403);
+    assertIdentical(reporter.status, 200);
+    assertIdentical(await reporter.text(), "GET /orders {}");
   });
 
   it("refuses the generated endpoint when the API disables it", async () => {

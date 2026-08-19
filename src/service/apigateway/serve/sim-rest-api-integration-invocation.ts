@@ -66,7 +66,10 @@ export class SimRestApiIntegrationInvocation {
       const event = await this.eventBuilder.build(
         input.request,
         simRestApiEndpoint(input.restApi, input.match),
-        { lambda: input.authorization.lambda },
+        {
+          lambda: input.authorization.lambda,
+          caller: input.authorization.caller,
+        },
       );
       const result = await target.simFunction.invoke(event);
 

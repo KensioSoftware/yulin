@@ -95,14 +95,19 @@ The client's own authorization runs first. A request presenting no credentials i
 not the integration behind the method would have worked. Whether the API may invoke a function is a
 separate question, asked afterwards, and it is the API's rather than the client's.
 
-`serve/auth/` holds one authorization type, and the pieces are the ones a `TOKEN` authorizer needs:
+`serve/auth/` holds the authorization types, one decider each:
 
 ```text
 SimRestApiMethodAuthorizer            which type the method asks for
+├── SimRestApiIamMethodAuthorizer     the caller, put to IAM against the method ARN
 └── SimRestApiAuthorizerInvocation    the invoke permission, the event, the answer
     ├── SimRestApiAuthorizerResponse  the principal, the context, the policy
     └── SimRestApiAuthorizerPolicy    that policy, put to IAM against the method ARN
 ```
+
+An `AWS_IAM` method asks the IAM of the Account that owns the API about the caller the serving
+boundary resolved. The caller travels on with the admission, and `src/serve/payload-1/` describes it
+to the handler under `requestContext.identity`.
 
 The method ARN is the one part with no HTTP API equivalent worth copying. A REST API authorizer is
 handed the ARN of the request the client made, with the concrete path in it, and the policy it
@@ -204,10 +209,10 @@ type other than `AWS_PROXY` are all refused there, so a request naming one fails
 been applied on real AWS.
 
 Authorization is refused the same way, in the two commands that carry it.
-`CreateAuthorizer` takes `TOKEN` and refuses the other two kinds, and `PutMethod` takes `NONE` and
-`CUSTOM` and refuses the other two types. A method served open where AWS would have gated it lets a
-test pass on a request real AWS rejects, so a template asking for one of them fails to deploy rather
-than deploying around it.
+`CreateAuthorizer` takes `TOKEN` and refuses the other two kinds, and `PutMethod` takes `NONE`,
+`CUSTOM` and `AWS_IAM` and refuses `COGNITO_USER_POOLS`. A method served open where AWS would have
+gated it lets a test pass on a request real AWS rejects, so a template asking for one of them fails
+to deploy rather than deploying around it.
 
 An imported document meets those refusals through the commands, and `openapi/` adds the ones about
 members no command sees. A document-level `security`, an operation's `security`, a Swagger 2

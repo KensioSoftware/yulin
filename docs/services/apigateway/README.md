@@ -521,6 +521,147 @@ arn:aws:execute-api:{region}:{account}:{apiId}/authorizers/{authorizerId}
 That ARN names no stage. A function used both as an integration and as an authorizer needs two
 permissions, as it does on AWS. CDK's `TokenAuthorizer` writes this one.
 
+## Protecting a method with IAM
+
+A method declared `authorizationType: "AWS_IAM"` reaches its integration only when the caller is
+allowed `execute-api:Invoke` on the ARN of the method being called. IAM decides. The method takes no
+authorizer, and naming one is refused by `PutMethod`.
+
+The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
+naming a principal directly. A request offering neither is anonymous, owns no policies, and is
+refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how that
+resolution works and how to sign a served request.
+
+The ARN a request is authorized against is:
+
+```text
+arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<path>
+```
+
+- The Account and Region are the API's own, not the caller's.
+- The stage is the one that served the request.
+- The method is the one the client sent, upper case. A `GET` reaching a resource declaring `ANY`
+  gives `GET`.
+- The path is the request path with the stage segment and the leading slash taken off, so
+  `/prod/orders/42` served from stage `prod` gives `orders/42`. It is the path the client asked for,
+  because a policy names it by hand. A request to a method declared on `/orders/{orderId}` is
+  authorized under `GET/orders/42`, with no braces in it. A request to the API root gives an ARN
+  ending `/GET/`.
+
+An identity policy may wildcard any part of that. `<apiId>/*`, `<apiId>/prod/*` and
+`<apiId>/*/GET/orders/*` all allow a `GET` of `/orders/42` on stage `prod`.
+
+```typescript sim-apigateway-iam-authorization
+/**
+ * Protecting a simulated REST API method with IAM.
+ *
+ * The caller the request was attributed to has to be allowed
+ * execute-api:Invoke on the method it is calling.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    iamAuthorization: true,
+    resourcePaths: ["/orders/{orderId}"],
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "text/plain" },
+      body: `orders for ${event.requestContext.identity.userArn ?? "nobody"}`,
+    }),
+  },
+  simAws,
+);
+
+// A Role of the API's own Account, allowed to call the orders methods of this
+// API on the stage it is deployed to.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "Reporter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { AWS: "arn:aws:iam::888888888888:root" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Reporter",
+    PolicyName: "InvokeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "execute-api:Invoke",
+          Resource: `arn:aws:execute-api:us-east-1:888888888888:${restApi.apiId}/prod/GET/orders/*`,
+        },
+      ],
+    }),
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders/42`);
+
+const anonymous = await fetch(url);
+
+console.log(anonymous.status);
+// 403
+
+const reporter = await fetch(url, {
+  headers: { "x-sim-aws-caller": "arn:aws:iam::888888888888:role/Reporter" },
+});
+
+console.log(await reporter.text());
+// "orders for arn:aws:iam::888888888888:role/Reporter"
+
+await srv.close();
+```
+
+A caller IAM does not allow gets 403 with `User is not authorized to access this resource`. An
+explicit Deny gets that same body, where a Lambda authorizer's Deny gets one of its own.
+
+Only the caller's identity policies are read. A REST API also has a resource policy on real AWS, and
+`Policy` on an `AWS::ApiGateway::RestApi` is recorded against the Resource with the API deployed
+without it. A caller from another Account is therefore always refused, because a cross-Account
+request needs an Allow from each side. The way through, here as on AWS, is to assume a Role in the
+API's Account.
+
+### The identity the handler receives
+
+An admitted caller reaches the handler under `requestContext.identity`.
+
+| Field       | What it carries                    |
+| ----------- | ---------------------------------- |
+| `accountId` | The Account the caller's ARN names |
+| `caller`    | The caller's ARN                   |
+| `user`      | The caller's ARN                   |
+| `userArn`   | The caller's ARN                   |
+
+Real API Gateway puts the unique id of the principal in `caller` and `user`, such as `AIDA...` for a
+User. A request carries no such id into the simulation, so the ARN identifying the caller goes in
+every field that can be filled from it.
+
+A method of any other authorization type leaves those four `null`, and so does an `AWS_IAM` method
+called by a principal with no ARN behind it. `accessKey`, `apiKey`, `apiKeyId`, `principalOrgId` and
+the two Cognito identity pool fields are `null` throughout. `sourceIp` and `userAgent` describe the
+request itself and are filled for every method.
+
 ## Intercepting an SDK client
 
 `SimSdk` routes `@aws-sdk/client-api-gateway` commands to the simulation. Code under test builds its
@@ -1021,8 +1162,9 @@ An input outside what this simulates is refused. Dropping it would let a request
 and behave differently deployed. The refusals worth knowing about:
 
 - **Authorizer kinds.** `TOKEN` is the one simulated. A `REQUEST` or `COGNITO_USER_POOLS`
-  authorizer is refused by `CreateAuthorizer`, and an `AWS_IAM` method by `PutMethod`. Each is a
-  separate piece of work.
+  authorizer is refused by `CreateAuthorizer`, and a `COGNITO_USER_POOLS` method by `PutMethod`.
+  Each is a separate piece of work. An `AWS_IAM` method is decided by IAM and names no authorizer.
+  See [Protecting a method with IAM](#protecting-a-method-with-iam).
 - **Holding an authorizer's decision.** `authorizerResultTtlInSeconds` is refused. The function is
   invoked once per request reaching the method.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
