@@ -3,12 +3,14 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
 import { samMergedFunctionProperties } from "../sim-cfn-sam-globals.js";
+import { samFunctionEventResources } from "./event/sim-cfn-sam-function-events.js";
 import {
   samCarriedAttributes,
   samCarriedProperties,
   samResourceProperties,
 } from "./sim-cfn-sam-function-properties.js";
 import { samFunctionRoleResource } from "./sim-cfn-sam-function-role.js";
+import { samFunctionUrlResources } from "./sim-cfn-sam-function-url.js";
 
 interface SamFunctionExpansionProperties {
   readonly logicalId: string;
@@ -31,6 +33,11 @@ export const samFunctionType = "AWS::Serverless::Function";
  * names. The execution Role is a second Resource named after it, unless the
  * function named a Role of its own to run as.
  *
+ * The `Events` of the function reach the world in front of it, and a
+ * `FunctionUrlConfig` is the AWS::Lambda::Url it answers on. Both expand into
+ * Resources beside the function, named after it, so what an event made is
+ * something a template can `Ref` and something a Stack tears down.
+ *
  * `CodeUri` is not carried over. Nothing reads code off disk here, and a
  * function a bound handler backs needs no `Code` at all. A function carrying
  * neither is reported as skipped the way an unbacked AWS::Lambda::Function
@@ -46,6 +53,7 @@ export function samFunctionResources(
   );
   const roleLogicalId = `${logicalId}Role`;
   const declaredRole = functionProperties["Role"];
+  const condition = resource["Condition"];
 
   const lambdaFunction: SimCfnTemplateValueRecord = {
     Type: "AWS::Lambda::Function",
@@ -56,16 +64,16 @@ export function samFunctionResources(
     },
   };
 
-  if (declaredRole !== undefined) {
-    return { [logicalId]: lambdaFunction };
-  }
-
   return {
     [logicalId]: lambdaFunction,
-    [roleLogicalId]: samFunctionRoleResource({
-      logicalId,
-      functionProperties,
-      condition: resource["Condition"],
+    ...(declaredRole === undefined && {
+      [roleLogicalId]: samFunctionRoleResource({
+        logicalId,
+        functionProperties,
+        condition,
+      }),
     }),
+    ...samFunctionUrlResources({ logicalId, functionProperties, condition }),
+    ...samFunctionEventResources({ logicalId, functionProperties, condition }),
   };
 }

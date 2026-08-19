@@ -1978,6 +1978,88 @@ such as `DynamoDBCrudPolicy` are left ungenerated, because simulated IAM allows 
 default and a role missing those statements authorizes the same calls either way. A function naming
 its own `Role` runs as that role, and gets no expanded one.
 
+### Function events
+
+`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi` is the type
+this covers. An event of any other type is left where it is, and the function deploys with nothing in
+front of it.
+
+An `HttpApi` event becomes an `AWS::ApiGatewayV2::Integration`, an `AWS::ApiGatewayV2::Route` and the
+`AWS::Lambda::Permission` the API invokes the function under. `Path` and `Method` become the route
+key (`GET /rates/{currency}`). An event stating no method gets `ANY`, and a `Path` of `$default`
+becomes the catch-all route.
+
+Events naming no `ApiId` share one API under the logical ID SAM gives it, `ServerlessHttpApi`, with a
+`$default` stage. Two functions with events of their own answer on the same endpoint. An event naming
+an `ApiId` routes to the API that logical ID belongs to, and the template brings the stage.
+
+```typescript sim-cloudformation-sam-http-api-event
+/**
+ * A SAM function reached through the HTTP API its HttpApi event made.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "rates-api-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Resources: {
+      Rates: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Events: {
+            Get: {
+              Type: "HttpApi",
+              Properties: { Path: "/rates/{currency}", Method: "GET" },
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      ApiEndpoint: {
+        Value: { "Fn::GetAtt": ["ServerlessHttpApi", "ApiEndpoint"] },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Rates",
+      handler: (request: {
+        pathParameters?: Record<string, string>;
+      }): { statusCode: number; body: string } => ({
+        statusCode: 200,
+        body: `rate for ${request.pathParameters?.["currency"]}`,
+      }),
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(
+  srv.localUrl(`${stack.output("ApiEndpoint")}/rates/GBP`),
+);
+
+console.log(await response.text());
+
+await srv.close();
+```
+
+`Auth` on the event is left out. Every request matching the expanded route reaches the function.
+
+A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
+for a function called `Rates`. `AuthType` and `InvokeMode` carry over. `Cors` is left out (the
+simulated Function URL answers no preflight request).
+
 ## Serving deployed resources on localhost
 
 CloudFormation itself is not served as an HTTP API. Instead, you deploy infrastructure through Sim
@@ -2558,6 +2640,8 @@ Sim CloudFormation currently supports:
 - Implicit dependencies from resource `Ref` expressions
 - SAM templates naming the `AWS::Serverless-2016-10-31` transform, with `AWS::Serverless::Function`
   expanded into a Lambda function and its execution Role, and `Globals.Function` defaults applied
+- The `HttpApi` event of a SAM function, expanded into the API, integration, route, stage and invoke
+  permission that serve it, and `FunctionUrlConfig`, expanded into a Function URL
 
 The resource types it creates are:
 
@@ -2659,9 +2743,10 @@ Each service's own docs describe what its resource types support.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.
-- The SAM transform is expanded for `AWS::Serverless::Function` alone. `Events` on a function are
-  left out. A SAM API, schedule or queue trigger creates nothing, and every other
-  `AWS::Serverless::*` resource type is recorded as unsupported. `AutoPublishAlias` and
-  `DeploymentPreference` are left out too, because the simulator has one version of a function and
-  nothing to shift traffic between.
+- The SAM transform is expanded for `AWS::Serverless::Function` alone. Every other
+  `AWS::Serverless::*` resource type is recorded as unsupported. `HttpApi` is the only event type
+  expanded, so a SAM `Api`, schedule or queue trigger creates nothing. `Auth` on an `HttpApi` event
+  and on the implicit API it shares is left out. `AutoPublishAlias` and `DeploymentPreference` are
+  left out too, because the simulator has one version of a function and nothing to shift traffic
+  between.
 - Many advanced CloudFormation features are outside the simulation.

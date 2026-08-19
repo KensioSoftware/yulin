@@ -19,6 +19,11 @@ export interface SimCfnSamFunctionTemplateInput {
    * gets no `Globals` section.
    */
   readonly globals: SimCfnTemplateValueRecord;
+  /**
+   * Resources the template carries beside the function, such as the API an
+   * event names or a second function sharing one.
+   */
+  readonly resources: SimCfnTemplateValueRecord;
 }
 
 /**
@@ -53,7 +58,7 @@ export const simCfnSamFunctionTemplateFactory = new MappedFactory<
   SimCfnSamFunctionTemplateInput,
   CfnTemplateBodyRecord
 >(
-  () => ({ functionProperties: {}, globals: {} }),
+  () => ({ functionProperties: {}, globals: {}, resources: {} }),
   (input) => ({
     Transform: samTransformName,
     ...globalsSection(input),
@@ -62,6 +67,7 @@ export const simCfnSamFunctionTemplateFactory = new MappedFactory<
         Type: samFunctionType,
         Properties: { ...workingFunction, ...input.functionProperties },
       },
+      ...input.resources,
     },
   }),
 );
