@@ -5,6 +5,10 @@ import {
   samHttpApiResources,
   samHttpApiType,
 } from "./api/sim-cfn-sam-http-api.js";
+import {
+  samRestApiResources,
+  samRestApiType,
+} from "./api/sim-cfn-sam-rest-api.js";
 import type { SamResourceEdit } from "./function/event/sim-cfn-sam-resource-edit.js";
 import { samEditedResources } from "./function/event/sim-cfn-sam-resource-edit.js";
 import {
@@ -84,11 +88,7 @@ function resourceEdits(
     return [];
   }
 
-  return samFunctionResourceEdits({
-    logicalId,
-    resource,
-    globals: globals.forFunction,
-  });
+  return samFunctionResourceEdits({ logicalId, resource, globals });
 }
 
 /**
@@ -107,11 +107,7 @@ function expandedResource(
   const type = resource["Type"];
 
   if (type === samFunctionType) {
-    return samFunctionResources({
-      logicalId,
-      resource,
-      globals: globals.forFunction,
-    });
+    return samFunctionResources({ logicalId, resource, globals });
   }
 
   if (type === samHttpApiType) {
@@ -119,6 +115,14 @@ function expandedResource(
       logicalId,
       resource,
       globals: globals.forHttpApi,
+    });
+  }
+
+  if (type === samRestApiType) {
+    return samRestApiResources({
+      logicalId,
+      resource,
+      globals: globals.forApi,
     });
   }
 

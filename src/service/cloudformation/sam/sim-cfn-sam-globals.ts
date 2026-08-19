@@ -11,6 +11,8 @@ export interface SamTemplateGlobals {
   readonly forFunction: SimCfnTemplateValueRecord;
   /** The `Globals.HttpApi` defaults every SAM HTTP API takes. */
   readonly forHttpApi: SimCfnTemplateValueRecord;
+  /** The `Globals.Api` defaults every SAM REST API takes. */
+  readonly forApi: SimCfnTemplateValueRecord;
 }
 
 /**
@@ -23,12 +25,13 @@ export function samTemplateGlobals(
   const globals = template["Globals"];
 
   if (!isSamTemplateRecord(globals)) {
-    return { forFunction: {}, forHttpApi: {} };
+    return { forFunction: {}, forHttpApi: {}, forApi: {} };
   }
 
   return {
     forFunction: samGlobalsSection(globals["Function"]),
     forHttpApi: samGlobalsSection(globals["HttpApi"]),
+    forApi: samGlobalsSection(globals["Api"]),
   };
 }
 
@@ -41,14 +44,16 @@ function samGlobalsSection(section: unknown): SimCfnTemplateValueRecord {
 }
 
 /**
- * The properties an HTTP API is expanded with, from the `Globals.HttpApi`
- * defaults and what the API states for itself.
+ * The properties an API is expanded with, from the `Globals` defaults its kind
+ * takes and what the API states for itself.
  *
  * A property the API states wins outright. Nothing here is merged the way a
- * function's environment variables are, because none of what an HTTP API takes
- * from `Globals` is a set of named entries a second declaration adds to.
+ * function's environment variables are, because none of what an API takes from
+ * `Globals` is a set of named entries a second declaration adds to.
+ *
+ * Both API kinds merge the same way, against the section of their own.
  */
-export function samMergedHttpApiProperties(
+export function samMergedApiProperties(
   globals: SimCfnTemplateValueRecord,
   properties: SimCfnTemplateValueRecord,
 ): SimCfnTemplateValueRecord {

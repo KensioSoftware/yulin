@@ -374,3 +374,14 @@ Install pnpm
 ```bash
 pnpm i
 ```
+
+The local test suite compares Yulin's SAM expansion against real SAM, and needs the AWS SAM CLI on
+the `PATH` to do it. The CLI has no npm package. It installs through Homebrew, pip or the AWS
+installer:
+
+```bash
+brew install aws-sam-cli
+```
+
+`pnpm test:iso` runs without it. `pnpm test:local` and `pnpm check` skip the comparison with a
+warning where the CLI is absent, and a CI run that cannot find it fails.

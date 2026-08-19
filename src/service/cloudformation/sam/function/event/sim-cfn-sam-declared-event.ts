@@ -13,6 +13,11 @@ export interface SamFunctionEventsProperties {
   readonly logicalId: string;
   /** The function properties, with the `Globals` defaults already merged in. */
   readonly functionProperties: SimCfnTemplateValueRecord;
+  /**
+   * The `Globals.Api` defaults the template states, for the events that make
+   * an API of their own.
+   */
+  readonly apiGlobals: SimCfnTemplateValueRecord;
   /** The `Condition` the SAM Resource carried, where it carried one. */
   readonly condition: SimCfnTemplateValue | undefined;
 }
@@ -39,6 +44,12 @@ export interface SamFunctionEvent {
    * supplies nothing.
    */
   readonly condition: SimCfnTemplateValueRecord;
+  /**
+   * The `Globals.Api` defaults the template states. An `Api` event naming no
+   * `RestApiId` makes the implicit API, and SAM gives that API the same
+   * defaults as one the template declared.
+   */
+  readonly apiGlobals: SimCfnTemplateValueRecord;
 }
 
 /**
@@ -96,6 +107,7 @@ function declaredEvent(
         eventName,
         properties: isSamTemplateRecord(eventProperties) ? eventProperties : {},
         condition: samConditionAttribute(properties.condition),
+        apiGlobals: properties.apiGlobals,
       },
     },
   ];

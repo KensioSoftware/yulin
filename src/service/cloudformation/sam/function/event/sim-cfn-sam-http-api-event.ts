@@ -4,7 +4,7 @@ import type {
 } from "../../../template/value/sim-cfn-template-value.js";
 import { isSamTemplateRecord } from "../../sim-cfn-sam-record.js";
 import type { SamFunctionEvent } from "./sim-cfn-sam-function-events.js";
-import { samHttpApiPermissionResource } from "./sim-cfn-sam-http-api-permission.js";
+import { samApiInvokePermissionResource } from "./sim-cfn-sam-api-invoke-permission.js";
 import { samHttpApiRouteResource } from "./sim-cfn-sam-http-api-route.js";
 import {
   samImplicitHttpApiLogicalId,
@@ -43,7 +43,11 @@ export function samHttpApiEventResources(
       integrationLogicalId,
       event,
     }),
-    [`${prefix}Permission`]: samHttpApiPermissionResource(event, apiId),
+    [`${prefix}Permission`]: samApiInvokePermissionResource({
+      event,
+      apiId,
+      sourceArnSuffix: "/*/*",
+    }),
   };
 }
 

@@ -20,6 +20,11 @@ export interface SimCfnSamFunctionTemplateInput {
    */
   readonly globals: SimCfnTemplateValueRecord;
   /**
+   * The `Globals.Api` defaults the template states, for a test about what an
+   * `Api` event takes from them. A test stating none gets no section.
+   */
+  readonly apiGlobals: SimCfnTemplateValueRecord;
+  /**
    * Resources the template carries beside the function, such as the API an
    * event names or a second function sharing one.
    */
@@ -58,7 +63,12 @@ export const simCfnSamFunctionTemplateFactory = new MappedFactory<
   SimCfnSamFunctionTemplateInput,
   CfnTemplateBodyRecord
 >(
-  () => ({ functionProperties: {}, globals: {}, resources: {} }),
+  () => ({
+    functionProperties: {},
+    globals: {},
+    apiGlobals: {},
+    resources: {},
+  }),
   (input) => ({
     Transform: samTransformName,
     ...globalsSection(input),
@@ -78,9 +88,21 @@ export const simCfnSamFunctionTemplateFactory = new MappedFactory<
 function globalsSection(
   input: SimCfnSamFunctionTemplateInput,
 ): SimCfnTemplateValueRecord {
-  if (Object.keys(input.globals).length === 0) {
-    return {};
-  }
+  const globals = {
+    ...section("Function", input.globals),
+    ...section("Api", input.apiGlobals),
+  };
 
-  return { Globals: { Function: input.globals } };
+  return Object.keys(globals).length === 0 ? {} : { Globals: globals };
+}
+
+/**
+ * One section of the `Globals`, for a test stating defaults for that kind of
+ * Resource.
+ */
+function section(
+  name: string,
+  defaults: SimCfnTemplateValueRecord,
+): SimCfnTemplateValueRecord {
+  return Object.keys(defaults).length === 0 ? {} : { [name]: defaults };
 }

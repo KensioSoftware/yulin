@@ -1909,9 +1909,10 @@ a matching binding keep their template code, running in the simulated vm runtime
 A template naming the `AWS::Serverless-2016-10-31` transform has its SAM resources expanded before
 the stack deploys, the way CloudFormation expands them. `AWS::Serverless::Function` becomes an
 `AWS::Lambda::Function` and the `AWS::IAM::Role` it runs as. `AWS::Serverless::SimpleTable` becomes
-an `AWS::DynamoDB::Table`, and `AWS::Serverless::HttpApi` becomes an `AWS::ApiGatewayV2::Api` and
-its stage. `Globals.Function` and `Globals.HttpApi` supply the defaults every function and every API
-takes, and a value on the resource itself wins.
+an `AWS::DynamoDB::Table`. `AWS::Serverless::HttpApi` becomes an `AWS::ApiGatewayV2::Api` and its
+stage, and `AWS::Serverless::Api` becomes an `AWS::ApiGateway::RestApi` with the deployment and
+stage that publish it. `Globals.Function`, `Globals.HttpApi` and `Globals.Api` supply the defaults
+every function and every API takes, and a value on the resource itself wins.
 
 The expanded function keeps the logical ID the SAM resource had. `Ref` and `Fn::GetAtt` against that
 name answer for the function, and a binding targeting that logical ID backs it with your real
@@ -1982,9 +1983,10 @@ its own `Role` runs as that role, and gets no expanded one.
 
 ### Function events
 
-`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi`, `SQS`,
-`DynamoDB`, `SNS`, `S3`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this covers. An
-event of any other type is left where it is, and the function deploys with nothing in front of it.
+`Events` on a SAM function expand into whatever puts the function behind them. `Api`, `HttpApi`,
+`SQS`, `DynamoDB`, `SNS`, `S3`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this
+covers. An event of any other type is left where it is, and the function deploys with nothing in
+front of it.
 
 An `HttpApi` event becomes an `AWS::ApiGatewayV2::Integration`, an `AWS::ApiGatewayV2::Route` and the
 `AWS::Lambda::Permission` the API invokes the function under. `Path` and `Method` become the route
@@ -2057,6 +2059,99 @@ await srv.close();
 ```
 
 `Auth` on the event is left out. Every request matching the expanded route reaches the function.
+
+An `Api` event is the REST half of the same idea. It becomes an `AWS::ApiGateway::Resource` for each
+segment of `Path`, an `AWS::ApiGateway::Method` on the last of them carrying a proxy `Integration`
+to the function, and the `AWS::Lambda::Permission` the API invokes it under. A `Method` of `any`
+becomes `ANY`, and an event stating none gets `ANY` as well. Two events sharing a path prefix share
+the resources that spell it, so `/rates` and `/rates/{currency}` sit on one branch of one tree.
+
+Events naming no `RestApiId` share the API SAM calls `ServerlessRestApi`, published to a `Prod`
+stage. A REST API carries the stage as the first segment of every path it serves. The example below
+requests `/Prod/rates/GBP` for that reason.
+
+```typescript sim-cloudformation-sam-api-event
+/**
+ * A SAM function reached through the REST API its Api event made.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "rates-api-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Resources: {
+      Rates: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Events: {
+            Get: {
+              Type: "Api",
+              Properties: { Path: "/rates/{currency}", Method: "GET" },
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      ApiUrl: {
+        Value: {
+          "Fn::Join": [
+            "",
+            [
+              "https://",
+              { Ref: "ServerlessRestApi" },
+              ".execute-api.",
+              { Ref: "AWS::Region" },
+              ".",
+              { Ref: "AWS::URLSuffix" },
+              "/",
+              { Ref: "ServerlessRestApiProdStage" },
+              "/",
+            ],
+          ],
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Rates",
+      handler: (request: {
+        pathParameters?: Record<string, string> | null;
+      }): { statusCode: number; body: string } => ({
+        statusCode: 200,
+        body: `rate for ${request.pathParameters?.["currency"]}`,
+      }),
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(
+  srv.localUrl(`${stack.output("ApiUrl")}rates/GBP`),
+);
+
+console.log(await response.text());
+// "rate for GBP"
+
+await srv.close();
+```
+
+An event naming a `RestApiId` puts its method on the API that logical ID belongs to, whether an
+`AWS::Serverless::Api` or an `AWS::ApiGateway::RestApi` the template declared. The API is named as
+the logical ID or as a `Ref` to it. An event naming it any other way, such as through
+`Fn::ImportValue`, expands into no resources at all, because a REST API path tree is built downwards
+from a root resource this has no way to reach. `Auth` on the event is left out, the same as on an `HttpApi` one.
 
 A `Schedule` event becomes an `AWS::Events::Rule` on a timer, with the `AWS::Lambda::Permission` the
 rule invokes the function under. The event's `Schedule` is the rule's `ScheduleExpression`, and the
@@ -2310,6 +2405,76 @@ const described = await simAws
 
 console.log(described.Table?.KeySchema);
 ```
+
+### REST APIs
+
+`AWS::Serverless::Api` deploys a REST API, the deployment that publishes it, and the stage `StageName`
+names. The stage carries the logical ID SAM builds for it (`OrdersprodStage` for an API called
+`Orders` with `StageName: prod`, and `OrdersStage` followed by ten characters of a hash where the
+name cannot be part of an identifier). The deployment is `OrdersDeployment`, where SAM appends a
+hash of the document it generates. `Variables` become the stage's stage variables, and `Name`,
+`Description` and `DisableExecuteApiEndpoint` go on the API.
+
+`StageName` is required on an `AWS::Serverless::Api`, and real SAM refuses a template leaving it
+out. Deployment here is best effort, so an API without one publishes to `Prod`, the stage SAM gives
+the implicit API.
+
+A REST API takes a name whatever else it declares, and an API stating no `Name` is named after its
+logical ID. Methods reach it as resources naming it by `RestApiId`. That is how an `Api` event on a
+function reaches an API the template declared, and how an `AWS::ApiGateway::Method` resource of its
+own does.
+
+A `DefinitionBody` reaches the API as its Swagger `Body` and is recorded as a property the API was
+created without, because reading the document is outside this. An API declaring one deploys with a
+root resource and an empty tree under it. An API naming a `DefinitionUri` is recorded as
+unsupported, because this reads no document off disk or out of S3.
+
+The API is deployed without `Auth`, `Cors`, `Domain`, `GatewayResponses`, `MethodSettings` and
+`BinaryMediaTypes`. SAM writes each of them into the document it generates, and none is expanded
+here.
+
+```typescript sim-cloudformation-sam-rest-api
+/**
+ * Deploying a SAM AWS::Serverless::Api, with the Globals.Api defaults.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Globals: {
+      Api: { Variables: { TABLE_NAME: "orders" } },
+    },
+    Resources: {
+      Orders: {
+        Type: "AWS::Serverless::Api",
+        Properties: { Name: "orders-api", StageName: "prod" },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+console.log(stack.getResource("Orders")?.type);
+// "AWS::ApiGateway::RestApi"
+
+console.log(stack.getResource("OrdersDeployment")?.type);
+// "AWS::ApiGateway::Deployment"
+
+console.log(stack.getResource("OrdersprodStage")?.type);
+// "AWS::ApiGateway::Stage"
+```
+
+SAM expands a REST API through the Swagger document it generates, with the paths, methods and
+integrations inside the `Body` of one resource. The expansion here writes the
+`AWS::ApiGateway::Resource` and `AWS::ApiGateway::Method` resources directly. A method is then
+something the stack holds, answers `Ref` for and tears down. The APIs, stages and methods come out
+the same either way, and the logical IDs of the path resources have no counterpart in what SAM
+produces.
 
 ## Serving deployed resources on localhost
 
@@ -2891,16 +3056,21 @@ Sim CloudFormation currently supports:
 - Implicit dependencies from resource `Ref` expressions
 - SAM templates naming the `AWS::Serverless-2016-10-31` transform, with `AWS::Serverless::Function`
   expanded into a Lambda function and its execution Role, `AWS::Serverless::SimpleTable` into a
-  DynamoDB table, `AWS::Serverless::HttpApi` into an HTTP API and its stage, and the
-  `Globals.Function` and `Globals.HttpApi` defaults applied
+  DynamoDB table, `AWS::Serverless::HttpApi` into an HTTP API and its stage,
+  `AWS::Serverless::Api` into a REST API with its deployment and stage, and the `Globals.Function`,
+  `Globals.HttpApi` and `Globals.Api` defaults applied
 - The `HttpApi` event of a SAM function, expanded into the API, integration, route, stage and invoke
-  permission that serve it, and `FunctionUrlConfig`, expanded into a Function URL
+  permission that serve it, and the `Api` event, expanded into the API, path resources, method,
+  deployment, stage and invoke permission that serve it
+- `FunctionUrlConfig` on a SAM function, expanded into a Function URL
 - The `Schedule`, `ScheduleV2` and `EventBridgeRule` events of a SAM function, expanded into the
   EventBridge rule or Scheduler schedule that fires the function, and the permission or execution
   Role the invocation is authorized by
 
 The resource types it creates are:
 
+- `AWS::ApiGateway::RestApi`, `AWS::ApiGateway::Resource`, `AWS::ApiGateway::Method`,
+  `AWS::ApiGateway::Deployment` and `AWS::ApiGateway::Stage`
 - `AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Integration`, `AWS::ApiGatewayV2::Route` and
   `AWS::ApiGatewayV2::Stage`
 - `AWS::CertificateManager::Certificate`
@@ -2999,12 +3169,11 @@ Each service's own docs describe what its resource types support.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.
-- The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable` and
-  `AWS::Serverless::HttpApi`. Every other `AWS::Serverless::*` resource type is recorded as
-  unsupported. `HttpApi`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the event types
-  expanded. An event of another type, such as `Api` or `SQS`, creates nothing. `Auth` on an
-  `HttpApi` event
-  and on the implicit API it shares is left out. `AutoPublishAlias` and `DeploymentPreference` are
-  left out too, because the simulator has one version of a function and nothing to shift traffic
-  between.
+- The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable`,
+  `AWS::Serverless::HttpApi` and `AWS::Serverless::Api`. Every other `AWS::Serverless::*` resource
+  type is recorded as unsupported. `Api`, `HttpApi`, `SQS`, `DynamoDB`, `SNS`, `S3`, `Schedule`,
+  `ScheduleV2` and `EventBridgeRule` are the event types expanded, and an event of another type,
+  such as `Cognito`, is left where it is. `Auth` on an `Api` or `HttpApi` event, and on the implicit API
+  either of them shares, is left out. `AutoPublishAlias` and `DeploymentPreference` are left out
+  too, because the simulator has one version of a function and nothing to shift traffic between.
 - Many advanced CloudFormation features are outside the simulation.
