@@ -1805,6 +1805,80 @@ function's execution Role as the ambient simulated caller, so downstream calls m
 `SimSdk`-intercepted clients are authorized by simulated IAM as on real Lambda. Functions without
 a matching binding keep their template code, running in the simulated vm runtime.
 
+## SAM templates
+
+A template naming the `AWS::Serverless-2016-10-31` transform has its SAM resources expanded before
+the stack deploys, the way CloudFormation expands them. `AWS::Serverless::Function` becomes an
+`AWS::Lambda::Function` and the `AWS::IAM::Role` it runs as. `Globals.Function` supplies the
+defaults every function takes, and a value on the function itself wins.
+
+The expanded function keeps the logical ID the SAM resource had. `Ref` and `Fn::GetAtt` against that
+name answer for the function, and a binding targeting that logical ID backs it with your real
+handler. `CodeUri` is never read from disk (a bound function can leave the code out of the template
+altogether).
+
+```typescript sim-cloudformation-sam-function
+/**
+ * Deploying a SAM AWS::Serverless::Function into simulated AWS.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "rates-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Globals: {
+      Function: {
+        Runtime: "nodejs22.x",
+        Timeout: 10,
+      },
+    },
+    Resources: {
+      Rates: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          FunctionName: "rates",
+          CodeUri: "src/rates/",
+          Handler: "index.handler",
+          Environment: {
+            Variables: { TABLE_NAME: "rates-table" },
+          },
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Rates",
+      handler: (event: { currency: string }): string =>
+        `rate for ${event.currency}`,
+    },
+  ],
+});
+
+console.log(stack.getResource("Rates")?.type);
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "rates",
+    Payload: JSON.stringify({ currency: "GBP" }),
+  }),
+);
+
+console.log(new TextDecoder().decode(output.Payload));
+```
+
+The execution role is named after the function, `RatesRole` for a function called `Rates`, and
+carries the basic execution policy SAM gives one. `Policies` on the function reach it. A policy
+document goes on as an inline policy, and a managed policy ARN is attached. SAM policy templates
+such as `DynamoDBCrudPolicy` are left ungenerated, because simulated IAM allows every call by
+default and a role missing those statements authorizes the same calls either way. A function naming
+its own `Role` runs as that role, and gets no expanded one.
+
 ## Serving deployed resources on localhost
 
 CloudFormation itself is not served as an HTTP API. Instead, you deploy infrastructure through Sim
@@ -2381,6 +2455,8 @@ Sim CloudFormation currently supports:
   `Fn::Select` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
+- SAM templates naming the `AWS::Serverless-2016-10-31` transform, with `AWS::Serverless::Function`
+  expanded into a Lambda function and its execution Role, and `Globals.Function` defaults applied
 
 The resource types it creates are:
 
@@ -2484,4 +2560,9 @@ Each service's own docs describe what its resource types support.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.
+- The SAM transform is expanded for `AWS::Serverless::Function` alone. `Events` on a function are
+  left out. A SAM API, schedule or queue trigger creates nothing, and every other
+  `AWS::Serverless::*` resource type is recorded as unsupported. `AutoPublishAlias` and
+  `DeploymentPreference` are left out too, because the simulator has one version of a function and
+  nothing to shift traffic between.
 - Many advanced CloudFormation features are outside the simulation.
