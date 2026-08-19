@@ -42,15 +42,16 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
   constructor(private readonly handler: SimLambdaHandler) {}
 
   /**
-   * Record nothing.
+   * Record nothing here.
    *
-   * A referenced handler has no streams of its own to tee: it is an ordinary
-   * function closing over the test's own module scope, so its `console.log`
-   * reaches the host console directly and there is nothing here to intercept
-   * without patching a global the whole test run shares.
+   * A referenced handler has no streams of its own to tee. It is an ordinary
+   * function closing over the test's own module scope, and it prints through
+   * the process console and the process standard streams. Its invocation is
+   * run with those bridged to the function's sink instead, the way the clock
+   * and process.env are bridged for the same code.
    */
   recordOutputTo(): void {
-    // Nothing to record from.
+    // Recorded by the invocation, from the process globals.
   }
 
   /**

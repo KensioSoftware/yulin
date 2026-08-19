@@ -284,16 +284,17 @@ export class SimLambdaFunction {
 
   /**
    * Run an invocation with the process globals host-scope code reads bridged
-   * to this simulation: the current time, and the HTTP clients it reaches for.
+   * to this simulation: the current time, the HTTP clients it reaches for,
+   * and the console and streams it prints through.
    */
   private async runInHostScope<T>(run: () => Promise<T>): Promise<T> {
     if (!this.code.runsInHostScope) {
       return await run();
     }
 
-    return await runSimLambdaInHostScope(
-      { clock: this.clock, outboundHttp: this.outboundHttp },
-      run,
-    );
+    const { clock, outboundHttp } = this;
+    const output = this.logging.outputSink();
+
+    return await runSimLambdaInHostScope({ clock, outboundHttp, output }, run);
   }
 }

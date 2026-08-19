@@ -1,7 +1,9 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 import { simLambdaProcessClock } from "./sim-lambda-process-clock.js";
 import { simLambdaProcessOutbound } from "./sim-lambda-process-outbound.js";
+import { simLambdaProcessOutput } from "./sim-lambda-process-output.js";
 
 /**
  * What an invocation of host-scope code has bridged to it.
@@ -16,25 +18,40 @@ interface SimLambdaHostScope {
    * and its requests go where they were addressed.
    */
   readonly outboundHttp: SimLambdaOutboundHttp | undefined;
+
+  /**
+   * Where what the invocation prints is recorded. A function built standalone,
+   * outside a SimAws instance, has no simulated CloudWatch Logs to record to,
+   * and its output reaches the host console alone.
+   */
+  readonly output: SimLambdaOutputSink | undefined;
 }
 
 /**
  * Run an invocation of code in the host scope with the process globals it
  * reads bridged to its simulation.
  *
- * Only code running in the host scope needs this. Zip code reads the Date and
- * the HTTP clients its own vm sandbox was given, so a function backed by one
- * leaves the globals alone entirely and never comes here.
+ * Only code running in the host scope needs this. Zip code reads the Date, the
+ * HTTP clients and the standard streams its own vm sandbox was given, so a
+ * function backed by one leaves the globals alone entirely and never comes
+ * here.
  */
 export async function runSimLambdaInHostScope<T>(
   scope: SimLambdaHostScope,
   run: () => Promise<T>,
 ): Promise<T> {
-  const { outboundHttp } = scope;
+  const { clock, outboundHttp, output } = scope;
 
-  return await simLambdaProcessClock.run(scope.clock, async () =>
+  const recording =
+    output === undefined
+      ? run
+      : async (): Promise<T> => await simLambdaProcessOutput.run(output, run);
+
+  const reachingTheSimulation =
     outboundHttp === undefined
-      ? await run()
-      : await simLambdaProcessOutbound.run(outboundHttp, run),
-  );
+      ? recording
+      : async (): Promise<T> =>
+          await simLambdaProcessOutbound.run(outboundHttp, recording);
+
+  return await simLambdaProcessClock.run(clock, reachingTheSimulation);
 }
