@@ -37,7 +37,17 @@ export interface SimCfnDynamicReferenceResolution {
 
 /**
  * How one simulated service answers the dynamic references naming it.
+ *
+ * A service that cannot answer without being waited on returns a promise, as
+ * Secrets Manager does (reading a secret decrypts it through simulated KMS).
+ * Property resolution stays synchronous either way. A promised answer is
+ * substituted once the Resource's properties have resolved around it, so the
+ * resolver is free to await whatever answering takes.
  */
 export interface SimCfnDynamicReferenceResolver {
-  resolve(reference: SimCfnDynamicReference): SimCfnDynamicReferenceResolution;
+  resolve(
+    reference: SimCfnDynamicReference,
+  ):
+    | SimCfnDynamicReferenceResolution
+    | Promise<SimCfnDynamicReferenceResolution>;
 }

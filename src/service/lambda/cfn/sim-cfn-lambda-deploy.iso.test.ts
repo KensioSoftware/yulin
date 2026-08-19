@@ -225,9 +225,10 @@ describe("Lambda CloudFormation Function deployment", () => {
 
     assertIdentical(functionResource.refValue, "output-function");
 
-    const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      resources: stack.resources,
-    });
+    const resolvedWaitHandleProperties =
+      await waitHandleResource.resolvedProperties({
+        resources: stack.resources,
+      });
 
     assertIdentical(
       resolvedWaitHandleProperties["FunctionName"],

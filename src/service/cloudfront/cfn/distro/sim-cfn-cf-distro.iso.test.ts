@@ -145,9 +145,10 @@ describe("CloudFront CloudFormation Distribution", () => {
 
     assertTypeString(distributionId);
 
-    const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      resources: stack.resources,
-    });
+    const resolvedWaitHandleProperties =
+      await waitHandleResource.resolvedProperties({
+        resources: stack.resources,
+      });
 
     assertIdentical(
       resolvedWaitHandleProperties["DistributionId"],

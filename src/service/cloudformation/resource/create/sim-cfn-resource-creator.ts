@@ -62,7 +62,7 @@ export class SimCfnResourceCreator<T extends object = object> {
 
     const resolvedContext: SimCloudFormationResourceCreateContext = {
       ...context,
-      resolvedProperties: this.resource.resolvedProperties(context),
+      resolvedProperties: await this.resource.resolvedProperties(context),
     };
 
     return await factory.create(

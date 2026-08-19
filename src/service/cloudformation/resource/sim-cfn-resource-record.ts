@@ -173,11 +173,16 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
    * CREATE_COMPLETE, and by the deletion operation while everything this
    * Resource names is still there, so referenced Resources have valid Ref
    * values either way.
+   *
+   * This is awaited for the sake of the dynamic references a property can
+   * hold. A `{{resolve:secretsmanager:...}}` reference decrypts the secret it
+   * names through simulated KMS, and the properties are finished once it
+   * has.
    */
-  resolvedProperties(
+  async resolvedProperties(
     context: SimCfnResourceResolveContext,
-  ): SimCfnTemplateValueRecord {
-    return this.propertyResolver.resolve(this.properties, context);
+  ): Promise<SimCfnTemplateValueRecord> {
+    return await this.propertyResolver.resolve(this.properties, context);
   }
 
   /**

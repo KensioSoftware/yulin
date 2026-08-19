@@ -63,7 +63,7 @@ export class SimCfnResourceDeleter<T extends object = object> {
 
     await factory.delete(resourceType.resourceTypeName, this.resource, {
       ...context,
-      resolvedProperties: this.resource.resolvedProperties(context),
+      resolvedProperties: await this.resource.resolvedProperties(context),
     });
   }
 }

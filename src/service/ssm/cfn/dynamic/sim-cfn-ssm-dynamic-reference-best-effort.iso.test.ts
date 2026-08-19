@@ -166,14 +166,11 @@ describe("SSM CloudFormation dynamic references the simulation cannot answer", (
     // When the template is deployed.
     const stack = await deployReading(
       simAws,
-      "{{resolve:secretsmanager:MySecret:SecretString:password}}",
+      "{{resolve:ssm-secure:/myapp/token}}",
     );
 
     // Then the reference is untouched and nothing is recorded about it.
-    assertIdentical(
-      readValue(simAws),
-      "{{resolve:secretsmanager:MySecret:SecretString:password}}",
-    );
+    assertIdentical(readValue(simAws), "{{resolve:ssm-secure:/myapp/token}}");
     assertArrayLength(stack.ignoredProperties, 0);
   });
 });
