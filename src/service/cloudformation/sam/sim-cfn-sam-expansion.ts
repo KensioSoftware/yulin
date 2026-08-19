@@ -2,10 +2,19 @@ import { isRecord } from "../../../util/type-guard/record.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateValue } from "../template/value/sim-cfn-template-value.js";
 import {
+  samHttpApiResources,
+  samHttpApiType,
+} from "./api/sim-cfn-sam-http-api.js";
+import {
   samFunctionResources,
   samFunctionType,
 } from "./function/sim-cfn-sam-function.js";
-import { samFunctionGlobals } from "./sim-cfn-sam-globals.js";
+import {
+  samSimpleTableResources,
+  samSimpleTableType,
+} from "./table/sim-cfn-sam-simple-table.js";
+import type { SamTemplateGlobals } from "./sim-cfn-sam-globals.js";
+import { samTemplateGlobals } from "./sim-cfn-sam-globals.js";
 import { isSamTemplateRecord } from "./sim-cfn-sam-record.js";
 import {
   templateNamesSamTransform,
@@ -38,7 +47,7 @@ export function samExpandedTemplate(
     return template;
   }
 
-  const globals = samFunctionGlobals(template);
+  const globals = samTemplateGlobals(template);
 
   return {
     ...withoutSamSections(template),
@@ -57,11 +66,33 @@ export function samExpandedTemplate(
 function expandedResource(
   logicalId: string,
   resource: SimCfnTemplateValue,
-  globals: Record<string, SimCfnTemplateValue>,
+  globals: SamTemplateGlobals,
 ): Record<string, SimCfnTemplateValue> {
-  if (!isSamTemplateRecord(resource) || resource["Type"] !== samFunctionType) {
+  if (!isSamTemplateRecord(resource)) {
     return { [logicalId]: resource };
   }
 
-  return samFunctionResources({ logicalId, resource, globals });
+  const type = resource["Type"];
+
+  if (type === samFunctionType) {
+    return samFunctionResources({
+      logicalId,
+      resource,
+      globals: globals.forFunction,
+    });
+  }
+
+  if (type === samHttpApiType) {
+    return samHttpApiResources({
+      logicalId,
+      resource,
+      globals: globals.forHttpApi,
+    });
+  }
+
+  if (type === samSimpleTableType) {
+    return samSimpleTableResources({ logicalId, resource });
+  }
+
+  return { [logicalId]: resource };
 }
