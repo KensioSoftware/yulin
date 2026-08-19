@@ -4,7 +4,6 @@ import type {
   BackgroundCompleter,
   BackgroundScheduler,
 } from "../../../../util/background/background.js";
-import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
@@ -12,10 +11,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
-import {
-  type CfnTemplateBodyRecord,
-  SimCfnTemplate,
-} from "../../template/sim-cfn-template.js";
+import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
@@ -110,15 +106,12 @@ export class UpdateStackCommandHandler implements CommandHandler<
     });
 
     await stack.update(
-      SimCfnTemplate.fromJson(
-        command.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
-        {
-          stackName,
-          parameters,
-          accountRegionScope: this.accountRegionScope,
-          exports: this.exports,
-        },
-      ),
+      SimCfnTemplate.fromTemplateBody(command.input.TemplateBody, {
+        stackName,
+        parameters,
+        accountRegionScope: this.accountRegionScope,
+        exports: this.exports,
+      }),
       { cdkOutContext: this.cdkOutContext },
     );
 

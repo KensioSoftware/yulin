@@ -7,7 +7,7 @@ import type {
 import { isRecord } from "../../../util/type-guard/record.js";
 import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
 import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters.type.js";
-import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
+import { parseSimCfnTemplateBody } from "./sim-cfn-template-body-parse.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnMappings } from "./mapping/sim-cfn-mappings.js";
@@ -56,7 +56,7 @@ interface SimCfnTemplateProperties {
   readonly exports?: SimCfnExports | undefined;
 }
 
-interface SimCfnTemplateFromJsonProperties {
+interface SimCfnTemplateFromBodyProperties {
   readonly stackName?: string | undefined;
   readonly parameters?: SimCfnParameters | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
@@ -95,28 +95,23 @@ export class SimCfnTemplate {
   }
 
   /**
-   * Parse a JSON CloudFormation template body.
+   * Parse a CloudFormation template body written as JSON or as YAML.
+   *
+   * This is the `TemplateBody` a Stack command carries, in either of the two
+   * formats CloudFormation takes it in.
    *
    * A template naming the SAM transform is expanded on the way through, so
    * what the Stack is deployed from holds the Resource types simulated AWS
-   * creates rather than the `AWS::Serverless::*` ones the author wrote.
+   * creates rather than the `AWS::Serverless::*` ones the author wrote. That
+   * holds for a YAML template as it does for a JSON one.
    */
-  static fromJson(
-    templateBody: JSONString<CfnTemplateBodyRecord>,
-    properties: SimCfnTemplateFromJsonProperties = {},
+  static fromTemplateBody(
+    templateBody: string,
+    properties: SimCfnTemplateFromBodyProperties = {},
   ): SimCfnTemplate {
-    let template: CfnTemplateBodyRecord;
-
-    try {
-      template = jsonParse(templateBody);
-    } catch (error) {
-      throw new Error(
-        `Sim CloudFormation Stack ${properties.stackName ?? "unknown"} TemplateBody must be valid JSON`,
-        {
-          cause: error,
-        },
-      );
-    }
+    const template = parseSimCfnTemplateBody(templateBody, {
+      stackName: properties.stackName,
+    });
 
     return new SimCfnTemplate({
       template: samExpandedTemplate(template),

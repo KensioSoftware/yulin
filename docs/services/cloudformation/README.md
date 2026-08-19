@@ -1183,6 +1183,54 @@ A file that does not parse is refused by naming the resolved path, along with th
 parser stopped at. `updateTemplateFile(...)` and watching read the file the same way, and a saved
 YAML template updates its Stack in place.
 
+## A YAML TemplateBody
+
+`CreateStackCommand` and `UpdateStackCommand` take a YAML `TemplateBody`, as CloudFormation does.
+The field carries no file name to say which format it holds. Yulin reads the body as JSON, and as
+YAML when that fails.
+
+```typescript sim-cloudformation-yaml-template-body
+/**
+ * Creating a simulated CloudFormation Stack from a YAML TemplateBody.
+ */
+
+import { CreateStackCommand } from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "work-stack",
+    TemplateBody: [
+      "Resources:",
+      "  WorkQueue:",
+      "    Type: AWS::SQS::Queue",
+      "    Properties:",
+      "      QueueName: work-queue",
+      "Outputs:",
+      "  QueueArn:",
+      "    Value: !GetAtt WorkQueue.Arn",
+    ].join("\n"),
+  }),
+);
+
+await simCfn.waitForStackDeployComplete("work-stack");
+
+const stack = simCfn.getStackByName("work-stack");
+
+console.log(stack?.outputs.get("QueueArn")?.value);
+```
+
+Short-form tags resolve as they do in a template file, and a body naming the SAM transform is
+expanded the way a JSON one is. An `UpdateStackCommand` may hand a Stack a YAML body whichever
+format the Stack was deployed from.
+
+A body that fails both attempts is refused by naming the Stack, along with what each format made of
+it.
+
 ## Deploying a whole cloud assembly
 
 `deployCdkOut(...)` deploys the Stacks a `cdk.out` directory holds, each into the region its own
@@ -2489,7 +2537,8 @@ normal application tests, prefer the `SimAws` entry point.
 
 Sim CloudFormation currently supports:
 
-- `CreateStackCommand`, `DescribeStacksCommand`, `UpdateStackCommand` and `DeleteStackCommand`
+- `CreateStackCommand`, `DescribeStacksCommand`, `UpdateStackCommand` and `DeleteStackCommand`,
+  taking a `TemplateBody` written as JSON or as YAML with short-form intrinsic tags
 - Waiting for simulated stack deployment, update and deletion completion
 - The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
@@ -2541,8 +2590,6 @@ Each service's own docs describe what its resource types support.
 
 ## Limitations
 
-- `TemplateBody` must be JSON when using `CreateStackCommand` or `UpdateStackCommand`. A template
-  file deployed with `deployTemplateFile(...)` may be JSON or YAML.
 - Only supported resource types create simulated service resources. An unsupported resource may be
   skipped or may fail the stack, depending on how safely the simulator can model it. A skipped
   resource answers `Ref` and `Fn::GetAtt` with
@@ -2581,7 +2628,7 @@ Each service's own docs describe what its resource types support.
 - A failed stack update is not rolled back to the template the stack was deployed from. The stack is
   left in `UPDATE_FAILED` holding whatever the update managed.
 - `UpdateStackCommand` reads `StackName`, `TemplateBody` and `Parameters`. `UsePreviousTemplate` and
-  `UsePreviousValue` are not read, so an update has to be given the whole new template as JSON.
+  `UsePreviousValue` are not read, so an update has to be given the whole new template.
 - An update asked for while another is still running is refused, as CloudFormation refuses it. There
   is no queue behind it.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it

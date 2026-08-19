@@ -11,8 +11,7 @@ import { jsonStringify } from "../../../util/type-guard/json.js";
 describe("SimCfnTemplate params", () => {
   it("throws a clear error when TemplateBody Parameters is not an object", () => {
     const error = assertThrowsError(() => {
-      SimCfnTemplate.fromJson(
-        // @ts-expect-error -- testing bad input
+      SimCfnTemplate.fromTemplateBody(
         jsonStringify({
           Parameters: ["not", "a", "parameters", "object"],
           Resources: {},
