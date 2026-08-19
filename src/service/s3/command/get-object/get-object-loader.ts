@@ -2,6 +2,10 @@ import { Readable } from "node:stream";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
+import {
+  simS3ContentRange,
+  simS3ReadObjectRange,
+} from "../../object/s3-object-range.js";
 import type { SimGetObjectCommandOutput } from "./get-object.command.js";
 
 /**
@@ -15,7 +19,8 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  * response is a representation of the stored Object:
  *
  * - a missing storage entry becomes the S3 NoSuchKey error;
- * - the stored Buffer becomes the readable response body;
+ * - the stored Buffer, or the part of it the read asked for, becomes the
+ *   readable response body;
  * - stored metadata becomes SDK response metadata;
  * - the Object's content hash and write time become its ETag and LastModified.
  *
@@ -24,22 +29,38 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  */
 export class GetObjectLoader {
   /**
-   * Read an Object from the resolved Bucket and build its SDK command output.
+   * Read an Object, or the range of it that was asked for, from the resolved
+   * Bucket, and build its SDK command output.
    */
   async load(
     bucket: SimS3Bucket,
     key: string,
+    rangeHeader?: string,
   ): Promise<SimGetObjectCommandOutput> {
     const object = await bucket.getObject(key);
     if (object === undefined) {
       throw new SimS3NoSuchKey(`No S3 Object named ${key}`);
     }
 
+    const size = object.body.length;
+    const range = simS3ReadObjectRange(rangeHeader, size);
+    const body =
+      range === undefined
+        ? object.body
+        : object.body.subarray(range.start, range.end + 1);
+
     return {
-      Body: Readable.from([object.body]),
+      Body: Readable.from([body]),
       Metadata: object.metadata.values,
+      // The ETag identifies the Object rather than the bytes being sent. A
+      // client reading it in pieces compares the value across them to see
+      // whether the Object changed underneath it.
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
+      ContentLength: body.length,
+      ...(range !== undefined && {
+        ContentRange: simS3ContentRange(range, size),
+      }),
       $metadata: {},
     };
   }

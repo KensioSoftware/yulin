@@ -1,8 +1,9 @@
 import {
   createMultipartUploadInput,
+  getObjectInput,
   objectInput,
   putObjectInput,
-} from "./sim-s3-api-input.js";
+} from "./sim-s3-api-object-input.js";
 import {
   completeMultipartUploadInput,
   uploadInput,
@@ -24,7 +25,7 @@ export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
     method: "GET",
     target: "object",
     commandName: "GetObjectCommand",
-    input: objectInput,
+    input: getObjectInput,
   },
   {
     method: "GET",

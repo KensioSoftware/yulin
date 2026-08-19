@@ -9,6 +9,11 @@ import { simS3ObjectResponseHeaders } from "../object/s3-object-response-headers
  * The two share everything but the body, because a `HEAD` is a `GET` whose
  * response real S3 stops short of sending, so they are read the same way here
  * and differ only in what comes back.
+ *
+ * A `GET` may ask for part of the Object, and is answered with that part and
+ * `206 Partial Content`. A `HEAD` may not. Simulated S3 describes the whole
+ * Object however it is asked about, and HeadObject does the same for an
+ * in-process caller.
  */
 export class SimS3RestObjectReader {
   /**
@@ -19,8 +24,17 @@ export class SimS3RestObjectReader {
     route: SimS3RestObjectRoute,
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
+    const { request } = serviceRequest;
+    const head = request.method === "HEAD";
+
     const output = await simS3.getObject(
-      { input: { Bucket: route.bucket.bucketName, Key: route.objectKey } },
+      {
+        input: {
+          Bucket: route.bucket.bucketName,
+          Key: route.objectKey,
+          Range: head ? undefined : (request.headers.get("range") ?? undefined),
+        },
+      },
       { caller: serviceRequest.caller.toCaller() },
     );
 
@@ -30,13 +44,17 @@ export class SimS3RestObjectReader {
       bodyLength: body.length,
       etag: output.ETag,
       lastModified: output.LastModified,
+      contentRange: output.ContentRange,
     });
 
-    if (serviceRequest.request.method === "HEAD") {
+    if (head) {
       return new Response(undefined, { status: 200, headers });
     }
 
-    return new Response(body, { status: 200, headers });
+    return new Response(body, {
+      status: output.ContentRange === undefined ? 200 : 206,
+      headers,
+    });
   }
 }
 

@@ -2,19 +2,26 @@ import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-head
 
 /**
  * Answer a read with the Object itself, headers and all.
+ *
+ * A read that asked for part of the Object is answered `206 Partial Content`
+ * and says which part it carries, because a client reading a large Object in
+ * pieces at once writes each response at the offset it asked for, and a `200`
+ * carrying the whole Object would be written over its neighbours.
  */
 export async function simS3GetObjectResponse(
   output: Record<string, unknown>,
 ): Promise<Response> {
   const body = await objectBodyBytes(output["Body"]);
+  const contentRange = output["ContentRange"] as string | undefined;
 
   return new Response(body, {
-    status: 200,
+    status: contentRange === undefined ? 200 : 206,
     headers: simS3ObjectResponseHeaders({
       metadata: output["Metadata"] as Record<string, string> | undefined,
       bodyLength: body.length,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,
+      contentRange,
     }),
   });
 }

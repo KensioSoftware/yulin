@@ -62,6 +62,9 @@ export class GetObjectCommandHandler implements CommandHandler<
    * - authorization occurs before key lookup so denied callers cannot determine
    *   whether an Object exists;
    * - the loader performs storage access only after authorization succeeds.
+   *
+   * A stated `Range` reaches the loader with the key, since which bytes of an
+   * Object a caller may read is not something IAM decides.
    */
   async handle(
     command: SimGetObjectCommand,
@@ -81,6 +84,10 @@ export class GetObjectCommandHandler implements CommandHandler<
 
     this.authorizer.authorize(bucket, command.input.Key, options);
 
-    return await this.loader.load(bucket, command.input.Key);
+    return await this.loader.load(
+      bucket,
+      command.input.Key,
+      command.input.Range,
+    );
   }
 }

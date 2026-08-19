@@ -8,13 +8,6 @@ export function bucketInput(request: SimS3ApiRequest): object {
 }
 
 /**
- * The input of an operation naming one Object.
- */
-export function objectInput(request: SimS3ApiRequest): object {
-  return { Bucket: request.bucketName, Key: request.objectKey };
-}
-
-/**
  * The input of an operation that names a Bucket and reads its body into one
  * member, which every configuration write does.
  */
@@ -24,34 +17,6 @@ export function bucketBodyInput<T>(
   read: (body: string) => T,
 ): object {
   return { Bucket: request.bucketName, [member]: read(utf8(request.body)) };
-}
-
-/**
- * The input of an upload, which carries its bytes and the headers describing
- * them.
- */
-export function putObjectInput(request: SimS3ApiRequest): object {
-  return { ...createMultipartUploadInput(request), Body: request.body };
-}
-
-/**
- * The input of a request that describes an Object without carrying its bytes,
- * which is what starting a multipart upload is.
- */
-export function createMultipartUploadInput(request: SimS3ApiRequest): object {
-  return {
-    Bucket: request.bucketName,
-    Key: request.objectKey,
-    ...optional("ContentType", request.headers.get("content-type")),
-    ...optional("CacheControl", request.headers.get("cache-control")),
-    ...optional(
-      "ContentDisposition",
-      request.headers.get("content-disposition"),
-    ),
-    ...optional("ContentEncoding", request.headers.get("content-encoding")),
-    ...optional("ContentLanguage", request.headers.get("content-language")),
-    ...simS3UserMetadata(request.headers),
-  };
 }
 
 /**

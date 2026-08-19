@@ -12,6 +12,11 @@ export interface SimS3ObjectResponseDescription {
   readonly etag?: string | undefined;
   /** When S3 last wrote the Object. */
   readonly lastModified?: Date | undefined;
+  /**
+   * Which bytes of the Object are being served, for a read that asked for some
+   * of them rather than all of them.
+   */
+  readonly contentRange?: string | undefined;
 }
 
 /**
@@ -26,7 +31,8 @@ export interface SimS3ObjectResponseDescription {
  *
  * `ETag` and `Last-Modified` are not metadata but facts about the stored bytes,
  * and are what makes a conditional request or a content-hash comparison
- * possible over HTTP.
+ * possible over HTTP. `Content-Range` is a fact about the response rather than
+ * the Object. It says which of the Object's bytes the ones being sent are.
  *
  * Every path that serves an Object goes through here, so they agree on what
  * reading one looks like.
@@ -54,6 +60,10 @@ export function simS3ObjectResponseHeaders(
 
   if (description.lastModified !== undefined) {
     headers["last-modified"] = description.lastModified.toUTCString();
+  }
+
+  if (description.contentRange !== undefined) {
+    headers["content-range"] = description.contentRange;
   }
 
   return headers;

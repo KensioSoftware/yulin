@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import {
@@ -35,7 +36,7 @@ const runFile = promisify(execFile);
  * Nothing here knows the upload was in parts: `aws s3 cp` is asked for a file
  * and `aws s3 ls` is asked what the Bucket holds.
  */
-describe("Copying a large file into simulated S3 with the aws CLI", () => {
+describe("Copying a large file in and out of simulated S3 with the aws CLI", () => {
   const simAws = new SimAws();
   const srv = new SimAwsLocalServer({ simAws });
   const simS3 = simAws.s3();
@@ -183,5 +184,24 @@ describe("Copying a large file into simulated S3 with the aws CLI", () => {
     // ordinary tooling can put in and take out again
     const listed = await aws("s3", "ls", "s3://widgets/round-trip.bin");
     assertStringIncludes(listed, `${fileSize} round-trip.bin`);
+  });
+
+  it("writes the downloaded file byte for byte", async () => {
+    // Given an Object above the size the CLI downloads in one request, which
+    // it fetches as several ranged reads at once
+    await aws("s3", "cp", filePath, "s3://widgets/checked-download.bin");
+
+    // When it is copied back to a local file
+    const downloadPath = files.join("checked-download.bin");
+    await aws("s3", "cp", "s3://widgets/checked-download.bin", downloadPath);
+
+    // Then the file on disk is the file that was uploaded, which a read
+    // answering each of those requests with the whole Object would not be
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- this test's own temporary directory
+    const downloaded = await readFile(downloadPath);
+    assertIdentical(downloaded.byteLength, fileSize);
+    assertIdentical(downloaded.at(0), byteAt(0));
+    assertIdentical(downloaded.at(9 * 1024 * 1024), byteAt(9 * 1024 * 1024));
+    assertIdentical(downloaded.at(fileSize - 1), byteAt(fileSize - 1));
   });
 });

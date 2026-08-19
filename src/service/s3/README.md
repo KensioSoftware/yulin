@@ -411,7 +411,19 @@ never the thing caching holds on to.
 4. sequences background work
 5. gets the object from Bucket storage
 6. throws `SimS3NoSuchKey` if absent
-7. returns a readable body stream, metadata, `ETag`, `LastModified`, and `$metadata`
+7. resolves any stated `Range` against the size of the stored body
+8. returns a readable body stream, metadata, `ETag`, `LastModified`, `ContentLength` and
+   `$metadata`, with a `ContentRange` for a read that asked for part of the Object
+
+`simS3ReadObjectRange` in `object/s3-object-range.ts` reads the header. The three forms are
+`bytes=<start>-<end>`, `bytes=<start>-` and `bytes=-<suffix>`, and an end past the last byte is
+clamped to it. `undefined` comes back for a read that stated no range and for one whose header S3
+answers as though it had never been sent (several ranges at once, a unit other than bytes, an end
+before its start). A start past the last byte, a suffix of zero and any range of an empty Object
+each throw `SimS3InvalidRange`.
+
+The `ETag` is the whole Object's either way. Real S3 identifies the Object a slice came from, and a
+client reading in pieces compares the value across them.
 
 ### ListObjects
 
@@ -704,6 +716,8 @@ Bucket, or path style, where the first path segment does. `SimS3BucketLocator` t
 - a `DELETE` answers `204 No Content` whether or not the Object was there, as real S3 does
 - `DeleteObjects` is a `POST` to the Bucket rather than an Object request, so it is reachable through
   the SDK but not over this endpoint
+- a `GET` carrying a `Range` is answered `206 Partial Content` with a `content-range` header, and a
+  `HEAD` describes the whole Object however it is asked about, matching `HeadObjectCommandHandler`
 - it checks any `x-amz-checksum-*` an upload states before storing anything, through
   `SimS3UploadChecksum`
 - failures become the XML error document real S3 answers with, through `SimS3RestErrorResponse`,
@@ -790,6 +804,7 @@ Handlers throw AWS-like errors for supported failure cases, including:
 - no such key
 - no such Bucket policy
 - access denied, for S3's own refusals such as Block Public Access
+- invalid range, for a read whose `Range` names bytes the Object does not hold
 - Bucket already exists
 - Bucket already owned by you
 - invalid argument, for a notification configuration with overlapping filters, a repeated
