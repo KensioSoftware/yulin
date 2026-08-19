@@ -154,21 +154,22 @@ describe("Creating a sim HTTP API Lambda REQUEST authorizer", () => {
     const apiId = await createdApiId(simAws);
 
     // When the authorizer names its function the long way round
+    const wrappedUri =
+      `arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/` +
+      `${functionArn}/invocations`;
     const created = await simAws.apiGatewayV2().createAuthorizer(
       new CreateAuthorizerCommand({
         ApiId: apiId,
         Name: "wrapped",
         AuthorizerType: "REQUEST",
-        AuthorizerUri:
-          `arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/` +
-          `${functionArn}/invocations`,
+        AuthorizerUri: wrappedUri,
         AuthorizerPayloadFormatVersion: "2.0",
         IdentitySource: ["$request.header.cookie"],
       }),
     );
 
-    // Then it is held as the function ARN, the way an integration URI is
-    assertIdentical(created.AuthorizerUri, functionArn);
+    // Then it is handed back as it was written, the way an integration URI is
+    assertIdentical(created.AuthorizerUri, wrappedUri);
   });
 
   it("attaches to a route as CUSTOM authorization", async () => {

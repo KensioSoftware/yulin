@@ -27,6 +27,17 @@ const unusedFunctionArn =
   "arn:aws:lambda:us-east-1:111111111111:function:session-authorizer";
 
 /**
+ * The `authorizerUri` a scheme names a function with, which is the wrapped
+ * invoke path a document writes and the API hands back as written.
+ */
+function wrappedAuthorizerUri(functionArn: string): string {
+  return (
+    `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
+    `${functionArn}/invocations`
+  );
+}
+
+/**
  * The security scheme an HTTP API declares a Lambda `REQUEST` authorizer with:
  * an `apiKey` scheme carrying an authorizer of type `request`.
  */
@@ -38,9 +49,7 @@ function requestScheme(functionArn = unusedFunctionArn): JSONObject {
     "x-amazon-apigateway-authorizer": {
       type: "request",
       identitySource: "$request.header.cookie",
-      authorizerUri:
-        `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
-        `${functionArn}/invocations`,
+      authorizerUri: wrappedAuthorizerUri(functionArn),
       authorizerPayloadFormatVersion: "2.0",
       enableSimpleResponses: true,
       authorizerResultTtlInSeconds: 300,
@@ -121,7 +130,10 @@ describe("Importing a sim HTTP API's Lambda REQUEST authorizers", () => {
     assertNonNullable(authorizer);
     assertIdentical(authorizer.Name, "session-authorizer");
     assertIdentical(authorizer.AuthorizerType, "REQUEST");
-    assertIdentical(authorizer.AuthorizerUri, unusedFunctionArn);
+    assertIdentical(
+      authorizer.AuthorizerUri,
+      wrappedAuthorizerUri(unusedFunctionArn),
+    );
     assertTrue(authorizer.EnableSimpleResponses);
     assertIdentical(authorizer.AuthorizerResultTtlInSeconds, 300);
     expect(authorizer.IdentitySource).toStrictEqual(["$request.header.cookie"]);
