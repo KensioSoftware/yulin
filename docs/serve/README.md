@@ -1,4 +1,4 @@
-# Serving simulated AWS on localhost
+# Localhost server
 
 Serving puts a simulated AWS environment behind a real port. A browser, `curl` or an SDK client then
 reaches it over HTTP. The same request path is also available in the process with no port at all,

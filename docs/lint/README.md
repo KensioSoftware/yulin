@@ -1,4 +1,4 @@
-# Linting CloudFront Functions JS2
+# Linting CFF JS2
 
 CloudFront Functions run JS2, ECMAScript 5.1 with a named subset of ES 6 to 12 on top, rather than
 a current JavaScript engine. A class or a `for...of` is a syntax error, and CloudFront refuses the

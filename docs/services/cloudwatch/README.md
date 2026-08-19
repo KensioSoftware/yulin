@@ -1,4 +1,4 @@
-# Simulated CloudWatch metrics and alarms
+# Simulated CloudWatch Metrics
 
 Yulin includes a simulated Amazon CloudWatch for tests and local development. It holds custom
 metrics. Those are the datapoints `PutMetricData` publishes, and the statistics
