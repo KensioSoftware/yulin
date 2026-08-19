@@ -89,10 +89,7 @@ export class RequestCertificateCommandHandler implements CommandHandler<
 
     this.authorizer.authorize(options?.caller);
 
-    const certificate = this.certificateFactory.makeCertificate(
-      command,
-      this.certificates.size,
-    );
+    const certificate = this.makeUntakenCertificate(command);
     const { certificateArn } = certificate;
 
     this.certificates.set(certificateArn, certificate);
@@ -104,5 +101,33 @@ export class RequestCertificateCommandHandler implements CommandHandler<
       $metadata: {},
       CertificateArn: certificateArn,
     };
+  }
+
+  /**
+   * Build the certificate, on an ARN no other certificate holds.
+   *
+   * ARNs are allocated from the number of certificates ACM holds, and a
+   * registered certificate holds an ARN the simulation never allocated. One of
+   * those can sit on the sequence number this count reaches, and stepping past
+   * it keeps a requested certificate from replacing a registered one.
+   */
+  private makeUntakenCertificate(
+    command: SimRequestCertificateCommand,
+  ): SimAcmCertificate {
+    let certificateCount = this.certificates.size;
+    let certificate = this.certificateFactory.makeCertificate(
+      command,
+      certificateCount,
+    );
+
+    while (this.certificates.has(certificate.certificateArn)) {
+      certificateCount += 1;
+      certificate = this.certificateFactory.makeCertificate(
+        command,
+        certificateCount,
+      );
+    }
+
+    return certificate;
   }
 }

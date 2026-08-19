@@ -10,6 +10,10 @@ import type {
 } from "./command/request-certificate/request-certificate.command.js";
 import { RequestCertificateCommandHandler } from "./command/request-certificate/request-certificate.handler.js";
 import type { SimAcmCertificate } from "./certificate/sim-acm-certificate.js";
+import {
+  registerSimAcmCertificate,
+  type SimAcmCertificateRegistration,
+} from "./certificate/register-sim-acm-certificate.js";
 import type {
   SimDescribeCertificateCommand,
   SimDescribeCertificateCommandOutput,
@@ -129,6 +133,29 @@ export class SimAcm {
     certificate: SimAcmCertificate,
   ): Promise<void> {
     await this.validation.settle(certificate);
+  }
+
+  /**
+   * Register a Certificate that already exists, with an ARN of your choosing.
+   *
+   * `RequestCertificate` allocates its own ARN, as real ACM does, so this is
+   * the way to stand up a Certificate a template already names. A CDK app that
+   * passes a certificate ARN into another stack bakes that ARN into the
+   * template it synthesizes, and a registered Certificate answers ACM commands
+   * and satisfies the CloudFront and ELBv2 lookups the same as one this
+   * simulation issued.
+   *
+   * An ARN another Certificate holds, an ARN outside this ACM's own Account and
+   * Region, or a string that is no ACM Certificate ARN, is refused.
+   */
+  registerCertificate(
+    registration: SimAcmCertificateRegistration,
+  ): SimAcmCertificate {
+    return registerSimAcmCertificate(registration, {
+      certificates: this.certificates,
+      accountRegionScope: this.accountRegionScope,
+      clock: this.background,
+    });
   }
 
   /**
