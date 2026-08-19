@@ -268,7 +268,43 @@ aws sts get-caller-identity
 
 An assumed-role session reports its own session ARN, as it does in real AWS, and its user id joins the Role's id to the session name. A caller with no identity is refused, since there is nothing to answer with.
 
-`GetCallerIdentity` is the only STS operation served. `AssumeRole` works in process and through SDK interception.
+### Assuming a Role over the endpoint
+
+`sts assume-role` answers with temporary credentials, and those credentials sign the requests that
+follow:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws sts assume-role --role-arn arn:aws:iam::888888888888:role/Reader --role-session-name probe
+{
+    "Credentials": {
+        "AccessKeyId": "ASIAQ3JZQ6XKFPWLZ4TM",
+        "SecretAccessKey": "T4rBqYbLXKsJ0nZuV9dHc2Wm1PfAeR7gSjNyIvXo",
+        "SessionToken": "IQoJb3JpZ2luX2VjEHkaCXVzLWVhc3QtMSJHMEUCIQ",
+        "Expiration": "2026-08-18T21:00:00.000Z"
+    },
+    "AssumedRoleUser": {
+        "AssumedRoleId": "AROA5KQZH2XWNDLB7YTVR:probe",
+        "Arn": "arn:aws:sts::888888888888:assumed-role/Reader/probe"
+    }
+}
+```
+
+Hand the three credential values to an SDK client, or to `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`, and the whole assume-then-work sequence runs
+against the endpoint URL. Simulated IAM authorizes each request against the Role behind the session,
+and `get-caller-identity` reports the session ARN above.
+
+`DurationSeconds` and `ExternalId` are read from the request as they are in process. The expiry is
+stamped from the simulation's own clock. `simAws.clock().advanceBy({ hours: 2 })` takes a session
+past it, and the credentials stop authenticating. An SDK refreshes an expired session by assuming
+again.
+
+A Role whose trust policy refuses the caller comes back as `AccessDenied`, under the name real STS
+raises it.
+
+`AssumeRole` and `GetCallerIdentity` are the two operations simulated STS implements, and both are
+served. `AssumeRoleWithWebIdentity` and `GetSessionToken` are refused as `NotImplemented`.
 
 ### S3 over the endpoint
 
@@ -840,5 +876,5 @@ it is without watch mode.
   again and local state stays the same as what tests and CI see.
 - The IDE run configurations for attaching a debugger to a watched process are not documented yet.
 - The served AWS service API covers S3, STS and the AWS JSON protocol services. A service speaking REST-JSON, or Query other than STS, is refused with `501 Not Implemented`.
-- `GetCallerIdentity` is the only STS operation served. `AssumeRole` over a port would mean the temporary credentials it issues have to sign the calls that follow, which is its own piece of work.
+- Simulated STS implements `AssumeRole` and `GetCallerIdentity`, and serves both. `AssumeRoleWithWebIdentity` and `GetSessionToken` are refused as `NotImplemented`.
 - A served AWS API request is routed by its SigV4 credential scope. An unsigned one reaches nothing, whatever endpoint URL it used.

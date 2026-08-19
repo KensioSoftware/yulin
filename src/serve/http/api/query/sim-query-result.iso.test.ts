@@ -7,6 +7,7 @@ import {
   queryMap,
   queryMembers,
   queryScalarList,
+  queryStructure,
 } from "./sim-query-result.js";
 
 /**
@@ -59,6 +60,39 @@ describe("writing a Query protocol response", () => {
     assertIdentical(
       written,
       "<OutputValue>[&quot;one&quot;,&quot;two&quot;]</OutputValue>",
+    );
+  });
+
+  it("nests the members of a structure inside it", () => {
+    // Given an output holding a structure, as an assumed-role session's
+    // credentials are
+    const output = {
+      Credentials: { AccessKeyId: "ASIAEXAMPLE", Expiration: new Date(0) },
+    };
+
+    // When the structure is written
+    const written = queryStructure(output, "Credentials", (credentials) =>
+      queryMembers(credentials, ["AccessKeyId", "Expiration"]),
+    );
+
+    // Then its members are inside it rather than alongside it
+    assertIdentical(
+      written,
+      "<Credentials><AccessKeyId>ASIAEXAMPLE</AccessKeyId>" +
+        "<Expiration>1970-01-01T00:00:00.000Z</Expiration></Credentials>",
+    );
+  });
+
+  it("writes nothing for a structure the operation left out", () => {
+    // Given an operation that answered without one of its structures, as a
+    // refused request does
+    const output = {};
+
+    // When it is written
+    // Then there is no element at all, rather than an empty one
+    assertIdentical(
+      queryStructure(output, "Credentials", () => ""),
+      "",
     );
   });
 

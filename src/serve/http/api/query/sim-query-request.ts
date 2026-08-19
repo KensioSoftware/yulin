@@ -64,6 +64,24 @@ export class SimQueryFields {
   }
 
   /**
+   * One numeric member, which Query carries as its decimal text.
+   *
+   * Text that is not a number at all is nothing rather than NaN, so a
+   * simulated service sees a member the request never stated instead of a
+   * value it has to check.
+   */
+  number(name: string): number | undefined {
+    const value = this.text(name);
+    if (value === undefined || value.trim().length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number(value);
+
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  /**
    * One blob member, which Query carries as base64 text.
    */
   binary(name: string): Uint8Array | undefined {

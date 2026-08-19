@@ -25,6 +25,23 @@ export function queryMembers(
 }
 
 /**
+ * Write a structure member, whose own members Query nests inside it.
+ *
+ * A structure the operation did not produce writes nothing, the same way an
+ * absent scalar member does, so a caller reads its absence rather than an
+ * empty element.
+ */
+export function queryStructure(
+  value: SimQueryOutput,
+  name: string,
+  members: (structure: SimQueryOutput) => string,
+): string {
+  const structure = value[name];
+
+  return isRecord(structure) ? xmlElement(name, members(structure)) : "";
+}
+
+/**
  * Write a list member, whose items Query wraps one `member` element each.
  */
 export function queryList(
