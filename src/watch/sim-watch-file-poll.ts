@@ -23,35 +23,59 @@ interface SimWatchFilePollProperties {
  * always works, which is why both are here: the event is what makes a save feel
  * immediate, and this is what makes sure it arrives.
  *
- * Nothing here tries to tell a save the watch reported from one it lost, and
- * every read that finds a change reports it. A settle window turns the two of
- * them into the one change they are, and it is the same window that already
- * turns one editor save into one change.
+ * A save the watch did report is the same save this finds a moment later, and
+ * acting on it twice is two updates for one change. `reported()` is how the
+ * watch says it got there first, and the next read to find the file changed
+ * stays quiet about it.
  */
 export class SimWatchFilePoll {
   private readonly filePath: string;
   private readonly intervalMs: number;
+  private readonly onChanged: () => void;
+  private reportedElsewhere = false;
 
   // Held as one function so it can be taken off the file again. Node keys
   // polled files by path and by listener, which is what lets two Stacks
   // deployed from one file each stop reading it without stopping the other.
-  private readonly onPolled: () => void;
+  private readonly onPolled = (): void => {
+    if (this.reportedElsewhere) {
+      this.reportedElsewhere = false;
+
+      return;
+    }
+
+    this.onChanged();
+  };
 
   constructor(properties: SimWatchFilePollProperties) {
     this.filePath = properties.filePath;
     this.intervalMs = properties.intervalMs;
-    this.onPolled = properties.onChanged;
+    this.onChanged = properties.onChanged;
   }
 
   /**
    * Start reading the file, and report it changing.
    *
-   * A file that is not there yet is read all the same, and reports itself once
-   * it appears.
+   * Starting is asking for a first look rather than taking one, and a save
+   * landing before that look is part of the state the file is found in. The
+   * deployment that starts a watch has just read the template, so the save this
+   * would miss is one it already has.
    */
   start(): void {
     // oxlint-disable-next-line security/detect-non-literal-fs-filename
     watchFile(this.filePath, { interval: this.intervalMs }, this.onPolled);
+  }
+
+  /**
+   * Say that a save has been reported by whatever this stands behind, so the
+   * next change found here is taken as that same save.
+   *
+   * Only the next one. Two saves inside a single interval, where the watch
+   * reported the first and lost the second, leave the second for the save after
+   * it to carry, because one read of the file cannot tell two writes apart.
+   */
+  reported(): void {
+    this.reportedElsewhere = true;
   }
 
   /**

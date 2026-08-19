@@ -210,7 +210,8 @@ updates the stack rather than needing the process restarted:
   watch in the process starts or stops. A save landing during a rebuild is delivered nowhere, so a
   process that also mounts a directory into a bucket, deploys a second stack, or serves with live
   reload can lose one outright. Reading the file reports the same change without depending on the
-  stream, and both sources report into the one settle window.
+  stream, and a read finding a change the events already reported stays quiet about it, so one save
+  stays one update.
 - `SimCfnTemplateWatchUpdate` decides what a save came to: an update, a file written without being
   changed, or a failure. Nothing thrown gets past it, since the watch applies changes in a queue
   that a rejection would stop. An update is where the `reload` target is told, after the `onUpdated`

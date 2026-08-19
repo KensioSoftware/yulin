@@ -20,9 +20,8 @@ interface SimCfnTemplateFileEventsProperties {
  * Behind the events the file is read on a timer, because an event can go
  * missing outright: macOS gives a process one FSEvents stream for every watch
  * in it, and a save that lands while libuv is rebuilding that stream is
- * delivered nowhere. Reading the file is what notices the save the stream lost.
- * Both sources report into the same settle window, so a save they both notice
- * is the one change it was.
+ * delivered nowhere. Reading the file is what notices the save the stream lost,
+ * and it stays quiet about a save the stream reported.
  */
 export class SimCfnTemplateFileEvents {
   private readonly directoryPath: string;
@@ -48,9 +47,12 @@ export class SimCfnTemplateFileEvents {
   start(): void {
     // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const watcher = fs.watch(this.directoryPath, (_event, fileName) => {
-      if (fileName === this.fileName) {
-        this.onEvent();
+      if (!(fileName === this.fileName)) {
+        return;
       }
+
+      this.poll.reported();
+      this.onEvent();
     });
 
     // The directory can be deleted or replaced, and a watcher with no error

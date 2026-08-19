@@ -11,8 +11,10 @@ const fileName = "Site.template.json";
  * testing.
  */
 export class PolledFile {
-  private readonly poll: SimWatchFilePoll;
-  private readonly changed: string[] = [];
+  readonly poll: SimWatchFilePoll;
+
+  private changed = 0;
+  private saves = 0;
 
   private constructor(private readonly directory: TemporaryDirectory) {
     this.poll = new SimWatchFilePoll({
@@ -21,34 +23,48 @@ export class PolledFile {
       // interval a running simulation reads its templates on.
       intervalMs: 50,
       onChanged: (): void => {
-        this.changed.push(fileName);
+        this.changed++;
       },
     });
     this.poll.start();
   }
 
   /**
-   * Write a file and start reading it.
+   * Write a file, start reading it, and wait until the read is running.
    */
   static async of(): Promise<PolledFile> {
     const directory = new TemporaryDirectory();
     await directory.writeFile(fileName, "initial");
+    const polled = new PolledFile(directory);
 
-    return new PolledFile(directory);
+    try {
+      await polled.running();
+    } catch (error) {
+      polled.close();
+
+      throw error;
+    }
+
+    return polled;
   }
 
   /**
-   * Save the file, as whatever writes it does.
+   * Save the file.
+   *
+   * Every save is a different length. A read comparing what the file looks like
+   * has that to go on wherever the timestamps behind it are coarser than the
+   * gap between two saves.
    */
-  async write(content: string): Promise<void> {
-    await this.directory.writeFile(fileName, content);
+  async write(): Promise<void> {
+    this.saves++;
+    await this.directory.writeFile(fileName, "save".repeat(this.saves));
   }
 
   /**
    * How many changes the read has reported.
    */
   changeCount(): number {
-    return this.changed.length;
+    return this.changed;
   }
 
   /**
@@ -58,10 +74,10 @@ export class PolledFile {
   async changes(count: number, withinMs = 5000): Promise<void> {
     const giveUpAt = Date.now() + withinMs;
 
-    while (this.changed.length < count) {
+    while (this.changed < count) {
       if (Date.now() >= giveUpAt) {
         throw new Error(
-          `Polled file reported ${String(this.changed.length)} changes, expected ${String(count)}`,
+          `Polled file reported ${String(this.changed)} changes, expected ${String(count)}`,
         );
       }
 
@@ -85,5 +101,32 @@ export class PolledFile {
    */
   close(): void {
     this.poll.close();
+  }
+
+  /**
+   * Wait until the read has taken its first look at the file.
+   *
+   * Starting one asks for that look rather than taking it, and a save arriving
+   * before it is part of the state the file is found in. A test about what a
+   * save does starts from a read that has already looked, so it saves until one
+   * is reported and then counts from zero again.
+   */
+  private async running(withinMs = 5000): Promise<void> {
+    const giveUpAt = Date.now() + withinMs;
+
+    while (this.changed === 0) {
+      if (Date.now() >= giveUpAt) {
+        throw new Error(
+          "Polled file never reported the save it was started on",
+        );
+      }
+
+      // oxlint-disable-next-line no-await-in-loop -- waiting on a real read
+      await this.write();
+      // oxlint-disable-next-line no-await-in-loop -- waiting on a real read
+      await this.pause(20);
+    }
+
+    this.changed = 0;
   }
 }

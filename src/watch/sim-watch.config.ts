@@ -36,10 +36,9 @@ export const simWatchConfig = {
   // a write that lands during the rebuild reaches nothing. Reading the file
   // says the same thing without depending on the stream.
   //
-  // Well inside `settleMs`, so an event and a read noticing the same save fall
-  // in one burst and are one change rather than two. That is also what it costs:
-  // a read landing inside the window pushes the window back, so a save the
-  // events did report is acted on up to one interval later than it would be.
+  // How long a lost save waits, and no longer than a person notices. A read
+  // finding a change the events already reported stays quiet about it, so this
+  // is the delay on the saves the events lose and nothing else.
   filePollMs: 100,
   // How long the supervisor waits for a process to say it has told its browsers
   // a reload is coming. A process not running Yulin's runtime never answers, so
