@@ -212,9 +212,9 @@ describe("SAM Serverless Api expansion", () => {
     assertIdentical(stage.stageName, "Prod");
   });
 
-  it("records a DefinitionBody as a property the API was created without", async () => {
-    // Given an API declaring its methods as a Swagger document, which nothing
-    // here reads yet
+  it("records a Swagger DefinitionBody the API was created without", async () => {
+    // Given an API declaring its methods as a Swagger 2.0 document, which is
+    // the specification this reads nothing from
     const simAws = new SimAws();
 
     // When it is deployed
@@ -242,6 +242,47 @@ describe("SAM Serverless Api expansion", () => {
           ignored.reason.includes("Body"),
       ),
     );
+  });
+
+  it("imports an OpenAPI 3 DefinitionBody into the API's path tree", async () => {
+    // Given an API declaring its one method as an OpenAPI 3.0 document, which
+    // is what SAM writes for OpenApiVersion 3.0.1
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await deployRestApi(
+      simAws,
+      simCfnSamRestApiTemplateFactory.make({
+        path: undefined,
+        apiProperties: {
+          DefinitionBody: {
+            openapi: "3.0.1",
+            info: { title: "orders-api", version: "1.0" },
+            paths: {
+              "/orders": {
+                get: {
+                  "x-amazon-apigateway-integration": {
+                    type: "aws_proxy",
+                    httpMethod: "POST",
+                    uri: { "Fn::GetAtt": ["Handler", "Arn"] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    // Then the document built the path tree and the method on it. SAM writes
+    // no invoke permission for a method only the document declares, so the
+    // function's own AWS::Lambda::Permission is what makes it serve.
+    const api = deployedApi(stack);
+    assertObjectEquals(
+      api.resources.list().map((resource) => resource.path),
+      ["/", "/orders"],
+    );
+    assertNonNullable(api.resources.findByPath("/orders")?.findMethod("GET"));
   });
 
   it("records an API declaring a DefinitionUri as unsupported", async () => {

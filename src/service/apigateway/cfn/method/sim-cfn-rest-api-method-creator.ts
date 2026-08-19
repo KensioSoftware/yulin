@@ -3,10 +3,13 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimRestApiMethod } from "../../api/method/sim-rest-api-method.js";
 import type { SimApiGateway } from "../../sim-api-gateway.js";
+import type { SimCfnRestApiImports } from "../sim-cfn-rest-api-imports.js";
+import { SimCfnRestApiMethodIntegration } from "./sim-cfn-rest-api-method-integration.js";
 import { SimCfnRestApiMethodProperties } from "./sim-cfn-rest-api-method-properties.js";
 
 interface SimCfnRestApiMethodCreatorProperties {
   readonly apiGateway: SimApiGateway;
+  readonly imports: SimCfnRestApiImports;
 }
 
 /**
@@ -20,9 +23,13 @@ interface SimCfnRestApiMethodCreatorProperties {
  */
 export class SimCfnRestApiMethodCreator {
   private readonly apiGateway: SimApiGateway;
+  private readonly imports: SimCfnRestApiImports;
+  private readonly integration: SimCfnRestApiMethodIntegration;
 
   constructor(properties: SimCfnRestApiMethodCreatorProperties) {
     this.apiGateway = properties.apiGateway;
+    this.imports = properties.imports;
+    this.integration = new SimCfnRestApiMethodIntegration(properties);
   }
 
   /**
@@ -36,53 +43,27 @@ export class SimCfnRestApiMethodCreator {
       resource,
       properties,
     });
+    const address = methodProperties.address();
+    this.imports.requireNotImported(
+      "AWS::ApiGateway::Method",
+      resource,
+      address.restApiId,
+    );
 
     await this.apiGateway.putMethod({
       input: methodProperties.putMethodInput(),
     });
-    await this.putIntegration(methodProperties);
+    await this.integration.put(methodProperties, address);
 
     const method = this.apiGateway
-      .findRestApi(methodProperties.restApiId())
-      ?.resources.find(methodProperties.resourceId())
-      ?.findMethod(methodProperties.httpMethod());
+      .findRestApi(address.restApiId)
+      ?.resources.find(address.resourceId)
+      ?.findMethod(address.httpMethod);
     assertDefined(
       method,
-      `sim REST API method ${methodProperties.httpMethod()} after ` +
-        `CloudFormation creation`,
+      `sim REST API method ${address.httpMethod} after CloudFormation creation`,
     );
 
     return method;
-  }
-
-  /**
-   * Declare what the method does with a request, taking the method back out
-   * again where the block cannot be applied.
-   *
-   * `PutMethod` has already left a method on the resource by this point, and
-   * an integration real API Gateway refuses would leave that method behind on
-   * a Resource CloudFormation reports as failed. The next deployment of the
-   * corrected template would then be refused for a method that already exists.
-   */
-  private async putIntegration(
-    methodProperties: SimCfnRestApiMethodProperties,
-  ): Promise<void> {
-    try {
-      const integrationInput = methodProperties.putIntegrationInput();
-
-      if (integrationInput !== undefined) {
-        await this.apiGateway.putIntegration({ input: integrationInput });
-      }
-    } catch (error) {
-      await this.apiGateway.deleteMethod({
-        input: {
-          restApiId: methodProperties.restApiId(),
-          resourceId: methodProperties.resourceId(),
-          httpMethod: methodProperties.httpMethod(),
-        },
-      });
-
-      throw error;
-    }
   }
 }

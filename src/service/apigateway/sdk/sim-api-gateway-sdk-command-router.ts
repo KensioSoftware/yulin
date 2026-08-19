@@ -5,6 +5,8 @@ import {
 } from "../../../sdk/index.js";
 import type {
   SimCreateRestApiCommand,
+  SimImportRestApiCommand,
+  SimPutRestApiCommand,
   SimGetRestApiCommand,
   SimGetRestApisCommand,
   SimUpdateRestApiCommand,
@@ -47,6 +49,22 @@ export class SimApiGatewaySdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGateway.createRestApi(
             command as SimCreateRestApiCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ImportRestApiCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.importRestApi(
+            command as SimImportRestApiCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutRestApiCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.putRestApi(
+            command as SimPutRestApiCommand,
             simSdkCallerOptions(context),
           ),
       ],

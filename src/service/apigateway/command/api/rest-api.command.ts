@@ -1,3 +1,5 @@
+import type { Readable } from "node:stream";
+
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimRestApiView } from "../../api/sim-rest-api-view.js";
 
@@ -98,5 +100,61 @@ export interface SimDeleteRestApiCommandInput {
 }
 
 export interface SimDeleteRestApiCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal supported sim REST API definition body type.
+ *
+ * This allows for the different types the request body could be in the real
+ * SDK commands, even though only string and Uint8Array documents are read.
+ */
+export type SimRestApiDefinitionBody =
+  | string
+  | ArrayBuffer
+  | ArrayBufferView
+  | Uint8Array
+  | Buffer
+  | Blob
+  | Readable
+  | ReadableStream<Uint8Array>;
+
+/**
+ * Minimal structural sim API Gateway ImportRestApi command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/api-gateway/command/ImportRestApiCommand/
+ */
+export interface SimImportRestApiCommand {
+  readonly input: SimImportRestApiCommandInput;
+}
+
+export interface SimImportRestApiCommandInput {
+  readonly body?: SimRestApiDefinitionBody | undefined;
+  readonly failOnWarnings?: boolean | undefined;
+  readonly parameters?: Record<string, string> | undefined;
+}
+
+export interface SimImportRestApiCommandOutput extends SimRestApiView {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim API Gateway PutRestApi command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/api-gateway/command/PutRestApiCommand/
+ */
+export interface SimPutRestApiCommand {
+  readonly input: SimPutRestApiCommandInput;
+}
+
+export interface SimPutRestApiCommandInput {
+  readonly restApiId?: string | undefined;
+  readonly mode?: string | undefined;
+  readonly body?: SimRestApiDefinitionBody | undefined;
+  readonly failOnWarnings?: boolean | undefined;
+  readonly parameters?: Record<string, string> | undefined;
+}
+
+export interface SimPutRestApiCommandOutput extends SimRestApiView {
   readonly $metadata: SimResponseMetadata;
 }

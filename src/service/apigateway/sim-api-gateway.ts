@@ -57,6 +57,28 @@ export class SimApiGateway extends SimRestApiParts {
   }
 
   /**
+   * Handle an ImportRestApi Command from the SDK.
+   */
+  async importRestApi(
+    command: simApiGatewayCommands.SimImportRestApiCommand,
+    options?: SimApiGatewayRequestOptions,
+  ): Promise<simApiGatewayCommands.SimImportRestApiCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.imports.importRestApi(command, options);
+  }
+
+  /**
+   * Handle a PutRestApi Command from the SDK.
+   */
+  async putRestApi(
+    command: simApiGatewayCommands.SimPutRestApiCommand,
+    options?: SimApiGatewayRequestOptions,
+  ): Promise<simApiGatewayCommands.SimPutRestApiCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.imports.putRestApi(command, options);
+  }
+
+  /**
    * Handle a GetRestApi Command from the SDK.
    */
   async getRestApi(

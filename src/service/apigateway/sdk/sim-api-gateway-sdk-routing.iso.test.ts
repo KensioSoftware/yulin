@@ -16,8 +16,10 @@ import {
   GetRestApisCommand,
   GetStageCommand,
   GetStagesCommand,
+  ImportRestApiCommand,
   PutIntegrationCommand,
   PutMethodCommand,
+  PutRestApiCommand,
   UpdateRestApiCommand,
 } from "@aws-sdk/client-api-gateway";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
@@ -25,6 +27,8 @@ import { describe, expect, it } from "vitest";
 
 import { SimSdk } from "../../../sdk/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { simRestApiOpenApiDocumentFactory } from "../openapi/sim-rest-api-openapi-document.factory.js";
+import { simRestApiOpenApiIntegrationFactory } from "../openapi/sim-rest-api-openapi-integration.factory.js";
 
 const functionArn = "arn:aws:lambda:eu-west-2:111111111111:function:orders";
 
@@ -129,6 +133,52 @@ describe("Intercepting an API Gateway SDK client", () => {
     await client.send(new DeleteRestApiCommand({ restApiId }));
     const remaining = await client.send(new GetRestApisCommand({}));
     expect(remaining.items).toStrictEqual([]);
+  });
+
+  it("routes the importing Commands through the client", async () => {
+    // Given a real SDK client intercepted into a simulated AWS
+    const simAws = new SimAws();
+    using simSdk = new SimSdk({ simAws });
+    const client = new APIGatewayClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+    const integration = simRestApiOpenApiIntegrationFactory.make({
+      functionArn,
+      regionName: "eu-west-2",
+    });
+    const definition = (path: string): Uint8Array =>
+      new TextEncoder().encode(
+        JSON.stringify(
+          simRestApiOpenApiDocumentFactory.make({
+            paths: {
+              [path]: {
+                get: { "x-amazon-apigateway-integration": integration },
+              },
+            },
+          }),
+        ),
+      );
+
+    // When an OpenAPI document is imported through it and another is put over
+    // the API afterwards
+    const imported = await client.send(
+      new ImportRestApiCommand({ body: definition("/orders") }),
+    );
+    const restApiId = imported.id ?? "";
+    await client.send(
+      new PutRestApiCommand({
+        restApiId,
+        mode: "overwrite",
+        body: definition("/owners"),
+      }),
+    );
+
+    // Then the simulation answered both, with the path the second document
+    // declared
+    const resources = await client.send(new GetResourcesCommand({ restApiId }));
+    expect(resources.items?.map((one) => one.path)).toStrictEqual([
+      "/",
+      "/owners",
+    ]);
   });
 
   it("advertises every Command name it routes", () => {

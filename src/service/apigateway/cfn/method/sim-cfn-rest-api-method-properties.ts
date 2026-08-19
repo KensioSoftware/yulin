@@ -25,6 +25,15 @@ const simulatedProperties = [
   "Integration",
 ];
 
+/**
+ * The three values every command reaching one method names it by.
+ */
+export interface SimCfnRestApiMethodAddress {
+  readonly restApiId: string;
+  readonly resourceId: string;
+  readonly httpMethod: string;
+}
+
 interface SimCfnRestApiMethodPropertiesProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
@@ -47,6 +56,18 @@ export class SimCfnRestApiMethodProperties {
     this.properties = properties.properties;
 
     this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
+  }
+
+  /**
+   * The API, node and verb this method is addressed by, which is how every
+   * command reaching one names it.
+   */
+  address(): SimCfnRestApiMethodAddress {
+    return {
+      restApiId: this.restApiId(),
+      resourceId: this.resourceId(),
+      httpMethod: this.httpMethod(),
+    };
   }
 
   /**

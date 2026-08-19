@@ -121,6 +121,35 @@ the id. That split is made when the request is routed rather than while the host
 for the same reason a load balancer's DNS name resolves before anything asks whether a load balancer
 still answers on it.
 
+## Importing an OpenAPI document
+
+`openapi/` reads an OpenAPI 3.0 document into the same commands an SDK caller sends:
+
+```text
+SimRestApiOpenApiDocument        the root, the version check, and the paths
+├── SimRestApiOpenApiPathItem    one path: its segments and its operations
+├── SimRestApiOpenApiIntegration one x-amazon-apigateway-integration
+├── SimRestApiOpenApiPathTree    a resource per segment, shared between paths
+├── SimRestApiOpenApiMethods     PutMethod and PutIntegration for one operation
+├── SimRestApiOpenApiImport      the walk over the document
+└── SimRestApiOpenApiReplacement the overwrite PutRestApi asks for
+```
+
+`ImportRestApi`, `PutRestApi` and a `Body` on an `AWS::ApiGateway::RestApi` all arrive here with the
+same document and meet the same refusals. `SimRestApiOpenApiValue` and `SimRestApiOpenApiObject`
+narrow whatever JSON held. Every refusal carries the RFC 6901 pointer of the member it is about, and
+a reader follows that pointer into their own document.
+
+A refusal from one of the ordinary commands is caught by `SimRestApiOpenApiCommand` and given that
+pointer. Path part grammar, integration types and URI parsing are therefore stated once, where an
+SDK caller and a template already meet them.
+
+The equivalent for HTTP APIs is `../apigatewayv2/openapi/`. The two services keep separate readers
+for the same reason they keep separate commands and separate stores. Three things differ in what a
+REST API document may carry. It has the catch-all `x-amazon-apigateway-any-method`, it has no
+reusable integration definitions, and its paths become a tree where an HTTP API's become route
+keys.
+
 ## Deploying from a template
 
 `cfn/` turns the `AWS::ApiGateway::*` Resource types into the same commands an SDK caller sends:
@@ -132,7 +161,8 @@ SimApiGatewayCfnResourceFactory              which creator answers a Resource ty
 ├── sim-cfn-rest-api-template.factory.ts     the template tests deploy
 ├── sim-cfn-rest-api-template-ids.ts         the logical IDs a test names it by
 ├── sim-cfn-rest-api-part-deleter.ts         what a teardown deletes an API's parts by
-├── api/         RestApi
+├── sim-cfn-rest-api-imports.ts              the APIs a Body declared
+├── api/         RestApi, and the Body it may be declared as
 ├── resource/    Resource
 ├── authorizer/  Authorizer
 ├── method/      Method, and the Integration block it carries
@@ -145,6 +175,11 @@ is, and the refusals below apply to a deployed Resource as well. Each properties
 properties its type simulates and records every other one against the Resource. That record is what
 keeps a template from deploying an API that looks configured to the template and unconfigured to
 every request.
+
+An API carrying a `Body` goes through `ImportRestApi`, which creates its own resources, methods and
+integrations. A sibling Resource adding to that API is a template written two ways at once.
+`SimCfnRestApiImports` fails the stack naming both Resources. Deploying whichever was created last
+would leave what a request reaches turning on the order the stack happened to take.
 
 A method is one Resource and two commands, because the REST API declares a method and what it does
 with a request separately. The template writes both as one entry, with the integration as a block of
@@ -173,3 +208,8 @@ Authorization is refused the same way, in the two commands that carry it.
 `CUSTOM` and refuses the other two types. A method served open where AWS would have gated it lets a
 test pass on a request real AWS rejects, so a template asking for one of them fails to deploy rather
 than deploying around it.
+
+An imported document meets those refusals through the commands, and `openapi/` adds the ones about
+members no command sees. A document-level `security`, an operation's `security`, a Swagger 2
+document and every `x-amazon-apigateway-*` extension outside the two that are read are refused
+where they are written.

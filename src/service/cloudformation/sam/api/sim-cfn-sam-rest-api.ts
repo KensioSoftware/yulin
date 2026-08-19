@@ -57,11 +57,13 @@ const propertyNames = new Set([
  * this one does, so a method is an `AWS::ApiGateway::Method` a Stack holds and
  * tears down rather than a line of a document nothing reads.
  *
- * A `DefinitionBody` goes on as the API's `Body`, which is recorded as a
- * property the API was created without until the OpenAPI reader lands. A
- * `DefinitionUri` points at a document on disk or in S3, and an API declaring
- * one is left as the template wrote it, to be recorded as unsupported. The
- * alternative is an API deployed with an empty path tree and no sign of why.
+ * A `DefinitionBody` goes on as the API's `Body`, which is imported where it
+ * is an OpenAPI 3.0 document. SAM writes Swagger 2.0 unless the template asks
+ * for `OpenApiVersion: 3.0.1`, and the API is created without a Swagger
+ * document and the record says so. A `DefinitionUri` points at a document on
+ * disk or in S3, and an API declaring one is left as the template wrote it, to
+ * be recorded as unsupported. The alternative is an API deployed with an empty
+ * path tree and no sign of why.
  */
 export function samRestApiResources(
   properties: SamRestApiExpansionProperties,
@@ -91,8 +93,8 @@ export function samRestApiResources(
 }
 
 /**
- * The Swagger document the API is imported from, where the template declared
- * one inline.
+ * The document the API is imported from, where the template declared one
+ * inline.
  *
  * A REST API is named whatever the template named it either way. The document
  * carries a title of its own, and an API Gateway REST API takes a name whether

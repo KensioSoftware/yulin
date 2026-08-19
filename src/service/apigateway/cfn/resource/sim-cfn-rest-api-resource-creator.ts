@@ -3,10 +3,12 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimRestApiResource } from "../../api/resource/sim-rest-api-resource.js";
 import type { SimApiGateway } from "../../sim-api-gateway.js";
+import type { SimCfnRestApiImports } from "../sim-cfn-rest-api-imports.js";
 import { SimCfnRestApiResourceProperties } from "./sim-cfn-rest-api-resource-properties.js";
 
 interface SimCfnRestApiResourceCreatorProperties {
   readonly apiGateway: SimApiGateway;
+  readonly imports: SimCfnRestApiImports;
 }
 
 /**
@@ -18,9 +20,11 @@ interface SimCfnRestApiResourceCreatorProperties {
  */
 export class SimCfnRestApiResourceCreator {
   private readonly apiGateway: SimApiGateway;
+  private readonly imports: SimCfnRestApiImports;
 
   constructor(properties: SimCfnRestApiResourceCreatorProperties) {
     this.apiGateway = properties.apiGateway;
+    this.imports = properties.imports;
   }
 
   /**
@@ -35,6 +39,11 @@ export class SimCfnRestApiResourceCreator {
       properties,
     });
     const restApiId = resourceProperties.restApiId();
+    this.imports.requireNotImported(
+      "AWS::ApiGateway::Resource",
+      resource,
+      restApiId,
+    );
 
     const created = await this.apiGateway.createResource({
       input: resourceProperties.createResourceInput(),
