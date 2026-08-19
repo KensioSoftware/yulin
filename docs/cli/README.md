@@ -1,4 +1,4 @@
-# The AWS CLI against simulated AWS
+# AWS CLI
 
 The real `aws` CLI reaches a served simulated environment over a local endpoint URL, and twenty of
 Yulin's twenty-five SDK-facing services answer it.

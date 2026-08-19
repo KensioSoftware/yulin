@@ -1,4 +1,4 @@
-# Simulated Cognito user pools
+# Simulated Cognito IDP
 
 Yulin includes a simulated Cognito user pool directory for tests and local development. Pools and
 their app clients are held in memory, and every operation is authorized by simulated IAM.
