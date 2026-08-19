@@ -49,6 +49,12 @@ export type SimCloudFormationResourceStatus =
  */
 export interface SimCfnResourceResolveContext {
   readonly resources: ReadonlyMap<string, SimCfnResource>;
+
+  /**
+   * The simulation the Stack is deploying into, for the values that come from
+   * another service rather than from the template. A dynamic reference is one.
+   */
+  readonly simAws?: SimAws | undefined;
 }
 
 export interface SimCloudFormationResourceCreateContext {

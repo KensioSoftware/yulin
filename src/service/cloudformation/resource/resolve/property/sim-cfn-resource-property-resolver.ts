@@ -7,11 +7,19 @@ import type {
 import type { SimCfnResourceResolveContext } from "../../sim-cfn-resource.type.js";
 import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnExports } from "../../../export/sim-cfn-exports.js";
+import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
+import {
+  makeSimCfnDynamicReferences,
+  type SimCfnDynamicReferences,
+} from "../../../template/dynamic/sim-cfn-dynamic-references.js";
+import type { SimCfnPropertyIgnorer } from "../../ignore/sim-cfn-ignored-property.type.js";
 
 interface SimCfnResourcePropertyResolverProperties {
   readonly parameters?: SimCfnParameters | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
   readonly exports?: SimCfnExports | undefined;
+  readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
+  readonly propertyIgnorer?: SimCfnPropertyIgnorer | undefined;
 }
 
 /**
@@ -31,11 +39,15 @@ export class SimCfnResourcePropertyResolver {
   private readonly parameters: SimCfnParameters | undefined;
   private readonly pseudoParameters: SimCfnPseudoParameters | undefined;
   private readonly exports: SimCfnExports | undefined;
+  private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
+  private readonly propertyIgnorer: SimCfnPropertyIgnorer | undefined;
 
   constructor(properties: SimCfnResourcePropertyResolverProperties = {}) {
     this.parameters = properties.parameters;
     this.pseudoParameters = properties.pseudoParameters;
     this.exports = properties.exports;
+    this.accountRegionScope = properties.accountRegionScope;
+    this.propertyIgnorer = properties.propertyIgnorer;
   }
 
   /**
@@ -57,6 +69,7 @@ export class SimCfnResourcePropertyResolver {
       parameters: this.parameters ?? new SimCfnParameters(),
       pseudoParameters: this.pseudoParameters,
       exports: this.exports,
+      dynamicReferences: this.dynamicReferences(context),
       resources: {
         has: (id): boolean => context.resources.has(id),
         refValue: (id): SimCfnTemplateValue => {
@@ -83,5 +96,28 @@ export class SimCfnResourcePropertyResolver {
     });
 
     return resolver.resolveRecord(properties);
+  }
+
+  /**
+   * The services answering this Resource's dynamic references.
+   *
+   * Absent where the caller has no simulation to read from, which is how the
+   * resolver is used on its own in tests. A reference then stays in the
+   * property as the template wrote it.
+   */
+  private dynamicReferences(
+    context: SimCfnResourceResolveContext,
+  ): SimCfnDynamicReferences | undefined {
+    const { simAws } = context;
+
+    if (simAws === undefined || this.accountRegionScope === undefined) {
+      return undefined;
+    }
+
+    return makeSimCfnDynamicReferences({
+      simAws,
+      accountRegionScope: this.accountRegionScope,
+      propertyIgnorer: this.propertyIgnorer,
+    });
   }
 }

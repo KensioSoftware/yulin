@@ -66,6 +66,8 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
     this.propertyResolver = new SimCfnResourcePropertyResolver({
       parameters,
       exports,
+      accountRegionScope: this.accountRegionScope,
+      propertyIgnorer: this,
     });
     this.resourceLogicalIds = resourceLogicalIds;
   }

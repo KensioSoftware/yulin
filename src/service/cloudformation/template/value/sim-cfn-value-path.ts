@@ -15,6 +15,26 @@ interface SimCfnValuePath {
 const valuePaths = new WeakMap<Error, SimCfnValuePath>();
 
 /**
+ * Where resolution currently is, as the keys and list positions it descended
+ * through to get there.
+ *
+ * The failure path above is built on the way back up, which only a thrown
+ * error travels. Something noticed part way down and carried on, such as a
+ * dynamic reference resolved to a stand-in value, has nothing to throw and
+ * still has to say which property it happened on. Resolution is synchronous,
+ * so one stack pushed and popped by the same wrapper answers that.
+ */
+const currentPath: SimCfnValuePathSegment[] = [];
+
+/**
+ * The property path resolution is inside, written the way an ignored property
+ * records one, e.g. `Tags.0.Value`.
+ */
+export function currentSimCfnValuePath(): string {
+  return currentPath.map(String).join(".");
+}
+
+/**
  * Resolve a value, naming the key it sat under if it fails.
  *
  * A failure on its own says what was wrong with the expression but not which
@@ -29,10 +49,14 @@ export function resolveSimCfnValueAt<T>(
   segment: SimCfnValuePathSegment,
   resolve: () => T,
 ): T {
+  currentPath.push(segment);
+
   try {
     return resolve();
   } catch (error) {
     rethrowSimCfnValueAt(segment, error);
+  } finally {
+    currentPath.pop();
   }
 }
 

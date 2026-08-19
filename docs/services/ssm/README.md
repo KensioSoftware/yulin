@@ -375,6 +375,86 @@ Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/myapp/pro
 CDK does this for you. `ssm.StringParameter` with `grantRead(fn)` synthesises a template that deploys
 here without hand-editing.
 
+## Reading a parameter with a dynamic reference
+
+A template reads a parameter that already exists through a `{{resolve:ssm:...}}` dynamic reference.
+The reference is replaced with the parameter's value as the resource holding it is created.
+
+`{{resolve:ssm:name}}` reads the current version, and `{{resolve:ssm:name:3}}` reads version 3. A
+reference can sit inside a longer string, where only the reference itself is replaced.
+
+```typescript sim-ssm-dynamic-reference
+/**
+ * Reading an existing parameter from a template with a dynamic reference.
+ */
+
+import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/db-host",
+    Type: "String",
+    Value: "db.internal",
+  }),
+);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "app-stack",
+  template: {
+    Resources: {
+      DbUrl: {
+        Type: "AWS::SSM::Parameter",
+        Properties: {
+          Name: "/myapp/prod/db-url",
+          Type: "String",
+          Value: "postgres://{{resolve:ssm:/myapp/prod/db-host}}:5432/app",
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const read = await simAws
+  .ssm()
+  .getParameter(new GetParameterCommand({ Name: "/myapp/prod/db-url" }));
+
+console.log(read.Parameter?.Value); // "postgres://db.internal:5432/app"
+```
+
+CDK emits one of these from `ssm.StringParameter.valueForStringParameter` when a version is given,
+and from `fromStringParameterAttributes` with `forceDynamicReference`.
+
+A reference inside `Fn::Sub` is read after the variables around it are substituted, so
+`!Sub "{{resolve:ssm:/myapp/${Environment}/db-host}}"` looks up the name the substitution produced.
+
+A `StringList` parameter resolves to the comma-separated string Parameter Store holds, which
+`Fn::Split` then splits.
+
+Real CloudFormation makes no dependency out of a dynamic reference, and neither does this. A
+parameter another resource of the same stack creates is only there in time when the template says
+`DependsOn`.
+
+`{{resolve:ssm-secure:...}}` and `{{resolve:secretsmanager:...}}` are left in the template as
+written. Neither is resolved yet.
+
+### A reference the simulation cannot answer
+
+Simulated CloudFormation deploys what it can. A reference naming a parameter that was never created
+resolves to `dummy-value-for-<name>`, and the stack carries on deploying. A template reading
+configuration a test does not care about is still worth deploying for everything else in it.
+
+The substitution is recorded on
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+naming the property that held the reference and why the value is a stand-in. A version the parameter
+never had, a `SecureString`, and a body that is not a name and an optional integer version are all
+recorded the same way.
+
 ## Reading configuration in a Lambda handler
 
 Function code that reads its configuration on cold start needs no special treatment. Any
@@ -736,6 +816,10 @@ Sim SSM currently supports:
 - `String`, `StringList` and `SecureString` parameter types
 - `SecureString` values encrypted through simulated KMS, decrypted only with `WithDecryption`
 - The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
+- `{{resolve:ssm:...}}` dynamic references in CloudFormation resource properties, by version or by
+  current value, embedded in a longer string and inside `Fn::Sub`
+- `StringList` parameters read through a dynamic reference as the comma-separated string `Fn::Split`
+  then splits
 - Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -780,9 +864,14 @@ Current documented limitations:
 - Every deployment of an `AWS::SSM::Parameter` is a create. A name another stack already used is
   refused. A stack update that changes `Value` deletes the parameter and creates it again, where
   real CloudFormation overwrites it in place, so the parameter's version starts from 1 again.
-- `{{resolve:ssm:...}}` dynamic references and the `AWS::SSM::Parameter::Value<String>` template
-  parameter type are absent. Those are CloudFormation engine features rather than Parameter Store
-  ones. Pass the name from `Ref` instead.
+- The `AWS::SSM::Parameter::Value<String>` template parameter type is absent. A `Ref` to a parameter
+  declared with it gives the name it was given, where real CloudFormation gives the value stored
+  under that name. Pass the name from `Ref` and read it with `GetParameter`.
+- `{{resolve:ssm-secure:...}}` dynamic references are absent. Reading a `SecureString` into a
+  template means decrypting it, which the CloudFormation engine has no route to yet.
+- A `{{resolve:ssm:...}}` reference naming a parameter, or a version, that simulated Parameter Store
+  has never held resolves to `dummy-value-for-<name>` and records the substitution. Real
+  CloudFormation fails the stack.
 - Public parameters under `/aws/service/...` do not exist, and names under the reserved `aws` and
   `ssm` prefixes are refused, as they are on real AWS.
 - The Parameters and Secrets Lambda extension HTTP endpoint is absent. Handler code has to use the

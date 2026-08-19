@@ -921,6 +921,19 @@ deploy. A deleted Stack releases its export names, leaving them free for the nex
 Exports are scoped per Account and Region, as they are on AWS. A Stack in one Region reads only the
 exports published in that Region.
 
+## Dynamic references
+
+A `{{resolve:...}}` dynamic reference reads a value from another service while a resource is being
+created. It is written into the template as ordinary text, so it can sit inside a longer string and
+inside `Fn::Sub`.
+
+`{{resolve:ssm:name}}` and `{{resolve:ssm:name:3}}` read a simulated SSM parameter. See
+[reading a parameter with a dynamic reference](../ssm/README.md#reading-a-parameter-with-a-dynamic-reference)
+for what they resolve to, and for what happens when Parameter Store cannot answer one.
+
+`{{resolve:ssm-secure:...}}` and `{{resolve:secretsmanager:...}}` are left in the template as
+written. Neither is resolved yet.
+
 ## Conditions
 
 A template `Conditions` section names boolean expressions over the stack's parameter values. A

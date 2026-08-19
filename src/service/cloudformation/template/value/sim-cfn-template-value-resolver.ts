@@ -10,6 +10,7 @@ import { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 import type { SimCfnConditions } from "../condition/sim-cfn-conditions.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
+import type { SimCfnDynamicReferences } from "../dynamic/sim-cfn-dynamic-references.js";
 import {
   resolveSimCfnValueAt,
   resolveSimCfnValueIn,
@@ -22,6 +23,7 @@ interface SimCfnTemplateValueResolverProperties {
   readonly mappings?: SimCfnMappings | undefined;
   readonly conditions?: SimCfnConditions | undefined;
   readonly exports?: SimCfnExports | undefined;
+  readonly dynamicReferences?: SimCfnDynamicReferences | undefined;
 }
 
 /**
@@ -38,6 +40,7 @@ export class SimCfnTemplateValueResolver {
       mappings: properties.mappings,
       conditions: properties.conditions,
       exports: properties.exports,
+      dynamicReferences: properties.dynamicReferences,
     });
   }
 
