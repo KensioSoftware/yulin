@@ -48,10 +48,8 @@ export {
 } from "./api/sim-rest-api-lambda-proxy.factory.js";
 export { SimApiGatewayServiceController } from "./serve/sim-api-gateway-controller.js";
 export { SimApiGatewayRouter } from "./serve/sim-api-gateway-router.js";
-export {
-  simApiGatewayServicePrincipal,
-  SimRestApiIntegrationInvocation,
-} from "./serve/sim-rest-api-integration-invocation.js";
+export { SimRestApiIntegrationInvocation } from "./serve/sim-rest-api-integration-invocation.js";
+export { simApiGatewayServicePrincipal } from "./sim-api-gateway-service-principal.js";
 export type { SimRestApiFunctionTarget } from "./serve/sim-rest-api-function-target.js";
 export {
   makeSimRestApiDeploymentId,

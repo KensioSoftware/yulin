@@ -1,6 +1,6 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
-import { simApiGatewayServicePrincipal } from "../serve/sim-rest-api-integration-invocation.js";
+import { simApiGatewayServicePrincipal } from "../sim-api-gateway-service-principal.js";
 
 interface SimRestApiProxyFunctionInput {
   readonly functionAccountId: string;

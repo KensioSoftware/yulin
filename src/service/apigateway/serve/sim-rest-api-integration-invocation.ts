@@ -5,15 +5,11 @@ import { SimLambdaServiceInvokeAuthorizer } from "../../lambda/command/authorize
 import type { SimRestApiMatch } from "../api/match/sim-rest-api-match.js";
 import { SimRestApiExecuteApiArn } from "../api/sim-rest-api-execute-api-arn.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
+import { simApiGatewayServicePrincipal } from "../sim-api-gateway-service-principal.js";
 import { SimApiGatewayErrorResponse } from "./sim-api-gateway-error-response.js";
 import type { SimApiGatewayRouter } from "./sim-api-gateway-router.js";
 import { simRestApiEndpoint } from "./sim-rest-api-endpoint.js";
 import type { SimRestApiFunctionTarget } from "./sim-rest-api-function-target.js";
-
-/**
- * The service principal API Gateway invokes a Lambda function as.
- */
-export const simApiGatewayServicePrincipal = "apigateway.amazonaws.com";
 
 interface SimRestApiIntegrationInvocationProperties {
   readonly router: SimApiGatewayRouter;
