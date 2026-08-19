@@ -4,7 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLambdaPermission } from "../../function/policy/sim-lambda-permission.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
-import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
+import { simCfnLambdaTargetFunction } from "../function/sim-cfn-lambda-target-function.js";
 
 interface SimCfnLambdaPermissionCreatorProperties {
   readonly lambda: SimLambda;
@@ -17,7 +17,12 @@ interface SimCfnLambdaPermissionCreatorProperties {
  * This is what CDK emits for every `grantInvoke` and `grantInvokeUrl`, so a
  * synthesized template reaches it whether or not the app mentions permissions
  * itself. A template that declares one and a test that calls `AddPermission`
- * produce the same statement, because both end up on the same function policy.
+ * produce the same statement, because both end up on the same policy.
+ *
+ * That policy is the one belonging to whatever the template named. CDK grants
+ * on an alias by writing the alias ARN as the `FunctionName`, so the qualifier
+ * is carried through to `AddPermission` rather than dropped, and the grant
+ * decides calls through the alias rather than calls on `$LATEST`.
  */
 export class SimCfnLambdaPermissionCreator {
   private readonly lambda: SimLambda;
@@ -38,7 +43,7 @@ export class SimCfnLambdaPermissionCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimLambdaPermission> {
-    const functionName = simCfnLambdaTargetFunctionName(
+    const { functionName, qualifier } = simCfnLambdaTargetFunction(
       this.propertyParser.requiredString(
         resource,
         properties["FunctionName"],
@@ -49,6 +54,7 @@ export class SimCfnLambdaPermissionCreator {
     await this.lambda.addPermission({
       input: {
         FunctionName: functionName,
+        Qualifier: qualifier,
         StatementId: resource.logicalId,
         Action: this.propertyParser.requiredString(
           resource,
@@ -89,8 +95,8 @@ export class SimCfnLambdaPermissionCreator {
     });
 
     const permission = this.lambda
-      .getSimFunctionByName(functionName)
-      ?.resourcePolicy.get(resource.logicalId);
+      .getSimFunctionTarget(functionName, qualifier)
+      ?.resource.resourcePolicy.get(resource.logicalId);
 
     assertDefined(
       permission,

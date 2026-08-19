@@ -4,10 +4,12 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimLambda } from "../sim-lambda.js";
+import { SimCfnLambdaAliasCreator } from "./alias/sim-cfn-lambda-alias-creator.js";
 import { SimCfnLambdaEventSourceMappingCreator } from "./event-source-mapping/sim-cfn-lambda-event-source-mapping-creator.js";
 import { SimCfnLambdaFunctionCreator } from "./function/sim-cfn-lambda-function-creator.js";
 import { SimCfnLambdaPermissionCreator } from "./permission/sim-cfn-lambda-permission-creator.js";
 import { SimCfnLambdaUrlCreator } from "./url/sim-cfn-lambda-url-creator.js";
+import { SimCfnLambdaVersionCreator } from "./version/sim-cfn-lambda-version-creator.js";
 import { SimCfnLambdaResourceDeleter } from "./sim-cfn-lambda-resource-deleter.js";
 
 /**
@@ -17,6 +19,8 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
   private readonly functionCreator: SimCfnLambdaFunctionCreator;
   private readonly urlCreator: SimCfnLambdaUrlCreator;
   private readonly permissionCreator: SimCfnLambdaPermissionCreator;
+  private readonly versionCreator: SimCfnLambdaVersionCreator;
+  private readonly aliasCreator: SimCfnLambdaAliasCreator;
   private readonly eventSourceMappingCreator: SimCfnLambdaEventSourceMappingCreator;
   private readonly deleter: SimCfnLambdaResourceDeleter;
 
@@ -25,6 +29,8 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
     this.functionCreator = new SimCfnLambdaFunctionCreator({ lambda });
     this.urlCreator = new SimCfnLambdaUrlCreator({ lambda });
     this.permissionCreator = new SimCfnLambdaPermissionCreator({ lambda });
+    this.versionCreator = new SimCfnLambdaVersionCreator({ lambda });
+    this.aliasCreator = new SimCfnLambdaAliasCreator({ lambda });
     this.eventSourceMappingCreator = new SimCfnLambdaEventSourceMappingCreator({
       lambda,
     });
@@ -60,6 +66,18 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
       }
       case "Permission": {
         return await this.permissionCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
+      case "Version": {
+        return await this.versionCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
+      case "Alias": {
+        return await this.aliasCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
         );

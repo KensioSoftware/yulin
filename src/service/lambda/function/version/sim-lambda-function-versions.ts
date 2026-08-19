@@ -36,8 +36,14 @@ export class SimLambdaFunctionVersions {
   /**
    * Publish the function as it stands as the next version.
    */
-  publish(simFunction: SimLambdaFunction): SimLambdaFunction {
-    const version = simFunction.publishedAs(String(this.nextVersionNumber));
+  publish(
+    simFunction: SimLambdaFunction,
+    description?: string,
+  ): SimLambdaFunction {
+    const version = simFunction.publishedAs(
+      String(this.nextVersionNumber),
+      description,
+    );
 
     this.nextVersionNumber += 1;
     this.published.push(version);

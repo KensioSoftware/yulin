@@ -2067,6 +2067,11 @@ after the logical ID, and so does this.
 `FunctionName` accepts either a `Ref` to the function, giving its name, or an `Fn::GetAtt` on it,
 giving the ARN. A synthesized CDK app deploys either way with no special casing.
 
+A `FunctionName` carrying a version number or an alias name grants on that qualified resource, and
+the statement's `Resource` is the qualified ARN. This is how CDK writes `grantInvoke` on a
+`lambda.Alias`, and a grant made that way admits a call through the alias while `$LATEST` keeps a
+policy of its own. See [versions and aliases](#versions-and-aliases).
+
 ## Environment variables
 
 A function can declare its own environment variables with `Environment.Variables`, as on real
@@ -2497,6 +2502,102 @@ CDK templates work the same way. Synth the app, deploy the template file, and re
 `AWS::Lambda::Permission`, which deploys alongside it as
 [permissions in templates](#permissions-in-templates) covers.
 
+## Versions and aliases in templates
+
+`AWS::Lambda::Version` publishes a version of the function its `FunctionName` names, and
+`AWS::Lambda::Alias` gives one of those versions a name. CDK emits both for `fn.currentVersion` and
+`new lambda.Alias(...)`, and the integrations in such an app point at the alias.
+
+`FunctionName` accepts either a `Ref` to the function, giving its name, or an `Fn::GetAtt` on it,
+giving the ARN. `Ref` on the version resolves to the qualified function ARN
+(`arn:aws:lambda:us-east-1:888888888888:function:greeter:1`) and `Fn::GetAtt` `Version` to the
+number on the end of it. An alias's `FunctionVersion` is usually written from that number. `Ref` on
+the alias resolves to the alias ARN. `Fn::GetAtt` also supports `FunctionArn` on a version and
+`AliasArn` on an alias.
+
+```typescript sim-lambda-cloudformation-alias
+/**
+ * Deploying a Lambda version and an alias on it from a CloudFormation
+ * template, and invoking the function through the alias.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "greeter-stack",
+  template: {
+    Resources: {
+      GreeterFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "greeter",
+          Role: "arn:aws:iam::111111111111:role/GreeterRole",
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Code: {
+            ZipFile:
+              "exports.handler = async (event, context) => " +
+              "context.functionVersion;",
+          },
+        },
+      },
+      GreeterVersion: {
+        Type: "AWS::Lambda::Version",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+        },
+      },
+      GreeterAlias: {
+        Type: "AWS::Lambda::Alias",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Name: "live",
+          FunctionVersion: { "Fn::GetAtt": ["GreeterVersion", "Version"] },
+        },
+      },
+    },
+    Outputs: {
+      GreeterAliasArn: { Value: { Ref: "GreeterAlias" } },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+console.log(stack.output("GreeterAliasArn"));
+
+const invoked = await simAws
+  .lambda()
+  .invoke(new InvokeCommand({ FunctionName: "greeter", Qualifier: "live" }));
+
+console.log(invoked.ExecutedVersion);
+
+await simAws.backgroundTasksComplete();
+```
+
+Supported `AWS::Lambda::Version` properties:
+
+- `FunctionName`
+- `Description`, which describes the published version and leaves the function's own description
+  alone
+
+Supported `AWS::Lambda::Alias` properties:
+
+- `FunctionName`
+- `Name`
+- `FunctionVersion`
+- `Description`
+
+An `AWS::Lambda::Permission` naming a version or an alias grants on it. See
+[permissions in templates](#permissions-in-templates).
+
+Deleting the Stack deletes the alias. Lambda has no operation that deletes one published version.
+The version Resource has nothing of its own to do on teardown, and the version it published goes
+when the function does.
+
 ## Executable bindings
 
 Deploy-time `bindings` let a template function be backed by a real in-process handler instead of its
@@ -2751,9 +2852,12 @@ Sim Lambda currently supports:
   `lambda:GetFunction`, `lambda:InvokeFunction`, the Function URL config actions, and the version
   and alias actions)
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
-- The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission` and
-  `AWS::Lambda::EventSourceMapping` CloudFormation resources, with `Ref`/`Fn::GetAtt` support and
-  deploy-time executable bindings
+- The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission`,
+  `AWS::Lambda::Version`, `AWS::Lambda::Alias` and `AWS::Lambda::EventSourceMapping`
+  CloudFormation resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
+- A CDK app built on `fn.currentVersion` or a `lambda.Alias`, which deploys with the alias its
+  integrations point at, and where an `AWS::Lambda::Permission` naming that alias grants on the
+  alias
 - `AWS::Lambda::EventSourceMapping` on a queue or on a table's stream, including the
   `StartingPosition` a stream mapping needs, so a CDK `SqsEventSource` or `DynamoEventSource`
   deploys as it is synthesised
@@ -2787,13 +2891,16 @@ Current documented limitations:
   out.
 - A published version keeps what it was published with, and `UpdateFunctionCode` is absent, so
   `$LATEST` has no way to drift from it yet. The `CodeSha256` and `RevisionId` checks
-  `PublishVersion` makes are left out, along with `Description` on a published version, alias
-  `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the two
-  listings.
+  `PublishVersion` makes are left out, along with alias `RoutingConfig` weights, provisioned
+  concurrency, and the `Marker`/`MaxItems` paging on the two listings. `CodeSha256`, `RuntimePolicy`
+  and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig` and
+  `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
+  `AutoPublishAlias` is left out.
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
   CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
-  API Gateway integration and authorizer URIs. The CloudFormation target-function reader still
-  refuses or drops a qualifier.
+  API Gateway integration and authorizer URIs, and `AWS::Lambda::Permission`. The
+  `AWS::Lambda::Url` and `AWS::Lambda::EventSourceMapping` template readers still refuse or drop a
+  qualifier.
 - The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
   has yet to land.
 - A handler function reference is recorded through the process console and the process standard

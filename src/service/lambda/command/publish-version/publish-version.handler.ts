@@ -85,7 +85,10 @@ export class PublishVersionCommandHandler implements CommandHandler<
       options?.caller,
     );
 
-    const version = this.versions.publish(this.functions.require(functionName));
+    const version = this.versions.publish(
+      this.functions.require(functionName),
+      command.input.Description,
+    );
 
     return { $metadata: {}, ...version.configuration() };
   }

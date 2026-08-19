@@ -8,6 +8,7 @@ import type {
   SimLambdaFunctionUrl,
   SimLambdaFunctionUrlId,
 } from "./function/url/sim-lambda-function-url.js";
+import type { SimLambdaFunctionAlias } from "./function/version/sim-lambda-function-alias.js";
 import type { SimLambdaFunctionTarget } from "./function/version/sim-lambda-function-target.js";
 import type { SimLambdaCommands } from "./sim-lambda-commands.js";
 
@@ -50,6 +51,18 @@ export abstract class SimLambdaInspection {
     qualifier?: string,
   ): SimLambdaFunctionTarget | undefined {
     return this.commands.functionLookup.findTarget(functionName, qualifier);
+  }
+
+  /** Get one alias of a simulated Lambda function, if it has one by name. */
+  getSimFunctionAlias(
+    functionName: SimLambdaFunctionName | string,
+    aliasName: string,
+  ): SimLambdaFunctionAlias | undefined {
+    const simFunction = this.getSimFunctionByName(functionName);
+
+    return simFunction === undefined
+      ? undefined
+      : this.commands.versionStore.of(simFunction).alias(aliasName);
   }
 
   /** Get a simulated Lambda function's Function URL, if it has one. */
