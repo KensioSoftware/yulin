@@ -49,6 +49,37 @@ function deployedMapping(
 }
 
 /**
+ * A policy document a function states for itself, which has nothing to do with
+ * polling and has to survive the event's own addition to the Role.
+ */
+const statedPolicy: SimCfnTemplateValueRecord = {
+  Version: "2012-10-17",
+  Statement: [{ Effect: "Allow", Action: "s3:GetObject", Resource: "*" }],
+};
+
+/**
+ * The `Policies` of the execution Role the function is expanded with.
+ */
+function expandedRolePolicies(
+  functionProperties: SimCfnTemplateValueRecord,
+): readonly SimCfnTemplateValueRecord[] {
+  const expanded = samExpandedTemplate(
+    simCfnSamFunctionTemplateFactory.make({ functionProperties }),
+  );
+  const role = entry(
+    expanded.Resources,
+    `${samFunctionTemplateLogicalId}Role`,
+  ) as SimCfnTemplateValueRecord;
+
+  assertNonNullable(role);
+
+  const properties = entry(role, "Properties") as SimCfnTemplateValueRecord;
+
+  return (entry(properties, "Policies") ??
+    []) as readonly SimCfnTemplateValueRecord[];
+}
+
+/**
  * The `Properties` the mapping is expanded with, read off the expanded
  * template rather than a deployment.
  *
@@ -255,14 +286,7 @@ describe("SAM SQS and DynamoDB event expansion", () => {
       stackName: "policied-orders-stack",
       template: simCfnSamFunctionTemplateFactory.make({
         functionProperties: {
-          Policies: [
-            {
-              Version: "2012-10-17",
-              Statement: [
-                { Effect: "Allow", Action: "s3:GetObject", Resource: "*" },
-              ],
-            },
-          ],
+          Policies: [statedPolicy],
           Events: {
             Work: {
               Type: "SQS",
@@ -293,7 +317,29 @@ describe("SAM SQS and DynamoDB event expansion", () => {
     );
     await simAws.backgroundTasksComplete();
 
-    // Then the function's own policy did not cost it the permission to poll
+    // Then the Role carries both, the policy the function stated and the one
+    // the event added, and the function's own did not cost it the permission
+    // to poll
+    const policies = expandedRolePolicies({
+      Policies: [statedPolicy],
+      Events: {
+        Work: {
+          Type: "SQS",
+          Properties: { Queue: "arn:aws:sqs:eu-west-2:111111111111:orders" },
+        },
+      },
+    });
+
+    assertArrayLength(policies, 2);
+    assertIdentical(
+      JSON.stringify(policies[0]["PolicyDocument"]),
+      JSON.stringify(statedPolicy),
+    );
+    assertIdentical(
+      policies[1]["PolicyName"],
+      `${samFunctionTemplateLogicalId}WorkPollerPolicy`,
+    );
+
     assertArrayLength(events, 1);
   });
 

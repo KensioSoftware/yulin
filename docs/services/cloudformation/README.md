@@ -2227,6 +2227,14 @@ states one event name or a list of them, and each one becomes a configuration of
 event's `Filter` on it. Notifications the bucket already declared are kept, and so are the ones
 another function's event put there.
 
+Two shapes are refused rather than expanded. A bucket writing its `NotificationConfiguration` or its
+`LambdaConfigurations` as an intrinsic such as `Fn::If` is one, because there is no appending to a
+list CloudFormation has not resolved yet, and adding the event's own entries would drop whatever the
+intrinsic resolved to. The other is a function the template conditions out, which real CloudFormation
+refuses for the same reason SAM cannot fix it: the notification belongs to the bucket, the bucket is
+not conditioned, and nothing can condition one entry of somebody else's property. Condition the
+bucket along with the function, or declare the notification on the bucket yourself.
+
 ### Simple tables
 
 `AWS::Serverless::SimpleTable` deploys a table with one partition key and on-demand billing.

@@ -1,8 +1,10 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -55,6 +57,7 @@ function notifiedTemplate(
 async function uploadedObjects(
   template: CfnTemplateBodyRecord,
   keys: readonly string[],
+  deletedKeys: readonly string[] = [],
 ): Promise<readonly S3EventDocument[]> {
   const simAws = new SimAws();
   const received: S3EventDocument[] = [];
@@ -84,6 +87,15 @@ async function uploadedObjects(
           Body: "a picture",
         }),
       ),
+    ),
+  );
+  await simAws.backgroundTasksComplete();
+
+  await Promise.all(
+    deletedKeys.map(async (key) =>
+      simAws
+        .s3()
+        .deleteObject(new DeleteObjectCommand({ Bucket: "uploads", Key: key })),
     ),
   );
   await simAws.backgroundTasksComplete();
@@ -147,16 +159,124 @@ describe("SAM S3 event expansion", () => {
       },
     };
 
-    // When it is deployed and an Object is put into the Bucket
+    // When it is deployed, and an Object is put into the Bucket and then
+    // deleted again
     const received = await uploadedObjects(
       notifiedTemplate({ Events: ["s3:ObjectCreated:*"] }, withRemovals),
       ["cat.jpg"],
+      ["cat.jpg"],
     );
 
-    // Then the event's own notification was added rather than replacing the
-    // one the template wrote by hand
-    assertArrayLength(received, 1);
+    // Then both notifications fired, so the event's own was added rather than
+    // put in place of the one the template wrote by hand
+    assertArrayLength(received, 2);
     assertIdentical(received[0].Records[0].eventName, "ObjectCreated:Put");
+    assertIdentical(received[1].Records[0].eventName, "ObjectRemoved:Delete");
+  });
+
+  it("refuses a Bucket whose notification list is an intrinsic", async () => {
+    // Given a Bucket stating its notifications through Fn::If, which is a list
+    // CloudFormation has not resolved by the time the event is expanded
+    const simAws = new SimAws();
+    const conditional: SimCfnTemplateValueRecord = {
+      Type: "AWS::S3::Bucket",
+      Properties: {
+        BucketName: "uploads",
+        NotificationConfiguration: {
+          LambdaConfigurations: {
+            "Fn::If": [
+              "IsProduction",
+              [
+                {
+                  Event: "s3:ObjectRemoved:*",
+                  Function: {
+                    "Fn::GetAtt": [samFunctionTemplateLogicalId, "Arn"],
+                  },
+                },
+              ],
+              [],
+            ],
+          },
+        },
+      },
+    };
+
+    // When an S3 event asks to be added to it
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "intrinsic-uploads-stack",
+        template: {
+          ...notifiedTemplate({ Events: "s3:ObjectCreated:*" }, conditional),
+          Parameters: { Stage: { Type: "String" } },
+          Conditions: {
+            IsProduction: { "Fn::Equals": [{ Ref: "Stage" }, "production"] },
+          },
+        },
+        parameters: { Stage: "test" },
+      });
+    });
+
+    // Then the Bucket is refused by name, rather than deploying with the
+    // notifications it declared quietly dropped
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::S3::Bucket NotificationConfiguration in Resource " +
+        "UploadsBucket",
+    );
+    assertStringIncludes(error.message, "LambdaConfigurations");
+  });
+
+  it("refuses a Bucket a conditioned function's event would break", async () => {
+    // Given a function the template conditions out, with an S3 event on a
+    // Bucket that is not conditioned
+    const simAws = new SimAws();
+
+    // When it is deployed with the condition false
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "conditioned-uploads-stack",
+        template: {
+          Transform: "AWS::Serverless-2016-10-31",
+          Parameters: { Stage: { Type: "String" } },
+          Conditions: {
+            IsProduction: { "Fn::Equals": [{ Ref: "Stage" }, "production"] },
+          },
+          Resources: {
+            UploadsBucket: uploadsBucket,
+            [samFunctionTemplateLogicalId]: {
+              Type: "AWS::Serverless::Function",
+              Condition: "IsProduction",
+              Properties: {
+                FunctionName: "rates",
+                Handler: "index.handler",
+                Runtime: "nodejs22.x",
+                InlineCode: "exports.handler = async () => 'rates';",
+                Events: {
+                  Upload: {
+                    Type: "S3",
+                    Properties: {
+                      Bucket: "UploadsBucket",
+                      Events: "s3:ObjectCreated:*",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        parameters: { Stage: "test" },
+      });
+    });
+
+    // Then the Stack says which Resource named the function it never created.
+    // A notification belongs to the Bucket, and there is no conditioning one
+    // entry of somebody else's property, so a template wanting the function
+    // conditioned has to condition the Bucket with it.
+    assertStringIncludes(
+      error.message,
+      `Resource UploadsBucket names Resource ${samFunctionTemplateLogicalId}`,
+    );
+    assertStringIncludes(error.message, "Condition IsProduction is false");
   });
 
   it("expands nothing for an event naming no event to be told about", async () => {

@@ -79,6 +79,7 @@ export function samS3EventEdits(
       logicalId: notification.bucketLogicalId,
       edit: (resource) =>
         samS3NotifiedBucket(resource, {
+          bucketLogicalId: notification.bucketLogicalId,
           configurations: notification.configurations,
           permissionLogicalId: permissionLogicalId(event),
         }),
