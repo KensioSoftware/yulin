@@ -16,14 +16,14 @@ import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factor
 
 describe("API Gateway REST API CloudFormation refusals", () => {
   it("refuses a method asking for an authorization type nothing enforces", async () => {
-    // Given a method behind IAM authorization
+    // Given a method behind a user pool
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const error = await deployRestApiFailure(
       simAws,
       simCfnRestApiTemplateFactory.make({
-        methodProperties: { AuthorizationType: "AWS_IAM" },
+        methodProperties: { AuthorizationType: "COGNITO_USER_POOLS" },
       }),
     );
 
@@ -31,7 +31,7 @@ describe("API Gateway REST API CloudFormation refusals", () => {
     // would have gated
     assertStringIncludes(
       error.message,
-      "PutMethod authorizationType 'AWS_IAM' is not simulated",
+      "PutMethod authorizationType 'COGNITO_USER_POOLS' is not simulated",
     );
   });
 

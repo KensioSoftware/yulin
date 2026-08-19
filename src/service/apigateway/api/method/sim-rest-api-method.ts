@@ -12,13 +12,14 @@ export const simRestApiAnyMethod = "ANY";
 /**
  * The authorization types simulated so far.
  *
- * `NONE` is an open method, and `CUSTOM` sends the request through the Lambda
- * authorizer the method names. `COGNITO_USER_POOLS` and `AWS_IAM` are
- * separate pieces of work, and a method asking for either is refused when it
- * is created. A method served open where AWS would have gated it lets a test
- * pass on a request real AWS rejects.
+ * `NONE` is an open method, `CUSTOM` sends the request through the Lambda
+ * authorizer the method names, and `AWS_IAM` asks IAM whether the caller the
+ * request was attributed to may invoke the method. `COGNITO_USER_POOLS` is a
+ * separate piece of work, and a method asking for it is refused when it is
+ * created. A method served open where AWS would have gated it lets a test pass
+ * on a request real AWS rejects.
  */
-export type SimRestApiAuthorizationType = "NONE" | "CUSTOM";
+export type SimRestApiAuthorizationType = "NONE" | "CUSTOM" | "AWS_IAM";
 
 interface SimRestApiMethodProperties {
   readonly httpMethod: string;

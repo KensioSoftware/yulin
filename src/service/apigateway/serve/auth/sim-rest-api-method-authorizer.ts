@@ -9,6 +9,7 @@ import {
   type SimRestApiAuthorizerFunctions,
   SimRestApiAuthorizerInvocation,
 } from "./sim-rest-api-authorizer-invocation.js";
+import { SimRestApiIamMethodAuthorizer } from "./sim-rest-api-iam-method-authorizer.js";
 import type { SimRestApiMethodAuthorizeInput } from "./sim-rest-api-method-authorize-input.js";
 
 interface SimRestApiMethodAuthorizerProperties {
@@ -29,7 +30,9 @@ interface SimRestApiMethodAuthorizerProperties {
  * is refused whether or not the integration behind the method would have
  * worked.
  *
- * The steps for a `CUSTOM` method are the ones real API Gateway takes:
+ * Which kind of authorization the method asks for is settled here, and each
+ * kind decides on its own terms. The steps for a `CUSTOM` method are the ones
+ * real API Gateway takes:
  *
  * 1. the request has to carry something at every one of the authorizer's
  *    identity sources, or it is refused with a 401 and the function is never
@@ -39,6 +42,7 @@ interface SimRestApiMethodAuthorizerProperties {
  */
 export class SimRestApiMethodAuthorizer {
   private readonly invocation: SimRestApiAuthorizerInvocation;
+  private readonly iamAuthorizer = new SimRestApiIamMethodAuthorizer();
 
   constructor(properties: SimRestApiMethodAuthorizerProperties) {
     this.invocation = new SimRestApiAuthorizerInvocation({
@@ -53,13 +57,19 @@ export class SimRestApiMethodAuthorizer {
   async authorize(
     input: SimRestApiMethodAuthorizeInput,
   ): Promise<SimRestApiAuthorization> {
-    if (input.match.method.authorizationType === "NONE") {
-      // Nobody was authorized, so there is no caller to describe, which is
-      // what leaves requestContext.authorizer out of the event entirely.
-      return new SimRestApiAdmitted();
+    switch (input.match.method.authorizationType) {
+      case "NONE": {
+        // Nobody was authorized, so there is no caller to describe, which is
+        // what leaves requestContext.authorizer out of the event entirely.
+        return new SimRestApiAdmitted();
+      }
+      case "AWS_IAM": {
+        return this.iamAuthorizer.authorize(input);
+      }
+      case "CUSTOM": {
+        return await this.custom(input);
+      }
     }
-
-    return await this.custom(input);
   }
 
   /**

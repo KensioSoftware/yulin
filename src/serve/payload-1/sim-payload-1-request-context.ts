@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 
+import type { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 import { simProxyEventTime } from "../proxy/sim-proxy-event-time.js";
 import type { SimPayload1Endpoint } from "./sim-payload-1-endpoint.js";
+import { SimPayload1IamCaller } from "./sim-payload-1-iam-caller.js";
 import type {
   SimPayload1Identity,
   SimPayload1LambdaAuthorizer,
@@ -9,14 +11,18 @@ import type {
 } from "./sim-payload-1-event.type.js";
 
 /**
- * What the endpoint's authorizer knows about the caller, if it authorized one.
+ * What the endpoint's authorization knows about the caller, if it authorized
+ * one.
  *
- * A method admitting anybody supplies none, which is what leaves the
- * authorizer block out of the event.
+ * A method admitting anybody supplies neither, which is what leaves the
+ * authorizer block out of the event and every identity field describing a
+ * principal `null`.
  */
 export interface SimPayload1Authorization {
   /** The principal and the context a Lambda authorizer answered with. */
   readonly lambda?: SimPayload1LambdaAuthorizer | undefined;
+  /** The caller an `AWS_IAM` method allowed the request. */
+  readonly caller?: SimAwsRequestCaller | undefined;
 }
 
 interface SimPayload1RequestContextInput {
@@ -74,26 +80,24 @@ export class SimPayload1RequestContextBuilder {
   /**
    * Who API Gateway says made the request.
    *
-   * Only the open case is described here. The fields an `AWS_IAM` method
-   * fills stay `null`, because that authorization type is a separate piece of
-   * work.
+   * The fields naming a principal are filled for an `AWS_IAM` method, which is
+   * the one authorization type that authenticates the caller itself, and are
+   * `null` for every other method. The Cognito identity pool fields are `null`
+   * throughout, as they are for any request that came without one.
    */
   private identity(input: SimPayload1RequestContextInput): SimPayload1Identity {
     return {
       sourceIp: input.sourceIp,
       userAgent: input.request.headers.get("user-agent"),
       accessKey: null,
-      accountId: null,
       apiKey: null,
       apiKeyId: null,
-      caller: null,
       cognitoAuthenticationProvider: null,
       cognitoAuthenticationType: null,
       cognitoIdentityId: null,
       cognitoIdentityPoolId: null,
       principalOrgId: null,
-      user: null,
-      userArn: null,
+      ...new SimPayload1IamCaller(input.authorization?.caller).identity(),
     };
   }
 }

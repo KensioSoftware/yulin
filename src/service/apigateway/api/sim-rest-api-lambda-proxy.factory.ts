@@ -25,6 +25,11 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
   readonly handler: (event: SimPayload1Event) => unknown;
   readonly disableExecuteApiEndpoint: boolean;
   /**
+   * Whether every method is authorized by IAM, which is what an `AWS_IAM`
+   * method asks for. An API asking for this names no authorizer.
+   */
+  readonly iamAuthorization: boolean;
+  /**
    * The resource paths the API declares, written as templates such as
    * `/orders/{orderId}` or `/{proxy+}`. Each one gets the method below.
    */
@@ -57,7 +62,8 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
  *
  * Supplying an `authorizerHandler` puts a `TOKEN` authorizer in front of every
  * method, invoking a second simulated function of its own. A
- * `requestAuthorizerHandler` puts a `REQUEST` authorizer there instead.
+ * `requestAuthorizerHandler` puts a `REQUEST` authorizer there instead, and
+ * asking for `iamAuthorization` puts every method behind IAM.
  *
  * ```typescript
  * const restApi = await simRestApiLambdaProxyFactory.make(
@@ -88,6 +94,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
     authorizerIdentitySource: "method.request.header.Authorization",
     authorizerInvokePermission: true,
     disableExecuteApiEndpoint: false,
+    iamAuthorization: false,
     resourcePaths: ["/{proxy+}"],
     httpMethod: "ANY",
     stageName: "prod",
@@ -111,6 +118,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
       httpMethod: input.httpMethod,
       functionArn,
       authorizerId: await simRestApiProxyAuthorizer(simAws, input, restApiId),
+      iamAuthorization: input.iamAuthorization,
     });
 
     if (input.invokePermission) {

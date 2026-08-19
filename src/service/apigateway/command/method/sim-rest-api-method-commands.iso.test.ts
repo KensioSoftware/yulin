@@ -3,7 +3,11 @@ import {
   CreateRestApiCommand,
   PutMethodCommand,
 } from "@aws-sdk/client-api-gateway";
-import { assertFalse, assertIdentical } from "@kensio/smartass";
+import {
+  assertFalse,
+  assertIdentical,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -83,6 +87,52 @@ describe("Sim API Gateway REST API method commands", () => {
 
     // Then it is refused, since one resource declares each method once
     await expect(again).rejects.toThrow(SimApiGatewayConflict);
+  });
+
+  it("declares a method IAM decides, with no authorizer to name", async () => {
+    // Given a resource
+    const simAws = new SimAws();
+    const { restApiId, resourceId } = await givenResource(simAws.apiGateway());
+
+    // When a method asks to be authorized by IAM
+    const method = await simAws.apiGateway().putMethod(
+      new PutMethodCommand({
+        restApiId,
+        resourceId,
+        httpMethod: "GET",
+        authorizationType: "AWS_IAM",
+      }),
+    );
+
+    // Then it carries the type and names no authorizer, since IAM decides its
+    // requests rather than a function of the API's
+    assertIdentical(method.authorizationType, "AWS_IAM");
+    assertUndefined(method.authorizerId);
+  });
+
+  it("refuses an authorizer named by a method IAM decides", async () => {
+    // Given a resource
+    const simAws = new SimAws();
+    const { restApiId, resourceId } = await givenResource(simAws.apiGateway());
+
+    // When an AWS_IAM method names an authorizer as well
+    const method = simAws.apiGateway().putMethod(
+      new PutMethodCommand({
+        restApiId,
+        resourceId,
+        httpMethod: "GET",
+        authorizationType: "AWS_IAM",
+        authorizerId: "auth123",
+      }),
+    );
+
+    // Then it is refused rather than served with the id ignored, which would
+    // leave the caller that wrote it reading a gate the method has not got
+    await expect(method).rejects.toThrow(SimApiGatewayBadRequest);
+    await expect(method).rejects.toThrow(
+      "PutMethod authorizerId is set on GET /orders with authorizationType " +
+        "AWS_IAM",
+    );
   });
 
   it("refuses an authorization type nothing here enforces", async () => {
