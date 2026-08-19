@@ -1,4 +1,7 @@
-import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "../../template/value/sim-cfn-template-value.js";
 import { isSamTemplateRecord } from "../sim-cfn-sam-record.js";
 
 /**
@@ -40,6 +43,19 @@ export function samCarriedAttributes(
   resource: SimCfnTemplateValueRecord,
 ): SimCfnTemplateValueRecord {
   return picked(resource, attributeNames);
+}
+
+/**
+ * The `Condition` attribute a Resource expanded beside the function carries.
+ *
+ * Everything the function was expanded with exists because the function does,
+ * so a function the template conditioned out leaves none of them behind for
+ * the Stack to create.
+ */
+export function samConditionAttribute(
+  condition: SimCfnTemplateValue | undefined,
+): SimCfnTemplateValueRecord {
+  return condition === undefined ? {} : { Condition: condition };
 }
 
 /**

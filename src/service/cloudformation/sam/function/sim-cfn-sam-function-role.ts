@@ -2,6 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
+import { samConditionAttribute } from "./sim-cfn-sam-function-properties.js";
 import {
   basicExecutionPolicyArn,
   lambdaAssumeRolePolicyDocument,
@@ -34,7 +35,7 @@ export function samFunctionRoleResource(
 
   return {
     Type: "AWS::IAM::Role",
-    ...roleCondition(condition),
+    ...samConditionAttribute(condition),
     Properties: {
       AssumeRolePolicyDocument: lambdaAssumeRolePolicyDocument,
       ManagedPolicyArns: [
@@ -44,15 +45,6 @@ export function samFunctionRoleResource(
       ...inlinePolicies(policies.inlinePolicies),
     },
   };
-}
-
-/**
- * The `Condition` attribute the Role carries, where the function carried one.
- */
-function roleCondition(
-  condition: SimCfnTemplateValue | undefined,
-): SimCfnTemplateValueRecord {
-  return condition === undefined ? {} : { Condition: condition };
 }
 
 /**
