@@ -46,6 +46,7 @@ npm i -D @kensio/yulin
 
 ## Feature specific docs
 
+- [AI skill](./docs/ai-skill "Yulin AI skill docs")
 - [The AWS CLI](./docs/cli "The AWS CLI against simulated AWS docs")
 - [AWS SDK interception](./docs/sdk "Simulated AWS SDK docs")
 - [Serving on localhost](./docs/serve "Serving simulated AWS on localhost docs")
