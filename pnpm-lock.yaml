@@ -33,6 +33,9 @@ importers:
       '@aws-sdk/client-acm':
         specifier: ^3.1101.0
         version: 3.1108.0
+      '@aws-sdk/client-api-gateway':
+        specifier: ^3.1112.0
+        version: 3.1112.0
       '@aws-sdk/client-apigatewayv2':
         specifier: ^3.1101.0
         version: 3.1108.0
@@ -278,6 +281,10 @@ packages:
     resolution: {integrity: sha512-GGPp9HWHTS0kvevpOhLN8cCy4NcbO3b/tTSvFyK1FjRIqGp8V2nQqrOPqjHHFqpz1VA8Ymyji03c21ntG8BotQ==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/client-api-gateway@3.1112.0':
+    resolution: {integrity: sha512-TDsf7EF2yXryFS/WClxgS2lfjg2TE16+95HAzKTS9zydPPmumaD+8rCRBSJ/QIeUi1GX69wNBt1gTnVn7YUkww==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-apigatewayv2@3.1108.0':
     resolution: {integrity: sha512-vaHgrGM3oHCZ5X/Y7jcDUBnXNnhYunQyY6j7qX1GSiKFfuAswxTOxDS81q5FDtrTW2RlnPsb7IXzRgK7/T9bjQ==}
     engines: {node: '>=20.0.0'}
@@ -472,6 +479,10 @@ packages:
 
   '@aws-sdk/middleware-endpoint-discovery@3.972.29':
     resolution: {integrity: sha512-cXW7QNIOhUSfccZmwJEjn9EdCAjzdOtt/+MtO5HWgxIZdhzyC1kNuQKIgGEDkgabxiXymWw0/VFWdqxqeLbgMA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-sdk-api-gateway@3.972.28':
+    resolution: {integrity: sha512-4CfqA8dKTtRATsmNcGC4t3IVi0GjWyzkQgnIamx3t3i6lL7jebRPUcPTd3pwSb/TPl/qI+w1krmIZl5/dLPe/g==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-sdk-route53@3.972.25':
@@ -3592,6 +3603,18 @@ snapshots:
       '@smithy/types': 4.17.2
       tslib: 2.8.1
 
+  '@aws-sdk/client-api-gateway@3.1112.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.8
+      '@aws-sdk/credential-provider-node': 3.972.80
+      '@aws-sdk/middleware-sdk-api-gateway': 3.972.28
+      '@aws-sdk/types': 3.974.4
+      '@smithy/core': 3.33.2
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.2
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
   '@aws-sdk/client-apigatewayv2@3.1108.0':
     dependencies:
       '@aws-sdk/core': 3.977.8
@@ -4103,6 +4126,13 @@ snapshots:
   '@aws-sdk/middleware-endpoint-discovery@3.972.29':
     dependencies:
       '@aws-sdk/endpoint-cache': 3.972.11
+      '@aws-sdk/types': 3.974.4
+      '@smithy/core': 3.33.2
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/middleware-sdk-api-gateway@3.972.28':
+    dependencies:
       '@aws-sdk/types': 3.974.4
       '@smithy/core': 3.33.2
       '@smithy/types': 4.17.2

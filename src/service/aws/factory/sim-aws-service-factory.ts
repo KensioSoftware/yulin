@@ -5,6 +5,7 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
+import type { SimApiGateway } from "../../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import type { SimCloudFormation } from "../../cloudformation/index.js";
@@ -166,6 +167,11 @@ export class SimAwsServiceFactory {
   /** Create simulated ACM for an Account Region scope. */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     return this.registeredServices.createAcm(scope);
+  }
+
+  /** Create simulated API Gateway REST APIs for an Account Region scope. */
+  createApiGateway(scope: SimAwsAccountRegionContainer): SimApiGateway {
+    return this.registeredServices.createApiGateway(scope);
   }
 
   /** Create simulated API Gateway v2 for an Account Region scope. */

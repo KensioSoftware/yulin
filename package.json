@@ -46,6 +46,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./apigateway": {
+      "import": "./dist/service/apigateway/index.js",
+      "types": "./dist/service/apigateway/index.d.ts"
+    },
     "./apigatewayv2": {
       "import": "./dist/service/apigatewayv2/index.js",
       "types": "./dist/service/apigatewayv2/index.d.ts"
@@ -178,6 +182,7 @@
     "@aws-lambda-powertools/logger": "^2.34.0",
     "@aws-lambda-powertools/metrics": "^2.34.0",
     "@aws-sdk/client-acm": "^3.1101.0",
+    "@aws-sdk/client-api-gateway": "^3.1112.0",
     "@aws-sdk/client-apigatewayv2": "^3.1101.0",
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",
