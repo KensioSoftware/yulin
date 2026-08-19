@@ -18,6 +18,7 @@ import type {
 } from "./condition/sim-cfn-conditions.js";
 import { SimCfnResourceConditions } from "./condition/sim-cfn-resource-conditions.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
+import { samExpandedTemplate } from "../sam/sim-cfn-sam-expansion.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -95,6 +96,10 @@ export class SimCfnTemplate {
 
   /**
    * Parse a JSON CloudFormation template body.
+   *
+   * A template naming the SAM transform is expanded on the way through, so
+   * what the Stack is deployed from holds the Resource types simulated AWS
+   * creates rather than the `AWS::Serverless::*` ones the author wrote.
    */
   static fromJson(
     templateBody: JSONString<CfnTemplateBodyRecord>,
@@ -114,7 +119,7 @@ export class SimCfnTemplate {
     }
 
     return new SimCfnTemplate({
-      template,
+      template: samExpandedTemplate(template),
       parameters: properties.parameters,
       stackName: properties.stackName,
       accountRegionScope: properties.accountRegionScope,
