@@ -233,6 +233,99 @@ describe("Secrets Manager CloudFormation dynamic references the simulation canno
     );
   });
 
+  it("deploys with a stand-in value where the body names no secret", async () => {
+    // Given a reference whose body is empty.
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed.
+    const stack = await deployReading(simAws, "{{resolve:secretsmanager:}}");
+
+    // Then it deploys, saying the reference names no secret.
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "which names no secret",
+    );
+  });
+
+  it("deploys with a stand-in value where the body has more segments than a reference takes", async () => {
+    // Given a secret a template could have read.
+    const simAws = simAwsInEuWest2();
+    await createCredentials(simAws);
+
+    // When the reference carries a sixth segment.
+    const stack = await deployReading(
+      simAws,
+      "{{resolve:secretsmanager:db-credentials:SecretString:password:::}}",
+    );
+
+    // Then it deploys, saying the body has more than a reference takes.
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "more than the secret id",
+    );
+  });
+
+  it("deploys with a stand-in value for a secret holding binary", async () => {
+    // Given a secret holding bytes.
+    const simAws = simAwsInEuWest2();
+    await simAws.secretsManager().createSecret({
+      input: {
+        Name: "api-token",
+        SecretBinary: Uint8Array.from([1, 2, 3]),
+      },
+    });
+
+    // When a template reads it.
+    const stack = await deployReading(
+      simAws,
+      "{{resolve:secretsmanager:api-token}}",
+    );
+
+    // Then the reference says a binary value cannot be read this way.
+    assertIdentical(readValue(simAws), "dummy-value-for-api-token");
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "holds a binary value",
+    );
+  });
+
+  it("deploys with a stand-in value where the ARN is malformed", async () => {
+    // Given a secret at home and something ARN-shaped naming no account.
+    const simAws = simAwsInEuWest2();
+    await createCredentials(simAws);
+
+    // When a template reads a body that starts like an ARN.
+    const stack = await deployReading(
+      simAws,
+      "{{resolve:secretsmanager:arn:aws:secretsmanager:eu-west-2}}",
+    );
+
+    // Then the local Secrets Manager is asked, and it refuses the ARN.
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "could not read it",
+    );
+  });
+
+  it("deploys with a stand-in value where the ARN names no valid account", async () => {
+    // Given an ARN of the right shape carrying something that is no account.
+    const simAws = simAwsInEuWest2();
+    await createCredentials(simAws);
+
+    // When a template reads it.
+    const stack = await deployReading(
+      simAws,
+      "{{resolve:secretsmanager:arn:aws:secretsmanager:eu-west-2:nobody:secret:db-credentials-AbCdEf}}",
+    );
+
+    // Then no account is read from it, and the ARN is refused at home.
+    assertStringIncludes(
+      dynamicReferenceRecord(stack).reason,
+      "could not read it",
+    );
+  });
+
   it("records the whole path to a reference nested in a property", async () => {
     // Given a Stack tagging a queue with a secret that does not exist.
     const simAws = simAwsInEuWest2();

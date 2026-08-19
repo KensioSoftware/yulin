@@ -74,15 +74,16 @@ export class SimCfnSecretsManagerDynamicReferenceResolver implements SimCfnDynam
         return this.standIn(reference, secretId, error.message);
       }
 
-      if (error instanceof SimSecretsManagerError) {
-        return this.standIn(
-          reference,
-          secretId,
-          `and simulated Secrets Manager could not read it: ${error.message}`,
-        );
+      /* v8 ignore next 3 -- defensive: only Secrets Manager reaches here */
+      if (!(error instanceof SimSecretsManagerError)) {
+        throw error;
       }
 
-      throw error;
+      return this.standIn(
+        reference,
+        secretId,
+        `and simulated Secrets Manager could not read it (${error.message})`,
+      );
     }
   }
 
