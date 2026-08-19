@@ -149,7 +149,7 @@ describe("What a Lambda REQUEST authorizer refuses rather than ignores", () => {
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When an authorizer names no function, then a qualified one
+    // When an authorizer names no function, then a Lambda Function URL
     // Then each is refused rather than created with nothing to ask
     await expect(
       simAws
@@ -160,7 +160,7 @@ describe("What a Lambda REQUEST authorizer refuses rather than ignores", () => {
     await expect(
       simAws.apiGatewayV2().createAuthorizer(
         requestAuthorizer(apiId, {
-          AuthorizerUri: `${functionArn}:live`,
+          AuthorizerUri: "https://abc123.lambda-url.us-east-1.on.aws/",
         }),
       ),
     ).rejects.toThrow(/AuthorizerUri .+ is not a simulated invocation target/);

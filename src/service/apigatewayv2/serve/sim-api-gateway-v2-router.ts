@@ -2,27 +2,15 @@ import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-function.js";
 import type { SimHttpApiIntegration } from "../api/integration/sim-http-api-integration.js";
 import type { SimHttpApiLambdaUri } from "../api/integration/sim-http-api-lambda-uri.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import type { SimHttpApiRegistry } from "../registry/sim-http-api-registry.js";
+import type { SimHttpApiFunctionTarget } from "./sim-http-api-function-target.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 
 interface SimApiGatewayV2RouterProperties {
   readonly simAws?: SimAws;
-}
-
-/**
- * A function the API invokes, and what decides whether it may.
- */
-export interface SimHttpApiFunctionTarget {
-  readonly simFunction: SimLambdaFunction;
-  /**
-   * IAM of the Account that owns the function, which is what the API's invoke
-   * permission is evaluated against. It need not be the API's Account.
-   */
-  readonly iam: SimIamInterServiceAuthZ;
 }
 
 /**
@@ -98,22 +86,28 @@ export class SimApiGatewayV2Router {
    * The function is looked up in the Account and Region its own ARN names, not
    * the API's, because an integration URI and an authorizer URI are each free
    * to name either.
+   *
+   * A version or alias qualifier on the URI is resolved here, once per
+   * request. A route built on an alias runs whichever version the alias points
+   * at now. A qualifier naming neither a version nor an alias answers with
+   * nothing, the way a function that was never created does. Both are
+   * invocation-time failures on real AWS.
+   *
+   * The target carries the resource the URI named as well as the version that
+   * runs. They differ for an alias, and the grant admitting the call was made
+   * on the alias.
    */
   functionFor(
     lambdaUri: SimHttpApiLambdaUri,
   ): SimHttpApiFunctionTarget | undefined {
-    const { accountId, regionName, functionName } = lambdaUri;
-
     const scope = this.simAws.accountRegionScope(
-      accountId as SimAwsAccountId,
-      regionName as AwsRegionName,
+      lambdaUri.accountId as SimAwsAccountId,
+      lambdaUri.regionName as AwsRegionName,
     );
-    const simFunction = scope.lambda().getSimFunctionByName(functionName);
+    const target = scope
+      .lambda()
+      .getSimFunctionTarget(lambdaUri.functionName, lambdaUri.qualifier);
 
-    if (simFunction === undefined) {
-      return undefined;
-    }
-
-    return { simFunction, iam: scope.iam() };
+    return target === undefined ? undefined : { ...target, iam: scope.iam() };
   }
 }

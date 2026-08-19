@@ -7,10 +7,8 @@ import { SimHttpApiExecuteApiArn } from "../api/sim-http-api-execute-api-arn.js"
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import { SimHttpApiInvokeAuthorizer } from "./auth/sim-http-api-invoke-authorizer.js";
 import { SimApiGatewayV2ErrorResponse } from "./sim-api-gateway-v2-error-response.js";
-import type {
-  SimApiGatewayV2Router,
-  SimHttpApiFunctionTarget,
-} from "./sim-api-gateway-v2-router.js";
+import type { SimApiGatewayV2Router } from "./sim-api-gateway-v2-router.js";
+import type { SimHttpApiFunctionTarget } from "./sim-http-api-function-target.js";
 import { simHttpApiEndpoint } from "./sim-http-api-endpoint.js";
 
 interface SimHttpApiIntegrationInvocationProperties {
@@ -98,7 +96,7 @@ export class SimHttpApiIntegrationInvocation {
 
     return new SimHttpApiInvokeAuthorizer({ iam: target.iam }).authorize({
       api,
-      simFunction: target.simFunction,
+      target,
       sourceArn: SimHttpApiExecuteApiArn.forMatchedRoute(
         api,
         match,

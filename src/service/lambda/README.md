@@ -390,8 +390,8 @@ and the version that runs, and `findTarget` and `requireTarget` on the version s
 everything else here is built on. `SimLambdaFunctionLookup` offers the same two by function name,
 and `SimLambda.getSimFunctionTarget` is how the other simulated services reach a function a target
 ARN points at. Each of them resolves the qualifier at the moment it is asked, so an alias moved to
-another version moves what a standing notification, subscription, trigger, rule target or event
-source mapping delivers to.
+another version moves what a standing notification, subscription, trigger, rule target, event
+source mapping or API Gateway route delivers to.
 
 `SimLambdaServiceInvokeAuthorizer` takes that resource rather than the function, so a delivery to
 an alias is admitted by a grant made on the alias. The service being the caller is the only thing

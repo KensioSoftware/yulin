@@ -6,7 +6,7 @@ import {
 import type { SimHttpApiRequestAuthorizer } from "../../api/authorizer/sim-http-api-request-authorizer.js";
 import type { SimHttpApiLambdaUri } from "../../api/integration/sim-http-api-lambda-uri.js";
 import { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
-import type { SimHttpApiFunctionTarget } from "../sim-api-gateway-v2-router.js";
+import type { SimHttpApiFunctionTarget } from "../sim-http-api-function-target.js";
 import { simHttpApiEndpoint } from "../sim-http-api-endpoint.js";
 import { SimHttpApiAuthorizerEventBuilder } from "./sim-http-api-authorizer-event.js";
 import { SimHttpApiAuthorizerResponse } from "./sim-http-api-authorizer-response.js";
