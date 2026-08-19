@@ -33,6 +33,7 @@ behaviour and includes example code that can be copied into tests or local devel
 
 ## Feature documentation
 
+- [AI skill](./ai-skill/ "Yulin AI skill usage docs")
 - [The AWS CLI](./cli/ "The AWS CLI against simulated AWS usage docs")
 - [AWS SDK interception](./sdk/ "Simulated AWS SDK usage docs")
 - [Event factories](./factories/ "Test factories for AWS event shapes usage docs")
