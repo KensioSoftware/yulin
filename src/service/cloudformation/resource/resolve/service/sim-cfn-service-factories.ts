@@ -36,6 +36,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
   ["ACM", acmResourceFactory],
   ["CertificateManager", acmResourceFactory],
   [
+    "ApiGateway",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.apiGateway().cfnResourceFactory(),
+  ],
+  [
     "ApiGatewayV2",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.apiGatewayV2().cfnResourceFactory(),

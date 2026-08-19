@@ -1,5 +1,6 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimRestApi } from "./api/sim-rest-api.js";
+import { SimApiGatewayCfnResourceFactory } from "./cfn/sim-cfn-api-gateway-resource-factory.js";
 import type * as simApiGatewayCommands from "./command/sim-api-gateway-command.types.js";
 import type { SimApiGatewayRequestOptions } from "./command/sim-api-gateway-request-options.js";
 import { SimApiGatewaySdkCommandRouter } from "./sdk/sim-api-gateway-sdk-command-router.js";
@@ -26,6 +27,9 @@ import {
 export class SimApiGateway {
   private readonly commands: SimApiGatewayCommands;
   private readonly sdkRouter = new SimApiGatewaySdkCommandRouter(this);
+  private readonly cfnFactory = new SimApiGatewayCfnResourceFactory({
+    apiGateway: this,
+  });
 
   constructor(properties: SimApiGatewayProperties = {}) {
     this.commands = new SimApiGatewayCommands(properties);
@@ -248,6 +252,13 @@ export class SimApiGateway {
   ): Promise<simApiGatewayCommands.SimDeleteStageCommandOutput> {
     await this.commands.background.sequence();
     return this.commands.stages.deleteStage(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimApiGatewayCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**
