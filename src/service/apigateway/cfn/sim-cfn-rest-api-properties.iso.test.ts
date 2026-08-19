@@ -143,32 +143,31 @@ describe("API Gateway REST API CloudFormation property shapes", () => {
 });
 
 describe("API Gateway REST API CloudFormation properties left out", () => {
-  it("records the OpenAPI Body an API is declared with", async () => {
-    // Given an API declaring its resources and methods as a document
+  it("records a document an API is declared with somewhere else", async () => {
+    // Given an API declaring its resources and methods as a document in S3
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const stack = await deployRestApi(
       simAws,
       simCfnRestApiTemplateFactory.make({
-        apiProperties: { Body: { openapi: "3.0.1" }, FailOnWarnings: true },
+        apiProperties: {
+          BodyS3Location: { Bucket: "orders-definitions", Key: "orders.json" },
+        },
       }),
     );
 
-    // Then the API is created and the document is reported, since nothing here
-    // reads one and the API has only what its sibling Resources declared
+    // Then the API is created and the location is reported, since nothing here
+    // fetches one and the API has only what its sibling Resources declared. An
+    // inline Body is read; this is the other way of writing one.
     const apiId = stack.getResource("Api")?.refValue;
     assertTypeString(apiId);
     assertNonNullable(simAws.apiGateway().findRestApi(apiId));
     expect(ignoredReasons(stack)).toStrictEqual([
-      "Api AWS::ApiGateway::RestApi property Body is not simulated, so the " +
-        "Resource is created without it and behaves differently here than on " +
-        "AWS. The simulated properties are Name, Description, " +
-        "DisableExecuteApiEndpoint.",
-      "Api AWS::ApiGateway::RestApi property FailOnWarnings is not simulated, " +
-        "so the Resource is created without it and behaves differently here " +
-        "than on AWS. The simulated properties are Name, Description, " +
-        "DisableExecuteApiEndpoint.",
+      "Api AWS::ApiGateway::RestApi property BodyS3Location is not " +
+        "simulated, so the Resource is created without it and behaves " +
+        "differently here than on AWS. The simulated properties are Name, " +
+        "Description, DisableExecuteApiEndpoint, Body, FailOnWarnings.",
     ]);
   });
 

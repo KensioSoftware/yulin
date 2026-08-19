@@ -556,6 +556,172 @@ console.log(listed.items?.map((restApi) => restApi.name));
 The client's region decides which simulated account and region scope the API lands in, the same way
 it does for every other intercepted service.
 
+## Importing an OpenAPI definition
+
+`ImportRestApiCommand` takes a serialised OpenAPI 3.0 document and creates the API, the resources of
+its path tree, one method per operation and the integration behind each method. Every segment of a
+path becomes a resource, and paths sharing a prefix share the nodes that spell it, so
+`/pets/{petId}` is a `{petId}` resource under a `pets` one under the root.
+
+An import creates no stage. `CreateDeploymentCommand` or an `AWS::ApiGateway::Stage` is still
+declared separately, and an imported API with no stage answers 403.
+
+```typescript sim-apigateway-openapi
+/**
+ * Creating a simulated REST API from an OpenAPI 3 definition.
+ */
+
+import {
+  CreateDeploymentCommand,
+  GetResourcesCommand,
+  ImportRestApiCommand,
+} from "@aws-sdk/client-api-gateway";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws, type SimPayload1Event } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pets",
+    Role: "arn:aws:iam::111111111111:role/PetsRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload1Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `pet ${event.pathParameters?.["petId"] ?? "none"}`,
+      })),
+    },
+  }),
+);
+
+const openApi = {
+  openapi: "3.0.1",
+  info: { title: "pets", version: "1.0" },
+  paths: {
+    "/pets/{petId}": {
+      get: {
+        // Ignored, as on AWS, since no request validator names this schema.
+        responses: { "200": { description: "200 response" } },
+        "x-amazon-apigateway-integration": {
+          type: "aws_proxy",
+          httpMethod: "POST",
+          uri:
+            `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
+            `${FunctionArn}/invocations`,
+        },
+      },
+    },
+  },
+};
+
+const apiGateway = simAws.apiGateway();
+const definition = new TextEncoder().encode(JSON.stringify(openApi));
+
+const { id: restApiId } = await apiGateway.importRestApi(
+  new ImportRestApiCommand({ body: definition }),
+);
+
+const resources = await apiGateway.getResources(
+  new GetResourcesCommand({ restApiId }),
+);
+
+console.log(resources.items.map((resource) => resource.path));
+// [ "/", "/pets", "/pets/{petId}" ]
+
+// An import creates no stage. The API answers 403 until one is deployed.
+await apiGateway.createDeployment(
+  new CreateDeploymentCommand({ restApiId, stageName: "prod" }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "pets",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${restApiId}/*/*/*`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(
+  srv.localUrl(
+    `https://${restApiId}.execute-api.us-east-1.amazonaws.com/prod/pets/42`,
+  ),
+);
+
+console.log(await response.text());
+// "pet 42"
+
+await srv.close();
+```
+
+The API is named by `info.title`. `uri` is read as either the long
+`arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form above
+or as the bare function ARN. Every imported method is declared with `AuthorizationType: "NONE"`, and
+a document naming an authorizer is refused. Gate a method with `CreateAuthorizer` and `PutMethod`
+instead, as [Authorizing a method](#authorizing-a-method) covers.
+
+### The catch-all operation key
+
+`x-amazon-apigateway-any-method` declares an `ANY` method on the path. That method serves every verb
+the resource has no method of its own for, and OpenAPI has no operation key of its own for it:
+
+```json
+{
+  "/pets": {
+    "x-amazon-apigateway-any-method": {
+      "x-amazon-apigateway-integration": { "type": "aws_proxy", "uri": "..." }
+    }
+  }
+}
+```
+
+A `{proxy+}` segment becomes a greedy resource that matches the rest of the request path. One path
+of `/{proxy+}` carrying that extension is the whole of what CDK's `LambdaRestApi` builds.
+
+### Members that are ignored
+
+AWS sorts what an import finds into three categories, and the third is valid OpenAPI a REST API
+leaves unsupported without a request validator. AWS ignores it silently, and so does this:
+`requestBody`, the content schemas under `responses`, `components.schemas`, and an operation's
+`parameters`, `summary`, `description` and `tags`. Request validation is refused at the root of the
+document, so a request whose body contradicts a declared schema still reaches the handler.
+`operationId` is ignored too, since it only supplies the `OperationName` a method carries for
+documentation.
+
+Everything else the document carries and this simulation cannot apply is refused, naming the JSON
+pointer of the member, such as
+`#/paths/~1pets~1{petId}/get/x-amazon-apigateway-integration/passthroughBehavior`.
+
+### Replacing a definition
+
+`PutRestApiCommand` with `mode: "overwrite"` replaces an API's whole definition with the document's.
+The API keeps its id, its endpoint and the stages serving it, and its path tree is built again from
+the document.
+
+```typescript
+await apiGateway.putRestApi(
+  new PutRestApiCommand({ restApiId, mode: "overwrite", body: definition }),
+);
+```
+
+`mode: "merge"` is refused, and so is a `PutRestApi` that leaves the mode out, which AWS reads as a
+merge. A merge adds the document's paths to the API's existing ones, and which of two declarations
+of one method it keeps decides what every request to that method reaches.
+
+A refused replacement leaves the API with an empty path tree. The old definition has already been
+taken out by the time a member deep in the document is refused, and an API serving nothing is
+clearer than one serving half of each document.
+
 ## Deploying from CloudFormation and CDK
 
 [Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
@@ -762,7 +928,7 @@ naming the Resource type, the logical id and the ones this can act on. The API, 
 deployment or stage is created either way. The stack deploys, and the record says which of its parts
 behaves differently to the template. The simulated properties are:
 
-- `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`
+- `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`, `Body`, `FailOnWarnings`
 - `Resource`: `RestApiId`, `ParentId`, `PathPart`
 - `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `AuthorizerId`,
   `ApiKeyRequired`, `OperationName`, `Integration`
@@ -771,9 +937,40 @@ behaves differently to the template. The simulated properties are:
 - `Deployment`: `RestApiId`, `Description`, `StageName`
 - `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`
 
-A `Body` on the `RestApi` is one of the recorded ones. It is an OpenAPI document declaring the API's
-resources, methods and integrations, and reading one is outside this. An API declared that way
-deploys with a root resource and an empty tree under it.
+A `Body` on the `RestApi` is an inline OpenAPI document declaring the API's resources, methods and
+integrations. It goes through `ImportRestApi`, the same translator an SDK caller importing a
+document reaches, and the template then carries no `Resource` or `Method` of its own. See
+[Importing an OpenAPI definition](#importing-an-openapi-definition) for what the document may hold.
+
+```yaml
+Api:
+  Type: AWS::ApiGateway::RestApi
+  Properties:
+    Body:
+      openapi: 3.0.1
+      info: { title: pets, version: "1.0" }
+      paths:
+        /pets/{petId}:
+          get:
+            x-amazon-apigateway-integration:
+              type: aws_proxy
+              httpMethod: POST
+              uri: !GetAtt Handler.Arn
+```
+
+`Name` names the API where the template carries both, and the document's `info.title` names it
+otherwise. `Description` and `DisableExecuteApiEndpoint` beside a `Body` are recorded and left off
+the API, because `ImportRestApi` takes neither and AWS applies them in a second step. A
+`Resource`, `Method` or other entry adding to an API a `Body` already declared fails the stack
+naming both, since the template would then declare the API two ways at once. `BodyS3Location` and
+`Mode` are recorded like any other unsimulated property.
+
+A `Body` holding a Swagger 2.0 document is the one document that is recorded instead of refused. The
+API deploys with an empty path tree and the record says why. SAM writes Swagger 2.0 for an
+`AWS::Serverless::Api` unless the template asks for `OpenApiVersion: 3.0.1`, and failing the stack
+over the version of a document would take a whole SAM API down with it. Every other document the
+import refuses fails the Resource, because an API deployed with an empty tree answers 403 for every
+path the document declared.
 
 `StageName` on a `Deployment` is the older one-Resource form, where the deployment publishes a stage
 of that name by itself and the template carries one Resource fewer.
@@ -835,12 +1032,17 @@ and behave differently deployed. The refusals worth knowing about:
 - **Paging.** Every list command answers in full, and `limit` or `position` is refused.
 - **Endpoint types, request validators, models, mapping templates and WAF.** All refused.
 - **Updates.** `UpdateRestApi` replaces `/name` and `/description`. Any other patch path is refused.
+- **OpenAPI extensions.** An import reads `x-amazon-apigateway-integration` and
+  `x-amazon-apigateway-any-method`. Every other `x-amazon-apigateway-*` extension is refused, and so
+  is any integration member beyond `type`, `httpMethod` and `uri`. Each refusal names the JSON
+  pointer of the member.
 
 ## Available functionality
 
 | Area         | Commands                                                                       |
 | ------------ | ------------------------------------------------------------------------------ |
 | REST APIs    | `CreateRestApi`, `GetRestApi`, `GetRestApis`, `UpdateRestApi`, `DeleteRestApi` |
+| OpenAPI      | `ImportRestApi`, `PutRestApi`                                                  |
 | Resources    | `CreateResource`, `GetResource`, `GetResources`, `DeleteResource`              |
 | Authorizers  | `CreateAuthorizer`, `GetAuthorizer`, `GetAuthorizers`, `DeleteAuthorizer`      |
 | Methods      | `PutMethod`, `GetMethod`, `DeleteMethod`                                       |
@@ -863,3 +1065,13 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
   A response body is still base64 decoded when the handler says `isBase64Encoded`.
 - WebSocket APIs are outside this and outside the v2 service.
+- Only OpenAPI 3.0.x is imported. `ImportRestApi` and `PutRestApi` refuse a `swagger: "2.0"`
+  document and an `openapi: "3.1.0"` one by version. A `Body` carrying a Swagger 2.0 document is
+  recorded and the API deploys without it. The body is JSON, and YAML is refused with the same
+  message.
+- A security scheme carrying `x-amazon-apigateway-authorizer` is not read, and an operation with a
+  `security` requirement is refused. An imported method is open or the import did not happen. A
+  method gated by an authorizer is declared through `CreateAuthorizer` and `PutMethod` instead. See
+  [Authorizing a method](#authorizing-a-method).
+- `PutRestApi` replaces a definition and never merges one. `BodyS3Location` on the Resource, and a
+  document held anywhere but inline, are outside this.

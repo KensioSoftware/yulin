@@ -12,6 +12,7 @@ import { SimCfnRestApiMethodCreator } from "./method/sim-cfn-rest-api-method-cre
 import { SimCfnRestApiResourceCreator } from "./resource/sim-cfn-rest-api-resource-creator.js";
 import { SimCfnApiGatewayResourceDeleter } from "./sim-cfn-api-gateway-resource-deleter.js";
 import { simCfnApiGatewayUnsupportedReason } from "./sim-cfn-api-gateway-unsupported.js";
+import { SimCfnRestApiImports } from "./sim-cfn-rest-api-imports.js";
 import { SimCfnRestApiStageCreator } from "./stage/sim-cfn-rest-api-stage-creator.js";
 
 interface SimApiGatewayCfnResourceFactoryProperties {
@@ -32,10 +33,12 @@ export class SimApiGatewayCfnResourceFactory implements SimCfnServiceResourceFac
   private readonly deleter: SimCfnApiGatewayResourceDeleter;
 
   constructor(properties: SimApiGatewayCfnResourceFactoryProperties) {
-    this.apiCreator = new SimCfnRestApiCreator(properties);
-    this.resourceCreator = new SimCfnRestApiResourceCreator(properties);
+    const withImports = { ...properties, imports: new SimCfnRestApiImports() };
+
+    this.apiCreator = new SimCfnRestApiCreator(withImports);
+    this.resourceCreator = new SimCfnRestApiResourceCreator(withImports);
     this.authorizerCreator = new SimCfnRestApiAuthorizerCreator(properties);
-    this.methodCreator = new SimCfnRestApiMethodCreator(properties);
+    this.methodCreator = new SimCfnRestApiMethodCreator(withImports);
     this.deploymentCreator = new SimCfnRestApiDeploymentCreator(properties);
     this.stageCreator = new SimCfnRestApiStageCreator(properties);
     this.deleter = new SimCfnApiGatewayResourceDeleter(properties);
