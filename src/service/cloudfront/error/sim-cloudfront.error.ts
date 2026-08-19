@@ -202,3 +202,18 @@ export class SimCloudFrontDistributionNotDisabled extends SimCloudFrontError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated CloudFront FunctionSizeLimitExceeded error.
+ *
+ * CloudFront caps Function source at 10 KB and will not raise the quota. What
+ * counts is the source as uploaded, comments and all, because nothing minifies
+ * it on the way.
+ */
+export class SimCloudFrontFunctionSizeLimitExceeded extends SimCloudFrontError {
+  public override readonly name = "FunctionSizeLimitExceeded";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 413 });
+  }
+}

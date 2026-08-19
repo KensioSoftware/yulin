@@ -9,6 +9,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCloudFrontFunction } from "../../cff/sim-cloudfront-function.js";
+import { maxCffCodeBytes } from "../../command/create-function/create-function-code-size.js";
 
 describe("Sim CloudFormation CloudFront Function configuration", () => {
   it("creates a CloudFront Function when FunctionConfig is omitted", async () => {
@@ -107,5 +108,38 @@ function handler(event) {
       error.message,
       "AWS::CloudFront::Function InvalidCodeFunction FunctionCode must be a string",
     );
+  });
+
+  it("rejects a CloudFront Function template with oversized FunctionCode", async () => {
+    // Given a CloudFormation template whose inline FunctionCode is over the
+    // CloudFront size limit.
+    const simAws = new SimAws();
+    const handlerSource =
+      "function handler(event) { return event.request; }\n// ";
+    const oversized = handlerSource.padEnd(maxCffCodeBytes + 1, "x");
+
+    // When the template is deployed, then simulated CloudFront refuses it.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        template: {
+          Resources: {
+            OversizedFunction: {
+              Type: "AWS::CloudFront::Function",
+              Properties: {
+                Name: "oversized-function",
+                FunctionConfig: {
+                  Comment: "Oversized FunctionCode",
+                  Runtime: "cloudfront-js-2.0",
+                },
+                FunctionCode: oversized,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    assertIdentical(error.name, "FunctionSizeLimitExceeded");
+    assertStringIncludes(error.message, String(maxCffCodeBytes + 1));
   });
 });

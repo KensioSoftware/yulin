@@ -964,6 +964,12 @@ constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs
 refusals in the editor, ahead of publication. See
 [Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
 
+CloudFront also caps Function code at 10 KB, counted on the source as uploaded, comments and all.
+Simulated `CreateFunction` refuses anything larger with `FunctionSizeLimitExceeded`, as the real
+service does. A test that deploys the Stack reports the overrun where the rest of the suite runs,
+ahead of `cdk deploy`. A handler passed as a function reference carries no source to count, and the
+limit leaves it alone.
+
 ### Calling a Function handler without a Distribution
 
 A test of the handler on its own, with no Distribution in front of it, still has to pass it a whole
@@ -1800,6 +1806,7 @@ Sim CloudFront currently supports:
 - `CreateDistributionCommand`, `GetDistributionCommand`, `UpdateDistributionCommand` and
   `DeleteDistributionCommand`
 - `CreateFunctionCommand` and `DeleteFunctionCommand`
+- Refusing Function code over CloudFront's 10 KB size limit, with `FunctionSizeLimitExceeded`
 - Key value stores, through both the CloudFront client and the key value store data client
 - S3 Origins backed by sim S3 Buckets, reading them as the Bucket policy allows
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
@@ -1864,6 +1871,10 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **A key value store association is fixed once the Function is created.** There is no
   `UpdateFunction` here, and the store a Function reads is the one it was created with. Delete the
   Function and create it again to change it.
+- **A bound handler goes unmeasured.** Function code over CloudFront's 10 KB limit is refused with
+  `FunctionSizeLimitExceeded`, counted on the source as uploaded. A handler passed as a function
+  reference, through `makeCffFunctionCodeInput` or a CloudFormation binding, carries no source to
+  count. The limit reaches only the inline code a real deploy would upload.
 - **`ImportSource` is unsupported.** `CreateKeyValueStoreCommand` ignores it, and
   `AWS::CloudFront::KeyValueStore` refuses a Resource carrying one. Nothing here reads an S3 Object
   as key data, and deploying an empty store would let a test pass against data the deploy should
