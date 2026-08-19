@@ -1982,9 +1982,9 @@ its own `Role` runs as that role, and gets no expanded one.
 
 ### Function events
 
-`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi` is the type
-this covers. An event of any other type is left where it is, and the function deploys with nothing in
-front of it.
+`Events` on a SAM function expand into whatever puts the function behind them. `HttpApi`,
+`Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this covers. An event of any other type
+is left where it is, and the function deploys with nothing in front of it.
 
 An `HttpApi` event becomes an `AWS::ApiGatewayV2::Integration`, an `AWS::ApiGatewayV2::Route` and the
 `AWS::Lambda::Permission` the API invokes the function under. `Path` and `Method` become the route
@@ -2057,6 +2057,77 @@ await srv.close();
 ```
 
 `Auth` on the event is left out. Every request matching the expanded route reaches the function.
+
+A `Schedule` event becomes an `AWS::Events::Rule` on a timer, with the `AWS::Lambda::Permission` the
+rule invokes the function under. The event's `Schedule` is the rule's `ScheduleExpression`, and the
+function runs as a test advances simulated time past a due instant. An `EventBridgeRule` event
+becomes the same pair, with the event's `Pattern` as the rule's `EventPattern`. A matching event put
+on the bus invokes the function. Both events take `Name` (an `EventBridgeRule` event calls it
+`RuleName`), `Description`, `Input` and `Enabled`, and an event naming an `EventBusName` watches
+that bus.
+
+```typescript sim-cloudformation-sam-schedule-event
+/**
+ * A SAM function put on a timer by its Schedule event.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const runs: string[] = [];
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reconciliation-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Resources: {
+      Reconcile: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Events: {
+            Hourly: {
+              Type: "Schedule",
+              Properties: {
+                Schedule: "rate(1 hour)",
+                Input: JSON.stringify({ ledger: "rates" }),
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Reconcile",
+      handler: (event: { ledger: string }): string => {
+        runs.push(event.ledger);
+
+        return "reconciled";
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+await simAws.clock().advanceBy({ hours: 3 });
+
+console.log(runs);
+```
+
+A `ScheduleV2` event becomes an `AWS::Scheduler::Schedule` and the `AWS::IAM::Role` Scheduler assumes
+to invoke the function. The role trusts `scheduler.amazonaws.com` and may invoke the one function the
+event was declared on. An event naming a `RoleArn` runs as that role, and the expansion makes no role
+of its own. `Name`, `Description`, `Input`, `Enabled`, `GroupName`, `StartDate`, `EndDate`,
+`ScheduleExpressionTimezone`, `KmsKeyArn` and `FlexibleTimeWindow` carry over. An event stating no
+time window gets `OFF`.
+
+`DeadLetterConfig` and `RetryPolicy` on these three events are left out. A delivery is attempted
+once, and a failed one is recorded by the rule or the schedule that made it.
 
 A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
 for a function called `Rates`. `AuthType` and `InvokeMode` carry over. `Cors` is left out (the
@@ -2722,6 +2793,9 @@ Sim CloudFormation currently supports:
   `Globals.Function` and `Globals.HttpApi` defaults applied
 - The `HttpApi` event of a SAM function, expanded into the API, integration, route, stage and invoke
   permission that serve it, and `FunctionUrlConfig`, expanded into a Function URL
+- The `Schedule`, `ScheduleV2` and `EventBridgeRule` events of a SAM function, expanded into the
+  EventBridge rule or Scheduler schedule that fires the function, and the permission or execution
+  Role the invocation is authorized by
 
 The resource types it creates are:
 
@@ -2823,9 +2897,11 @@ Each service's own docs describe what its resource types support.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.
-- The SAM transform is expanded for `AWS::Serverless::Function` alone. Every other
-  `AWS::Serverless::*` resource type is recorded as unsupported. `HttpApi` is the only event type
-  expanded, so a SAM `Api`, schedule or queue trigger creates nothing. `Auth` on an `HttpApi` event
+- The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable` and
+  `AWS::Serverless::HttpApi`. Every other `AWS::Serverless::*` resource type is recorded as
+  unsupported. `HttpApi`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the event types
+  expanded. An event of another type, such as `Api` or `SQS`, creates nothing. `Auth` on an
+  `HttpApi` event
   and on the implicit API it shares is left out. `AutoPublishAlias` and `DeploymentPreference` are
   left out too, because the simulator has one version of a function and nothing to shift traffic
   between.
