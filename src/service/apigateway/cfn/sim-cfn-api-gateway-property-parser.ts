@@ -82,6 +82,29 @@ export class SimCfnApiGatewayPropertyParser extends SimCfnApiGatewayScalarValues
   }
 
   /**
+   * Parse a property value that must be a list of strings when present, which
+   * is the shape an authorizer's `ProviderARNs` and a method's
+   * `AuthorizationScopes` take.
+   */
+  optionalStringList(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): string[] | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!Array.isArray(value)) {
+      throw this.invalidPropertyError(resource, label, "a list of strings");
+    }
+
+    return value.map((entry, index) =>
+      this.requiredString(resource, entry, `${label}[${index}]`),
+    );
+  }
+
+  /**
    * Parse a property value that must be an object of strings when present,
    * which is the shape a stage's `Variables` takes.
    */

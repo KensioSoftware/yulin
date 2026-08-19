@@ -770,6 +770,169 @@ called by a principal with no ARN behind it. `accessKey`, `apiKey`, `apiKeyId`, 
 the two Cognito identity pool fields are `null` throughout. `sourceIp` and `userAgent` describe the
 request itself and are filled for every method.
 
+## Authorizing a method with a user pool
+
+A `COGNITO_USER_POOLS` authorizer verifies the token itself against the keys the user pools it names
+publish. Nothing is invoked, so there is no function to write and no policy to answer.
+`CreateAuthorizerCommand` takes the pools as `providerARNs`, and `PutMethodCommand` binds the
+authorizer to a method with `authorizationType: "COGNITO_USER_POOLS"`.
+
+```typescript sim-apigateway-cognito-authorizer
+/**
+ * Gating a REST API method with a Cognito user pool authorizer.
+ *
+ * The authorizer verifies the token against the keys the pool publishes, and
+ * the token's own claims reach the handler under `requestContext.authorizer`.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const UserPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const ClientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId, Username: "ada" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId,
+    Username: "ada",
+    Password: "Correct-horse-1",
+    Permanent: true,
+  }),
+);
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders"],
+    cognitoUserPoolArns: [pool.UserPool!.Arn!],
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "text/plain" },
+      body: `orders for ${
+        event.requestContext.authorizer?.claims?.["cognito:username"] ??
+        "nobody"
+      }`,
+    }),
+  },
+  simAws,
+);
+
+const signedIn = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId,
+    ClientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "ada", PASSWORD: "Correct-horse-1" },
+  }),
+);
+const idToken = signedIn.AuthenticationResult!.IdToken!;
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders`);
+
+const anonymous = await fetch(url);
+
+console.log(anonymous.status);
+// 401
+
+const authorized = await fetch(url, { headers: { authorization: idToken } });
+
+console.log(await authorized.text());
+// "orders for ada"
+
+// Advancing the simulation's clock past the token's expiry closes the method
+// to the same token, with nothing reissued.
+await simAws.clock().advanceBy({ hours: 2 });
+
+const expired = await fetch(url, { headers: { authorization: idToken } });
+
+console.log(expired.status);
+// 401
+
+await srv.close();
+```
+
+`simRestApiLambdaProxyFactory` builds the authorizer and the methods bound to it when it is given
+`cognitoUserPoolArns`.
+
+A `providerARN` is read for the pool id it names, and the pool is looked up across every simulated
+account. The token is accepted when any one of the named pools signed it, its `iss` names that same
+pool, and its time claims hold against the simulation's clock. Advancing the clock past a token's
+`exp` therefore closes a method that was open to it.
+
+### The claims the handler receives
+
+The token's own claims reach the handler under `requestContext.authorizer.claims`, and every value
+arrives as a string. A list claim such as `cognito:groups` is rendered the way Go prints a slice, so
+two groups arrive as `[Admins Readers]`.
+
+```json
+{
+  "claims": {
+    "sub": "5c4a5f6c-6c31-4a2e-9a55-2c4dcb8f2f4f",
+    "cognito:username": "ada",
+    "cognito:groups": "[Admins Readers]",
+    "iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_aBcDeFgHi",
+    "token_use": "id"
+  }
+}
+```
+
+An HTTP API puts the same claims under `requestContext.authorizer.jwt.claims`, with the scopes
+beside them, so a handler moved between the two reads a different shape.
+
+### Scopes
+
+`authorizationScopes` on the method is met by any one of the scopes the token's `scope` claim
+carries. The scopes are the method's own, so one authorizer covers methods asking for different
+ones.
+
+A method asking for no scope takes an id token and an access token alike, because `token_use` is not
+checked, which is what real API Gateway does. A method asking for a scope takes only an access
+token, since an id token carries no `scope` claim at all.
+
+### What a refused request gets back
+
+| Case                                                       | Answer                                               |
+| ---------------------------------------------------------- | ---------------------------------------------------- |
+| No value at the identity source                            | 401 `Unauthorized`                                   |
+| A value that is not a readable JWT                         | 401 `Unauthorized`                                   |
+| A token no named pool signed, or one signed by another key | 401 `Unauthorized`                                   |
+| A token that has expired, or has no `exp` at all           | 401 `Unauthorized`                                   |
+| A verified token claiming none of the method's scopes      | 403 `User is not authorized to access this resource` |
+
+Every refusal up to and including the claim checks is the same 401, so a client learns that its
+token was not accepted and nothing about which check it failed. An unmet scope is the one 403: the
+token was accepted, and it does not allow this method.
+
+The token is taken with or without the `Bearer` scheme in front of it. The identity source is one
+header, as it is for a `TOKEN` authorizer.
+
 ## Intercepting an SDK client
 
 `SimSdk` routes `@aws-sdk/client-api-gateway` commands to the simulation. Code under test builds its
@@ -1180,9 +1343,9 @@ behaves differently to the template. The simulated properties are:
 - `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`, `Body`, `FailOnWarnings`
 - `Resource`: `RestApiId`, `ParentId`, `PathPart`
 - `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `AuthorizerId`,
-  `ApiKeyRequired`, `OperationName`, `Integration`
+  `AuthorizationScopes`, `ApiKeyRequired`, `OperationName`, `Integration`
 - A method's `Integration` block: `Type`, `IntegrationHttpMethod`, `Uri`
-- `Authorizer`: `RestApiId`, `Name`, `Type`, `AuthorizerUri`, `IdentitySource`
+- `Authorizer`: `RestApiId`, `Name`, `Type`, `AuthorizerUri`, `ProviderARNs`, `IdentitySource`
 - `Deployment`: `RestApiId`, `Description`, `StageName`
 - `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`
 
@@ -1244,6 +1407,10 @@ writes for its own function. Give either one `resultsCacheTtl: Duration.seconds(
 holds a decision for five minutes by default and `AuthorizerResultTtlInSeconds` is one of the
 recorded properties.
 
+`CognitoUserPoolsAuthorizer` deploys as it stands, naming the pools it was given by ARN. A method
+takes it with `authorizationType: apigateway.AuthorizationType.COGNITO`, and a user pool the same
+stack declares is reached through the `Fn::GetAtt` on its ARN that CDK writes.
+
 CDK also writes an `AWS::ApiGateway::Account` and a CloudWatch role beside a default `RestApi`.
 Neither is simulated. The `Account` Resource is recorded in
 [`stack.skippedResources`](../cloudformation/README.md#inspecting-stacks-and-resources) and the rest of the
@@ -1270,14 +1437,16 @@ nothing on real AWS.
 An input outside what this simulates is refused. Dropping it would let a request look applied here
 and behave differently deployed. The refusals worth knowing about:
 
-- **Authorizer kinds.** `TOKEN` and `REQUEST` are the two simulated. A `COGNITO_USER_POOLS`
-  authorizer is refused by `CreateAuthorizer`, and a `COGNITO_USER_POOLS` method by `PutMethod`.
-  That is a separate piece of work. An `AWS_IAM` method is decided by IAM and names no authorizer.
-  See [Protecting a method with IAM](#protecting-a-method-with-iam).
+- **Authorizer kinds.** `CreateAuthorizer` takes `TOKEN`, `REQUEST` and `COGNITO_USER_POOLS`, which
+  is every kind a REST API has. The `JWT` authorizer an HTTP API takes is the v2 service's and is
+  refused here. An `AWS_IAM` method is decided by IAM and names no authorizer. See
+  [Protecting a method with IAM](#protecting-a-method-with-iam).
 - **Identity source expressions.** A `REQUEST` authorizer reads
   `method.request.header.<name>` and `method.request.querystring.<name>`. AWS also allows
   `method.request.path`, `context` and `stageVariables`, and each is refused by
   `CreateAuthorizer`.
+- **Scopes on a method that checks none.** `authorizationScopes` is refused on a method that is not
+  `COGNITO_USER_POOLS`, since a method carrying scopes nothing checks reads as gated by them.
 - **Holding an authorizer's decision.** `authorizerResultTtlInSeconds` is refused. The function is
   invoked once per request reaching the method.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
@@ -1317,6 +1486,9 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
   that is the form the platform's `Headers` hands over. Real API Gateway reports each separately.
 - A Lambda authorizer's `context` reaches the handler as the authorizer returned it. AWS accepts a
   string, a number or a boolean for each value, and how it renders them is not published.
+- A Cognito authorizer reads a `providerARN` for the pool id it names, so a pool in another account
+  is verified against whenever this simulation holds it. `identityValidationExpression`, which real
+  API Gateway matches a token against before verifying it, is outside this.
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
   A response body is still base64 decoded when the handler says `isBase64Encoded`.
 - WebSocket APIs are outside this and outside the v2 service.

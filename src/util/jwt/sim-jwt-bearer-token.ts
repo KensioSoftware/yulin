@@ -5,16 +5,16 @@
  * there rather than required. The comparison is case-insensitive, since HTTP
  * authorization schemes are.
  */
-const bearerPrefix = /^bearer\s+/i;
+const bearerPrefix = /^bearer\s+/iu;
 
 /**
  * The token an identity source value carries, if it carries one at all.
  *
- * This is a JWT authorizer's reading of the value. A Lambda `REQUEST`
- * authorizer is handed the value as it arrived instead, since what it names
- * may be a cookie or an API key rather than a bearer token.
+ * This is how a verifier of tokens reads the value. A Lambda authorizer is
+ * handed the value as it arrived instead, since what it names may be a cookie
+ * or an API key rather than a bearer token.
  */
-export function simHttpApiBearerToken(
+export function simJwtBearerToken(
   value: string | undefined,
 ): string | undefined {
   const token = value?.replace(bearerPrefix, "").trim();

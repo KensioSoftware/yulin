@@ -1,4 +1,5 @@
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
+import { SimCognitoRestApiUserPools } from "../../apigateway/api/authorizer/sim-cognito-rest-api-user-pools.js";
 import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
 import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
 import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
@@ -30,6 +31,20 @@ export function simAwsHttpApiJwtIssuerKeys(
   registries: SimAwsScopedServiceRegistries,
 ): SimCognitoHttpApiJwtIssuerKeys {
   return new SimCognitoHttpApiJwtIssuerKeys({
+    userPoolRegistry: registries.cognito,
+  });
+}
+
+/**
+ * The user pools a simulated REST API's Cognito authorizer verifies against.
+ *
+ * An authorizer can name a pool in any Account, as a real one can, so this
+ * reads the whole simulation's Cognito rather than one scope's.
+ */
+export function simAwsRestApiUserPools(
+  registries: SimAwsScopedServiceRegistries,
+): SimCognitoRestApiUserPools {
+  return new SimCognitoRestApiUserPools({
     userPoolRegistry: registries.cognito,
   });
 }

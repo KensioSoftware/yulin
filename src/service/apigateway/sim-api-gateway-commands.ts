@@ -8,6 +8,10 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import {
+  SimRestApiNoUserPools,
+  type SimRestApiUserPools,
+} from "./api/authorizer/sim-rest-api-user-pools.js";
 import { SimRestApiStore } from "./api/sim-rest-api-store.js";
 import { SimRestApiCommands } from "./command/api/sim-rest-api-commands.js";
 import { SimRestApiImportCommands } from "./command/api/sim-rest-api-import-commands.js";
@@ -29,6 +33,13 @@ export interface SimApiGatewayProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly registry?: SimRestApiRegistry;
+  /**
+   * The user pools this API Gateway's Cognito authorizers verify tokens
+   * against. A standalone simulated API Gateway has none, so a
+   * `COGNITO_USER_POOLS` method refuses every request rather than admitting
+   * one it could not check.
+   */
+  readonly userPools?: SimRestApiUserPools;
 }
 
 /**
@@ -57,6 +68,7 @@ export class SimApiGatewayCommands {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       registry = new SimRestApiRegistry(),
+      userPools = new SimRestApiNoUserPools(),
     } = properties;
 
     const access = new SimRestApiAccess({
@@ -71,6 +83,7 @@ export class SimApiGatewayCommands {
       access,
       accountRegionScope,
       clock: background,
+      userPools,
     });
     this.resources = new SimRestApiResourceCommands({ access });
     this.authorizers = new SimRestApiAuthorizerCommands({ access });

@@ -160,24 +160,24 @@ describe("Sim API Gateway REST API authorizer commands", () => {
     await expect(authorizer).rejects.toThrow(SimApiGatewayNotFound);
   });
 
-  it("refuses an authorizer kind nothing here invokes", async () => {
+  it("refuses an authorizer kind a REST API does not have", async () => {
     // Given a REST API
     const simAws = new SimAws();
     const restApiId = await givenRestApi(simAws.apiGateway());
 
-    // When a Cognito authorizer is asked for
-    const authorizer = simAws.apiGateway().createAuthorizer(
-      new CreateAuthorizerCommand({
-        ...tokenAuthorizerInput(restApiId),
-        type: "COGNITO_USER_POOLS",
-      }),
-    );
+    // When the JWT authorizer an HTTP API takes is asked for here. The SDK's
+    // own AuthorizerType has no room for the value, so the command is written
+    // out rather than built, which is what a caller reaching the simulation
+    // from another language would send.
+    const authorizer = simAws.apiGateway().createAuthorizer({
+      input: { ...tokenAuthorizerInput(restApiId), type: "JWT" },
+    });
 
     // Then it is refused, rather than created as something that decides
     // nothing
     await expect(authorizer).rejects.toThrow(SimApiGatewayBadRequest);
     await expect(authorizer).rejects.toThrow(
-      "CreateAuthorizer type 'COGNITO_USER_POOLS' is not simulated",
+      "CreateAuthorizer type 'JWT' is not simulated",
     );
   });
 

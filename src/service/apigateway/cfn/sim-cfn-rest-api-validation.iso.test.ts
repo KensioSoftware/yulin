@@ -16,14 +16,14 @@ import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factor
 
 describe("API Gateway REST API CloudFormation refusals", () => {
   it("refuses a method asking for an authorization type nothing enforces", async () => {
-    // Given a method behind a user pool
+    // Given a method asking to be authorized by a REQUEST authorizer
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const error = await deployRestApiFailure(
       simAws,
       simCfnRestApiTemplateFactory.make({
-        methodProperties: { AuthorizationType: "COGNITO_USER_POOLS" },
+        methodProperties: { AuthorizationType: "REQUEST" },
       }),
     );
 
@@ -31,7 +31,7 @@ describe("API Gateway REST API CloudFormation refusals", () => {
     // would have gated
     assertStringIncludes(
       error.message,
-      "PutMethod authorizationType 'COGNITO_USER_POOLS' is not simulated",
+      "PutMethod authorizationType 'REQUEST' is not simulated",
     );
   });
 
@@ -196,8 +196,8 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
     assertIdentical(account.status, "CREATE_COMPLETE");
   });
 
-  it("refuses an authorizer of a kind nothing here invokes", async () => {
-    // Given a template declaring a Cognito authorizer
+  it("refuses an authorizer of a kind a REST API does not have", async () => {
+    // Given a template declaring the JWT authorizer an HTTP API takes
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -210,7 +210,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
             Properties: {
               RestApiId: { Ref: "Api" },
               Name: "session-cookie",
-              Type: "COGNITO_USER_POOLS",
+              Type: "JWT",
             },
           },
         },
@@ -221,7 +221,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
     // authorizer that decides nothing
     assertStringIncludes(
       error.message,
-      "CreateAuthorizer type 'COGNITO_USER_POOLS' is not simulated",
+      "CreateAuthorizer type 'JWT' is not simulated",
     );
   });
 });

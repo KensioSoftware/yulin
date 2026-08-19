@@ -3,7 +3,7 @@ import {
   type SimRestApiAuthorization,
   SimRestApiRefused,
 } from "../../api/authorizer/sim-rest-api-authorization.js";
-import type { SimRestApiAuthorizer } from "../../api/authorizer/sim-rest-api-authorizer.js";
+import type { SimRestApiLambdaAuthorizer } from "../../api/authorizer/sim-rest-api-lambda-authorizer.js";
 import type { SimRestApiLambdaUri } from "../../api/method/sim-rest-api-lambda-uri.js";
 import { simRestApiEndpoint } from "../sim-rest-api-endpoint.js";
 import type { SimRestApiFunctionTarget } from "../sim-rest-api-function-target.js";
@@ -56,7 +56,7 @@ export class SimRestApiAuthorizerInvocation {
    */
   async invoke(
     input: SimRestApiMethodAuthorizeInput,
-    authorizer: SimRestApiAuthorizer,
+    authorizer: SimRestApiLambdaAuthorizer,
     identityValues: readonly string[],
     methodArn: string,
   ): Promise<SimRestApiAuthorization> {
@@ -87,7 +87,7 @@ export class SimRestApiAuthorizerInvocation {
    */
   private async event(
     input: SimRestApiMethodAuthorizeInput,
-    authorizer: SimRestApiAuthorizer,
+    authorizer: SimRestApiLambdaAuthorizer,
     identityValues: readonly string[],
     methodArn: string,
   ): Promise<unknown> {

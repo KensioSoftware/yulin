@@ -36,6 +36,32 @@ export interface SimPayload1LambdaAuthorizer {
 }
 
 /**
+ * What a `COGNITO_USER_POOLS` method's authorizer passed on to the handler.
+ *
+ * The claims are the accepted token's own, and every value arrives as a
+ * string. A REST API sends them alone, where payload format 2.0 puts the
+ * scopes beside them.
+ */
+export interface SimPayload1CognitoAuthorizer {
+  claims: Record<string, string>;
+}
+
+/**
+ * What the method's authorizer knows about the caller, whichever kind of
+ * authorizer ran.
+ *
+ * One block carries both kinds, as the event itself does: `principalId` and
+ * the flattened context beside it are a Lambda authorizer's, and `claims` is a
+ * Cognito one's. A handler reads whichever its own method has, and a method
+ * that authorizes nobody has no block at all.
+ */
+export interface SimPayload1Authorizer {
+  principalId?: string;
+  claims?: Record<string, string>;
+  [contextKey: string]: unknown;
+}
+
+/**
  * What payload format 1.0 says about the request beyond the request itself.
  */
 export interface SimPayload1RequestContext {
@@ -45,7 +71,7 @@ export interface SimPayload1RequestContext {
    * What the method's authorizer knows about the caller. It is absent on a
    * method that authorizes nobody, which is what real API Gateway sends.
    */
-  authorizer?: SimPayload1LambdaAuthorizer;
+  authorizer?: SimPayload1Authorizer;
   domainName: string;
   domainPrefix: string;
   extendedRequestId: string;

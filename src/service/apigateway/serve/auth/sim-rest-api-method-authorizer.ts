@@ -4,11 +4,13 @@ import {
   type SimRestApiAuthorization,
   SimRestApiRefused,
 } from "../../api/authorizer/sim-rest-api-authorization.js";
+import { SimRestApiLambdaAuthorizer } from "../../api/authorizer/sim-rest-api-lambda-authorizer.js";
 import { SimRestApiExecuteApiArn } from "../../api/sim-rest-api-execute-api-arn.js";
 import {
   type SimRestApiAuthorizerFunctions,
   SimRestApiAuthorizerInvocation,
 } from "./sim-rest-api-authorizer-invocation.js";
+import { SimRestApiCognitoMethodAuthorizer } from "./sim-rest-api-cognito-method-authorizer.js";
 import { SimRestApiIamMethodAuthorizer } from "./sim-rest-api-iam-method-authorizer.js";
 import type { SimRestApiMethodAuthorizeInput } from "./sim-rest-api-method-authorize-input.js";
 
@@ -18,7 +20,11 @@ interface SimRestApiMethodAuthorizerProperties {
    * finds an integration's.
    */
   readonly functions: SimRestApiAuthorizerFunctions;
-  /** Clock an authorizer's invocation event is stamped with. */
+  /**
+   * Clock an authorizer's invocation event is stamped with, and a verified
+   * token's time claims are checked against, so advancing simulated time
+   * expires a token that was accepted before it.
+   */
   readonly clock: SimClock;
 }
 
@@ -43,10 +49,14 @@ interface SimRestApiMethodAuthorizerProperties {
 export class SimRestApiMethodAuthorizer {
   private readonly invocation: SimRestApiAuthorizerInvocation;
   private readonly iamAuthorizer = new SimRestApiIamMethodAuthorizer();
+  private readonly cognito: SimRestApiCognitoMethodAuthorizer;
 
   constructor(properties: SimRestApiMethodAuthorizerProperties) {
     this.invocation = new SimRestApiAuthorizerInvocation({
       functions: properties.functions,
+      clock: properties.clock,
+    });
+    this.cognito = new SimRestApiCognitoMethodAuthorizer({
       clock: properties.clock,
     });
   }
@@ -66,6 +76,9 @@ export class SimRestApiMethodAuthorizer {
       case "AWS_IAM": {
         return this.iamAuthorizer.authorize(input);
       }
+      case "COGNITO_USER_POOLS": {
+        return this.cognito.authorize(input);
+      }
       case "CUSTOM": {
         return await this.custom(input);
       }
@@ -83,10 +96,10 @@ export class SimRestApiMethodAuthorizer {
       match.method.authorizerId ?? "",
     );
 
-    // A CUSTOM method always names an authorizer, and that authorizer can
-    // still be deleted out from under it, so the two come to the same thing
-    // here: with nothing to ask, the method stays closed.
-    if (authorizer === undefined) {
+    // A CUSTOM method always names a Lambda authorizer, and that authorizer
+    // can still be deleted out from under it, so the two come to the same
+    // thing here: with nothing to ask, the method stays closed.
+    if (!(authorizer instanceof SimRestApiLambdaAuthorizer)) {
       return SimRestApiRefused.unauthorized();
     }
 

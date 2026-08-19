@@ -95,14 +95,16 @@ The client's own authorization runs first. A request presenting no credentials i
 not the integration behind the method would have worked. Whether the API may invoke a function is a
 separate question, asked afterwards, and it is the API's rather than the client's.
 
-`serve/auth/` holds the authorization types, one decider each:
+`serve/auth/` holds the authorization types, and the pieces under each are the ones that type needs:
 
 ```text
-SimRestApiMethodAuthorizer            which type the method asks for
-├── SimRestApiIamMethodAuthorizer     the caller, put to IAM against the method ARN
-└── SimRestApiAuthorizerInvocation    the invoke permission, the event, the answer
-    ├── SimRestApiAuthorizerResponse  the principal, the context, the policy
-    └── SimRestApiAuthorizerPolicy    that policy, put to IAM against the method ARN
+SimRestApiMethodAuthorizer                which type the method asks for
+├── SimRestApiIamMethodAuthorizer         AWS_IAM: the caller, put to IAM against the method ARN
+├── SimRestApiAuthorizerInvocation        CUSTOM: the invoke permission, the event, the answer
+│   ├── SimRestApiAuthorizerResponse      the principal, the context, the policy
+│   └── SimRestApiAuthorizerPolicy        that policy, put to IAM against the method ARN
+└── SimRestApiCognitoMethodAuthorizer     COGNITO_USER_POOLS: the authorizer and the token
+    └── SimRestApiCognitoVerification     the key, the signature, the claims, the scopes
 ```
 
 An `AWS_IAM` method asks the IAM of the Account that owns the API about the caller the serving
@@ -117,6 +119,17 @@ payload format 1.0 event. Everything downstream of the answer is shared.
 `api/authorizer/identity/` reads the identity source expressions. A REST API writes them as one
 comma-separated string where an HTTP API takes a list, so the splitting lives here and the
 per-expression parsing mirrors `apigatewayv2/api/authorizer/identity/`.
+
+A `COGNITO_USER_POOLS` method invokes nothing and asks nothing. It verifies the token against the
+keys the pools its authorizer names publish, which it reaches through the `SimRestApiUserPools` port
+on the API. `SimCognitoRestApiUserPools` is the implementation reading simulated Cognito, and a
+standalone `SimApiGateway` gets `SimRestApiNoUserPools` so a gated method stays closed rather than
+admitting a token it could not check. The same split is in `../apigatewayv2/` for a JWT authorizer's
+issuer keys, and the JWT mechanics both use are in `src/util/jwt/`.
+
+`SimRestApiAuthorizer` is the base the three kinds share, holding the id, the name and the view.
+`SimRestApiLambdaAuthorizer` covers `TOKEN` and `REQUEST`, which differ only in the event, and
+`SimRestApiCognitoAuthorizer` names pools where that one names a function.
 
 The method ARN is the one part with no HTTP API equivalent worth copying. A REST API authorizer is
 handed the ARN of the request the client made, with the concrete path in it, and the policy it
@@ -218,10 +231,11 @@ type other than `AWS_PROXY` are all refused there, so a request naming one fails
 been applied on real AWS.
 
 Authorization is refused the same way, in the two commands that carry it.
-`CreateAuthorizer` takes `TOKEN` and refuses the other two kinds, and `PutMethod` takes `NONE`,
-`CUSTOM` and `AWS_IAM` and refuses `COGNITO_USER_POOLS`. A method served open where AWS would have
-gated it lets a test pass on a request real AWS rejects, so a template asking for one of them fails
-to deploy rather than deploying around it.
+`CreateAuthorizer` takes `TOKEN` and `COGNITO_USER_POOLS` and refuses `REQUEST`, and `PutMethod`
+takes all four of its types. A method served open where AWS would have gated it lets a test pass on
+a request real AWS rejects, so a template asking for a type nothing enforces fails to deploy rather
+than deploying around it. A method naming an authorizer of the other kind is refused for the same
+reason.
 
 An imported document meets those refusals through the commands, and `openapi/` adds the ones about
 members no command sees. A document-level `security`, an operation's `security`, a Swagger 2

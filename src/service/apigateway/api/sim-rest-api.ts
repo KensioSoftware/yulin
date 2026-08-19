@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimRestApiAuthorizerStore } from "./authorizer/sim-rest-api-authorizer-store.js";
+import type { SimRestApiUserPools } from "./authorizer/sim-rest-api-user-pools.js";
 import { SimRestApiDeploymentStore } from "./deployment/sim-rest-api-deployment-store.js";
 import { SimRestApiResourceStore } from "./resource/sim-rest-api-resource-store.js";
 import type { SimRestApiResource } from "./resource/sim-rest-api-resource.js";
@@ -20,6 +21,7 @@ interface SimRestApiProperties {
   readonly name: string;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly createdDate: Date;
+  readonly userPools: SimRestApiUserPools;
   readonly description?: string | undefined;
   readonly disableExecuteApiEndpoint?: boolean | undefined;
 }
@@ -40,6 +42,14 @@ export class SimRestApi {
   public readonly disableExecuteApiEndpoint: boolean;
 
   /**
+   * The user pools this API's Cognito authorizers verify tokens against.
+   *
+   * They are held on the API because a request is served without a command,
+   * and the serving layer reaches the API and nothing around it.
+   */
+  public readonly userPools: SimRestApiUserPools;
+
+  /**
    * The API's name and description, which `UpdateRestApi` can replace. Neither
    * identifies the API, and two APIs in one Account and Region may share both.
    */
@@ -58,6 +68,7 @@ export class SimRestApi {
     this.name = properties.name;
     this.accountRegionScope = properties.accountRegionScope;
     this.createdDate = properties.createdDate;
+    this.userPools = properties.userPools;
     this.description = properties.description;
     this.disableExecuteApiEndpoint =
       properties.disableExecuteApiEndpoint ?? false;

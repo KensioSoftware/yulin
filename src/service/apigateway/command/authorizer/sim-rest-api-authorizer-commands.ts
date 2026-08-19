@@ -28,17 +28,19 @@ const acceptedCreateOptions = [
   "name",
   "type",
   "authorizerUri",
+  "providerARNs",
   "identitySource",
 ];
 
 const simulatedAuthorizerTypes: readonly SimRestApiAuthorizerType[] = [
   "TOKEN",
   "REQUEST",
+  "COGNITO_USER_POOLS",
 ];
 
 const authorizerTypeRefusal =
-  "a COGNITO_USER_POOLS authorizer verifies a user pool token itself rather " +
-  "than invoking a function, and that is not built here";
+  "a REST API authorizer invokes a function or verifies a user pool token, " +
+  "and the JWT authorizer an HTTP API takes is the v2 service's";
 
 interface SimRestApiAuthorizerCommandsProperties {
   readonly access: SimRestApiAccess;

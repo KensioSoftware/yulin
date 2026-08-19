@@ -27,8 +27,21 @@ export {
   type SimRestApiAuthorizerId,
   type SimRestApiAuthorizerType,
   type SimRestApiAuthorizerView,
+  simRestApiCognitoAuthType,
   simRestApiCustomAuthType,
 } from "./api/authorizer/sim-rest-api-authorizer.js";
+export {
+  SimRestApiLambdaAuthorizer,
+  type SimRestApiLambdaAuthorizerType,
+} from "./api/authorizer/sim-rest-api-lambda-authorizer.js";
+export { SimRestApiCognitoAuthorizer } from "./api/authorizer/sim-rest-api-cognito-authorizer.js";
+export { SimRestApiUserPoolProviders } from "./api/authorizer/sim-rest-api-user-pool-providers.js";
+export {
+  SimRestApiNoUserPools,
+  type SimRestApiUserPool,
+  type SimRestApiUserPools,
+} from "./api/authorizer/sim-rest-api-user-pools.js";
+export { SimCognitoRestApiUserPools } from "./api/authorizer/sim-cognito-rest-api-user-pools.js";
 export { SimRestApiAuthorizerStore } from "./api/authorizer/sim-rest-api-authorizer-store.js";
 export {
   SimRestApiAdmitted,
@@ -50,6 +63,7 @@ export {
   SimRestApiQueryStringIdentitySource,
   simRestApiQueryStringIdentityPrefix,
 } from "./api/authorizer/identity/sim-rest-api-query-string-identity-source.js";
+export { SimRestApiMethodScopes } from "./api/method/sim-rest-api-method-scopes.js";
 export {
   simRestApiAnyMethod,
   SimRestApiMethod,

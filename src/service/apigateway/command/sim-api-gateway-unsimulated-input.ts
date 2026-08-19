@@ -65,9 +65,12 @@ export class SimApiGatewayUnsimulatedInput {
       return;
     }
 
+    const quoted = simulated.map((one) => `'${one}'`);
+    const last = quoted.at(-1);
+
     throw new SimApiGatewayBadRequest(
       `${this.operation} ${option} '${value}' is not simulated: ` +
-        `${feature}. Only ${simulated.map((one) => `'${one}'`).join(" and ")} ` +
+        `${feature}. Only ${quoted.slice(0, -1).join(", ")} and ${last} ` +
         `are supported.`,
     );
   }

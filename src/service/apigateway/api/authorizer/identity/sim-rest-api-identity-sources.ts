@@ -28,7 +28,9 @@ export class SimRestApiIdentitySources {
    * Read the one header a `TOKEN` authorizer takes its token from.
    */
   static token(identitySource: string): SimRestApiIdentitySources {
-    return new SimRestApiIdentitySources([parser.header(identitySource)]);
+    return new SimRestApiIdentitySources([
+      parser.header(identitySource, "TOKEN"),
+    ]);
   }
 
   /**
