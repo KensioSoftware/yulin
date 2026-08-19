@@ -65,9 +65,10 @@ protocol's question, answered by `requireSimSnsSubscriptionEndpoint`: `SimSnsQue
 `sqs`, `SimSnsFunctionEndpointArn` for `lambda`, and `SimSnsPhoneNumber` for `sms`. The Account and
 the Region are optional on the endpoint, since an `sms` endpoint is a phone number. Reading a function
 ARN is Lambda's own business, so those parts come from `parseSimLambdaFunctionArn`; what SNS adds is
-what an unreadable one means to a `Subscribe` request. A qualified function ARN naming a version or
-an alias is refused, since simulated Lambda has neither and delivering to `$LATEST` instead would be
-the wrong function.
+what an unreadable one means to a `Subscribe` request. A qualifier naming a version or an alias is
+held alongside the function name, and `SimSnsDeliveryFunction` resolves it against simulated Lambda
+on every delivery. The alias is what the delivery is authorized against, and the version behind it
+is what runs.
 
 Nothing checks that the endpoint queue or function exists when a subscription is created, because
 real SNS does not either: a subscription to something that is not there is created, and fails when

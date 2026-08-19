@@ -53,7 +53,7 @@ export class SimAwsLogsSubscriptionFunctions implements SimLogsSubscriptionDesti
     // already inside the background task that stands for the asynchronous
     // delivery real CloudWatch Logs makes, and because a handler failure has
     // to reach the delivery outcome rather than being swallowed.
-    await this.permitted(destinationArn).invoke(
+    await this.permitted(destinationArn).simFunction.invoke(
       simLogsSubscriptionEventPayload(delivery),
     );
   }
@@ -67,8 +67,7 @@ export class SimAwsLogsSubscriptionFunctions implements SimLogsSubscriptionDesti
     );
 
     return permittedSimLogsDestinationFunction(
-      destinationArn,
-      arn.functionName,
+      arn,
       this.#simAws.accountRegionScope(arn.accountId, arn.regionName),
     );
   }

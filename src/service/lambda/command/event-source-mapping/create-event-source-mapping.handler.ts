@@ -13,6 +13,7 @@ import { SimLambdaEventSourceRolePermissions } from "../../event-source/sim-lamb
 import type { SimLambdaEventSourceStreams } from "../../event-source/stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
+import type { SimLambdaFunctionTarget } from "../../function/version/sim-lambda-function-target.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
 import { SimLambdaEventSourceMappingInput } from "./create-event-source-mapping-input.js";
 import type {
@@ -87,17 +88,20 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
     const { functions } = this.properties;
 
     this.authorizer.authorize(
-      functions.functionArn(input.functionName),
+      functions.functionArn(input.functionName, input.qualifier),
       options?.caller,
     );
 
-    const simFunction = functions.require(input.functionName);
+    // The version a qualifier names has to be there when the mapping is made,
+    // the same way the function does, so a mapping onto an alias nothing
+    // published is refused rather than polling into nothing.
+    const target = functions.requireTarget(input.functionName, input.qualifier);
 
-    await this.assertPollable(simFunction, input.eventSourceArn);
+    await this.assertPollable(target.simFunction, input.eventSourceArn);
 
     return {
       $metadata: {},
-      ...this.created(input, simFunction).configuration(),
+      ...this.created(input, target).configuration(),
     };
   }
 
@@ -122,13 +126,17 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
 
   private created(
     input: SimLambdaEventSourceMappingInput,
-    simFunction: SimLambdaFunction,
+    target: SimLambdaFunctionTarget,
   ): SimLambdaEventSourceMapping {
     const mapping = new SimLambdaEventSourceMapping({
       accountRegionScope: this.properties.accountRegionScope,
       eventSourceArn: input.eventSourceArn.value,
       functionName: input.functionName,
-      functionArn: simFunction.arn,
+      qualifier: input.qualifier,
+      // The ARN the mapping reports is the resource it was pointed at, so a
+      // mapping onto an alias reports the alias rather than the version behind
+      // it, as real Lambda does.
+      functionArn: target.resource.arn,
       batchSize: input.batchSize,
       startingPosition: input.startingPosition,
       enabled: input.enabled,

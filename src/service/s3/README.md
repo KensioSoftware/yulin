@@ -601,7 +601,11 @@ returned.
 
 `SimAwsS3NotificationFunctions` resolves and invokes the function. Whether S3 may invoke a function
 is Lambda's own rule, so the decision comes from `SimLambdaServiceInvokeAuthorizer` with the Bucket
-ARN and Account supplied as the source.
+ARN and Account supplied as the source. A destination ARN carrying a version or alias qualifier is
+resolved through `getSimFunctionTarget`, which answers with the resource the ARN named and the
+version behind it. The alias is what the delivery is authorized against and the version is what
+runs. A qualifier naming neither is refused where the configuration is applied, the way a missing
+function is.
 
 `SimAwsS3NotificationQueues` does the same for a queue, and splits in two: it applies the one rule
 that is S3's, that the queue is in the Bucket's Region, and hands the rest to

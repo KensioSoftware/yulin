@@ -1,8 +1,9 @@
 import type { SimAwsAccountRegionContainer } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimLambdaServiceInvokeAuthorizer } from "../../../lambda/command/authorize/sim-lambda-service-invoke-authorizer.js";
-import type { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
+import type { SimLambdaFunctionTarget } from "../../../lambda/function/version/sim-lambda-function-target.js";
 import { SimLogsDeliveryNotPermitted } from "../../error/sim-logs-delivery.error.js";
 import { SimLogsResourceNotFoundException } from "../../error/sim-logs.error.js";
+import type { SimLogsSubscriptionFunctionArn } from "./sim-logs-subscription-function-arn.js";
 
 /**
  * The service principal CloudWatch Logs invokes a destination function as.
@@ -19,27 +20,32 @@ export function simLogsServicePrincipal(regionName: string): string {
  * The destination function, refusing one that is missing or does not admit
  * CloudWatch Logs.
  *
- * The resource policy is consulted on every delivery rather than remembered
- * from when the filter was put, so a permission taken away afterwards stops
- * delivery, as it does in an account.
+ * The function and the resource policy are both resolved on every delivery
+ * rather than remembered from when the filter was put, so a permission taken
+ * away afterwards stops delivery, as it does in an account, and an alias moved
+ * to another version moves what runs.
  */
 export function permittedSimLogsDestinationFunction(
-  destinationArn: string,
-  functionName: string,
+  arn: SimLogsSubscriptionFunctionArn,
   scope: SimAwsAccountRegionContainer,
-): SimLambdaFunction {
-  const simFunction = scope.lambda().getSimFunctionByName(functionName);
+): SimLambdaFunctionTarget {
+  const destinationArn = arn.value;
+  const target = scope
+    .lambda()
+    .getSimFunctionTarget(arn.functionName, arn.qualifier);
 
-  if (simFunction === undefined) {
+  if (target === undefined) {
     throw new SimLogsResourceNotFoundException(
-      `${destinationArn} is not a simulated Lambda function.`,
+      arn.qualifier === undefined
+        ? `${destinationArn} is not a simulated Lambda function.`
+        : `${destinationArn} names no simulated Lambda function version or alias.`,
     );
   }
 
   const servicePrincipal = simLogsServicePrincipal(scope.region.regionName);
   const decision = new SimLambdaServiceInvokeAuthorizer({
     iam: scope.iam(),
-  }).authorize({ simFunction, servicePrincipal });
+  }).authorize({ resource: target.resource, servicePrincipal });
 
   if (decision.isDenied) {
     throw new SimLogsDeliveryNotPermitted(
@@ -50,5 +56,5 @@ export function permittedSimLogsDestinationFunction(
     );
   }
 
-  return simFunction;
+  return target;
 }

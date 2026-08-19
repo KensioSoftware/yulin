@@ -5,6 +5,7 @@ import type {
   SimLambdaFunction,
   SimLambdaFunctionName,
 } from "../sim-lambda-function.js";
+import type { SimLambdaFunctionTarget } from "./sim-lambda-function-target.js";
 import {
   simLambdaQualifiedFunctionArn,
   SimLambdaFunctionVersions,
@@ -51,19 +52,53 @@ export class SimLambdaFunctionVersionStore {
     simFunction: SimLambdaFunction,
     qualifier: string | undefined,
   ): SimLambdaFunction {
-    if (qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION) {
-      return simFunction;
+    return this.requireTarget(simFunction, qualifier).simFunction;
+  }
+
+  /**
+   * What a qualifier names, or nothing when there is no such function or the
+   * qualifier names neither a version nor an alias.
+   *
+   * A function that is not there answers with nothing, since a request naming
+   * one is authorized before it is reported missing, and since a service whose
+   * target was configured before the function was created has to be able to
+   * ask.
+   */
+  findTarget(
+    simFunction: SimLambdaFunction | undefined,
+    qualifier: string | undefined,
+  ): SimLambdaFunctionTarget | undefined {
+    if (simFunction === undefined) {
+      return undefined;
     }
 
-    const resolved = this.of(simFunction).resolve(qualifier);
+    return qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION
+      ? { resource: simFunction, simFunction }
+      : this.of(simFunction).target(qualifier);
+  }
 
-    if (resolved === undefined) {
+  /**
+   * What a qualifier names, or fail as AWS does when it names neither a
+   * version nor an alias.
+   */
+  requireTarget(
+    simFunction: SimLambdaFunction,
+    qualifier: string | undefined,
+  ): SimLambdaFunctionTarget {
+    const target = this.findTarget(simFunction, qualifier);
+
+    if (target === undefined) {
+      // Only a qualifier naming neither a version nor an alias reaches here,
+      // since a caller passing none gets the function itself.
       throw new SimLambdaResourceNotFoundException(
-        `Function not found: ${simLambdaQualifiedFunctionArn(simFunction, qualifier)}`,
+        `Function not found: ${simLambdaQualifiedFunctionArn(
+          simFunction,
+          qualifier ?? SIM_LAMBDA_LATEST_VERSION,
+        )}`,
       );
     }
 
-    return resolved;
+    return target;
   }
 
   /**
@@ -73,20 +108,13 @@ export class SimLambdaFunctionVersionStore {
    * An alias answers as itself here rather than as the version it points at,
    * because the two hold their own resource policies. Resolving the alias
    * first would evaluate the version's policy for a request made against the
-   * alias. A function that is not there answers with nothing, since a request
-   * naming one is authorized before it is reported missing.
+   * alias.
    */
   findResource(
     simFunction: SimLambdaFunction | undefined,
     qualifier: string | undefined,
   ): SimLambdaPolicyResource | undefined {
-    if (simFunction === undefined) {
-      return undefined;
-    }
-
-    return qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION
-      ? simFunction
-      : this.of(simFunction).named(qualifier);
+    return this.findTarget(simFunction, qualifier)?.resource;
   }
 
   /**
@@ -97,19 +125,7 @@ export class SimLambdaFunctionVersionStore {
     simFunction: SimLambdaFunction,
     qualifier: string | undefined,
   ): SimLambdaPolicyResource {
-    if (qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION) {
-      return simFunction;
-    }
-
-    const resource = this.of(simFunction).named(qualifier);
-
-    if (resource === undefined) {
-      throw new SimLambdaResourceNotFoundException(
-        `Function not found: ${simLambdaQualifiedFunctionArn(simFunction, qualifier)}`,
-      );
-    }
-
-    return resource;
+    return this.requireTarget(simFunction, qualifier).resource;
   }
 
   /**

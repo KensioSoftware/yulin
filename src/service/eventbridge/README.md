@@ -125,6 +125,11 @@ that cannot work says so at the point it was written. The two services whose res
 a type are checked for naming something in it, because a layer ARN and a task definition ARN are
 both well formed ARNs of a service this delivers to, and neither names anything a rule can reach.
 
+A function target ARN may carry a version or alias qualifier, which `functionQualifier` reads beside
+`functionName`. `SimEventBridgeDeliveryFunction` resolves the two together through
+`getSimFunctionTarget` on every delivery, so an alias moved to another version moves what the rule
+reaches.
+
 Delivery has one class per destination service, and each asks that service's own authorizer:
 `SimSqsServiceSendAuthorizer`, `SimSnsServicePublishAuthorizer` and
 `SimLambdaServiceInvokeAuthorizer`. Those already existed for simulated SNS's own fan-out, and they

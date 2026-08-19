@@ -534,7 +534,10 @@ the pool records.
 `SimAwsCognitoTriggerFunctions` is the bridge to simulated Lambda, and
 `SimCognitoNoTriggerFunctions` is what a standalone `SimCognitoIdentityProvider` gets instead. The
 functions come from the whole simulation rather than from the pool's own scope, because a
-`LambdaConfig` names a function by ARN and that ARN can name any Account and Region.
+`LambdaConfig` names a function by ARN and that ARN can name any Account and Region. That ARN may
+carry a version or alias qualifier, resolved through `getSimFunctionTarget` when the trigger fires,
+so the pool is free to name a version published after it was created. The alias is what the
+invocation is authorized against and the version behind it is what runs.
 
 ## Command handling
 

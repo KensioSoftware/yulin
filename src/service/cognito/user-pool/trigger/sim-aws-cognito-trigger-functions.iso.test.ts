@@ -49,13 +49,13 @@ describe("Simulated Lambda functions as Cognito user pool triggers", () => {
     assertStringIncludes(refusal, "is not a Lambda function ARN");
   });
 
-  it("refuses a function version or alias", () => {
+  it("refuses a qualifier naming no version or alias", () => {
     // Given a simulation.
     const functions = new SimAwsCognitoTriggerFunctions({
       simAws: new SimAws(),
     });
 
-    // When a trigger names a published version rather than the function.
+    // When a trigger names an alias nothing points at.
     const refusal = functions.invokeRefusal(
       request("arn:aws:lambda:us-east-1:888888888888:function:pre-auth:PROD"),
     );
@@ -63,7 +63,10 @@ describe("Simulated Lambda functions as Cognito user pool triggers", () => {
     // Then it is refused rather than run against `$LATEST`, which is a
     // different function to the one the pool named.
     assertNonNullable(refusal);
-    assertStringIncludes(refusal, "names a function version or alias");
+    assertStringIncludes(
+      refusal,
+      "names no simulated Lambda function version or alias",
+    );
   });
 
   it("refuses to invoke a function that is not there", async () => {

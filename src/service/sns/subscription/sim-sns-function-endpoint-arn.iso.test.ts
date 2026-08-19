@@ -1,6 +1,13 @@
-import { assertInstanceOf, assertStringIncludes } from "@kensio/smartass";
+import { GetSubscriptionAttributesCommand } from "@aws-sdk/client-sns";
+import {
+  assertIdentical,
+  assertInstanceOf,
+  assertStringIncludes,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { subscribeFunction } from "../../../../test/sns/function-fixture.js";
 import { subscribeRefusal } from "../../../../test/sns/subscription-fixture.js";
+import { simAwsWithTopic } from "../../../../test/sns/topic-fixture.js";
 import { SimSnsInvalidParameterException } from "../error/sim-sns.error.js";
 
 /**
@@ -45,15 +52,28 @@ describe("The endpoint of a lambda subscription", () => {
     }
   });
 
-  it("refuses a qualified function ARN naming a version or an alias", async () => {
+  it("takes a qualified function ARN naming a version or an alias", async () => {
     // Given a topic.
+    const { simAws, topicArn } = await simAwsWithTopic();
+
     // When a function alias is subscribed.
-    const error = await functionEndpointRefusal(
+    const subscriptionArn = await subscribeFunction(
+      simAws,
+      topicArn,
       "arn:aws:lambda:us-east-1:888888888888:function:orders:PROD",
     );
 
-    // Then it is refused rather than quietly subscribing the unqualified
-    // function, which would be a different function from the one asked for.
-    assertStringIncludes(error.message, "no function versions or aliases");
+    // Then the alias is the endpoint, and the qualifier is kept rather than
+    // read off to leave the unqualified function subscribed.
+    const attributes = await simAws.sns().getSubscriptionAttributes(
+      new GetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+      }),
+    );
+
+    assertIdentical(
+      attributes.Attributes?.["Endpoint"],
+      "arn:aws:lambda:us-east-1:888888888888:function:orders:PROD",
+    );
   });
 });

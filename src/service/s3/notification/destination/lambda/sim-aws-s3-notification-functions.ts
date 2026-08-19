@@ -1,6 +1,6 @@
 import type { SimAws } from "../../../../aws/sim-aws.js";
 import { SimLambdaServiceInvokeAuthorizer } from "../../../../lambda/command/authorize/sim-lambda-service-invoke-authorizer.js";
-import type { SimLambdaFunction } from "../../../../lambda/function/sim-lambda-function.js";
+import type { SimLambdaFunctionTarget } from "../../../../lambda/function/version/sim-lambda-function-target.js";
 import type { SimIamInterServiceAuthZ } from "../../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimS3NotificationDestinationRequest } from "../sim-s3-notification-destination.js";
 import { simS3ServicePrincipal } from "../sim-s3-service-principal.js";
@@ -40,16 +40,16 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
     request: SimS3NotificationDestinationRequest,
   ): string | undefined {
     const arn = SimS3NotificationFunctionArn.parse(request.destinationArn);
-    const simFunction = this.findFunction(arn);
+    const target = this.findTarget(arn);
 
-    if (simFunction === undefined) {
-      return `${request.destinationArn} is not a simulated Lambda function.`;
+    if (target === undefined) {
+      return missingFunctionRefusal(arn, request.destinationArn);
     }
 
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: this.iam(arn),
     }).authorize({
-      simFunction,
+      resource: target.resource,
       servicePrincipal: simS3ServicePrincipal,
       sourceArn: request.bucketArn,
       sourceAccount: request.bucketOwnerAccountId,
@@ -80,22 +80,22 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
     event: object,
   ): Promise<void> {
     const arn = SimS3NotificationFunctionArn.parse(request.destinationArn);
-    const simFunction = this.findFunction(arn);
+    const target = this.findTarget(arn);
 
     // oxlint-disable-next-line yulin/assert-defined-guard -- `assertDefined` is denser per line, and this file is close enough to the FTA threshold that the guard costs less kept as it is
-    if (simFunction === undefined) {
-      throw new Error(
-        `${request.destinationArn} is not a simulated Lambda function.`,
-      );
+    if (target === undefined) {
+      throw new Error(missingFunctionRefusal(arn, request.destinationArn));
     }
 
-    await simFunction.invoke(event);
+    await target.simFunction.invoke(event);
   }
 
-  private findFunction(
+  private findTarget(
     arn: SimS3NotificationFunctionArn,
-  ): SimLambdaFunction | undefined {
-    return this.scope(arn).lambda().getSimFunctionByName(arn.functionName);
+  ): SimLambdaFunctionTarget | undefined {
+    return this.scope(arn)
+      .lambda()
+      .getSimFunctionTarget(arn.functionName, arn.qualifier);
   }
 
   private iam(arn: SimS3NotificationFunctionArn): SimIamInterServiceAuthZ {
@@ -107,4 +107,19 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
   ): ReturnType<SimAws["accountRegionScope"]> {
     return this.simAws.accountRegionScope(arn.accountId, arn.regionName);
   }
+}
+
+/**
+ * Why a destination ARN reaches nothing, for a Bucket to repeat back.
+ *
+ * A qualified ARN says so, since the function it names may well be there while
+ * the version or alias it asked for is not.
+ */
+function missingFunctionRefusal(
+  arn: SimS3NotificationFunctionArn,
+  destinationArn: string,
+): string {
+  return arn.qualifier === undefined
+    ? `${destinationArn} is not a simulated Lambda function.`
+    : `${destinationArn} names no simulated Lambda function version or alias.`;
 }
