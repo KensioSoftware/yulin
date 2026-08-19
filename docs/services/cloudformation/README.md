@@ -2067,8 +2067,9 @@ simulated Function URL answers no preflight request).
 `AWS::Serverless::SimpleTable` deploys a table with one partition key and on-demand billing.
 `PrimaryKey` names that key, and its `Type` is the SAM name for the attribute type (`String`,
 `Number` or `Binary`). A table naming no key is keyed on a string `id`, the key SAM gives it.
-`TableName`, `SSESpecification` and `ProvisionedThroughput` carry across as the template wrote them,
-and a table asking for capacity is billed for the capacity it asked for. `Tags` are stated as a map
+`TableName`, `SSESpecification`, `PointInTimeRecoverySpecification` and `ProvisionedThroughput`
+carry across as the template wrote them, and a table asking for capacity is billed for the capacity
+it asked for. `Tags` are stated as a map
 of one value per tag name, and reach the table as the list of `Key` and `Value` pairs DynamoDB
 takes.
 
@@ -2076,8 +2077,9 @@ takes.
 
 `AWS::Serverless::HttpApi` deploys an HTTP API and the stage that serves it. The stage is `$default`
 until `StageName` names another one, and it carries the logical ID SAM builds for it
-(`OrdersApiGatewayDefaultStage` for an API called `Orders`, and `OrdersprodStage` for the same API
-with `StageName: prod`). `AccessLogSettings`, `DefaultRouteSettings`, `RouteSettings`,
+(`OrdersApiGatewayDefaultStage` for an API called `Orders`, `OrdersprodStage` for the same API with
+`StageName: prod`, and `OrdersStage` followed by ten characters of a hash where the name cannot be
+part of an identifier). `AccessLogSettings`, `DefaultRouteSettings`, `RouteSettings`,
 `StageVariables` and `Tags` go on the stage, and the rest of the API's properties on the API.
 
 A `DefinitionBody` reaches the API as its OpenAPI `Body`, and the routes, integrations and

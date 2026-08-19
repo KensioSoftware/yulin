@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
@@ -60,14 +62,14 @@ export function samHttpApiStageResources(
 }
 
 /**
- * The logical ID the stage is deployed under, which SAM builds out of the
- * API's logical ID and the stage's name.
+ * The logical ID the stage is deployed under, which SAM builds out of the API's
+ * logical ID and the stage's name.
  *
- * The name is in there because it is what a template writing `Ref` on the
- * stage is reaching for. SAM hashes a name that cannot be part of an
- * identifier. An API has one stage and nothing here collides, and an
- * unhashable name gets the plain suffix (a hash would be a logical ID no
- * reader could predict).
+ * The three forms are SAM's own. A name that can be part of an identifier goes
+ * in whole, `$default` becomes the suffix SAM spells out, and anything else is
+ * hashed, down to the ten hexadecimal characters SAM takes off a SHA-1 of the
+ * name. A stage the template names with an intrinsic function has no name to
+ * hash at this point, and SAM hashes the empty string for it.
  */
 function samHttpApiStageLogicalId(
   logicalId: string,
@@ -81,7 +83,17 @@ function samHttpApiStageLogicalId(
     return `${logicalId}${stageName}Stage`;
   }
 
-  return `${logicalId}Stage`;
+  return `${logicalId}Stage${samStageNameHash(stageName)}`;
+}
+
+/**
+ * The hash SAM builds a stage's logical ID out of when the name cannot be part
+ * of one.
+ */
+function samStageNameHash(stageName: SimCfnTemplateValue): string {
+  const name = typeof stageName === "string" ? stageName : "";
+
+  return createHash("sha1").update(name).digest("hex").slice(0, 10);
 }
 
 /**

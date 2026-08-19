@@ -19,6 +19,7 @@ import type { SimDynamoDbTableDescription } from "../../dynamodb/command/table/t
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
 import {
+  samSimpleTableTemplateLogicalId,
   samSimpleTableTemplateTableName,
   simCfnSamSimpleTableTemplateFactory,
 } from "./table/sim-cfn-sam-simple-table-template.factory.js";
@@ -282,5 +283,35 @@ describe("SAM Serverless SimpleTable expansion", () => {
     // And the failure is the one CreateTable gives, because the type was
     // carried across for CreateTable to answer for
     assertStringIncludes(error.message, "Text");
+  });
+
+  it("carries the point in time recovery the table asks for", async () => {
+    // Given a table asking for point in time recovery, which SAM passes to the
+    // DynamoDB table and this simulation has no answer for
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await deploySimpleTable(
+      simAws,
+      simCfnSamSimpleTableTemplateFactory.make({
+        tableProperties: {
+          PointInTimeRecoverySpecification: {
+            PointInTimeRecoveryEnabled: true,
+          },
+        },
+      }),
+    );
+
+    // Then the table was created, and the property it was created without is
+    // recorded against it under the DynamoDB Resource type
+    assertArrayLength(stack.ignoredProperties, 1);
+    const ignored = stack.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.logicalId, samSimpleTableTemplateLogicalId);
+    assertStringIncludes(
+      ignored.reason,
+      "PointInTimeRecoverySpecification is a real AWS::DynamoDB::Table " +
+        "property that simulated DynamoDB does not simulate",
+    );
   });
 });

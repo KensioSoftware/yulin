@@ -213,7 +213,7 @@ describe("SAM Serverless HttpApi expansion", () => {
 
   it("names the stage of an API whose stage name is no identifier", async () => {
     // Given an API naming a stage a logical ID cannot be built out of, which
-    // SAM names by hashing it
+    // SAM hashes into one
     const simAws = new SimAws();
 
     // When it is deployed
@@ -224,8 +224,9 @@ describe("SAM Serverless HttpApi expansion", () => {
       }),
     );
 
-    // Then the stage carries the plain suffix, and serves the API's routes
-    const stage = stack.getResource("OrdersStage")
+    // Then the stage carries the logical ID SAM hashes the name into, and
+    // serves the API's routes
+    const stage = stack.getResource("OrdersStageaed0986a76")
       ?.simResource as SimHttpApiStage;
     assertNonNullable(stage);
     assertIdentical(stage.stageName, "orders-dev");

@@ -24,7 +24,11 @@ export const samSimpleTableType = "AWS::Serverless::SimpleTable";
  * The properties whose names and meanings are the same on both Resource types.
  * Expanding one of them is carrying it across.
  */
-const propertyNames = new Set(["SSESpecification", "TableName"]);
+const propertyNames = new Set([
+  "PointInTimeRecoverySpecification",
+  "SSESpecification",
+  "TableName",
+]);
 
 /**
  * Expand one AWS::Serverless::SimpleTable into the Resource CloudFormation
