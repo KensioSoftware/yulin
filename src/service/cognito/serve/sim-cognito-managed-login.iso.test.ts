@@ -53,6 +53,29 @@ describe("The pages a sim Cognito hosted domain serves", () => {
     assertStringIncludes(page, "identity_provider=Google");
   });
 
+  it("styles the page it serves from a stylesheet held inline", async () => {
+    // Given a pool with a hosted domain.
+    const setUp = await simCognitoHosted();
+
+    // When the browser is sent to the authorize endpoint.
+    const response = await simCognitoGetPage(
+      setUp,
+      "/oauth2/authorize",
+      simCognitoAuthorizeParameters(setUp),
+    );
+
+    // Then the page carries the stylesheet itself, with the form in a card the
+    // stylesheet has something to select.
+    const page = await response.text();
+    assertStringIncludes(page, "<style>");
+    assertStringIncludes(page, "<main>");
+
+    // And it asks for nothing else to render, because a browser fetching an
+    // asset from the simulation would need a route to fetch it from.
+    assertStringNotIncludes(page, "<link");
+    assertStringNotIncludes(page, "<script");
+  });
+
   it("signs a user in when the form is posted", async () => {
     // Given a pool holding a confirmed user of its own.
     const setUp = await simCognitoHosted();

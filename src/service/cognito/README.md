@@ -446,8 +446,9 @@ Sim Lambda's outbound HTTP rewrites that endpoint to the local hostname and rout
 (see `src/service/lambda/README.md`).
 
 `serve/page/` under it is the managed login pages. `SimCognitoPageMarkup` is the HTML they are built
-from, `SimCognitoPageForm` is one request read as the form it fetched or posted, and
-`SimCognitoManagedLogin` is what `SimCognitoDomainEndpoints` hands a page request to. The five pages
+from, `simCognitoPageStyle` is the stylesheet it writes into every page, `SimCognitoPageForm` is one
+request read as the form it fetched or posted, and `SimCognitoManagedLogin` is what
+`SimCognitoDomainEndpoints` hands a page request to. The five pages
 are `SimCognitoSignInPage`, `SimCognitoSignUpPage`, `SimCognitoConfirmPage`,
 `SimCognitoForgotPasswordPage` and `SimCognitoResetPasswordPage`, and the last four call `SignUp`,
 `ConfirmSignUp`, `ResendConfirmationCode`, `ForgotPassword` and `ConfirmForgotPassword` as an
@@ -669,8 +670,9 @@ resource, here or on real AWS.
   developer credentials, and nothing here tells one caller from another that way.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
-- The managed login pages are bare forms at paths of this simulation's own. The authorize endpoint
-  answers with the sign-in form where real managed login redirects to `/login`, and `/confirm` is a
+- The managed login pages carry an inline stylesheet approximating real managed login, and go no
+  closer than that. They are at paths of this simulation's own. The authorize endpoint answers with
+  the sign-in form where real managed login redirects to `/login`, and `/confirm` is a
   page where real managed login confirms within `/signup`. They hold no session and set no cookie,
   and carry the authorize parameters in hidden inputs instead. A sign-in managed login would answer
   with a second page, which is a user owing a second factor and a user holding a temporary
