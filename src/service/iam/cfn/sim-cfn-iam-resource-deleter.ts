@@ -1,3 +1,4 @@
+import type { SimArn } from "../../aws/arn.js";
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimIam } from "../sim-iam.js";
@@ -57,7 +58,30 @@ export class SimCfnIamResourceDeleter {
       `sim IAM Managed Policy for CloudFormation Resource ${resource.logicalId}`,
     );
 
+    await this.detachManagedPolicy(policy.arn);
     await this.iam.deletePolicy({ input: { PolicyArn: policy.arn } });
+  }
+
+  /**
+   * Take the Managed Policy off every Role still carrying it.
+   *
+   * DeletePolicy refuses a policy anything is attached to, and an
+   * AWS::IAM::ManagedPolicy attaches itself to the Roles its `Roles` property
+   * names. A Role the same Stack created gives the policy up as its own
+   * Resource is deleted. A Role declared outside the Stack keeps it. This
+   * clears whatever attachments are left either way.
+   */
+  private async detachManagedPolicy(policyArn: SimArn): Promise<void> {
+    await Promise.all(
+      this.iam.roles
+        .values()
+        .filter((role) => role.attachedPolicyArns.has(policyArn))
+        .map(async (role) =>
+          this.iam.detachRolePolicy({
+            input: { RoleName: role.roleName, PolicyArn: policyArn },
+          }),
+        ),
+    );
   }
 
   /**

@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
+import { SimCfnIamManagedPolicyAttacher } from "./sim-cfn-iam-managed-policy-attacher.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface SimCfnIamManagedPolicyCreatorProperties {
@@ -13,9 +14,11 @@ interface SimCfnIamManagedPolicyCreatorProperties {
  */
 export class SimCfnIamManagedPolicyCreator {
   private readonly iam: SimIam;
+  private readonly attacher: SimCfnIamManagedPolicyAttacher;
 
   constructor(properties: SimCfnIamManagedPolicyCreatorProperties) {
     this.iam = properties.iam;
+    this.attacher = new SimCfnIamManagedPolicyAttacher({ iam: properties.iam });
   }
 
   /**
@@ -25,6 +28,7 @@ export class SimCfnIamManagedPolicyCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimIamManagedPolicy> {
+    const roleNames = this.attacher.roleNames(resource, properties);
     const policyName = this.managedPolicyName(resource, properties);
     const path = this.path(resource, properties);
     const description = this.description(resource, properties);
@@ -44,6 +48,8 @@ export class SimCfnIamManagedPolicyCreator {
       policy,
       `Sim IAM Managed Policy ${policyCreation.Policy.Arn} after CloudFormation creation`,
     );
+
+    await this.attacher.attach(policy.arn, roleNames);
 
     return policy;
   }

@@ -2368,6 +2368,12 @@ Each service's own docs describe what its resource types support.
   `stack.inertResources` instead, and are listed under
   [resources deliberately left out](#resources-deliberately-left-out). Read both when accounting for
   every resource in a template.
+- `AWS::IAM::ManagedPolicy` is created from `ManagedPolicyName`, `Path`, `Description`,
+  `PolicyDocument` and `Roles`. Every `Roles` entry names a Role in the Stack's Account, and the
+  created policy is attached to each of them. An entry naming no simulated Role fails the resource,
+  as an `AWS::IAM::Policy` naming one does. `Users` and `Groups` fail the resource, because neither
+  can hold a managed policy attachment in the simulation. Deleting the stack takes the policy off
+  the Roles still carrying it before deleting the policy itself.
 - `AWS::Logs::LogGroup` is created, including the one CDK writes for a custom resource provider. That
   one is left empty, because the provider is never invoked. A log group a stack declares for a
   Lambda function is the same group that function writes to, and a group already there is taken over

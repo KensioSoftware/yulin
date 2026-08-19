@@ -671,6 +671,11 @@ inline policy. That is the shape CDK grants such as `bucket.grantRead(fn)` synth
 "DefaultPolicy" resource. IAM Users and Groups are not simulated as policy principals. Naming one
 fails the creation outright.
 
+An `AWS::IAM::ManagedPolicy` also carries `Roles`, and attaches itself to each Role it names as it
+is created (the attachment `AttachRolePolicy` records). A name no simulated Role in the Account
+answers to fails the resource. Deleting the stack takes the policy back off the Roles still
+carrying it, and then deletes the policy.
+
 ```typescript sim-iam-cloudformation
 /**
  * Creating IAM resources through simulated CloudFormation.
@@ -717,6 +722,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         Type: "AWS::IAM::ManagedPolicy",
         Properties: {
           ManagedPolicyName: "ReadOnlyAccess",
+          Roles: [{ Ref: "ServiceRole" }],
           PolicyDocument: {
             Version: "2012-10-17",
             Statement: {
@@ -760,7 +766,8 @@ console.log(roleOut.Role.Arn);
 For `AWS::IAM::Role`, `Ref` returns the Role name and `Fn::GetAtt` supports `Arn` and `RoleId`. For
 `AWS::IAM::ManagedPolicy`, `Ref` returns the Policy ARN. Both resource types default their name to
 the logical ID when it is omitted, and inline `Policies` declared on a Role are stored as the
-Role's inline policies.
+Role's inline policies. The `ReadOnlyAccess` policy above is attached to `LambdaExecutionRole`.
+Authorization for that Role reads the policy document the template gave it.
 
 ## Accounts
 
