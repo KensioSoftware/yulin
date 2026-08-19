@@ -10,6 +10,16 @@ import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
 } from "./create-access-key/create-access-key.command.js";
+import { AttachUserPolicyCommandHandler } from "./attach-user-policy/attach-user-policy.handler.js";
+import type {
+  SimAttachUserPolicyCommand,
+  SimAttachUserPolicyCommandOutput,
+} from "./attach-user-policy/attach-user-policy.command.js";
+import { CreateLoginProfileCommandHandler } from "./create-login-profile/create-login-profile.handler.js";
+import type {
+  SimCreateLoginProfileCommand,
+  SimCreateLoginProfileCommandOutput,
+} from "./create-login-profile/create-login-profile.command.js";
 import { CreateUserCommandHandler } from "./create-user/create-user.handler.js";
 import type {
   SimCreateUserCommand,
@@ -72,6 +82,44 @@ export class SimIamUserCommandHandlers {
     );
     const handler = new CreateUserCommandHandler({
       accountId: this.accountId,
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle an AttachUserPolicy command from the SDK.
+   */
+  async attachUserPolicy(
+    command: SimAttachUserPolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimAttachUserPolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:AttachUserPolicy",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
+    const handler = new AttachUserPolicyCommandHandler({
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a CreateLoginProfile command from the SDK.
+   */
+  async createLoginProfile(
+    command: SimCreateLoginProfileCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimCreateLoginProfileCommandOutput> {
+    this.authorizer.authorize(
+      "iam:CreateLoginProfile",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
+    const handler = new CreateLoginProfileCommandHandler({
       users: this.users,
       background: this.background,
     });

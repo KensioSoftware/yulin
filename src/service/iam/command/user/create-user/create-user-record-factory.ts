@@ -32,6 +32,7 @@ export class CreateUserRecordFactory {
       accessKeys: new Map(),
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
+      loginProfile: undefined,
     };
   }
 

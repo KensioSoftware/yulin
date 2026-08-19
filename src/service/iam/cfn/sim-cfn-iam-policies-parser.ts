@@ -1,26 +1,40 @@
-import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
-import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
-export interface SimCfnIamRoleInlinePolicy {
+export interface SimCfnIamInlinePolicy {
   readonly policyName: string;
   readonly policyDocument: string;
 }
 
+interface SimCfnIamPoliciesParserProperties {
+  /**
+   * The Resource type being parsed, for error messages.
+   */
+  readonly resourceType: string;
+}
+
 /**
- * Parses the AWS::IAM::Role policy collection properties: the inline `Policies`
- * list and the attached `ManagedPolicyArns` list.
+ * Parses the policy collection properties an IAM identity Resource carries:
+ * the inline `Policies` list and the attached `ManagedPolicyArns` list.
  *
- * These list-shaped properties carry the bulk of the Role property validation,
- * so grouping them here keeps the main Role props parser small.
+ * AWS::IAM::Role and AWS::IAM::User declare both in the same shape, and these
+ * list-shaped properties carry the bulk of the property validation, so
+ * grouping them here keeps each identity's own props parser small.
  */
-export class SimCfnIamRolePoliciesParser {
+export class SimCfnIamPoliciesParser {
+  private readonly resourceType: string;
+
+  constructor(properties: SimCfnIamPoliciesParserProperties) {
+    this.resourceType = properties.resourceType;
+  }
+
   /**
    * Parse the inline `Policies` property into normalised inline policies.
    */
   inlinePolicies(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
-  ): readonly SimCfnIamRoleInlinePolicy[] {
+  ): readonly SimCfnIamInlinePolicy[] {
     const policies = properties["Policies"];
 
     if (policies === undefined) {
@@ -29,7 +43,7 @@ export class SimCfnIamRolePoliciesParser {
 
     if (!Array.isArray(policies)) {
       throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: Policies must be an array`,
+        `Invalid ${this.resourceType} ${resource.logicalId}: Policies must be an array`,
       );
     }
 
@@ -51,14 +65,14 @@ export class SimCfnIamRolePoliciesParser {
 
     if (!Array.isArray(managedPolicyArns)) {
       throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: ManagedPolicyArns must be an array`,
+        `Invalid ${this.resourceType} ${resource.logicalId}: ManagedPolicyArns must be an array`,
       );
     }
 
     return managedPolicyArns.map((arn) => {
       if (typeof arn !== "string") {
         throw new TypeError(
-          `Invalid AWS::IAM::Role ${resource.logicalId}: each ManagedPolicyArns entry must be a string`,
+          `Invalid ${this.resourceType} ${resource.logicalId}: each ManagedPolicyArns entry must be a string`,
         );
       }
 
@@ -69,14 +83,14 @@ export class SimCfnIamRolePoliciesParser {
   private inlinePolicy(
     resource: SimCfnResource,
     policy: SimCfnTemplateValueRecord[string] | undefined,
-  ): SimCfnIamRoleInlinePolicy {
+  ): SimCfnIamInlinePolicy {
     if (
       typeof policy !== "object" ||
       policy === null ||
       Array.isArray(policy)
     ) {
       throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: each Policies entry must be an object`,
+        `Invalid ${this.resourceType} ${resource.logicalId}: each Policies entry must be an object`,
       );
     }
 
@@ -84,7 +98,7 @@ export class SimCfnIamRolePoliciesParser {
 
     if (typeof policyName !== "string") {
       throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: Policies entry PolicyName must be a string`,
+        `Invalid ${this.resourceType} ${resource.logicalId}: Policies entry PolicyName must be a string`,
       );
     }
 
@@ -96,7 +110,7 @@ export class SimCfnIamRolePoliciesParser {
       Array.isArray(policyDocument)
     ) {
       throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: Policies entry PolicyDocument must be an object`,
+        `Invalid ${this.resourceType} ${resource.logicalId}: Policies entry PolicyDocument must be an object`,
       );
     }
 

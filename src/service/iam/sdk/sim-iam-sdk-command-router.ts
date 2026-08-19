@@ -16,7 +16,9 @@ import type { SimAttachRolePolicyCommand } from "../command/role/attach-role-pol
 import type { SimCreateRoleCommand } from "../command/role/create-role/create-role.command.js";
 import type { SimGetRoleCommand } from "../command/role/get-role/get-role.command.js";
 import type { SimListRolesCommand } from "../command/role/list-roles/list-roles.command.js";
+import type { SimAttachUserPolicyCommand } from "../command/user/attach-user-policy/attach-user-policy.command.js";
 import type { SimCreateAccessKeyCommand } from "../command/user/create-access-key/create-access-key.command.js";
+import type { SimCreateLoginProfileCommand } from "../command/user/create-login-profile/create-login-profile.command.js";
 import type { SimCreateUserCommand } from "../command/user/create-user/create-user.command.js";
 import type { SimIam } from "../sim-iam.js";
 
@@ -33,6 +35,14 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simIam.attachRolePolicy(
             command as SimAttachRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AttachUserPolicyCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.attachUserPolicy(
+            command as SimAttachUserPolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -73,6 +83,14 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simIam.createAccessKey(
             command as SimCreateAccessKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateLoginProfileCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.createLoginProfile(
+            command as SimCreateLoginProfileCommand,
             simSdkCallerOptions(context),
           ),
       ],

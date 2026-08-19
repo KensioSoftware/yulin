@@ -58,9 +58,17 @@ export type {
   SimListRolesCommandOutput,
 } from "./role/list-roles/list-roles.command.js";
 export type {
+  SimAttachUserPolicyCommand,
+  SimAttachUserPolicyCommandOutput,
+} from "./user/attach-user-policy/attach-user-policy.command.js";
+export type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
 } from "./user/create-access-key/create-access-key.command.js";
+export type {
+  SimCreateLoginProfileCommand,
+  SimCreateLoginProfileCommandOutput,
+} from "./user/create-login-profile/create-login-profile.command.js";
 export type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,

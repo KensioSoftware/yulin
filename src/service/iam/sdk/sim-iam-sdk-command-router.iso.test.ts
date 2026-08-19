@@ -1,7 +1,9 @@
 import { describe, it } from "vitest";
 import {
   AttachRolePolicyCommand,
+  AttachUserPolicyCommand,
   CreateAccessKeyCommand,
+  CreateLoginProfileCommand,
   CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
@@ -192,6 +194,32 @@ describe("simulated IAM SDK Command routing", () => {
         PolicyName: "inline-user-policy",
         PolicyDocument: allowAllPolicyDocument,
       }),
+    );
+
+    const policyCreation = await client.send(
+      new CreatePolicyCommand({
+        PolicyName: "intercept-user-policy",
+        PolicyDocument: allowAllPolicyDocument,
+      }),
+    );
+    assertNonNullable(policyCreation.Policy?.Arn);
+
+    await client.send(
+      new AttachUserPolicyCommand({
+        UserName: "InterceptUser",
+        PolicyArn: policyCreation.Policy.Arn,
+      }),
+    );
+
+    const loginProfileCreation = await client.send(
+      new CreateLoginProfileCommand({
+        UserName: "InterceptUser",
+        Password: "initial-console-password",
+      }),
+    );
+    assertIdentical(
+      loginProfileCreation.LoginProfile?.UserName,
+      "InterceptUser",
     );
 
     const accessKeyCreation = await client.send(
