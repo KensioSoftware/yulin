@@ -1511,8 +1511,6 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
   rather than putting Objects, and neither raises an event. Real CDK `BucketDeployment` fires one
   `ObjectCreated:Put` per file.
-- A function ARN naming a version or an alias is refused, since simulated Lambda has no versions or
-  aliases.
 - A topic destination publishes with no message attributes, since real S3 publishes none. The only
   thing on the message besides the event document is the `Amazon S3 Notification` subject.
 - `s3:TestEvent` is left out. Real S3 puts one on a queue or topic when a configuration naming it is
