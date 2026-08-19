@@ -205,6 +205,13 @@ updates the stack rather than needing the process restarted:
   name, because a synthesis renames a temporary file over the template and a watch on the file
   itself would be left holding the file that was replaced. Changes are settled through
   `SimWatchSettle`, the same debounce `yulin watch` uses, and applied one after another.
+- `SimWatchFilePoll` reads the template on a timer behind those events, because macOS gives a
+  process one FSEvents stream for all of its watches and libuv rebuilds that stream whenever any
+  watch in the process starts or stops. A save landing during a rebuild is delivered nowhere, so a
+  process that also mounts a directory into a bucket, deploys a second stack, or serves with live
+  reload can lose one outright. Reading the file reports the same change without depending on the
+  stream, and a read finding a change the events already reported stays quiet about it, so one save
+  stays one update.
 - `SimCfnTemplateWatchUpdate` decides what a save came to: an update, a file written without being
   changed, or a failure. Nothing thrown gets past it, since the watch applies changes in a queue
   that a rejection would stop. An update is where the `reload` target is told, after the `onUpdated`
