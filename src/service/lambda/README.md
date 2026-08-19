@@ -360,6 +360,10 @@ through the version store. A number is a version, anything else is an alias name
 nothing at all is the function. A qualifier naming neither fails with `ResourceNotFoundException`
 against the qualified ARN.
 
+`PublishVersion`, `ListVersionsByFunction` and the alias commands act on the function itself, and
+`simLambdaUnqualifiedFunctionOf` refuses a qualified `FunctionName` for them. Dropping the qualifier
+would act on something other than what the caller named.
+
 An alias points at a published version and only at one: `$LATEST` is refused on the API-level
 version pattern, before anything of that name is looked for. Invoking through an alias reports the
 version number it resolved to as `ExecutedVersion`, not the alias name, and the handler's context

@@ -97,6 +97,10 @@ export class SimLambdaFunctionAliasStore {
 
   /**
    * Every alias a function has, narrowed to one version when asked for.
+   *
+   * The version has to be one the function has. Narrowing to a version nothing
+   * published is a request against something that is not there, and comes back
+   * as that rather than as an empty listing.
    */
   all(
     simFunction: SimLambdaFunction,
@@ -104,9 +108,13 @@ export class SimLambdaFunctionAliasStore {
   ): readonly SimLambdaFunctionAlias[] {
     const aliases = this.versions.of(simFunction).allAliases();
 
-    return functionVersion === undefined
-      ? aliases
-      : aliases.filter((alias) => alias.functionVersion === functionVersion);
+    if (functionVersion === undefined) {
+      return aliases;
+    }
+
+    this.versions.require(simFunction, functionVersion);
+
+    return aliases.filter((alias) => alias.functionVersion === functionVersion);
   }
 
   /**

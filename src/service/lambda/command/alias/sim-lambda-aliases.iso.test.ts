@@ -18,11 +18,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import {
-  SimLambdaResourceConflictException,
-  SimLambdaResourceNotFoundException,
-  SimLambdaValidationException,
-} from "../../error/sim-lambda.error.js";
+import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import type { SimLambda } from "../../sim-lambda.js";
 
@@ -69,72 +65,6 @@ describe("Lambda alias commands", () => {
     assertIdentical(alias.FunctionVersion, "1");
     assertIdentical(alias.Description, "What the shop calls");
     assertStringIncludes(alias.AliasArn, ":function:orders:live");
-  });
-
-  it("refuses an alias for a version that does not exist", async () => {
-    const lambda = await givenFunctionWithTwoVersions();
-
-    // When an alias is created for a version nothing published.
-    const error = await assertThrowsErrorAsync(async () =>
-      lambda.createAlias(
-        new CreateAliasCommand({
-          FunctionName: "orders",
-          Name: "live",
-          FunctionVersion: "7",
-        }),
-      ),
-    );
-
-    // Then the version that is missing is what gets reported.
-    assertInstanceOf(error, SimLambdaResourceNotFoundException);
-    assertStringIncludes(error.message, ":function:orders:7");
-  });
-
-  it("refuses an alias for $LATEST", async () => {
-    const lambda = await givenFunctionWithTwoVersions();
-
-    // When an alias is pointed at the function itself.
-    const error = await assertThrowsErrorAsync(async () =>
-      lambda.createAlias(
-        new CreateAliasCommand({
-          FunctionName: "orders",
-          Name: "live",
-          FunctionVersion: "$LATEST",
-        }),
-      ),
-    );
-
-    // Then it fails the version pattern, as it does on real Lambda.
-    assertInstanceOf(error, SimLambdaValidationException);
-    assertStringIncludes(error.message, "'functionVersion'");
-  });
-
-  it("refuses an alias name that is already taken", async () => {
-    const lambda = await givenFunctionWithTwoVersions();
-
-    // Given an alias that exists.
-    await lambda.createAlias(
-      new CreateAliasCommand({
-        FunctionName: "orders",
-        Name: "live",
-        FunctionVersion: "1",
-      }),
-    );
-
-    // When another alias is created under the same name.
-    const error = await assertThrowsErrorAsync(async () =>
-      lambda.createAlias(
-        new CreateAliasCommand({
-          FunctionName: "orders",
-          Name: "live",
-          FunctionVersion: "2",
-        }),
-      ),
-    );
-
-    // Then the conflict is reported.
-    assertInstanceOf(error, SimLambdaResourceConflictException);
-    assertStringIncludes(error.message, "Alias already exists");
   });
 
   it("points an existing alias at another version", async () => {

@@ -65,3 +65,26 @@ export function simLambdaQualifiedFunctionOf(
 
   return { functionName, qualifier: requestedQualifier ?? qualifier };
 }
+
+/**
+ * The function a request names, refusing a qualifier the operation has no use
+ * for.
+ *
+ * Publishing a version, listing versions and the alias operations all act on
+ * the function itself. Dropping a qualifier there would act on something other
+ * than what the caller named, so it is refused instead.
+ */
+export function simLambdaUnqualifiedFunctionOf(
+  functionNameOrArn: string,
+): string {
+  const { functionName, qualifier } =
+    simLambdaFunctionReferenceOf(functionNameOrArn);
+
+  if (qualifier !== undefined) {
+    throw new SimLambdaInvalidParameterValueException(
+      `This operation is not permitted on a qualified function: ${functionNameOrArn}`,
+    );
+  }
+
+  return functionName;
+}

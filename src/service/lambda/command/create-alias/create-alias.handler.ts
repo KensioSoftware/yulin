@@ -9,7 +9,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
+import { simLambdaUnqualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
 import type { SimLambdaFunctionAliasStore } from "../../function/version/sim-lambda-function-alias-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { AliasInputParser } from "../alias/alias-input.js";
@@ -82,18 +82,22 @@ export class CreateAliasCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const { functionName } = simLambdaFunctionReferenceOf(input.FunctionName);
+    const functionName = simLambdaUnqualifiedFunctionOf(input.FunctionName);
     this.authorizer.authorize(
       this.functions.functionArn(functionName),
       options?.caller,
     );
 
+    // Checked before the function is looked up, as AWS reports input that
+    // fails an API-level constraint ahead of anything about the resource.
+    const functionVersion = this.inputParser.requireFunctionVersion(
+      input.FunctionVersion,
+    );
+
     const alias = this.aliases.create({
       simFunction: this.functions.require(functionName),
       name: input.Name,
-      functionVersion: this.inputParser.requireFunctionVersion(
-        input.FunctionVersion,
-      ),
+      functionVersion,
       description: input.Description,
     });
 

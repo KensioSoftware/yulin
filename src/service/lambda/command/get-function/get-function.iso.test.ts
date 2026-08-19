@@ -101,6 +101,38 @@ describe("Lambda GetFunctionCommand", () => {
     );
   });
 
+  it("reads a version off a qualified function ARN", async () => {
+    // Given a function with a published version.
+    const simLambda = new SimLambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
+    );
+    await simLambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+    const { Configuration } = await simLambda.getFunction(
+      new GetFunctionCommand({ FunctionName: "orders" }),
+    );
+
+    // When the function is read by an ARN naming that version.
+    const fetched = await simLambda.getFunction(
+      new GetFunctionCommand({
+        FunctionName: `${Configuration.FunctionArn}:1`,
+      }),
+    );
+
+    // Then it resolves the same way a Qualifier does.
+    assertIdentical(fetched.Configuration.Version, "1");
+    assertStringIncludes(
+      fetched.Configuration.FunctionArn,
+      ":function:orders:1",
+    );
+  });
+
   it("throws on a Qualifier naming no version or alias", async () => {
     // Given a function with nothing published.
     const simLambda = new SimLambda();

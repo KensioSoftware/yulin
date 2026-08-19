@@ -14,7 +14,10 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
+import {
+  SimLambdaInvalidParameterValueException,
+  SimLambdaResourceNotFoundException,
+} from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
 
@@ -111,6 +114,33 @@ describe("Lambda PublishVersionCommand", () => {
     // Then the missing function is what gets reported.
     assertInstanceOf(error, SimLambdaResourceNotFoundException);
     assertStringIncludes(error.message, "Function not found");
+  });
+
+  it("refuses a function name carrying a qualifier", async () => {
+    // Given a function with a published version.
+    const simAws = new SimAws();
+    const lambda = simAws.lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+      }),
+    );
+    await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+
+    // When a version is published from a name naming one of its versions.
+    const error = await assertThrowsErrorAsync(async () =>
+      lambda.publishVersion(
+        new PublishVersionCommand({ FunctionName: "orders:1" }),
+      ),
+    );
+
+    // Then it is refused rather than published from the function anyway.
+    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
+    assertStringIncludes(error.message, "qualified function");
   });
 
   it("throws on an undefined function name", async () => {

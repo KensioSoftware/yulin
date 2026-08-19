@@ -9,7 +9,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
+import { simLambdaUnqualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { VersionAuthorizer } from "../version/version-authorizer.js";
@@ -75,7 +75,7 @@ export class ListVersionsByFunctionCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const { functionName } = simLambdaFunctionReferenceOf(
+    const functionName = simLambdaUnqualifiedFunctionOf(
       command.input.FunctionName,
     );
     this.authorizer.authorize(

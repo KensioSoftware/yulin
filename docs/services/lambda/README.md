@@ -780,9 +780,14 @@ it is on real Lambda. A qualifier naming no version and no alias fails with
 `ResourceNotFoundException` against the qualified ARN.
 
 `GetAliasCommand`, `ListAliasesCommand` and `DeleteAliasCommand` read and remove aliases.
-`ListAliasesCommand` takes a `FunctionVersion` to narrow the answer to the aliases on one version.
+`ListAliasesCommand` takes a `FunctionVersion` to narrow the answer to the aliases on one version,
+and a version nothing published is reported as missing rather than answered with an empty listing.
 Deleting an alias leaves the version it pointed at invokable by its number. Deleting the function
 takes its versions and aliases with it.
+
+The version and alias commands act on the function itself, so they take its name or its unqualified
+ARN. A `FunctionName` carrying a qualifier (`orders:live`) is refused with an
+`InvalidParameterValueException` rather than acted on as though the qualifier were absent.
 
 ## Triggering a function from an SQS queue
 
