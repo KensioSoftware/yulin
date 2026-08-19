@@ -57,6 +57,6 @@ The skill sends the AI agent to these docs for anything API-shaped, and
 plain markdown by appending `llms.txt` to its URL, one file per guide and one per simulated service.
 That index works with or without the skill installed.
 
-The skill is maintained at
-[KensioSoftware/kensio.ai](https://github.com/KensioSoftware/kensio.ai/tree/main/plugins/yulin-aws-simulation),
-versioned separately from Yulin and licensed Apache-2.0.
+The skill lives at
+[kensio.ai/skills/yulin-aws-simulation](https://kensio.ai/skills/yulin-aws-simulation), versioned
+separately from Yulin and licensed Apache-2.0.
