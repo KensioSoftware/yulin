@@ -245,6 +245,26 @@ export class SimIam
   }
 
   /**
+   * Handle an IAM AttachUserPolicy command.
+   */
+  async attachUserPolicy(
+    command: simIamCommands.SimAttachUserPolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimAttachUserPolicyCommandOutput> {
+    return await this.commands.users.attachUserPolicy(command, options);
+  }
+
+  /**
+   * Handle an IAM CreateLoginProfile command.
+   */
+  async createLoginProfile(
+    command: simIamCommands.SimCreateLoginProfileCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimCreateLoginProfileCommandOutput> {
+    return await this.commands.users.createLoginProfile(command, options);
+  }
+
+  /**
    * Handle an IAM CreateAccessKey command.
    */
   async createAccessKey(

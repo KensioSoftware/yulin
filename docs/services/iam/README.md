@@ -360,6 +360,14 @@ console.log(decision.caller.arn);
 Invalid credentials throw an AWS-like error before any policies are evaluated, with a diagnostic
 reason such as an unknown access key, a secret access key mismatch, or an expired session.
 
+`AttachUserPolicyCommand` attaches a managed Policy to a User by ARN, the way
+`AttachRolePolicyCommand` does for a Role. An ARN with no stored Policy behind it, such as an
+AWS-managed one, attaches and contributes no statements to a decision.
+
+`CreateLoginProfileCommand` gives a User a console password. The response describes the profile
+without the password, which is how real IAM behaves. See
+[CloudFormation Users](#users) for reading the password back out of the simulator.
+
 ## STS AssumeRole sessions
 
 Simulated STS issues temporary credentials for IAM Roles with `AssumeRoleCommand`. The assume
@@ -663,13 +671,13 @@ action, resource, and caller for diagnostics, before the service mutates any sta
 caller defaults to the Account root. The Account root is allowed within its own Account, and a test
 that never mentions IAM keeps working.
 
-## CloudFormation Roles and Managed Policies
+## CloudFormation IAM resources
 
-Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy`, and
-`AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles` as an
-inline policy. That is the shape CDK grants such as `bucket.grantRead(fn)` synthesize as a
-"DefaultPolicy" resource. IAM Users and Groups are not simulated as policy principals. Naming one
-fails the creation outright.
+Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
+`AWS::IAM::ManagedPolicy`, and `AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each
+Role named in `Roles` as an inline policy. That is the shape CDK grants such as
+`bucket.grantRead(fn)` synthesize as a "DefaultPolicy" resource. A `Users` or `Groups` property on
+an `AWS::IAM::Policy` fails the creation outright.
 
 ```typescript sim-iam-cloudformation
 /**
@@ -761,6 +769,103 @@ For `AWS::IAM::Role`, `Ref` returns the Role name and `Fn::GetAtt` supports `Arn
 `AWS::IAM::ManagedPolicy`, `Ref` returns the Policy ARN. Both resource types default their name to
 the logical ID when it is omitted, and inline `Policies` declared on a Role are stored as the
 Role's inline policies.
+
+### Users
+
+An `AWS::IAM::User` creates a User in the Stack's Account. `UserName` names it and falls back to the
+Resource logical ID. `Path`, the inline `Policies` list and `ManagedPolicyArns` work as they do on a
+Role, and both policy forms reach the authorization decision made for that User. `Ref` returns the
+User name and `Fn::GetAtt` supports `Arn` and `UserId`.
+
+`LoginProfile` gives the User a console password, the way real CloudFormation calls
+`CreateLoginProfile`. The profile records the password, its creation date and
+`PasswordResetRequired`. Real IAM never reads a password back, and neither does the simulator. A
+test asserting on the password reads the User record from `SimIam.users`.
+
+Group membership is a gap. A `Groups` entry fails the Resource. An empty list still deploys, and CDK
+leaves `Groups` out of the template for a User that belongs to no group.
+
+```typescript sim-iam-cloudformation-user
+/**
+ * Creating an IAM User through simulated CloudFormation.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "iam-user-stack",
+  template: {
+    Resources: {
+      ReportsReadPolicy: {
+        Type: "AWS::IAM::ManagedPolicy",
+        Properties: {
+          ManagedPolicyName: "ReportsReadPolicy",
+          PolicyDocument: {
+            Version: "2012-10-17",
+            Statement: {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "arn:aws:s3:::reports-bucket/*",
+            },
+          },
+        },
+      },
+      ReportPublisher: {
+        Type: "AWS::IAM::User",
+        Properties: {
+          UserName: "ReportPublisher",
+          Path: "/application/",
+          ManagedPolicyArns: [{ Ref: "ReportsReadPolicy" }],
+          Policies: [
+            {
+              PolicyName: "WriteReports",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: {
+                  Effect: "Allow",
+                  Action: "s3:PutObject",
+                  Resource: "arn:aws:s3:::reports-bucket/*",
+                },
+              },
+            },
+          ],
+          LoginProfile: {
+            Password: "initial-console-password",
+            PasswordResetRequired: true,
+          },
+        },
+      },
+    },
+    Outputs: {
+      UserArn: {
+        Value: {
+          "Fn::GetAtt": ["ReportPublisher", "Arn"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const simIam = simAws.iam();
+
+const decision = simIam.authorize({
+  action: "s3:PutObject",
+  resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
+  caller: { kind: "arn", arn: stack.output("UserArn") },
+});
+
+console.log(decision.isAllowed);
+
+const user = simIam.users
+  .values()
+  .find((each) => each.userName === "ReportPublisher");
+
+console.log(user?.loginProfile?.passwordResetRequired);
+```
 
 ## Accounts
 
@@ -942,7 +1047,8 @@ Sim IAM currently supports:
 - `PutRolePolicyCommand`, for inline Role policies
 - `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
 - `AttachRolePolicyCommand`
-- `CreateUserCommand` and `PutUserPolicyCommand`
+- `CreateUserCommand`, `PutUserPolicyCommand` and `AttachUserPolicyCommand`
+- `CreateLoginProfileCommand`, for a User's console password
 - `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and policy conditions with explicit-deny precedence
@@ -952,7 +1058,8 @@ Sim IAM currently supports:
   `x-sim-aws-source-arn` and `x-sim-aws-source-account`
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
-- The `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
+- The `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
+  CloudFormation resources
 
 Unsupported IAM options may be ignored or may throw errors depending on whether the simulator needs
 them to model the requested behaviour.
@@ -961,6 +1068,8 @@ them to model the requested behaviour.
 
 Sim IAM models the policy behaviour that multi-service tests most commonly need. Notable gaps:
 
+- Groups are absent. An `AWS::IAM::User` naming one fails, and an `AWS::IAM::Policy` naming one
+  fails too
 - Permissions boundaries, session policies, and service control policies are not evaluated
 - Managed Policies have a single version, and the policy version commands are absent
 - Deleting and detaching resources (Roles, Users, Policies, access keys) is not yet supported

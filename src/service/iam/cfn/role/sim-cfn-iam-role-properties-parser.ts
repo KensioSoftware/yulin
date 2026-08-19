@@ -1,16 +1,16 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import {
-  SimCfnIamRolePoliciesParser,
-  type SimCfnIamRoleInlinePolicy,
-} from "./sim-cfn-iam-role-policies-parser.js";
+  SimCfnIamPoliciesParser,
+  type SimCfnIamInlinePolicy,
+} from "../sim-cfn-iam-policies-parser.js";
 
 export interface SimCfnIamRoleProperties {
   readonly roleName: string;
   readonly path: string | undefined;
   readonly description: string | undefined;
   readonly assumeRolePolicyDocument: string;
-  readonly inlinePolicies: readonly SimCfnIamRoleInlinePolicy[];
+  readonly inlinePolicies: readonly SimCfnIamInlinePolicy[];
   readonly managedPolicyArns: readonly string[];
 }
 
@@ -22,7 +22,9 @@ export interface SimCfnIamRoleProperties {
  * orchestrating IAM command calls.
  */
 export class SimCfnIamRolePropertiesParser {
-  private readonly policiesParser = new SimCfnIamRolePoliciesParser();
+  private readonly policiesParser = new SimCfnIamPoliciesParser({
+    resourceType: "AWS::IAM::Role",
+  });
 
   /**
    * Parse the resolved CloudFormation properties for an AWS::IAM::Role.
