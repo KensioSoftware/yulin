@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/va
 import type { SimIam } from "../sim-iam.js";
 import type { SimIamManagedPolicy } from "../policy/sim-iam-policy.js";
 import { SimCfnIamRoleDeleter } from "./role/sim-cfn-iam-role-deleter.js";
+import { SimCfnIamUserDeleter } from "./user/sim-cfn-iam-user-deleter.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
 interface SimCfnIamResourceDeleterProperties {
@@ -16,10 +17,12 @@ interface SimCfnIamResourceDeleterProperties {
 export class SimCfnIamResourceDeleter {
   private readonly iam: SimIam;
   private readonly roleDeleter: SimCfnIamRoleDeleter;
+  private readonly userDeleter: SimCfnIamUserDeleter;
 
   constructor(properties: SimCfnIamResourceDeleterProperties) {
     this.iam = properties.iam;
     this.roleDeleter = new SimCfnIamRoleDeleter({ iam: properties.iam });
+    this.userDeleter = new SimCfnIamUserDeleter({ iam: properties.iam });
   }
 
   /**
@@ -41,6 +44,10 @@ export class SimCfnIamResourceDeleter {
       }
       case "Role": {
         await this.roleDeleter.delete(resource);
+        return;
+      }
+      case "User": {
+        await this.userDeleter.delete(resource);
         return;
       }
       default: {

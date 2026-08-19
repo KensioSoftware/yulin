@@ -73,3 +73,7 @@ export type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
 } from "./user/create-user/create-user.command.js";
+export type {
+  SimDeleteUserCommand,
+  SimDeleteUserCommandOutput,
+} from "./user/delete-user/delete-user.command.js";

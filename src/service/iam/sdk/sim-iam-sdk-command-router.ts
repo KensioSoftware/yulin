@@ -20,6 +20,7 @@ import type { SimAttachUserPolicyCommand } from "../command/user/attach-user-pol
 import type { SimCreateAccessKeyCommand } from "../command/user/create-access-key/create-access-key.command.js";
 import type { SimCreateLoginProfileCommand } from "../command/user/create-login-profile/create-login-profile.command.js";
 import type { SimCreateUserCommand } from "../command/user/create-user/create-user.command.js";
+import type { SimDeleteUserCommand } from "../command/user/delete-user/delete-user.command.js";
 import type { SimIam } from "../sim-iam.js";
 
 /**
@@ -59,6 +60,14 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simIam.deleteRole(
             command as SimDeleteRoleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.deleteUser(
+            command as SimDeleteUserCommand,
             simSdkCallerOptions(context),
           ),
       ],
