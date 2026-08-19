@@ -50,8 +50,12 @@ export function elbV2QueryPagingInput(
  * The Query layer reads a list by handing each member its own fields, which
  * reaches the members of a structure. A list of plain values has none:
  * `Subnets.member.1` is the value itself. So the subscripts are walked from
- * one until the request stops stating them, which is the order every AWS
- * client writes a list in.
+ * one until the request stops stating them.
+ *
+ * That stops at a gap, where the Query layer's own list reader carries on. It
+ * makes no difference to a request anything sends, since every AWS client
+ * numbers a list from one without skipping, and it is the reason this belongs
+ * in `SimQueryFields` alongside that reader rather than here.
  */
 export function elbV2QueryValues(
   fields: SimQueryFields,

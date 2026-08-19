@@ -182,13 +182,22 @@ describe("Serving simulated ELBv2 on an endpoint URL", () => {
       }),
     );
 
-    const remaining = await client.send(
+    const asked = await client.send(
       new DescribeTargetHealthCommand({
         TargetGroupArn: targetGroupArn,
         Targets: [{ Id: "10.0.0.2", Port: 8081 }],
       }),
     );
+    assertArrayLength(asked.TargetHealthDescriptions ?? [], 1);
+
+    const remaining = await client.send(
+      new DescribeTargetHealthCommand({ TargetGroupArn: targetGroupArn }),
+    );
+    const [left] = remaining.TargetHealthDescriptions ?? [];
     assertArrayLength(remaining.TargetHealthDescriptions ?? [], 1);
+    assertNonNullable(left, "the target that was not deregistered");
+    assertIdentical(left.Target?.Id, "10.0.0.2");
+    assertIdentical(left.Target.Port, 8081);
   });
 
   it("refuses an ELBv2 operation it does not serve", async () => {

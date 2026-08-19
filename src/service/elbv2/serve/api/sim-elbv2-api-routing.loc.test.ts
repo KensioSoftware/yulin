@@ -19,6 +19,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertTrue,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -190,7 +191,11 @@ describe("Serving simulated ELBv2 routing on an endpoint URL", () => {
     const remaining = await client.send(
       new DescribeListenerCertificatesCommand({ ListenerArn: listenerArn }),
     );
+    const [left] = remaining.Certificates ?? [];
     assertArrayLength(remaining.Certificates ?? [], 1);
+    assertNonNullable(left, "the certificate that was not removed");
+    assertIdentical(left.CertificateArn, defaultCertificateArn);
+    assertTrue(left.IsDefault ?? false);
   });
 
   it("writes rules on a listener in both condition forms", async () => {
