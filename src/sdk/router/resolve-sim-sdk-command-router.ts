@@ -29,6 +29,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
 >([
   ["ACM", (scoped): SimSdkCommandRouter => scoped.acm().sdkCommandRouter()],
   [
+    "API Gateway",
+    (scoped): SimSdkCommandRouter => scoped.apiGateway().sdkCommandRouter(),
+  ],
+  [
     "ApiGatewayV2",
     (scoped): SimSdkCommandRouter => scoped.apiGatewayV2().sdkCommandRouter(),
   ],

@@ -1,4 +1,5 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
+import { SimRestApiRegistry } from "../../apigateway/registry/sim-rest-api-registry.js";
 import { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
@@ -61,6 +62,14 @@ export class SimAwsScopedServiceRegistries {
    * scope that owns it.
    */
   public readonly httpApi = new SimHttpApiRegistry();
+
+  /**
+   * Indexes the REST API ids allocated in any Account and Region of one SimAws
+   * instance, the way `httpApi` does for HTTP APIs. The two services issue
+   * endpoints under the same `execute-api` host, and a served request carries
+   * no Account, so each keeps the hop from an id to the scope owning it.
+   */
+  public readonly restApi = new SimRestApiRegistry();
 
   /**
    * Indexes the account/region-scoped KMS facades created for one SimAws

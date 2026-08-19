@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimAcm } from "../../acm/sim-acm.js";
+import { SimApiGateway } from "../../apigateway/index.js";
 import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import {
   simAwsAcmDnsRecords,
@@ -50,6 +51,21 @@ export class SimAwsRegisteredServiceBuilder {
     this.registries.acm.register(scope.accountRegionScope, acm);
 
     return acm;
+  }
+
+  /**
+   * Create simulated API Gateway REST APIs for an Account Region scope.
+   *
+   * REST APIs are Region-scoped on real AWS: the endpoint API Gateway
+   * generates names the Region, and an API cannot be reached from another one.
+   */
+  createApiGateway(scope: SimAwsAccountRegionContainer): SimApiGateway {
+    return new SimApiGateway({
+      ...this.scoped(scope),
+      // API ids are unique across the simulation, and an API is reachable by
+      // id alone from the serving layer, whichever scope created it.
+      registry: this.registries.restApi,
+    });
   }
 
   /**

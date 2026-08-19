@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimApiGateway } from "../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
@@ -46,6 +47,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated ACM in the default Account Region scope. */
   acm(): SimAcm {
     return this.defaultAccountRegionScope().acm();
+  }
+
+  /** Get simulated API Gateway REST APIs in the default Account Region scope. */
+  apiGateway(): SimApiGateway {
+    return this.defaultAccountRegionScope().apiGateway();
   }
 
   /** Get simulated API Gateway v2 in the default Account Region scope. */
