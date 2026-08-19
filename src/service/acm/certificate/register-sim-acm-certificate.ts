@@ -92,7 +92,11 @@ function scopedCertificateArn(
 ): SimArn {
   const arn = parseSimArn(value);
 
-  if (arn?.service !== "acm" || arn.resourceType !== "certificate") {
+  if (
+    arn?.service !== "acm" ||
+    arn.resourceType !== "certificate" ||
+    arn.resourceId === ""
+  ) {
     throw new SimAcmInvalidArgumentsException(
       `${value} is not a sim ACM Certificate ARN`,
     );

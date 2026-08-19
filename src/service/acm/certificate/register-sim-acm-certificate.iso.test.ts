@@ -224,6 +224,24 @@ describe("Registering a simulated ACM Certificate", () => {
     );
   });
 
+  it("refuses an ACM ARN with no certificate ID", () => {
+    // Given a simulated ACM service.
+    const simAws = new SimAws();
+    const simAcm = simAcmInAccount(simAws);
+
+    // When an ARN naming no certificate is registered.
+    const error = assertThrowsError(() => {
+      simAcm.registerCertificate({
+        arn: "arn:aws:acm:us-east-1:111122223333:certificate/",
+        domainName: "example.test",
+      });
+    });
+
+    // Then it is refused, the same as any other string that names none.
+    assertInstanceOf(error, SimAcmInvalidArgumentsException);
+    assertMapSize(simAcm.certificates, 0);
+  });
+
   it("still allocates its own ARN for a requested Certificate", async () => {
     // Given a registered Certificate.
     const simAws = new SimAws();
