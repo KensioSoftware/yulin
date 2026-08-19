@@ -4,6 +4,8 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
+import { simLambdaQualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
 import type {
@@ -13,6 +15,7 @@ import type {
 
 interface GetPolicyCommandHandlerProperties {
   readonly functions: SimLambdaFunctionLookup;
+  readonly versions: SimLambdaFunctionVersionStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
 }
@@ -31,11 +34,13 @@ export class GetPolicyCommandHandler implements CommandHandler<
   SimGetPolicyCommandOutput
 > {
   private readonly functions: SimLambdaFunctionLookup;
+  private readonly versions: SimLambdaFunctionVersionStore;
   private readonly authorizer: FunctionUrlAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: GetPolicyCommandHandlerProperties) {
     this.functions = properties.functions;
+    this.versions = properties.versions;
     this.authorizer = new FunctionUrlAuthorizer({
       iam: properties.iam,
       action: "lambda:GetPolicy",
@@ -44,11 +49,13 @@ export class GetPolicyCommandHandler implements CommandHandler<
   }
 
   /**
-   * Read a sim Lambda function's resource policy.
+   * Read the resource policy of a sim Lambda function, or of the version or
+   * alias a qualifier names.
    *
-   * A function that has been granted nothing has no policy at all, which real
+   * A resource that has been granted nothing has no policy at all, which real
    * Lambda reports as the policy not being found rather than as an empty
-   * document.
+   * document. Each qualified resource answers with its own statements, so the
+   * function's policy is what a request with no qualifier reads.
    */
   async handle(
     command: SimGetPolicyCommand,
@@ -61,11 +68,17 @@ export class GetPolicyCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    const functionName = command.input.FunctionName;
-    const functionArn = this.functions.functionArn(functionName);
+    const { functionName, qualifier } = simLambdaQualifiedFunctionOf(
+      command.input.FunctionName,
+      command.input.Qualifier,
+    );
+    const functionArn = this.functions.functionArn(functionName, qualifier);
     this.authorizer.authorize(functionArn, options?.caller);
 
-    const { resourcePolicy } = this.functions.require(functionName);
+    const { resourcePolicy } = this.versions.requireResource(
+      this.functions.require(functionName),
+      qualifier,
+    );
 
     if (resourcePolicy.isEmpty()) {
       throw new SimLambdaResourceNotFoundException(

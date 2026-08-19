@@ -12,6 +12,7 @@ export interface SimAddPermissionCommand {
  */
 export interface SimAddPermissionCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Qualifier?: string | undefined;
   readonly StatementId?: string | undefined;
   readonly Action?: string | undefined;
   readonly Principal?: string | undefined;

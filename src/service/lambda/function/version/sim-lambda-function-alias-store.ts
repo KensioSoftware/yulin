@@ -51,7 +51,7 @@ export class SimLambdaFunctionAliasStore {
     }
 
     const alias = new SimLambdaFunctionAlias({
-      aliasArn: simLambdaQualifiedFunctionArn(simFunction, name),
+      arn: simLambdaQualifiedFunctionArn(simFunction, name),
       name,
       functionVersion,
       description,

@@ -1,3 +1,4 @@
+import { SimLambdaFunctionPolicy } from "../policy/sim-lambda-function-policy.js";
 import type { SimLambdaFunctionArn } from "../sim-lambda-function-configuration.js";
 
 /**
@@ -12,7 +13,7 @@ export interface SimLambdaFunctionAliasConfiguration {
 }
 
 interface SimLambdaFunctionAliasProperties {
-  readonly aliasArn: SimLambdaFunctionArn;
+  readonly arn: SimLambdaFunctionArn;
   readonly name: string;
   readonly functionVersion: string;
   readonly description?: string | undefined;
@@ -26,14 +27,24 @@ interface SimLambdaFunctionAliasProperties {
  * changes while the name integrations were built against stays where it is.
  */
 export class SimLambdaFunctionAlias {
-  public readonly aliasArn: SimLambdaFunctionArn;
+  public readonly arn: SimLambdaFunctionArn;
   public readonly name: string;
+  /**
+   * This alias's own resource-based policy, which says who may act on the
+   * alias.
+   *
+   * An alias holds a policy apart from the version it points at, as real
+   * Lambda does. A grant made on `live` is what admits a call on `live`, and
+   * moving the alias to another version carries the grant with the name rather
+   * than leaving it behind.
+   */
+  public readonly resourcePolicy = new SimLambdaFunctionPolicy();
 
   #functionVersion: string;
   #description: string | undefined;
 
   constructor(properties: SimLambdaFunctionAliasProperties) {
-    this.aliasArn = properties.aliasArn;
+    this.arn = properties.arn;
     this.name = properties.name;
     this.#functionVersion = properties.functionVersion;
     this.#description = properties.description;
@@ -64,7 +75,7 @@ export class SimLambdaFunctionAlias {
    */
   configuration(): SimLambdaFunctionAliasConfiguration {
     return {
-      AliasArn: this.aliasArn,
+      AliasArn: this.arn,
       Name: this.name,
       FunctionVersion: this.#functionVersion,
       Description: this.#description,

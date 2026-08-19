@@ -27,24 +27,20 @@ export type SimLambdaFunctionArn =
  *
  * A qualifier is appended as real Lambda appends one, so a published version
  * and an alias are addressed by the ARN of the function they belong to with
- * their own name on the end.
+ * their own name on the end. `$LATEST` is the function itself, so it is
+ * addressed by an unqualified ARN.
  */
 export function simLambdaFunctionArn(
   scope: SimAwsAccountRegionScope,
   name: string,
   qualifier?: string,
 ): SimLambdaFunctionArn {
-  const qualifierSuffix = qualifier === undefined ? "" : `:${qualifier}`;
+  const qualifierSuffix =
+    qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION
+      ? ""
+      : `:${qualifier}`;
 
   return `arn:aws:lambda:${scope.regionName}:${scope.accountId}:function:${name}${qualifierSuffix}`;
-}
-
-/**
- * The qualifier a version's ARN carries. `$LATEST` carries none, since the
- * function itself is addressed by an unqualified ARN.
- */
-export function simLambdaVersionQualifier(version: string): string | undefined {
-  return version === SIM_LAMBDA_LATEST_VERSION ? undefined : version;
 }
 
 /**

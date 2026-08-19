@@ -11,7 +11,6 @@ import {
   simLambdaFunctionArn,
   type SimLambdaFunctionConfiguration,
   type SimLambdaFunctionState,
-  simLambdaVersionQualifier,
 } from "./sim-lambda-function-configuration.js";
 import {
   type SimLambdaExecutableCode,
@@ -187,7 +186,7 @@ export class SimLambdaFunction {
     return simLambdaFunctionArn(
       this.accountRegionScope,
       this.name,
-      simLambdaVersionQualifier(this.version),
+      this.version,
     );
   }
 

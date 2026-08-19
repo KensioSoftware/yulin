@@ -1,4 +1,5 @@
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
+import type { SimLambdaPolicyResource } from "../policy/sim-lambda-policy-resource.js";
 import { SIM_LAMBDA_LATEST_VERSION } from "../sim-lambda-function-configuration.js";
 import type {
   SimLambdaFunction,
@@ -63,6 +64,52 @@ export class SimLambdaFunctionVersionStore {
     }
 
     return resolved;
+  }
+
+  /**
+   * The resource a qualifier names, or nothing when there is no such function
+   * or the qualifier names neither a version nor an alias.
+   *
+   * An alias answers as itself here rather than as the version it points at,
+   * because the two hold their own resource policies. Resolving the alias
+   * first would evaluate the version's policy for a request made against the
+   * alias. A function that is not there answers with nothing, since a request
+   * naming one is authorized before it is reported missing.
+   */
+  findResource(
+    simFunction: SimLambdaFunction | undefined,
+    qualifier: string | undefined,
+  ): SimLambdaPolicyResource | undefined {
+    if (simFunction === undefined) {
+      return undefined;
+    }
+
+    return qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION
+      ? simFunction
+      : this.of(simFunction).named(qualifier);
+  }
+
+  /**
+   * The resource a qualifier names, or fail as AWS does when it names neither
+   * a version nor an alias.
+   */
+  requireResource(
+    simFunction: SimLambdaFunction,
+    qualifier: string | undefined,
+  ): SimLambdaPolicyResource {
+    if (qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION) {
+      return simFunction;
+    }
+
+    const resource = this.of(simFunction).named(qualifier);
+
+    if (resource === undefined) {
+      throw new SimLambdaResourceNotFoundException(
+        `Function not found: ${simLambdaQualifiedFunctionArn(simFunction, qualifier)}`,
+      );
+    }
+
+    return resource;
   }
 
   /**
