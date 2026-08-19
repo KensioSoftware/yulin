@@ -246,7 +246,7 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-S3, STS, SNS, CloudFormation, Lambda, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, STS, IAM, ELBv2, SNS, CloudFormation, Lambda, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
 A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
 
@@ -305,6 +305,65 @@ raises it.
 
 `AssumeRole` and `GetCallerIdentity` are the two operations simulated STS implements, and both are
 served. `AssumeRoleWithWebIdentity` and `GetSessionToken` are refused as `NotImplemented`.
+
+### IAM over the endpoint
+
+A served request runs as whoever signed it, and the credentials to sign one used to come from the
+process that built the simulation. `aws iam` closes that circle. A container or a shell script
+creates its own User over the endpoint, gives it a policy, asks for an access key and signs
+everything after that with what it was answered:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws iam create-user --user-name widgets
+aws iam put-user-policy --user-name widgets --policy-name everything \
+  --policy-document '{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"*","Resource":"*"}}'
+aws iam create-access-key --user-name widgets
+```
+
+`create-access-key` answers with the secret, and nothing reports it again. The first request still
+has to be signed by somebody. The [example above](#pointing-an-aws-sdk-or-the-cli-at-the-simulation)
+builds one identity in process, and everything after it can be built over the port.
+
+The fifteen operations simulated IAM implements are:
+
+- **Users** — `CreateUser`, `CreateAccessKey`, `PutUserPolicy`
+- **Roles** — `CreateRole`, `GetRole`, `ListRoles`, `DeleteRole`, `AttachRolePolicy`,
+  `DetachRolePolicy`, `PutRolePolicy`, `DeleteRolePolicy`
+- **Managed policies** — `CreatePolicy`, `GetPolicy`, `ListPolicies`, `DeletePolicy`
+
+Anything else is refused as `NotImplemented`, which an SDK raises under that name.
+
+### ELBv2 over the endpoint
+
+`aws elbv2` builds an Application Load Balancer in the simulation over the same endpoint URL:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws elbv2 create-load-balancer --name shop-alb --subnets subnet-1 subnet-2
+aws elbv2 create-target-group --name checkout-tg --target-type lambda
+aws elbv2 create-listener --load-balancer-arn <arn> --protocol HTTP --port 80 \
+  --default-actions Type=forward,TargetGroupArn=<arn>
+```
+
+A load balancer built this way is the same load balancer an in-process build produces. Its DNS name
+is served on the local port, and a request to it reaches the simulated Functions and ECS Services
+registered behind it.
+
+The twenty-two operations simulated ELBv2 implements are:
+
+- **Load balancers** — `CreateLoadBalancer`, `DescribeLoadBalancers`, `DeleteLoadBalancer`
+- **Target groups** — `CreateTargetGroup`, `DescribeTargetGroups`, `ModifyTargetGroup`,
+  `DeleteTargetGroup`
+- **Targets** — `RegisterTargets`, `DeregisterTargets`, `DescribeTargetHealth`
+- **Listeners** — `CreateListener`, `DescribeListeners`, `ModifyListener`, `DeleteListener`
+- **Listener certificates** — `AddListenerCertificates`, `RemoveListenerCertificates`,
+  `DescribeListenerCertificates`
+- **Rules** — `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule`, `SetRulePriorities`
+
+A rule matches on `host-header` and `path-pattern`, in either the plain `Values` form or the
+per-field configuration. A condition naming any other field is refused by name, as is an operation
+outside the list above.
 
 ### S3 over the endpoint
 
