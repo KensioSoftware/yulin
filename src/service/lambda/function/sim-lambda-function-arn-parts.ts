@@ -5,9 +5,9 @@ import type { AwsRegionName } from "../../aws/sim-aws-region.js";
  * The parts of a Lambda function ARN.
  *
  * The qualifier is the version or alias a qualified ARN names, and it is
- * reported rather than ignored: simulated Lambda has neither, so a service
- * pointed at `:PROD` would otherwise reach `$LATEST` and think it had done as
- * it was told.
+ * reported rather than ignored: a service that cannot follow one refuses the
+ * target rather than reaching `$LATEST` and thinking it had done as it was
+ * told.
  */
 export interface SimLambdaFunctionArnParts {
   readonly regionName: AwsRegionName;

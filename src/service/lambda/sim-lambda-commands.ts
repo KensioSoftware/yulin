@@ -10,10 +10,12 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimLambdaAliasCommands } from "./command/alias/sim-lambda-alias-commands.js";
 import { SimLambdaEventSourceMappingCommands } from "./command/event-source-mapping/sim-lambda-event-source-mapping-commands.js";
 import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-function-commands.js";
 import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
 import { SimLambdaPermissionCommands } from "./command/permission/sim-lambda-permission-commands.js";
+import { SimLambdaVersionCommands } from "./command/version/sim-lambda-version-commands.js";
 import { SimLambdaEventSourcePollers } from "./event-source/sim-lambda-event-source-pollers.js";
 import { SimLambdaNoEventSourceQueues } from "./event-source/queue/sim-lambda-no-event-source-queues.js";
 import {
@@ -32,6 +34,8 @@ import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda
 import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import { SimLambdaFunctionLookup } from "./function/url/sim-lambda-function-lookup.js";
 import { SimLambdaFunctionUrlStore } from "./function/url/sim-lambda-function-url-store.js";
+import { SimLambdaFunctionAliasStore } from "./function/version/sim-lambda-function-alias-store.js";
+import { SimLambdaFunctionVersionStore } from "./function/version/sim-lambda-function-version-store.js";
 import { SimLambdaUrlRegistry } from "./registry/sim-lambda-url-registry.js";
 
 /**
@@ -80,10 +84,16 @@ export class SimLambdaCommands {
   public readonly containerImages: SimLambdaContainerImages;
 
   public readonly functionUrlStore: SimLambdaFunctionUrlStore;
+  public readonly versionStore = new SimLambdaFunctionVersionStore();
+  public readonly aliasStore = new SimLambdaFunctionAliasStore({
+    versions: this.versionStore,
+  });
   public readonly functionLookup: SimLambdaFunctionLookup;
   public readonly functions: SimLambdaFunctionCommands;
   public readonly functionUrls: SimLambdaFunctionUrlCommands;
   public readonly permissions: SimLambdaPermissionCommands;
+  public readonly versions: SimLambdaVersionCommands;
+  public readonly aliases: SimLambdaAliasCommands;
   public readonly eventSourceMappings: SimLambdaEventSourceMappingCommands;
 
   constructor(properties: SimLambdaCommandsProperties) {
@@ -131,6 +141,18 @@ export class SimLambdaCommands {
       iam,
       background,
     });
+    this.versions = new SimLambdaVersionCommands({
+      functions: this.functionLookup,
+      versions: this.versionStore,
+      iam,
+      background,
+    });
+    this.aliases = new SimLambdaAliasCommands({
+      functions: this.functionLookup,
+      aliases: this.aliasStore,
+      iam,
+      background,
+    });
     this.eventSourceMappings = new SimLambdaEventSourceMappingCommands({
       accountRegionScope,
       pollers: new SimLambdaEventSourcePollers({
@@ -149,6 +171,7 @@ export class SimLambdaCommands {
       accountRegionScope,
       functions: properties.functions,
       functionUrls: this.functionUrlStore,
+      versions: this.versionStore,
       iam,
       background,
       runAsOwner: properties.runAsOwner,

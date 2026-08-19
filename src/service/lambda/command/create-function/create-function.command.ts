@@ -3,7 +3,7 @@
  */
 
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function.js";
+import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function-configuration.js";
 
 /**
  * Minimal structural sim Lambda CreateFunction command.

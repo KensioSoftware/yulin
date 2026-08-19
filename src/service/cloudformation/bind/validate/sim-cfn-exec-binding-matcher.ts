@@ -1,4 +1,4 @@
-import { simLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function.js";
+import { simLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function-configuration.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
 import { SimCfnImageRepositoryTarget } from "./sim-cfn-image-repository-target.js";

@@ -5,8 +5,11 @@ import {
   DeleteFunctionCommand,
   GetFunctionCommand,
   GetFunctionUrlConfigCommand,
+  ListVersionsByFunctionCommand,
+  PublishVersionCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEquals,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -39,6 +42,35 @@ async function givenFunction(
 }
 
 describe("Lambda DeleteFunctionCommand", () => {
+  it("takes the function's published versions with it", async () => {
+    // Given a function with a published version, deleted and made again.
+    const simLambda = new SimLambda();
+    await givenFunction(simLambda, "disposable");
+    await simLambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "disposable" }),
+    );
+    await simLambda.deleteFunction(
+      new DeleteFunctionCommand({ FunctionName: "disposable" }),
+    );
+    await givenFunction(simLambda, "disposable");
+
+    // When the new function's versions are listed.
+    const listed = await simLambda.listVersionsByFunction(
+      new ListVersionsByFunctionCommand({ FunctionName: "disposable" }),
+    );
+
+    // Then nothing published from the old one is left, and the next version
+    // it publishes starts again at 1.
+    assertArrayEquals(
+      listed.Versions.map((version) => version.Version),
+      ["$LATEST"],
+    );
+    const published = await simLambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "disposable" }),
+    );
+    assertIdentical(published.Version, "1");
+  });
+
   it("deletes a function so it can no longer be read", async () => {
     // Given an existing function.
     const simLambda = new SimLambda();

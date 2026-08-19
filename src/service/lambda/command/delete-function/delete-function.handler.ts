@@ -11,12 +11,13 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
-import {
-  type SimLambdaFunctionMap,
-  type SimLambdaFunctionName,
-  simLambdaFunctionArn,
+import type {
+  SimLambdaFunctionMap,
+  SimLambdaFunctionName,
 } from "../../function/sim-lambda-function.js";
+import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
 import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import { DeleteFunctionAuthorizer } from "./delete-function-authorizer.js";
 import type {
   SimDeleteFunctionCommand,
@@ -27,6 +28,7 @@ interface DeleteFunctionCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly functions: SimLambdaFunctionMap;
   readonly functionUrls: SimLambdaFunctionUrlStore;
+  readonly versions: SimLambdaFunctionVersionStore;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
@@ -47,6 +49,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly functions: SimLambdaFunctionMap;
   private readonly functionUrls: SimLambdaFunctionUrlStore;
+  private readonly versions: SimLambdaFunctionVersionStore;
   private readonly authorizer: DeleteFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
 
@@ -55,6 +58,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
       accountRegionScope,
       functions,
       functionUrls,
+      versions,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
@@ -62,6 +66,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
     this.functionUrls = functionUrls;
+    this.versions = versions;
     this.authorizer = new DeleteFunctionAuthorizer({ iam });
     this.background = background;
   }
@@ -75,7 +80,8 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
    * function as nothing to deliver to.
    *
    * The resource policy the Add Permission command builds is held on the
-   * function itself, so it goes at the same time.
+   * function itself, so it goes at the same time. So do the versions published
+   * from it and the aliases pointing at those, as they do on real Lambda.
    */
   async handle(
     command: SimDeleteFunctionCommand,
@@ -105,6 +111,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
     }
 
     this.functionUrls.deleteIfPresent(simFunction);
+    this.versions.forget(simFunction);
     this.functions.delete(functionName);
 
     return { $metadata: {} };

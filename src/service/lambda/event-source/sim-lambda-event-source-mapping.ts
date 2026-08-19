@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimLambdaFunctionArn } from "../function/sim-lambda-function.js";
+import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
 import type { SimLambdaEventSourceStartingPosition } from "./sim-lambda-event-source-starting-position.js";
 
 /**

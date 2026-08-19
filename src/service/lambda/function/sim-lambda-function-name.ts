@@ -6,7 +6,9 @@ const functionArnSeparator = ":function:";
  * Real Lambda accepts a name or a function ARN wherever it takes a
  * `FunctionName`, and CloudFormation templates point at a function either way
  * too: `Ref` gives the name and `Fn::GetAtt` gives the ARN. A version or alias
- * qualifier on the ARN is dropped, as qualified functions are not simulated.
+ * qualified ARN is reduced to the bare function name, dropping the version or
+ * alias, for the callers that act on the function whichever version they were
+ * pointed at.
  */
 export function simLambdaFunctionNameOf(functionNameOrArn: string): string {
   const separatorIndex = functionNameOrArn.indexOf(functionArnSeparator);

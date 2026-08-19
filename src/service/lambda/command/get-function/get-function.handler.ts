@@ -11,11 +11,13 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
-import {
-  type SimLambdaFunctionMap,
-  type SimLambdaFunctionName,
-  simLambdaFunctionArn,
+import { simLambdaQualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
+import type {
+  SimLambdaFunctionMap,
+  SimLambdaFunctionName,
 } from "../../function/sim-lambda-function.js";
+import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
 import { GetFunctionAuthorizer } from "./get-function-authorizer.js";
 import type {
   SimGetFunctionCommand,
@@ -25,6 +27,7 @@ import type {
 interface GetFunctionCommandHandlerProperties {
   accountRegionScope: SimAwsAccountRegionScope;
   functions: SimLambdaFunctionMap;
+  versions: SimLambdaFunctionVersionStore;
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
 }
@@ -44,6 +47,7 @@ export class GetFunctionCommandHandler implements CommandHandler<
 > {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly functions: SimLambdaFunctionMap;
+  private readonly versions: SimLambdaFunctionVersionStore;
   private readonly authorizer: GetFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
 
@@ -51,17 +55,20 @@ export class GetFunctionCommandHandler implements CommandHandler<
     const {
       accountRegionScope,
       functions,
+      versions,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
+    this.versions = versions;
     this.authorizer = new GetFunctionAuthorizer({ iam });
     this.background = background;
   }
 
   /**
-   * Get a sim Lambda function's configuration.
+   * Get a sim Lambda function's configuration, or that of the version a
+   * qualifier names.
    */
   async handle(
     command: SimGetFunctionCommand,
@@ -75,14 +82,18 @@ export class GetFunctionCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
+    const { functionName, qualifier } = simLambdaQualifiedFunctionOf(
+      command.input.FunctionName,
+      command.input.Qualifier,
+    );
     const functionArn = simLambdaFunctionArn(
       this.accountRegionScope,
-      command.input.FunctionName,
+      functionName,
     );
     this.authorizer.authorize(functionArn, options?.caller);
 
     const simFunction = this.functions.get(
-      command.input.FunctionName as SimLambdaFunctionName,
+      functionName as SimLambdaFunctionName,
     );
     if (simFunction === undefined) {
       throw new SimLambdaResourceNotFoundException(
@@ -92,7 +103,9 @@ export class GetFunctionCommandHandler implements CommandHandler<
 
     return {
       $metadata: {},
-      Configuration: simFunction.configuration(),
+      Configuration: this.versions
+        .require(simFunction, qualifier)
+        .configuration(),
     };
   }
 }

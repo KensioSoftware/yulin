@@ -20,6 +20,9 @@ interface SimLambdaInvocationDispatcherProperties {
 /**
  * Dispatches an authorized Invoke request to a sim Lambda function using the
  * requested AWS invocation type.
+ *
+ * The function it is given is the one the request resolved to, so a request
+ * for a published version reports that version as the one it ran.
  */
 export class SimLambdaInvocationDispatcher {
   private readonly background: BackgroundScheduler;
@@ -63,14 +66,14 @@ export class SimLambdaInvocationDispatcher {
       return {
         $metadata: {},
         StatusCode: 200,
-        ExecutedVersion: "$LATEST",
+        ExecutedVersion: simFunction.version,
         Payload: resultPayload(result),
       };
     } catch (error) {
       return {
         $metadata: {},
         StatusCode: 200,
-        ExecutedVersion: "$LATEST",
+        ExecutedVersion: simFunction.version,
         FunctionError: "Unhandled",
         Payload: functionErrorPayload(error),
       };

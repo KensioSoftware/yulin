@@ -11,6 +11,7 @@ import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-o
 import type { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import type { SimLambdaFunctionMap } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import { CreateFunctionCommandHandler } from "../create-function/create-function.handler.js";
 import type {
   SimCreateFunctionCommand,
@@ -39,6 +40,7 @@ interface SimLambdaFunctionCommandsProperties {
   readonly background: BackgroundScheduler;
   readonly runAsOwner: SimAwsRunAsOwner;
   readonly functionUrls: SimLambdaFunctionUrlStore;
+  readonly versions: SimLambdaFunctionVersionStore;
   readonly environmentConflicts: SimLambdaEnvironmentConflicts;
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly containerImages?: SimLambdaContainerImages | undefined;
@@ -105,7 +107,7 @@ export class SimLambdaFunctionCommands {
   }
 
   /**
-   * Invoke a function.
+   * Invoke a function, or the version a qualifier names.
    */
   async invoke(
     command: SimInvokeCommand,

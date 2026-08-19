@@ -21,12 +21,14 @@ import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-o
 import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import { SimLambdaEnvironment } from "../../function/environment/sim-lambda-environment.js";
 import {
-  DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
   SimLambdaFunction,
   type SimLambdaFunctionMap,
   type SimLambdaFunctionName,
-  simLambdaFunctionArn,
 } from "../../function/sim-lambda-function.js";
+import {
+  DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+  simLambdaFunctionArn,
+} from "../../function/sim-lambda-function-configuration.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
 import {
   type CreateFunctionInput,
