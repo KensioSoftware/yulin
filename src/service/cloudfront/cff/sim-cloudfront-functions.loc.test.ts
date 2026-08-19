@@ -110,16 +110,18 @@ describe("Serve sim CloudFront Functions on localhost", () => {
   it("gives a viewer-request CFF the Distribution domain name as its host", async () => {
     const simCloudFront = simAws.cloudFront();
 
-    // Given a CFF that redirects to the host it was given.
-    function hostRedirectHandlerFunction(
+    // Given a CFF that answers with the host it was given. The host is
+    // reported in a header of its own, since a Location header naming a
+    // hostname this simulation serves is localised on the way to the client.
+    function hostReportingHandlerFunction(
       event: CloudFrontFunction.ViewerRequestEvent,
     ) {
       const host = event.request.headers["host"]?.value ?? "no-host";
       return {
-        statusCode: 302,
-        statusDescription: "Found",
+        statusCode: 200,
+        statusDescription: "OK",
         headers: {
-          location: { value: `https://${host}/redirected.html` },
+          "x-cff-host": { value: host },
         },
       };
     }
@@ -130,7 +132,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
           Comment: "Host Viewer Request CloudFront Function",
           Runtime: "cloudfront-js-2.0",
         },
-        FunctionCode: makeCffFunctionCodeInput(hostRedirectHandlerFunction),
+        FunctionCode: makeCffFunctionCodeInput(hostReportingHandlerFunction),
       }),
     );
 
@@ -172,14 +174,13 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     // When the Distribution is requested by its CloudFront domain name.
     const distroHostResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/index.html`,
-      { redirect: "manual" },
     );
 
     // Then the CFF saw the CloudFront domain name, without the local suffix
     // and without the local server port.
     assertIdentical(
-      distroHostResponse.headers.get("location"),
-      `https://${distroId.toLowerCase()}.cloudfront.net/redirected.html`,
+      distroHostResponse.headers.get("x-cff-host"),
+      `${distroId.toLowerCase()}.cloudfront.net`,
     );
   });
 

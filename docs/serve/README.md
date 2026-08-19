@@ -52,6 +52,28 @@ console.log(srv.localUrl(websiteUrl).toString());
 await srv.close();
 ```
 
+### Redirects
+
+A simulated service redirects to the hostname it would use against real AWS. Served on localhost that
+address reaches the public internet, and a browser following it leaves the simulation behind.
+
+A `Location` header naming a hostname the simulation serves is put into its localhost form on the way
+out of the local server. A sign-in page behind `www.example.com` redirecting to its user pool domain
+answers with an address the browser can open:
+
+```http
+303 See Other
+Location: http://auth.example.com.sim-aws.localhost:8787/oauth2/authorize?client_id=1a2b3c
+```
+
+The rewrite is `srv.localUrl(...)` applied to the header, and the hostname is matched the way an
+arriving request's hostname is matched. A `Location` naming an address the simulation serves nothing
+at is passed on as the service wrote it. So is a relative one, since that is already relative to the
+address the client arrived at.
+
+Only the local server does this. `SimAwsHttp` reaches every simulated hostname by its own name. A
+test using it sees the `Location` the service issued and asserts on the production hostname.
+
 ## Requests without a port
 
 `SimAwsHttp` is the same request path with no socket under it. It takes a Fetch API `Request` and
@@ -962,6 +984,9 @@ it is without watch mode.
 - An injected page is not byte for byte what the real service would return, and its `cache-control`
   is the simulator's rather than the service's. That is the point of the feature, and the reason it
   is off by default and says so on startup.
+- The `Location` header is the only place a simulated hostname is rewritten for a browser. A
+  hostname in a page body, in a JSON response or in a cookie `Domain` is left as the service wrote
+  it.
 - `/__sim-aws/live-reload` is shadowed on every served hostname while live reload is on.
 - Injection decodes the HTML as UTF-8. A page stored in another encoding would be corrupted, so
   serve HTML as UTF-8.

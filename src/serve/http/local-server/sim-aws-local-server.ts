@@ -5,6 +5,7 @@ import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
 import { NodeServerPortBinder } from "./node-server-port-binder.js";
 import { nodeServerPort } from "./node-server-port.js";
+import { SimAwsLocalLocation } from "./sim-aws-local-location.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
 import { SimLocalLiveReload } from "../live-reload/sim-local-live-reload.js";
@@ -37,6 +38,10 @@ export class SimAwsLocalServer {
     const channel = this.liveReload.channel();
     this.requestHandler = new SimAwsLocalRequestHandler({
       simAwsHttp: new SimAwsHttp({ simAws }),
+      location: new SimAwsLocalLocation({
+        simAws,
+        port: (): string => this.port,
+      }),
       ...(channel !== undefined && { liveReload: channel }),
     });
     this.dnsServer = new SimAwsDnsServer({ simAws });
