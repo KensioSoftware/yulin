@@ -25,6 +25,11 @@ import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
 } from "./create-user/create-user.command.js";
+import { DeleteUserCommandHandler } from "./delete-user/delete-user.handler.js";
+import type {
+  SimDeleteUserCommand,
+  SimDeleteUserCommandOutput,
+} from "./delete-user/delete-user.command.js";
 
 interface SimIamUserCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -82,6 +87,25 @@ export class SimIamUserCommandHandlers {
     );
     const handler = new CreateUserCommandHandler({
       accountId: this.accountId,
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a DeleteUser command from the SDK.
+   */
+  async deleteUser(
+    command: SimDeleteUserCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimDeleteUserCommandOutput> {
+    this.authorizer.authorize(
+      "iam:DeleteUser",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
+    const handler = new DeleteUserCommandHandler({
       users: this.users,
       background: this.background,
     });

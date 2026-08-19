@@ -7,6 +7,7 @@ import {
   CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
+  DeleteAccessKeyCommand,
   DeletePolicyCommand,
   DeleteRoleCommand,
   DeleteRolePolicyCommand,
@@ -235,6 +236,21 @@ describe("simulated IAM SDK Command routing", () => {
     assertIdentical(identity.principal.kind, "arn");
   });
 
+  it("deletes a User through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new IAMClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateUserCommand({ UserName: "TransientUser" }));
+    await client.send(new DeleteUserCommand({ UserName: "TransientUser" }));
+
+    // The User is gone, so deleting it again is a missing entity.
+    const error = await assertThrowsErrorAsync(async () => {
+      await client.send(new DeleteUserCommand({ UserName: "TransientUser" }));
+    });
+    assertIdentical(error.name, "NoSuchEntity");
+  });
+
   it("does not give a denied run-as caller root privileges", async () => {
     using simSdk = new SimSdk();
     const accountId = simSdk.simAws.defaultAccountId;
@@ -261,10 +277,15 @@ describe("simulated IAM SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new DeleteUserCommand({ UserName: "InterceptUser" }));
+      await client.send(
+        new DeleteAccessKeyCommand({
+          UserName: "InterceptUser",
+          AccessKeyId: "AKIAINTERCEPTKEY",
+        }),
+      );
     });
 
-    assertStringIncludes(error.message, "DeleteUserCommand");
+    assertStringIncludes(error.message, "DeleteAccessKeyCommand");
     assertStringIncludes(error.message, "CreateRoleCommand");
   });
 });

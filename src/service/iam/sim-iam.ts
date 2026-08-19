@@ -245,6 +245,16 @@ export class SimIam
   }
 
   /**
+   * Handle an IAM DeleteUser command.
+   */
+  async deleteUser(
+    command: simIamCommands.SimDeleteUserCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimDeleteUserCommandOutput> {
+    return await this.commands.users.deleteUser(command, options);
+  }
+
+  /**
    * Handle an IAM AttachUserPolicy command.
    */
   async attachUserPolicy(

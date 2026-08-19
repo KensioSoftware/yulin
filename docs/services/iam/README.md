@@ -298,6 +298,11 @@ issue access keys with `CreateAccessKeyCommand`. Access keys are registered with
 credential registry. Credentials can then be supplied as the caller of an authorization attempt,
 and are authenticated before policy evaluation.
 
+`DeleteUserCommand` removes a User. IAM refuses it while the User still holds an inline policy or an
+attached managed policy, the way `DeleteRoleCommand` refuses a Role, and answers `NoSuchEntity` for
+a name the Account does not hold. Real IAM also refuses a User that still has access keys or a login
+profile. Sim IAM serves no way to remove either, and lets the User go.
+
 ```typescript sim-iam-user-access-key
 /**
  * Simulated IAM Users, inline policies, and access keys.
@@ -797,6 +802,9 @@ inline policy. That is what a CDK grant against a User synthesizes.
 Group membership is a gap. A `Groups` entry fails the Resource. An empty list still deploys, and CDK
 leaves `Groups` out of the template for a User that belongs to no group.
 
+Deleting the Stack deletes the User. Its inline policies and managed policy attachments come off
+first, as they do for a Role, and the User name is free for the same template to deploy again.
+
 ```typescript sim-iam-cloudformation-user
 /**
  * Creating an IAM User through simulated CloudFormation.
@@ -1059,7 +1067,7 @@ Sim IAM currently supports:
 - `PutRolePolicyCommand`, for inline Role policies
 - `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
 - `AttachRolePolicyCommand`
-- `CreateUserCommand`, `PutUserPolicyCommand` and `AttachUserPolicyCommand`
+- `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand` and `AttachUserPolicyCommand`
 - `CreateLoginProfileCommand`, for a User's console password
 - `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
@@ -1084,7 +1092,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   fails too
 - Permissions boundaries, session policies, and service control policies are not evaluated
 - Managed Policies have a single version, and the policy version commands are absent
-- Deleting and detaching resources (Roles, Users, Policies, access keys) is not yet supported
+- `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
+  `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
+  CloudFormation teardown clears a User's policies before deleting it
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree

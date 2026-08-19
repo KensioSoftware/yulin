@@ -9,6 +9,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimIamRole } from "../role/sim-iam-role.js";
+import type { SimIamUser } from "../user/sim-iam-user.js";
 
 const assumeRolePolicyDocument = {
   Version: "2012-10-17",
@@ -62,6 +63,31 @@ const template = {
   },
 };
 
+const userTemplate = {
+  Resources: {
+    PublishPolicy: {
+      Type: "AWS::IAM::ManagedPolicy",
+      Properties: {
+        ManagedPolicyName: "publish-objects",
+        PolicyDocument: readObjectsDocument,
+      },
+    },
+    PublisherUser: {
+      Type: "AWS::IAM::User",
+      Properties: {
+        UserName: "publisher-user",
+        ManagedPolicyArns: [{ Ref: "PublishPolicy" }],
+        Policies: [
+          {
+            PolicyName: "inline-publish",
+            PolicyDocument: readObjectsDocument,
+          },
+        ],
+      },
+    },
+  },
+};
+
 describe("IAM CloudFormation Resource teardown", () => {
   it("takes a Role's policies off it before deleting the Role", async () => {
     // Given a deployed Role carrying an attached managed policy and two inline
@@ -90,6 +116,60 @@ describe("IAM CloudFormation Resource teardown", () => {
     assertIdentical(
       stack.resources.get("ReadPolicy")?.status,
       "DELETE_COMPLETE",
+    );
+  });
+
+  it("takes a User's policies off it before deleting the User", async () => {
+    // Given a deployed User carrying an attached managed policy and an inline
+    // policy. IAM refuses DeleteUser while either of them is still on it.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "publisher-stack",
+      template: userTemplate,
+    });
+
+    const user = stack.resources.get("PublisherUser")?.simResource as
+      | SimIamUser
+      | undefined;
+    assertIdentical(user?.userName, "publisher-user");
+    assertSetSize(user.attachedPolicyArns, 1);
+    assertMapSize(user.inlinePolicies, 1);
+
+    // When the Stack's Resources are torn down.
+    await stack.teardown();
+
+    // Then the User is gone, along with the managed policy it used.
+    assertUndefined(simAws.iam().users.get(user.userName));
+    assertMapSize(simAws.iam().policies, 0);
+    assertIdentical(
+      stack.resources.get("PublisherUser")?.status,
+      "DELETE_COMPLETE",
+    );
+  });
+
+  it("redeploys the same template into the Account the first Stack left", async () => {
+    // Given a deployed Stack naming its User, which CreateUser refuses a
+    // second time while the first User still holds the name.
+    const simAws = new SimAws();
+    const first = await simAws
+      .cloudFormation()
+      .deployTemplate({ stackName: "publisher-stack", template: userTemplate });
+    await first.teardown();
+
+    // When the same template is deployed into the same Account again.
+    const second = await simAws.cloudFormation().deployTemplate({
+      stackName: "publisher-stack-again",
+      template: userTemplate,
+    });
+
+    // Then the Stack reaches its User, with the name free to take again.
+    const user = second.resources.get("PublisherUser")?.simResource as
+      | SimIamUser
+      | undefined;
+    assertIdentical(user?.userName, "publisher-user");
+    assertIdentical(
+      simAws.iam().users.get(user.userName)?.userName,
+      "publisher-user",
     );
   });
 
