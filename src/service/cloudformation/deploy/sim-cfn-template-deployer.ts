@@ -87,6 +87,7 @@ export class SimCloudFormationTemplateDeployer {
     this.background = properties.background;
     this.exports = properties.exports;
     this.templateFileUpdater = new SimCfnTemplateFileUpdater({
+      simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,

@@ -1,21 +1,22 @@
 import type { SimCfnTemplateValue } from "../template/value/sim-cfn-template-value.js";
+import type { SimCfnParameterStoreReader } from "./store/sim-cfn-parameter-store.type.js";
 
 /**
- * Runtime value for a CloudFormation Parameter after command input and template
- * defaults have been applied.
+ * Runtime value for a CloudFormation Parameter after command input, template
+ * defaults and Parameter Store reads have been applied.
  *
- * The simulator currently supports string Parameter values because AWS
- * CloudFormation command inputs provide ParameterValue as a string.
+ * A Parameter is given its value as a string, because AWS CloudFormation
+ * command inputs provide ParameterValue as one. A Parameter declared as
+ * `AWS::SSM::Parameter::Value<List<String>>` is given a parameter name and
+ * resolves to the stored value split into a list, so a resolved value can be
+ * either.
  */
-export type SimCloudFormationParameterValue = string;
+export type SimCloudFormationParameterValue = string | string[];
 
 /**
- * Normalized Parameter values keyed by CloudFormation Parameter name.
+ * The Parameter values a command supplied, keyed by Parameter name.
  */
-export type SimCloudFormationParameterValues = Record<
-  string,
-  SimCloudFormationParameterValue
->;
+export type SimCloudFormationParameterValues = Record<string, string>;
 
 /**
  * Minimal structural shape accepted from CloudFormation command inputs.
@@ -43,15 +44,37 @@ export interface SimCfnParametersProperties {
   readonly definitions?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly values?: SimCloudFormationParameterValues | undefined;
   readonly stackName?: string | undefined;
+
+  /**
+   * The simulated Parameter Store that a Parameter typed as one of its values
+   * is read from.
+   *
+   * Absent where a template is resolved outside a simulation, which leaves
+   * such a Parameter resolving to the name it was given.
+   */
+  readonly parameterStore?: SimCfnParameterStoreReader | undefined;
 }
+
+/**
+ * What a Parameters wrapper is given about the Stack it belongs to.
+ *
+ * Everything but the values. A caller with command input to normalize passes
+ * the values separately, and a caller reading a template Parameters section has
+ * none to pass at all.
+ */
+export type SimCfnParametersContext = Pick<
+  SimCfnParametersProperties,
+  "definitions" | "stackName" | "parameterStore"
+>;
 
 /**
  * Minimal CloudFormation template Parameter definition understood by the
  * simulator.
  *
  * Most fields are recorded for structural typing/documentation. Runtime
- * behavior currently only applies string Default values when a command does not
- * provide an explicit Parameter value.
+ * behavior applies string Default values when a command does not provide an
+ * explicit Parameter value, and reads an `AWS::SSM::Parameter::Value<...>`
+ * Type from simulated Parameter Store.
  */
 export interface SimCfnParameterDefinition {
   readonly Type?: string | undefined;

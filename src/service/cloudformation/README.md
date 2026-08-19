@@ -238,6 +238,13 @@ resource creation time.
 - template `Parameters` definitions
 - parameter values supplied to `CreateStack`
 - default values from the template
+- values read from simulated Parameter Store for the `AWS::SSM::Parameter::Value<...>` types
+
+A Parameter Store value type is given a parameter name by whichever of the supplied value and the
+default it takes. `store/` reads that name through the `SimCfnParameterStoreReader` a simulated
+service implements, and records a name the store cannot answer as an ignored property of the
+Parameter. A `SimCfnParameters` built with no store, as a template resolved outside a simulation is,
+leaves such a Parameter holding the name it was given.
 
 Parameter resolution happens before runtime `SimCfnResource` objects are created. This means
 resource templates in the stack resource map already have parameter-derived values substituted where

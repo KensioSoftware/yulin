@@ -1,20 +1,27 @@
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnIgnoredProperty } from "../../resource/ignore/sim-cfn-ignored-property.type.js";
+import type { SimCfnTemplate } from "../../template/sim-cfn-template.js";
 
 /**
  * What a Stack's Resources say happened to them.
  *
- * Everything here is read off the Resources rather than collected while the
- * Stack ran, so the Stack and its Resources cannot disagree, and a Stack whose
- * Resources changed under an update reports the Resources it holds now.
+ * Everything here is read off the Resources and the template rather than
+ * collected while the Stack ran, so the Stack and its Resources cannot
+ * disagree, and a Stack whose Resources changed under an update reports the
+ * Resources it holds now.
  *
  * It does not create, delete, or order Resources.
  */
 export class SimCfnStackResourceReport {
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
+  private readonly template: SimCfnTemplate | undefined;
 
-  constructor(resources: ReadonlyMap<string, SimCfnResource>) {
+  constructor(
+    resources: ReadonlyMap<string, SimCfnResource>,
+    template?: SimCfnTemplate,
+  ) {
     this.resources = resources;
+    this.template = template;
   }
 
   /**
@@ -54,13 +61,16 @@ export class SimCfnStackResourceReport {
   }
 
   /**
-   * Every property a Resource was created without acting on.
+   * Every property a Resource was created without acting on, and every template
+   * Parameter that resolved to a stand-in value.
    */
   public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
-    return this.resources
-      .values()
-      .flatMap((resource) => resource.ignoredProperties)
-      .toArray();
+    return [
+      ...(this.template?.parameters.ignoredProperties ?? []),
+      ...this.resources
+        .values()
+        .flatMap((resource) => resource.ignoredProperties),
+    ];
   }
 
   private matching(

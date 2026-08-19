@@ -149,6 +149,7 @@ export class SimCloudFormation {
   ): Promise<SimUpdateStackCommandOutput> {
     this.authorization.updateStack(command.input.StackName, options?.caller);
     const handler = new UpdateStackCommandHandler({
+      simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,

@@ -8,6 +8,7 @@ import {
   SimCfnTemplateFileLoader,
   type SimCloudFormationDeployTemplateFileProperties,
 } from "./sim-cfn-template-file-loader.js";
+import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type {
   BackgroundCompleter,
@@ -29,6 +30,7 @@ export interface SimCfnTemplateFileUpdating {
 }
 
 interface SimCfnTemplateFileUpdaterProperties {
+  readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
@@ -47,12 +49,14 @@ interface SimCfnTemplateFileUpdaterProperties {
  * re-synthesis rewrites beside the template.
  */
 export class SimCfnTemplateFileUpdater implements SimCfnTemplateFileUpdating {
+  private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
 
   constructor(properties: SimCfnTemplateFileUpdaterProperties) {
+    this.simAws = properties.simAws;
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
@@ -71,6 +75,7 @@ export class SimCfnTemplateFileUpdater implements SimCfnTemplateFileUpdating {
   ): Promise<SimCfnStack> {
     const loaded = await this.templateFileLoader.load(properties);
     const handler = new UpdateStackCommandHandler({
+      simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,

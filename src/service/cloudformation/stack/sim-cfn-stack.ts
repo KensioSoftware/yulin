@@ -271,13 +271,13 @@ export class SimCfnStack {
     return this.report.retained;
   }
 
-  /** Every property a Resource was created without acting on. */
+  /** Every property or Parameter that did not reach simulated AWS as written. */
   public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
     return this.report.ignoredProperties;
   }
 
   private get report(): SimCfnStackResourceReport {
-    return new SimCfnStackResourceReport(this.resources);
+    return new SimCfnStackResourceReport(this.resources, this.cfnTemplate);
   }
 
   private async createResources(): Promise<void> {

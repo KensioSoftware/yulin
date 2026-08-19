@@ -455,6 +455,84 @@ naming the property that held the reference and why the value is a stand-in. A v
 never had, a `SecureString`, and a body that is not a name and an optional integer version are all
 recorded the same way.
 
+## Reading a parameter through a template Parameter
+
+A template `Parameters` entry declared as `AWS::SSM::Parameter::Value<String>` is given a parameter
+name, and `Ref` on it gives the value held under that name in the stack's account and region. The
+name comes from the value passed to `CreateStack`, and from the template `Default` when no value is
+passed.
+
+```typescript sim-ssm-template-parameter-value
+/**
+ * Reading configuration into a template through a Parameter Store value type.
+ */
+
+import { PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/uploads-bucket",
+    Type: "String",
+    Value: "myapp-prod-uploads",
+  }),
+);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "app-stack",
+  template: {
+    Parameters: {
+      UploadsBucketName: {
+        Type: "AWS::SSM::Parameter::Value<String>",
+        Default: "/myapp/prod/uploads-bucket",
+      },
+    },
+    Resources: {
+      UploadsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: { Ref: "UploadsBucketName" } },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// The Bucket was created under the name the parameter holds.
+console.log(simAws.s3().getSimBucketByName("myapp-prod-uploads")?.bucketName);
+// "myapp-prod-uploads"
+```
+
+CDK emits this Parameter from `ssm.StringParameter.valueForStringParameter(scope, name)` called
+without a version, carrying the name as the `Default`.
+
+`AWS::SSM::Parameter::Value<List<String>>` resolves to the stored comma-separated string split into
+a list, which `Fn::Select` then reads by index. `AWS::SSM::Parameter::Value<CommaDelimitedList>`
+resolves the same way. `ssm.StringListParameter.fromListParameterAttributes` without a version emits
+the first of the two.
+
+The `Parameters` section is read before any resource is created, as it is on real AWS. A name a
+resource of the same stack goes on to create is never there in time, whatever the template says
+about `DependsOn`.
+
+The stored value goes unchecked against the inner type. A name held against something other than an
+image ID resolves under `AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>`, where real CloudFormation
+refuses the stack.
+
+### A name the simulation cannot answer
+
+The same best-effort answer a dynamic reference gets. A name Parameter Store has never held resolves
+to `dummy-value-for-<name>`, and the stack carries on deploying. A `SecureString` resolves that way
+too, since real CloudFormation refuses to read one into a template Parameter.
+
+The substitution is recorded on
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+The `logicalId` names the template Parameter, the `resourceType` gives its declared type, and the
+`path` is `Parameters.<parameter name>`.
+
 ## Reading configuration in a Lambda handler
 
 Function code that reads its configuration on cold start needs no special treatment. Any
@@ -820,6 +898,9 @@ Sim SSM currently supports:
   current value, embedded in a longer string and inside `Fn::Sub`
 - `StringList` parameters read through a dynamic reference as the comma-separated string `Fn::Split`
   then splits
+- `AWS::SSM::Parameter::Value<String>` template parameters, resolving `Ref` to the stored value
+- `AWS::SSM::Parameter::Value<List<String>>` and `<CommaDelimitedList>` template parameters,
+  resolving `Ref` to the stored string split into a list
 - Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -864,14 +945,17 @@ Current documented limitations:
 - Every deployment of an `AWS::SSM::Parameter` is a create. A name another stack already used is
   refused. A stack update that changes `Value` deletes the parameter and creates it again, where
   real CloudFormation overwrites it in place, so the parameter's version starts from 1 again.
-- The `AWS::SSM::Parameter::Value<String>` template parameter type is absent. A `Ref` to a parameter
-  declared with it gives the name it was given, where real CloudFormation gives the value stored
-  under that name. Pass the name from `Ref` and read it with `GetParameter`.
+- A template parameter typed as `AWS::SSM::Parameter::Value<...>` is read once, while the
+  `Parameters` section is. Real CloudFormation does the same, so a name that only exists once the
+  stack has deployed resolves to a stand-in value here and fails the stack there.
+- The value a template parameter resolves to goes unvalidated against the inner type. The
+  `AWS::EC2::*` and `AWS::Route53::HostedZone::Id` inner types name EC2 and Route53 resources, which
+  this simulation holds none of.
 - `{{resolve:ssm-secure:...}}` dynamic references are absent. Reading a `SecureString` into a
   template means decrypting it, which the CloudFormation engine has no route to yet.
 - A `{{resolve:ssm:...}}` reference naming a parameter, or a version, that simulated Parameter Store
   has never held resolves to `dummy-value-for-<name>` and records the substitution. Real
-  CloudFormation fails the stack.
+  CloudFormation fails the stack. A template parameter naming one gets the same stand-in value.
 - Public parameters under `/aws/service/...` do not exist, and names under the reserved `aws` and
   `ssm` prefixes are refused, as they are on real AWS.
 - The Parameters and Secrets Lambda extension HTTP endpoint is absent. Handler code has to use the

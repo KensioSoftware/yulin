@@ -460,6 +460,12 @@ console.log(
 
 A parameter with no supplied value takes the template default, when the template has one.
 
+A parameter's `Type` is read for the `AWS::SSM::Parameter::Value<...>` types, which hold a Parameter
+Store name and resolve to the value stored under it. See
+[reading a parameter through a template Parameter](../ssm/README.md#reading-a-parameter-through-a-template-parameter).
+Every other type is accepted and its value used as written, with no validation of the value against
+the type.
+
 ## Intrinsic functions
 
 Sim CloudFormation supports common intrinsic functions used by supported resources.
@@ -2193,6 +2199,10 @@ for (const ignored of stack.ignoredProperties) {
   //  are not simulated, ..."
 }
 ```
+
+A template parameter that resolved to a stand-in value is recorded in the same list, with the
+parameter name as the `logicalId`, its declared `Type` as the `resourceType`, and a `path` of
+`Parameters.<parameter name>`. Only the `AWS::SSM::Parameter::Value<...>` types can produce one.
 
 Each entry names the `logicalId` and `resourceType` of the Resource, the `path` to the property, and
 a `reason`. The path is the whole way down, and a setting on one entry of a list says which entry it
