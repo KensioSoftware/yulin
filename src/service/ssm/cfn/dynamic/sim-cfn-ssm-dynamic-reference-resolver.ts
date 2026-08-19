@@ -6,44 +6,8 @@ import type {
 import { SimSsmParameterVersionNotFound } from "../../error/sim-ssm.error.js";
 import type { SimSsmParameter } from "../../parameter/sim-ssm-parameter.js";
 import type { SimSsm } from "../../sim-ssm.js";
-
-/** The characters CloudFormation documents a referenced parameter name as. */
-const ssmReferenceName = /^[a-zA-Z0-9_.\-/]+$/;
-
-/** The version selector, which CloudFormation documents as an integer. */
-const ssmReferenceVersion = /^\d+$/;
-
-/** A reference body read as the parameter name and the version after it. */
-interface SimCfnSsmReferenceBody {
-  readonly name: string;
-  readonly version: string | undefined;
-}
-
-/**
- * Read a reference body as a parameter name and an optional version.
- *
- * A parameter name holds no colon, so the last one always opens the version.
- */
-function parseSsmReferenceBody(
-  body: string,
-): SimCfnSsmReferenceBody | undefined {
-  const colon = body.lastIndexOf(":");
-
-  if (colon === -1) {
-    return ssmReferenceName.test(body)
-      ? { name: body, version: undefined }
-      : undefined;
-  }
-
-  const name = body.slice(0, colon);
-  const version = body.slice(colon + 1);
-
-  if (!ssmReferenceName.test(name) || !ssmReferenceVersion.test(version)) {
-    return undefined;
-  }
-
-  return { name, version };
-}
+import { parseSimCfnSsmReferenceBody } from "./sim-cfn-ssm-reference-body.js";
+import { simCfnSsmReferenceStandIn } from "./sim-cfn-ssm-reference-stand-in.js";
 
 interface SimCfnSsmDynamicReferenceResolverProperties {
   readonly ssm: SimSsm;
@@ -73,10 +37,10 @@ export class SimCfnSsmDynamicReferenceResolver implements SimCfnDynamicReference
    * Resolve one reference to the parameter value it names.
    */
   resolve(reference: SimCfnDynamicReference): SimCfnDynamicReferenceResolution {
-    const parsed = parseSsmReferenceBody(reference.body);
+    const parsed = parseSimCfnSsmReferenceBody(reference.body);
 
     if (parsed === undefined) {
-      return this.standIn(
+      return simCfnSsmReferenceStandIn(
         reference,
         reference.body,
         `which is not the parameter name, optionally followed by an integer ` +
@@ -88,7 +52,7 @@ export class SimCfnSsmDynamicReferenceResolver implements SimCfnDynamicReference
     const parameter = this.ssm.findParameter(name);
 
     if (parameter === undefined) {
-      return this.standIn(
+      return simCfnSsmReferenceStandIn(
         reference,
         name,
         `and simulated Parameter Store holds no parameter '${name}'`,
@@ -96,7 +60,7 @@ export class SimCfnSsmDynamicReferenceResolver implements SimCfnDynamicReference
     }
 
     if (parameter.type.value === "SecureString") {
-      return this.standIn(
+      return simCfnSsmReferenceStandIn(
         reference,
         name,
         `and '${name}' is a SecureString, which real CloudFormation reads ` +
@@ -128,30 +92,11 @@ export class SimCfnSsmDynamicReferenceResolver implements SimCfnDynamicReference
         throw error;
       }
 
-      return this.standIn(
+      return simCfnSsmReferenceStandIn(
         reference,
         name,
         `and '${name}' has no version ${version}`,
       );
     }
-  }
-
-  /**
-   * The value a reference Parameter Store could not answer resolves to.
-   *
-   * The shape follows CDK, which fills an unresolved context lookup with
-   * `dummy-value-for-<name>`. A test reading one back sees where it came from.
-   */
-  private standIn(
-    reference: SimCfnDynamicReference,
-    name: string,
-    reason: string,
-  ): SimCfnDynamicReferenceResolution {
-    return {
-      value: `dummy-value-for-${name}`,
-      reason:
-        `holds ${reference.text}, ${reason}, so the Resource is created ` +
-        `with a stand-in value`,
-    };
   }
 }
