@@ -141,6 +141,11 @@ permission fails the call rather than leaving a filter that drops every event in
 resource policy is then consulted again on every delivery, so a permission taken away afterwards
 stops delivery, which is what an account does.
 
+A destination ARN may carry a version or alias qualifier. `SimLogsSubscriptionFunctionArn` holds it
+beside the function name and `permittedSimLogsDestinationFunction` resolves it through
+`getSimFunctionTarget` at both of those points. The alias is what the delivery is authorized
+against, and the version behind it is what runs.
+
 Failures are kept rather than thrown. Real CloudWatch Logs tells nobody about a failed delivery,
 which would leave a test with a handler that mysteriously never ran, so every failure lands in
 `subscriptionFailures` for a test to read.

@@ -34,28 +34,36 @@ export class SimEventBridgeDeliveryFunction {
    * Invoke the function with the event, if it admits EventBridge for this
    * rule.
    *
-   * The resource policy is consulted on every delivery rather than remembered
+   * The function, the version or alias a qualified target named, and the
+   * resource policy are all resolved on every delivery rather than remembered
    * from the moment the target was added, so a permission taken away
-   * afterwards stops delivery. Real EventBridge does not check it at
-   * `PutTargets` time either.
+   * afterwards stops delivery and an alias moved to another version moves what
+   * runs. Real EventBridge does not check any of it at `PutTargets` time
+   * either.
    */
   async deliver(request: SimEventBridgeDeliveryRequest): Promise<void> {
     const source = simEventBridgeDeliverySource(request);
     const targetArn = request.target.arn;
-    const simFunction = this.scope
+    const target = this.scope
       .lambda()
-      .getSimFunctionByName(targetArn.functionName);
+      .getSimFunctionTarget(
+        targetArn.functionName,
+        targetArn.functionQualifier,
+      );
 
-    if (simFunction === undefined) {
+    if (target === undefined) {
       throw new SimEventBridgeTargetNotFound(
-        `${targetArn.value} is not a simulated Lambda function.`,
+        targetArn.functionQualifier === undefined
+          ? `${targetArn.value} is not a simulated Lambda function.`
+          : `${targetArn.value} names no simulated Lambda function version ` +
+              "or alias.",
       );
     }
 
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: this.scope.iam(),
     }).authorize({
-      simFunction,
+      resource: target.resource,
       servicePrincipal: simEventBridgeServicePrincipal,
       ...source,
     });
@@ -73,6 +81,6 @@ export class SimEventBridgeDeliveryFunction {
     // asynchronous invocation real EventBridge makes, and because a handler
     // failure has to reach the delivery outcome rather than being swallowed
     // as an asynchronous invocation error.
-    await simFunction.invoke(simEventBridgeDeliveryDocument(request));
+    await target.simFunction.invoke(simEventBridgeDeliveryDocument(request));
   }
 }

@@ -2,6 +2,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
+import { simLambdaEventSourceFunction } from "./sim-lambda-event-source-function.js";
 import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda-dynamodb-stream-event-source-arn.js";
 import type { SimLambdaEventSourceStreams } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaDynamoDbPolledStream } from "./sim-lambda-dynamodb-polled-stream.js";
@@ -153,6 +154,6 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
       return undefined;
     }
 
-    return this.functions.find(this.mapping.functionName);
+    return simLambdaEventSourceFunction(this.functions, this.mapping);
   }
 }

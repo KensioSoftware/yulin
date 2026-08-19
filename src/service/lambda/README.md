@@ -10,6 +10,9 @@ code can interact with it through familiar AWS SDK commands.
 ## Entry points
 
 - `sim-lambda.ts` is the main in-memory service object for one account/region scope.
+- `sim-lambda-inspection.ts` holds the simulator's own accessors, which go through no Command and no
+  authorization. `SimLambda` extends it, the way `SimEventBridge` extends its own inspection base,
+  and the split keeps the facade to delegating SDK commands.
 - `index.ts` exports the public Lambda simulator API for `@kensio/yulin/lambda`.
 
 A `SimLambda` instance owns an in-memory map of functions:
@@ -382,6 +385,18 @@ front of a request made against the alias. `Invoke` reaches the same resource th
 `findResource`. It tolerates a function that is absent, since a request naming one is authorized
 before it is reported missing.
 
+Both answers come from one lookup. `SimLambdaFunctionTarget` carries the resource a qualifier named
+and the version that runs, and `findTarget` and `requireTarget` on the version store are what
+everything else here is built on. `SimLambdaFunctionLookup` offers the same two by function name,
+and `SimLambda.getSimFunctionTarget` is how the other simulated services reach a function a target
+ARN points at. Each of them resolves the qualifier at the moment it is asked, so an alias moved to
+another version moves what a standing notification, subscription, trigger, rule target or event
+source mapping delivers to.
+
+`SimLambdaServiceInvokeAuthorizer` takes that resource rather than the function, so a delivery to
+an alias is admitted by a grant made on the alias. The service being the caller is the only thing
+that differs from an `Invoke`.
+
 ## Event source mappings
 
 `event-source/` owns delivery from a simulated SQS queue or DynamoDB stream to a function.
@@ -424,6 +439,15 @@ exists, and that the execution role may perform the operations polling it takes
 (`SimLambdaEventSourceRolePermissions`, which reads those operations off the ARN — for a queue,
 `ReceiveMessage`, `DeleteMessage` and `GetQueueAttributes`). Both failures are the mapping's, not
 the poller's: a mapping that cannot poll looks like a working subscription and delivers nothing.
+
+A `FunctionName` may carry a version or alias qualifier. `SimLambdaEventSourceMappingInput` reads it
+with `simLambdaFunctionReferenceOf` and the mapping holds it beside the name, so each poll resolves
+it again through `SimLambdaFunctionLookup.findTarget` and an alias moved to another version moves
+what the mapping delivers to. The version has to be there when the mapping is created, checked with
+`requireTarget` alongside the function. `FunctionArn` on the mapping is the resource it was pointed
+at, so a mapping onto an alias reports the alias. `simLambdaFunctionNameOf` is left where the
+qualifier genuinely has no bearing, which is the `ListEventSourceMappings` filter and the
+CloudFormation target-function reader.
 
 `poll/` holds what one poll does. `SimLambdaEventSourcePoller` is the three-method interface
 (`watch`, `pollNow`, `stop`) the mapping's pollers are held behind, and

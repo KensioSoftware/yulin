@@ -2,9 +2,9 @@ import {
   type SimLambdaFunctionArn,
   simLambdaFunctionArn,
 } from "../sim-lambda-function-configuration.js";
-import type { SimLambdaPolicyResource } from "../policy/sim-lambda-policy-resource.js";
 import type { SimLambdaFunction } from "../sim-lambda-function.js";
 import type { SimLambdaFunctionAlias } from "./sim-lambda-function-alias.js";
+import type { SimLambdaFunctionTarget } from "./sim-lambda-function-target.js";
 
 /**
  * The ARN a version or an alias of a function has, which is the function's own
@@ -53,36 +53,32 @@ export class SimLambdaFunctionVersions {
   }
 
   /**
-   * The version a qualifier names, or nothing when it names neither a version
-   * nor an alias.
+   * What a qualifier names, or nothing when it names neither a version nor an
+   * alias.
    *
    * Real Lambda tells the two apart the way this does. An alias name cannot be
    * all digits, so a qualifier that is one is a version number.
+   *
+   * An alias is the resource a grant is made on and a request is authorized
+   * against, so it answers as the resource while the version it points at is
+   * what runs.
    */
-  resolve(qualifier: string): SimLambdaFunction | undefined {
+  target(qualifier: string): SimLambdaFunctionTarget | undefined {
     if (isVersionNumber(qualifier)) {
-      return this.version(qualifier);
+      const version = this.version(qualifier);
+
+      return version === undefined
+        ? undefined
+        : { resource: version, simFunction: version };
     }
 
     const alias = this.aliases.get(qualifier);
+    const version =
+      alias === undefined ? undefined : this.version(alias.functionVersion);
 
-    return alias === undefined
+    return alias === undefined || version === undefined
       ? undefined
-      : this.version(alias.functionVersion);
-  }
-
-  /**
-   * The resource a qualifier names, or nothing when it names neither a version
-   * nor an alias.
-   *
-   * This stops where `resolve` carries on: an alias is the resource a grant is
-   * made on and a request is authorized against, so it answers as itself
-   * rather than as the version behind it.
-   */
-  named(qualifier: string): SimLambdaPolicyResource | undefined {
-    return isVersionNumber(qualifier)
-      ? this.version(qualifier)
-      : this.aliases.get(qualifier);
+      : { resource: alias, simFunction: version };
   }
 
   /**

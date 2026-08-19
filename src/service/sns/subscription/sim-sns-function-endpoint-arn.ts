@@ -1,16 +1,14 @@
 import type { SimAwsAccountId } from "../../aws/sim-aws-account-id.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { parseSimLambdaFunctionArn } from "../../lambda/function/sim-lambda-function-arn-parts.js";
-import {
-  SimSnsInvalidParameterException,
-  SimSnsUnsimulatedInputException,
-} from "../error/sim-sns.error.js";
+import { SimSnsInvalidParameterException } from "../error/sim-sns.error.js";
 
 interface SimSnsFunctionEndpointArnProperties {
   readonly value: string;
   readonly regionName: AwsRegionName;
   readonly accountId: SimAwsAccountId;
   readonly functionName: string;
+  readonly qualifier: string | undefined;
 }
 
 /**
@@ -27,11 +25,21 @@ export class SimSnsFunctionEndpointArn {
   public readonly accountId: SimAwsAccountId;
   public readonly functionName: string;
 
+  /**
+   * The version or alias the endpoint qualified the function with, if it named
+   * one.
+   *
+   * A subscription to `orders:live` delivers to the version the alias points
+   * at, so the qualifier is held here and resolved on every delivery.
+   */
+  public readonly qualifier: string | undefined;
+
   private constructor(properties: SimSnsFunctionEndpointArnProperties) {
     this.value = properties.value;
     this.regionName = properties.regionName;
     this.accountId = properties.accountId;
     this.functionName = properties.functionName;
+    this.qualifier = properties.qualifier;
   }
 
   /**
@@ -41,10 +49,6 @@ export class SimSnsFunctionEndpointArn {
    * What SNS adds is what an unreadable one means to a `Subscribe` request,
    * which is the same `InvalidParameterException` a queue ARN that is not one
    * gets.
-   *
-   * A qualified ARN naming a version or an alias is refused rather than read as
-   * the unqualified function, because simulated Lambda has neither and
-   * delivering to `$LATEST` instead would be the wrong function.
    */
   static parse(endpoint: string): SimSnsFunctionEndpointArn {
     const parts = parseSimLambdaFunctionArn(endpoint);
@@ -57,19 +61,12 @@ export class SimSnsFunctionEndpointArn {
       );
     }
 
-    if (parts.qualifier !== undefined) {
-      throw new SimSnsUnsimulatedInputException(
-        `Cannot subscribe ${endpoint}: simulated Lambda has no function ` +
-          "versions or aliases, so a qualified function ARN is refused rather " +
-          "than treated as the unqualified function.",
-      );
-    }
-
     return new this({
       value: endpoint,
       regionName: parts.regionName,
       accountId: parts.accountId,
       functionName: parts.functionName,
+      qualifier: parts.qualifier,
     });
   }
 }

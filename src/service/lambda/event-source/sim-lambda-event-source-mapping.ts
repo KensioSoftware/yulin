@@ -33,6 +33,7 @@ interface SimLambdaEventSourceMappingProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly eventSourceArn: string;
   readonly functionName: string;
+  readonly qualifier?: string | undefined;
   readonly functionArn: SimLambdaFunctionArn;
   readonly batchSize: number;
   readonly startingPosition?: SimLambdaEventSourceStartingPosition | undefined;
@@ -76,6 +77,15 @@ export class SimLambdaEventSourceMapping {
   public readonly uuid: string = randomUUID();
   public readonly eventSourceArn: string;
   public readonly functionName: string;
+
+  /**
+   * The version or alias this mapping delivers to, if it was created with one.
+   *
+   * It is resolved on every poll rather than at creation, so an alias moved to
+   * another version moves what the mapping delivers to.
+   */
+  public readonly qualifier: string | undefined;
+
   public readonly functionArn: SimLambdaFunctionArn;
   public readonly batchSize: number;
   /**
@@ -97,6 +107,7 @@ export class SimLambdaEventSourceMapping {
     this.accountRegionScope = properties.accountRegionScope;
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
+    this.qualifier = properties.qualifier;
     this.functionArn = properties.functionArn;
     this.batchSize = properties.batchSize;
     this.startingPosition = properties.startingPosition;

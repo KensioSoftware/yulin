@@ -35,32 +35,37 @@ export class SimSnsDeliveryFunction {
   /**
    * Invoke the function with the event, if it still admits SNS for this topic.
    *
-   * The resource policy is consulted on every delivery rather than remembered
-   * from the moment the subscription was made, so a permission taken away
-   * afterwards stops delivery. Real SNS does not check it at `Subscribe` time
-   * at all, which is why this is the only place it is asked.
+   * The function, and the version or alias a qualified endpoint named, are
+   * resolved on every delivery, along with the resource policy, so a
+   * permission taken away afterwards stops delivery and an alias moved to
+   * another version moves what runs. Real SNS checks none of it at
+   * `Subscribe` time, which is why this is the only place it is asked.
    */
   async deliver(request: SimSnsDeliveryRequest): Promise<void> {
     const source = simSnsDeliverySource(request);
     const endpointArn = request.subscription.endpoint.value;
-    const simFunction = this.scope
+    const target = this.scope
       .lambda()
-      .getSimFunctionByName(this.arn.functionName);
+      .getSimFunctionTarget(this.arn.functionName, this.arn.qualifier);
 
-    if (simFunction === undefined) {
+    if (target === undefined) {
       // Not a refusal: the resource policy said nothing, because there is no
       // function. A subscription pointing at nothing is a mistake worth
       // warning about, where a policy saying no is a modelled outcome a test
-      // may be asking for on purpose.
+      // may be asking for on purpose. A qualified endpoint reaches here for a
+      // version or alias that is not there as well.
       throw new SimSnsNotFoundException(
-        `${endpointArn} is not a simulated Lambda function.`,
+        this.arn.qualifier === undefined
+          ? `${endpointArn} is not a simulated Lambda function.`
+          : `${endpointArn} names no simulated Lambda function version or ` +
+              "alias.",
       );
     }
 
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: this.scope.iam(),
     }).authorize({
-      simFunction,
+      resource: target.resource,
       servicePrincipal: simSnsServicePrincipal,
       ...source,
     });
@@ -78,6 +83,6 @@ export class SimSnsDeliveryFunction {
     // asynchronous invocation real SNS makes, and because a handler failure
     // has to reach the delivery outcome rather than being swallowed as an
     // asynchronous invocation error.
-    await simFunction.invoke(simSnsLambdaEventDocument(request));
+    await target.simFunction.invoke(simSnsLambdaEventDocument(request));
   }
 }

@@ -124,6 +124,7 @@ export class SimLambdaCommands {
     this.functionLookup = new SimLambdaFunctionLookup({
       accountRegionScope,
       functions: properties.functions,
+      versions: this.versionStore,
     });
     this.functionUrlStore = new SimLambdaFunctionUrlStore({
       accountRegionScope,

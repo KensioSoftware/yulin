@@ -9,10 +9,13 @@ import {
   type SimLambdaFunctionArn,
   simLambdaFunctionArn,
 } from "../sim-lambda-function-configuration.js";
+import type { SimLambdaFunctionTarget } from "../version/sim-lambda-function-target.js";
+import type { SimLambdaFunctionVersionStore } from "../version/sim-lambda-function-version-store.js";
 
 interface SimLambdaFunctionLookupProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly functions: SimLambdaFunctionMap;
+  readonly versions: SimLambdaFunctionVersionStore;
 }
 
 /**
@@ -26,10 +29,12 @@ interface SimLambdaFunctionLookupProperties {
 export class SimLambdaFunctionLookup {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly functions: SimLambdaFunctionMap;
+  private readonly versions: SimLambdaFunctionVersionStore;
 
   constructor(properties: SimLambdaFunctionLookupProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.functions = properties.functions;
+    this.versions = properties.versions;
   }
 
   /**
@@ -49,6 +54,31 @@ export class SimLambdaFunctionLookup {
    */
   find(functionName: string): SimLambdaFunction | undefined {
     return this.functions.get(functionName as SimLambdaFunctionName);
+  }
+
+  /**
+   * Get what a name and a qualifier together name, or nothing when there is no
+   * such function, version or alias.
+   *
+   * A qualifier is resolved on every lookup rather than once, so an alias
+   * moved to another version afterwards moves what a standing target reaches.
+   */
+  findTarget(
+    functionName: string,
+    qualifier?: string,
+  ): SimLambdaFunctionTarget | undefined {
+    return this.versions.findTarget(this.find(functionName), qualifier);
+  }
+
+  /**
+   * Get what a name and a qualifier together name, or fail as AWS does when
+   * there is no such function, version or alias.
+   */
+  requireTarget(
+    functionName: string,
+    qualifier?: string,
+  ): SimLambdaFunctionTarget {
+    return this.versions.requireTarget(this.require(functionName), qualifier);
   }
 
   /**

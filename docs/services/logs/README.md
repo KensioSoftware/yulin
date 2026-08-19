@@ -422,7 +422,106 @@ The behaviour in detail:
   picks up what that function wrote. A forwarder can be tested against a real handler's output.
 - **Lambda is the only destination.** Kinesis, Firehose and cross-account destinations are refused
   outright.
+- **A destination can name a version or an alias.** See
+  [Subscribing a Lambda alias](#subscribing-a-lambda-alias).
 - **Two filters per log group**, the current AWS account default.
+
+### Subscribing a Lambda alias
+
+A `destinationArn` can carry a version number or an alias name on the end, and matched events go to
+the version that qualifier names. The grant is made on the same qualifier:
+
+```typescript sim-logs-subscription-alias
+/**
+ * Delivering matched log events to a simulated Lambda alias.
+ */
+
+import {
+  CreateLogGroupCommand,
+  CreateLogStreamCommand,
+  PutLogEventsCommand,
+  PutSubscriptionFilterCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+import {
+  AddPermissionCommand,
+  CreateAliasCommand,
+  CreateFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const logGroupName = "/aws/lambda/orders";
+const logStreamName = "2026/08/19/[$LATEST]0f7c1a";
+const trackerArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:error-tracker`;
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "error-tracker",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/TrackerRole`,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => {
+        console.log(context.functionVersion); // "1", the version behind `live`
+
+        return "recorded";
+      }),
+    },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const published = await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "error-tracker" }),
+);
+
+await lambda.createAlias(
+  new CreateAliasCommand({
+    FunctionName: "error-tracker",
+    Name: "live",
+    FunctionVersion: published.Version,
+  }),
+);
+
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "error-tracker",
+    Qualifier: "live",
+    StatementId: "logs",
+    Action: "lambda:InvokeFunction",
+    Principal: `logs.${simAws.defaultRegionName}.amazonaws.com`,
+  }),
+);
+
+await simAws.logs().createLogGroup(new CreateLogGroupCommand({ logGroupName }));
+await simAws
+  .logs()
+  .createLogStream(new CreateLogStreamCommand({ logGroupName, logStreamName }));
+
+await simAws.logs().putSubscriptionFilter(
+  new PutSubscriptionFilterCommand({
+    logGroupName,
+    filterName: "errors-to-tracker",
+    filterPattern: "ERROR",
+    destinationArn: `${trackerArn}:live`,
+  }),
+);
+
+await simAws.logs().putLogEvents(
+  new PutLogEventsCommand({
+    logGroupName,
+    logStreamName,
+    logEvents: [{ timestamp: 1000, message: "ERROR order has no items" }],
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+```
+
+A qualifier naming no version and no alias is refused where the filter is put, the way a missing
+function is. `UpdateAlias` moves what the filter reaches, and the filter stays as it is.
 
 ## Permissions
 

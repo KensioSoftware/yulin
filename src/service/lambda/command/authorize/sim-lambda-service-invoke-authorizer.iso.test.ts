@@ -41,7 +41,7 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: simAws.iam(),
     }).authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
       sourceArn: bucketArn,
       sourceAccount: bucketAccountId,
@@ -71,7 +71,7 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: simAws.iam(),
     }).authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
       sourceArn: bucketArn,
       sourceAccount: bucketAccountId,
@@ -99,7 +99,7 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: simAws.iam(),
     }).authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
       sourceArn: bucketArn,
       sourceAccount: "222222222222",
@@ -131,13 +131,13 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
 
     // When both match, and when only one of them does
     const both = authorizer.authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
       sourceArn: bucketArn,
       sourceAccount: bucketAccountId,
     });
     const otherBucket = authorizer.authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
       sourceArn: "arn:aws:s3:::refunds",
       sourceAccount: bucketAccountId,
@@ -166,7 +166,7 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: simAws.iam(),
     }).authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: s3ServicePrincipal,
     });
 
@@ -192,7 +192,7 @@ describe("Authorizing a simulated service to invoke a Lambda function", () => {
     const decision = new SimLambdaServiceInvokeAuthorizer({
       iam: simAws.iam(),
     }).authorize({
-      simFunction,
+      resource: simFunction,
       servicePrincipal: "events.amazonaws.com",
       sourceAccount: bucketAccountId,
     });

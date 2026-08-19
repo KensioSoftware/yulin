@@ -255,11 +255,11 @@ describe("CloudWatch Logs subscription filters", () => {
     assertStringIncludes(noDestination.message, "destinationArn");
   });
 
-  it("refuses a destination naming a function version", async () => {
-    // Given a log group and a qualified function ARN.
+  it("refuses a destination naming no version or alias", async () => {
+    // Given a log group and a function nothing was published from.
     const simAws = await simAwsWithTrackers();
 
-    // When a filter is put on it.
+    // When a filter names a version of it.
     const error = await assertThrowsErrorAsync(
       async () =>
         await simAws.logs().putSubscriptionFilter(
@@ -272,10 +272,12 @@ describe("CloudWatch Logs subscription filters", () => {
         ),
     );
 
-    // Then it is refused, because simulated Lambda has no versions and
-    // delivering to the unqualified function would be a different one.
-    assertInstanceOf(error, SimLogsInvalidParameterException);
-    assertStringIncludes(error.message, "version or alias");
+    // Then it is refused where the filter is put, rather than delivering to
+    // the unqualified function, which would be a different one.
+    assertStringIncludes(
+      error.message,
+      "names no simulated Lambda function version or alias",
+    );
   });
 
   it("refuses a destination in another Account or Region", async () => {

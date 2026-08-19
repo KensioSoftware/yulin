@@ -142,14 +142,21 @@ describe("The destination a simulated S3 notification configuration names", () =
     assertStringIncludes(error.message, "not a simulated Lambda function");
   });
 
-  it("refuses a qualified function ARN", async () => {
-    // Given a Bucket
+  it("refuses a qualifier naming no version or alias", async () => {
+    // Given a Bucket and a function nothing was published from
     const simAws = new SimAws();
     await simAws
       .s3()
       .createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "thumbnailer",
+        Role: "arn:aws:iam::888888888888:role/ThumbnailerRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "thumbnailed") },
+      }),
+    );
 
-    // When a configuration names a function version
+    // When a configuration names a version nothing published
     const error = await assertThrowsErrorAsync(async () =>
       simAws.s3().putBucketNotificationConfiguration(
         new PutBucketNotificationConfigurationCommand({
@@ -167,7 +174,10 @@ describe("The destination a simulated S3 notification configuration names", () =
     );
 
     // Then it is refused rather than read as the unqualified function
-    assertStringIncludes(error.message, "versions or aliases");
+    assertStringIncludes(
+      error.message,
+      "names no simulated Lambda function version or alias",
+    );
   });
 
   it("refuses a Lambda destination ARN naming another service", async () => {

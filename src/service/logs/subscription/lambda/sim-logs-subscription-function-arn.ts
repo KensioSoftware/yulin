@@ -12,6 +12,7 @@ interface SimLogsSubscriptionFunctionArnProperties {
   readonly regionName: AwsRegionName;
   readonly accountId: SimAwsAccountId;
   readonly functionName: string;
+  readonly qualifier: string | undefined;
 }
 
 /**
@@ -26,11 +27,22 @@ export class SimLogsSubscriptionFunctionArn {
   readonly accountId: SimAwsAccountId;
   readonly functionName: string;
 
+  /**
+   * The version or alias the destination qualified the function with, if it
+   * named one.
+   *
+   * A filter whose destination is `orders:live` delivers to the version the
+   * alias points at, so the qualifier is held here and resolved when the
+   * filter is put and again on every delivery.
+   */
+  readonly qualifier: string | undefined;
+
   private constructor(properties: SimLogsSubscriptionFunctionArnProperties) {
     this.value = properties.value;
     this.regionName = properties.regionName;
     this.accountId = properties.accountId;
     this.functionName = properties.functionName;
+    this.qualifier = properties.qualifier;
   }
 
   /**
@@ -62,14 +74,6 @@ export class SimLogsSubscriptionFunctionArn {
       );
     }
 
-    if (parts.qualifier !== undefined) {
-      throw new SimLogsInvalidParameterException(
-        `${destinationArn} names a function version or alias, and simulated ` +
-          `Lambda has neither, so delivering to the unqualified function ` +
-          `instead would be delivering to a different one`,
-      );
-    }
-
     if (parts.accountId !== scope.accountId) {
       throw new SimLogsInvalidParameterException(
         `${destinationArn} is in Account ${parts.accountId}, and a Lambda ` +
@@ -92,6 +96,7 @@ export class SimLogsSubscriptionFunctionArn {
       regionName: parts.regionName,
       accountId: parts.accountId,
       functionName: parts.functionName,
+      qualifier: parts.qualifier,
     });
   }
 }

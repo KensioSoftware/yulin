@@ -6,7 +6,7 @@ import {
   simLambdaSourceAccountConditionKey,
   simLambdaSourceArnConditionKey,
 } from "../../function/policy/sim-lambda-permission.js";
-import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
+import type { SimLambdaPolicyResource } from "../../function/policy/sim-lambda-policy-resource.js";
 import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
 import { simLambdaResourcePolicies } from "./sim-lambda-resource-policies.js";
 
@@ -15,7 +15,15 @@ interface SimLambdaServiceInvokeAuthorizerProperties {
 }
 
 interface SimLambdaServiceInvokeAuthorizationInput {
-  readonly simFunction: SimLambdaFunction;
+  /**
+   * What the service is invoking, which is a function, a published version or
+   * an alias.
+   *
+   * Each qualified resource holds a policy of its own. A delivery to the alias
+   * `live` is admitted by a grant made on `live`, and one to the function
+   * itself by a grant on the function.
+   */
+  readonly resource: SimLambdaPolicyResource;
 
   /** The service principal the invoking service calls Lambda as. */
   readonly servicePrincipal: string;
@@ -67,9 +75,9 @@ export class SimLambdaServiceInvokeAuthorizer {
   ): SimIamAuthorizationDecision {
     return this.iam.authorize({
       action: SimLambdaServiceInvokeAuthorizer.action,
-      resource: input.simFunction.arn,
+      resource: input.resource.arn,
       caller: { kind: "service", service: input.servicePrincipal },
-      resourcePolicies: simLambdaResourcePolicies(input.simFunction),
+      resourcePolicies: simLambdaResourcePolicies(input.resource),
       conditionContext: this.conditionContext(input),
     });
   }

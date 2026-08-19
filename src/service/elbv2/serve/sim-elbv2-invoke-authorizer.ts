@@ -61,7 +61,7 @@ export class SimElbV2InvokeAuthorizer {
     input: SimElbV2InvokeAuthorizationInput,
   ): SimIamAuthorizationDecision {
     return this.lambdaAuthorizer.authorize({
-      simFunction: input.simFunction,
+      resource: input.simFunction,
       servicePrincipal: simElbV2ServicePrincipal,
       sourceArn: input.targetGroup.arn,
       sourceAccount: input.accountId,

@@ -371,9 +371,9 @@ by it.
 
 The endpoint has to be what the protocol implies, and it is checked when the subscription is made. A
 queue ARN over the `lambda` protocol is refused, as it is on real SNS, and so is an `sms` endpoint
-outside E.164. A qualified function ARN naming a version or an alias is refused too, since simulated
-Lambda has no versions or aliases. Subscribing `$LATEST` in its place would be a different function
-from the one asked for.
+outside E.164. A function ARN may carry a version number or an alias name on the end
+(`arn:aws:lambda:us-east-1:888888888888:function:orders:live`), and messages then go to the version
+that qualifier names.
 
 Subscribing the same endpoint to the same topic twice answers with the subscription that is already
 there, as real SNS does. The attributes the repeated request carries are ignored, the same way a
@@ -633,6 +633,95 @@ there too. Delivery to the topic's other subscriptions carries on.
 
 A function in another account or another region is invoked the same way, on that account's own
 resource policy.
+
+An endpoint carrying a version number or an alias name delivers to the version it names, and the
+grant it needs is one made on that same qualifier. `AddPermission` takes a `Qualifier` for it. The
+version behind an alias runs, and `UpdateAlias` moves what an existing subscription reaches without
+touching the subscription:
+
+```typescript sim-sns-lambda-alias
+/**
+ * Subscribing a simulated Lambda alias to a topic, so published messages reach
+ * the version the alias points at.
+ */
+
+import {
+  AddPermissionCommand,
+  CreateAliasCommand,
+  CreateFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const lambda = simAws.lambda();
+const functionArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:order-consumer`;
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrderConsumerRole`,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => {
+        console.log(context.functionVersion); // "1", the version behind `live`
+
+        return "handled";
+      }),
+    },
+  }),
+);
+
+const published = await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "order-consumer" }),
+);
+
+await lambda.createAlias(
+  new CreateAliasCommand({
+    FunctionName: "order-consumer",
+    Name: "live",
+    FunctionVersion: published.Version,
+  }),
+);
+
+// The grant is made on the alias, which is the resource the delivery names.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "order-consumer",
+    Qualifier: "live",
+    StatementId: "AllowSns",
+    Action: "lambda:InvokeFunction",
+    Principal: "sns.amazonaws.com",
+    SourceArn: TopicArn,
+  }),
+);
+
+await sns.subscribe(
+  new SubscribeCommand({
+    TopicArn,
+    Protocol: "lambda",
+    Endpoint: `${functionArn}:live`,
+  }),
+);
+
+await sns.publish(new PublishCommand({ TopicArn, Message: "order-1" }));
+await simAws.backgroundTasksComplete();
+```
+
+The qualifier is resolved on every delivery, along with the resource policy. An endpoint naming a
+version or an alias that is not there is recorded on `simAws.sns().deliveryFailures` the way a
+missing function is. Real SNS checks no endpoint at `Subscribe` time, so this is where a subscription
+pointing at nothing shows up.
 
 ## The event a Lambda function receives
 
@@ -1723,9 +1812,6 @@ Current documented limitations:
   out.
 - `RawMessageDelivery` is accepted on a `lambda` subscription and has no effect on it, as it has none
   on real SNS.
-- A qualified function ARN naming a version or an alias is refused as a subscription endpoint.
-  Simulated Lambda has no versions or aliases, so subscribing `$LATEST` instead would be a different
-  function from the one named.
 - `SigningCertURL` and `UnsubscribeURL` name `sns.<region>.yulin.invalid` rather than
   `sns.<region>.amazonaws.com`, and both are unfetchable, since simulated SNS has no HTTP endpoint.
   The certificate is handed out in process by `simAws.sns().signingCertificate(url)`. A real SNS

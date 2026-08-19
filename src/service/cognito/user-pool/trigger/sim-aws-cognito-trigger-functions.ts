@@ -1,7 +1,7 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaServiceInvokeAuthorizer } from "../../../lambda/command/authorize/sim-lambda-service-invoke-authorizer.js";
-import type { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
+import type { SimLambdaFunctionTarget } from "../../../lambda/function/version/sim-lambda-function-target.js";
 import {
   parseSimLambdaFunctionArn,
   type SimLambdaFunctionArnParts,
@@ -64,21 +64,13 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
       return `${request.functionArn} is not a Lambda function ARN.`;
     }
 
-    if (arn.qualifier !== undefined) {
-      return (
-        `${request.functionArn} names a function version or alias, and ` +
-        "simulated Lambda has neither, so it is refused rather than treated " +
-        "as the unqualified function."
-      );
+    const target = this.findTarget(arn);
+
+    if (target === undefined) {
+      return missingFunctionRefusal(arn, request.functionArn);
     }
 
-    const simFunction = this.findFunction(arn);
-
-    if (simFunction === undefined) {
-      return `${request.functionArn} is not a simulated Lambda function.`;
-    }
-
-    return this.policyRefusal(simFunction, request);
+    return this.policyRefusal(target, request);
   }
 
   /**
@@ -96,26 +88,26 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
     event: object,
   ): Promise<unknown> {
     const arn = parseSimLambdaFunctionArn(request.functionArn);
-    const simFunction = arn === undefined ? undefined : this.findFunction(arn);
+    const target = arn === undefined ? undefined : this.findTarget(arn);
 
     // oxlint-disable-next-line yulin/assert-defined-guard -- `assertDefined` is denser per line, and this file is close enough to the FTA threshold that the guard costs less kept as it is
-    if (simFunction === undefined) {
+    if (target === undefined) {
       throw new Error(
         `${request.functionArn} is not a simulated Lambda function.`,
       );
     }
 
-    return await simFunction.invoke(event);
+    return await target.simFunction.invoke(event);
   }
 
   private policyRefusal(
-    simFunction: SimLambdaFunction,
+    target: SimLambdaFunctionTarget,
     request: SimCognitoTriggerFunctionRequest,
   ): string | undefined {
     const decision = new SimLambdaServiceInvokeAuthorizer({
-      iam: this.iam(simFunction),
+      iam: this.iam(target),
     }).authorize({
-      simFunction,
+      resource: target.resource,
       servicePrincipal: simCognitoServicePrincipal,
       sourceArn: request.userPoolArn,
       sourceAccount: request.userPoolAccountId,
@@ -133,18 +125,34 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
     return undefined;
   }
 
-  private findFunction(
+  private findTarget(
     arn: SimLambdaFunctionArnParts,
-  ): SimLambdaFunction | undefined {
+  ): SimLambdaFunctionTarget | undefined {
     return this.simAws
       .accountRegionScope(arn.accountId, arn.regionName)
       .lambda()
-      .getSimFunctionByName(arn.functionName);
+      .getSimFunctionTarget(arn.functionName, arn.qualifier);
   }
 
-  private iam(simFunction: SimLambdaFunction): SimIamInterServiceAuthZ {
-    const { accountId, regionName } = simFunction.accountRegionScope;
+  private iam(target: SimLambdaFunctionTarget): SimIamInterServiceAuthZ {
+    const { accountId, regionName } = target.simFunction.accountRegionScope;
 
     return this.simAws.accountRegionScope(accountId, regionName).iam();
   }
+}
+
+/**
+ * Why a trigger ARN reaches nothing, for the pool to repeat back in its
+ * `UnexpectedLambdaException`.
+ *
+ * A qualified ARN says so, since the function it names may well be there while
+ * the version or alias it asked for is not.
+ */
+function missingFunctionRefusal(
+  arn: SimLambdaFunctionArnParts,
+  functionArn: string,
+): string {
+  return arn.qualifier === undefined
+    ? `${functionArn} is not a simulated Lambda function.`
+    : `${functionArn} names no simulated Lambda function version or alias.`;
 }

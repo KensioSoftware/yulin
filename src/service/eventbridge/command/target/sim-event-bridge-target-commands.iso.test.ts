@@ -238,7 +238,7 @@ describe("EventBridge target commands", () => {
     assertIdentical(removed.FailedEntryCount, 0);
   });
 
-  it("reads the function name out of a qualified Lambda target ARN", async () => {
+  it("reads the qualifier out of a qualified Lambda target ARN", async () => {
     // Given a target ARN carrying a version after the function name.
     const simAws = await simAwsWithRule();
 
@@ -254,11 +254,12 @@ describe("EventBridge target commands", () => {
       }),
     );
 
-    // Then the name is read without the qualifier, which this simulation does
-    // not model.
+    // Then the name and the version it names are both read, so the rule
+    // delivers to the version rather than to `$LATEST`.
     const [target] = simAws.eventBridge().ruleTargets("orders");
 
     assertNonNullable(target);
     assertIdentical(target.arn.functionName, "fulfilment");
+    assertIdentical(target.arn.functionQualifier, "2");
   });
 });

@@ -157,17 +157,29 @@ export class SimEventTargetArn {
    * something else in Lambda.
    *
    * A function ARN's resource is `function:<name>`, and may carry a version or
-   * alias after a second colon, which this simulation does not model and so
-   * reads as part of nothing. The resource type is checked rather than
-   * assumed, because Lambda writes more than functions this way: a layer is
-   * `layer:<name>` and an event source mapping is
-   * `event-source-mapping:<uuid>`, and taking the part after the first colon
-   * would read either as a function that is not there.
+   * alias after a second colon, which `functionQualifier` reads. The resource
+   * type is checked rather than assumed, because Lambda writes more than
+   * functions this way: a layer is `layer:<name>` and an event source mapping
+   * is `event-source-mapping:<uuid>`, and taking the part after the first
+   * colon would read either as a function that is not there.
    */
   get functionName(): string {
-    const [resourceType, name = ""] = this.resource.split(":", 2);
+    const [resourceType, name = ""] = this.resource.split(":", 3);
 
     return resourceType === "function" ? name : "";
+  }
+
+  /**
+   * The version or alias this ARN qualified the function with, or nothing when
+   * it named the function itself.
+   *
+   * A rule delivers to the version a qualified target names, so the qualifier
+   * is read rather than dropped.
+   */
+  get functionQualifier(): string | undefined {
+    const [resourceType, , qualifier] = this.resource.split(":", 3);
+
+    return resourceType === "function" ? qualifier : undefined;
   }
 
   /**

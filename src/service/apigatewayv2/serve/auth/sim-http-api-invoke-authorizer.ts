@@ -64,7 +64,7 @@ export class SimHttpApiInvokeAuthorizer {
     input: SimHttpApiInvokeAuthorizationInput,
   ): SimIamAuthorizationDecision {
     return this.lambdaAuthorizer.authorize({
-      simFunction: input.simFunction,
+      resource: input.simFunction,
       servicePrincipal: simApiGatewayServicePrincipal,
       sourceArn: input.sourceArn.toString(),
       sourceAccount: input.api.accountRegionScope.accountId,

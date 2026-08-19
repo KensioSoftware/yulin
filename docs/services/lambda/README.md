@@ -942,6 +942,117 @@ function's execution role has to be allowed `sqs:ReceiveMessage`, `sqs:DeleteMes
 returns and `Enabled` once the simulation has caught up, as on real Lambda. Deleting it stops the
 polling.
 
+### Mapping onto a version or an alias
+
+A `FunctionName` can carry a version number or an alias name on the end, or be a qualified function
+ARN, and batches then go to the version that qualifier names. `FunctionArn` on the mapping is the
+alias, and the version behind it is what runs:
+
+```typescript sim-lambda-event-source-alias
+/**
+ * An event source mapping onto an alias, polling for the version it points at.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateAliasCommand,
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderConsumerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderConsumerRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => {
+        console.log(context.functionVersion); // "1", the version behind `live`
+
+        return "handled";
+      }),
+    },
+  }),
+);
+
+const published = await lambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "order-consumer" }),
+);
+
+await lambda.createAlias(
+  new CreateAliasCommand({
+    FunctionName: "order-consumer",
+    Name: "live",
+    FunctionVersion: published.Version,
+  }),
+);
+
+const mapping = await lambda.createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "order-consumer:live",
+  }),
+);
+
+console.log(mapping.FunctionArn); // ...:function:order-consumer:live
+
+await simAws
+  .sqs()
+  .sendMessage(new SendMessageCommand({ QueueUrl, MessageBody: "order-1" }));
+await simAws.backgroundTasksComplete();
+```
+
+The qualifier is resolved on every poll, so `UpdateAlias` moves what an existing mapping delivers to.
+The version has to be there when the mapping is made. A qualifier naming none fails with
+`ResourceNotFoundException`, the way a function that is not there does. Polling still runs as the
+function's execution role, which a published version carries over from the function it was published
+from.
+
 ### When the handler fails
 
 A handler that returns normally has handled the batch, and the messages are deleted from the queue.
@@ -2679,9 +2790,9 @@ Current documented limitations:
   `PublishVersion` makes are left out, along with `Description` on a published version, alias
   `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the two
   listings.
-- A qualified function ARN reaches simulated Lambda itself. The services that name a function
-  elsewhere (S3 notifications, SNS subscriptions, CloudWatch Logs subscriptions, Cognito triggers,
-  EventBridge targets, event source mappings and the CloudFormation target-function reader) still
+- A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
+  CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets and event source mappings.
+  API Gateway integration and authorizer URIs and the CloudFormation target-function reader still
   refuse or drop a qualifier.
 - The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
   has yet to land.

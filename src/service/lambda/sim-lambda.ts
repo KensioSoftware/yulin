@@ -2,22 +2,14 @@ import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
-import type { SimLambdaEventSourceMapping } from "./event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambdaContainerImages } from "./function/code/image/sim-lambda-container-images.js";
-import type {
-  SimLambdaFunction,
-  SimLambdaFunctionMap,
-  SimLambdaFunctionName,
-} from "./function/sim-lambda-function.js";
-import type {
-  SimLambdaFunctionUrl,
-  SimLambdaFunctionUrlId,
-} from "./function/url/sim-lambda-function-url.js";
+import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import type * as simLambdaCommands from "./command/sim-lambda-command.types.js";
 import {
   SimLambdaCommands,
   type SimLambdaProperties,
 } from "./sim-lambda-commands.js";
+import { SimLambdaInspection } from "./sim-lambda-inspection.js";
 import { SimLambdaSdkCommandRouter } from "./sdk/sim-lambda-sdk-command-router.js";
 
 export interface SimLambdaRequestOptions {
@@ -30,10 +22,12 @@ export interface SimLambdaRequestOptions {
  * Each command below carries a one line doc comment rather than a block. This
  * file grows by one delegating method per simulated operation and is close to
  * the max-lines limit, which is the same reason `SimDynamoDb` reads that way.
+ * The simulator's own accessors are held apart in `SimLambdaInspection`, which
+ * this extends.
  */
-export class SimLambda {
-  private readonly functions: SimLambdaFunctionMap = new Map();
-  private readonly commands: SimLambdaCommands;
+export class SimLambda extends SimLambdaInspection {
+  protected readonly functions: SimLambdaFunctionMap = new Map();
+  protected readonly commands: SimLambdaCommands;
 
   private readonly cfnFactory = new SimLambdaCloudFormationResourceFactory(
     this,
@@ -42,6 +36,7 @@ export class SimLambda {
   private readonly sdkRouter = new SimLambdaSdkCommandRouter(this);
 
   constructor(properties: SimLambdaProperties = {}) {
+    super();
     this.commands = new SimLambdaCommands({
       ...properties,
       functions: this.functions,
@@ -246,39 +241,6 @@ export class SimLambda {
     options?: SimLambdaRequestOptions,
   ): Promise<simLambdaCommands.SimGetPolicyCommandOutput> {
     return await this.commands.permissions.getPolicy(command, options);
-  }
-
-  /** Get a simulated event source mapping by its UUID. */
-  getSimEventSourceMapping(
-    uuid: string,
-  ): SimLambdaEventSourceMapping | undefined {
-    return this.commands.eventSourceMappings.find(uuid);
-  }
-
-  /** Get a simulated Lambda function instance by name. */
-  getSimFunctionByName(
-    functionName: SimLambdaFunctionName | string,
-  ): SimLambdaFunction | undefined {
-    return this.functions.get(functionName as SimLambdaFunctionName);
-  }
-
-  /** Get a simulated Lambda function's Function URL, if it has one. */
-  getSimFunctionUrl(
-    functionName: SimLambdaFunctionName | string,
-  ): SimLambdaFunctionUrl | undefined {
-    return this.commands.functionUrlStore.get(functionName);
-  }
-
-  /**
-   * Get a simulated Lambda Function URL by the id in its hostname.
-   *
-   * This is how the localhost serving layer finds the Function URL a request
-   * was addressed to, once the registry has named the owning Account.
-   */
-  getSimFunctionUrlById(
-    urlId: SimLambdaFunctionUrlId,
-  ): SimLambdaFunctionUrl | undefined {
-    return this.commands.functionUrlStore.byUrlId(urlId);
   }
 
   /** Get this service's CloudFormation Resource factory. */

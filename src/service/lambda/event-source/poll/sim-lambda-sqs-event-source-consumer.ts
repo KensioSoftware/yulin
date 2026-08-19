@@ -8,6 +8,7 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaSqsEventSourceArn } from "../queue/sim-lambda-sqs-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
+import { simLambdaEventSourceFunction } from "./sim-lambda-event-source-function.js";
 import type { SimLambdaEventSourceDelivery } from "./sim-lambda-event-source-delivery.js";
 import { makeSimLambdaSqsDelivery } from "./sim-lambda-sqs-delivery.js";
 
@@ -69,6 +70,6 @@ export class SimLambdaSqsEventSourceConsumer implements SimSqsPollConsumer {
       return undefined;
     }
 
-    return this.functions.find(this.mapping.functionName);
+    return simLambdaEventSourceFunction(this.functions, this.mapping);
   }
 }

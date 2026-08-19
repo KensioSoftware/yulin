@@ -6,7 +6,7 @@ import {
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambdaEventSourceStartingPosition } from "../../event-source/sim-lambda-event-source-starting-position.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
-import { simLambdaFunctionNameOf } from "../../function/sim-lambda-function-name.js";
+import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
 import {
   functionResponseTypesIn,
   requiredString,
@@ -20,6 +20,7 @@ import type { SimCreateEventSourceMappingCommandInput } from "./event-source-map
 interface SimLambdaEventSourceMappingInputProperties {
   readonly eventSourceArn: SimLambdaEventSourceArn;
   readonly functionName: string;
+  readonly qualifier: string | undefined;
   readonly batchSize: number;
   readonly startingPosition: SimLambdaEventSourceStartingPosition | undefined;
   readonly enabled: boolean;
@@ -39,6 +40,15 @@ interface SimLambdaEventSourceMappingInputProperties {
 export class SimLambdaEventSourceMappingInput {
   public readonly eventSourceArn: SimLambdaEventSourceArn;
   public readonly functionName: string;
+
+  /**
+   * The version or alias the request qualified the function name with, if it
+   * named one.
+   *
+   * A mapping onto `orders:live` delivers to the version the alias points at,
+   * so the qualifier travels with the name rather than being dropped.
+   */
+  public readonly qualifier: string | undefined;
   public readonly batchSize: number;
   public readonly startingPosition:
     | SimLambdaEventSourceStartingPosition
@@ -49,6 +59,7 @@ export class SimLambdaEventSourceMappingInput {
   private constructor(properties: SimLambdaEventSourceMappingInputProperties) {
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
+    this.qualifier = properties.qualifier;
     this.batchSize = properties.batchSize;
     this.startingPosition = properties.startingPosition;
     this.enabled = properties.enabled;
@@ -70,7 +81,7 @@ export class SimLambdaEventSourceMappingInput {
 
     return new this({
       eventSourceArn,
-      functionName: simLambdaFunctionNameOf(
+      ...simLambdaFunctionReferenceOf(
         requiredString(input.FunctionName, "functionName"),
       ),
       batchSize: eventSourceArn.batchRules.sizeIn(input.BatchSize),
