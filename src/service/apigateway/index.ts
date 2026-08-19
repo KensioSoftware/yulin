@@ -37,9 +37,19 @@ export {
   type SimRestApiRefusalKind,
 } from "./api/authorizer/sim-rest-api-authorization.js";
 export {
-  SimRestApiIdentitySource,
+  type SimRestApiIdentitySource,
+  simRestApiIdentityValue,
+} from "./api/authorizer/identity/sim-rest-api-identity-source.js";
+export { SimRestApiIdentitySourceParser } from "./api/authorizer/identity/sim-rest-api-identity-source-parser.js";
+export { SimRestApiIdentitySources } from "./api/authorizer/identity/sim-rest-api-identity-sources.js";
+export {
+  SimRestApiHeaderIdentitySource,
   simRestApiHeaderIdentityPrefix,
-} from "./api/authorizer/sim-rest-api-identity-source.js";
+} from "./api/authorizer/identity/sim-rest-api-header-identity-source.js";
+export {
+  SimRestApiQueryStringIdentitySource,
+  simRestApiQueryStringIdentityPrefix,
+} from "./api/authorizer/identity/sim-rest-api-query-string-identity-source.js";
 export {
   simRestApiAnyMethod,
   SimRestApiMethod,
@@ -70,6 +80,7 @@ export { SimApiGatewayRouter } from "./serve/sim-api-gateway-router.js";
 export { SimRestApiMethodAuthorizer } from "./serve/auth/sim-rest-api-method-authorizer.js";
 export { SimRestApiRefusalResponse } from "./serve/sim-rest-api-refusal-response.js";
 export type { SimRestApiTokenAuthorizerEvent } from "./serve/auth/sim-rest-api-authorizer-event.js";
+export type { SimRestApiRequestAuthorizerEvent } from "./serve/auth/sim-rest-api-request-authorizer-event.js";
 export { SimRestApiIntegrationInvocation } from "./serve/sim-rest-api-integration-invocation.js";
 export { simApiGatewayServicePrincipal } from "./sim-api-gateway-service-principal.js";
 export type { SimRestApiFunctionTarget } from "./serve/sim-rest-api-function-target.js";

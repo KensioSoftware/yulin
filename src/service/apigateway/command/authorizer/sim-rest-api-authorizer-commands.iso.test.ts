@@ -165,11 +165,11 @@ describe("Sim API Gateway REST API authorizer commands", () => {
     const simAws = new SimAws();
     const restApiId = await givenRestApi(simAws.apiGateway());
 
-    // When a REQUEST authorizer is asked for
+    // When a Cognito authorizer is asked for
     const authorizer = simAws.apiGateway().createAuthorizer(
       new CreateAuthorizerCommand({
         ...tokenAuthorizerInput(restApiId),
-        type: "REQUEST",
+        type: "COGNITO_USER_POOLS",
       }),
     );
 
@@ -177,7 +177,7 @@ describe("Sim API Gateway REST API authorizer commands", () => {
     // nothing
     await expect(authorizer).rejects.toThrow(SimApiGatewayBadRequest);
     await expect(authorizer).rejects.toThrow(
-      "CreateAuthorizer type 'REQUEST' is not simulated",
+      "CreateAuthorizer type 'COGNITO_USER_POOLS' is not simulated",
     );
   });
 

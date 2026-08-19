@@ -1,4 +1,7 @@
-import type { SimRestApiAuthorizer } from "../../api/authorizer/sim-rest-api-authorizer.js";
+import type {
+  SimRestApiAuthorizer,
+  SimRestApiAuthorizerType,
+} from "../../api/authorizer/sim-rest-api-authorizer.js";
 import type { SimRestApi } from "../../api/sim-rest-api.js";
 import { SimApiGatewayNotFound } from "../../error/sim-api-gateway.error.js";
 import type { SimApiGatewayRequestOptions } from "../sim-api-gateway-request-options.js";
@@ -28,12 +31,14 @@ const acceptedCreateOptions = [
   "identitySource",
 ];
 
-const simulatedAuthorizerType = "TOKEN";
+const simulatedAuthorizerTypes: readonly SimRestApiAuthorizerType[] = [
+  "TOKEN",
+  "REQUEST",
+];
 
 const authorizerTypeRefusal =
-  "a REQUEST authorizer receives the whole request and a " +
-  "COGNITO_USER_POOLS one verifies a user pool token, and neither is built " +
-  "here";
+  "a COGNITO_USER_POOLS authorizer verifies a user pool token itself rather " +
+  "than invoking a function, and that is not built here";
 
 interface SimRestApiAuthorizerCommandsProperties {
   readonly access: SimRestApiAccess;
@@ -61,15 +66,18 @@ export class SimRestApiAuthorizerCommands {
     unsimulated.refuseUnaccepted(input, acceptedCreateOptions);
     const restApiId = unsimulated.require("restApiId", input.restApiId);
     unsimulated.require("name", input.name);
-    unsimulated.require("type", input.type);
-    unsimulated.refuseUnless(
+    const type = unsimulated.require("type", input.type);
+    unsimulated.refuseUnlessOneOf(
       "type",
-      input.type,
-      simulatedAuthorizerType,
+      type,
+      simulatedAuthorizerTypes,
       authorizerTypeRefusal,
     );
 
-    const authorizerInput = new SimRestApiAuthorizerInput(input);
+    const authorizerInput = new SimRestApiAuthorizerInput({
+      input,
+      type: type as SimRestApiAuthorizerType,
+    });
 
     const restApi = this.access.api({
       method: "POST",

@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import {
   SimRestApiAdmitted,
   type SimRestApiAuthorization,
@@ -16,6 +17,8 @@ interface SimRestApiMethodAuthorizerProperties {
    * finds an integration's.
    */
   readonly functions: SimRestApiAuthorizerFunctions;
+  /** Clock an authorizer's invocation event is stamped with. */
+  readonly clock: SimClock;
 }
 
 /**
@@ -28,8 +31,9 @@ interface SimRestApiMethodAuthorizerProperties {
  *
  * The steps for a `CUSTOM` method are the ones real API Gateway takes:
  *
- * 1. the request has to carry something at the authorizer's identity source,
- *    or it is refused with a 401 and the function is never invoked;
+ * 1. the request has to carry something at every one of the authorizer's
+ *    identity sources, or it is refused with a 401 and the function is never
+ *    invoked;
  * 2. otherwise the function is asked, and the policy it answers with is
  *    evaluated against the ARN of the request being made.
  */
@@ -39,6 +43,7 @@ export class SimRestApiMethodAuthorizer {
   constructor(properties: SimRestApiMethodAuthorizerProperties) {
     this.invocation = new SimRestApiAuthorizerInvocation({
       functions: properties.functions,
+      clock: properties.clock,
     });
   }
 
@@ -75,16 +80,16 @@ export class SimRestApiMethodAuthorizer {
       return SimRestApiRefused.unauthorized();
     }
 
-    const authorizationToken = authorizer.identitySource.value(request);
+    const identityValues = authorizer.identitySources.values(request);
 
-    if (authorizationToken === undefined) {
+    if (identityValues === undefined) {
       return SimRestApiRefused.unauthorized();
     }
 
     return await this.invocation.invoke(
       input,
       authorizer,
-      authorizationToken,
+      identityValues,
       SimRestApiExecuteApiArn.forRequest(
         restApi,
         match,

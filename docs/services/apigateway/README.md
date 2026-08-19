@@ -359,8 +359,12 @@ A method is open unless it names an authorizer. `CreateAuthorizerCommand` create
 API allocated.
 
 A `TOKEN` authorizer reads one header and sends its value to a Lambda function of its own. That
-function answers an IAM policy document, which is evaluated for `execute-api:Invoke` against the ARN
-of the request being made. Whatever `context` it returns reaches the handler.
+function answers an IAM policy document, evaluated for `execute-api:Invoke` against the ARN of the
+request being made. Whatever `context` it returns reaches the handler.
+
+A `REQUEST` authorizer sends the whole request to its function (see
+[A REQUEST authorizer](#a-request-authorizer)), so it can identify a caller by several headers
+together or by the query string. It answers the same policy document.
 
 ```typescript sim-apigateway-token-authorizer
 /**
@@ -447,10 +451,113 @@ A `TOKEN` authorizer sees three fields and no more.
 The `methodArn` names the path the client asked for rather than the resource template it matched. A
 request to `/orders/6` behind an `/orders/{orderId}` resource is named as `GET/orders/6`.
 
-The identity source is one header, written as `method.request.header.Authorization`. An expression
-naming anywhere else is refused by `CreateAuthorizer`, because an authorizer that looks where the
-request never carries anything refuses everyone. That refusal reads like a signing problem when the
-configuration is what went wrong.
+A `TOKEN` authorizer's identity source is one header, written as
+`method.request.header.Authorization`. An expression naming anywhere else is refused by
+`CreateAuthorizer`, because an authorizer that looks where the request never carries anything
+refuses everyone. That refusal reads like a signing problem when the configuration is what went
+wrong.
+
+### A REQUEST authorizer
+
+`type: "REQUEST"` sends the request itself to the function. The `identitySource` is one
+comma-separated string naming as many places as identify a caller, in the
+`method.request.header.<name>` and `method.request.querystring.<name>` forms. An HTTP API takes a
+list here, and a REST API takes the string.
+
+```typescript sim-apigateway-request-authorizer
+/**
+ * Gating a REST API method with a REQUEST Lambda authorizer.
+ *
+ * The authorizer reads a header and a query string parameter together, which
+ * is what a TOKEN authorizer cannot do.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders"],
+    httpMethod: "GET",
+    authorizerIdentitySource:
+      "method.request.header.X-Tenant,method.request.querystring.plan",
+    requestAuthorizerHandler: (event) => ({
+      principalId: event.headers["x-tenant"],
+      context: { plan: event.queryStringParameters["plan"] },
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Action: "execute-api:Invoke",
+            Effect:
+              event.queryStringParameters["plan"] === "gold" ? "Allow" : "Deny",
+            Resource: event.methodArn,
+          },
+        ],
+      },
+    }),
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(event.requestContext.authorizer),
+    }),
+  },
+  simAws,
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders`).href;
+const headers = { "x-tenant": "acme" };
+
+const admitted = await fetch(`${url}?plan=gold`, { headers });
+
+console.log(admitted.status);
+// 200
+
+console.log(await admitted.text());
+// '{"plan":"gold","principalId":"acme"}'
+
+const refused = await fetch(`${url}?plan=free`, { headers });
+
+console.log(refused.status);
+// 403
+
+const anonymous = await fetch(`${url}?plan=gold`);
+
+console.log(anonymous.status);
+// 401
+
+await srv.close();
+```
+
+The function is invoked only once the request carries something at every identity source. The
+request with no `X-Tenant` header above got its 401 without the function running.
+
+An authorizer created with no `identitySource` is refused. Real AWS invokes that authorizer for
+every request including one carrying nothing, and CDK's `RequestAuthorizer` requires at least one
+source.
+
+#### The event a REQUEST authorizer receives
+
+The event is the payload format 1.0 request event with `type` and `methodArn` added and the body
+left out.
+
+| Field                                                      | What it carries                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `type`                                                     | The literal `REQUEST`                                          |
+| `methodArn`                                                | The ARN of the request, the same one a `TOKEN` authorizer gets |
+| `resource`, `path`, `httpMethod`                           | The resource template, the path asked for and the method       |
+| `headers`, `multiValueHeaders`                             | The request headers, in both forms payload format 1.0 sends    |
+| `queryStringParameters`, `multiValueQueryStringParameters` | The query string, in both forms                                |
+| `pathParameters`, `stageVariables`                         | What the resource path captured, and the stage's variables     |
+| `requestContext`                                           | The same block a handler gets, without the `authorizer` member |
+
+The maps are empty objects where the request supplied nothing. An integration event sends `null`
+there, and AWS's own example of the authorizer event sends `{}`, so a function reading
+`event.queryStringParameters.plan` finds nothing rather than throwing.
 
 ### Answering with a policy
 
@@ -519,7 +626,8 @@ arn:aws:execute-api:{region}:{account}:{apiId}/authorizers/{authorizerId}
 ```
 
 That ARN names no stage. A function used both as an integration and as an authorizer needs two
-permissions, as it does on AWS. CDK's `TokenAuthorizer` writes this one.
+permissions, as it does on AWS. CDK's `TokenAuthorizer` and `RequestAuthorizer` both write this
+one.
 
 ## Intercepting an SDK client
 
@@ -990,9 +1098,10 @@ method on the root and another on a `{proxy+}` resource, both in front of one fu
 `AWS::Lambda::Permission` each needs. `restApi.url` and `restApi.urlForPath` resolve to the local
 hostname through `AWS::URLSuffix`.
 
-`TokenAuthorizer` deploys too, with the `AWS::Lambda::Permission` it writes for its own function.
-Give it `resultsCacheTtl: Duration.seconds(0)`, since CDK holds a decision for five minutes by
-default and `AuthorizerResultTtlInSeconds` is one of the recorded properties.
+`TokenAuthorizer` and `RequestAuthorizer` deploy too, with the `AWS::Lambda::Permission` each
+writes for its own function. Give either one `resultsCacheTtl: Duration.seconds(0)`, since CDK
+holds a decision for five minutes by default and `AuthorizerResultTtlInSeconds` is one of the
+recorded properties.
 
 CDK also writes an `AWS::ApiGateway::Account` and a CloudWatch role beside a default `RestApi`.
 Neither is simulated. The `Account` Resource is recorded in
@@ -1020,9 +1129,13 @@ nothing on real AWS.
 An input outside what this simulates is refused. Dropping it would let a request look applied here
 and behave differently deployed. The refusals worth knowing about:
 
-- **Authorizer kinds.** `TOKEN` is the one simulated. A `REQUEST` or `COGNITO_USER_POOLS`
+- **Authorizer kinds.** `TOKEN` and `REQUEST` are the two simulated. A `COGNITO_USER_POOLS`
   authorizer is refused by `CreateAuthorizer`, and an `AWS_IAM` method by `PutMethod`. Each is a
   separate piece of work.
+- **Identity source expressions.** A `REQUEST` authorizer reads
+  `method.request.header.<name>` and `method.request.querystring.<name>`. AWS also allows
+  `method.request.path`, `context` and `stageVariables`, and each is refused by
+  `CreateAuthorizer`.
 - **Holding an authorizer's decision.** `authorizerResultTtlInSeconds` is refused. The function is
   invoked once per request reaching the method.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,

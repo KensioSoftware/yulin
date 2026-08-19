@@ -95,7 +95,7 @@ The client's own authorization runs first. A request presenting no credentials i
 not the integration behind the method would have worked. Whether the API may invoke a function is a
 separate question, asked afterwards, and it is the API's rather than the client's.
 
-`serve/auth/` holds one authorization type, and the pieces are the ones a `TOKEN` authorizer needs:
+`serve/auth/` holds the `CUSTOM` authorization type, covering both kinds of Lambda authorizer:
 
 ```text
 SimRestApiMethodAuthorizer            which type the method asks for
@@ -103,6 +103,15 @@ SimRestApiMethodAuthorizer            which type the method asks for
     ├── SimRestApiAuthorizerResponse  the principal, the context, the policy
     └── SimRestApiAuthorizerPolicy    that policy, put to IAM against the method ARN
 ```
+
+The two kinds part company at the event and nowhere else. A `TOKEN` authorizer is handed the one
+value the request carried at its identity source, and a `REQUEST` authorizer is handed a copy of
+the request as a payload format 1.0 event. `SimRestApiAuthorizerInvocation` picks between the two
+builders, and everything downstream of the answer is shared.
+
+`api/authorizer/identity/` reads the identity source expressions. A REST API writes them as one
+comma-separated string where an HTTP API takes a list, so the splitting lives here and the
+per-expression parsing mirrors `apigatewayv2/api/authorizer/identity/`.
 
 The method ARN is the one part with no HTTP API equivalent worth copying. A REST API authorizer is
 handed the ARN of the request the client made, with the concrete path in it, and the policy it
