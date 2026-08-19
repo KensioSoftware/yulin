@@ -2,6 +2,7 @@ import {
   type SimLambdaFunctionArn,
   simLambdaFunctionArn,
 } from "../sim-lambda-function-configuration.js";
+import type { SimLambdaPolicyResource } from "../policy/sim-lambda-policy-resource.js";
 import type { SimLambdaFunction } from "../sim-lambda-function.js";
 import type { SimLambdaFunctionAlias } from "./sim-lambda-function-alias.js";
 
@@ -59,7 +60,7 @@ export class SimLambdaFunctionVersions {
    * all digits, so a qualifier that is one is a version number.
    */
   resolve(qualifier: string): SimLambdaFunction | undefined {
-    if (/^\d+$/.test(qualifier)) {
+    if (isVersionNumber(qualifier)) {
       return this.version(qualifier);
     }
 
@@ -68,6 +69,20 @@ export class SimLambdaFunctionVersions {
     return alias === undefined
       ? undefined
       : this.version(alias.functionVersion);
+  }
+
+  /**
+   * The resource a qualifier names, or nothing when it names neither a version
+   * nor an alias.
+   *
+   * This stops where `resolve` carries on: an alias is the resource a grant is
+   * made on and a request is authorized against, so it answers as itself
+   * rather than as the version behind it.
+   */
+  named(qualifier: string): SimLambdaPolicyResource | undefined {
+    return isVersionNumber(qualifier)
+      ? this.version(qualifier)
+      : this.aliases.get(qualifier);
   }
 
   /**
@@ -106,4 +121,12 @@ export class SimLambdaFunctionVersions {
   deleteAlias(name: string): void {
     this.aliases.delete(name);
   }
+}
+
+/**
+ * Whether a qualifier is a version number rather than an alias name, which is
+ * how real Lambda tells the two apart.
+ */
+function isVersionNumber(qualifier: string): boolean {
+  return /^\d+$/.test(qualifier);
 }

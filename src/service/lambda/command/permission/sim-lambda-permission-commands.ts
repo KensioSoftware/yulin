@@ -1,6 +1,7 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { AddPermissionCommandHandler } from "../add-permission/add-permission.handler.js";
 import type {
@@ -20,6 +21,7 @@ import type {
 
 interface SimLambdaPermissionCommandsProperties {
   readonly functions: SimLambdaFunctionLookup;
+  readonly versions: SimLambdaFunctionVersionStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
 }
@@ -43,7 +45,8 @@ export class SimLambdaPermissionCommands {
   }
 
   /**
-   * Grant a permission on a function.
+   * Grant a permission on a function, or on the version or alias a qualifier
+   * names.
    */
   async add(
     command: SimAddPermissionCommand,
@@ -56,7 +59,8 @@ export class SimLambdaPermissionCommands {
   }
 
   /**
-   * Revoke a permission from a function.
+   * Revoke a permission from a function, or from the version or alias a
+   * qualifier names.
    */
   async remove(
     command: SimRemovePermissionCommand,
@@ -69,7 +73,8 @@ export class SimLambdaPermissionCommands {
   }
 
   /**
-   * Read a function's resource policy.
+   * Read the resource policy of a function, or of the version or alias a
+   * qualifier names.
    */
   async getPolicy(
     command: SimGetPolicyCommand,

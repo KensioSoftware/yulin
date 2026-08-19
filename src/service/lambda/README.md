@@ -71,13 +71,18 @@ facade itself is state and delegation and nothing else.
 
 Function state lives under `function/`.
 
-`function/policy/` holds the function's resource-based policy: a map of `SimLambdaPermission`
-statements keyed by `StatementId`, which is how `AddPermission` and `RemovePermission` address
-them. `AddPermission` is a shorthand for writing a policy statement, so the permission holds the
-parts it was given and expands them into a statement on demand, rather than storing a statement
-nothing can address. The policy belongs to the function because it survives exactly as long as the
-function does, and because it is this Account's half of admitting a principal from another Account:
-the other half is that Account's own identity policy, which IAM asks it for.
+`function/policy/` holds a resource-based policy: a map of `SimLambdaPermission` statements keyed by
+`StatementId`, which is how `AddPermission` and `RemovePermission` address them. `AddPermission` is
+a shorthand for writing a policy statement, so the permission holds the parts it was given and
+expands them into a statement on demand, rather than storing a statement nothing can address. A
+policy survives exactly as long as the thing it is granted on does, and it is this Account's half of
+admitting a principal from another Account: the other half is that Account's own identity policy,
+which IAM asks it for.
+
+A function, each of its published versions and each of its aliases holds one of these.
+`SimLambdaPolicyResource` is the interface the three share, an ARN and a policy. Real Lambda holds a
+policy per qualified resource. A grant made on the alias `live` decides a call on `live`, and the
+version behind it needs a grant of its own.
 
 `SimLambdaFunction` is the stored simulated resource: name, execution role ARN, scope, AWS-like
 configuration metadata, and the real handler function reference that backs it. A new function
@@ -369,9 +374,13 @@ version pattern, before anything of that name is looked for. Invoking through an
 version number it resolved to as `ExecutedVersion`, not the alias name, and the handler's context
 carries the same number and the qualified ARN.
 
-Authorization stays against the function's own ARN for now. Qualified statements in a function's
-resource policy are their own piece of work, so a permission granted on the function admits an
-invocation of any of its versions.
+Authorization is against the resource the request named, and so is a grant. `AddPermission`,
+`RemovePermission` and `GetPolicy` take a `Qualifier` of their own, and `requireResource` on the
+version store answers with the resource it names. An alias answers as itself there, where `require`
+carries on to the version behind it. Resolving the alias first would put the version's policy in
+front of a request made against the alias. `Invoke` reaches the same resource through
+`findResource`. It tolerates a function that is absent, since a request naming one is authorized
+before it is reported missing.
 
 ## Event source mappings
 
@@ -687,8 +696,8 @@ the CloudFormation engine with an "Unsupported" diagnostic.
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
 - `UpdateFunctionCode` and function listing
-- `Qualifier` on the permission commands, qualified Function URLs, alias `RoutingConfig` weights,
-  provisioned concurrency, and `RevisionId`
+- `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
+  `RoutingConfig` weights, and provisioned concurrency
 - version and alias operations over the served HTTP API endpoint, which routes the other sixteen
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment

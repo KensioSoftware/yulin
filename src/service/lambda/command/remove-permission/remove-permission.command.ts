@@ -12,6 +12,7 @@ export interface SimRemovePermissionCommand {
  */
 export interface SimRemovePermissionCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Qualifier?: string | undefined;
   readonly StatementId?: string | undefined;
 }
 

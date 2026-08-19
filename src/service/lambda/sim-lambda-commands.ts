@@ -138,6 +138,7 @@ export class SimLambdaCommands {
     });
     this.permissions = new SimLambdaPermissionCommands({
       functions: this.functionLookup,
+      versions: this.versionStore,
       iam,
       background,
     });

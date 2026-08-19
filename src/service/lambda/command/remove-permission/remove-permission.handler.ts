@@ -3,6 +3,8 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simLambdaQualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
+import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
 import type {
@@ -12,6 +14,7 @@ import type {
 
 interface RemovePermissionCommandHandlerProperties {
   readonly functions: SimLambdaFunctionLookup;
+  readonly versions: SimLambdaFunctionVersionStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
 }
@@ -30,11 +33,13 @@ export class RemovePermissionCommandHandler implements CommandHandler<
   SimRemovePermissionCommandOutput
 > {
   private readonly functions: SimLambdaFunctionLookup;
+  private readonly versions: SimLambdaFunctionVersionStore;
   private readonly authorizer: FunctionUrlAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: RemovePermissionCommandHandlerProperties) {
     this.functions = properties.functions;
+    this.versions = properties.versions;
     this.authorizer = new FunctionUrlAuthorizer({
       iam: properties.iam,
       action: "lambda:RemovePermission",
@@ -43,7 +48,11 @@ export class RemovePermissionCommandHandler implements CommandHandler<
   }
 
   /**
-   * Revoke a permission from a sim Lambda function's resource policy.
+   * Revoke a permission from the resource policy of a sim Lambda function, or
+   * of the version or alias a qualifier names.
+   *
+   * A statement is only ever revoked from the resource it was granted on, so a
+   * statement id granted on an alias is not found on the function itself.
    */
   async handle(
     command: SimRemovePermissionCommand,
@@ -61,14 +70,17 @@ export class RemovePermissionCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    const functionName = input.FunctionName;
+    const { functionName, qualifier } = simLambdaQualifiedFunctionOf(
+      input.FunctionName,
+      input.Qualifier,
+    );
     this.authorizer.authorize(
-      this.functions.functionArn(functionName),
+      this.functions.functionArn(functionName, qualifier),
       options?.caller,
     );
 
-    this.functions
-      .require(functionName)
+    this.versions
+      .requireResource(this.functions.require(functionName), qualifier)
       .resourcePolicy.remove(input.StatementId);
 
     return { $metadata: {} };

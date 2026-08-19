@@ -33,10 +33,15 @@ export class SimLambdaFunctionLookup {
   }
 
   /**
-   * Build the ARN a function has, or would have, in this scope.
+   * Build the ARN a function has, or would have, in this scope, qualified by
+   * the version or alias a request named.
    */
-  functionArn(functionName: string): SimLambdaFunctionArn {
-    return simLambdaFunctionArn(this.accountRegionScope, functionName);
+  functionArn(functionName: string, qualifier?: string): SimLambdaFunctionArn {
+    return simLambdaFunctionArn(
+      this.accountRegionScope,
+      functionName,
+      qualifier,
+    );
   }
 
   /**

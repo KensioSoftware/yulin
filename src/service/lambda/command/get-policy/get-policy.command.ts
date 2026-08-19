@@ -12,6 +12,7 @@ export interface SimGetPolicyCommand {
  */
 export interface SimGetPolicyCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Qualifier?: string | undefined;
 }
 
 /**

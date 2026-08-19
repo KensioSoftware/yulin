@@ -718,13 +718,15 @@ carries that number as `functionVersion` and the qualified ARN as `invokedFuncti
 
 ```typescript sim-lambda-versions-and-aliases
 /**
- * Publishing a simulated Lambda function version, pointing an alias at it, and
- * invoking through the alias.
+ * Publishing a simulated Lambda function version, pointing an alias at it,
+ * invoking through the alias, and granting a permission on the alias alone.
  */
 
 import {
+  AddPermissionCommand,
   CreateAliasCommand,
   CreateFunctionCommand,
+  GetPolicyCommand,
   InvokeCommand,
   ListVersionsByFunctionCommand,
   PublishVersionCommand,
@@ -771,6 +773,22 @@ const versions = await lambda.listVersionsByFunction(
   new ListVersionsByFunctionCommand({ FunctionName: "orders" }),
 );
 console.log(versions.Versions.map((version) => version.Version));
+
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    Qualifier: "live",
+    StatementId: "AllowReporting",
+    Action: "lambda:InvokeFunction",
+    Principal: "222222222222",
+  }),
+);
+
+// The statements granted on the alias, and on nothing else.
+const aliasPolicy = await lambda.getPolicy(
+  new GetPolicyCommand({ FunctionName: "orders", Qualifier: "live" }),
+);
+console.log(aliasPolicy.Policy);
 ```
 
 A function with no qualifier is `$LATEST`, which is what every caller that passes none reaches, and
@@ -784,6 +802,18 @@ it is on real Lambda. A qualifier naming no version and no alias fails with
 and a version nothing published is reported as missing rather than answered with an empty listing.
 Deleting an alias leaves the version it pointed at invokable by its number. Deleting the function
 takes its versions and aliases with it.
+
+`AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand` take the same `Qualifier`.
+The statement is held against the version or the alias it names, and carries that qualified ARN as
+its `Resource`. `GetPolicy` reads back the statements of the one resource it was asked for, and a
+request with no qualifier reads the function's own. An `Invoke` is authorized against the resource
+it names. A grant on `live` admits a call through `live`, and a call on the function itself or on
+the version behind the alias needs a grant of its own. See
+[Resource-based policies](#resource-based-policies).
+
+An alias keeps the grants made on it when `UpdateAliasCommand` moves it to another version. That is
+what makes an alias a stable thing for another Account or another service to be granted (the grant
+belongs to the name that was integrated against).
 
 The version and alias commands act on the function itself, so they take its name or its unqualified
 ARN. A `FunctionName` carrying a qualifier (`orders:live`) is refused with an
@@ -1893,6 +1923,10 @@ statement carrying one matches no request of theirs.
 the grant that was made. No value is supplied for them at request time, and a statement carrying one
 of those never matches.
 
+All three commands take a `Qualifier` naming a published version or an alias, and each qualified
+resource holds its own policy. See
+[Versions and aliases](#versions-and-aliases) for what a grant on one covers.
+
 A function with no grant on it has no policy at all. `GetPolicy` reports that as a
 `ResourceNotFoundException`, and never as an empty document. Granting a `StatementId` that is
 already in use is a `ResourceConflictException`, and removing one that was never granted is a
@@ -2600,8 +2634,8 @@ Sim Lambda currently supports:
   token verifier fetches from the regional Cognito endpoint
 - Execution roles, evaluated against simulated IAM
 - Published versions and aliases, with `PublishVersion`, `ListVersionsByFunction`, `CreateAlias`,
-  `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke` and
-  `GetFunction`
+  `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke`,
+  `GetFunction` and the permission commands, each qualified resource holding its own policy
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:InvokeFunction`, the Function URL config actions, and the version
   and alias actions)
@@ -2631,8 +2665,7 @@ Current documented limitations:
   `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
   the grant that was made, and no value is supplied for them, so a statement carrying one never
   matches.
-- `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are left out. A
-  permission granted on a function admits an invocation of any of its versions.
+- `RevisionId` and `EventSourceToken` on the permission commands are left out.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
