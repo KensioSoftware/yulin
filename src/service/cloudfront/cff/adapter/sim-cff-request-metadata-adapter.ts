@@ -10,8 +10,12 @@ export class SimCffRequestMetadataAdapter {
   toCffHeaders(headers: Headers): CloudFrontFunction.Headers {
     const cffHeaders = Object.create(null) as CloudFrontFunction.Headers;
 
-    for (const [name, value] of headers.entries()) {
-      cffHeaders[name.toLowerCase()] = { value };
+    for (const [name, values] of this.headerValuesByName(headers)) {
+      const cffValue = this.toCffValue(values);
+      if (cffValue !== undefined) {
+        // oxlint-disable-next-line security/detect-object-injection
+        cffHeaders[name] = cffValue;
+      }
     }
 
     return cffHeaders;
@@ -26,8 +30,10 @@ export class SimCffRequestMetadataAdapter {
   ): Headers {
     const nativeHeaders = new Headers();
 
-    for (const [name, { value }] of Object.entries(headers)) {
-      nativeHeaders.set(name, value);
+    for (const [name, valueOrMultiValue] of Object.entries(headers)) {
+      for (const value of this.fromCffValue(valueOrMultiValue)) {
+        nativeHeaders.append(name, value);
+      }
     }
 
     const cookieHeader = this.fromCffCookies(cookies);
@@ -48,19 +54,10 @@ export class SimCffRequestMetadataAdapter {
 
     const searchParameterKeys = new Set(searchParameters.keys());
     for (const key of searchParameterKeys) {
-      const values = searchParameters.getAll(key).map((value) => ({ value }));
-
-      if (values[0] !== undefined) {
+      const cffValue = this.toCffValue(searchParameters.getAll(key));
+      if (cffValue !== undefined) {
         // oxlint-disable-next-line security/detect-object-injection
-        queryString[key] = values[0];
-        if (values.length > 1) {
-          // Multi-value: first value as `value`, all values in `multiValue`
-          // oxlint-disable-next-line security/detect-object-injection
-          queryString[key] = {
-            value: values[0].value,
-            multiValue: values,
-          };
-        }
+        queryString[key] = cffValue;
       }
     }
 
@@ -74,12 +71,8 @@ export class SimCffRequestMetadataAdapter {
     const searchParameters = new URLSearchParams();
 
     for (const [key, valueOrMultiValue] of Object.entries(querystring)) {
-      if ("multiValue" in valueOrMultiValue) {
-        for (const { value } of valueOrMultiValue.multiValue) {
-          searchParameters.append(key, value);
-        }
-      } else {
-        searchParameters.append(key, valueOrMultiValue.value);
+      for (const value of this.fromCffValue(valueOrMultiValue)) {
+        searchParameters.append(key, value);
       }
     }
 
@@ -111,6 +104,67 @@ export class SimCffRequestMetadataAdapter {
     }
 
     return cookies;
+  }
+
+  /**
+   * Group header values under their lowercased name.
+   *
+   * A `Set-Cookie` header repeated on a response is the case this exists for.
+   * Node fetch Headers keep each one, and CloudFront presents a repeated
+   * header as one entry holding all of its values.
+   */
+  private headerValuesByName(headers: Headers): Map<string, string[]> {
+    const valuesByName = new Map<string, string[]>();
+
+    for (const [name, value] of headers.entries()) {
+      const headerName = name.toLowerCase();
+      const values = valuesByName.get(headerName) ?? [];
+      values.push(value);
+      valuesByName.set(headerName, values);
+    }
+
+    return valuesByName;
+  }
+
+  /**
+   * Present values in the shape CloudFront gives a repeated name.
+   *
+   * A single value is `value` alone. Repeated values keep the first in `value`
+   * and all of them in `multiValue`. That is what a Function reads for a header
+   * or a query parameter appearing more than once.
+   */
+  private toCffValue(
+    values: readonly string[],
+  ): CloudFrontFunction.Value | CloudFrontFunction.MultiValue | undefined {
+    const [first] = values;
+    if (first === undefined) {
+      return undefined;
+    }
+
+    if (values.length === 1) {
+      return { value: first };
+    }
+
+    return {
+      value: first,
+      multiValue: values.map((value) => ({ value })),
+    };
+  }
+
+  /**
+   * Read back the values a Function left under one name.
+   *
+   * A Function that means to send several values sets `multiValue`, and
+   * CloudFront sends those in place of `value`.
+   */
+  private fromCffValue(
+    valueOrMultiValue: CloudFrontFunction.Value | CloudFrontFunction.MultiValue,
+  ): string[] {
+    if ("multiValue" in valueOrMultiValue) {
+      return valueOrMultiValue.multiValue.map(({ value }) => value);
+    }
+
+    return [valueOrMultiValue.value];
   }
 
   private fromCffCookies(
