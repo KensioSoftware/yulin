@@ -43,6 +43,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         Type: "AWS::IAM::ManagedPolicy",
         Properties: {
           ManagedPolicyName: "ReadOnlyAccess",
+          Roles: [{ Ref: "ServiceRole" }],
           PolicyDocument: {
             Version: "2012-10-17",
             Statement: {

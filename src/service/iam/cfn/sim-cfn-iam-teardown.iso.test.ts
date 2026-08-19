@@ -133,4 +133,92 @@ describe("IAM CloudFormation Resource teardown", () => {
       "DELETE_COMPLETE",
     );
   });
+
+  it("deletes a Managed Policy the Stack attached to a Role it also created", async () => {
+    // Given a Stack whose Managed Policy names the Role the Stack created, so
+    // the policy is attached the moment it exists. IAM refuses DeletePolicy
+    // while an attachment is live.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "attached-policy-stack",
+      template: {
+        Resources: {
+          WorkerRole: {
+            Type: "AWS::IAM::Role",
+            Properties: {
+              RoleName: "worker-role",
+              AssumeRolePolicyDocument: assumeRolePolicyDocument,
+            },
+          },
+          WorkerReadPolicy: {
+            Type: "AWS::IAM::ManagedPolicy",
+            Properties: {
+              ManagedPolicyName: "worker-read",
+              Roles: [{ Ref: "WorkerRole" }],
+              PolicyDocument: readObjectsDocument,
+            },
+          },
+        },
+      },
+    });
+
+    const role = stack.resources.get("WorkerRole")?.simResource as
+      | SimIamRole
+      | undefined;
+    assertSetSize(role?.attachedPolicyArns, 1);
+
+    // When the Stack's Resources are torn down.
+    await stack.teardown();
+
+    // Then both the Managed Policy and the Role it was attached to are gone.
+    assertIdentical(
+      stack.resources.get("WorkerReadPolicy")?.status,
+      "DELETE_COMPLETE",
+    );
+    assertUndefined(simAws.iam().roles.get(role.roleName));
+    assertMapSize(simAws.iam().policies, 0);
+  });
+
+  it("takes a Managed Policy off a Role that outlives the Stack", async () => {
+    // Given a Role declared outside the Stack, so nothing else takes the
+    // Managed Policy off it as the Stack is torn down.
+    const simAws = new SimAws();
+    await simAws.iam().createRole({
+      input: {
+        RoleName: "standing-worker",
+        AssumeRolePolicyDocument: JSON.stringify(assumeRolePolicyDocument),
+      },
+    });
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "standing-role-policy-stack",
+      template: {
+        Resources: {
+          StandingReadPolicy: {
+            Type: "AWS::IAM::ManagedPolicy",
+            Properties: {
+              ManagedPolicyName: "standing-read",
+              Roles: ["standing-worker"],
+              PolicyDocument: readObjectsDocument,
+            },
+          },
+        },
+      },
+    });
+
+    const role = simAws.iam().roles.get("standing-worker" as never);
+    assertSetSize(role?.attachedPolicyArns, 1);
+
+    // When the Stack's Resources are torn down.
+    await stack.teardown();
+
+    // Then the attachment is off the Role, which is still there, and the
+    // Managed Policy is deleted.
+    assertSetSize(role.attachedPolicyArns, 0);
+    assertIdentical(
+      stack.resources.get("StandingReadPolicy")?.status,
+      "DELETE_COMPLETE",
+    );
+    assertMapSize(simAws.iam().policies, 0);
+  });
 });
