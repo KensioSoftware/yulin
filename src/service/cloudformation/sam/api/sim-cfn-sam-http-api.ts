@@ -6,7 +6,7 @@ import {
   samCarriedAttributes,
   samResourceProperties,
 } from "../function/sim-cfn-sam-function-properties.js";
-import { samMergedHttpApiProperties } from "../sim-cfn-sam-globals.js";
+import { samMergedApiProperties } from "../sim-cfn-sam-globals.js";
 import { samPickedProperties } from "../sim-cfn-sam-picked.js";
 import { samHttpApiStageResources } from "./sim-cfn-sam-http-api-stage.js";
 
@@ -57,7 +57,7 @@ export function samHttpApiResources(
   properties: SamHttpApiExpansionProperties,
 ): Record<string, SimCfnTemplateValue> {
   const { logicalId, resource, globals } = properties;
-  const apiProperties = samMergedHttpApiProperties(
+  const apiProperties = samMergedApiProperties(
     globals,
     samResourceProperties(resource),
   );

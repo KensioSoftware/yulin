@@ -2,6 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
+import type { SamTemplateGlobals } from "../sim-cfn-sam-globals.js";
 import { samMergedFunctionProperties } from "../sim-cfn-sam-globals.js";
 import {
   samFunctionEventEdits,
@@ -19,7 +20,11 @@ import { samFunctionUrlResources } from "./sim-cfn-sam-function-url.js";
 interface SamFunctionExpansionProperties {
   readonly logicalId: string;
   readonly resource: SimCfnTemplateValueRecord;
-  readonly globals: SimCfnTemplateValueRecord;
+  /**
+   * The whole `Globals` section. The function takes its own defaults from
+   * `Function`, and its `Api` events take theirs from `Api`.
+   */
+  readonly globals: SamTemplateGlobals;
 }
 
 /**
@@ -52,7 +57,7 @@ export function samFunctionResources(
 ): Record<string, SimCfnTemplateValue> {
   const { logicalId, resource, globals } = properties;
   const functionProperties = samMergedFunctionProperties(
-    globals,
+    globals.forFunction,
     samResourceProperties(resource),
   );
   const roleLogicalId = `${logicalId}Role`;
@@ -78,7 +83,12 @@ export function samFunctionResources(
       }),
     }),
     ...samFunctionUrlResources({ logicalId, functionProperties, condition }),
-    ...samFunctionEventResources({ logicalId, functionProperties, condition }),
+    ...samFunctionEventResources({
+      logicalId,
+      functionProperties,
+      condition,
+      apiGlobals: globals.forApi,
+    }),
   };
 }
 
@@ -99,9 +109,10 @@ export function samFunctionResourceEdits(
   return samFunctionEventEdits({
     logicalId,
     functionProperties: samMergedFunctionProperties(
-      globals,
+      globals.forFunction,
       samResourceProperties(resource),
     ),
     condition: resource["Condition"],
+    apiGlobals: globals.forApi,
   });
 }

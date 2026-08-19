@@ -608,6 +608,14 @@ deploys with a root resource and an empty tree under it.
 `StageName` on a `Deployment` is the older one-Resource form, where the deployment publishes a stage
 of that name by itself and the template carries one Resource fewer.
 
+### SAM
+
+A template naming the SAM transform reaches the same resource types.
+`AWS::Serverless::Api` becomes a REST API with its deployment and stage, and the `Api` event of an
+`AWS::Serverless::Function` becomes the path resources, the method and the invoke permission that
+put the function behind it. Events naming no `RestApiId` share one API on a `Prod` stage.
+[The SAM section of the CloudFormation docs](../cloudformation/README.md#rest-apis) covers both.
+
 ### CDK
 
 CDK's `RestApi` and `LambdaRestApi` both deploy and serve. `LambdaRestApi` synthesizes an `ANY`

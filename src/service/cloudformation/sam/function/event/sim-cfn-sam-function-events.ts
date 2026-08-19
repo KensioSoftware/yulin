@@ -12,6 +12,7 @@ import {
   samDynamoDbEventEdits,
   samSqsEventEdits,
 } from "./sim-cfn-sam-event-source-role.js";
+import { samApiEventResources } from "./sim-cfn-sam-api-event.js";
 import { samEventBridgeRuleEventResources } from "./sim-cfn-sam-event-bridge-rule-event.js";
 import { samHttpApiEventResources } from "./sim-cfn-sam-http-api-event.js";
 import type { SamResourceEdit } from "./sim-cfn-sam-resource-edit.js";
@@ -51,6 +52,7 @@ export type SamFunctionEventEdit = (
  */
 const eventExpansions: ReadonlyMap<string, SamFunctionEventExpansion> = new Map(
   [
+    ["Api", samApiEventResources],
     ["DynamoDB", samDynamoDbEventResources],
     ["EventBridgeRule", samEventBridgeRuleEventResources],
     ["HttpApi", samHttpApiEventResources],
