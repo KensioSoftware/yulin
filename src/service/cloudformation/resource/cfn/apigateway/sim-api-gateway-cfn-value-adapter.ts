@@ -1,3 +1,4 @@
+import { SimRestApiAuthorizer } from "../../../../apigateway/api/authorizer/sim-rest-api-authorizer.js";
 import { SimRestApiDeployment } from "../../../../apigateway/api/deployment/sim-rest-api-deployment.js";
 import { SimRestApiResource } from "../../../../apigateway/api/resource/sim-rest-api-resource.js";
 import { SimRestApi } from "../../../../apigateway/api/sim-rest-api.js";
@@ -6,6 +7,7 @@ import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
 } from "../sim-cfn-resource-value-adapter.js";
+import { SimRestApiAuthorizerCfn } from "./sim-rest-api-authorizer-cfn.js";
 import { SimRestApiCfn } from "./sim-rest-api-cfn.js";
 import { SimRestApiDeploymentCfn } from "./sim-rest-api-deployment-cfn.js";
 import { SimRestApiResourceCfn } from "./sim-rest-api-resource-cfn.js";
@@ -36,6 +38,13 @@ export function apiGatewayValueAdapter(
     properties.simResource instanceof SimRestApiResource
   ) {
     return new SimRestApiResourceCfn({ resource: properties.simResource });
+  }
+
+  if (
+    properties.type === "AWS::ApiGateway::Authorizer" &&
+    properties.simResource instanceof SimRestApiAuthorizer
+  ) {
+    return new SimRestApiAuthorizerCfn({ authorizer: properties.simResource });
   }
 
   if (

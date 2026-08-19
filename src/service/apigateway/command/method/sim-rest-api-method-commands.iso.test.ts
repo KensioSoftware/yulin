@@ -85,12 +85,12 @@ describe("Sim API Gateway REST API method commands", () => {
     await expect(again).rejects.toThrow(SimApiGatewayConflict);
   });
 
-  it("refuses a method asking for an authorizer", async () => {
+  it("refuses an authorization type nothing here enforces", async () => {
     // Given a resource
     const simAws = new SimAws();
     const { restApiId, resourceId } = await givenResource(simAws.apiGateway());
 
-    // When a method asks to be authorized
+    // When a method asks to be authorized by a user pool
     const method = simAws.apiGateway().putMethod(
       new PutMethodCommand({
         restApiId,
@@ -104,7 +104,7 @@ describe("Sim API Gateway REST API method commands", () => {
     // that real AWS would reject
     await expect(method).rejects.toThrow(SimApiGatewayBadRequest);
     await expect(method).rejects.toThrow(
-      "authorizing a method is not simulated",
+      "PutMethod authorizationType 'COGNITO_USER_POOLS' is not simulated",
     );
   });
 

@@ -6,6 +6,8 @@ interface SimRestApiDeclaredMethodInput {
   readonly resourcePath: string;
   readonly httpMethod: string;
   readonly functionArn: string;
+  /** The authorizer every method is gated by, where the API has one. */
+  readonly authorizerId: string | undefined;
 }
 
 /**
@@ -43,7 +45,14 @@ async function declaredMethod(
   );
 
   await apiGateway.putMethod({
-    input: { restApiId, resourceId, httpMethod, authorizationType: "NONE" },
+    input: {
+      restApiId,
+      resourceId,
+      httpMethod,
+      ...(input.authorizerId === undefined
+        ? { authorizationType: "NONE" }
+        : { authorizationType: "CUSTOM", authorizerId: input.authorizerId }),
+    },
   });
   await apiGateway.putIntegration({
     input: {

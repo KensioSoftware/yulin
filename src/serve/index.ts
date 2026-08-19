@@ -25,9 +25,11 @@ export {
 export type {
   SimPayload1Event,
   SimPayload1Identity,
+  SimPayload1LambdaAuthorizer,
   SimPayload1RequestContext,
   SimPayload1Result,
 } from "./payload-1/sim-payload-1-event.type.js";
 export type { SimPayload1Endpoint } from "./payload-1/sim-payload-1-endpoint.js";
+export type { SimPayload1Authorization } from "./payload-1/sim-payload-1-request-context.js";
 export { SimPayload1EventBuilder } from "./payload-1/sim-payload-1-event-builder.js";
 export { SimPayload1ResponseBuilder } from "./payload-1/sim-payload-1-response-builder.js";

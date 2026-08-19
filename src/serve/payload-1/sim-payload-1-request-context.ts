@@ -4,8 +4,20 @@ import { simProxyEventTime } from "../proxy/sim-proxy-event-time.js";
 import type { SimPayload1Endpoint } from "./sim-payload-1-endpoint.js";
 import type {
   SimPayload1Identity,
+  SimPayload1LambdaAuthorizer,
   SimPayload1RequestContext,
 } from "./sim-payload-1-event.type.js";
+
+/**
+ * What the endpoint's authorizer knows about the caller, if it authorized one.
+ *
+ * A method admitting anybody supplies none, which is what leaves the
+ * authorizer block out of the event.
+ */
+export interface SimPayload1Authorization {
+  /** The principal and the context a Lambda authorizer answered with. */
+  readonly lambda?: SimPayload1LambdaAuthorizer | undefined;
+}
 
 interface SimPayload1RequestContextInput {
   readonly request: Request;
@@ -13,6 +25,7 @@ interface SimPayload1RequestContextInput {
   readonly endpoint: SimPayload1Endpoint;
   readonly sourceIp: string;
   readonly at: Date;
+  readonly authorization?: SimPayload1Authorization | undefined;
 }
 
 /**
@@ -29,7 +42,7 @@ export class SimPayload1RequestContextBuilder {
   build(input: SimPayload1RequestContextInput): SimPayload1RequestContext {
     const { endpoint, url, at } = input;
 
-    return {
+    const requestContext: SimPayload1RequestContext = {
       accountId: endpoint.accountId,
       apiId: endpoint.apiId,
       domainName: endpoint.domainName,
@@ -48,14 +61,22 @@ export class SimPayload1RequestContextBuilder {
       resourcePath: endpoint.resourcePath,
       stage: endpoint.stage,
     };
+
+    const { lambda } = input.authorization ?? {};
+
+    if (lambda !== undefined) {
+      requestContext.authorizer = lambda;
+    }
+
+    return requestContext;
   }
 
   /**
    * Who API Gateway says made the request.
    *
-   * Only the open case is described here. Authorizing a method is a separate
-   * piece of work, and the fields an authorizer would fill stay `null` until
-   * something fills them.
+   * Only the open case is described here. The fields an `AWS_IAM` method
+   * fills stay `null`, because that authorization type is a separate piece of
+   * work.
    */
   private identity(input: SimPayload1RequestContextInput): SimPayload1Identity {
     return {

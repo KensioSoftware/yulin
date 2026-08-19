@@ -27,6 +27,45 @@ export class SimApiGatewayErrorResponse {
   }
 
   /**
+   * The request carried nothing at the authorizer's identity source, or the
+   * authorizer answered `Unauthorized`.
+   */
+  unauthorized(): Response {
+    return this.jsonResponse(401, "Unauthorized");
+  }
+
+  /**
+   * A Deny statement in the authorizer's policy matched the method.
+   *
+   * The body names the deny, and its member is `Message` where every other
+   * message here is `message`. Real API Gateway is inconsistent about the two
+   * and this follows it.
+   */
+  explicitDeny(): Response {
+    return this.messageResponse(
+      403,
+      "User is not authorized to access this resource with an explicit deny",
+    );
+  }
+
+  /**
+   * The authorizer's policy allowed nothing covering the method.
+   */
+  implicitDeny(): Response {
+    return this.messageResponse(
+      403,
+      "User is not authorized to access this resource",
+    );
+  }
+
+  /**
+   * The method's authorizer could not answer at all.
+   */
+  internalServerError(): Response {
+    return this.jsonResponse(500, "Internal server error");
+  }
+
+  /**
    * The integration could not be reached, or answered something that is not a
    * response.
    */
@@ -37,6 +76,13 @@ export class SimApiGatewayErrorResponse {
   private jsonResponse(status: number, message: string): Response {
     return Response.json(
       { message },
+      { status, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  private messageResponse(status: number, message: string): Response {
+    return Response.json(
+      { Message: message },
       { status, headers: { "content-type": "application/json" } },
     );
   }

@@ -8,6 +8,7 @@ import {
   SimApiGatewayCommands,
   type SimApiGatewayProperties,
 } from "./sim-api-gateway-commands.js";
+import { SimRestApiParts } from "./sim-rest-api-parts.js";
 
 /**
  * Simulated API Gateway. Handles SDK commands. Emulates AWS behaviour and
@@ -24,15 +25,14 @@ import {
  * methods, because every one of them is addressed by `restApiId` on real AWS
  * and none of them outlives the API.
  */
-export class SimApiGateway {
-  private readonly commands: SimApiGatewayCommands;
+export class SimApiGateway extends SimRestApiParts {
   private readonly sdkRouter = new SimApiGatewaySdkCommandRouter(this);
   private readonly cfnFactory = new SimApiGatewayCfnResourceFactory({
     apiGateway: this,
   });
 
   constructor(properties: SimApiGatewayProperties = {}) {
-    this.commands = new SimApiGatewayCommands(properties);
+    super(new SimApiGatewayCommands(properties));
   }
 
   /**
@@ -98,105 +98,6 @@ export class SimApiGateway {
   ): Promise<simApiGatewayCommands.SimDeleteRestApiCommandOutput> {
     await this.commands.background.sequence();
     return this.commands.api.deleteRestApi(command, options);
-  }
-
-  /**
-   * Handle a CreateResource Command from the SDK.
-   */
-  async createResource(
-    command: simApiGatewayCommands.SimCreateResourceCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimCreateResourceCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.resources.createResource(command, options);
-  }
-
-  /**
-   * Handle a GetResource Command from the SDK.
-   */
-  async getResource(
-    command: simApiGatewayCommands.SimGetResourceCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimGetResourceCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.resources.getResource(command, options);
-  }
-
-  /**
-   * Handle a GetResources Command from the SDK.
-   */
-  async getResources(
-    command: simApiGatewayCommands.SimGetResourcesCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimGetResourcesCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.resources.getResources(command, options);
-  }
-
-  /**
-   * Handle a DeleteResource Command from the SDK.
-   */
-  async deleteResource(
-    command: simApiGatewayCommands.SimDeleteResourceCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimDeleteResourceCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.resources.deleteResource(command, options);
-  }
-
-  /**
-   * Handle a PutMethod Command from the SDK.
-   */
-  async putMethod(
-    command: simApiGatewayCommands.SimPutMethodCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimPutMethodCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.methods.putMethod(command, options);
-  }
-
-  /**
-   * Handle a GetMethod Command from the SDK.
-   */
-  async getMethod(
-    command: simApiGatewayCommands.SimGetMethodCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimGetMethodCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.methods.getMethod(command, options);
-  }
-
-  /**
-   * Handle a DeleteMethod Command from the SDK.
-   */
-  async deleteMethod(
-    command: simApiGatewayCommands.SimDeleteMethodCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimDeleteMethodCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.methods.deleteMethod(command, options);
-  }
-
-  /**
-   * Handle a PutIntegration Command from the SDK.
-   */
-  async putIntegration(
-    command: simApiGatewayCommands.SimPutIntegrationCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimPutIntegrationCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.integrations.putIntegration(command, options);
-  }
-
-  /**
-   * Handle a GetIntegration Command from the SDK.
-   */
-  async getIntegration(
-    command: simApiGatewayCommands.SimGetIntegrationCommand,
-    options?: SimApiGatewayRequestOptions,
-  ): Promise<simApiGatewayCommands.SimGetIntegrationCommandOutput> {
-    await this.commands.background.sequence();
-    return this.commands.integrations.getIntegration(command, options);
   }
 
   /**

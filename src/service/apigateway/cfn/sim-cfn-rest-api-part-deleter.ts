@@ -3,6 +3,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimRestApiAuthorizer } from "../api/authorizer/sim-rest-api-authorizer.js";
 import type { SimRestApiResource } from "../api/resource/sim-rest-api-resource.js";
 import type { SimRestApiStage } from "../api/stage/sim-rest-api-stage.js";
 import type { SimApiGateway } from "../sim-api-gateway.js";
@@ -49,6 +50,15 @@ export class SimCfnRestApiPartDeleter {
 
         await this.apiGateway.deleteResource({
           input: { restApiId, resourceId },
+        });
+
+        return;
+      }
+      case "Authorizer": {
+        const { authorizerId } = this.part<SimRestApiAuthorizer>(resource);
+
+        await this.apiGateway.deleteAuthorizer({
+          input: { restApiId, authorizerId },
         });
 
         return;

@@ -51,6 +51,20 @@ export type {
   SimPutMethodCommandOutput,
 } from "./method/method.command.js";
 export type {
+  SimCreateAuthorizerCommand,
+  SimCreateAuthorizerCommandInput,
+  SimCreateAuthorizerCommandOutput,
+  SimDeleteAuthorizerCommand,
+  SimDeleteAuthorizerCommandInput,
+  SimDeleteAuthorizerCommandOutput,
+  SimGetAuthorizerCommand,
+  SimGetAuthorizerCommandInput,
+  SimGetAuthorizerCommandOutput,
+  SimGetAuthorizersCommand,
+  SimGetAuthorizersCommandInput,
+  SimGetAuthorizersCommandOutput,
+} from "./authorizer/authorizer.command.js";
+export type {
   SimCreateDeploymentCommand,
   SimCreateDeploymentCommandInput,
   SimCreateDeploymentCommandOutput,

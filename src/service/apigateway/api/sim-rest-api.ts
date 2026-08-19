@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { SimRestApiAuthorizerStore } from "./authorizer/sim-rest-api-authorizer-store.js";
 import { SimRestApiDeploymentStore } from "./deployment/sim-rest-api-deployment-store.js";
 import { SimRestApiResourceStore } from "./resource/sim-rest-api-resource-store.js";
 import type { SimRestApiResource } from "./resource/sim-rest-api-resource.js";
@@ -46,6 +47,7 @@ export class SimRestApi {
   public description?: string | undefined;
 
   public readonly resources = new SimRestApiResourceStore();
+  public readonly authorizers = new SimRestApiAuthorizerStore();
   public readonly deployments = new SimRestApiDeploymentStore();
   public readonly stages = new SimRestApiStageStore();
 

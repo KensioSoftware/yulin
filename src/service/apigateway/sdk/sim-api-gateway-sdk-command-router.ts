@@ -13,6 +13,10 @@ import type {
   SimGetResourceCommand,
   SimGetResourcesCommand,
   SimDeleteResourceCommand,
+  SimCreateAuthorizerCommand,
+  SimGetAuthorizerCommand,
+  SimGetAuthorizersCommand,
+  SimDeleteAuthorizerCommand,
   SimPutMethodCommand,
   SimGetMethodCommand,
   SimDeleteMethodCommand,
@@ -107,6 +111,38 @@ export class SimApiGatewaySdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGateway.deleteResource(
             command as SimDeleteResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateAuthorizerCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.createAuthorizer(
+            command as SimCreateAuthorizerCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetAuthorizerCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.getAuthorizer(
+            command as SimGetAuthorizerCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetAuthorizersCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.getAuthorizers(
+            command as SimGetAuthorizersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteAuthorizerCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGateway.deleteAuthorizer(
+            command as SimDeleteAuthorizerCommand,
             simSdkCallerOptions(context),
           ),
       ],
