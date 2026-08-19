@@ -8,7 +8,7 @@ export declare namespace CloudFrontFunction {
     multiValue: Value[];
   }
 
-  export type Headers = Record<string, Value>;
+  export type Headers = Record<string, Value | MultiValue>;
 
   export type QueryString = Record<string, Value | MultiValue>;
 

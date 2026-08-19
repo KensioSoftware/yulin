@@ -1,4 +1,8 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type {
+  IncomingMessage,
+  OutgoingHttpHeaders,
+  ServerResponse,
+} from "node:http";
 import { assertDefined } from "../../util/type-guard/defined.js";
 
 /**
@@ -28,10 +32,7 @@ export class NodeFetchHttpAdapter {
     nodeResponse: ServerResponse,
     response: Response,
   ): Promise<void> {
-    nodeResponse.writeHead(
-      response.status,
-      Object.fromEntries(response.headers.entries()),
-    );
+    nodeResponse.writeHead(response.status, this.outgoingHeaders(response));
 
     if (response.body === null) {
       nodeResponse.end();
@@ -40,6 +41,27 @@ export class NodeFetchHttpAdapter {
 
     const body = Buffer.from(await response.arrayBuffer());
     nodeResponse.end(body);
+  }
+
+  /**
+   * Convert response headers to the shape Node sends.
+   *
+   * `Headers.entries()` yields one entry per `Set-Cookie` header, and
+   * collecting them into an object keeps only the last. Node takes an array for
+   * a header sent more than once. A response establishing one cookie and
+   * clearing another reaches the client whole.
+   */
+  private outgoingHeaders(response: Response): OutgoingHttpHeaders {
+    const outgoing: OutgoingHttpHeaders = Object.fromEntries(
+      response.headers.entries(),
+    );
+
+    const setCookies = response.headers.getSetCookie();
+    if (setCookies.length > 0) {
+      outgoing["set-cookie"] = setCookies;
+    }
+
+    return outgoing;
   }
 
   private nodeRequestHeaders(nodeRequest: IncomingMessage): Headers {

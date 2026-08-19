@@ -760,6 +760,26 @@ suffix and port are dropped before the function runs. A function building a URL 
 `event.request.headers.host.value` behaves as it would on AWS. As on AWS, `host` is read-only, and a
 host a function writes is discarded before the Origin sees it.
 
+A header arriving more than once reaches the Function as one entry holding every value it arrived
+with. `value` carries the first, and `multiValue` carries all of them, the same shape a repeated
+query string parameter has. A response setting three cookies gives a viewer-response Function this:
+
+```typescript
+event.response.headers["set-cookie"];
+// {
+//   value: "session=abc123; Path=/",
+//   multiValue: [
+//     { value: "session=abc123; Path=/" },
+//     { value: "state=; Max-Age=0" },
+//     { value: "signed-in=1; Path=/" },
+//   ],
+// }
+```
+
+A Function returning that response untouched leaves all three cookies on their way to the viewer. A
+Function writing `multiValue` sends one header per value in it, and CloudFront ignores `value` while
+both are there. Writing `value` on its own sends a single header.
+
 ```typescript sim-cloudfront-function
 /**
  * Simulated CloudFront Functions.
