@@ -388,10 +388,11 @@ before it is reported missing.
 Both answers come from one lookup. `SimLambdaFunctionTarget` carries the resource a qualifier named
 and the version that runs, and `findTarget` and `requireTarget` on the version store are what
 everything else here is built on. `SimLambdaFunctionLookup` offers the same two by function name,
-and `SimLambda.getSimFunctionTarget` is how the other simulated services reach a function a target
-ARN points at. Each of them resolves the qualifier at the moment it is asked, so an alias moved to
-another version moves what a standing notification, subscription, trigger, rule target, event
-source mapping or API Gateway route delivers to.
+and `SimLambda.getSimFunctionTarget` is how the other simulated services, and the CloudFormation
+version and permission creators, reach a function a target ARN points at. Each of them resolves the
+qualifier at the moment it is asked, so an alias moved to another version moves what a standing
+notification, subscription, trigger, rule target, event source mapping or API Gateway route
+delivers to.
 
 `SimLambdaServiceInvokeAuthorizer` takes that resource rather than the function, so a delivery to
 an alias is admitted by a grant made on the alias. The service being the caller is the only thing
@@ -704,13 +705,40 @@ rule. `StartingPosition` and `StartingPositionTimestamp` are read and passed on 
 here, since a stream mapping has to have a position and a queue mapping is refused for naming one,
 and only `CreateEventSourceMapping` knows which source the ARN names.
 
-Other `AWS::Lambda::*` resource types (`Version`, `Alias`, ...) are not supported and are skipped by
-the CloudFormation engine with an "Unsupported" diagnostic.
+### Versions and aliases
+
+`cfn/version/` publishes `AWS::Lambda::Version` through `PublishVersion`, and `cfn/alias/` creates
+`AWS::Lambda::Alias` through `CreateAlias`. A deployed template reaches the same store an SDK
+caller does. Both are what CDK emits for `fn.currentVersion` and `new lambda.Alias(...)`, and the
+integrations in such an app point at the alias.
+
+Each hands back the object the command created. The version creator reads it back with
+`SimLambda.getSimFunctionTarget(...)`, which answers with the version a number names, and the alias
+creator with `getSimFunctionAlias(...)`. `Ref` on the version resolves to the qualified function
+ARN and `Fn::GetAtt` `Version` to the number, and `Ref` on the alias resolves to the alias ARN. `SimLambdaFunctionVersionCfn` and `SimLambdaFunctionAliasCfn` under
+`src/service/cloudformation/resource/cfn/lambda/` hold that. The version adapter matches on the
+Resource type, since a published version and the function it came from are both a
+`SimLambdaFunction` and only the template says which Resource is being read.
+
+`cfn/permission/` reads a qualifier out of `FunctionName` and passes it to `AddPermission` as the
+`Qualifier`, then reads the statement back off the resource `getSimFunctionTarget` answers with.
+That is how a CDK `grantInvoke` on an alias lands on the alias. The other readers
+(`cfn/url/` and `cfn/event-source-mapping/`) act on the function itself and keep dropping it,
+through `simCfnLambdaTargetFunctionName`.
+
+`SimCfnLambdaResourceDeleter` deletes the alias on teardown. A version has no deleter, and the
+`Version` case does nothing on purpose. Lambda has no operation that deletes one published version.
+The version goes when the function it was published from does, and the Stack is tearing that
+function down in the same teardown.
+
+Other `AWS::Lambda::*` resource types (`LayerVersion`, `CodeSigningConfig`, ...) are not supported
+and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 
 ## Not simulated yet
 
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
-  `AWS::Lambda::Url`, `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping`
+  `AWS::Lambda::Url`, `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias` and
+  `AWS::Lambda::EventSourceMapping`
 - event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
   `UpdateEventSourceMapping`, and polling concurrency
 - Function URL `Cors` configuration and OPTIONS preflight handling
@@ -721,7 +749,8 @@ the CloudFormation engine with an "Unsupported" diagnostic.
   skipped or refused where neither does
 - `UpdateFunctionCode` and function listing
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
-  `RoutingConfig` weights, and provisioned concurrency
+  `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
+  `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
 - version and alias operations over the served HTTP API endpoint, which routes the other sixteen
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment

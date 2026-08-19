@@ -27,10 +27,14 @@ export class SimLambdaFunctionVersionStore {
   >();
 
   /**
-   * Publish a function as it stands as its next version.
+   * Publish a function as it stands as its next version, described as the
+   * caller asked for or as the function itself is.
    */
-  publish(simFunction: SimLambdaFunction): SimLambdaFunction {
-    return this.of(simFunction).publish(simFunction);
+  publish(
+    simFunction: SimLambdaFunction,
+    description?: string,
+  ): SimLambdaFunction {
+    return this.of(simFunction).publish(simFunction, description);
   }
 
   /**

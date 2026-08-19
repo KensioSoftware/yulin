@@ -180,9 +180,9 @@ describe("SimLambdaCloudFormationResourceFactory", () => {
     const simLambda = simAws.lambda();
     const resource = new SimCfnResource({
       accountRegionScope,
-      logicalId: "ExampleAlias",
+      logicalId: "ExampleLayer",
       template: {
-        Type: "AWS::Lambda::Alias",
+        Type: "AWS::Lambda::LayerVersion",
       },
     });
     const context: SimCloudFormationResourceCreateContext = {
@@ -194,13 +194,13 @@ describe("SimLambdaCloudFormationResourceFactory", () => {
     // When creation is attempted, then it rejects with an unsupported Resource
     // type error.
     const error = await assertThrowsErrorAsync(async () =>
-      factory.create("Alias", resource, context),
+      factory.create("LayerVersion", resource, context),
     );
 
     // Then the unsupported Resource type name is included for diagnosis.
     assertIdentical(
       error.message,
-      "Unsupported sim Lambda CloudFormation Resource Alias",
+      "Unsupported sim Lambda CloudFormation Resource LayerVersion",
     );
   });
 });

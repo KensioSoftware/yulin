@@ -192,17 +192,18 @@ export class SimLambdaFunction {
 
   /**
    * A copy of this function as it stands now, published under a version
-   * number, keeping the code, handler, timeout, memory and environment it was
-   * published with. It is Active from the start, since the code it copied is
-   * already resolved and has nothing left to become.
+   * number, with a description of its own where one is given, and keeping the
+   * code, handler, timeout, memory and environment it was published with. It
+   * is Active from the start, since the code it copied is already resolved.
    */
-  publishedAs(version: string): SimLambdaFunction {
+  publishedAs(version: string, description?: string): SimLambdaFunction {
     return new SimLambdaFunction({
       ...this.properties,
       code: this.code,
       environment: this.environment,
       runAsOwner: this.runAsOwner,
       state: "Active",
+      description: description ?? this.description,
       version,
     });
   }

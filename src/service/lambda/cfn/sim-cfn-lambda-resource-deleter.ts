@@ -3,8 +3,9 @@ import type { SimLambda } from "../sim-lambda.js";
 import type { SimLambdaFunction } from "../function/sim-lambda-function.js";
 import type { SimLambdaFunctionUrl } from "../function/url/sim-lambda-function-url.js";
 import type { SimLambdaEventSourceMapping } from "../event-source/sim-lambda-event-source-mapping.js";
-import type { SimLambdaPermission } from "../function/policy/sim-lambda-permission.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimLambdaFunctionAlias } from "../function/version/sim-lambda-function-alias.js";
+import { simCfnLambdaCreatedResource } from "./sim-cfn-lambda-created-resource.js";
+import { simCfnLambdaRevokePermission } from "./permission/sim-cfn-lambda-permission-revoker.js";
 import { simCfnLambdaTargetFunctionName } from "./function/sim-cfn-lambda-target-function.js";
 
 interface SimCfnLambdaResourceDeleterProperties {
@@ -46,7 +47,19 @@ export class SimCfnLambdaResourceDeleter {
         return;
       }
       case "Permission": {
-        await this.removePermission(resource);
+        await simCfnLambdaRevokePermission(this.lambda, resource);
+        return;
+      }
+      case "Version": {
+        // Nothing to do. Lambda has no operation that deletes one published
+        // version, and a version goes when the function it was published from
+        // does. A Stack that published one is tearing that function down in
+        // the same teardown, so leaving the version alone here leaves it
+        // reachable for exactly as long as the function is.
+        return;
+      }
+      case "Alias": {
+        await this.deleteAlias(resource);
         return;
       }
       default: {
@@ -58,10 +71,9 @@ export class SimCfnLambdaResourceDeleter {
   }
 
   private async deleteFunction(resource: SimCfnResource): Promise<void> {
-    const simFunction = resource.simResource as SimLambdaFunction | undefined;
-    assertDefined(
-      simFunction,
-      `sim Lambda Function for CloudFormation Resource ${resource.logicalId}`,
+    const simFunction = simCfnLambdaCreatedResource<SimLambdaFunction>(
+      resource,
+      "function",
     );
 
     await this.lambda.deleteFunction({
@@ -70,12 +82,9 @@ export class SimCfnLambdaResourceDeleter {
   }
 
   private async deleteFunctionUrl(resource: SimCfnResource): Promise<void> {
-    const functionUrl = resource.simResource as
-      | SimLambdaFunctionUrl
-      | undefined;
-    assertDefined(
-      functionUrl,
-      `sim Lambda Function URL for CloudFormation Resource ${resource.logicalId}`,
+    const functionUrl = simCfnLambdaCreatedResource<SimLambdaFunctionUrl>(
+      resource,
+      "Function URL",
     );
 
     await this.lambda.deleteFunctionUrlConfig({
@@ -86,12 +95,9 @@ export class SimCfnLambdaResourceDeleter {
   private async deleteEventSourceMapping(
     resource: SimCfnResource,
   ): Promise<void> {
-    const mapping = resource.simResource as
-      | SimLambdaEventSourceMapping
-      | undefined;
-    assertDefined(
-      mapping,
-      `sim Lambda event source mapping for CloudFormation Resource ${resource.logicalId}`,
+    const mapping = simCfnLambdaCreatedResource<SimLambdaEventSourceMapping>(
+      resource,
+      "event source mapping",
     );
 
     await this.lambda.deleteEventSourceMapping({
@@ -100,23 +106,18 @@ export class SimCfnLambdaResourceDeleter {
   }
 
   /**
-   * Take a permission back off the function it was added to.
-   *
-   * The statement is named after the Resource's logical ID when it is added,
-   * because AWS::Lambda::Permission has no StatementId property, so that is
-   * what addresses it again here.
+   * Drop an alias, leaving the version it pointed at where it is.
    */
-  private async removePermission(resource: SimCfnResource): Promise<void> {
-    const permission = resource.simResource as SimLambdaPermission | undefined;
-    assertDefined(
-      permission,
-      `sim Lambda permission for CloudFormation Resource ${resource.logicalId}`,
+  private async deleteAlias(resource: SimCfnResource): Promise<void> {
+    const alias = simCfnLambdaCreatedResource<SimLambdaFunctionAlias>(
+      resource,
+      "alias",
     );
 
-    await this.lambda.removePermission({
+    await this.lambda.deleteAlias({
       input: {
-        FunctionName: simCfnLambdaTargetFunctionName(permission.resourceArn),
-        StatementId: permission.statementId,
+        FunctionName: simCfnLambdaTargetFunctionName(alias.arn),
+        Name: alias.name,
       },
     });
   }
