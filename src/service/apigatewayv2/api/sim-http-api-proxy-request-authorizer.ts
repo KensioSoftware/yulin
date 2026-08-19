@@ -1,7 +1,7 @@
+import { simApiGatewayServicePrincipal } from "../../apigateway/sim-api-gateway-service-principal.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
 import type { SimCreateRouteCommandInput } from "../command/route/route.command.js";
-import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-invoke-authorizer.js";
 import type { SimHttpApiAuthorizerEvent } from "../serve/auth/sim-http-api-authorizer-event.js";
 
 /**

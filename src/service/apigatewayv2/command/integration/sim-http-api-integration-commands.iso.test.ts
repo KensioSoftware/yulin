@@ -146,19 +146,20 @@ describe("Sim API Gateway v2 integration commands", () => {
         PayloadFormatVersion: "2.0",
       }),
     );
+    const wrappedUri =
+      `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
+      `${functionArn}:3/invocations`;
     const version = await simAws.apiGatewayV2().createIntegration(
       new CreateIntegrationCommand({
         ApiId: apiId,
         IntegrationType: "AWS_PROXY",
-        IntegrationUri:
-          `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
-          `${functionArn}:3/invocations`,
+        IntegrationUri: wrappedUri,
         PayloadFormatVersion: "2.0",
       }),
     );
 
-    // Then each is created, and each keeps the qualifier it was given
+    // Then each is created, and each is handed back as it was written
     assertIdentical(alias.IntegrationUri, `${functionArn}:live`);
-    assertIdentical(version.IntegrationUri, `${functionArn}:3`);
+    assertIdentical(version.IntegrationUri, wrappedUri);
   });
 });

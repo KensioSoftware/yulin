@@ -50,7 +50,11 @@ const stack = await simAws.cloudFormation().deployTemplate({
             "Fn::Join": [
               "",
               [
-                "arn:aws:execute-api:us-east-1:111111111111:",
+                "arn:aws:execute-api:",
+                { Ref: "AWS::Region" },
+                ":",
+                { Ref: "AWS::AccountId" },
+                ":",
                 { Ref: "Api" },
                 "/*/*",
               ],
@@ -107,6 +111,9 @@ const srv = await serveSimAws({ simAws });
 const response = await fetch(srv.localUrl(`${apiEndpoint}/orders`));
 
 console.log(response.status);
+// 200
+
 console.log(await response.text());
+// "orders"
 
 await srv.close();

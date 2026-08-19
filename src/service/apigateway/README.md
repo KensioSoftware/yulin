@@ -99,6 +99,45 @@ the id. That split is made when the request is routed rather than while the host
 for the same reason a load balancer's DNS name resolves before anything asks whether a load balancer
 still answers on it.
 
+## Deploying from a template
+
+`cfn/` turns the `AWS::ApiGateway::*` Resource types into the same commands an SDK caller sends:
+
+```text
+SimApiGatewayCfnResourceFactory              which creator answers a Resource type
+├── sim-cfn-api-gateway-property-parser.ts   the allow-list of properties
+├── sim-cfn-api-gateway-scalar-values.ts     the value shapes each may take
+├── sim-cfn-rest-api-template.factory.ts     the template tests deploy
+├── sim-cfn-rest-api-template-ids.ts         the logical IDs a test names it by
+├── sim-cfn-rest-api-part-deleter.ts         what a teardown deletes an API's parts by
+├── api/         RestApi
+├── resource/    Resource
+├── method/      Method, and the Integration block it carries
+├── deployment/  Deployment
+└── stage/       Stage
+```
+
+Every creator goes through the ordinary command. A template is held to the same rules an SDK caller
+is, and the refusals below apply to a deployed Resource as well. Each properties reader states the
+properties its type simulates and records every other one against the Resource. That record is what
+keeps a template from deploying an API that looks configured to the template and unconfigured to
+every request.
+
+A method is one Resource and two commands, because the REST API declares a method and what it does
+with a request separately. The template writes both as one entry, with the integration as a block of
+the method, and `PutMethod` and `PutIntegration` go together or neither does. An integration real
+API Gateway refuses takes the method back out again, because the next deployment of the corrected
+template would otherwise be refused for a method that already exists.
+
+A teardown deletes each part through the command that removes it, and the API last. A deployment is
+the exception. API Gateway deletes one and nothing here does. The Resource is reported as a deletion
+nothing carried out, and the deployment goes with its API a moment later.
+
+`Ref` and `Fn::GetAtt` live beside the CloudFormation engine, in
+`src/service/cloudformation/resource/cfn/apigateway/`, where every service keeps its value adapters.
+A method has no adapter there. It has no id of its own on real AWS, and the engine's fallback
+answers a `Ref` with the logical ID.
+
 ## What is refused
 
 `command/sim-api-gateway-unsimulated-input.ts` refuses every input outside the accepted set of each

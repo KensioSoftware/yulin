@@ -181,13 +181,15 @@ describe("Deploying an AWS::ApiGatewayV2::Authorizer of type REQUEST", () => {
       .getRoutes({ input: { ApiId: apiId } });
 
     // Then the authorizer carries what the template gave it, including the
-    // function ARN the wrapped AuthorizerUri named, and the route is the one
+    // wrapped AuthorizerUri as the template wrote it, and the route is the one
     // pointed at it
     assertObjectMatches(authorizers.Items[0] ?? {}, {
       Name: "session-cookie",
       AuthorizerType: "REQUEST",
       AuthorizerUri:
-        "arn:aws:lambda:eu-west-2:888888888888:function:session-authorizer",
+        "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/" +
+        "arn:aws:lambda:eu-west-2:888888888888:function:session-authorizer" +
+        "/invocations",
       AuthorizerPayloadFormatVersion: "2.0",
       EnableSimpleResponses: true,
       AuthorizerResultTtlInSeconds: 300,

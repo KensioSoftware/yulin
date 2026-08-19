@@ -387,6 +387,244 @@ console.log(listed.items?.map((restApi) => restApi.name));
 The client's region decides which simulated account and region scope the API lands in, the same way
 it does for every other intercepted service.
 
+## Deploying from CloudFormation and CDK
+
+[Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
+`AWS::ApiGateway::RestApi`, `AWS::ApiGateway::Resource`, `AWS::ApiGateway::Method`,
+`AWS::ApiGateway::Deployment` and `AWS::ApiGateway::Stage`. A synthesized or hand-written template
+produces an API that serves requests.
+
+`Ref` and `Fn::GetAtt` return what real CloudFormation returns for each type:
+
+| Resource type | `Ref`             | `Fn::GetAtt`                  |
+| ------------- | ----------------- | ----------------------------- |
+| `RestApi`     | the API id        | `RestApiId`, `RootResourceId` |
+| `Resource`    | the resource id   | `ResourceId`                  |
+| `Method`      | the logical id    | none, as AWS documents none   |
+| `Deployment`  | the deployment id | `DeploymentId`                |
+| `Stage`       | the stage name    | none, as AWS documents none   |
+
+A REST API method has no id of its own. It is addressed by its API, its resource and its HTTP verb,
+and a `Ref` to one falls back on the CloudFormation logical id. CDK reads that value only to publish
+`Method.methodId`.
+
+The API publishes no endpoint attribute either, because real API Gateway reports none. CDK joins the
+URL out of a `Ref` to the API, the region, `AWS::URLSuffix` and a `Ref` to the stage. That suffix
+resolves to the local `sim-aws.localhost` hostname, and the stage is the first path segment of what
+it builds.
+
+A `Resource` names its place in the tree through `ParentId`. The top of the tree reads
+`Fn::GetAtt: ["<Api>", "RootResourceId"]`, and everything below it a `Ref` to the node above.
+
+A `Method` carries its integration as an `Integration` block of its own, which is how the REST API
+models one. The block becomes the `PutIntegration` that follows the method's `PutMethod`, and its
+`Uri` is read as the bare Lambda function ARN or as the
+`arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` string CDK
+builds with `Fn::Join`.
+
+```typescript sim-apigateway-cloudformation
+/**
+ * Deploying a simulated REST API from a CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      HandlerRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "orders-role",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+        },
+      },
+      Handler: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: { "Fn::GetAtt": ["HandlerRole", "Arn"] },
+          Handler: "index.handler",
+          Runtime: "nodejs20.x",
+          Code: {
+            ZipFile:
+              "exports.handler = async (event) => ({ statusCode: 200, body: 'order ' + event.pathParameters.orderId });",
+          },
+        },
+      },
+      HandlerPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          Action: "lambda:InvokeFunction",
+          FunctionName: { "Fn::GetAtt": ["Handler", "Arn"] },
+          Principal: "apigateway.amazonaws.com",
+          SourceArn: {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:execute-api:",
+                { Ref: "AWS::Region" },
+                ":",
+                { Ref: "AWS::AccountId" },
+                ":",
+                { Ref: "Api" },
+                "/*/*/*",
+              ],
+            ],
+          },
+        },
+      },
+      Api: {
+        Type: "AWS::ApiGateway::RestApi",
+        Properties: { Name: "orders" },
+      },
+      OrdersResource: {
+        Type: "AWS::ApiGateway::Resource",
+        Properties: {
+          RestApiId: { Ref: "Api" },
+          ParentId: { "Fn::GetAtt": ["Api", "RootResourceId"] },
+          PathPart: "orders",
+        },
+      },
+      OrderResource: {
+        Type: "AWS::ApiGateway::Resource",
+        Properties: {
+          RestApiId: { Ref: "Api" },
+          ParentId: { Ref: "OrdersResource" },
+          PathPart: "{orderId}",
+        },
+      },
+      GetOrder: {
+        Type: "AWS::ApiGateway::Method",
+        Properties: {
+          RestApiId: { Ref: "Api" },
+          ResourceId: { Ref: "OrderResource" },
+          HttpMethod: "GET",
+          AuthorizationType: "NONE",
+          Integration: {
+            Type: "AWS_PROXY",
+            IntegrationHttpMethod: "POST",
+            Uri: {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:apigateway:",
+                  { Ref: "AWS::Region" },
+                  ":lambda:path/2015-03-31/functions/",
+                  { "Fn::GetAtt": ["Handler", "Arn"] },
+                  "/invocations",
+                ],
+              ],
+            },
+          },
+        },
+      },
+      Deployment: {
+        Type: "AWS::ApiGateway::Deployment",
+        Properties: { RestApiId: { Ref: "Api" } },
+        DependsOn: ["GetOrder"],
+      },
+      Stage: {
+        Type: "AWS::ApiGateway::Stage",
+        Properties: {
+          RestApiId: { Ref: "Api" },
+          DeploymentId: { Ref: "Deployment" },
+          StageName: "prod",
+        },
+      },
+    },
+    Outputs: {
+      ApiUrl: {
+        Value: {
+          "Fn::Join": [
+            "",
+            [
+              "https://",
+              { Ref: "Api" },
+              ".execute-api.",
+              { Ref: "AWS::Region" },
+              ".",
+              { Ref: "AWS::URLSuffix" },
+              "/",
+              { Ref: "Stage" },
+              "/",
+            ],
+          ],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// https://<api-id>.execute-api.us-east-1.sim-aws.localhost/prod/
+const apiUrl = stack.output("ApiUrl");
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(srv.localUrl(`${apiUrl}orders/6`));
+
+console.log(response.status);
+// 200
+
+console.log(await response.text());
+// "order 6"
+
+await srv.close();
+```
+
+Every property outside the simulated set is left out of what is created and recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+naming the Resource type, the logical id and the ones this can act on. The API, resource, method,
+deployment or stage is created either way. The stack deploys, and the record says which of its parts
+behaves differently to the template. The simulated properties are:
+
+- `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`
+- `Resource`: `RestApiId`, `ParentId`, `PathPart`
+- `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `ApiKeyRequired`,
+  `OperationName`, `Integration`
+- A method's `Integration` block: `Type`, `IntegrationHttpMethod`, `Uri`
+- `Deployment`: `RestApiId`, `Description`, `StageName`
+- `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`
+
+A `Body` on the `RestApi` is one of the recorded ones. It is an OpenAPI document declaring the API's
+resources, methods and integrations, and reading one is outside this. An API declared that way
+deploys with a root resource and an empty tree under it.
+
+`StageName` on a `Deployment` is the older one-Resource form, where the deployment publishes a stage
+of that name by itself and the template carries one Resource fewer.
+
+### CDK
+
+CDK's `RestApi` and `LambdaRestApi` both deploy and serve. `LambdaRestApi` synthesizes an `ANY`
+method on the root and another on a `{proxy+}` resource, both in front of one function, with the
+`AWS::Lambda::Permission` each needs. `restApi.url` and `restApi.urlForPath` resolve to the local
+hostname through `AWS::URLSuffix`.
+
+CDK also writes an `AWS::ApiGateway::Account` and a CloudWatch role beside a default `RestApi`.
+Neither is simulated. The `Account` Resource is recorded in
+[`stack.skippedResources`](../cloudformation/README.md#inspecting-stacks-and-resources) and the rest of the
+stack deploys.
+
+`Authorizer`, `ApiKey`, `UsagePlan`, `UsagePlanKey`, `RequestValidator`, `Model`, `DomainName` and
+`BasePathMapping` are recorded there too, each naming the reason. A method under one of them is
+refused by `PutMethod`, because a method that looked gated to the template and answered every
+request here is worse than a failed deployment.
+
 ## Authorization
 
 Every command is authorized by simulated IAM, and API Gateway asks IAM an unusual question. The
@@ -423,9 +661,15 @@ and behave differently deployed. The refusals worth knowing about:
 | Integrations | `PutIntegration`, `GetIntegration`                                             |
 | Publishing   | `CreateDeployment`, `CreateStage`, `GetStage`, `GetStages`, `DeleteStage`      |
 
+CloudFormation deploys `AWS::ApiGateway::RestApi`, `Resource`, `Method`, `Deployment` and `Stage`,
+including the template CDK synthesizes from a `RestApi` or a `LambdaRestApi`. See
+[Deploying from CloudFormation and CDK](#deploying-from-cloudformation-and-cdk).
+
 ## Limitations
 
-- CloudFormation and CDK deployment of `AWS::ApiGateway::*` resources is still to come.
+- An `AWS::ApiGateway::Deployment` is created and never deleted, because API Gateway deletes one
+  and this simulation has no command for it. A Stack teardown lists it in
+  `stack.skippedResourceDeletions` and the deployment goes with its API a moment later.
 - A repeated request header reaches the handler as one joined value in `multiValueHeaders`, because
   that is the form the platform's `Headers` hands over. Real API Gateway reports each separately.
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.

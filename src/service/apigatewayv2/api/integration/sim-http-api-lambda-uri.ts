@@ -15,10 +15,17 @@ import { SimApiGatewayV2BadRequest } from "../../error/sim-api-gateway-v2.error.
  * A URI is written either as the bare function ARN or wrapped in an API
  * Gateway invoke path, and both reach the same function. Reading them through
  * one reader is what lets an SDK caller, a template and an imported document
- * write whichever form they write.
+ * write whichever form they write. The string is kept as it was given, because
+ * `GetIntegration` and `GetAuthorizer` echo back what was configured. The
+ * function ARN is held beside it for whatever has to reach the function.
  */
 export class SimHttpApiLambdaUri {
+  /** The URI as it was configured, which is what the API hands back. */
   public readonly uri: string;
+
+  /** The function ARN the URI named, with any wrapper taken off. */
+  public readonly functionArn: string;
+
   public readonly regionName: string;
   public readonly accountId: string;
   public readonly functionName: string;
@@ -30,12 +37,14 @@ export class SimHttpApiLambdaUri {
 
   private constructor(properties: {
     readonly uri: string;
+    readonly functionArn: string;
     readonly regionName: string;
     readonly accountId: string;
     readonly functionName: string;
     readonly qualifier: string | undefined;
   }) {
     this.uri = properties.uri;
+    this.functionArn = properties.functionArn;
     this.regionName = properties.regionName;
     this.accountId = properties.accountId;
     this.functionName = properties.functionName;
@@ -83,9 +92,6 @@ export class SimHttpApiLambdaUri {
       );
     }
 
-    return new SimHttpApiLambdaUri({
-      ...invocation,
-      uri: invocation.functionArn,
-    });
+    return new SimHttpApiLambdaUri({ ...invocation, uri });
   }
 }

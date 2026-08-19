@@ -24,8 +24,8 @@ import {
 } from "../../../../test/lambda/alias-fixture.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
+import { simApiGatewayServicePrincipal } from "../../apigateway/sim-api-gateway-service-principal.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { simApiGatewayServicePrincipal } from "./auth/sim-http-api-invoke-authorizer.js";
 
 /**
  * What the handler behind every route here answers with. The version that ran

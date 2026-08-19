@@ -1,3 +1,4 @@
+import { simApiGatewayServicePrincipal } from "../../../apigateway/sim-api-gateway-service-principal.js";
 import type {
   SimIamAuthorizationDecision,
   SimIamInterServiceAuthZ,
@@ -7,12 +8,6 @@ import type { SimHttpApiRequestAuthorizer } from "../../api/authorizer/sim-http-
 import { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
 import type { SimHttpApi } from "../../api/sim-http-api.js";
 import type { SimHttpApiFunctionTarget } from "../sim-http-api-function-target.js";
-
-/**
- * The service principal API Gateway invokes a Lambda function as, whether that
- * function is behind an integration or behind an authorizer.
- */
-export const simApiGatewayServicePrincipal = "apigateway.amazonaws.com";
 
 interface SimHttpApiInvokeAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
