@@ -224,6 +224,41 @@ describe("Secrets Manager CloudFormation dynamic references", () => {
     assertIdentical(readValue(simAws), "app:hunter2");
   });
 
+  it("leaves a property written to look like a substitution marker alone", async () => {
+    // Given a secret, and a template writing marker-shaped text of its own.
+    const simAws = simAwsInEuWest2();
+    await simAws
+      .secretsManager()
+      .createSecret({ input: { Name: "api-key", SecretString: "hunter2" } });
+
+    const markerShaped = "\u{E000}dynamic-reference-0\u{E000}";
+
+    // When both sit in the same Resource.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "config-stack",
+      template: {
+        Resources: {
+          Read: {
+            Type: "AWS::SSM::Parameter",
+            Properties: {
+              Name: "/myapp/read",
+              Type: "String",
+              Value: "{{resolve:secretsmanager:api-key}}",
+              Description: markerShaped,
+            },
+          },
+        },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the secret reaches its own property and nothing else.
+    const parameter = simAws.ssm().findParameter("/myapp/read");
+    assertNonNullable(parameter, "the deployed parameter");
+    assertIdentical(parameter.currentVersion.value.value, "hunter2");
+    assertIdentical(parameter.currentVersion.description, markerShaped);
+  });
+
   it("resolves a reference whose secret name comes from an Fn::Sub variable", async () => {
     // Given a secret under an environment-specific name.
     const simAws = simAwsInEuWest2();

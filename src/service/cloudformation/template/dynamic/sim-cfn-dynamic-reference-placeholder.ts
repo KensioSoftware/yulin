@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
@@ -12,18 +13,34 @@ import type {
  * template resolves, and the value replaces it once the service has answered.
  *
  * The marker is wrapped in a private use character (one nothing in a
- * CloudFormation template holds), so no value a template wrote can be mistaken
- * for one. While it is in flight the marker is opaque text, which is what an
- * intrinsic function reading the string around it sees. An `Fn::Split` over a
- * value the service has yet to answer with splits the marker.
+ * CloudFormation template holds) and carries random bytes of its own. A
+ * property holding text a template author wrote is therefore left alone, even
+ * where that text was written to look like a marker. While it is in flight the
+ * marker is opaque text, which is what an intrinsic function reading the
+ * string around it sees. An `Fn::Split` over a value the service has yet to
+ * answer with splits the marker.
  */
-const placeholderPattern = /\u{E000}dynamic-reference-\d+\u{E000}/gu;
+const placeholderPattern = /\u{E000}dynamic-reference-[\da-f]+-\d+\u{E000}/gu;
+
+/** How many random bytes each resolution's markers are marked with. */
+const markingLength = 8;
+
+/**
+ * What one resolution's markers are marked with, so that no other resolution
+ * and nothing a template wrote produces the same marker.
+ */
+export function simCfnDynamicReferenceMarking(): string {
+  return randomBytes(markingLength).toString("hex");
+}
 
 /**
  * The marker standing in for the reference at this position in a resolution.
  */
-export function simCfnDynamicReferencePlaceholder(position: number): string {
-  return `\u{E000}dynamic-reference-${String(position)}\u{E000}`;
+export function simCfnDynamicReferencePlaceholder(
+  marking: string,
+  position: number,
+): string {
+  return `\u{E000}dynamic-reference-${marking}-${String(position)}\u{E000}`;
 }
 
 /**
