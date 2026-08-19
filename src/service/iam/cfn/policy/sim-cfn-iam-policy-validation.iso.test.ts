@@ -94,20 +94,35 @@ describe("IAM CloudFormation Policy validation", () => {
     );
   });
 
-  it("rejects missing, empty, or malformed Roles", async () => {
-    // Given Policy properties with missing or malformed Roles.
-    // When creation is attempted, then each rejects naming the property.
+  it("rejects a Policy naming no principal", async () => {
+    // Given Policy properties naming neither a Role nor a User, which leaves
+    // the policy with nothing to attach to.
+    // When creation is attempted, then each rejects naming both properties.
     await assertRejectsPolicy(
       { PolicyName: "BadPolicy", PolicyDocument: validPolicyDocument },
-      "Roles must be a non-empty array",
+      "Roles or Users must name at least one principal",
     );
     await assertRejectsPolicy(
       {
         PolicyName: "BadPolicy",
         PolicyDocument: validPolicyDocument,
         Roles: [],
+        Users: [],
       },
-      "Roles must be a non-empty array",
+      "Roles or Users must name at least one principal",
+    );
+  });
+
+  it("rejects malformed Roles", async () => {
+    // Given Policy properties with malformed Roles.
+    // When creation is attempted, then each rejects naming the property.
+    await assertRejectsPolicy(
+      {
+        PolicyName: "BadPolicy",
+        PolicyDocument: validPolicyDocument,
+        Roles: "ReaderRole",
+      },
+      "Roles must be an array",
     );
     await assertRejectsPolicy(
       {
@@ -116,6 +131,27 @@ describe("IAM CloudFormation Policy validation", () => {
         Roles: [42],
       },
       "Roles entries must be strings",
+    );
+  });
+
+  it("rejects malformed Users", async () => {
+    // Given Policy properties with malformed Users.
+    // When creation is attempted, then each rejects naming the property.
+    await assertRejectsPolicy(
+      {
+        PolicyName: "BadPolicy",
+        PolicyDocument: validPolicyDocument,
+        Users: "ReaderUser",
+      },
+      "Users must be an array",
+    );
+    await assertRejectsPolicy(
+      {
+        PolicyName: "BadPolicy",
+        PolicyDocument: validPolicyDocument,
+        Users: [42],
+      },
+      "Users entries must be strings",
     );
   });
 
@@ -147,20 +183,11 @@ describe("IAM CloudFormation Policy validation", () => {
     );
   });
 
-  it("rejects unsimulated Users and Groups principals", async () => {
-    // Given Policy properties naming Users or Groups, which sim IAM does not
-    // simulate as CloudFormation policy principals.
-    // When creation is attempted, then each rejects rather than silently
+  it("rejects an unsimulated Groups principal", async () => {
+    // Given Policy properties naming Groups, which sim IAM does not simulate
+    // as a CloudFormation policy principal.
+    // When creation is attempted, then it rejects rather than silently
     // dropping the grant.
-    await assertRejectsPolicy(
-      {
-        PolicyName: "BadPolicy",
-        PolicyDocument: validPolicyDocument,
-        Roles: ["ReaderRole"],
-        Users: ["SomeUser"],
-      },
-      "Users are not simulated",
-    );
     await assertRejectsPolicy(
       {
         PolicyName: "BadPolicy",
