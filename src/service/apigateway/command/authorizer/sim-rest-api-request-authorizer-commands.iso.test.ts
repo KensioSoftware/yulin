@@ -3,7 +3,12 @@ import {
   CreateRestApiCommand,
   GetAuthorizerCommand,
 } from "@aws-sdk/client-api-gateway";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertInstanceOf,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -191,20 +196,39 @@ describe("Sim API Gateway REST API REQUEST authorizer commands", () => {
     );
   });
 
-  it("refuses an identity source that is only separators", async () => {
+  it("refuses an identity source with a stray comma in it", async () => {
     // Given a REST API
     const simAws = new SimAws();
     const restApiId = await givenRestApi(simAws.apiGateway());
+    const header = "method.request.header.X-Tenant";
+    const strayComma = [
+      `,${header}`,
+      `${header},`,
+      `${header},,${header}`,
+      " , ",
+    ];
 
-    // When the list holds commas and nothing else
-    const authorizer = simAws
-      .apiGateway()
-      .createAuthorizer(
-        new CreateAuthorizerCommand(requestAuthorizerInput(restApiId, " , ")),
-      );
+    // When each list is written with a comma naming nothing
+    const errors = await Promise.all(
+      strayComma.map(async (identitySource) =>
+        assertThrowsErrorAsync(async () => {
+          await simAws
+            .apiGateway()
+            .createAuthorizer(
+              new CreateAuthorizerCommand(
+                requestAuthorizerInput(restApiId, identitySource),
+              ),
+            );
+        }),
+      ),
+    );
 
-    // Then it is refused, the same as naming no source at all
-    await expect(authorizer).rejects.toThrow("names nothing");
+    // Then each is refused rather than read as the shorter list it looks
+    // like, since a dropped expression is one the request is never checked for
+    for (const error of errors) {
+      assertInstanceOf(error, SimApiGatewayBadRequest);
+      assertStringIncludes(error.message, "holds an empty expression");
+    }
   });
 
   it("refuses a REQUEST authorizer naming no function", async () => {

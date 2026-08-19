@@ -38,17 +38,21 @@ export class SimRestApiIdentitySources {
    * Whitespace around a separator is dropped, since CDK's `IdentitySource`
    * writes the list joined by commas and a template written by hand often
    * spaces them out.
+   *
+   * A stray comma leaves an empty expression, and that is refused rather than
+   * dropped. A dropped one would make a list the caller wrote and a list the
+   * authorizer holds two different things.
    */
   static request(identitySource: string): SimRestApiIdentitySources {
     const expressions = identitySource
       .split(",")
-      .map((expression) => expression.trim())
-      .filter((expression) => expression.length > 0);
+      .map((expression) => expression.trim());
 
-    if (expressions.length === 0) {
+    if (expressions.some((expression) => expression.length === 0)) {
       throw new SimApiGatewayBadRequest(
-        `identitySource '${identitySource}' names nothing, so the ` +
-          `authorizer would identify every caller the same way`,
+        `identitySource '${identitySource}' holds an empty expression ` +
+          `between its commas, and every expression has to name somewhere ` +
+          `the request carries something`,
       );
     }
 
