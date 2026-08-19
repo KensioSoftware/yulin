@@ -1,4 +1,7 @@
-import { SimApiGatewayConflict } from "../../error/sim-api-gateway.error.js";
+import {
+  SimApiGatewayBadRequest,
+  SimApiGatewayConflict,
+} from "../../error/sim-api-gateway.error.js";
 import type { SimRestApiPathPart } from "./sim-rest-api-path-part.js";
 import {
   makeSimRestApiResourceId,
@@ -87,11 +90,20 @@ export class SimRestApiResourceStore {
   /**
    * Forget a resource and everything under it, as DeleteResource does.
    *
-   * Real API Gateway deletes the subtree with the resource rather than
-   * refusing while children remain, so a caller tearing a path down names only
-   * the top of it.
+   * Real API Gateway deletes the subtree with the resource. A caller tearing a
+   * path down therefore names only the top of it.
+   *
+   * The root is refused here rather than in the command, because this store
+   * creates the root and is what would be left holding a tree with no node to
+   * hang a path on.
    */
   remove(resource: SimRestApiResource): void {
+    if (resource.resourceId === this.root.resourceId) {
+      throw new SimApiGatewayBadRequest(
+        "The root resource cannot be deleted, as every REST API has one",
+      );
+    }
+
     for (const child of this.children(resource.resourceId)) {
       this.remove(child);
     }

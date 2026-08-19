@@ -54,6 +54,9 @@ export class SimRestApiMethodCommands {
     const { input } = command;
     const unsimulated = new SimApiGatewayUnsimulatedInput("PutMethod");
     unsimulated.refuseUnaccepted(input, acceptedPutOptions);
+    // Real PutMethod requires it, and defaulting an absent one to NONE here
+    // would declare an open method for a request AWS rejects outright.
+    unsimulated.require("authorizationType", input.authorizationType);
     unsimulated.refuseUnless(
       "authorizationType",
       input.authorizationType,

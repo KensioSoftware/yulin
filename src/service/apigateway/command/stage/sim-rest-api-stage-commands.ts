@@ -67,7 +67,7 @@ export class SimRestApiStageCommands {
       caller: options?.caller,
     });
     const deploymentId = this.rules.requireDeployment(restApi, named);
-    const stage = this.publisher.publish(restApi, {
+    const stage = this.publisher.create(restApi, {
       stageName,
       deploymentId,
       description: input.description,

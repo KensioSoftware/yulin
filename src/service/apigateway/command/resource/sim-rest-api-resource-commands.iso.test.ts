@@ -260,6 +260,26 @@ describe("Sim API Gateway REST API resource commands", () => {
     ).rejects.toThrow(SimApiGatewayNotFound);
   });
 
+  it("refuses to remove the root through the store itself", async () => {
+    // Given a REST API, whose store created the root resource
+    const simAws = new SimAws();
+    const { restApiId } = await givenRestApi(simAws.apiGateway());
+    const restApi = simAws.apiGateway().findRestApi(restApiId);
+    assertNonNullable(restApi);
+
+    // When the root is removed through the store rather than the command
+    const removed = (): void => {
+      restApi.resources.remove(restApi.resources.root);
+    };
+
+    // Then it is refused there too, because the store is what would be left
+    // holding a tree with no node to hang a path on
+    expect(removed).toThrow(SimApiGatewayBadRequest);
+    assertNonNullable(
+      restApi.resources.find(restApi.resources.root.resourceId),
+    );
+  });
+
   it("refuses to delete the root resource", async () => {
     // Given a REST API
     const simAws = new SimAws();

@@ -2,7 +2,9 @@
  * Publishing an API to a stage, and building the URL a request to it goes to.
  *
  * `CreateDeployment` with a `stageName` is the one-call form. Without it the
- * deployment is created and a `CreateStage` points at it separately.
+ * deployment is created and a `CreateStage` points at it separately. Deploying
+ * again to a stage that is already there points that stage at the new
+ * deployment, which is what every release after the first does.
  */
 
 import {

@@ -29,17 +29,35 @@ export interface SimRestApiStageView {
  */
 export class SimRestApiStage {
   public readonly stageName: string;
-  public readonly deploymentId: SimRestApiDeploymentId;
   public readonly createdDate: Date;
   public readonly variables: Readonly<Record<string, string>>;
   public readonly description?: string | undefined;
+
+  /**
+   * The deployment this stage serves, and when it last changed.
+   *
+   * A `CreateDeployment` naming a stage that already exists points that stage
+   * at the new deployment, which is how an API is redeployed. The stage keeps
+   * its name, its creation time and everything addressed through it.
+   */
+  public deploymentId: SimRestApiDeploymentId;
+  public lastUpdatedDate: Date;
 
   constructor(properties: SimRestApiStageProperties) {
     this.stageName = properties.stageName;
     this.deploymentId = properties.deploymentId;
     this.createdDate = properties.createdDate;
+    this.lastUpdatedDate = properties.createdDate;
     this.variables = properties.variables ?? {};
     this.description = properties.description;
+  }
+
+  /**
+   * Point this stage at a newer deployment of the same API.
+   */
+  redeploy(deploymentId: SimRestApiDeploymentId, at: Date): void {
+    this.deploymentId = deploymentId;
+    this.lastUpdatedDate = at;
   }
 
   /**
@@ -53,7 +71,7 @@ export class SimRestApiStage {
       stageName: this.stageName,
       deploymentId: this.deploymentId,
       createdDate: new Date(this.createdDate),
-      lastUpdatedDate: new Date(this.createdDate),
+      lastUpdatedDate: new Date(this.lastUpdatedDate),
     };
 
     if (Object.keys(this.variables).length > 0) {

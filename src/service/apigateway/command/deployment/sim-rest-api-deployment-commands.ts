@@ -2,7 +2,9 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import {
   makeSimRestApiDeploymentId,
   SimRestApiDeployment,
+  type SimRestApiDeploymentId,
 } from "../../api/deployment/sim-rest-api-deployment.js";
+import type { SimRestApi } from "../../api/sim-rest-api.js";
 import type { SimApiGatewayRequestOptions } from "../sim-api-gateway-request-options.js";
 import { SimApiGatewayUnsimulatedInput } from "../sim-api-gateway-unsimulated-input.js";
 import type { SimRestApiAccess } from "../sim-rest-api-access.js";
@@ -76,11 +78,14 @@ export class SimRestApiDeploymentCommands {
   }
 
   /**
-   * Publish the deployment to the stage the request named, where it named one.
+   * Serve the deployment from the stage the request named, where it named one.
+   *
+   * A stage of that name already there is repointed at this deployment, since
+   * that is what redeploying an API does.
    */
   private publishStage(
-    restApi: Parameters<SimRestApiStagePublisher["publish"]>[0],
-    deploymentId: SimRestApiDeployment["deploymentId"],
+    restApi: SimRestApi,
+    deploymentId: SimRestApiDeploymentId,
     input: SimCreateDeploymentCommand["input"],
   ): void {
     const { stageName } = input;
@@ -89,7 +94,7 @@ export class SimRestApiDeploymentCommands {
       return;
     }
 
-    this.publisher.publish(restApi, {
+    this.publisher.deployTo(restApi, {
       stageName,
       deploymentId,
       description: input.stageDescription,

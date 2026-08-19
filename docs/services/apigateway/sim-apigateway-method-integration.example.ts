@@ -60,4 +60,6 @@ const method = await apiGateway.getMethod(
 );
 
 console.log(method.methodIntegration?.uri);
-// "arn:aws:lambda:eu-west-2:111111111111:function:orders"
+// "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/
+//   arn:aws:lambda:eu-west-2:111111111111:function:orders/invocations",
+// echoed back as one line, the way it was configured

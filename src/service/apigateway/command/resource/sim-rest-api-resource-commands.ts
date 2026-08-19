@@ -137,9 +137,7 @@ export class SimRestApiResourceCommands {
       childPath: `${resourcesPath}/${resourceId}`,
       caller: options?.caller,
     });
-    const resource = restApi.requireResource(resourceId);
-    this.rules.requireDeletable(resource);
-    restApi.resources.remove(resource);
+    restApi.resources.remove(restApi.requireResource(resourceId));
 
     return { $metadata: {} };
   }

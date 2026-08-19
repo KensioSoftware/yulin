@@ -180,27 +180,33 @@ const method = await apiGateway.getMethod(
 );
 
 console.log(method.methodIntegration?.uri);
-// "arn:aws:lambda:eu-west-2:111111111111:function:orders"
+// "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/
+//   arn:aws:lambda:eu-west-2:111111111111:function:orders/invocations",
+// echoed back as one line, the way it was configured
 ```
 
 The integration URI is written either as the bare function ARN, which CDK emits, or wrapped in the
 API Gateway invoke path above, which CloudFormation templates and OpenAPI documents emit. Both reach
-the same function and both are held as the function ARN. A version or alias qualifier on the end of
-the ARN is kept. An integration built on an alias therefore follows that alias.
+the same function, and the string is echoed back as it was configured, the way real API Gateway does.
+A version or alias qualifier on the end of the ARN is kept. An integration built on an alias
+therefore follows that alias.
 
 Deleting a method deletes its integration, because a REST API integration is part of the method.
 
 ## Deployments and stages
 
-A REST API is reachable once a stage exists, and every stage is the first path segment of the URL.
-An HTTP API can serve a `$default` stage at the root, and a REST API always carries the segment.
+A REST API has an invocation URL once a stage exists, and every stage is the first path segment of
+that URL. An HTTP API can serve a `$default` stage at the root, and a REST API always carries the
+segment.
 
 ```typescript sim-apigateway-deploy-stage
 /**
  * Publishing an API to a stage, and building the URL a request to it goes to.
  *
  * `CreateDeployment` with a `stageName` is the one-call form. Without it the
- * deployment is created and a `CreateStage` points at it separately.
+ * deployment is created and a `CreateStage` points at it separately. Deploying
+ * again to a stage that is already there points that stage at the new
+ * deployment, which is what every release after the first does.
  */
 
 import {

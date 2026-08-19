@@ -103,6 +103,37 @@ describe("Sim API Gateway REST API deployment and stage commands", () => {
     await expect(stage).rejects.toThrow("Invalid deployment identifier");
   });
 
+  it("points an existing stage at a new deployment when redeployed", async () => {
+    // Given an API published to a stage
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+    const first = await simAws
+      .apiGateway()
+      .createDeployment(
+        new CreateDeploymentCommand({ restApiId, stageName: "prod" }),
+      );
+
+    // When it is deployed again to the same stage, which is what every release
+    // after the first does
+    const second = await simAws
+      .apiGateway()
+      .createDeployment(
+        new CreateDeploymentCommand({ restApiId, stageName: "prod" }),
+      );
+
+    // Then the stage serves the new deployment, and the API still has one
+    // stage rather than a refusal and a stale one
+    expect(first.id).not.toStrictEqual(second.id);
+    const stage = await simAws
+      .apiGateway()
+      .getStage(new GetStageCommand({ restApiId, stageName: "prod" }));
+    assertIdentical(stage.deploymentId, second.id);
+    const stages = await simAws
+      .apiGateway()
+      .getStages(new GetStagesCommand({ restApiId }));
+    expect(stages.item.map((one) => one.stageName)).toStrictEqual(["prod"]);
+  });
+
   it("refuses a second stage of the same name", async () => {
     // Given an API published to a stage
     const simAws = new SimAws();

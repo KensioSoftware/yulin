@@ -21,9 +21,12 @@ export interface SimRestApiStageInput {
 /**
  * Publishes a deployment of a REST API to a stage.
  *
- * `CreateStage` and `CreateDeployment` both end here, because a deployment
- * given a `stageName` publishes itself in the same call. That is how the SDK
- * and the console publish an API in one step.
+ * The two callers want different things from a stage name that is already
+ * taken, which is why they get a method each. `CreateStage` is creating a
+ * stage and refuses a name in use. `CreateDeployment` naming a stage is
+ * redeploying, and points the stage that is already there at the new
+ * deployment. That second one is the ordinary release workflow, and every
+ * `sam deploy` and `cdk deploy` after the first goes through it.
  */
 export class SimRestApiStagePublisher {
   private readonly clock: SimClock;
@@ -36,9 +39,32 @@ export class SimRestApiStagePublisher {
   /**
    * Add a stage to an API, refusing a name it already serves on.
    */
-  publish(restApi: SimRestApi, input: SimRestApiStageInput): SimRestApiStage {
+  create(restApi: SimRestApi, input: SimRestApiStageInput): SimRestApiStage {
     this.rules.requireUnusedStageName(restApi, input.stageName);
 
+    return this.added(restApi, input);
+  }
+
+  /**
+   * Serve a deployment from a stage, creating the stage where the API has no
+   * stage of that name and repointing the one it has where it does.
+   */
+  deployTo(restApi: SimRestApi, input: SimRestApiStageInput): SimRestApiStage {
+    const existing = restApi.stages.find(input.stageName);
+
+    if (existing === undefined) {
+      return this.added(restApi, input);
+    }
+
+    existing.redeploy(input.deploymentId, this.clock.now());
+
+    return existing;
+  }
+
+  private added(
+    restApi: SimRestApi,
+    input: SimRestApiStageInput,
+  ): SimRestApiStage {
     const stage = new SimRestApiStage({
       ...input,
       createdDate: this.clock.now(),

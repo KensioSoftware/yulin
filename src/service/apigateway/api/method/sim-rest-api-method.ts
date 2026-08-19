@@ -1,5 +1,7 @@
-import type { SimRestApiIntegration } from "./sim-rest-api-integration.js";
-import type { SimRestApiIntegrationView } from "./sim-rest-api-integration.js";
+import type {
+  SimRestApiIntegration,
+  SimRestApiIntegrationView,
+} from "./sim-rest-api-integration.js";
 
 /**
  * The method matching any HTTP method the client used, where no method of that
