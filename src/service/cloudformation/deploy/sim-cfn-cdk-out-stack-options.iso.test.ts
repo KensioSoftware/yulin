@@ -1,6 +1,7 @@
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
+  assertMapSize,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -12,7 +13,10 @@ import {
   assemblyStackBucketName,
   simCdkCloudAssemblyFactory,
 } from "../cdk/sim-cdk-cloud-assembly.factory.js";
+import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
+import type { SimCfnCdkOutTemplateTransform } from "./sim-cfn-cdk-out-stack-options.js";
 
 const assumeRolePolicyDocument = {
   Version: "2012-10-17",
@@ -128,6 +132,86 @@ describe("Deploying a CDK cloud assembly with per-Stack options [iso]", () => {
     );
   });
 
+  it("transforms a Stack with a value an earlier Stack in the call created", async () => {
+    // Given an assembly where a DNS Stack shares a value the simulation
+    // allocates, and a site Stack whose template names the real one.
+    const directory = await simCdkCloudAssemblyFactory.make({
+      stacks: [
+        {
+          artifactId: "DnsStack",
+          regionName: "us-east-1",
+          outputs: { SiteBucketName: { Value: { Ref: "DnsStackBucket" } } },
+        },
+        {
+          artifactId: "SiteStack",
+          regionName: "eu-west-2",
+          resources: {
+            SiteTopic: {
+              Type: "AWS::SNS::Topic",
+              Properties: {
+                TopicName: "site-topic",
+                DisplayName: "the-real-account-value",
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    // When the site Stack is transformed with the deployment so far.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+    const stacks = await simAws.cloudFormation().deployCdkOut({
+      directoryPath: directory.join("cdk.out"),
+      stackOptions: {
+        SiteStack: {
+          transform: (template, deployed) =>
+            withTopicDisplayName(
+              template,
+              deployedOutput(deployed, "DnsStack", "SiteBucketName"),
+            ),
+        },
+      },
+    });
+
+    // Then the Stack deployed the value the DNS Stack had just created.
+    assertIdentical(
+      stacks.get("SiteStack")?.resources.get("SiteTopic")?.properties[
+        "DisplayName"
+      ],
+      assemblyStackBucketName("DnsStack"),
+    );
+  });
+
+  it("transforms the first Stack with a deployment holding nothing yet", async () => {
+    // Given an assembly whose first Stack is transformed.
+    const directory = await simCdkCloudAssemblyFactory.make({
+      stacks: [
+        { artifactId: "DnsStack", regionName: "us-east-1" },
+        { artifactId: "SiteStack", regionName: "eu-west-2" },
+      ],
+    });
+
+    const deployments = new Map<string, ReadonlyMap<string, SimCfnStack>>();
+
+    // When both Stacks record the deployment their transform was handed.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+    await simAws.cloudFormation().deployCdkOut({
+      directoryPath: directory.join("cdk.out"),
+      stackOptions: {
+        DnsStack: { transform: recordingTransform(deployments, "DnsStack") },
+        SiteStack: { transform: recordingTransform(deployments, "SiteStack") },
+      },
+    });
+
+    // Then the first Stack saw nothing, and the second saw the first.
+    assertMapSize(assertedDeployment(deployments, "DnsStack"), 0);
+    assertNonNullable(
+      assertedDeployment(deployments, "SiteStack").get("DnsStack"),
+    );
+  });
+
   it("fails when options name a Stack that is not being deployed", async () => {
     // Given an assembly whose Stack has since been renamed.
     const directory = await simCdkCloudAssemblyFactory.make({
@@ -159,3 +243,50 @@ describe("Deploying a CDK cloud assembly with per-Stack options [iso]", () => {
     );
   });
 });
+
+function deployedOutput(
+  deployed: ReadonlyMap<string, SimCfnStack>,
+  stackName: string,
+  outputKey: string,
+): string {
+  const stack = deployed.get(stackName);
+  assertNonNullable(stack);
+
+  return stack.output(outputKey);
+}
+
+function withTopicDisplayName(
+  template: CfnTemplateBodyRecord,
+  displayName: string,
+): CfnTemplateBodyRecord {
+  return {
+    ...template,
+    Resources: {
+      SiteTopic: {
+        Type: "AWS::SNS::Topic",
+        Properties: { TopicName: "site-topic", DisplayName: displayName },
+      },
+    },
+  };
+}
+
+function recordingTransform(
+  deployments: Map<string, ReadonlyMap<string, SimCfnStack>>,
+  stackName: string,
+): SimCfnCdkOutTemplateTransform {
+  return (template, deployed) => {
+    deployments.set(stackName, deployed);
+
+    return template;
+  };
+}
+
+function assertedDeployment(
+  deployments: ReadonlyMap<string, ReadonlyMap<string, SimCfnStack>>,
+  stackName: string,
+): ReadonlyMap<string, SimCfnStack> {
+  const deployment = deployments.get(stackName);
+  assertNonNullable(deployment);
+
+  return deployment;
+}
