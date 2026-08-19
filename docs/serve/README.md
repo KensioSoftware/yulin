@@ -246,7 +246,7 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 ### Which services answer
 
-S3, STS, SNS, CloudFormation, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
+S3, STS, SNS, CloudFormation, Lambda, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
 A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
 
@@ -371,6 +371,49 @@ The four operations simulated CloudFormation implements are `CreateStack`, `Upda
 `DeleteStack` and `DescribeStacks`. A deployment starts in the background and the call is answered
 before the Resources exist, as real CloudFormation answers it. `describe-stacks` reports the status
 it reached, and `waitForStackDeployComplete` waits for it in process.
+
+### Lambda over the endpoint
+
+`aws lambda` and a `LambdaClient` reach simulated Lambda through the same endpoint URL:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:8787
+aws lambda invoke --function-name orders --payload '{"id":1}' /tmp/out.json
+cat /tmp/out.json
+```
+
+The function runs in the process serving it, and what its handler returned is written to the file.
+A handler that throws answers `200` with `FunctionError` set to `Unhandled`, and the payload holds
+the error it threw. `--invocation-type Event` answers `202` and runs the handler on the background
+scheduler. A test that goes on to read what the function did waits on
+`simAws.backgroundTasksComplete()` first.
+
+A function created over the endpoint carries its code as a zip archive, which is the shape the
+`Code.ZipFile` member travels in over HTTP:
+
+```bash
+aws lambda create-function --function-name orders \
+  --role arn:aws:iam::888888888888:role/OrdersRole \
+  --handler index.handler --runtime nodejs22.x \
+  --zip-file fileb://orders.zip
+```
+
+The operations served are the sixteen simulated Lambda implements:
+
+- **Functions** — `CreateFunction`, `GetFunction`, `DeleteFunction`, `Invoke`
+- **Function URLs** — `CreateFunctionUrlConfig`, `GetFunctionUrlConfig`,
+  `UpdateFunctionUrlConfig`, `DeleteFunctionUrlConfig`, `ListFunctionUrlConfigs`
+- **Permissions** — `AddPermission`, `RemovePermission`, `GetPolicy`
+- **Event source mappings** — `CreateEventSourceMapping`, `GetEventSourceMapping`,
+  `ListEventSourceMappings`, `DeleteEventSourceMapping`
+
+Anything else is refused as `NotImplemented`, which an SDK raises under that name. The refusal names
+the path it arrived at. `aws lambda list-functions` reports that `GET /2015-03-31/functions` is
+unserved, and an unimplemented operation sharing a method with one that is served gets the same
+answer.
+
+Simulated Lambda also answers its own Function URL hostnames, covered above. That path is unchanged,
+and it is what a browser and a webhook reach.
 
 ## Stopping and restarting
 
