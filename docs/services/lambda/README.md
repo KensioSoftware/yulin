@@ -875,7 +875,10 @@ import {
 import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 
 import { SimAws } from "@kensio/yulin";
-import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaDestinationRecord,
+} from "@kensio/yulin/lambda";
 
 const simAws = new SimAws();
 const lambda = simAws.lambda();
@@ -929,10 +932,9 @@ console.log(attempts.length);
 const received = await sqs.receiveMessage(
   new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
 );
-const record = JSON.parse(String(received.Messages?.[0]?.Body)) as {
-  requestContext: { condition: string; approximateInvokeCount: number };
-  requestPayload: unknown;
-};
+const record = JSON.parse(
+  String(received.Messages?.[0]?.Body),
+) as SimLambdaDestinationRecord;
 console.log(record.requestContext.condition);
 console.log(record.requestContext.approximateInvokeCount);
 console.log(record.requestPayload);
