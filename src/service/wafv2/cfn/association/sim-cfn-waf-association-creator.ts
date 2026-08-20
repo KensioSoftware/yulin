@@ -23,8 +23,9 @@ interface SimCfnWafAssociationCreatorProperties {
  * which reaches a distribution through the distribution's own `WebACLId`
  * rather than through an association.
  *
- * A resource type AWS WAF protects and this simulation does not is a skip
- * rather than a failure, and so is an association whose web ACL was skipped.
+ * Two things are a skip rather than a failure. A resource type AWS WAF
+ * protects and this simulation does not, and a web ACL that is not here at
+ * all.
  */
 export class SimCfnWafAssociationCreator {
   readonly #wafV2: SimWafV2;
@@ -39,7 +40,6 @@ export class SimCfnWafAssociationCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
-    resources: ReadonlyMap<string, SimCfnResource>,
   ): Promise<SimWafCfnWebAclAssociation> {
     const config = new SimCfnWafAssociationConfig({ resource, properties });
     const association = new SimWafCfnWebAclAssociation({
@@ -47,9 +47,9 @@ export class SimCfnWafAssociationCreator {
       webAclArn: config.webAclArn(),
     });
     const skipError = simCfnWafAssociationSkipError(
+      this.#wafV2,
       resource,
       association.webAclArn,
-      resources,
     );
 
     if (skipError !== undefined) {

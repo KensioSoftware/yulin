@@ -1073,11 +1073,12 @@ simulation never created, is refused with `InvalidWebACLId` at `CreateDistributi
 The web ACL decides before any other stage sees the request. A blocked request never reaches a
 viewer-request CloudFront Function, a cache Behavior, a response headers policy or the Origin.
 
-A CloudFormation Distribution naming a web ACL the deployment skipped is skipped as well, and the
-rest of the template deploys. Simulated WAFv2 skips a web ACL carrying a rule it cannot evaluate
-(see [Refusals](../wafv2/README.md#refusals)), and a Distribution created without the firewall it
-was written with would serve every request those rules were there to stop. `skippedReason` on the
-Distribution names the web ACL.
+A CloudFormation Distribution naming a web ACL this simulation does not hold deploys without one.
+The `WebACLId` lands on `stack.ignoredProperties` and every request is served, including the ones
+the web ACL would have decided. A template naming a web ACL from a real account is ordinary, and a
+site that failed to deploy over its firewall would cost a local dev server and a test suite every
+request they make. `CreateDistribution` still refuses the same `WebACLId`, as real CloudFront
+refuses it.
 
 ```typescript sim-cloudfront-web-acl
 /**
@@ -2030,7 +2031,8 @@ Where sim CloudFront knowingly behaves differently from AWS:
   catches.
 - **A web ACL a Distribution names has to exist here.** `WebACLId` resolves to a web ACL created in
   this simulation, and the ARN carries the Account and Region holding it. A managed web ACL, or one
-  from a real account, is refused at create and at update. Deleting a web ACL a Distribution still
+  from a real account, is refused at create and at update. A CloudFormation Distribution is the
+  exception and deploys without it, recording the property. Deleting a web ACL a Distribution still
   names leaves the Distribution answering `InvalidWebACLId` on every request, because real WAF
   refuses that deletion and nothing here tracks the association to refuse it.
 - **`IfMatch` ETags are ignored on a Distribution or a Function.** `UpdateDistributionCommand`,

@@ -234,7 +234,7 @@ describe("AWS::WAFv2::WebACL", () => {
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
   });
 
-  it("skips a web ACL whose rule the service cannot evaluate", async () => {
+  it("deploys a web ACL without the rule it cannot evaluate", async () => {
     // Given a template whose rule inspects the client address, which every
     // request in this simulation shares.
     const simAws = new SimAws();
@@ -251,16 +251,20 @@ describe("AWS::WAFv2::WebACL", () => {
       ],
     });
 
-    // Then the stack deployed without the web ACL, and the skip names the
-    // logical id alongside the rule and the statement kind WAFv2 would not
-    // compile. Skips are covered in sim-cfn-waf-skips.iso.test.ts.
-    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
+    // Then the web ACL deployed with no rules, and the one it lost is recorded
+    // under the logical id that declared it, with the rule and the statement
+    // kind WAFv2 would not compile. Best effort is covered in
+    // sim-cfn-waf-best-effort.iso.test.ts.
+    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
+    assertIdentical(decisionFor(simAws, stack, "/admin/users"), "ALLOW");
 
-    const reason = stack.skippedResources[0]?.skippedReason ?? "";
+    const ignoredProperty = stack.ignoredProperties[0];
 
-    assertStringIncludes(reason, "AWS::WAFv2::WebACL Resource OrdersAcl");
-    assertStringIncludes(reason, "Rule block-admin");
-    assertStringIncludes(reason, "IPSetReferenceStatement");
+    assertNonNullable(ignoredProperty);
+    assertIdentical(ignoredProperty.logicalId, "OrdersAcl");
+    assertIdentical(ignoredProperty.path, "Rules.block-admin");
+    assertStringIncludes(ignoredProperty.reason, "Rule block-admin");
+    assertStringIncludes(ignoredProperty.reason, "IPSetReferenceStatement");
   });
 
   it("refuses a Rules property that is not a list", async () => {

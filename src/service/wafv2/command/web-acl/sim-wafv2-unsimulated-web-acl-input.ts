@@ -44,6 +44,17 @@ const refusedMembers: readonly SimWafRefusedMember[] = [
 ];
 
 /**
+ * Why each web ACL member this simulation does not model is refused, by the
+ * name a request and a template both write.
+ *
+ * The refusal below and the CloudFormation layer read the same list. One
+ * throws and the other records the member and deploys the web ACL without it,
+ * and neither should be able to grow a reason the other has not got.
+ */
+export const simWafUnsimulatedWebAclMembers: ReadonlyMap<string, string> =
+  new Map(refusedMembers.map(([, member, reason]) => [member, reason]));
+
+/**
  * Refuse the web ACL members this simulation does not model.
  *
  * Each of them changes what a web ACL does on real WAF, so accepting one and

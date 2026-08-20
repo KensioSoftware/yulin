@@ -52,11 +52,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
 
     switch (resourceTypeName) {
       case "Distribution": {
-        return await this.distroCreator.create(
-          resource,
-          properties,
-          context.resources,
-        );
+        return await this.distroCreator.create(resource, properties, context);
       }
       case "Function": {
         return await this.functionCreator.create(resource, properties, context);

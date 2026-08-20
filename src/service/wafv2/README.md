@@ -246,17 +246,22 @@ compilation of every rule that an SDK caller gets, and the same refusals.
 because a deployment failing on `Rule block-admin uses the statement kind SqliMatchStatement` says
 which rule and not which of a template's web ACLs declared it.
 
-The same file sorts the two kinds of refusal. A template and an SDK caller part company there. A
-`SimWafUnsimulatedInputException` skips the Resource, worded so sim CloudFormation records it and
-steps over it (see `resource/unsupported/sim-cfn-unsupported-resource.ts`). Every other
-`SimWafError` fails the stack, because the template asked for something WAFv2 itself will not
-take.
+A rule this simulation cannot evaluate is where the two part company, and where the CloudFormation
+layer does more than pass the template through. `SimWafV2.unevaluatableWebAclRules` compiles each
+rule on its own and reports the ones that raise a `SimWafUnsimulatedInputException`
+(`web-acl/sim-waf-unevaluatable-rules.ts`), and `web-acl/sim-cfn-waf-web-acl-creator.ts` leaves them
+out of the input it writes, recording each on the Resource. The web ACL members with no behaviour
+behind them go the same way, from `web-acl/sim-cfn-waf-web-acl-config.ts`.
 
-Issue #823 is the reasoning behind that split, and #391 is the principle it comes from. A web ACL
-that accepted a rule it cannot evaluate would allow a request AWS blocks, and a web ACL that is
-missing allows exactly what a stack that never deployed allows. The caution was right and the blast
-radius was the mistake. One rate limiting rule used to take a user pool, a table, a secret and two
-functions down with it.
+Issue #823 is the reasoning, and #391 is the principle it comes from. A web ACL that accepted a rule
+it cannot evaluate would allow a request AWS blocks, so `CreateWebACL` refuses one. Failing a whole
+stack over it is a different thing, and it cost one consumer twelve Resources and 25 test files over
+a single rate limiting rule. The unit is the rule, and everything larger than the rule deploys.
+
+`sim-cfn-waf-resource-error.ts` still sorts what is left. A `SimWafUnsimulatedInputException`
+reaching it skips the Resource, worded so sim CloudFormation records it and steps over it (see
+`resource/unsupported/sim-cfn-unsupported-resource.ts`). Every other `SimWafError` fails the stack,
+because the template asked for something WAFv2 itself will not take.
 
 The association hands `ResourceArn` straight to `AssociateWebACL`. What a web ACL may be put in
 front of is decided once, in `association/sim-waf-protected-resource.ts`, and the CloudFormation
@@ -265,17 +270,15 @@ stack, and a load balancer skips the association. Deleting the association toler
 has gone already, which is what a REST API stage in one stack and the association in another leaves
 behind.
 
-`cfn/sim-cfn-waf-skipped-web-acl.ts` catches the case the split leaves open. A skipped Resource
-reaches CREATE_COMPLETE and answers `Fn::GetAtt` with a stand-in, so an association naming a skipped
-web ACL would hand that stand-in to `AssociateWebACL` and fail the stack on a web ACL that does not
-exist. The association is skipped alongside it.
+`association/sim-cfn-waf-association-skip.ts` adds one answer of its own. An association naming a
+web ACL this simulation does not hold is skipped rather than failing the stack, which covers a
+template naming a web ACL from a real account. An association is the only Resource carrying that
+reference, so nothing else goes with it.
 
-The match is on the resolved `WebACLArn` rather than on the Resources the association depends on.
-`dependencies()` covers `DependsOn` and every `Ref` and `Fn::GetAtt` in the Resource, and an
-association that waits on one web ACL and associates another is made.
-
-CloudFront reads the same file, from `cfn/distro/sim-cfn-cf-distro-web-acl-skip.ts`, for the
-Distribution that names a web ACL in its own `WebACLId`.
+A CloudFront Distribution is the case that rule cannot be used for, because the reference is a
+property of the Distribution and skipping it would take the site with it.
+`cloudfront/cfn/distro/sim-cfn-cf-distro-web-acl.ts` drops the `WebACLId` and records it instead, so
+the Distribution deploys and serves.
 
 Two shapes differ between a template and the API. `SearchString` is plain text in a template and
 bytes in the SDK, and `RegularExpressionList` is a list of strings in a template and a list of

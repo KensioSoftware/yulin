@@ -5,6 +5,7 @@ import type { SimWafV2 } from "../../sim-wafv2.js";
 import type { SimWafWebAcl } from "../../web-acl/sim-waf-web-acl.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
+import { simCfnWafEvaluatableRules } from "./sim-cfn-waf-evaluatable-rules.js";
 import { SimCfnWafWebAclConfig } from "./sim-cfn-waf-web-acl-config.js";
 
 interface SimCfnWafWebAclCreatorProperties {
@@ -17,12 +18,17 @@ interface SimCfnWafWebAclCreatorProperties {
  * The web ACL is created through the ordinary CreateWebACL command rather than
  * constructed directly, so one a template deployed is the same thing an SDK
  * caller would have got: the same compilation of every rule, and the same
- * refusal of a statement kind this simulation cannot evaluate.
+ * refusals.
  *
- * What the two do with that refusal differs. An SDK caller is told and has the
- * web ACL refused; a template has this Resource skipped, so the rest of it
- * still deploys and `stack.skippedResources` says which web ACL is missing and
- * why.
+ * A rule this simulation cannot evaluate is the exception, and the two part
+ * company over it. An SDK caller has the whole web ACL refused. A template
+ * deploys the web ACL without that rule and records it on
+ * `stack.ignoredProperties`, because the alternative is one rule taking a
+ * user pool, a table and two functions in the same template down with it.
+ *
+ * The web ACL is then real, and thinner than the one the template describes.
+ * That is the cost of deploying it at all, and the record of the dropped rule
+ * is what a test reads to know the size of it.
  */
 export class SimCfnWafWebAclCreator {
   readonly #wafV2: SimWafV2;
@@ -42,12 +48,18 @@ export class SimCfnWafWebAclCreator {
       resource,
       properties,
     }).createInput();
+    const deployable = {
+      ...input,
+      Rules: simCfnWafEvaluatableRules(this.#wafV2, resource, input),
+    };
 
     return await simCfnWafResourceCommand(
       wafWebAclResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#wafV2.createWebAcl({ input });
+        const created = await this.#wafV2.createWebAcl({
+          input: deployable,
+        });
         const arn = created.Summary?.ARN;
 
         assertDefined(
