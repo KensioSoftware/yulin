@@ -1073,6 +1073,12 @@ simulation never created, is refused with `InvalidWebACLId` at `CreateDistributi
 The web ACL decides before any other stage sees the request. A blocked request never reaches a
 viewer-request CloudFront Function, a cache Behavior, a response headers policy or the Origin.
 
+A CloudFormation Distribution naming a web ACL the deployment skipped is skipped as well, and the
+rest of the template deploys. Simulated WAFv2 skips a web ACL carrying a rule it cannot evaluate
+(see [Refusals](../wafv2/README.md#refusals)), and a Distribution created without the firewall it
+was written with would serve every request those rules were there to stop. `skippedReason` on the
+Distribution names the web ACL.
+
 ```typescript sim-cloudfront-web-acl
 /**
  * Blocking a request to a Distribution with a web ACL.

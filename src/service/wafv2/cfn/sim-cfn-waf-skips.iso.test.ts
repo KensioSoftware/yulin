@@ -5,6 +5,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -164,6 +165,53 @@ describe("A WAFv2 Resource carrying something Yulin cannot evaluate", () => {
       "the web ACL it names, OrdersAcl, was skipped",
     );
     assertFalse(simAws.wafV2().protection().protects(poolArn));
+  });
+
+  it("associates a web ACL that is there while another one was skipped", async () => {
+    // Given a template holding two web ACLs, one Yulin cannot evaluate and one
+    // it can, with an association naming the second and waiting on the first.
+    const simAws = simAwsInEuWest2();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "two-acls",
+      template: {
+        Resources: {
+          OrdersAcl: rateLimitedAcl,
+          ReportsAcl: {
+            ...rateLimitedAcl,
+            Properties: {
+              ...rateLimitedAcl.Properties,
+              Name: "reports-acl",
+              Rules: [],
+            },
+          },
+          Pool: {
+            Type: "AWS::Cognito::UserPool",
+            Properties: { UserPoolName: "orders-pool" },
+          },
+          PoolAclAssociation: {
+            Type: "AWS::WAFv2::WebACLAssociation",
+            DependsOn: ["OrdersAcl"],
+            Properties: {
+              ResourceArn: { "Fn::GetAtt": ["Pool", "Arn"] },
+              WebACLArn: { "Fn::GetAtt": ["ReportsAcl", "Arn"] },
+            },
+          },
+        },
+        Outputs: { PoolArn: { Value: { "Fn::GetAtt": ["Pool", "Arn"] } } },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    const poolArn = stack.outputs.get("PoolArn")?.value;
+
+    assertTypeString(poolArn);
+
+    // Then only the web ACL that could not be evaluated was skipped. The
+    // association named the other one, and depending on a skipped Resource is
+    // not the same as pointing at it.
+    assertArrayLength(stack.skippedResources, 1);
+    assertIdentical(stack.skippedResources[0].logicalId, "OrdersAcl");
+    assertTrue(simAws.wafV2().protection().protects(poolArn));
   });
 
   it("serves a request reaching a stage whose web ACL was skipped", async () => {

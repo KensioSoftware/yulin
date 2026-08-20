@@ -2,13 +2,10 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimWafUnavailableEntityException } from "../../error/sim-wafv2.error.js";
 import type { SimWafV2 } from "../../sim-wafv2.js";
-import {
-  simCfnWafResourceCommand,
-  simCfnWafSkippedResourceError,
-} from "../sim-cfn-waf-resource-error.js";
+import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafWebAclAssociationResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafAssociationConfig } from "./sim-cfn-waf-association-config.js";
-import { skippedSimCfnWafWebAcl } from "./sim-cfn-waf-skipped-web-acl.js";
+import { simCfnWafAssociationSkipError } from "./sim-cfn-waf-association-skip.js";
 import { SimWafCfnWebAclAssociation } from "./sim-cfn-waf-web-acl-association.js";
 
 interface SimCfnWafAssociationCreatorProperties {
@@ -44,22 +41,20 @@ export class SimCfnWafAssociationCreator {
     properties: SimCfnTemplateValueRecord,
     resources: ReadonlyMap<string, SimCfnResource>,
   ): Promise<SimWafCfnWebAclAssociation> {
-    const skippedWebAcl = skippedSimCfnWafWebAcl(resource, resources);
-
-    if (skippedWebAcl !== undefined) {
-      throw simCfnWafSkippedResourceError(
-        wafWebAclAssociationResourceType,
-        resource.logicalId,
-        `the web ACL it names, ${skippedWebAcl.logicalId}, was skipped, so ` +
-          `there is nothing to put in front of the resource`,
-      );
-    }
-
     const config = new SimCfnWafAssociationConfig({ resource, properties });
     const association = new SimWafCfnWebAclAssociation({
       resourceArn: config.resourceArn(),
       webAclArn: config.webAclArn(),
     });
+    const skipError = simCfnWafAssociationSkipError(
+      resource,
+      association.webAclArn,
+      resources,
+    );
+
+    if (skipError !== undefined) {
+      throw skipError;
+    }
 
     return await simCfnWafResourceCommand(
       wafWebAclAssociationResourceType,

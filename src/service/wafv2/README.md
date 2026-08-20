@@ -265,10 +265,17 @@ stack, and a load balancer skips the association. Deleting the association toler
 has gone already, which is what a REST API stage in one stack and the association in another leaves
 behind.
 
-`association/sim-cfn-waf-skipped-web-acl.ts` catches the case the split leaves open. A skipped
-Resource reaches CREATE_COMPLETE and answers `Fn::GetAtt` with a stand-in, so an association naming
-a skipped web ACL would hand that stand-in to `AssociateWebACL` and fail the stack on a web ACL that
-does not exist. The association is skipped alongside the web ACL it depended on.
+`cfn/sim-cfn-waf-skipped-web-acl.ts` catches the case the split leaves open. A skipped Resource
+reaches CREATE_COMPLETE and answers `Fn::GetAtt` with a stand-in, so an association naming a skipped
+web ACL would hand that stand-in to `AssociateWebACL` and fail the stack on a web ACL that does not
+exist. The association is skipped alongside it.
+
+The match is on the resolved `WebACLArn` rather than on the Resources the association depends on.
+`dependencies()` covers `DependsOn` and every `Ref` and `Fn::GetAtt` in the Resource, and an
+association that waits on one web ACL and associates another is made.
+
+CloudFront reads the same file, from `cfn/distro/sim-cfn-cf-distro-web-acl-skip.ts`, for the
+Distribution that names a web ACL in its own `WebACLId`.
 
 Two shapes differ between a template and the API. `SearchString` is plain text in a template and
 bytes in the SDK, and `RegularExpressionList` is a list of strings in a template and a list of

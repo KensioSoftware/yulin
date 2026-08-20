@@ -763,6 +763,10 @@ CloudFront is associated this way and not through `AssociateWebACL`, which real 
 regional resource types. The ARN has to name a `CLOUDFRONT` [scope](#scopes) web ACL. See
 [web ACLs in the CloudFront docs](../cloudfront/README.md#web-acls) for the whole example.
 
+In a template, a distribution whose `WebACLId` names a web ACL the deployment skipped is skipped
+with it. Both land on `stack.skippedResources`, and the rest of the template deploys. Creating the
+distribution without its firewall would serve every request the rules were written to block.
+
 ## Regex pattern sets
 
 A rule can point at a regex pattern set by ARN, and matches when any expression in the set matches.

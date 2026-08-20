@@ -48,37 +48,27 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const properties = context.resolvedProperties ?? resource.properties;
+
     switch (resourceTypeName) {
       case "Distribution": {
         return await this.distroCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          context.resources,
         );
       }
       case "Function": {
-        return await this.functionCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-          context,
-        );
+        return await this.functionCreator.create(resource, properties, context);
       }
       case "ResponseHeadersPolicy": {
-        return this.responseHeadersPolicyCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return this.responseHeadersPolicyCreator.create(resource, properties);
       }
       case "OriginAccessControl": {
-        return this.originAccessControlCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return this.originAccessControlCreator.create(resource, properties);
       }
       case "KeyValueStore": {
-        return await this.keyValueStoreCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.keyValueStoreCreator.create(resource, properties);
       }
       default: {
         throw new Error(

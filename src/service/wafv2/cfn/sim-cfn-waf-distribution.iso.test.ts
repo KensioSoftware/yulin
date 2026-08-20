@@ -1,4 +1,5 @@
 import {
+  assertArrayLength,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -32,6 +33,36 @@ const visibility = {
 };
 
 /**
+ * The rule the site's web ACL carries, blocking whatever asks for an admin
+ * path.
+ */
+const blockAdmin = {
+  Name: "block-admin",
+  Priority: 0,
+  Action: { Block: {} },
+  Statement: {
+    ByteMatchStatement: {
+      FieldToMatch: { UriPath: {} },
+      PositionalConstraint: "CONTAINS",
+      SearchString: "/admin",
+      TextTransformations: [{ Priority: 0, Type: "NONE" }],
+    },
+  },
+  VisibilityConfig: { ...visibility, MetricName: "block-admin" },
+};
+
+/**
+ * A rule counting requests over a time window, which Yulin does not evaluate.
+ */
+const rateLimit = {
+  Name: "account-creation-rate",
+  Priority: 0,
+  Action: { Block: {} },
+  Statement: { RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" } },
+  VisibilityConfig: { ...visibility, MetricName: "account-creation-rate" },
+};
+
+/**
  * A template serving a bucket through a distribution the web ACL beside it
  * protects.
  *
@@ -43,6 +74,7 @@ const visibility = {
 function siteTemplate(
   webAclId: SimCfnTemplateValueRecord | string = webAclArnReference,
   scope = "CLOUDFRONT",
+  rules: readonly SimCfnTemplateValueRecord[] = [blockAdmin],
 ): CfnTemplateBodyRecord {
   return {
     Resources: {
@@ -53,22 +85,7 @@ function siteTemplate(
           Scope: scope,
           DefaultAction: { Allow: {} },
           VisibilityConfig: visibility,
-          Rules: [
-            {
-              Name: "block-admin",
-              Priority: 0,
-              Action: { Block: {} },
-              Statement: {
-                ByteMatchStatement: {
-                  FieldToMatch: { UriPath: {} },
-                  PositionalConstraint: "CONTAINS",
-                  SearchString: "/admin",
-                  TextTransformations: [{ Priority: 0, Type: "NONE" }],
-                },
-              },
-              VisibilityConfig: { ...visibility, MetricName: "block-admin" },
-            },
-          ],
+          Rules: [...rules],
         },
       },
       SiteDistribution: {
@@ -162,6 +179,29 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     // of nothing, naming the ARN it could not resolve.
     assertStringIncludes(error.message, missingWebAclArn);
     assertStringIncludes(error.message, "does not exist");
+  });
+
+  it("skips a distribution whose web ACL was skipped", async () => {
+    // Given a template whose web ACL rate limits requests, which Yulin does
+    // not evaluate, in front of the distribution serving the site.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, bucketName, {
+      "index.html": "<h1>Home</h1>",
+    });
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rate-limited-site",
+      template: siteTemplate(webAclArnReference, "CLOUDFRONT", [rateLimit]),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the deployment carried on, and the distribution went with the web
+    // ACL rather than serving the requests it was written to block.
+    assertArrayLength(stack.skippedResources, 2);
+    assertStringIncludes(
+      stack.resources.get("SiteDistribution")?.skippedReason ?? "",
+      "the web ACL its WebACLId names, SiteAcl, was skipped",
+    );
   });
 
   it("refuses a distribution naming a REGIONAL scope web ACL", async () => {
