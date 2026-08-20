@@ -12,6 +12,10 @@ import {
   SimRestApiNoUserPools,
   type SimRestApiUserPools,
 } from "./api/authorizer/sim-rest-api-user-pools.js";
+import {
+  SimWafNoProtection,
+  type SimWafProtection,
+} from "../wafv2/association/sim-waf-protection.js";
 import { SimRestApiStore } from "./api/sim-rest-api-store.js";
 import { SimRestApiCommands } from "./command/api/sim-rest-api-commands.js";
 import { SimRestApiImportCommands } from "./command/api/sim-rest-api-import-commands.js";
@@ -40,6 +44,12 @@ export interface SimApiGatewayProperties {
    * one it could not check.
    */
   readonly userPools?: SimRestApiUserPools;
+  /**
+   * The web ACLs this API Gateway's stages can be protected by. A standalone
+   * simulated API Gateway has none, so every stage serves the requests it
+   * always did.
+   */
+  readonly webAcls?: SimWafProtection;
 }
 
 /**
@@ -69,6 +79,7 @@ export class SimApiGatewayCommands {
       background = new BackgroundTasks(),
       registry = new SimRestApiRegistry(),
       userPools = new SimRestApiNoUserPools(),
+      webAcls = new SimWafNoProtection(),
     } = properties;
 
     const access = new SimRestApiAccess({
@@ -84,6 +95,7 @@ export class SimApiGatewayCommands {
       accountRegionScope,
       clock: background,
       userPools,
+      webAcls,
     });
     this.resources = new SimRestApiResourceCommands({ access });
     this.authorizers = new SimRestApiAuthorizerCommands({ access });

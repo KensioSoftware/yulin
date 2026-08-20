@@ -8,6 +8,13 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimWafAssociations } from "./association/sim-waf-associations.js";
+import {
+  SimWafNoProtectedResources,
+  type SimWafProtectedResources,
+} from "./association/sim-waf-protected-resources.js";
+import { SimWafAssociationAccess } from "./command/association/sim-wafv2-association-access.js";
+import { SimWafAssociationCommands } from "./command/association/sim-wafv2-association-commands.js";
 import { SimWafAuthorizer } from "./command/authorize/sim-wafv2-authorizer.js";
 import { SimWafIpSetCommands } from "./command/ip-set/sim-wafv2-ip-set-commands.js";
 import { SimWafManagedRuleGroupCommands } from "./command/managed-rule-group/sim-wafv2-managed-rule-group-commands.js";
@@ -23,6 +30,12 @@ export interface SimWafV2Properties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  /**
+   * The resources this WAFv2 can put a web ACL in front of. A standalone
+   * simulated WAFv2 has none, so an association names a resource that is not
+   * there rather than protecting something imaginary.
+   */
+  readonly protectedResources?: SimWafProtectedResources;
 }
 
 /**
@@ -40,9 +53,18 @@ export class SimWafCommands {
     "regex pattern set",
   );
 
+  /**
+   * The web ACLs this scope has in front of things.
+   *
+   * Held here rather than in the association commands because a served request
+   * reaches it without a Command, the way a fronting service reaches AWS WAF.
+   */
+  readonly associations = new SimWafAssociations();
+
   readonly managedRules = new SimWafManagedRules();
 
   readonly webAclCommands: SimWafWebAclCommands;
+  readonly associationCommands: SimWafAssociationCommands;
   readonly managedRuleGroupCommands: SimWafManagedRuleGroupCommands;
   readonly ipSetCommands: SimWafIpSetCommands;
   readonly regexPatternSetCommands: SimWafRegexPatternSetCommands;
@@ -53,6 +75,7 @@ export class SimWafCommands {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      protectedResources = new SimWafNoProtectedResources(),
     } = properties;
 
     const authorizer = new SimWafAuthorizer({ iam });
@@ -61,6 +84,7 @@ export class SimWafCommands {
     this.webAclCommands = new SimWafWebAclCommands({
       webAcls: this.webAcls,
       regexPatternSets: this.regexPatternSets,
+      associations: this.associations,
       managedRules: this.managedRules,
       authorizer,
       accountRegionScope,
@@ -68,6 +92,15 @@ export class SimWafCommands {
     this.managedRuleGroupCommands = new SimWafManagedRuleGroupCommands({
       authorizer,
       accountRegionScope,
+    });
+    this.associationCommands = new SimWafAssociationCommands({
+      associations: this.associations,
+      access: new SimWafAssociationAccess({
+        webAcls: this.webAcls,
+        protectedResources,
+        authorizer,
+        accountRegionScope,
+      }),
     });
     this.ipSetCommands = new SimWafIpSetCommands({
       ipSets: this.ipSets,

@@ -1,4 +1,5 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimWafProtection } from "./association/sim-waf-protection.js";
 import type * as simWafCommands from "./command/sim-wafv2-command.types.js";
 import type { SimWafRequestOptions } from "./command/sim-wafv2-request-options.js";
 import { SimWafNonexistentItemException } from "./error/sim-wafv2.error.js";
@@ -12,6 +13,7 @@ import {
   SimWafCommands,
   type SimWafV2Properties,
 } from "./sim-wafv2-commands.js";
+import { SimWafSets } from "./sim-wafv2-sets.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
 
 export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
@@ -20,22 +22,32 @@ export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-requ
  * Simulated AWS WAFv2. Handles SDK commands. Emulates AWS behaviour and state.
  *
  * A web ACL is a list of rules and a decision about the requests none of them
- * claims, and `evaluateRequest` is what that adds up to. Association with a
- * CloudFront distribution, an API Gateway stage or a Cognito user pool comes
- * separately: this holds the rules and reaches the verdict, and the fronting
- * services will ask it for one.
+ * claims, and `evaluateRequest` is what that adds up to. `AssociateWebACL`
+ * puts one in front of an API Gateway REST API stage, and the stage then asks
+ * for that decision itself on every request it serves.
  *
  * Resources are scoped to an Account and Region, and within that to
  * `CLOUDFRONT` or `REGIONAL`. The two scopes are separate namespaces rather
  * than a label, and `CLOUDFRONT` lives in `us-east-1` because CloudFront is
  * global and its web ACLs are held there.
  */
-export class SimWafV2 {
-  readonly #commands: SimWafCommands;
+export class SimWafV2 extends SimWafSets {
   readonly #sdkRouter = new SimWafSdkCommandRouter(this);
 
   constructor(properties: SimWafV2Properties = {}) {
-    this.#commands = new SimWafCommands(properties);
+    super(new SimWafCommands(properties));
+  }
+
+  /**
+   * The web ACLs this WAFv2 has in front of things, as a fronting service sees
+   * them.
+   *
+   * The simulator's own accessor rather than a WAFv2 operation. It is how a
+   * simulated API Gateway reaches the web ACL protecting a stage it is about
+   * to serve, and how it lets go of one when the stage is deleted.
+   */
+  protection(): SimWafProtection {
+    return this.commands.associations;
   }
 
   /**
@@ -45,7 +57,7 @@ export class SimWafV2 {
    * going through a Command and its authorization.
    */
   allWebAcls(scope: SimWafScope): readonly SimWafWebAcl[] {
-    return this.#commands.webAcls.all(scope);
+    return this.commands.webAcls.all(scope);
   }
 
   /**
@@ -55,7 +67,7 @@ export class SimWafV2 {
    * since an association carries the ARN and nothing else.
    */
   findWebAclByArn(webAclArn: string): SimWafWebAcl | undefined {
-    return this.#commands.webAcls.findByArn(webAclArn);
+    return this.commands.webAcls.findByArn(webAclArn);
   }
 
   /**
@@ -90,7 +102,7 @@ export class SimWafV2 {
    * nothing here, and `rules()` reports what is covered of each.
    */
   managedRules(): SimWafManagedRules {
-    return this.#commands.managedRules;
+    return this.commands.managedRules;
   }
 
   /**
@@ -100,8 +112,8 @@ export class SimWafV2 {
     command: simWafCommands.SimCreateWebAclCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimCreateWebAclCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.webAclCommands.createWebAcl(command, options);
+    await this.commands.background.sequence();
+    return this.commands.webAclCommands.createWebAcl(command, options);
   }
 
   /**
@@ -111,8 +123,8 @@ export class SimWafV2 {
     command: simWafCommands.SimGetWebAclCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimGetWebAclCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.webAclCommands.getWebAcl(command, options);
+    await this.commands.background.sequence();
+    return this.commands.webAclCommands.getWebAcl(command, options);
   }
 
   /**
@@ -122,8 +134,8 @@ export class SimWafV2 {
     command: simWafCommands.SimUpdateWebAclCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimUpdateWebAclCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.webAclCommands.updateWebAcl(command, options);
+    await this.commands.background.sequence();
+    return this.commands.webAclCommands.updateWebAcl(command, options);
   }
 
   /**
@@ -133,8 +145,8 @@ export class SimWafV2 {
     command: simWafCommands.SimListWebAclsCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimListWebAclsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.webAclCommands.listWebAcls(command, options);
+    await this.commands.background.sequence();
+    return this.commands.webAclCommands.listWebAcls(command, options);
   }
 
   /**
@@ -144,8 +156,8 @@ export class SimWafV2 {
     command: simWafCommands.SimDeleteWebAclCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimDeleteWebAclCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.webAclCommands.deleteWebAcl(command, options);
+    await this.commands.background.sequence();
+    return this.commands.webAclCommands.deleteWebAcl(command, options);
   }
 
   /**
@@ -155,133 +167,61 @@ export class SimWafV2 {
     command: simWafCommands.SimDescribeManagedRuleGroupCommand,
     options?: SimWafRequestOptions,
   ): Promise<simWafCommands.SimDescribeManagedRuleGroupCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.managedRuleGroupCommands.describeManagedRuleGroup(
+    await this.commands.background.sequence();
+    return this.commands.managedRuleGroupCommands.describeManagedRuleGroup(
       command,
       options,
     );
   }
 
   /**
-   * Handle a CreateIPSet Command from the SDK.
+   * Handle an AssociateWebACL Command from the SDK.
    */
-  async createIpSet(
-    command: simWafCommands.SimCreateIpSetCommand,
+  async associateWebAcl(
+    command: simWafCommands.SimAssociateWebAclCommand,
     options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimCreateIpSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.ipSetCommands.createIpSet(command, options);
+  ): Promise<simWafCommands.SimAssociateWebAclCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.associationCommands.associateWebAcl(command, options);
   }
 
   /**
-   * Handle a GetIPSet Command from the SDK.
+   * Handle a DisassociateWebACL Command from the SDK.
    */
-  async getIpSet(
-    command: simWafCommands.SimGetIpSetCommand,
+  async disassociateWebAcl(
+    command: simWafCommands.SimDisassociateWebAclCommand,
     options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimGetIpSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.ipSetCommands.getIpSet(command, options);
-  }
-
-  /**
-   * Handle an UpdateIPSet Command from the SDK.
-   */
-  async updateIpSet(
-    command: simWafCommands.SimUpdateIpSetCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimUpdateIpSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.ipSetCommands.updateIpSet(command, options);
-  }
-
-  /**
-   * Handle a ListIPSets Command from the SDK.
-   */
-  async listIpSets(
-    command: simWafCommands.SimListIpSetsCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimListIpSetsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.ipSetCommands.listIpSets(command, options);
-  }
-
-  /**
-   * Handle a DeleteIPSet Command from the SDK.
-   */
-  async deleteIpSet(
-    command: simWafCommands.SimDeleteIpSetCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimDeleteIpSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.ipSetCommands.deleteIpSet(command, options);
-  }
-
-  /**
-   * Handle a CreateRegexPatternSet Command from the SDK.
-   */
-  async createRegexPatternSet(
-    command: simWafCommands.SimCreateRegexPatternSetCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimCreateRegexPatternSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.regexPatternSetCommands.createRegexPatternSet(
+  ): Promise<simWafCommands.SimDisassociateWebAclCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.associationCommands.disassociateWebAcl(
       command,
       options,
     );
   }
 
   /**
-   * Handle a GetRegexPatternSet Command from the SDK.
+   * Handle a GetWebACLForResource Command from the SDK.
    */
-  async getRegexPatternSet(
-    command: simWafCommands.SimGetRegexPatternSetCommand,
+  async getWebAclForResource(
+    command: simWafCommands.SimGetWebAclForResourceCommand,
     options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimGetRegexPatternSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.regexPatternSetCommands.getRegexPatternSet(
+  ): Promise<simWafCommands.SimGetWebAclForResourceCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.associationCommands.getWebAclForResource(
       command,
       options,
     );
   }
 
   /**
-   * Handle an UpdateRegexPatternSet Command from the SDK.
+   * Handle a ListResourcesForWebACL Command from the SDK.
    */
-  async updateRegexPatternSet(
-    command: simWafCommands.SimUpdateRegexPatternSetCommand,
+  async listResourcesForWebAcl(
+    command: simWafCommands.SimListResourcesForWebAclCommand,
     options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimUpdateRegexPatternSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.regexPatternSetCommands.updateRegexPatternSet(
-      command,
-      options,
-    );
-  }
-
-  /**
-   * Handle a ListRegexPatternSets Command from the SDK.
-   */
-  async listRegexPatternSets(
-    command: simWafCommands.SimListRegexPatternSetsCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimListRegexPatternSetsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.regexPatternSetCommands.listRegexPatternSets(
-      command,
-      options,
-    );
-  }
-
-  /**
-   * Handle a DeleteRegexPatternSet Command from the SDK.
-   */
-  async deleteRegexPatternSet(
-    command: simWafCommands.SimDeleteRegexPatternSetCommand,
-    options?: SimWafRequestOptions,
-  ): Promise<simWafCommands.SimDeleteRegexPatternSetCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.regexPatternSetCommands.deleteRegexPatternSet(
+  ): Promise<simWafCommands.SimListResourcesForWebAclCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.associationCommands.listResourcesForWebAcl(
       command,
       options,
     );

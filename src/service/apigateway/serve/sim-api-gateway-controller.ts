@@ -14,6 +14,7 @@ import { SimApiGatewayErrorResponse } from "./sim-api-gateway-error-response.js"
 import { SimApiGatewayRouter } from "./sim-api-gateway-router.js";
 import { SimRestApiIntegrationInvocation } from "./sim-rest-api-integration-invocation.js";
 import { SimRestApiRefusalResponse } from "./sim-rest-api-refusal-response.js";
+import { SimRestApiWebAclInspection } from "./sim-rest-api-web-acl-inspection.js";
 
 interface SimApiGatewayServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -33,6 +34,10 @@ interface SimApiGatewayServiceControllerProperties {
  * `CUSTOM` method's Lambda authorizer has to allow the request, or the request
  * is refused and the integration is never invoked. Whether the API may invoke a
  * function is a separate question, and the API's own rather than the client's.
+ *
+ * A web ACL in front of the stage comes ahead of all of it, as it does on real
+ * API Gateway. A request the web ACL blocks is answered before the method is
+ * matched, so neither the authorizer nor the integration sees it.
  */
 export class SimApiGatewayServiceController implements SimAwsServiceController {
   private readonly router: SimApiGatewayRouter;
@@ -40,6 +45,7 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
   private readonly integration: SimRestApiIntegrationInvocation;
   private readonly errorResponse = new SimApiGatewayErrorResponse();
   private readonly refusalResponse = new SimRestApiRefusalResponse();
+  private readonly webAcl = new SimRestApiWebAclInspection();
 
   constructor(properties: SimApiGatewayServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
@@ -79,21 +85,32 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
     restApi: SimRestApi,
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
-    const { request } = serviceRequest;
     // The whole request path, stage segment and all. The stage takes its own
     // segment off, and the event reports the path as the client sent it.
-    const match = restApi.match(
-      new SimRestApiRequest({
-        method: request.method,
-        path: new URL(request.url).pathname,
-      }),
-    );
+    const restApiRequest = new SimRestApiRequest({
+      method: serviceRequest.request.method,
+      path: new URL(serviceRequest.request.url).pathname,
+    });
+    // The stage's web ACL sees the request before anything the API does with
+    // it, which is why this comes before matching rather than after it.
+    const inspected = await this.webAcl.inspect({
+      restApi,
+      stageName: restApiRequest.segments[0] ?? "",
+      request: serviceRequest.request,
+    });
+
+    if (inspected.blocked !== undefined) {
+      return inspected.blocked;
+    }
+
+    const { request } = inspected;
+    const match = restApi.match(restApiRequest);
 
     if (!isSimRestApiMatch(match)) {
       return this.missResponse(match);
     }
 
-    // The client's own authorization comes first: a request with no
+    // The client's own authorization comes next: a request with no
     // credentials is refused whether or not the integration behind the method
     // would work.
     const authorization = await this.methodAuthorizer.authorize({

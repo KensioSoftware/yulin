@@ -2,6 +2,20 @@
  * The sim WAFv2 Command types, gathered for the service facade.
  */
 export type {
+  SimAssociateWebAclCommand,
+  SimAssociateWebAclCommandInput,
+  SimAssociateWebAclCommandOutput,
+  SimDisassociateWebAclCommand,
+  SimDisassociateWebAclCommandInput,
+  SimDisassociateWebAclCommandOutput,
+  SimGetWebAclForResourceCommand,
+  SimGetWebAclForResourceCommandInput,
+  SimGetWebAclForResourceCommandOutput,
+  SimListResourcesForWebAclCommand,
+  SimListResourcesForWebAclCommandInput,
+  SimListResourcesForWebAclCommandOutput,
+} from "./association/association.command.js";
+export type {
   SimCreateIpSetCommand,
   SimCreateIpSetCommandInput,
   SimCreateIpSetCommandOutput,

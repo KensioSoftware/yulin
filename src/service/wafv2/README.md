@@ -4,16 +4,16 @@ This directory contains the simulated AWS WAFv2 implementation. It holds web ACL
 regex pattern sets, and it evaluates a request against a web ACL's rules to reach a decision. Three
 of the AWS managed rule groups are carried here, approximated to a tier each rule declares.
 
-Association comes later. A CloudFront distribution, an API Gateway REST API stage and a Cognito
-user pool each get a web ACL in the issues after the one this was built for.
-`SimWafV2.evaluateRequest` is the entry point those serving paths will call once they have a web ACL
-ARN to hand.
+A web ACL can be put in front of an API Gateway REST API stage. CloudFront distributions and
+Cognito user pools come later.
 
 ## Entry points
 
 - `sim-wafv2.ts` is the service facade for one Account and Region scope.
 - `sim-wafv2-commands.ts` is the wiring behind it, held apart because the facade grows by one method
   per SDK operation and the two would otherwise compete for room in one file.
+- `sim-wafv2-sets.ts` is the half of the facade holding the IP set and regex pattern set
+  operations, for the same reason.
 - `index.ts` exports the public WAFv2 simulator API for `@kensio/yulin/wafv2`.
 
 The service is scoped to an Account and Region, and within that to `CLOUDFRONT` or `REGIONAL`. The
@@ -66,8 +66,40 @@ it forwards. A custom response header keeps the name the rule gave it.
 
 `evaluate/sim-waf-blocked-response.ts` holds the default 403 body. Real WAF hands the blocking off
 to whatever the web ACL is in front of, and each of those writes its own page (CloudFront's error
-page, API Gateway's `{"message":"Forbidden"}`). This is Yulin's own body until there is a fronting
-service to ask, and it is documented as a divergence in `docs/services/wafv2`.
+page, API Gateway's `{"message":"Forbidden"}`). A blocked request to a protected stage gets this
+body here, which is documented as a divergence in `docs/services/wafv2`.
+
+## Association
+
+`association/` holds the web ACLs this scope has in front of things, and what an association may
+name:
+
+```text
+SimWafAssociations              resource ARN to web ACL, and what a fronting service asks it
+├── SimWafProtectedResource     what an association ARN names, read from the ARN
+│   └── SimWafRestApiStage      the one resource type so far
+├── SimWafProtectedResources    the port asking whether that resource is there
+└── SimWafProtection            the port a fronting service takes
+```
+
+The store holds the web ACL itself rather than its ARN. A request reaching a protected stage is then
+evaluated without a second lookup, and `DeleteWebACL` refuses a web ACL something still points at.
+Deleting the web ACL out from under a stage would leave the stage protected by rules nothing holds.
+
+Two ports run in opposite directions, and both are needed. `SimWafProtectedResources` is how
+WAFv2 asks whether a stage ARN names anything, since WAFv2 holds no API Gateway state of its own.
+`SimWafProtection` is how a simulated API Gateway reaches the web ACL in front of a stage it is
+about to serve, and how it lets go of one when the stage is deleted.
+`SimAwsWafProtectedResources` is the implementation reading a simulated AWS instance, and a
+standalone `SimWafV2` gets `SimWafNoProtectedResources`, which finds nothing. A standalone
+`SimApiGateway` gets `SimWafNoProtection` and serves every request the way it did before web ACLs.
+
+`sim-waf-protected-resource.ts` reads an ARN for what it names. The three refusals in it mean
+different things. An HTTP API stage is refused because AWS WAF protects no HTTP API, and an
+association accepted here would let a test cover protection AWS never applies. A load balancer and
+the other four resource types AWS does protect are refused as unsimulated. Anything else is refused
+as an ARN. A second target type joins the union and gains a branch in the reader, and everything
+holding an association goes on addressing a resource by its ARN.
 
 ## Compiling a statement
 
@@ -165,8 +197,12 @@ The reasons are worth knowing. `IPSetReferenceStatement`, `GeoMatchStatement` an
 `127.0.0.1` (`simAwsProxiedSourceIp`), and a rule on where a request came from would see one client
 for the whole simulation. `SqliMatchStatement` and `XssMatchStatement` are refused because AWS
 publishes no description of the detection they run. `RateBasedStatement` needs request counting over
-a window against the simulated clock (feasible, and not part of this). The rule group
-statements and `LabelMatchStatement` arrive with the AWS managed rule groups.
+a window against the simulated clock (feasible, and not part of this).
+`RuleGroupReferenceStatement` is refused because a rule group of the reader's own is a resource in
+its own right, and none is simulated.
+
+`managed/sim-waf-managed-group-input.ts` refuses a managed rule group outside the three, naming the
+ones that are simulated. It also refuses `Version`, `ExcludedRules` and `ManagedRuleGroupConfigs`.
 
 An IP set is held and reported, and no rule reads one, for the same reason
 `IPSetReferenceStatement` is refused. A stack that creates one still deploys, and a test can read
@@ -184,8 +220,8 @@ scoped to web ACL ARNs allows none of them, however broadly those ARNs are writt
 
 ## Testing
 
-Tests are colocated with the code they exercise. `sim-wafv2.fixture.ts` holds two helpers, and both
-exist for the same reason. `createSimWafWebAcl` reads the summary a create reported, holding the
+Tests are colocated with the code they exercise. `sim-wafv2.fixture.ts` holds the helpers a test
+about a web ACL is built from. `createSimWafWebAcl` reads the summary a create reported, holding the
 id, the ARN and the first lock token. `simWafStatementMatches` puts one statement behind a blocking
 rule and answers with a predicate over requests. That predicate is the whole of what a test about a
 statement kind wants to say.

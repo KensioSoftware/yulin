@@ -1,6 +1,7 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimRestApiUserPools } from "../../api/authorizer/sim-rest-api-user-pools.js";
+import type { SimWafProtection } from "../../../wafv2/association/sim-waf-protection.js";
 import type { SimRestApiStore } from "../../api/sim-rest-api-store.js";
 import { SimRestApi } from "../../api/sim-rest-api.js";
 import type { SimRestApiRegistry } from "../../registry/sim-rest-api-registry.js";
@@ -34,6 +35,7 @@ interface SimRestApiCommandsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
   readonly userPools: SimRestApiUserPools;
+  readonly webAcls: SimWafProtection;
 }
 
 /**
@@ -46,6 +48,7 @@ export class SimRestApiCommands {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: SimClock;
   private readonly userPools: SimRestApiUserPools;
+  private readonly webAcls: SimWafProtection;
 
   constructor(properties: SimRestApiCommandsProperties) {
     this.apis = properties.apis;
@@ -54,6 +57,7 @@ export class SimRestApiCommands {
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
     this.userPools = properties.userPools;
+    this.webAcls = properties.webAcls;
   }
 
   /**
@@ -79,6 +83,7 @@ export class SimRestApiCommands {
       accountRegionScope: this.accountRegionScope,
       createdDate: this.clock.now(),
       userPools: this.userPools,
+      webAcls: this.webAcls,
       description: input.description,
       disableExecuteApiEndpoint: input.disableExecuteApiEndpoint,
     });
@@ -171,6 +176,12 @@ export class SimRestApiCommands {
       restApiId,
       caller: options?.caller,
     });
+
+    // The API takes its stages with it, and a web ACL in front of one of them
+    // is let go of with the stage it was protecting.
+    for (const stage of restApi.stages.list()) {
+      restApi.webAcls.release(restApi.stageArn(stage.stageName));
+    }
 
     this.apis.remove(restApi.apiId);
     this.registry.deregisterApi(restApi.apiId);

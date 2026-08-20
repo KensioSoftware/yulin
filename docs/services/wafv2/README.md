@@ -5,9 +5,9 @@ regex pattern sets, and it evaluates a request against a web ACL's rules to reac
 can assert that a request to `/admin` is blocked and one to `/` is allowed, without an AWS account
 and without a distribution in front of anything.
 
-Association comes separately. Putting a web ACL in front of a CloudFront distribution, an API
-Gateway REST API stage or a Cognito user pool arrives later. Until then a test asks the web ACL
-about a request itself.
+A web ACL can also go in front of a simulated API Gateway REST API stage, and every request that
+stage serves is then put through its rules. CloudFront distributions and Cognito user pools arrive
+later.
 
 WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
 
@@ -407,7 +407,9 @@ managed rule group is qualified by the group it came from. That is the
 
 ## Answering a blocked request
 
-A `Block` action answers 403 with WAF's own body. A `CustomResponse` overrides the status and the
+A `Block` action answers 403 with WAF's own body, and so does a request a protected REST API stage
+blocked. Real API Gateway writes `{"message":"Forbidden"}` there. A `CustomResponse` overrides the
+status and the
 body, taking the body from the web ACL's `CustomResponseBodies` by key. It carries a `ResponseCode`
 of its own, from 200 to 599, and any response headers it names reach the client under the names it
 gave them.
@@ -489,6 +491,112 @@ console.log(
 
 The default body is Yulin's own. Real WAF hands the blocking off to whatever the web ACL is in front
 of, and each of those writes its own page. The status is 403 either way.
+
+## Protecting an API Gateway REST API stage
+
+`AssociateWebACL` puts a `REGIONAL` web ACL in front of a simulated REST API stage, named by the
+stage's ARN. `SimRestApi.stageArn` builds that ARN, of the form
+`arn:aws:apigateway:<region>::/restapis/<api-id>/stages/<stage-name>`.
+
+The stage then puts every request through the web ACL before it matches the method and before any
+authorizer runs. That is the order real API Gateway evaluates in, ahead of resource policies, IAM,
+Lambda authorizers and Cognito authorizers alike. A blocked request gets 403 with WAF's body, and
+neither the authorizer nor the integration behind the method sees it. An allowed request carries on,
+with the headers an `Allow` rule inserted added to what the integration receives.
+
+```typescript sim-wafv2-api-gateway-stage
+/**
+ * Blocking a request to a REST API stage with a web ACL in front of it.
+ */
+
+import {
+  AssociateWebACLCommand,
+  CreateWebACLCommand,
+} from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const waf = simAws.wafV2();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  { handler: () => ({ statusCode: 200, body: "orders" }) },
+  simAws,
+);
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "api",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "api-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "block-admin",
+        Priority: 0,
+        Action: { Block: {} },
+        Statement: {
+          ByteMatchStatement: {
+            FieldToMatch: { UriPath: {} },
+            PositionalConstraint: "CONTAINS",
+            SearchString: Buffer.from("/admin"),
+            TextTransformations: [{ Priority: 0, Type: "NONE" }],
+          },
+        },
+        VisibilityConfig: { ...visibility, MetricName: "block-admin" },
+      },
+    ],
+  }),
+);
+
+await waf.associateWebAcl(
+  new AssociateWebACLCommand({
+    WebACLArn: created.Summary?.ARN,
+    ResourceArn: restApi.stageArn("prod"),
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+const blocked = await fetch(
+  srv.localUrl(`${restApi.invokeUrl("prod")}/admin/users`),
+);
+const allowed = await fetch(
+  srv.localUrl(`${restApi.invokeUrl("prod")}/orders`),
+);
+
+console.log(blocked.status, allowed.status);
+// 403 200
+
+await srv.close();
+```
+
+`DisassociateWebACL` takes the web ACL back off. `GetWebACLForResource` reports the web ACL one
+stage carries, and `ListResourcesForWebACL` reports the stages one web ACL protects. That listing
+takes a `ResourceType` of `API_GATEWAY`. Real WAFv2 lists `APPLICATION_LOAD_BALANCER` for a request
+that names no type. Load balancers are outside this simulation, and a listing that names no type is
+refused.
+
+Deleting the stage or the whole API takes the association with it. A stage deployed again under the
+same name carries no web ACL. A web ACL that is still in front of a stage cannot be deleted, and
+`DeleteWebACL` names the stages still pointing at it.
+
+The web ACL and the stage belong to one Account and Region. A `CLOUDFRONT` scope web ACL is refused,
+because a distribution takes its web ACL from the distribution and not from `AssociateWebACL`. A web
+ACL from another Region or another Account is refused, as it is on AWS.
+
+An API Gateway HTTP API stage is refused. AWS WAF has no resource type for one, and an association
+accepted here would let a test cover protection AWS never applies. Application Load Balancer,
+AppSync, App Runner, Amplify and Verified Access resources are refused as unsimulated, each naming
+what it would have protected.
 
 ## Regex pattern sets
 
@@ -773,5 +881,6 @@ are refused for the same reason, each naming what it would have configured.
 
 `CreateWebACL`, `GetWebACL`, `UpdateWebACL`, `ListWebACLs`, `DeleteWebACL`, `CreateIPSet`,
 `GetIPSet`, `UpdateIPSet`, `ListIPSets`, `DeleteIPSet`, `CreateRegexPatternSet`,
-`GetRegexPatternSet`, `UpdateRegexPatternSet`, `ListRegexPatternSets`, `DeleteRegexPatternSet` and
-`DescribeManagedRuleGroup`.
+`GetRegexPatternSet`, `UpdateRegexPatternSet`, `ListRegexPatternSets`, `DeleteRegexPatternSet`,
+`DescribeManagedRuleGroup`, `AssociateWebACL`, `DisassociateWebACL`, `GetWebACLForResource` and
+`ListResourcesForWebACL`.

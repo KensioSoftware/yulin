@@ -6,16 +6,26 @@ import {
   DeleteIPSetCommand,
   DeleteRegexPatternSetCommand,
   DeleteWebACLCommand,
+  DisassociateWebACLCommand,
   GetIPSetCommand,
   GetRegexPatternSetCommand,
   GetWebACLCommand,
+  GetWebACLForResourceCommand,
   ListIPSetsCommand,
+  ListResourcesForWebACLCommand,
   ListRegexPatternSetsCommand,
   ListWebACLsCommand,
+  PutLoggingConfigurationCommand,
   UpdateWebACLCommand,
   WAFV2Client,
 } from "@aws-sdk/client-wafv2";
 import {
+  APIGatewayClient,
+  CreateDeploymentCommand,
+  CreateRestApiCommand,
+} from "@aws-sdk/client-api-gateway";
+import {
+  assertArrayEquals,
   assertArrayIncludesAll,
   assertArrayLength,
   assertIdentical,
@@ -73,6 +83,10 @@ describe("SimWafSdkCommandRouter", () => {
       "UpdateRegexPatternSetCommand",
       "ListRegexPatternSetsCommand",
       "DeleteRegexPatternSetCommand",
+      "AssociateWebACLCommand",
+      "DisassociateWebACLCommand",
+      "GetWebACLForResourceCommand",
+      "ListResourcesForWebACLCommand",
     ]);
   });
 
@@ -84,9 +98,9 @@ describe("SimWafSdkCommandRouter", () => {
     const route = simAws
       .wafV2()
       .sdkCommandRouter()
-      .route("AssociateWebACLCommand");
+      .route("PutLoggingConfigurationCommand");
 
-    // Then there is no route for it. Association follows in its own issues.
+    // Then there is no route for it. Logging is not simulated.
     assertUndefined(route);
   });
 });
@@ -221,6 +235,54 @@ describe("WAFv2 SDK interception", () => {
     assertArrayLength(afterDelete.WebACLs ?? [], 0);
   });
 
+  it("routes the association Commands through the intercepted client", async () => {
+    // Given an intercepted client, a web ACL and a deployed REST API stage.
+    using simSdk = new SimSdk();
+    simSdk.intercept(WAFV2Client);
+    simSdk.intercept(APIGatewayClient);
+
+    const client = new WAFV2Client({ region: "eu-west-2" });
+    const apiGateway = new APIGatewayClient({ region: "eu-west-2" });
+    const api = await apiGateway.send(
+      new CreateRestApiCommand({ name: "orders" }),
+    );
+    await apiGateway.send(
+      new CreateDeploymentCommand({ restApiId: api.id, stageName: "prod" }),
+    );
+
+    const stageArn = `arn:aws:apigateway:eu-west-2::/restapis/${api.id}/stages/prod`;
+    const created = await client.send(new CreateWebACLCommand(apiAclInput));
+
+    // When each association operation is used.
+    await client.send(
+      new AssociateWebACLCommand({
+        WebACLArn: created.Summary?.ARN,
+        ResourceArn: stageArn,
+      }),
+    );
+    const forResource = await client.send(
+      new GetWebACLForResourceCommand({ ResourceArn: stageArn }),
+    );
+    const listed = await client.send(
+      new ListResourcesForWebACLCommand({
+        WebACLArn: created.Summary?.ARN,
+        ResourceType: "API_GATEWAY",
+      }),
+    );
+    await client.send(new DisassociateWebACLCommand({ ResourceArn: stageArn }));
+    const afterDisassociate = await client.send(
+      new ListResourcesForWebACLCommand({
+        WebACLArn: created.Summary?.ARN,
+        ResourceType: "API_GATEWAY",
+      }),
+    );
+
+    // Then each one reached simulated WAFv2.
+    assertIdentical(forResource.WebACL?.Name, "api-acl");
+    assertArrayEquals(listed.ResourceArns ?? [], [stageArn]);
+    assertArrayLength(afterDisassociate.ResourceArns ?? [], 0);
+  });
+
   it("refuses a Command simulated WAFv2 does not handle", async () => {
     // Given an intercepted client.
     using simSdk = new SimSdk();
@@ -228,18 +290,23 @@ describe("WAFv2 SDK interception", () => {
 
     const client = new WAFV2Client({ region: "eu-west-2" });
 
-    // When it associates a web ACL with something.
+    // When it writes a logging configuration.
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new AssociateWebACLCommand({
-          WebACLArn: "arn:aws:wafv2:eu-west-2:111111111111:regional/webacl/x/y",
-          ResourceArn: "arn:aws:elasticloadbalancing:eu-west-2:111111111111:x",
+        new PutLoggingConfigurationCommand({
+          LoggingConfiguration: {
+            ResourceArn:
+              "arn:aws:wafv2:eu-west-2:111111111111:regional/webacl/x/y",
+            LogDestinationConfigs: [
+              "arn:aws:logs:eu-west-2:111111111111:log-group:aws-waf-logs-x",
+            ],
+          },
         }),
       );
     });
 
     // Then it is refused by name rather than reaching real AWS.
     assertInstanceOf(error, SimSdkUnsupportedCommandError);
-    assertStringIncludes(error.message, "AssociateWebACLCommand");
+    assertStringIncludes(error.message, "PutLoggingConfigurationCommand");
   });
 });

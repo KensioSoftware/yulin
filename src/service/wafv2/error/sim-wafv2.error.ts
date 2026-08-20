@@ -94,6 +94,36 @@ export class SimWafUnsimulatedInputException extends SimWafError {
 }
 
 /**
+ * Simulated WAFv2 WAFUnavailableEntityException error.
+ *
+ * An association names the resource a web ACL goes in front of, and WAFv2
+ * reports a resource it cannot reach this way. Here that is a REST API stage
+ * this simulation has never held.
+ */
+export class SimWafUnavailableEntityException extends SimWafError {
+  public override readonly name = "WAFUnavailableEntityException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated WAFv2 WAFAssociatedItemException error.
+ *
+ * A web ACL in front of something cannot be deleted. Removing one that a stage
+ * still points at would leave the stage protected by rules nothing holds any
+ * more, so the association is disassociated first.
+ */
+export class SimWafAssociatedItemException extends SimWafError {
+  public override readonly name = "WAFAssociatedItemException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * A match declared against this simulation that it cannot answer with.
  *
  * The four `CrossSiteScripting_*` rules of the core rule set detect nothing
