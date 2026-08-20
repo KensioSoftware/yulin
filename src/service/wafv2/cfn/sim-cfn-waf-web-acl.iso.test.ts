@@ -162,6 +162,40 @@ describe("AWS::WAFv2::WebACL", () => {
     assertIdentical(decisionFor(simAws, stack, "/orders"), "ALLOW");
   });
 
+  it("leaves out a rate limit aggregating on what it cannot read", async () => {
+    // Given a template whose rate limit counts by forwarded address, beside a
+    // rule this simulation does evaluate.
+    const simAws = new SimAws();
+    const stack = await deployWebAcl(simAws, {
+      Rules: [
+        {
+          Name: "forwarded-rate",
+          Priority: 1,
+          Action: { Block: {} },
+          Statement: {
+            RateBasedStatement: {
+              Limit: 100,
+              AggregateKeyType: "FORWARDED_IP",
+            },
+          },
+          VisibilityConfig: { ...visibility, MetricName: "forwarded-rate" },
+        },
+        blockAdmin,
+      ],
+    });
+
+    // Then the rate limit was left out and recorded, and the web ACL deployed
+    // with the rule beside it still deciding requests. A refused aggregation
+    // key costs the rule and nothing larger than the rule.
+    const [dropped] = stack.ignoredProperties;
+
+    assertNonNullable(dropped);
+    assertIdentical(dropped.path, "Rules.forwarded-rate");
+    assertStringIncludes(dropped.reason, "FORWARDED_IP");
+    assertArrayLength(stack.skippedResources, 0);
+    assertIdentical(decisionFor(simAws, stack, "/admin/users"), "BLOCK");
+  });
+
   it("answers Fn::GetAtt with the four attributes a web ACL publishes", async () => {
     // Given a deployed web ACL whose attributes are all outputs.
     const simAws = new SimAws();

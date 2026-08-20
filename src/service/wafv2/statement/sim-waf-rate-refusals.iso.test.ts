@@ -100,6 +100,25 @@ describe("SimWafV2 rate based refusals", () => {
     assertStringIncludes(error.message, "ScopeDownStatement");
   });
 
+  it("refuses a rate based statement beside another one", async () => {
+    // When a rule names a rate limit and a byte match together.
+    const error = await refusalForStatement({
+      RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" },
+      ByteMatchStatement: {
+        FieldToMatch: { UriPath: {} },
+        PositionalConstraint: "STARTS_WITH",
+        SearchString: "/signup",
+        TextTransformations: [{ Priority: 0, Type: "NONE" }],
+      },
+    });
+
+    // Then the rule is refused. Reading the rate limit and leaving the byte
+    // match unread would count every request the web ACL serves, which is not
+    // the rule that was written.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "whole of a rule's statement");
+  });
+
   it("refuses a rate based statement nested inside another one", async () => {
     // When a rule joins a rate limit to another statement.
     const error = await refusalForStatement({

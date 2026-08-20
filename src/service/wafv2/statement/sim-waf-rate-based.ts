@@ -1,6 +1,5 @@
 import type { SimWafMatcher } from "./sim-waf-field-match.js";
 import {
-  refuseUnsimulatedSimWafRateMembers,
   simWafRateAggregation,
   simWafRateLimit,
   simWafRateWindowMilliseconds,
@@ -11,6 +10,7 @@ import {
   compileSimWafStatement,
   type SimWafStatementScope,
 } from "./sim-waf-statement.js";
+import { refuseUnsimulatedSimWafRateMembers } from "./sim-waf-unsimulated-rate-based.js";
 
 /**
  * Compile a rule that limits how many requests one client may make.

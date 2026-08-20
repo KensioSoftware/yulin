@@ -166,8 +166,9 @@ describe("Sim CDK WAFv2 web ACL local integration", () => {
     assertIdentical(await allowed.text(), "order orders/YL-1");
 
     // And the rate limit the same template wrote counts the requests it
-    // scoped itself down to, so the eleventh in the window gets WAF's 403
-    // where the tenth was served.
+    // scoped itself down to. The `allowed` request above was the first of
+    // them, so the tenth of these ten is the eleventh in the window and the
+    // one that gets WAF's 403.
     const rated: Response[] = [];
 
     for (let sent = 0; sent < 10; sent += 1) {

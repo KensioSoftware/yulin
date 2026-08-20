@@ -1,10 +1,42 @@
 import { simAwsProxiedSourceIp } from "../../../serve/http/sim-aws-proxied-connection.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
 import type { SimWafRateBasedStatementInput } from "./sim-waf-rate-based.type.js";
-import {
-  invalidSimWafRule,
-  refuseSimWafRuleInput,
-} from "./sim-waf-rule-refusals.js";
+import type { SimWafStatementInput } from "./sim-waf-statement.type.js";
+import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
+import { refuseUnsimulatedSimWafRateKeyType } from "./sim-waf-unsimulated-rate-based.js";
+
+/**
+ * What a rule joining a rate limit to anything else is refused with.
+ *
+ * Real WAFv2 draws the line in both directions, and so does this. A
+ * `RateBasedStatement` beside another kind would leave that kind unread and
+ * the rate limit counting requests the rule meant to leave alone. Nesting one
+ * inside a logical statement would count only the requests that reached it. A
+ * rate limit narrows what it counts with its own `ScopeDownStatement`.
+ */
+export const simWafRateBasedIsWholeStatement =
+  "A RateBasedStatement is the whole of a rule's statement, and cannot be " +
+  "joined to or nested inside another one";
+
+/**
+ * Refuse a rule that names a rate limit and another statement kind together.
+ */
+export function refuseJoinedSimWafRateBased(
+  statement: SimWafStatementInput,
+  ruleName: string,
+): void {
+  if (statement.RateBasedStatement === undefined) {
+    return;
+  }
+
+  const joined = Object.entries(statement).some(
+    ([kind, value]) => kind !== "RateBasedStatement" && value !== undefined,
+  );
+
+  if (joined) {
+    invalidSimWafRule(ruleName, simWafRateBasedIsWholeStatement);
+  }
+}
 
 /**
  * Which aggregation instance one request is counted under.
@@ -22,46 +54,6 @@ const millisecondsPerSecond = 1000;
 /** The smallest and largest limits AWS takes. */
 const smallestLimit = 10;
 const largestLimit = 2_000_000_000;
-
-const forwardedAddress =
-  "it reads the address from a forwarding header, and needs the source " +
-  "address variety IPSetReferenceStatement is waiting on";
-
-const customAggregation =
-  "aggregating on headers, cookies and query arguments is feasible and is " +
-  "not part of this";
-
-/**
- * The aggregation key types real WAFv2 has and this simulation does not.
- */
-const refusedKeyTypes = new Map<string, string>([
-  ["FORWARDED_IP", forwardedAddress],
-  ["CUSTOM_KEYS", customAggregation],
-]);
-
-/**
- * The rate-based members real WAFv2 takes and this simulation does not.
- */
-const refusedMembers = new Map<string, string>([
-  ["CustomKeys", customAggregation],
-  ["ForwardedIPConfig", forwardedAddress],
-]);
-
-/**
- * Refuse the parts of a rate-based statement this simulation cannot evaluate.
- */
-export function refuseUnsimulatedSimWafRateMembers(
-  statement: SimWafRateBasedStatementInput,
-  ruleName: string,
-): void {
-  for (const [member, value] of Object.entries(statement)) {
-    const reason = refusedMembers.get(member);
-
-    if (reason !== undefined && value !== undefined) {
-      refuseSimWafRuleInput(ruleName, `RateBasedStatement ${member}`, reason);
-    }
-  }
-}
 
 /**
  * Read how many requests a rate-based statement counts up to.
@@ -130,15 +122,8 @@ export function simWafRateAggregation(
   ruleName: string,
 ): SimWafRateAggregation {
   const keyType = statement.AggregateKeyType;
-  const refused = refusedKeyTypes.get(keyType ?? "");
 
-  if (refused !== undefined) {
-    refuseSimWafRuleInput(
-      ruleName,
-      `the aggregation key type ${keyType}`,
-      refused,
-    );
-  }
+  refuseUnsimulatedSimWafRateKeyType(keyType, ruleName);
 
   if (keyType === "IP") {
     return (): string => simAwsProxiedSourceIp;

@@ -284,8 +284,9 @@ scope-down statement leaves alone is neither counted nor limited. That is what k
 The counts belong to the rule. Writing a new set of rules over a web ACL with `UpdateWebACL` starts
 them from nothing, as it does on AWS.
 
-A rate limit is the whole of a rule's statement, as it is on real WAFv2. Joining one to an
-`AndStatement` or nesting it in a `NotStatement` is refused where the rule is written.
+A rate limit is the whole of a rule's statement, as it is on real WAFv2. A rule naming another
+statement kind beside it, and a rate limit nested inside an `AndStatement` or a `NotStatement`, are
+both refused where the rule is written.
 
 ## The AWS managed rule groups
 

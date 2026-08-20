@@ -160,17 +160,19 @@ the key is read. The clock is the simulation's own, reaching a rule through
 `BackgroundScheduler` being a `SimClock` as well. Advancing simulated time past the window is
 therefore all a test needs to watch a limited client be served again.
 
-`sim-waf-rate-based-input.ts` reads `Limit`, `EvaluationWindowSec` and `AggregateKeyType`, and holds
-the refusals for the two aggregation key types that need something this simulation has none of.
-`IP` reads `simAwsProxiedSourceIp`, the address every request in this simulation reports, leaving a
+`sim-waf-rate-based-input.ts` reads `Limit`, `EvaluationWindowSec` and `AggregateKeyType`, and
+`sim-waf-unsimulated-rate-based.ts` beside it refuses the two aggregation key types that need
+something this simulation has none of. `IP` reads `simAwsProxiedSourceIp`, the address every request in this simulation reports, leaving a
 web ACL with one client. That is the case a rate limiting test covers, and the keyed counter is the
 seam if source addresses ever vary.
 
 A rate-based statement is compiled at the rule level (`web-acl/sim-waf-rule-evaluator.ts`) for the
 reason a managed rule group is. Both are the whole of a rule's statement on real WAFv2, and
-`compileSimWafStatement` refuses either one nested inside another statement. A rate limit narrows
-what it counts with its own `ScopeDownStatement`. That goes through the ordinary statement path and
-gets every kind above it.
+`compileSimWafStatement` refuses either one nested inside another statement. Being the whole of it
+is checked from the other side too. `refuseJoinedSimWafRateBased` refuses a rule naming a rate limit
+and another statement kind together, since dispatching on the member would otherwise read past the
+kind written beside it. A rate limit narrows what it counts with its own `ScopeDownStatement`. That
+goes through the ordinary statement path and gets every kind above it.
 
 ## The AWS managed rule groups
 
@@ -222,9 +224,10 @@ authorizes against `*` as the listings do.
 
 ## Refusals
 
-Three files hold them, one per level.
+Four files hold them, one per level.
 
 - `statement/sim-waf-unsimulated-statement.ts` for the statement kinds.
+- `statement/sim-waf-unsimulated-rate-based.ts` for the parts of a rate-based statement.
 - `statement/sim-waf-unsimulated-field.ts` for the field-to-match kinds.
 - `web-acl/sim-waf-rule-input.ts` and `command/web-acl/sim-wafv2-unsimulated-web-acl-input.ts` for
   the members of a rule and of a web ACL.
@@ -240,8 +243,8 @@ for the whole simulation. `SqliMatchStatement` and `XssMatchStatement` are refus
 publishes no description of the detection they run. `RuleGroupReferenceStatement` is refused because
 a rule group of the reader's own is a resource in its own right, and none is simulated.
 
-`statement/sim-waf-rate-based-input.ts` holds two more, for the same one-client-address reason and
-for scope. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding header.
+`statement/sim-waf-unsimulated-rate-based.ts` holds two more, for the same one-client-address reason
+and for scope. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding header.
 `CUSTOM_KEYS` and `CustomKeys` aggregate on headers, cookies and query arguments (feasible, and not
 part of this).
 

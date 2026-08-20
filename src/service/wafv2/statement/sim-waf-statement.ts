@@ -12,6 +12,7 @@ import {
 } from "./sim-waf-regex-match.js";
 import { compileSimWafLabelMatch } from "./sim-waf-label-match.js";
 import { compileSimWafLogicalStatement } from "./sim-waf-logical-statement.js";
+import { simWafRateBasedIsWholeStatement } from "./sim-waf-rate-based-input.js";
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
 import { simWafSizeTest } from "./sim-waf-size-constraint.js";
 import type {
@@ -66,15 +67,7 @@ export function compileSimWafStatement(
   }
 
   if (statement.RateBasedStatement !== undefined) {
-    // A rate-based statement is the whole of a rule's statement on real WAFv2
-    // as well. One nested inside another statement would count only the
-    // requests that reached it, which is not the rate the rule was written
-    // about.
-    invalidSimWafRule(
-      ruleName,
-      "A RateBasedStatement is the whole of a rule's statement, and cannot " +
-        "be joined to or nested inside another one",
-    );
+    invalidSimWafRule(ruleName, simWafRateBasedIsWholeStatement);
   }
 
   if (statement.LabelMatchStatement !== undefined) {
