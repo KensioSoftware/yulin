@@ -8,6 +8,8 @@ import { refuseSimWafTags, requiredSimWafName } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { requireSimWafResource } from "../sim-wafv2-resource-lookup.js";
 import type {
+  SimUpdateRegexPatternSetCommand,
+  SimUpdateRegexPatternSetCommandOutput,
   SimCreateRegexPatternSetCommand,
   SimCreateRegexPatternSetCommandOutput,
   SimDeleteRegexPatternSetCommand,
@@ -103,6 +105,32 @@ export class SimWafRegexPatternSetCommands {
         })),
       },
     };
+  }
+
+  /**
+   * Write a new list of expressions over a regex pattern set.
+   *
+   * A rule pointing at the set follows it, because a reference resolves to the
+   * set and reads its expressions when a request arrives.
+   */
+  updateRegexPatternSet(
+    command: SimUpdateRegexPatternSetCommand,
+    options?: SimWafRequestOptions,
+  ): SimUpdateRegexPatternSetCommandOutput {
+    const { input } = command;
+    const patternSet = this.require(
+      input,
+      "wafv2:UpdateRegexPatternSet",
+      options,
+    );
+
+    patternSet.replaceExpressions({
+      regularExpressions: input.RegularExpressionList ?? [],
+      description: input.Description,
+      lockToken: input.LockToken,
+    });
+
+    return { $metadata: {}, NextLockToken: patternSet.lockToken };
   }
 
   /**

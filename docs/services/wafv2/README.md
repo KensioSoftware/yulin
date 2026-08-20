@@ -329,8 +329,11 @@ const decision = waf.evaluateRequest({
 console.log(decision.action);
 ```
 
-IP sets are created, read, listed and deleted the same way. No rule reads one, for the reason in
-[Refusals](#refusals) below.
+An update to a pattern set reaches the rules pointing at it. A reference resolves to the set when
+the rule is written and reads its expressions when a request arrives, as it does on AWS.
+
+IP sets are created, read, updated, listed and deleted the same way. No rule reads one, for the
+reason in [Refusals](#refusals) below.
 
 ## Scopes
 
@@ -373,7 +376,7 @@ console.log(created.Summary?.ARN);
 
 ## Lock tokens
 
-Every WAFv2 resource carries a lock token that changes on each write. `UpdateWebACL` and the deletes
+Every WAFv2 resource carries a lock token that changes on each write. The updates and the deletes
 take the token from the last read, and a write made against a stale one is refused with
 `WAFOptimisticLockException`.
 
@@ -535,5 +538,6 @@ are refused for the same reason, each naming what it would have configured.
 ## Simulated commands
 
 `CreateWebACL`, `GetWebACL`, `UpdateWebACL`, `ListWebACLs`, `DeleteWebACL`, `CreateIPSet`,
-`GetIPSet`, `ListIPSets`, `DeleteIPSet`, `CreateRegexPatternSet`, `GetRegexPatternSet`,
-`ListRegexPatternSets` and `DeleteRegexPatternSet`.
+`GetIPSet`, `UpdateIPSet`, `ListIPSets`, `DeleteIPSet`, `CreateRegexPatternSet`,
+`GetRegexPatternSet`, `UpdateRegexPatternSet`, `ListRegexPatternSets` and
+`DeleteRegexPatternSet`.

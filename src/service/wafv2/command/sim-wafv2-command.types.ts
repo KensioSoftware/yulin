@@ -14,6 +14,9 @@ export type {
   SimListIpSetsCommand,
   SimListIpSetsCommandInput,
   SimListIpSetsCommandOutput,
+  SimUpdateIpSetCommand,
+  SimUpdateIpSetCommandInput,
+  SimUpdateIpSetCommandOutput,
   SimWafIpSetOutput,
 } from "./ip-set/ip-set.command.js";
 export type {
@@ -29,6 +32,9 @@ export type {
   SimListRegexPatternSetsCommand,
   SimListRegexPatternSetsCommandInput,
   SimListRegexPatternSetsCommandOutput,
+  SimUpdateRegexPatternSetCommand,
+  SimUpdateRegexPatternSetCommandInput,
+  SimUpdateRegexPatternSetCommandOutput,
   SimWafRegexPatternSetOutput,
 } from "./regex-pattern-set/regex-pattern-set.command.js";
 export type {

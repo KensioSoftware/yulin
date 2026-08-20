@@ -1,16 +1,12 @@
-import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 import {
   SimWafResource,
   type SimWafResourceProperties,
 } from "../resource/sim-waf-resource.js";
-import { simWafRegExp } from "../statement/sim-waf-regex.js";
-
-/**
- * Minimal structural WAFv2 Regex.
- */
-export interface SimWafRegularExpressionInput {
-  readonly RegexString?: string | undefined;
-}
+import {
+  compiledSimWafExpression,
+  type SimWafRegularExpressionInput,
+  simWafPatternStrings,
+} from "./sim-waf-regular-expressions.js";
 
 interface SimWafRegexPatternSetProperties extends SimWafResourceProperties {
   readonly regularExpressions: readonly SimWafRegularExpressionInput[];
@@ -24,43 +20,55 @@ interface SimWafRegexPatternSetProperties extends SimWafResourceProperties {
  * matching nothing when a request arrives.
  */
 export class SimWafRegexPatternSet extends SimWafResource {
-  public readonly regularExpressions: readonly string[];
-  public readonly expressions: readonly RegExp[];
+  #regularExpressions: readonly string[];
+  #expressions: readonly RegExp[];
 
   constructor(properties: SimWafRegexPatternSetProperties) {
     super("regexpatternset", properties);
 
-    this.regularExpressions = properties.regularExpressions.map(
-      (regularExpression) => requiredRegexString(regularExpression),
+    this.#regularExpressions = simWafPatternStrings(
+      properties.regularExpressions,
     );
-    this.expressions = this.regularExpressions.map((pattern) =>
-      compiled(pattern),
-    );
-  }
-}
-
-function requiredRegexString(
-  regularExpression: SimWafRegularExpressionInput,
-): string {
-  if (regularExpression.RegexString === undefined) {
-    throw new SimWafInvalidParameterException(
-      "Error reason: A regular expression needs a RegexString, field: " +
-        "REGULAR_EXPRESSION, parameter: RegexString",
+    this.#expressions = this.#regularExpressions.map((pattern) =>
+      compiledSimWafExpression(pattern),
     );
   }
 
-  return regularExpression.RegexString;
-}
-
-function compiled(pattern: string): RegExp {
-  const expression = simWafRegExp(pattern);
-
-  if (expression === undefined) {
-    throw new SimWafInvalidParameterException(
-      `Error reason: The regular expression is not valid, field: ` +
-        `REGULAR_EXPRESSION, parameter: ${pattern}`,
-    );
+  /**
+   * The expressions this set holds, as they were written.
+   */
+  get regularExpressions(): readonly string[] {
+    return this.#regularExpressions;
   }
 
-  return expression;
+  /**
+   * The expressions this set holds, compiled.
+   */
+  get expressions(): readonly RegExp[] {
+    return this.#expressions;
+  }
+
+  /**
+   * Write a new list of expressions over this one.
+   *
+   * Every expression is compiled before anything is replaced. A set that
+   * refuses an update keeps the expressions it had.
+   */
+  replaceExpressions(properties: {
+    readonly regularExpressions: readonly SimWafRegularExpressionInput[];
+    readonly description?: string | undefined;
+    readonly lockToken: string | undefined;
+  }): void {
+    const patterns = simWafPatternStrings(properties.regularExpressions);
+    const expressions = patterns.map((pattern) =>
+      compiledSimWafExpression(pattern),
+    );
+
+    this.takeLock(properties.lockToken);
+    this.replaceDescription(properties.description);
+    this.#regularExpressions = patterns;
+    this.#expressions = expressions;
+  }
 }
+
+export { type SimWafRegularExpressionInput } from "./sim-waf-regular-expressions.js";

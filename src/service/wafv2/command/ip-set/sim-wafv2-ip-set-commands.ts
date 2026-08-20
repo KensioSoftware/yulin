@@ -11,6 +11,8 @@ import { refuseSimWafTags, requiredSimWafName } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { requireSimWafResource } from "../sim-wafv2-resource-lookup.js";
 import type {
+  SimUpdateIpSetCommand,
+  SimUpdateIpSetCommandOutput,
   SimCreateIpSetCommand,
   SimCreateIpSetCommandOutput,
   SimDeleteIpSetCommand,
@@ -98,6 +100,25 @@ export class SimWafIpSetCommands {
         Addresses: ipSet.addresses,
       },
     };
+  }
+
+  /**
+   * Write a new list of ranges over an IP set.
+   */
+  updateIpSet(
+    command: SimUpdateIpSetCommand,
+    options?: SimWafRequestOptions,
+  ): SimUpdateIpSetCommandOutput {
+    const { input } = command;
+    const ipSet = this.require(input, "wafv2:UpdateIPSet", options);
+
+    ipSet.replaceAddresses({
+      addresses: input.Addresses ?? [],
+      description: input.Description,
+      lockToken: input.LockToken,
+    });
+
+    return { $metadata: {}, NextLockToken: ipSet.lockToken };
   }
 
   /**

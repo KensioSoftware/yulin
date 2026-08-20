@@ -71,6 +71,14 @@ export class SimWafSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "UpdateIPSetCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.updateIpSet(
+            command as simWafCommands.SimUpdateIpSetCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "ListIPSetsCommand",
         async (command, context): Promise<unknown> =>
           await simWaf.listIpSets(
@@ -99,6 +107,14 @@ export class SimWafSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simWaf.getRegexPatternSet(
             command as simWafCommands.SimGetRegexPatternSetCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateRegexPatternSetCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.updateRegexPatternSet(
+            command as simWafCommands.SimUpdateRegexPatternSetCommand,
             simSdkCallerOptions(context),
           ),
       ],

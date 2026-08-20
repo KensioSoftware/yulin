@@ -3,7 +3,7 @@ import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 /**
  * The largest page a WAFv2 listing will hand back.
  */
-const maximumLimit = 500;
+const maximumLimit = 100;
 
 interface SimWafPageProperties<T> {
   /** Everything the request selected, before paging. */

@@ -65,10 +65,12 @@ describe("SimWafSdkCommandRouter", () => {
       "DeleteWebACLCommand",
       "CreateIPSetCommand",
       "GetIPSetCommand",
+      "UpdateIPSetCommand",
       "ListIPSetsCommand",
       "DeleteIPSetCommand",
       "CreateRegexPatternSetCommand",
       "GetRegexPatternSetCommand",
+      "UpdateRegexPatternSetCommand",
       "ListRegexPatternSetsCommand",
       "DeleteRegexPatternSetCommand",
     ]);

@@ -28,16 +28,53 @@ interface SimWafIpSetProperties extends SimWafResourceProperties {
  */
 export class SimWafIpSet extends SimWafResource {
   public readonly ipAddressVersion: SimWafIpAddressVersion;
-  public readonly addresses: readonly string[];
+
+  #addresses: readonly string[];
 
   constructor(properties: SimWafIpSetProperties) {
     super("ipset", properties);
 
     this.ipAddressVersion = properties.ipAddressVersion;
-    this.addresses = properties.addresses.map((address) =>
-      checkedAddress(address, properties.ipAddressVersion),
+    this.#addresses = checkedAddresses(
+      properties.addresses,
+      properties.ipAddressVersion,
     );
   }
+
+  /**
+   * The ranges this set holds.
+   */
+  get addresses(): readonly string[] {
+    return this.#addresses;
+  }
+
+  /**
+   * Write a new list of ranges over this one.
+   *
+   * The addresses are checked before anything is replaced. A set that refuses
+   * an update keeps the ranges it had.
+   */
+  replaceAddresses(properties: {
+    readonly addresses: readonly string[];
+    readonly description?: string | undefined;
+    readonly lockToken: string | undefined;
+  }): void {
+    const addresses = checkedAddresses(
+      properties.addresses,
+      this.ipAddressVersion,
+    );
+
+    this.takeLock(properties.lockToken);
+    this.replaceDescription(properties.description);
+    this.#addresses = addresses;
+  }
+}
+
+function checkedAddresses(
+  addresses: readonly string[],
+  version: SimWafIpAddressVersion,
+): readonly string[] {
+  return addresses.map((address) => checkedAddress(address, version));
 }
 
 /**

@@ -59,6 +59,31 @@ export interface SimGetRegexPatternSetCommandOutput {
 }
 
 /**
+ * Minimal structural sim WAFv2 UpdateRegexPatternSet command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/command/UpdateRegexPatternSetCommand/
+ */
+export interface SimUpdateRegexPatternSetCommand {
+  readonly input: SimUpdateRegexPatternSetCommandInput;
+}
+
+export interface SimUpdateRegexPatternSetCommandInput {
+  readonly Name?: string | undefined;
+  readonly Scope?: string | undefined;
+  readonly Id?: string | undefined;
+  readonly RegularExpressionList?:
+    | readonly SimWafRegularExpressionInput[]
+    | undefined;
+  readonly Description?: string | undefined;
+  readonly LockToken?: string | undefined;
+}
+
+export interface SimUpdateRegexPatternSetCommandOutput {
+  readonly NextLockToken?: string | undefined;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
  * Minimal structural sim WAFv2 ListRegexPatternSets command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/command/ListRegexPatternSetsCommand/

@@ -146,6 +146,18 @@ describe("SimWafV2 input validation", () => {
     assertStringIncludes(error.message, "missing");
   });
 
+  it("refuses a custom header with no name", async () => {
+    // When a rule inserts a header it did not name.
+    const error = await refusalForRule({
+      ...simWafRuleFactory.make({ Name: "the-rule" }),
+      Action: { Allow: { CustomRequestHandling: { InsertHeaders: [{}] } } },
+    });
+
+    // Then it is refused, rather than inserting a header named after nothing.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "custom header");
+  });
+
   it("refuses a statement with nothing to match against", async () => {
     // When a statement names no field, or a field naming no part of a request.
     const fieldless = await refusalForStatement({

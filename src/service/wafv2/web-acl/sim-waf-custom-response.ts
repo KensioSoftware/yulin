@@ -22,9 +22,20 @@ export function simWafCustomHeaders(
   headers: readonly SimWafCustomHeaderInput[] | undefined,
 ): readonly SimWafHeader[] {
   return (headers ?? []).map((header) => ({
-    name: `x-amzn-waf-${String(header.Name)}`,
+    name: `x-amzn-waf-${requiredHeaderName(header.Name)}`,
     value: header.Value ?? "",
   }));
+}
+
+function requiredHeaderName(name: string | undefined): string {
+  if (name === undefined || name === "") {
+    throw new SimWafInvalidParameterException(
+      "Error reason: A custom header needs a Name, field: CUSTOM_HTTP_HEADER, " +
+        "parameter: Name",
+    );
+  }
+
+  return name;
 }
 
 /**

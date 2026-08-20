@@ -58,6 +58,29 @@ export interface SimGetIpSetCommandOutput {
 }
 
 /**
+ * Minimal structural sim WAFv2 UpdateIPSet command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/command/UpdateIPSetCommand/
+ */
+export interface SimUpdateIpSetCommand {
+  readonly input: SimUpdateIpSetCommandInput;
+}
+
+export interface SimUpdateIpSetCommandInput {
+  readonly Name?: string | undefined;
+  readonly Scope?: string | undefined;
+  readonly Id?: string | undefined;
+  readonly Addresses?: readonly string[] | undefined;
+  readonly Description?: string | undefined;
+  readonly LockToken?: string | undefined;
+}
+
+export interface SimUpdateIpSetCommandOutput {
+  readonly NextLockToken?: string | undefined;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
  * Minimal structural sim WAFv2 ListIPSets command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/command/ListIPSetsCommand/

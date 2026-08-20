@@ -172,6 +172,17 @@ export class SimWafV2 {
   }
 
   /**
+   * Handle an UpdateIPSet Command from the SDK.
+   */
+  async updateIpSet(
+    command: simWafCommands.SimUpdateIpSetCommand,
+    options?: SimWafRequestOptions,
+  ): Promise<simWafCommands.SimUpdateIpSetCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.ipSetCommands.updateIpSet(command, options);
+  }
+
+  /**
    * Handle a ListIPSets Command from the SDK.
    */
   async listIpSets(
@@ -216,6 +227,20 @@ export class SimWafV2 {
   ): Promise<simWafCommands.SimGetRegexPatternSetCommandOutput> {
     await this.#commands.background.sequence();
     return this.#commands.regexPatternSetCommands.getRegexPatternSet(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle an UpdateRegexPatternSet Command from the SDK.
+   */
+  async updateRegexPatternSet(
+    command: simWafCommands.SimUpdateRegexPatternSetCommand,
+    options?: SimWafRequestOptions,
+  ): Promise<simWafCommands.SimUpdateRegexPatternSetCommandOutput> {
+    await this.#commands.background.sequence();
+    return this.#commands.regexPatternSetCommands.updateRegexPatternSet(
       command,
       options,
     );
