@@ -3,6 +3,9 @@ import type { SimWafStatementInput } from "../statement/sim-waf-statement.type.j
 import type { SimWafRuleInput } from "./sim-waf-rule.type.js";
 import { simWafMatchCapacity } from "./sim-waf-statement-capacity.js";
 
+/** What AWS charges for counting requests, before any scope-down statement. */
+const rateBasedBaseCost = 2;
+
 /**
  * What a web ACL's rules add up to in capacity units.
  *
@@ -37,8 +40,23 @@ function statementCapacity(
   return (
     simWafMatchCapacity(statement) +
     nestedCapacity(statement) +
-    managedGroupCapacity(statement)
+    managedGroupCapacity(statement) +
+    rateBasedCapacity(statement)
   );
+}
+
+/**
+ * What a rule limiting a request rate costs.
+ *
+ * The base cost covers the counting, and a scope-down statement is charged on
+ * top of it as it is for a managed rule group.
+ */
+function rateBasedCapacity(statement: SimWafStatementInput): number {
+  const rateBased = statement.RateBasedStatement;
+
+  return rateBased === undefined
+    ? 0
+    : rateBasedBaseCost + statementCapacity(rateBased.ScopeDownStatement);
 }
 
 /**

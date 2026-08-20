@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimWafAssociations } from "../../association/sim-waf-associations.js";
 import { SimWafAssociatedItemException } from "../../error/sim-wafv2.error.js";
@@ -38,6 +39,7 @@ interface SimWafWebAclCommandsProperties {
   readonly managedRules: SimWafManagedRules;
   readonly authorizer: SimWafAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly clock: SimClock;
 }
 
 /**
@@ -54,6 +56,7 @@ export class SimWafWebAclCommands {
   readonly #managedRules: SimWafManagedRules;
   readonly #authorizer: SimWafAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
+  readonly #clock: SimClock;
 
   constructor(properties: SimWafWebAclCommandsProperties) {
     this.#webAcls = properties.webAcls;
@@ -62,6 +65,7 @@ export class SimWafWebAclCommands {
     this.#managedRules = properties.managedRules;
     this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
+    this.#clock = properties.clock;
   }
 
   /**
@@ -88,6 +92,7 @@ export class SimWafWebAclCommands {
       configuration: configurationOf(input),
       regexPatternSets: this.#regexPatternSets,
       managedRules: this.#managedRules,
+      clock: this.#clock,
     });
 
     this.#authorizer.authorizeResource(

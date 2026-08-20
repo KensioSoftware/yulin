@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimWafRegexPatternSet } from "../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafResourceStore } from "../resource/sim-waf-resource-store.js";
 import { simWafByteMatchTest } from "./sim-waf-byte-match.js";
@@ -11,6 +12,7 @@ import {
 } from "./sim-waf-regex-match.js";
 import { compileSimWafLabelMatch } from "./sim-waf-label-match.js";
 import { compileSimWafLogicalStatement } from "./sim-waf-logical-statement.js";
+import { simWafRateBasedIsWholeStatement } from "./sim-waf-rate-based-input.js";
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
 import { simWafSizeTest } from "./sim-waf-size-constraint.js";
 import type {
@@ -25,6 +27,12 @@ import { refuseUnsimulatedSimWafStatement } from "./sim-waf-unsimulated-statemen
 export interface SimWafStatementScope {
   readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
   readonly ruleName: string;
+
+  /**
+   * The simulation's sense of time, which a rate-based statement counts
+   * against.
+   */
+  readonly clock: SimClock;
 }
 
 /**
@@ -56,6 +64,10 @@ export function compileSimWafStatement(
       "A ManagedRuleGroupStatement is the whole of a rule's statement, and " +
         "cannot be joined to or nested inside another one",
     );
+  }
+
+  if (statement.RateBasedStatement !== undefined) {
+    invalidSimWafRule(ruleName, simWafRateBasedIsWholeStatement);
   }
 
   if (statement.LabelMatchStatement !== undefined) {

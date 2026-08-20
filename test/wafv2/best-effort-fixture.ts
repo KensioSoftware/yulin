@@ -23,16 +23,16 @@ const visibility = {
 };
 
 /**
- * A rule counting requests over a time window, which is the statement kind
- * Yulin does not evaluate that a real stack is most likely to carry. CDK's
- * sign-up protection for a user pool writes one.
+ * A rule blocking whole countries, which is the statement kind Yulin does not
+ * evaluate that a real stack is most likely to carry. Every request in this
+ * simulation comes from one address, so there is no country to read.
  */
-export const simWafRateLimitSignUps = {
-  Name: "account-creation-rate",
+export const simWafBlockCountries = {
+  Name: "block-countries",
   Priority: 0,
   Action: { Block: {} },
-  Statement: { RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" } },
-  VisibilityConfig: { ...visibility, MetricName: "account-creation-rate" },
+  Statement: { GeoMatchStatement: { CountryCodes: ["CN", "RU"] } },
+  VisibilityConfig: { ...visibility, MetricName: "block-countries" },
 };
 
 /**
@@ -63,7 +63,7 @@ export const simWafMixedAclResource = {
     Scope: "REGIONAL",
     DefaultAction: { Allow: {} },
     VisibilityConfig: visibility,
-    Rules: [simWafRateLimitSignUps, simWafBlockAdmin],
+    Rules: [simWafBlockCountries, simWafBlockAdmin],
   },
 };
 

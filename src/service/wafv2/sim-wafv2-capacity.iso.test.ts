@@ -223,6 +223,23 @@ describe("What a simulated web ACL costs in capacity units", () => {
     assertIdentical(capacity, 702);
   });
 
+  it("charges a rate limit its base cost and its scope-down statement", async () => {
+    // Given a rule limiting the rate of requests to one path.
+    const capacity = await capacityOf([
+      ruleWith({
+        RateBasedStatement: {
+          Limit: 100,
+          AggregateKeyType: "IP",
+          ScopeDownStatement: byteMatch("EXACTLY"),
+        },
+      }),
+    ]);
+
+    // Then the counting costs two, and the scope-down statement is charged on
+    // top of it as it is for a managed rule group.
+    assertIdentical(capacity, 4);
+  });
+
   it("adds up the rules of a whole web ACL", async () => {
     // Given a web ACL of two rules.
     const capacity = await capacityOf([

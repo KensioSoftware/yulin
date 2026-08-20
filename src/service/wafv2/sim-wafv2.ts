@@ -154,6 +154,7 @@ export class SimWafV2 extends SimWafSets {
     return unevaluatableSimWafRules(input.Rules, {
       regexPatternSets: this.commands.regexPatternSets,
       managedRules: this.commands.managedRules,
+      clock: this.commands.background,
       customResponseBodies: input.CustomResponseBodies ?? {},
     });
   }

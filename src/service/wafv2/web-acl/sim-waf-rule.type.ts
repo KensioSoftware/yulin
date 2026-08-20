@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimWafOverrideActionInput } from "../managed/sim-waf-managed-group.type.js";
 import type { SimWafManagedRules } from "../managed/sim-waf-managed-rules.js";
 import type { SimWafRegexPatternSet } from "../regex-pattern-set/sim-waf-regex-pattern-set.js";
@@ -33,6 +34,12 @@ export interface SimWafRuleInput {
 export interface SimWafWebAclRuleScope {
   readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
   readonly managedRules: SimWafManagedRules;
+
+  /**
+   * The simulation's sense of time. A rate-based rule counts against it, so
+   * advancing the clock past a rule's evaluation window drops what it counted.
+   */
+  readonly clock: SimClock;
 }
 
 /**
