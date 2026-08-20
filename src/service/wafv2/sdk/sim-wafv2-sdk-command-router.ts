@@ -55,6 +55,14 @@ export class SimWafSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "DescribeManagedRuleGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.describeManagedRuleGroup(
+            command as simWafCommands.SimDescribeManagedRuleGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "CreateIPSetCommand",
         async (command, context): Promise<unknown> =>
           await simWaf.createIpSet(

@@ -1,3 +1,6 @@
+import { simAwsRequestHostname } from "../../../serve/http/url/sim-aws-request-hostname.js";
+import { SimWafRequestLabels } from "./sim-waf-request-labels.js";
+
 /**
  * The parts of an HTTP request a web ACL's rules are matched against.
  *
@@ -18,8 +21,17 @@ export interface SimWafInspectedRequest {
 
   readonly headers: Headers;
 
+  /**
+   * The AWS-facing hostname the request was addressed to, which is the Host
+   * header with the Yulin-local suffix taken off it.
+   */
+  readonly host: string;
+
   /** The request body, or nothing when the request carried none. */
   readonly body: Uint8Array | undefined;
+
+  /** The labels the rules that have run so far added to this request. */
+  readonly labels: SimWafRequestLabels;
 }
 
 /**
@@ -28,6 +40,11 @@ export interface SimWafInspectedRequest {
  * The body is passed in rather than read here because a request body is a
  * stream that cannot be consumed twice, and everything that serves a request in
  * this simulator has already buffered it by the time WAF gets a look.
+ *
+ * The hostname is the one the request would have used against real AWS. A
+ * simulated endpoint is served under `*.sim-aws.localhost`, and a rule reading
+ * the raw Host header would see that suffix on every request that reached
+ * anything at all.
  */
 export function simWafInspectedRequest(
   request: Request,
@@ -43,6 +60,8 @@ export function simWafInspectedRequest(
     uriPath: url.pathname,
     queryString: url.search.replace(/^\?/u, ""),
     headers: request.headers,
+    host: simAwsRequestHostname(request),
     body,
+    labels: new SimWafRequestLabels(),
   };
 }

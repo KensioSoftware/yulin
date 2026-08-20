@@ -31,6 +31,18 @@ export {
 } from "./ip-set/sim-waf-ip-set.js";
 export { SimWafRegexPatternSet } from "./regex-pattern-set/sim-waf-regex-pattern-set.js";
 export type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
+export { SimWafRequestLabels } from "./evaluate/sim-waf-request-labels.js";
+export {
+  SimWafManagedRules,
+  type SimWafManagedMatchDeclaration,
+} from "./managed/sim-waf-managed-rules.js";
+export type { SimWafManagedRuleReport } from "./managed/sim-waf-managed-rule-report.js";
+export type { SimWafManagedRuleTier } from "./managed/sim-waf-managed-rule.type.js";
+export type {
+  SimWafManagedRuleGroupStatementInput,
+  SimWafOverrideActionInput,
+  SimWafRuleActionOverrideInput,
+} from "./managed/sim-waf-managed-group.type.js";
 export {
   simWafBlockedHttpResponse,
   type SimWafBlockedResponse,
@@ -43,6 +55,7 @@ export {
 export { simWafInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
 export type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 export {
+  SimWafDeclarationError,
   SimWafDuplicateItemException,
   SimWafError,
   type SimWafErrorMetadata,

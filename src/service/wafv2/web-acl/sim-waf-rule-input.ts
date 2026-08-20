@@ -13,15 +13,6 @@ const browserAnswered =
  * The rule members real WAFv2 takes and this simulation does not.
  */
 const refusedMembers = new Map<string, string>([
-  [
-    "OverrideAction",
-    "it only applies to a rule group statement, and no rule group is simulated",
-  ],
-  [
-    "RuleLabels",
-    "nothing here reads a label, since LabelMatchStatement arrives with the " +
-      "AWS managed rule groups",
-  ],
   ["CaptchaConfig", browserAnswered],
   ["ChallengeConfig", browserAnswered],
 ]);

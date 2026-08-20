@@ -10,9 +10,11 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimWafAuthorizer } from "./command/authorize/sim-wafv2-authorizer.js";
 import { SimWafIpSetCommands } from "./command/ip-set/sim-wafv2-ip-set-commands.js";
+import { SimWafManagedRuleGroupCommands } from "./command/managed-rule-group/sim-wafv2-managed-rule-group-commands.js";
 import { SimWafRegexPatternSetCommands } from "./command/regex-pattern-set/sim-wafv2-regex-pattern-set-commands.js";
 import { SimWafWebAclCommands } from "./command/web-acl/sim-wafv2-web-acl-commands.js";
 import type { SimWafIpSet } from "./ip-set/sim-waf-ip-set.js";
+import { SimWafManagedRules } from "./managed/sim-waf-managed-rules.js";
 import type { SimWafRegexPatternSet } from "./regex-pattern-set/sim-waf-regex-pattern-set.js";
 import { SimWafResourceStore } from "./resource/sim-waf-resource-store.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
@@ -38,7 +40,10 @@ export class SimWafCommands {
     "regex pattern set",
   );
 
+  readonly managedRules = new SimWafManagedRules();
+
   readonly webAclCommands: SimWafWebAclCommands;
+  readonly managedRuleGroupCommands: SimWafManagedRuleGroupCommands;
   readonly ipSetCommands: SimWafIpSetCommands;
   readonly regexPatternSetCommands: SimWafRegexPatternSetCommands;
   readonly background: BackgroundScheduler;
@@ -56,6 +61,11 @@ export class SimWafCommands {
     this.webAclCommands = new SimWafWebAclCommands({
       webAcls: this.webAcls,
       regexPatternSets: this.regexPatternSets,
+      managedRules: this.managedRules,
+      authorizer,
+      accountRegionScope,
+    });
+    this.managedRuleGroupCommands = new SimWafManagedRuleGroupCommands({
       authorizer,
       accountRegionScope,
     });

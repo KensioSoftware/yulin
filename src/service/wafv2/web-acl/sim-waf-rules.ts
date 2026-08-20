@@ -1,6 +1,27 @@
 import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 import { SimWafRule } from "./sim-waf-rule.js";
-import type { SimWafRuleInput, SimWafRuleScope } from "./sim-waf-rule.type.js";
+import type {
+  SimWafRuleInput,
+  SimWafRuleScope,
+  SimWafWebAclRuleScope,
+} from "./sim-waf-rule.type.js";
+import type { SimWafWebAclConfiguration } from "./sim-waf-web-acl-configuration.js";
+
+/**
+ * Compile the rules a web ACL was written with.
+ *
+ * The custom response bodies are part of the configuration and the rest of the
+ * scope belongs to the web ACL, which is what this puts together.
+ */
+export function compileSimWafWebAclRules(
+  configuration: SimWafWebAclConfiguration,
+  scope: SimWafWebAclRuleScope,
+): readonly SimWafRule[] {
+  return compileSimWafRules(configuration.rules, {
+    ...scope,
+    customResponseBodies: configuration.customResponseBodies ?? {},
+  });
+}
 
 /**
  * Compile a web ACL's rules into the order they are evaluated in.

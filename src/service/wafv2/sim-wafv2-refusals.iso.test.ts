@@ -106,28 +106,19 @@ describe("SimWafV2 refusals", () => {
     assertStringIncludes(xss.message, "XssMatchStatement");
   });
 
-  it("refuses the rule group statements", async () => {
-    // When a rule refers to a managed or customer rule group, or to a label
-    // one of them would have added.
-    const managed = await refusalForStatement({
-      ManagedRuleGroupStatement: {
-        VendorName: "AWS",
-        Name: "AWSManagedRulesCommonRuleSet",
-      },
-    });
-    const group = await refusalForStatement({
+  it("refuses a rule group of the reader's own", async () => {
+    // When a rule refers to a rule group the reader wrote.
+    const error = await refusalForStatement({
       RuleGroupReferenceStatement: {
         ARN: "arn:aws:wafv2:eu-west-2:111111111111:regional/rulegroup/x/y",
       },
     });
-    const label = await refusalForStatement({
-      LabelMatchStatement: { Scope: "LABEL", Key: "awswaf:managed:aws:x" },
-    });
 
-    // Then each is refused by name.
-    assertStringIncludes(managed.message, "ManagedRuleGroupStatement");
-    assertStringIncludes(group.message, "RuleGroupReferenceStatement");
-    assertStringIncludes(label.message, "LabelMatchStatement");
+    // Then it is refused by name: a rule group is a resource in its own right,
+    // and none is simulated. The AWS managed groups are, and they are named in
+    // a statement rather than created.
+    assertInstanceOf(error, SimWafUnsimulatedInputException);
+    assertStringIncludes(error.message, "RuleGroupReferenceStatement");
   });
 
   it("refuses a field to match this simulation does not read", async () => {
@@ -201,20 +192,6 @@ describe("SimWafV2 refusals", () => {
     // send the token back.
     assertStringIncludes(captcha.message, "Captcha");
     assertStringIncludes(challenge.message, "Challenge");
-  });
-
-  it("refuses a rule carrying labels nothing can read", async () => {
-    // When a rule adds a label.
-    const error = await refusalForRule(
-      simWafRuleFactory.make({
-        Name: "the-rule",
-        RuleLabels: [{ Name: "internal" }],
-      }),
-    );
-
-    // Then it is refused, because LabelMatchStatement arrives with the managed
-    // rule groups and nothing here would read the label.
-    assertStringIncludes(error.message, "RuleLabels");
   });
 
   it("refuses a web ACL member this simulation does not model", async () => {

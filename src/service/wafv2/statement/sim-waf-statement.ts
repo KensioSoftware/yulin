@@ -9,6 +9,7 @@ import {
   simWafRegexPatternSetTest,
   simWafRegexTest,
 } from "./sim-waf-regex-match.js";
+import { compileSimWafLabelMatch } from "./sim-waf-label-match.js";
 import { compileSimWafLogicalStatement } from "./sim-waf-logical-statement.js";
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
 import { simWafSizeTest } from "./sim-waf-size-constraint.js";
@@ -45,6 +46,21 @@ export function compileSimWafStatement(
   }
 
   refuseUnsimulatedSimWafStatement(statement, ruleName);
+
+  if (statement.ManagedRuleGroupStatement !== undefined) {
+    // A rule group statement is the whole of a rule's statement on real WAFv2
+    // as well, so one nested inside another statement is refused rather than
+    // evaluated somewhere it could not carry its own actions.
+    invalidSimWafRule(
+      ruleName,
+      "A ManagedRuleGroupStatement is the whole of a rule's statement, and " +
+        "cannot be joined to or nested inside another one",
+    );
+  }
+
+  if (statement.LabelMatchStatement !== undefined) {
+    return compileSimWafLabelMatch(statement.LabelMatchStatement, ruleName);
+  }
 
   return (
     compileFieldStatement(statement, scope) ??

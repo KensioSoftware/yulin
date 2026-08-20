@@ -1,7 +1,8 @@
 # Simulated WAFv2 implementation
 
 This directory contains the simulated AWS WAFv2 implementation. It holds web ACLs, IP sets and
-regex pattern sets, and it evaluates a request against a web ACL's rules to reach a decision.
+regex pattern sets, and it evaluates a request against a web ACL's rules to reach a decision. Three
+of the AWS managed rule groups are carried here, approximated to a tier each rule declares.
 
 Association comes later. A CloudFront distribution, an API Gateway REST API stage and a Cognito
 user pool each get a web ACL in the issues after the one this was built for.
@@ -37,15 +38,27 @@ apart. A caller with no permission for a web ACL learns only about the permissio
 
 ## Rule evaluation
 
-`web-acl/sim-waf-web-acl.ts` holds the loop, and it is short because everything it needs was worked
-out when the web ACL was written. Rules run in ascending `Priority`. The first rule that matches and
-carries a terminating action decides the request. A `Count` action records the match and lets the
-next rule have a look. A request no rule terminates gets the ACL's `DefaultAction`.
+`evaluate/sim-waf-evaluate-rules.ts` holds the loop, and it is short because everything it needs was
+worked out when the web ACL was written. Rules run in ascending `Priority`. The first rule that
+matches and carries a terminating action decides the request. A `Count` action records the match and
+lets the next rule have a look. A request no rule terminates gets the ACL's `DefaultAction`, which
+is the one thing the loop leaves to `web-acl/sim-waf-web-acl.ts`.
+
+`web-acl/sim-waf-rule.ts` answers with the action a rule applies, or with nothing when the rule does
+not claim the request. Most rules answer with the action they were written with. A rule naming a
+managed rule group answers with the action of whichever rule inside the group claimed the request,
+and that is the whole reason a rule answers with an action at all.
 
 `evaluate/sim-waf-decision.ts` is what comes back. It carries the action, the rule that decided, the
-rules that counted, the headers to add to a forwarded request, and what to answer a blocked request
-with. The counted rules matter because a `Count` action leaves the request as it found it. A test
-staging a rule before turning it on asserts against that list.
+rules that counted, the labels the request picked up, the headers to add to a forwarded request, and
+what to answer a blocked request with. The counted rules matter because a `Count` action leaves the
+request as it found it. A test staging a rule before turning it on asserts against that list.
+
+`evaluate/sim-waf-request-labels.ts` is the labels one request collected. They belong to the request
+being evaluated because that is where AWS puts them. A rule adds its labels when it matches, and the
+rules after it can match on them. `statement/sim-waf-label-match.ts` is the reading side, and
+`web-acl/sim-waf-rule-labels.ts` is a rule's own labels. A label added by a rule of the web ACL's
+own carries no prefix, where a label from a rule group is qualified by the group it came from.
 
 `web-acl/sim-waf-custom-response.ts` keeps the two header readers apart, and the difference is
 easy to get wrong. WAF prefixes an inserted request header with `x-amzn-waf-` as it adds it to what
@@ -85,6 +98,54 @@ read.
 
 Matching is case sensitive throughout, as it is on AWS. A rule that means to ignore case says so
 with a `LOWERCASE` transformation and a lower case search string.
+
+## The AWS managed rule groups
+
+`managed/` carries `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet` and
+`AWSManagedRulesAdminProtectionRuleSet`. AWS publishes every rule name, every default action, every
+label and the size limits, and holds back the pattern set behind each rule. What is here follows
+from that split.
+
+`managed/group/` holds the three groups, each an ordered list of rules. The order is AWS's own and
+it decides which of two matching rules blocks a request and whose label the request carries. The
+core rule set is split across two files (`sim-waf-core-request-rules.ts` and
+`sim-waf-core-payload-rules.ts`) because 22 rules in one file scores over the FTA threshold, and the
+join between them is where AWS's order goes from reading the request to looking inside it.
+
+Every rule declares a tier, in `managed/sim-waf-managed-rule.type.ts`.
+
+- `exact` matches where the AWS rule matches. The four `SizeRestrictions_*` rules at their
+  documented limits, `NoUserAgent_HEADER`, `PROPFIND_METHOD` and `Host_localhost_HEADER`.
+- `documented` matches the patterns AWS published for the rule and nothing beyond them.
+- `declared` detects nothing and matches a request a test declared a match for. The four
+  `CrossSiteScripting_*` rules run detection AWS documents none of.
+
+The tiers under-detect against AWS and never over-detect. The reason is what a test with the core
+rule set on is usually asking. A rule that blocked more than AWS blocks would fail that test for a
+request AWS allows, and send somebody off to work around a rule that does not exist. A rule that
+blocks less is invisible to it and right on AWS too. So `managed/detect/sim-waf-managed-patterns.ts`
+carries a pattern only where AWS published one, and the reverse test is covered by declaring a
+match.
+
+`Host_localhost_HEADER` is the one rule the simulation had to think about twice. It blocks a request
+whose Host header holds `localhost`, and Yulin serves every simulated endpoint under
+`*.sim-aws.localhost`. It reads `SimWafInspectedRequest.host`, which is the AWS-facing hostname with
+the Yulin-local suffix taken off, so it claims a request addressed to localhost and leaves the ones
+addressed to a simulated endpoint alone.
+
+`managed/sim-waf-managed-rules.ts` is the accessor behind `SimWafV2.managedRules()`. It holds the
+declared matches, keyed by URI path and matched exactly as simulated Rekognition matches the name of
+an image a result was declared for, and it reports the tier of every rule.
+
+`managed/sim-waf-managed-group-statement.ts` compiles a rule that names a group. The two overrides
+stack in one direction. `RuleActionOverrides` sets what a named rule does, and an `OverrideAction`
+of `Count` then holds the whole group to counting whatever its rules were set to. A
+`ScopeDownStatement` decides whether the group sees the request at all, and a request it does not
+claim picks up no label.
+
+`command/managed-rule-group/` is `DescribeManagedRuleGroup`, which reports the rules of a group and
+the labels they add. It is the only WAFv2 operation these groups have of their own, and it
+authorizes against `*` as the listings do.
 
 ## Refusals
 
@@ -129,7 +190,13 @@ id, the ARN and the first lock token. `simWafStatementMatches` puts one statemen
 rule and answers with a predicate over requests. That predicate is the whole of what a test about a
 statement kind wants to say.
 
+`simWafWebAclDecisions` is `simWafStatementMatches` for a test that wants the whole decision rather
+than whether one statement claimed the request. `simWafBrowserRequest` sends a User-Agent header,
+because `NoUserAgent_HEADER` claims a request without one and a test about any other rule would
+otherwise never reach it.
+
 `web-acl/sim-waf-rule.factory.ts` and `command/web-acl/sim-waf-create-web-acl.factory.ts` build the
-two shapes a test writes over and over. Overrides are merged into the defaults, and `Statement` and
+two shapes a test writes over and over. `simWafManagedRuleFactory` is the third, for a rule that
+names the core rule set. Overrides are merged into the defaults, and `Statement` and
 `Action` each hold one kind at a time, and a test replaces those whole. Merging two statement kinds
 onto one statement produces a rule WAF would refuse, and the factory says as much.

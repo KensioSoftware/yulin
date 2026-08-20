@@ -1,0 +1,64 @@
+import { compileSimWafManagedRuleGroup } from "../managed/sim-waf-managed-group-statement.js";
+import { invalidSimWafRule } from "../statement/sim-waf-rule-refusals.js";
+import { compileSimWafStatement } from "../statement/sim-waf-statement.js";
+import { SimWafAction } from "./sim-waf-action.js";
+import type {
+  SimWafRuleEvaluator,
+  SimWafRuleInput,
+  SimWafRuleScope,
+} from "./sim-waf-rule.type.js";
+
+/**
+ * Compile what one rule does with a request.
+ *
+ * A rule naming a managed rule group is the one rule that decides by something
+ * other than its own action, so it is the one branch here. Real WAFv2 draws
+ * the same line: a rule carries an `Action` or it names a rule group and
+ * carries an `OverrideAction`, and never both.
+ */
+export function compileSimWafRuleEvaluator(
+  input: SimWafRuleInput,
+  ruleName: string,
+  scope: SimWafRuleScope,
+): SimWafRuleEvaluator {
+  const managed = input.Statement?.ManagedRuleGroupStatement;
+
+  if (managed !== undefined) {
+    if (input.Action !== undefined) {
+      invalidSimWafRule(
+        ruleName,
+        "A rule naming a rule group takes an OverrideAction rather than an " +
+          "Action, since the action comes from the rule inside the group " +
+          "that claimed the request",
+      );
+    }
+
+    return compileSimWafManagedRuleGroup({
+      statement: managed,
+      overrideAction: input.OverrideAction,
+      ruleName,
+      scope,
+    });
+  }
+
+  if (input.OverrideAction !== undefined) {
+    invalidSimWafRule(
+      ruleName,
+      "An OverrideAction applies to a rule group statement, and this rule " +
+        "names no rule group",
+    );
+  }
+
+  const action = SimWafAction.read(
+    input.Action,
+    ruleName,
+    scope.customResponseBodies,
+  );
+  const matches = compileSimWafStatement(input.Statement, {
+    regexPatternSets: scope.regexPatternSets,
+    ruleName,
+  });
+
+  return (request): SimWafAction | undefined =>
+    matches(request) ? action : undefined;
+}
