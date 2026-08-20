@@ -44,8 +44,8 @@ export function makeSimRestApiAuthorizerId(): SimRestApiAuthorizerId {
 /**
  * Minimal structural authorizer view, as the Create and Get commands return.
  *
- * `authorizerUri` and `providerARNs` belong to one kind of authorizer each, so
- * each view carries the one its kind has.
+ * `authorizerUri`, `providerARNs` and `authorizerResultTtlInSeconds` belong to
+ * one kind of authorizer each, so each view carries the ones its kind has.
  */
 export interface SimRestApiAuthorizerView {
   id: string;
@@ -55,6 +55,7 @@ export interface SimRestApiAuthorizerView {
   identitySource: string;
   authorizerUri?: string;
   providerARNs?: string[];
+  authorizerResultTtlInSeconds?: number;
 }
 
 interface SimRestApiAuthorizerProperties {

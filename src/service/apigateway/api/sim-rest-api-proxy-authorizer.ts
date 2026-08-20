@@ -53,6 +53,11 @@ export interface SimRestApiProxyAuthorizerInput {
    */
   readonly authorizerIdentitySource: string;
   /**
+   * How long a Lambda authorizer holds a decision for, with zero meaning none,
+   * which is what an authorizer says nothing about it gets.
+   */
+  readonly authorizerResultTtlSeconds: number;
+  /**
    * Whether the authorizer's function grants the API permission to invoke it,
    * under the ARN naming the authorizer. A test about that permission turns
    * this off.

@@ -1,5 +1,6 @@
 import type { SimRestApiLambdaUri } from "../method/sim-rest-api-lambda-uri.js";
 import type { SimRestApiIdentitySources } from "./identity/sim-rest-api-identity-sources.js";
+import { SimRestApiAuthorizerResultCache } from "./sim-rest-api-authorizer-result-cache.js";
 import {
   SimRestApiAuthorizer,
   type SimRestApiAuthorizerId,
@@ -18,6 +19,7 @@ interface SimRestApiLambdaAuthorizerProperties {
   readonly type: SimRestApiLambdaAuthorizerType;
   readonly lambdaUri: SimRestApiLambdaUri;
   readonly identitySources: SimRestApiIdentitySources;
+  readonly resultTtlSeconds: number;
 }
 
 /**
@@ -26,8 +28,8 @@ interface SimRestApiLambdaAuthorizerProperties {
  *
  * The function decides, so nothing here says what a caller has to present.
  * All this holds is which function to invoke, what the request has to carry
- * before it is worth invoking, and how much of the request that function is
- * shown.
+ * before it is worth invoking, how much of the request that function is shown,
+ * and the decisions it has already made.
  */
 export class SimRestApiLambdaAuthorizer extends SimRestApiAuthorizer {
   /**
@@ -49,11 +51,26 @@ export class SimRestApiLambdaAuthorizer extends SimRestApiAuthorizer {
    */
   public readonly identitySources: SimRestApiIdentitySources;
 
+  /**
+   * How long a decision is held for, in seconds, with zero meaning none.
+   */
+  public readonly resultTtlSeconds: number;
+
+  /**
+   * The decisions already made, which a request presenting the same identity
+   * to the same method is served from rather than invoking the function again.
+   */
+  public readonly results: SimRestApiAuthorizerResultCache;
+
   constructor(properties: SimRestApiLambdaAuthorizerProperties) {
     super(properties);
     this.type = properties.type;
     this.lambdaUri = properties.lambdaUri;
     this.identitySources = properties.identitySources;
+    this.resultTtlSeconds = properties.resultTtlSeconds;
+    this.results = new SimRestApiAuthorizerResultCache(
+      properties.resultTtlSeconds,
+    );
   }
 
   /**
@@ -67,6 +84,7 @@ export class SimRestApiLambdaAuthorizer extends SimRestApiAuthorizer {
       authType: simRestApiCustomAuthType,
       authorizerUri: this.lambdaUri.uri,
       identitySource: this.identitySources.expression,
+      authorizerResultTtlInSeconds: this.resultTtlSeconds,
     };
   }
 }

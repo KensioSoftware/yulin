@@ -11,6 +11,7 @@ import { SimRestApiUserPoolProviders } from "../../api/authorizer/sim-rest-api-u
 import { SimRestApiLambdaUri } from "../../api/method/sim-rest-api-lambda-uri.js";
 import { SimApiGatewayBadRequest } from "../../error/sim-api-gateway.error.js";
 import type { SimCreateAuthorizerCommandInput } from "./authorizer.command.js";
+import { simRestApiAuthorizerResultTtl } from "./sim-rest-api-authorizer-result-ttl.js";
 
 interface SimRestApiAuthorizerInputProperties {
   readonly input: SimCreateAuthorizerCommandInput;
@@ -41,26 +42,29 @@ export class SimRestApiAuthorizerInput {
    */
   read(authorizerId: SimRestApiAuthorizerId): SimRestApiAuthorizer {
     const name = this.input.name ?? "";
+    const resultTtlSeconds = simRestApiAuthorizerResultTtl(
+      this.input,
+      this.type,
+    );
 
-    if (this.type === "COGNITO_USER_POOLS") {
-      return new SimRestApiCognitoAuthorizer({
-        authorizerId,
-        name,
-        providers: SimRestApiUserPoolProviders.parse(this.providerArns()),
-        identitySource: new SimRestApiIdentitySourceParser().header(
-          this.identitySource(),
-          this.type,
-        ),
-      });
-    }
-
-    return new SimRestApiLambdaAuthorizer({
-      authorizerId,
-      name,
-      type: this.type,
-      lambdaUri: this.lambdaUri(),
-      identitySources: this.identitySources(),
-    });
+    return this.type === "COGNITO_USER_POOLS"
+      ? new SimRestApiCognitoAuthorizer({
+          authorizerId,
+          name,
+          providers: SimRestApiUserPoolProviders.parse(this.providerArns()),
+          identitySource: new SimRestApiIdentitySourceParser().header(
+            this.identitySource(),
+            this.type,
+          ),
+        })
+      : new SimRestApiLambdaAuthorizer({
+          authorizerId,
+          name,
+          type: this.type,
+          lambdaUri: this.lambdaUri(),
+          identitySources: this.identitySources(),
+          resultTtlSeconds,
+        });
   }
 
   /**

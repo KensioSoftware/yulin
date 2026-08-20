@@ -213,6 +213,29 @@ describe("Sim API Gateway REST API Cognito authorizer commands", () => {
     );
   });
 
+  it("refuses a Cognito authorizer asking to hold its decisions", async () => {
+    // Given a REST API
+    const simAws = new SimAws();
+    const created = await simAws
+      .apiGateway()
+      .createRestApi(new CreateRestApiCommand({ name: "orders" }));
+
+    // When the authorizer asks for its decisions to be held for 5 minutes
+    const authorizer = simAws.apiGateway().createAuthorizer(
+      new CreateAuthorizerCommand({
+        ...cognitoAuthorizerInput(created.id),
+        authorizerResultTtlInSeconds: 300,
+      }),
+    );
+
+    // Then it is refused, because a token expiring during the period would
+    // still be accepted on AWS and is verified again here
+    await expect(authorizer).rejects.toThrow(SimApiGatewayBadRequest);
+    await expect(authorizer).rejects.toThrow(
+      "authorizerResultTtlInSeconds is set on a COGNITO_USER_POOLS authorizer",
+    );
+  });
+
   it("refuses a method naming an authorizer of the other kind", async () => {
     // Given an API whose authorizer verifies user pool tokens
     const simAws = new SimAws();
