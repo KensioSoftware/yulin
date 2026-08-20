@@ -6,6 +6,7 @@ import type {
 import { simSdkCallerOptions, simSdkStreamBody } from "../../../sdk/index.js";
 import type { SimAbortMultipartUploadCommand } from "../command/abort-multipart-upload/abort-multipart-upload.command.js";
 import type { SimCompleteMultipartUploadCommand } from "../command/complete-multipart-upload/complete-multipart-upload.command.js";
+import type { SimCopyObjectCommand } from "../command/copy-object/copy-object.command.js";
 import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.command.js";
 import type { SimCreateMultipartUploadCommand } from "../command/create-multipart-upload/create-multipart-upload.command.js";
 import type { SimListMultipartUploadsCommand } from "../command/list-multipart-uploads/list-multipart-uploads.command.js";
@@ -48,6 +49,14 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simS3.createBucket(
             command as SimCreateBucketCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CopyObjectCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.copyObject(
+            command as SimCopyObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
