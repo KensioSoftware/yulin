@@ -1,5 +1,4 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
-import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-login.error.js";
 import {
   requireSimCognitoConfirmed,
   requireSimCognitoPasswordSet,
@@ -10,15 +9,7 @@ import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognit
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
 import { simCognitoChallengeFactor } from "../auth/sim-cognito-mfa-factor-choice.js";
-import type { SimCognitoAuthorizeInput } from "./hosted-auth.command.js";
-
-/**
- * The credentials a local sign-in at the authorize endpoint carries.
- */
-interface SimCognitoHostedCredentials {
-  readonly username: string;
-  readonly password: string;
-}
+import type { SimCognitoHostedCredentials } from "./sim-cognito-hosted-credentials.js";
 
 /**
  * Signing one of a pool's own users in at the authorize endpoint.
@@ -36,14 +27,14 @@ interface SimCognitoHostedCredentials {
  */
 export class SimCognitoHostedPasswordSignIn {
   /**
-   * The user this request signs in, having checked its password.
+   * The user these credentials sign in, having checked the password.
    */
   signIn(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
-    input: SimCognitoAuthorizeInput,
+    credentials: SimCognitoHostedCredentials,
   ): SimCognitoUser {
-    const { username, password } = this.requiredCredentials(input);
+    const { username, password } = credentials;
     const user = requireSimCognitoSignInUser(pool, client, username);
 
     requireSimCognitoSignIn(user, password);
@@ -53,30 +44,6 @@ export class SimCognitoHostedPasswordSignIn {
     this.requireNoFurtherPage(pool, user);
 
     return user;
-  }
-
-  /**
-   * The username and password the request carried.
-   *
-   * A request carrying neither, and naming no identity provider, is one a
-   * browser is shown the sign-in page for. The serving layer is what answers
-   * with that page, from this refusal.
-   */
-  private requiredCredentials(
-    input: SimCognitoAuthorizeInput,
-  ): SimCognitoHostedCredentials {
-    const { username, password } = input;
-
-    if (
-      username === undefined ||
-      username === "" ||
-      password === undefined ||
-      password === ""
-    ) {
-      throw new SimCognitoManagedLoginRequired();
-    }
-
-    return { username, password };
   }
 
   /**

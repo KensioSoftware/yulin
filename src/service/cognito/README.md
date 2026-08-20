@@ -482,6 +482,14 @@ client and the one challenge it was issued for, and lasts the three minutes real
 It also holds the code an `SMS_MFA` challenge texted, because that code belongs to that challenge:
 it goes when the session goes.
 
+`SimCognitoManagedLoginSession` is the other kind of session, and the two are easy to confuse. An
+auth session is one authentication part way through, and a managed login session is a browser that
+has finished one. It lives in `SimCognitoManagedLoginSessionStore`, is keyed by the value the
+`cognito` cookie carries, belongs to the pool's domain rather than to an app client, and lasts the
+hour real Cognito gives one. `SimCognitoBrowserSession` is what starts and reuses it from the
+authorize endpoint. Signing a user out globally leaves it alone, and `/logout` ends it, which is
+what real Cognito does with each.
+
 `SimCognitoIssuedToken` is a token the pool has handed out, and `SimCognitoIssuedTokenStore` holds
 them. A refresh token is kept because the pool is what exchanges it later, and an access token
 because the pool is what a sign-out presents one to. Signing a user out forgets both kinds, which is
@@ -673,8 +681,9 @@ resource, here or on real AWS.
 - The managed login pages carry an inline stylesheet approximating real managed login, and go no
   closer than that. They are at paths of this simulation's own. The authorize endpoint answers with
   the sign-in form where real managed login redirects to `/login`, and `/confirm` is a
-  page where real managed login confirms within `/signup`. They hold no session and set no cookie,
-  and carry the authorize parameters in hidden inputs instead. A sign-in managed login would answer
+  page where real managed login confirms within `/signup`. They carry the authorize parameters in
+  hidden inputs, where real managed login carries them in a `page-data` cookie. A sign-in managed
+  login would answer
   with a second page, which is a user owing a second factor and a user holding a temporary
   password, is refused. The implicit and client credentials grants are refused too, and
   `/oauth2/userInfo`, `/oauth2/revoke` and the SAML endpoints are not served.
@@ -683,7 +692,11 @@ resource, here or on real AWS.
 - A custom domain answers on its own hostname with no Route53 record, where real AWS needs an alias
   record to the CloudFront distribution Cognito creates. The distribution name a domain reports is a
   name nothing here serves.
-- `/logout` redirects and ends no session, because there is no managed login session cookie here.
+- `/logout` ends the browser's managed login session and redirects. The session is held in the
+  `cognito` cookie, as real managed login holds it, and it is reused only by an authorize request
+  naming no identity provider and carrying no credentials. Real Cognito records which method started
+  the session, and a request naming a provider here signs in at that provider afresh. `prompt` goes
+  unread.
 - A pool creates no group for an identity provider, where real Cognito creates one named
   `<userPoolId>_<ProviderName>` and puts each federated user in it.
 - A federated sign-in whose username is already a user of the pool's own is refused with

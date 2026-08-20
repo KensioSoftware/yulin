@@ -131,13 +131,19 @@ export abstract class SimCognitoFederation extends SimCognitoUserDirectory {
    *
    * The answer is where the browser goes next, which for a request that signs
    * a user in is the app client's callback URL carrying an authorization code.
+   *
+   * `presentedSession` is the managed login session the browser holds, which a
+   * served request carries in the `cognito` cookie. Passing one signs the
+   * browser in without credentials, the way real managed login answers a
+   * browser it recognises.
    */
   async hostedAuthorize(
     pool: SimCognitoUserPool,
     input: SimCognitoAuthorizeInput,
+    presentedSession?: string,
   ): Promise<SimCognitoHostedRedirect> {
     await this.background.sequence();
-    return this.commands.hosted.authorize.handle(pool, input);
+    return this.commands.hosted.authorize.handle(pool, input, presentedSession);
   }
 
   /**
@@ -153,12 +159,16 @@ export abstract class SimCognitoFederation extends SimCognitoUserDirectory {
 
   /**
    * Handle a request to a pool's `/logout` endpoint.
+   *
+   * `presentedSession` is the managed login session the browser holds. Ending
+   * it is what makes the next authorize request ask for a password again.
    */
   async hostedSignOut(
     pool: SimCognitoUserPool,
     input: SimCognitoLogoutInput,
+    presentedSession?: string,
   ): Promise<SimCognitoHostedRedirect> {
     await this.background.sequence();
-    return this.commands.hosted.logout.handle(pool, input);
+    return this.commands.hosted.logout.handle(pool, input, presentedSession);
   }
 }

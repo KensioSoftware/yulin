@@ -27,9 +27,10 @@ interface SimCognitoAuthorizeEndpointProperties {
  * A request naming a provider signs in the user that provider has been told is
  * signed in at it. A request naming none signs in one of the pool's own users,
  * with the username and password real managed login would have taken from its
- * form. Nothing here draws the form: the serving layer is what answers a
- * browser with a page, and a test calling this directly passes the two fields
- * the form would have posted.
+ * form, or from the managed login session the browser presented. Nothing here
+ * draws the form: the serving layer is what answers a browser with a page, and
+ * a test calling this directly passes the two fields the form would have
+ * posted.
  */
 export class SimCognitoAuthorizeEndpoint {
   private readonly signIn: SimCognitoHostedSignIn;
@@ -45,10 +46,14 @@ export class SimCognitoAuthorizeEndpoint {
   /**
    * Sign a user in, and send the browser back to the application with an
    * authorization code.
+   *
+   * `presentedSession` is the managed login session the browser carried, which
+   * the serving layer reads out of the `cognito` cookie.
    */
   handle(
     pool: SimCognitoUserPool,
     input: SimCognitoAuthorizeInput,
+    presentedSession?: string,
   ): SimCognitoHostedRedirect {
     const client = this.hostedClient.forAuthorize(pool, input.client_id);
     const redirectUri = this.hostedClient.requiredRedirectUri(
@@ -64,7 +69,8 @@ export class SimCognitoAuthorizeEndpoint {
     this.request.requireChallengeMethod(input);
 
     const scopes = new SimCognitoGrantedScopes(client, input.scope);
-    const user = this.signIn.signIn(pool, client, input);
+    const signedIn = this.signIn.signIn(pool, client, input, presentedSession);
+    const { user } = signedIn;
 
     const code = new SimCognitoAuthorizationCode({
       username: user.username,
@@ -80,6 +86,7 @@ export class SimCognitoAuthorizeEndpoint {
     return {
       location: this.redirectWithCode(redirectUri, code.value, input.state),
       username: user.username,
+      session: signedIn.session,
     };
   }
 

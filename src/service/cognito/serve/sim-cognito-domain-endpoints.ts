@@ -1,9 +1,9 @@
 import { SimCognitoManagedLogin } from "./page/sim-cognito-managed-login.js";
-import type { SimCognitoPageParameters } from "./page/sim-cognito-page-markup.js";
 import { simCognitoAuthorizePath } from "./page/sim-cognito-page-paths.js";
-import { SimCognitoPageRequest } from "./page/sim-cognito-page-request.js";
+import { SimCognitoAuthorizeRoute } from "./sim-cognito-authorize-route.js";
 import type { SimCognitoDomainRequest } from "./sim-cognito-domain-request.js";
 import { SimCognitoOAuthResponse } from "./sim-cognito-oauth-response.js";
+import { SimCognitoSessionCookie } from "./sim-cognito-session-cookie.js";
 import { SimCognitoTokenRequest } from "./sim-cognito-token-request.js";
 
 /**
@@ -31,8 +31,9 @@ export type { SimCognitoDomainRequest } from "./sim-cognito-domain-request.js";
 export class SimCognitoDomainEndpoints {
   private readonly response = new SimCognitoOAuthResponse();
   private readonly tokenRequest = new SimCognitoTokenRequest();
-  private readonly pageRequest = new SimCognitoPageRequest();
   private readonly pages = new SimCognitoManagedLogin();
+  private readonly sessionCookie = new SimCognitoSessionCookie();
+  private readonly authorizeRoute = new SimCognitoAuthorizeRoute();
 
   /**
    * Answer a request that reached the domain's hostname.
@@ -62,45 +63,12 @@ export class SimCognitoDomainEndpoints {
   }
 
   /**
-   * Sign a user in and send the browser back to the application with a code,
-   * or serve the form that asks who is signing in.
-   *
-   * A get carrying credentials and a post of the sign-in form are the same
-   * request to the simulation. Both name the user and its password, and the
-   * only difference is where those two were read from.
+   * Answer the pool's authorize endpoint, which takes the post of the sign-in
+   * form it serves as well as the get an application sends the browser on.
    */
   private async authorize(request: SimCognitoDomainRequest): Promise<Response> {
-    return await this.answered(request, pageMethods, async () => {
-      const parameters = this.pageRequest.values(
-        request.serviceRequest,
-        request.url,
-      );
-
-      try {
-        return this.response.redirect(
-          await request.cognito.hostedAuthorize(request.pool, parameters),
-        );
-      } catch (error) {
-        return this.refused(request, parameters, error);
-      }
-    });
-  }
-
-  /**
-   * Answer a refused sign-in, on the form or at the application.
-   */
-  private refused(
-    request: SimCognitoDomainRequest,
-    parameters: SimCognitoPageParameters,
-    error: unknown,
-  ): Response {
-    return (
-      this.pages.refusedSignIn(request, parameters, error) ??
-      this.response.refusedRedirect(
-        error,
-        parameters["redirect_uri"],
-        parameters["state"],
-      )
+    return await this.answered(request, pageMethods, async () =>
+      this.authorizeRoute.handle(request),
     );
   }
 
@@ -123,7 +91,8 @@ export class SimCognitoDomainEndpoints {
   }
 
   /**
-   * Send the browser to the application's sign-out page.
+   * End the browser's managed login session and send it to the application's
+   * sign-out page.
    */
   private async logout(request: SimCognitoDomainRequest): Promise<Response> {
     const parameters = Object.fromEntries(request.url.searchParams);
@@ -131,7 +100,11 @@ export class SimCognitoDomainEndpoints {
     return await this.answered(request, "GET", async () => {
       try {
         return this.response.redirect(
-          await request.cognito.hostedSignOut(request.pool, parameters),
+          await request.cognito.hostedSignOut(
+            request.pool,
+            parameters,
+            this.sessionCookie.read(request.serviceRequest.request),
+          ),
         );
       } catch (error) {
         return this.response.refusedRequest(error);

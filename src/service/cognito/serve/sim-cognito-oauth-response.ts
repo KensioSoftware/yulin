@@ -3,6 +3,7 @@ import {
   SimCognitoOAuthError,
 } from "../error/sim-cognito-oauth.error.js";
 import type { SimCognitoHostedRedirect } from "../command/hosted/hosted-auth.command.js";
+import { SimCognitoSessionCookie } from "./sim-cognito-session-cookie.js";
 
 /**
  * The responses a pool's hosted OAuth endpoints answer with.
@@ -14,6 +15,8 @@ import type { SimCognitoHostedRedirect } from "../command/hosted/hosted-auth.com
  * browser can see.
  */
 export class SimCognitoOAuthResponse {
+  private readonly sessionCookie = new SimCognitoSessionCookie();
+
   /**
    * Read an error as an OAuth one, whatever it turned out to be.
    *
@@ -42,13 +45,18 @@ export class SimCognitoOAuthResponse {
   }
 
   /**
-   * Send the browser on to where an endpoint decided it goes.
+   * Send the browser on to where an endpoint decided it goes, holding the
+   * managed login session the endpoint gave it.
    */
   redirect(redirect: SimCognitoHostedRedirect): Response {
-    return new Response(undefined, {
-      status: 302,
-      headers: { location: redirect.location },
-    });
+    const headers = new Headers({ location: redirect.location });
+    const cookie = this.sessionCookie.headerFor(redirect.session);
+
+    if (cookie !== undefined) {
+      headers.set("set-cookie", cookie);
+    }
+
+    return new Response(undefined, { status: 302, headers });
   }
 
   /**
