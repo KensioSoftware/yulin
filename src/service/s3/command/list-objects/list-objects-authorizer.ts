@@ -11,6 +11,7 @@ interface ListObjectsAuthorizerProperties {
 interface ListObjectsAuthorizationInput {
   readonly bucket: SimS3Bucket;
   readonly prefix?: string | undefined;
+  readonly delimiter?: string | undefined;
   readonly maxKeys: number;
   readonly options?: SimS3RequestOptions | undefined;
 }
@@ -22,10 +23,11 @@ interface ListObjectsAuthorizationInput {
  * action. The resource is the Bucket ARN because listing examines a Bucket's
  * key namespace rather than reading any individual Object.
  *
- * Prefix and maximum-result constraints are request attributes used by IAM
- * policies to limit which listings a principal may perform. They are supplied
- * as S3 condition keys so policy evaluation can distinguish, for example, a
- * permitted app prefix from a restricted private prefix.
+ * Prefix, delimiter and maximum-result constraints are request attributes used
+ * by IAM policies to limit which listings a principal may perform. They are
+ * supplied as S3 condition keys so policy evaluation can distinguish, for
+ * example, a permitted app prefix from a restricted private prefix, or a
+ * listing of one folder from a listing of a whole Bucket.
  */
 export class ListObjectsAuthorizer {
   private static readonly action = "s3:ListBucket";
@@ -49,6 +51,7 @@ export class ListObjectsAuthorizer {
       conditionContext: {
         ...simS3ConditionContext(input.options),
         "s3:prefix": input.prefix ?? "",
+        "s3:delimiter": input.delimiter ?? "",
         "s3:max-keys": input.maxKeys,
       },
       resourcePolicies:

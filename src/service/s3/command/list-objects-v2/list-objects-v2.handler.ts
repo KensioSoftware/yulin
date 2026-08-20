@@ -94,6 +94,7 @@ export class ListObjectsV2CommandHandler implements CommandHandler<
     this.authorizer.authorize({
       bucket,
       prefix: command.input.Prefix,
+      delimiter: command.input.Delimiter,
       maxKeys,
       options,
     });
@@ -101,6 +102,7 @@ export class ListObjectsV2CommandHandler implements CommandHandler<
     return await this.pageBuilder.build({
       bucket,
       prefix: command.input.Prefix,
+      delimiter: command.input.Delimiter,
       continuationToken: command.input.ContinuationToken,
       startAfter: command.input.StartAfter,
       maxKeys,

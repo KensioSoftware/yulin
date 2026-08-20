@@ -148,4 +148,69 @@ describe("S3 ListObjectsV2Command IAM authorization", () => {
     assertIdentical(error.action, "s3:ListBucket");
     assertIdentical(error.resource, "arn:aws:s3:::v2-restricted-bucket");
   });
+  it("denies a Role a listing that walks past the folder its policy allows", async () => {
+    // Given a Role allowed to list one Bucket a folder at a time, which is the
+    // policy AWS documents for a console user browsing a Bucket.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws();
+    const simIam = simAws.account(accountId).iam();
+    const simS3 = simAws.account(accountId).region("eu-west-1").s3();
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "v2-browsable-bucket" }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "v2-browsable-bucket",
+        Key: "reports/a.json",
+      }),
+    );
+
+    const roleCreation = await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "V2Browser",
+        AssumeRolePolicyDocument: assumeRoleByAccountRoot(accountId),
+      }),
+    );
+    const roleArn = roleCreation.Role.Arn;
+
+    await simIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "V2Browser",
+        PolicyName: "BrowseOnly",
+        PolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Action: "s3:ListBucket",
+            Resource: "arn:aws:s3:::v2-browsable-bucket",
+            Condition: { StringEquals: { "s3:delimiter": "/" } },
+          },
+        }),
+      }),
+    );
+
+    // When the Role browses one folder, and then lists the Bucket flat.
+    const browsed = await simS3.listObjectsV2(
+      new ListObjectsV2Command({
+        Bucket: "v2-browsable-bucket",
+        Delimiter: "/",
+      }),
+      { caller: { kind: "arn", arn: roleArn } },
+    );
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simS3.listObjectsV2(
+        new ListObjectsV2Command({ Bucket: "v2-browsable-bucket" }),
+        { caller: { kind: "arn", arn: roleArn } },
+      ),
+    );
+
+    // Then the delimiter reaches IAM as its own condition key, which is what
+    // separates browsing a folder from listing every key in the Bucket.
+    assertArrayLength(browsed.CommonPrefixes, 1);
+    assertIdentical(browsed.CommonPrefixes[0].Prefix, "reports/");
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertIdentical(error.action, "s3:ListBucket");
+  });
 });

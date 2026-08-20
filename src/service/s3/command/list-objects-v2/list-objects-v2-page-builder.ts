@@ -1,4 +1,5 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import { simS3CommonPrefixes } from "../../object/s3-common-prefix.js";
 import { simS3ObjectPage } from "../../object/s3-object-listing.js";
 import { simS3ObjectSummaries } from "../../object/s3-object-summary.js";
 import {
@@ -10,6 +11,7 @@ import type { SimListObjectsV2CommandOutput } from "./list-objects-v2.command.js
 interface ListObjectsV2PageInput {
   readonly bucket: SimS3Bucket;
   readonly prefix?: string | undefined;
+  readonly delimiter?: string | undefined;
   readonly continuationToken?: string | undefined;
   readonly startAfter?: string | undefined;
   readonly maxKeys: number;
@@ -37,16 +39,20 @@ export class ListObjectsV2PageBuilder {
   ): Promise<SimListObjectsV2CommandOutput> {
     const page = simS3ObjectPage({
       objects: await input.bucket.listObjects(input.prefix),
+      prefix: input.prefix,
+      delimiter: input.delimiter,
       startAfter: this.resumeAfter(input),
       maxKeys: input.maxKeys,
     });
 
     return {
       Contents: simS3ObjectSummaries(page.objects),
+      CommonPrefixes: simS3CommonPrefixes(page.commonPrefixes),
       Name: input.bucket.bucketName,
       Prefix: input.prefix,
+      Delimiter: input.delimiter,
       MaxKeys: input.maxKeys,
-      KeyCount: page.objects.length,
+      KeyCount: page.objects.length + page.commonPrefixes.length,
       IsTruncated: page.isTruncated,
       ContinuationToken: input.continuationToken,
       NextContinuationToken:

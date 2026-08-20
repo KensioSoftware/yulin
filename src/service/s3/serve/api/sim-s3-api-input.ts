@@ -44,6 +44,7 @@ export function listObjectsV2Input(request: SimS3ApiRequest): object {
   return {
     Bucket: request.bucketName,
     ...optional("Prefix", request.query.get("prefix")),
+    ...optional("Delimiter", request.query.get("delimiter")),
     ...optional("ContinuationToken", request.query.get("continuation-token")),
     ...optional("StartAfter", request.query.get("start-after")),
     ...optionalNumber("MaxKeys", request.query.get("max-keys")),
@@ -57,6 +58,7 @@ export function listObjectsInput(request: SimS3ApiRequest): object {
   return {
     Bucket: request.bucketName,
     ...optional("Prefix", request.query.get("prefix")),
+    ...optional("Delimiter", request.query.get("delimiter")),
     ...optional("Marker", request.query.get("marker")),
     ...optionalNumber("MaxKeys", request.query.get("max-keys")),
   };
