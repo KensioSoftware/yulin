@@ -14,6 +14,8 @@ export function simWafWebAclOutput(webAcl: SimWafWebAcl): SimWafWebAclOutput {
     Name: webAcl.name,
     Id: webAcl.id,
     ARN: webAcl.arn,
+    Capacity: webAcl.capacity,
+    LabelNamespace: webAcl.labelNamespace,
     Description: webAcl.description,
     DefaultAction: configuration.defaultAction,
     Rules: configuration.rules ?? [],

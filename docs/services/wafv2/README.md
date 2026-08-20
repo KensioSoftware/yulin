@@ -841,6 +841,143 @@ the rule is written and reads its expressions when a request arrives, as it does
 IP sets are created, read, updated, listed and deleted the same way. No rule reads one, for the
 reason in [Refusals](#refusals) below.
 
+## Deploying web ACLs with CloudFormation
+
+`AWS::WAFv2::WebACL`, `AWS::WAFv2::WebACLAssociation`, `AWS::WAFv2::IPSet` and
+`AWS::WAFv2::RegexPatternSet` deploy into simulated WAFv2. CDK ships no L2 construct for WAFv2. A
+project protecting an API writes `CfnWebACL` and `CfnWebACLAssociation` by hand, and the template
+those synthesize to is the one that deploys here.
+
+```typescript sim-wafv2-cloudformation
+/**
+ * Deploying a web ACL from a CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "orders",
+};
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      OrdersAcl: {
+        Type: "AWS::WAFv2::WebACL",
+        Properties: {
+          Name: "orders-acl",
+          Scope: "REGIONAL",
+          DefaultAction: { Allow: {} },
+          VisibilityConfig: visibility,
+          Rules: [
+            {
+              Name: "block-admin",
+              Priority: 0,
+              Action: { Block: {} },
+              Statement: {
+                ByteMatchStatement: {
+                  FieldToMatch: { UriPath: {} },
+                  PositionalConstraint: "CONTAINS",
+                  SearchString: "/admin",
+                  TextTransformations: [{ Priority: 0, Type: "NONE" }],
+                },
+              },
+              VisibilityConfig: { ...visibility, MetricName: "block-admin" },
+            },
+          ],
+        },
+      },
+    },
+    Outputs: { AclArn: { Value: { "Fn::GetAtt": ["OrdersAcl", "Arn"] } } },
+  },
+});
+
+const decision = simAws.wafV2().evaluateRequest({
+  webAclArn: stack.outputs.get("AclArn")!.value as string,
+  request: new Request("https://orders.example.test/admin/users"),
+});
+
+// "BLOCK"
+console.log(decision.action);
+```
+
+A template spells a web ACL the way the API spells it, with two exceptions. A `SearchString` is
+plain text in a template where the SDK takes bytes, and a `RegularExpressionList` is a list of
+strings where the SDK takes a list of `RegexString` objects. Both are read here the way
+CloudFormation writes them.
+
+Every rule is compiled while the stack deploys. A statement kind this simulator will not evaluate
+(see [Refusals](#refusals)) fails the deployment, and the failure names the logical ID along with
+the rule and the statement kind. The web ACL never reaches a request it cannot decide.
+
+`Name` is optional on all three named types. An unnamed resource is named after the stack and the
+logical ID, as real CloudFormation names one, so `orders-acl` above would have deployed as
+`orders-OrdersAcl`.
+
+### Putting a deployed web ACL in front of something
+
+`AWS::WAFv2::WebACLAssociation` associates a web ACL with whatever its `ResourceArn` names, which
+covers an API Gateway REST API stage and a Cognito user pool. It goes through `AssociateWebACL` and
+inherits that command's refusals. An ARN naming an HTTP API stage or a load balancer fails the
+deployment with the reason WAF gives an SDK caller.
+
+```json
+{
+  "OrdersAclAssociation": {
+    "Type": "AWS::WAFv2::WebACLAssociation",
+    "Properties": {
+      "ResourceArn": {
+        "Fn::Join": [
+          "",
+          [
+            "arn:aws:apigateway:",
+            { "Ref": "AWS::Region" },
+            "::/restapis/",
+            { "Ref": "Api" },
+            "/stages/",
+            { "Ref": "Stage" }
+          ]
+        ]
+      },
+      "WebACLArn": { "Fn::GetAtt": ["OrdersAcl", "Arn"] }
+    }
+  }
+}
+```
+
+That `Fn::Join` is what CDK's `api.deploymentStage.stageArn` synthesizes to. Deleting the
+association disassociates, and deleting the stack takes the association down before the web ACL it
+names.
+
+A CloudFront distribution is associated through the distribution. `WebACLId` on
+`AWS::CloudFront::Distribution` holds a `CLOUDFRONT` [scope](#scopes) web ACL's ARN, usually as an
+`Fn::GetAtt` on a `CfnWebACL` in the same template. See
+[Protecting a CloudFront distribution](#protecting-a-cloudfront-distribution).
+
+### Attributes and Ref
+
+`Fn::GetAtt` on a web ACL answers `Arn`, `Id`, `Capacity` and `LabelNamespace`. `Arn` is the one a
+template usually wants, since an association and a distribution both name a web ACL by ARN. The two
+sets answer `Arn` and `Id`.
+
+`Capacity` is an approximation. It adds up the published cost of each rule's statement and leaves
+out the surcharges for text transformations and JSON body inspection, so it reads low against the
+same rules on AWS. Nothing here enforces the 1,500 unit limit on a web ACL. The attribute exists so
+that a template writing it into an output or an alarm deploys.
+
+`Ref` answers the physical ID, which WAFv2 spells in three parts (`orders-acl|<id>|REGIONAL`). It
+reads oddly beside every other service, and it is what AWS answers. WAFv2 resources carry a
+composite primary identifier of name, ID and scope. An association's physical ID is the resource ARN
+and the web ACL ARN joined by a pipe, and it publishes no attributes.
+
+`AWS::WAFv2::RuleGroup` and `AWS::WAFv2::LoggingConfiguration` are recorded as unsupported and
+stepped over. A rule naming a rule group is refused anyway, and there is no log here to write to.
+
 ## Scopes
 
 A web ACL is created in `CLOUDFRONT` or `REGIONAL` scope. The two are separate namespaces, and one
