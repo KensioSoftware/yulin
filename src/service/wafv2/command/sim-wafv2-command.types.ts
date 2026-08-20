@@ -34,6 +34,13 @@ export type {
   SimWafIpSetOutput,
 } from "./ip-set/ip-set.command.js";
 export type {
+  SimDescribeManagedRuleGroupCommand,
+  SimDescribeManagedRuleGroupCommandInput,
+  SimDescribeManagedRuleGroupCommandOutput,
+  SimWafLabelSummaryOutput,
+  SimWafManagedRuleSummaryOutput,
+} from "./managed-rule-group/managed-rule-group.command.js";
+export type {
   SimCreateRegexPatternSetCommand,
   SimCreateRegexPatternSetCommandInput,
   SimCreateRegexPatternSetCommandOutput,

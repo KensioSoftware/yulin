@@ -4,7 +4,9 @@ import type * as simWafCommands from "./command/sim-wafv2-command.types.js";
 import type { SimWafRequestOptions } from "./command/sim-wafv2-request-options.js";
 import { SimWafNonexistentItemException } from "./error/sim-wafv2.error.js";
 import type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
+import type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
 import { simWafInspectedRequest } from "./evaluate/sim-waf-inspected-request.js";
+import type { SimWafManagedRules } from "./managed/sim-waf-managed-rules.js";
 import type { SimWafScope } from "./scope/sim-waf-scope.js";
 import { SimWafSdkCommandRouter } from "./sdk/sim-wafv2-sdk-command-router.js";
 import {
@@ -14,21 +16,7 @@ import {
 import { SimWafSets } from "./sim-wafv2-sets.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
 
-/**
- * What a web ACL is asked to decide about.
- */
-export interface SimWafEvaluationRequest {
-  /** The web ACL to evaluate against, by ARN. */
-  readonly webAclArn: string;
-
-  readonly request: Request;
-
-  /**
-   * The request body, when the rules might inspect it. A request body is a
-   * stream that cannot be read twice, so it is passed in already buffered.
-   */
-  readonly body?: Uint8Array | undefined;
-}
+export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
 
 /**
  * Simulated AWS WAFv2. Handles SDK commands. Emulates AWS behaviour and state.
@@ -107,6 +95,17 @@ export class SimWafV2 extends SimWafSets {
   }
 
   /**
+   * What the AWS managed rule groups do here, and what a test declares of
+   * them.
+   *
+   * `onRequest` says which rules claim a request, for the ones that detect
+   * nothing here, and `rules()` reports what is covered of each.
+   */
+  managedRules(): SimWafManagedRules {
+    return this.commands.managedRules;
+  }
+
+  /**
    * Handle a CreateWebACL Command from the SDK.
    */
   async createWebAcl(
@@ -159,6 +158,20 @@ export class SimWafV2 extends SimWafSets {
   ): Promise<simWafCommands.SimDeleteWebAclCommandOutput> {
     await this.commands.background.sequence();
     return this.commands.webAclCommands.deleteWebAcl(command, options);
+  }
+
+  /**
+   * Handle a DescribeManagedRuleGroup Command from the SDK.
+   */
+  async describeManagedRuleGroup(
+    command: simWafCommands.SimDescribeManagedRuleGroupCommand,
+    options?: SimWafRequestOptions,
+  ): Promise<simWafCommands.SimDescribeManagedRuleGroupCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.managedRuleGroupCommands.describeManagedRuleGroup(
+      command,
+      options,
+    );
   }
 
   /**

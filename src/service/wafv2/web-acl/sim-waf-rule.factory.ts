@@ -41,3 +41,29 @@ export const simWafRuleFactory = new DynamicFactory<SimWafRuleInput>(() => ({
   },
   VisibilityConfig: simWafVisibilityConfig,
 }));
+
+/**
+ * Makes rules that run the AWS core rule set as it comes.
+ *
+ * `Statement` and `OverrideAction` are replaced whole rather than overridden,
+ * for the reason the statement of any other rule is: each of them holds one
+ * thing at a time, and a merge would leave a rule naming two.
+ *
+ * A rule that names a rule group carries an `OverrideAction` where any other
+ * rule carries an `Action`, since what it does to a request comes from
+ * whichever rule inside the group claimed it.
+ */
+export const simWafManagedRuleFactory = new DynamicFactory<SimWafRuleInput>(
+  () => ({
+    Name: `managed-${faker.string.alphanumeric(8)}`,
+    Priority: 0,
+    OverrideAction: { None: {} },
+    Statement: {
+      ManagedRuleGroupStatement: {
+        VendorName: "AWS",
+        Name: "AWSManagedRulesCommonRuleSet",
+      },
+    },
+    VisibilityConfig: simWafVisibilityConfig,
+  }),
+);

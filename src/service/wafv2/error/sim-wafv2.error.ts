@@ -122,3 +122,16 @@ export class SimWafAssociatedItemException extends SimWafError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * A match declared against this simulation that it cannot answer with.
+ *
+ * The four `CrossSiteScripting_*` rules of the core rule set detect nothing
+ * here, so a test says which requests they claim. This is a simulator
+ * configuration error rather than an AWS one, and it is raised where the
+ * declaration is made rather than where a request meets the rule: a rule name
+ * no managed group carries would otherwise sit there matching nothing.
+ */
+export class SimWafDeclarationError extends SimWafError {
+  public override readonly name = "SimWafDeclarationError";
+}

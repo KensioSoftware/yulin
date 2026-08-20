@@ -26,16 +26,6 @@ const refusedStatements = new Map<string, string>([
       "feasible and is not part of this",
   ],
   [
-    "LabelMatchStatement",
-    "nothing here adds a label to a request, and labels arrive with the AWS " +
-      "managed rule groups",
-  ],
-  [
-    "ManagedRuleGroupStatement",
-    "the AWS managed rule groups are a body of rules Yulin would have to " +
-      "carry, and they have an issue of their own",
-  ],
-  [
     "RuleGroupReferenceStatement",
     "a rule group is a resource in its own right, and none is simulated",
   ],

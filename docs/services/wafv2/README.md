@@ -178,6 +178,234 @@ WAF stops reading a body, a header set or a cookie set at 8 KB. The rule's `Over
 what content past that point counts as. `MATCH` and `NO_MATCH` settle the statement without looking,
 and `CONTINUE` inspects as much as WAF would have read.
 
+## The AWS managed rule groups
+
+Three of the AWS managed rule groups are simulated, so a stack that turns them on deploys and its
+traffic can be tested against them.
+
+- `AWSManagedRulesCommonRuleSet`, the core rule set, 22 rules.
+- `AWSManagedRulesKnownBadInputsRuleSet`, 11 rules.
+- `AWSManagedRulesAdminProtectionRuleSet`, one rule.
+
+A group evaluates its rules in the order AWS documents them, adds the documented
+`awswaf:managed:aws:*` label to a request a rule claims, and blocks by that rule's action. The
+labels are on the decision, and they are what says which rule inside a group claimed the request.
+
+```typescript sim-wafv2-managed-rule-group
+/**
+ * Running the AWS core rule set over an application's own traffic.
+ */
+
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "api",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "api-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "core-rule-set",
+        Priority: 0,
+        OverrideAction: { None: {} },
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesCommonRuleSet",
+            RuleActionOverrides: [
+              { Name: "NoUserAgent_HEADER", ActionToUse: { Count: {} } },
+            ],
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+    ],
+  }),
+);
+
+const webAclArn = created.Summary!.ARN;
+
+const healthCheck = waf.evaluateRequest({
+  webAclArn,
+  request: new Request("https://example.test/health"),
+});
+const traversal = waf.evaluateRequest({
+  webAclArn,
+  request: new Request(
+    "https://example.test/read?file=..%2F..%2Fetc%2Fpasswd",
+    {
+      headers: { "user-agent": "curl/8.5.0" },
+    },
+  ),
+});
+
+// "ALLOW" ["awswaf:managed:aws:core-rule-set:NoUserAgent_Header"]
+console.log(healthCheck.action, healthCheck.labels);
+
+// "BLOCK" "core-rule-set"
+console.log(traversal.action, traversal.terminatingRuleName);
+```
+
+The health check sends no User-Agent header, which `NoUserAgent_HEADER` claims. The override sets
+that rule to `Count`, so the request goes through carrying the label.
+
+`RuleActionOverrides`, `ScopeDownStatement` and `OverrideAction` behave as AWS documents them. An
+`OverrideAction` of `Count` holds the whole group to counting whatever its rules were set to. A
+`ScopeDownStatement` decides which requests the group sees at all, and a request it does not claim
+picks up no label from the group.
+
+`DescribeManagedRuleGroup` reports the rules of a group and the labels they add. An override names a
+rule in the spelling that reports.
+
+## How closely the managed rules match
+
+AWS publishes every rule name, every default action, every label and the size limits. It holds back
+the pattern set behind each rule, and says so. Each rule here declares how closely it follows the
+AWS rule it stands for, and `managedRules().rules()` reports the tier of every one.
+
+- **exact** matches where the AWS rule matches. The four `SizeRestrictions_*` rules at their
+  documented limits (2,048 bytes for the query string, 10,240 for the cookie header, 8,192 for the
+  body and 1,024 for the URI path), along with `NoUserAgent_HEADER`, `PROPFIND_METHOD` and
+  `Host_localhost_HEADER`.
+- **documented** matches the patterns AWS published and nothing beyond them. `Log4JRCE_*`,
+  `EC2MetaDataSSRF_*`, `GenericLFI_*`, `GenericRFI_*`, `RestrictedExtensions_*`,
+  `ExploitablePaths_URIPATH`, `AdminProtection_URIPATH`, `JavaDeserializationRCE_*` and
+  `UserAgent_BadBots_HEADER`.
+- **declared** detects nothing at all. The four `CrossSiteScripting_*` rules run AWS's own
+  detection, and AWS documents none of it.
+
+The tiers under-detect against AWS and never over-detect. The usual reason to put WAF in a test is
+to find out whether an application's own traffic still gets through with the core rule set on. A
+rule that blocked more than AWS blocks would fail that test for a request AWS allows, and send
+somebody off to work around a rule that does not exist. A rule that blocks less is invisible to that
+test and right on AWS too.
+
+`AdminProtection_URIPATH` is the one to know about. AWS gives `sqlmanager` as its example pattern
+and nothing else, so an application's own `/admin` paths reach it here. On AWS they may not.
+
+The reverse test, asserting that an attack payload is blocked, is covered by declaring the match.
+`onRequest` says which rules claim a request to one path, matched exactly.
+
+```typescript sim-wafv2-managed-declared-match
+/**
+ * Declaring the cross-site scripting match AWS does not document.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+waf.managedRules().onRequest("/search", {
+  matches: ["CrossSiteScripting_QUERYARGUMENTS"],
+});
+
+// "declared"
+console.log(waf.managedRules().tierOf("CrossSiteScripting_QUERYARGUMENTS"));
+
+// "exact"
+console.log(waf.managedRules().tierOf("SizeRestrictions_BODY"));
+```
+
+A request to `/search` is then claimed by that rule, which labels it, blocks it and takes any
+override written for it, as a rule that detected the payload itself would.
+
+A match names the rule, in the spelling `RuleActionOverrides` and `DescribeManagedRuleGroup` use
+(`CrossSiteScripting_QUERYARGUMENTS`), and not the label the rule adds
+(`CrossSiteScripting_QueryArguments`). A name no simulated group holds is refused where it was
+written.
+
+Anything outside the three groups is refused by name, and the refusal says which are simulated. The
+IP reputation and anonymous IP groups decide by caller address, and every request in this simulation
+comes from one client. Bot Control and the account takeover groups decide by behaviour across
+requests. The SQL injection group is undocumented in the way the cross-site scripting rules are.
+
+## Labels
+
+A rule adds its labels to a request when it matches, and the rules that run after it can match on
+them with a `LabelMatchStatement`. A `LABEL` scope matches one fully qualified label and a
+`NAMESPACE` scope matches every label under a prefix.
+
+This is how a managed rule group is tuned. Run the group in count mode, and block on the label of
+the rule that matters.
+
+```typescript sim-wafv2-label-match
+/**
+ * Blocking on a label the core rule set left behind.
+ */
+
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "api",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "api-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "core-rule-set",
+        Priority: 0,
+        OverrideAction: { Count: {} },
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesCommonRuleSet",
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+      {
+        Name: "block-restricted-files",
+        Priority: 1,
+        Action: { Block: {} },
+        Statement: {
+          LabelMatchStatement: {
+            Scope: "LABEL",
+            Key: "awswaf:managed:aws:core-rule-set:RestrictedExtensions_URIPath",
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+    ],
+  }),
+);
+
+const decision = waf.evaluateRequest({
+  webAclArn: created.Summary!.ARN,
+  request: new Request("https://example.test/app.ini", {
+    headers: { "user-agent": "curl/8.5.0" },
+  }),
+});
+
+// "BLOCK" "block-restricted-files"
+console.log(decision.action, decision.terminatingRuleName);
+```
+
+A rule of the web ACL's own adds a label under the name it gave it, with no prefix. A label from a
+managed rule group is qualified by the group it came from. That is the
+`awswaf:managed:aws:core-rule-set:` on the front of the key above.
+
 ## Answering a blocked request
 
 A `Block` action answers 403 with WAF's own body, and so does a request a protected REST API stage
@@ -648,8 +876,9 @@ These statement kinds are refused:
   feasible and is not part of this yet.
 - `SqliMatchStatement` and `XssMatchStatement`. AWS publishes no description of the detection they
   run.
-- `ManagedRuleGroupStatement`, `RuleGroupReferenceStatement` and `LabelMatchStatement`. The AWS
-  managed rule groups are a body of rules Yulin would have to carry, and labels arrive with them.
+- `RuleGroupReferenceStatement`. A rule group of your own is a resource in its own right, and none
+  is simulated. The three simulated AWS managed rule groups are named in a statement rather than
+  created.
 
 `JsonBody`, `HeaderOrder`, `UriFragment`, `JA3Fingerprint` and `JA4Fingerprint` are refused as
 fields to match. The `Captcha` and `Challenge` actions are refused, along with the `CaptchaConfig`,
@@ -664,4 +893,5 @@ are refused for the same reason, each naming what it would have configured.
 `CreateWebACL`, `GetWebACL`, `UpdateWebACL`, `ListWebACLs`, `DeleteWebACL`, `CreateIPSet`,
 `GetIPSet`, `UpdateIPSet`, `ListIPSets`, `DeleteIPSet`, `CreateRegexPatternSet`,
 `GetRegexPatternSet`, `UpdateRegexPatternSet`, `ListRegexPatternSets`, `DeleteRegexPatternSet`,
-`AssociateWebACL`, `DisassociateWebACL`, `GetWebACLForResource` and `ListResourcesForWebACL`.
+`DescribeManagedRuleGroup`, `AssociateWebACL`, `DisassociateWebACL`, `GetWebACLForResource` and
+`ListResourcesForWebACL`.

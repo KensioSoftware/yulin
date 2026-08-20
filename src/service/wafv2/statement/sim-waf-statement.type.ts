@@ -1,4 +1,6 @@
+import type { SimWafManagedRuleGroupStatementInput } from "../managed/sim-waf-managed-group.type.js";
 import type { SimWafByteMatchStatementInput } from "./sim-waf-byte-match.js";
+import type { SimWafLabelMatchStatementInput } from "./sim-waf-label-match.js";
 import type { SimWafFieldToMatchInput } from "./sim-waf-field-to-match.type.js";
 import type {
   SimWafRegexMatchStatementInput,
@@ -54,7 +56,9 @@ export interface SimWafStatementInput {
   readonly RateBasedStatement?: unknown;
   readonly SqliMatchStatement?: unknown;
   readonly XssMatchStatement?: unknown;
-  readonly LabelMatchStatement?: unknown;
+  readonly LabelMatchStatement?: SimWafLabelMatchStatementInput | undefined;
+  readonly ManagedRuleGroupStatement?:
+    | SimWafManagedRuleGroupStatementInput
+    | undefined;
   readonly RuleGroupReferenceStatement?: unknown;
-  readonly ManagedRuleGroupStatement?: unknown;
 }

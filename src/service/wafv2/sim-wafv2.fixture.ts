@@ -4,7 +4,9 @@ import type {
   SimCreateWebAclCommandInput,
   SimWafSummaryOutput,
 } from "./command/web-acl/web-acl.command.js";
+import type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
 import type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
+import type { SimWafRuleInput } from "./web-acl/sim-waf-rule.type.js";
 import type { SimWafV2 } from "./sim-wafv2.js";
 import { simWafRuleFactory } from "./web-acl/sim-waf-rule.factory.js";
 
@@ -61,3 +63,57 @@ export async function simWafStatementMatches(
   return (request, body): boolean =>
     simWaf.evaluateRequest({ webAclArn, request, body }).action === "BLOCK";
 }
+
+/**
+ * What a web ACL decided about one request.
+ */
+export type SimWafRequestDecision = (
+  request: Request,
+  body?: Uint8Array,
+) => SimWafDecision;
+
+/**
+ * Create a web ACL holding some rules, and answer with a way to put requests
+ * through it.
+ *
+ * This is `simWafStatementMatches` for a test that wants the whole decision
+ * rather than whether one statement claimed the request: which rule decided,
+ * which rules counted, and what labels the request came away with.
+ */
+export async function simWafWebAclDecisions(
+  simWaf: SimWafV2,
+  rules: readonly SimWafRuleInput[],
+  webAcl: Partial<SimCreateWebAclCommandInput> = {},
+): Promise<SimWafRequestDecision> {
+  const { ARN: webAclArn } = await createSimWafWebAcl(simWaf, {
+    ...simWafCreateWebAclFactory.make(),
+    ...webAcl,
+    Rules: rules,
+  });
+
+  return (request, body): SimWafDecision =>
+    simWaf.evaluateRequest({ webAclArn, request, body });
+}
+
+/**
+ * A request the core rule set does not claim on sight.
+ *
+ * `NoUserAgent_HEADER` blocks a request that sends no User-Agent header, and
+ * nothing here sends one unless it is asked to, so a test about any other rule
+ * makes its requests with this.
+ */
+export function simWafBrowserRequest(
+  url: string,
+  init: RequestInit = {},
+): Request {
+  const headers = new Headers(init.headers);
+
+  if (!headers.has("user-agent")) {
+    headers.set("user-agent", browserUserAgent);
+  }
+
+  return new Request(url, { ...init, headers });
+}
+
+const browserUserAgent =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";

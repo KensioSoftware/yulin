@@ -1,3 +1,4 @@
+import type { SimWafAction } from "../web-acl/sim-waf-action.js";
 import type { SimWafHeader } from "../web-acl/sim-waf-custom-response.type.js";
 import type { SimWafBlockedResponse } from "./sim-waf-blocked-response.js";
 
@@ -28,9 +29,52 @@ export interface SimWafDecision {
   /** The rules that matched in count mode, in the order they were evaluated. */
   readonly countedRuleNames: readonly string[];
 
+  /**
+   * The labels the rules that matched added to the request, in the order they
+   * were added.
+   *
+   * A managed rule group adds one for every rule of its own that matched, so
+   * this is what says which rule inside a group claimed the request. The rule
+   * that decided is the web ACL's own rule, and the group it names holds
+   * dozens.
+   */
+  readonly labels: readonly string[];
+
   /** The headers to add to the request before it is forwarded. */
   readonly insertedHeaders: readonly SimWafHeader[];
 
   /** What to answer with, when the decision was to block. */
   readonly blocked: SimWafBlockedResponse | undefined;
+}
+
+/**
+ * What a web ACL knows when it has finished evaluating a request.
+ */
+export interface SimWafDecisionProperties {
+  readonly action: SimWafAction;
+  readonly webAclName: string;
+  readonly webAclArn: string;
+  readonly terminatingRuleName: string | undefined;
+  readonly countedRuleNames: readonly string[];
+  readonly insertedHeaders: readonly SimWafHeader[];
+  readonly labels: readonly string[];
+}
+
+/**
+ * Turn what a web ACL worked out into the decision it answers with.
+ */
+export function simWafDecision(
+  properties: SimWafDecisionProperties,
+): SimWafDecision {
+  const { action } = properties;
+  const blocking = action.kind === "BLOCK";
+
+  return {
+    ...properties,
+    action: blocking ? "BLOCK" : "ALLOW",
+    // Nothing is forwarded when the request is blocked, so there is nothing
+    // for a rule's inserted headers to be added to.
+    insertedHeaders: blocking ? [] : properties.insertedHeaders,
+    blocked: action.blocked,
+  };
 }

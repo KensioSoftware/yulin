@@ -1,23 +1,25 @@
-import type { SimWafDecision } from "../evaluate/sim-waf-decision.js";
+import {
+  simWafDecision,
+  type SimWafDecision,
+} from "../evaluate/sim-waf-decision.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
-import type { SimWafRegexPatternSet } from "../regex-pattern-set/sim-waf-regex-pattern-set.js";
+import { simWafEvaluateRules } from "../evaluate/sim-waf-evaluate-rules.js";
 import {
   SimWafResource,
   type SimWafResourceProperties,
 } from "../resource/sim-waf-resource.js";
-import type { SimWafResourceStore } from "../resource/sim-waf-resource-store.js";
 import type { SimWafAction } from "./sim-waf-action.js";
-import type { SimWafHeader } from "./sim-waf-custom-response.type.js";
 import type { SimWafRule } from "./sim-waf-rule.js";
-import { compileSimWafRules } from "./sim-waf-rules.js";
+import type { SimWafWebAclRuleScope } from "./sim-waf-rule.type.js";
+import { compileSimWafWebAclRules } from "./sim-waf-rules.js";
 import {
   readSimWafDefaultAction,
   type SimWafWebAclConfiguration,
 } from "./sim-waf-web-acl-configuration.js";
 
-interface SimWafWebAclProperties extends SimWafResourceProperties {
+interface SimWafWebAclProperties
+  extends SimWafResourceProperties, SimWafWebAclRuleScope {
   readonly configuration: SimWafWebAclConfiguration;
-  readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
 }
 
 /**
@@ -31,7 +33,7 @@ interface SimWafWebAclProperties extends SimWafResourceProperties {
  * default action.
  */
 export class SimWafWebAcl extends SimWafResource {
-  readonly #regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
+  readonly #scope: SimWafWebAclRuleScope;
 
   #configuration: SimWafWebAclConfiguration;
   #defaultAction: SimWafAction;
@@ -40,10 +42,13 @@ export class SimWafWebAcl extends SimWafResource {
   constructor(properties: SimWafWebAclProperties) {
     super("webacl", properties);
 
-    this.#regexPatternSets = properties.regexPatternSets;
+    this.#scope = properties;
     this.#configuration = properties.configuration;
     this.#defaultAction = readSimWafDefaultAction(properties.configuration);
-    this.#rules = this.compileRules(properties.configuration);
+    this.#rules = compileSimWafWebAclRules(
+      properties.configuration,
+      this.#scope,
+    );
   }
 
   /**
@@ -64,7 +69,7 @@ export class SimWafWebAcl extends SimWafResource {
     lockToken: string | undefined,
   ): void {
     const defaultAction = readSimWafDefaultAction(configuration);
-    const rules = this.compileRules(configuration);
+    const rules = compileSimWafWebAclRules(configuration, this.#scope);
 
     this.takeLock(lockToken);
     this.replaceDescription(configuration.description);
@@ -77,53 +82,14 @@ export class SimWafWebAcl extends SimWafResource {
    * Decide what happens to one request.
    */
   evaluate(request: SimWafInspectedRequest): SimWafDecision {
-    const counted: string[] = [];
-    const inserted: SimWafHeader[] = [];
+    const outcome = simWafEvaluateRules(this.#rules, request);
 
-    for (const rule of this.#rules) {
-      if (!rule.matches(request)) {
-        continue;
-      }
-
-      inserted.push(...rule.action.insertHeaders);
-
-      if (rule.action.isTerminating) {
-        return this.decision(rule.action, rule.name, counted, inserted);
-      }
-
-      counted.push(rule.name);
-    }
-
-    return this.decision(this.#defaultAction, undefined, counted, inserted);
-  }
-
-  private decision(
-    action: SimWafAction,
-    terminatingRuleName: string | undefined,
-    countedRuleNames: readonly string[],
-    insertedHeaders: readonly SimWafHeader[],
-  ): SimWafDecision {
-    const blocking = action.kind === "BLOCK";
-
-    return {
-      action: blocking ? "BLOCK" : "ALLOW",
+    return simWafDecision({
+      ...outcome,
+      action: outcome.action ?? this.#defaultAction,
       webAclName: this.name,
       webAclArn: this.arn,
-      terminatingRuleName,
-      countedRuleNames,
-      // Nothing is forwarded when the request is blocked, so there is nothing
-      // for a rule's inserted headers to be added to.
-      insertedHeaders: blocking ? [] : insertedHeaders,
-      blocked: action.blocked,
-    };
-  }
-
-  private compileRules(
-    configuration: SimWafWebAclConfiguration,
-  ): readonly SimWafRule[] {
-    return compileSimWafRules(configuration.rules, {
-      regexPatternSets: this.#regexPatternSets,
-      customResponseBodies: configuration.customResponseBodies ?? {},
+      labels: request.labels.all(),
     });
   }
 }

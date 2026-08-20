@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimWafAssociations } from "../../association/sim-waf-associations.js";
 import { SimWafAssociatedItemException } from "../../error/sim-wafv2.error.js";
+import type { SimWafManagedRules } from "../../managed/sim-waf-managed-rules.js";
 import type { SimWafRegexPatternSet } from "../../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafResourceStore } from "../../resource/sim-waf-resource-store.js";
 import { requiredSimWafScope } from "../../scope/sim-waf-scope.js";
@@ -34,6 +35,7 @@ interface SimWafWebAclCommandsProperties {
   readonly webAcls: SimWafResourceStore<SimWafWebAcl>;
   readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
   readonly associations: SimWafAssociations;
+  readonly managedRules: SimWafManagedRules;
   readonly authorizer: SimWafAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -49,6 +51,7 @@ export class SimWafWebAclCommands {
   readonly #webAcls: SimWafResourceStore<SimWafWebAcl>;
   readonly #regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
   readonly #associations: SimWafAssociations;
+  readonly #managedRules: SimWafManagedRules;
   readonly #authorizer: SimWafAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
 
@@ -56,6 +59,7 @@ export class SimWafWebAclCommands {
     this.#webAcls = properties.webAcls;
     this.#regexPatternSets = properties.regexPatternSets;
     this.#associations = properties.associations;
+    this.#managedRules = properties.managedRules;
     this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
   }
@@ -83,6 +87,7 @@ export class SimWafWebAclCommands {
       description: input.Description,
       configuration: configurationOf(input),
       regexPatternSets: this.#regexPatternSets,
+      managedRules: this.#managedRules,
     });
 
     this.#authorizer.authorizeResource(
