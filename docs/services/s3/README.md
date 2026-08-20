@@ -2730,6 +2730,7 @@ it.
 Sim S3 currently supports:
 
 - `CreateBucketCommand` and `ListBucketsCommand`
+- `HeadObjectCommand` and `HeadBucketCommand`, describing an Object or a Bucket without reading it
 - `PutObjectCommand`, `GetObjectCommand`, `ListObjectsV2Command` and `ListObjectsCommand`, with an
   ETag and a last-modified time on every Object
 - `Delimiter` on a listing, rolling keys up into `CommonPrefixes` so a Bucket can be walked as a
@@ -2785,9 +2786,6 @@ These apply across the page. The sections above each list what is specific to th
 - `GetObjectCommand` returns system metadata through `Metadata`, under the header name it is stored
   as, rather than through the `ContentType`, `CacheControl` and other response fields real S3 uses.
   See [Object system metadata](#object-system-metadata).
-- `HeadObjectCommand` is absent from the Commands simulated S3 answers, and SDK interception leaves
-  it alone. A `HEAD` over the S3 REST endpoint is served, answering with the Object's headers and no
-  body, as a presigned `HEAD` URL uses.
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
   a presigned `PUT` unable to set the rest. A `PutObjectCommand` through the SDK keeps all of them.
 - A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other
