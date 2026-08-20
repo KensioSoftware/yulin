@@ -1029,6 +1029,18 @@ token was accepted, and it does not allow this method.
 The token is taken with or without the `Bearer` scheme in front of it. The identity source is one
 header, as it is for a `TOKEN` authorizer.
 
+## Protecting a stage with a web ACL
+
+A simulated WAFv2 web ACL can go in front of a stage, and every request that stage serves is then
+put through its rules. `AssociateWebACL` names the stage by its ARN, which `SimRestApi.stageArn`
+builds.
+
+The web ACL sees the request before the method is matched and before any authorizer runs, ahead of
+IAM, a Lambda authorizer and a Cognito authorizer alike. A blocked request gets 403 with WAF's body,
+and the integration is never invoked. See
+[Protecting an API Gateway REST API stage](../wafv2/#protecting-an-api-gateway-rest-api-stage) in
+the WAFv2 docs.
+
 ## Intercepting an SDK client
 
 `SimSdk` routes `@aws-sdk/client-api-gateway` commands to the simulation. Code under test builds its
@@ -1744,6 +1756,9 @@ and behave differently deployed. The refusals worth knowing about:
 | Methods      | `PutMethod`, `GetMethod`, `DeleteMethod`                                       |
 | Integrations | `PutIntegration`, `GetIntegration`                                             |
 | Publishing   | `CreateDeployment`, `CreateStage`, `GetStage`, `GetStages`, `DeleteStage`      |
+
+A stage can be protected by a simulated WAFv2 web ACL. See
+[Protecting a stage with a web ACL](#protecting-a-stage-with-a-web-acl).
 
 CloudFormation deploys `AWS::ApiGateway::RestApi`, `Resource`, `Method`, `Authorizer`, `Deployment`
 and `Stage`, including the template CDK synthesizes from a `RestApi` or a `LambdaRestApi`. See

@@ -1,10 +1,12 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimWafProtection } from "../../wafv2/association/sim-waf-protection.js";
 import { SimRestApiAuthorizerStore } from "./authorizer/sim-rest-api-authorizer-store.js";
 import type { SimRestApiUserPools } from "./authorizer/sim-rest-api-user-pools.js";
 import { SimRestApiDeploymentStore } from "./deployment/sim-rest-api-deployment-store.js";
 import { SimRestApiResourceStore } from "./resource/sim-rest-api-resource-store.js";
 import type { SimRestApiResource } from "./resource/sim-rest-api-resource.js";
 import { SimApiGatewayNotFound } from "../error/sim-api-gateway.error.js";
+import { simRestApiStageArn } from "./stage/sim-rest-api-stage-arn.js";
 import { SimRestApiStageStore } from "./stage/sim-rest-api-stage-store.js";
 import {
   type SimRestApiMatch,
@@ -22,6 +24,7 @@ interface SimRestApiProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly createdDate: Date;
   readonly userPools: SimRestApiUserPools;
+  readonly webAcls: SimWafProtection;
   readonly description?: string | undefined;
   readonly disableExecuteApiEndpoint?: boolean | undefined;
 }
@@ -50,6 +53,16 @@ export class SimRestApi {
   public readonly userPools: SimRestApiUserPools;
 
   /**
+   * The web ACLs this API's stages can be protected by.
+   *
+   * Held on the API for the reason the user pools are: a request is served
+   * without a command, and the serving layer reaches the API and nothing
+   * around it. Deleting a stage or the API lets go of what a web ACL was held
+   * against here too.
+   */
+  public readonly webAcls: SimWafProtection;
+
+  /**
    * The API's name and description, which `UpdateRestApi` can replace. Neither
    * identifies the API, and two APIs in one Account and Region may share both.
    */
@@ -69,6 +82,7 @@ export class SimRestApi {
     this.accountRegionScope = properties.accountRegionScope;
     this.createdDate = properties.createdDate;
     this.userPools = properties.userPools;
+    this.webAcls = properties.webAcls;
     this.description = properties.description;
     this.disableExecuteApiEndpoint =
       properties.disableExecuteApiEndpoint ?? false;
@@ -100,6 +114,20 @@ export class SimRestApi {
    */
   invokeUrl(stageName: string): string {
     return `https://${this.hostname}/${stageName}`;
+  }
+
+  /**
+   * The ARN naming one stage of this API, whether or not the stage exists.
+   *
+   * It is what a web ACL is associated with, and what a served request is
+   * looked up by. A name no stage carries simply has nothing held against it.
+   */
+  stageArn(stageName: string): string {
+    return simRestApiStageArn({
+      regionName: this.accountRegionScope.regionName,
+      restApiId: this.apiId,
+      stageName,
+    });
   }
 
   /**

@@ -30,6 +30,8 @@ import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-dest
 import { SimSns } from "../../sns/index.js";
 import { simAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-delivery-endpoints.js";
 import { SimSts } from "../../sts/sim-sts.js";
+import { SimWafV2 } from "../../wafv2/index.js";
+import { SimAwsWafProtectedResources } from "../../wafv2/association/sim-aws-waf-protected-resources.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
@@ -221,6 +223,24 @@ export class SimAwsAccountRegionServiceBuilder {
     return new SimScheduler({
       ...this.scoped(scope),
       deliveryTargets: simAwsSchedulerDeliveryTargets(this.simAws),
+    });
+  }
+
+  /**
+   * Create simulated WAFv2 for an Account Region scope.
+   *
+   * Web ACLs are Region-scoped on real AWS, and the `CLOUDFRONT` scope is held
+   * in `us-east-1` because CloudFront is global. It reaches outside itself for
+   * the resources an association can name: a stage ARN carries no Account, so
+   * the resource it names is looked for in this same scope.
+   */
+  createWafV2(scope: SimAwsAccountRegionContainer): SimWafV2 {
+    return new SimWafV2({
+      ...this.scoped(scope),
+      protectedResources: new SimAwsWafProtectedResources({
+        simAws: this.simAws,
+        accountRegionScope: scope.accountRegionScope,
+      }),
     });
   }
 

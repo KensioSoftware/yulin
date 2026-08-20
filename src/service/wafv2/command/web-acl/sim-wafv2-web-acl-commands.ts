@@ -1,4 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimWafAssociations } from "../../association/sim-waf-associations.js";
+import { SimWafAssociatedItemException } from "../../error/sim-wafv2.error.js";
 import type { SimWafRegexPatternSet } from "../../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafResourceStore } from "../../resource/sim-waf-resource-store.js";
 import { requiredSimWafScope } from "../../scope/sim-waf-scope.js";
@@ -13,6 +15,7 @@ import {
 } from "../sim-wafv2-resource-lookup.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { refuseUnsimulatedSimWafWebAclInput } from "./sim-wafv2-unsimulated-web-acl-input.js";
+import { simWafWebAclOutput } from "./sim-waf-web-acl-output.js";
 import type {
   SimCreateWebAclCommand,
   SimCreateWebAclCommandOutput,
@@ -30,6 +33,7 @@ import type {
 interface SimWafWebAclCommandsProperties {
   readonly webAcls: SimWafResourceStore<SimWafWebAcl>;
   readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
+  readonly associations: SimWafAssociations;
   readonly authorizer: SimWafAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -44,12 +48,14 @@ interface SimWafWebAclCommandsProperties {
 export class SimWafWebAclCommands {
   readonly #webAcls: SimWafResourceStore<SimWafWebAcl>;
   readonly #regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
+  readonly #associations: SimWafAssociations;
   readonly #authorizer: SimWafAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(properties: SimWafWebAclCommandsProperties) {
     this.#webAcls = properties.webAcls;
     this.#regexPatternSets = properties.regexPatternSets;
+    this.#associations = properties.associations;
     this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
   }
@@ -96,21 +102,11 @@ export class SimWafWebAclCommands {
     options?: SimWafRequestOptions,
   ): SimGetWebAclCommandOutput {
     const webAcl = this.require(command.input, "wafv2:GetWebACL", options);
-    const { configuration } = webAcl;
 
     return {
       $metadata: {},
       LockToken: webAcl.lockToken,
-      WebACL: {
-        Name: webAcl.name,
-        Id: webAcl.id,
-        ARN: webAcl.arn,
-        Description: webAcl.description,
-        DefaultAction: configuration.defaultAction,
-        Rules: configuration.rules ?? [],
-        VisibilityConfig: configuration.visibilityConfig,
-        CustomResponseBodies: configuration.customResponseBodies,
-      },
+      WebACL: simWafWebAclOutput(webAcl),
     };
   }
 
@@ -165,12 +161,26 @@ export class SimWafWebAclCommands {
 
   /**
    * Remove a web ACL.
+   *
+   * A web ACL still in front of something is refused. Deleting one would
+   * otherwise leave a stage protected by rules nothing holds any more, so the
+   * resources it protects are disassociated first.
    */
   deleteWebAcl(
     command: SimDeleteWebAclCommand,
     options?: SimWafRequestOptions,
   ): SimDeleteWebAclCommandOutput {
     const webAcl = this.require(command.input, "wafv2:DeleteWebACL", options);
+    const associated = this.#associations.resourceArnsFor(webAcl);
+
+    if (associated.length > 0) {
+      throw new SimWafAssociatedItemException(
+        `AWS WAF couldn't perform the operation because your resource is ` +
+          `being used by another resource or it's associated with another ` +
+          `resource: web ACL ${webAcl.name} is associated with ` +
+          `${associated.join(", ")}.`,
+      );
+    }
 
     webAcl.takeLock(command.input.LockToken);
     this.#webAcls.remove(webAcl);

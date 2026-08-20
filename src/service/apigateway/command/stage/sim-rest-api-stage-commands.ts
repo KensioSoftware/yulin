@@ -131,7 +131,8 @@ export class SimRestApiStageCommands {
    *
    * The stage stops serving, and a request addressed to it reaches nothing.
    * The API's resources and methods stay, because they belong to the API, and
-   * another stage still serves them.
+   * another stage still serves them. A web ACL in front of the stage is let go
+   * of, so a stage created again under the same name is unprotected.
    */
   deleteStage(
     command: SimDeleteStageCommand,
@@ -151,6 +152,7 @@ export class SimRestApiStageCommands {
     });
     this.rules.requireStage(restApi, stageName);
     restApi.stages.remove(stageName);
+    restApi.webAcls.release(restApi.stageArn(stageName));
 
     return { $metadata: {} };
   }

@@ -8,9 +8,28 @@ export {
 } from "./scope/sim-waf-scope.js";
 export {
   simWafArn,
+  type SimWafArnParts,
+  simWafArnParts,
   simWafArnPrefix,
   type SimWafResourceKind,
 } from "./sim-wafv2-arn.js";
+export { SimWafSets } from "./sim-wafv2-sets.js";
+export { SimWafAssociations } from "./association/sim-waf-associations.js";
+export {
+  simWafApiGatewayResourceType,
+  type SimWafProtectedResource,
+  simWafProtectedResource,
+} from "./association/sim-waf-protected-resource.js";
+export {
+  SimWafNoProtectedResources,
+  type SimWafProtectedResources,
+} from "./association/sim-waf-protected-resources.js";
+export {
+  SimWafNoProtection,
+  type SimWafProtectedRequest,
+  type SimWafProtection,
+} from "./association/sim-waf-protection.js";
+export { SimWafRestApiStage } from "./association/sim-waf-rest-api-stage.js";
 export {
   SimWafResource,
   type SimWafResourceSummary,
@@ -43,11 +62,13 @@ export {
 export { simWafInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
 export type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 export {
+  SimWafAssociatedItemException,
   SimWafDuplicateItemException,
   SimWafError,
   type SimWafErrorMetadata,
   SimWafInvalidParameterException,
   SimWafNonexistentItemException,
   SimWafOptimisticLockException,
+  SimWafUnavailableEntityException,
   SimWafUnsimulatedInputException,
 } from "./error/sim-wafv2.error.js";
