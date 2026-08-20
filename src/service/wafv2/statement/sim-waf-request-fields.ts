@@ -1,3 +1,4 @@
+import type { SimWafPatternSelection } from "./sim-waf-match-pattern.js";
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
 
 /**
@@ -6,17 +7,6 @@ import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
 export interface SimWafNameValue {
   readonly name: string;
   readonly value: string;
-}
-
-/**
- * Which headers or cookies a rule reads.
- */
-export interface SimWafMatchPatternInput {
-  readonly All?: unknown;
-  readonly IncludedHeaders?: readonly string[] | undefined;
-  readonly ExcludedHeaders?: readonly string[] | undefined;
-  readonly IncludedCookies?: readonly string[] | undefined;
-  readonly ExcludedCookies?: readonly string[] | undefined;
 }
 
 /**
@@ -84,12 +74,11 @@ export function simWafHeaderEntries(
  */
 export function simWafPatternCandidates(properties: {
   readonly entries: readonly SimWafNameValue[];
-  readonly pattern: SimWafMatchPatternInput | undefined;
+  readonly selection: SimWafPatternSelection;
   readonly matchScope: SimWafMatchScope;
 }): readonly string[] {
-  const { entries, pattern, matchScope } = properties;
-  const included = names(pattern?.IncludedHeaders ?? pattern?.IncludedCookies);
-  const excluded = names(pattern?.ExcludedHeaders ?? pattern?.ExcludedCookies);
+  const { entries, matchScope } = properties;
+  const { included, excluded } = properties.selection;
 
   return entries
     .filter(
@@ -115,12 +104,6 @@ export function requiredSimWafMatchScope(
   }
 
   return matchScope;
-}
-
-function names(listed: readonly string[] | undefined): Set<string> | undefined {
-  return listed === undefined
-    ? undefined
-    : new Set(listed.map((name) => name.toLowerCase()));
 }
 
 function scoped(

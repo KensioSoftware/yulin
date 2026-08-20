@@ -83,6 +83,10 @@ function readWithinLimit(encoded: readonly Uint8Array[]): readonly string[] {
   let budget = simWafInspectionLimitBytes;
 
   for (const bytes of encoded) {
+    if (budget === 0) {
+      break;
+    }
+
     if (bytes.length > budget) {
       // An entry over the remaining budget is cut where WAF stopped reading,
       // which for a body is the only case that happens.

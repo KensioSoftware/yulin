@@ -71,6 +71,27 @@ describe("SimWafV2 IP sets", () => {
     assertStringIncludes(error.message, "192.0.2.44");
   });
 
+  it("refuses an address whose prefix length is not digits", async () => {
+    // Given a simulated WAFv2.
+    const waf = new SimAws().wafV2();
+
+    // When an IP set carries a range with an empty prefix length.
+    const error = await assertThrowsErrorAsync(async () => {
+      await waf.createIpSet(
+        new CreateIPSetCommand({
+          Name: "office",
+          Scope: "REGIONAL",
+          IPAddressVersion: "IPV4",
+          Addresses: ["192.0.2.0/"],
+        }),
+      );
+    });
+
+    // Then it is refused, rather than being read as `/0` and covering every
+    // address there is.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+  });
+
   it("refuses an address version it does not hold", async () => {
     // Given a simulated WAFv2.
     const waf = new SimAws().wafV2();

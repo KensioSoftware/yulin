@@ -1,4 +1,4 @@
-import type { SimWafMatchPatternInput } from "./sim-waf-request-fields.js";
+import type { SimWafMatchPatternInput } from "./sim-waf-match-pattern.js";
 
 /**
  * The parts of a request a WAFv2 rule can be pointed at, in the API's own

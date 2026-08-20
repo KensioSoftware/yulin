@@ -1,5 +1,8 @@
 import type { SimWafFieldToMatchInput } from "./sim-waf-field-to-match.type.js";
-import { refuseSimWafRuleInput } from "./sim-waf-rule-refusals.js";
+import {
+  invalidSimWafRule,
+  refuseSimWafRuleInput,
+} from "./sim-waf-rule-refusals.js";
 
 /**
  * Refuse the field-to-match kinds real WAFv2 offers and this simulation does
@@ -13,6 +16,8 @@ export function refuseUnsimulatedSimWafField(
   field: SimWafFieldToMatchInput,
   ruleName: string,
 ): void {
+  refuseTwoFields(field, ruleName);
+
   if (field.JsonBody !== undefined) {
     refuseSimWafRuleInput(
       ruleName,
@@ -40,6 +45,31 @@ export function refuseUnsimulatedSimWafField(
   }
 
   refuseFingerprintFields(field, ruleName);
+}
+
+/**
+ * Refuse a field to match naming more than one part of the request.
+ *
+ * Real WAFv2 takes one request component per `FieldToMatch`, and a rule that
+ * wants two is written as two rules. Reading the first component found would
+ * make which of them the rule inspected a matter of the order they are checked
+ * in.
+ */
+function refuseTwoFields(
+  field: SimWafFieldToMatchInput,
+  ruleName: string,
+): void {
+  const named = Object.entries(field)
+    .filter(([, value]) => value !== undefined)
+    .map(([component]) => component);
+
+  if (named.length > 1) {
+    invalidSimWafRule(
+      ruleName,
+      `The field to match names ${named.join(" and ")}, and a statement ` +
+        `inspects one request component`,
+    );
+  }
 }
 
 function refuseFingerprintFields(

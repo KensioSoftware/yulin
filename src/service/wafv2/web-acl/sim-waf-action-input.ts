@@ -2,13 +2,14 @@ import {
   simWafDefaultBlockedResponse,
   type SimWafBlockedResponse,
 } from "../evaluate/sim-waf-blocked-response.js";
+import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 import {
   invalidSimWafRule,
   refuseSimWafRuleInput,
 } from "../statement/sim-waf-rule-refusals.js";
 import {
   requiredSimWafResponseBody,
-  simWafCustomHeaders,
+  simWafResponseHeaders,
 } from "./sim-waf-custom-response.js";
 import type {
   SimWafCustomResponseBodies,
@@ -35,11 +36,33 @@ export function simWafBlockedResponse(
     key === undefined ? undefined : requiredSimWafResponseBody(key, bodies);
 
   return {
-    statusCode: customResponse.ResponseCode ?? fallback.statusCode,
+    statusCode: requiredResponseCode(customResponse.ResponseCode),
     contentType: body?.contentType ?? fallback.contentType,
     body: body?.content ?? fallback.body,
-    headers: simWafCustomHeaders(customResponse.ResponseHeaders),
+    headers: simWafResponseHeaders(customResponse.ResponseHeaders),
   };
+}
+
+/**
+ * Read the status a custom response answers with.
+ *
+ * Real WAFv2 requires one in the 200 to 599 range. Falling back to WAF's own
+ * 403 would answer with a status the rule did not ask for.
+ */
+function requiredResponseCode(responseCode: number | undefined): number {
+  if (
+    responseCode === undefined ||
+    !Number.isSafeInteger(responseCode) ||
+    responseCode < 200 ||
+    responseCode > 599
+  ) {
+    throw new SimWafInvalidParameterException(
+      `Error reason: A custom response code is a whole number from 200 to ` +
+        `599, field: CUSTOM_RESPONSE, parameter: ${String(responseCode)}`,
+    );
+  }
+
+  return responseCode;
 }
 
 /**

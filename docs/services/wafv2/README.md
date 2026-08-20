@@ -180,8 +180,13 @@ and `CONTINUE` inspects as much as WAF would have read.
 ## Answering a blocked request
 
 A `Block` action answers 403 with WAF's own body. A `CustomResponse` overrides the status and the
-body, taking the body from the web ACL's `CustomResponseBodies` by key. Headers a rule names are
-prefixed with `x-amzn-waf-`, as WAF prefixes them.
+body, taking the body from the web ACL's `CustomResponseBodies` by key. It carries a `ResponseCode`
+of its own, from 200 to 599, and any response headers it names reach the client under the names it
+gave them.
+
+The `x-amzn-waf-` prefix belongs to the other direction. WAF puts it on the headers an `Allow` or
+`Count` action inserts into the request it forwards, which is what tells a rule's header apart from
+one the client sent.
 
 ```typescript sim-wafv2-custom-response
 /**
@@ -249,7 +254,7 @@ const response = simWafBlockedHttpResponse(decision.blocked!);
 // 404 "hide-admin" '{"message":"Not found"}'
 console.log(
   response.status,
-  response.headers.get("x-amzn-waf-rule"),
+  response.headers.get("rule"),
   await response.text(),
 );
 ```

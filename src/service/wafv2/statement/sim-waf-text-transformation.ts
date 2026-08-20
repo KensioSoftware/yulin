@@ -1,4 +1,5 @@
 import { refuseSimWafRuleInput } from "./sim-waf-rule-refusals.js";
+import { simWafUrlDecode } from "./sim-waf-url-decode.js";
 
 /**
  * Minimal structural WAFv2 text transformation.
@@ -24,7 +25,7 @@ const namedEntities = new Map<string, string>([
 const transforms = new Map<string, SimWafTextTransform>([
   ["NONE", (value): string => value],
   ["LOWERCASE", (value): string => value.toLowerCase()],
-  ["URL_DECODE", urlDecode],
+  ["URL_DECODE", simWafUrlDecode],
   ["COMPRESS_WHITE_SPACE", compressWhitespace],
   ["HTML_ENTITY_DECODE", htmlEntityDecode],
 ]);
@@ -71,27 +72,6 @@ function compileOne(
   }
 
   return transform;
-}
-
-/**
- * Decode percent escapes and `+` as a space, as WAF's URL_DECODE does.
- *
- * An escape that decodes to nothing is left as it stands rather than failing
- * the whole match. WAF still inspects malformed input, and a rule that threw
- * its hands up at it would be a way past the rule.
- */
-function urlDecode(value: string): string {
-  return value.replaceAll(/\+|%[\da-f]{2}/giu, (escape) => {
-    if (escape === "+") {
-      return " ";
-    }
-
-    try {
-      return decodeURIComponent(escape);
-    } catch {
-      return escape;
-    }
-  });
 }
 
 /**

@@ -294,6 +294,29 @@ describe("SimWafV2 field to match", () => {
     assertTrue(matches(new Request("https://example.test/", { headers })));
   });
 
+  it("stops at the header that used the last of the budget", async () => {
+    // Given a statement over every header value, and a first header that fills
+    // the inspection limit exactly.
+    const matches = await simWafStatementMatches(
+      new SimAws().wafV2(),
+      contains("needle", {
+        Headers: {
+          MatchPattern: { All: {} },
+          MatchScope: "VALUE",
+          OversizeHandling: "CONTINUE",
+        },
+      }),
+    );
+    const headers = new Headers({
+      "x-first": "y".repeat(simWafInspectionLimitBytes),
+      "x-second": "needle",
+    });
+
+    // Then the header after it is not read at all, and no empty value stands
+    // in for it.
+    assertFalse(matches(new Request("https://example.test/", { headers })));
+  });
+
   it("reads the request body", async () => {
     // Given a statement over the body.
     const matches = await simWafStatementMatches(

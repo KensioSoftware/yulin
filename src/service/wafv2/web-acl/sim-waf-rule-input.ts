@@ -47,8 +47,12 @@ export function requiredSimWafRulePriority(
   priority: number | undefined,
   name: string,
 ): number {
-  if (priority === undefined || !Number.isSafeInteger(priority)) {
-    invalidSimWafRule(name, "A rule needs a whole number Priority");
+  if (
+    priority === undefined ||
+    !Number.isSafeInteger(priority) ||
+    priority < 0
+  ) {
+    invalidSimWafRule(name, "A rule needs a Priority of zero or more");
   }
 
   return priority;

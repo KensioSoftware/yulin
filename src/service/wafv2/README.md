@@ -47,6 +47,10 @@ rules that counted, the headers to add to a forwarded request, and what to answe
 with. The counted rules matter because a `Count` action leaves the request as it found it. A test
 staging a rule before turning it on asserts against that list.
 
+`web-acl/sim-waf-custom-response.ts` keeps the two header readers apart, and the difference is
+easy to get wrong. WAF prefixes an inserted request header with `x-amzn-waf-` as it adds it to what
+it forwards. A custom response header keeps the name the rule gave it.
+
 `evaluate/sim-waf-blocked-response.ts` holds the default 403 body. Real WAF hands the blocking off
 to whatever the web ACL is in front of, and each of those writes its own page (CloudFront's error
 page, API Gateway's `{"message":"Forbidden"}`). This is Yulin's own body until there is a fronting
@@ -66,7 +70,10 @@ The pieces underneath it each answer one question about a statement:
   selected), and a statement matches when any of them does.
 - `sim-waf-text-transformation.ts` applies the rule's transformations in ascending `Priority`. WAF
   orders them by priority and not by how the list was written. Lowercasing after decoding is a
-  different rule from decoding after lowercasing.
+  different rule from decoding after lowercasing. `sim-waf-url-decode.ts` is the one of them worth
+  its own file, because a run of percent escapes has to be decoded together for a non-ASCII
+  character to come out of it.
+- `sim-waf-match-pattern.ts` reads which headers or cookies a rule selects.
 - `sim-waf-byte-match.ts`, `sim-waf-regex-match.ts` and `sim-waf-size-constraint.ts` are the three
   tests a field is put through.
 - `sim-waf-logical-statement.ts` joins and negates the others.
