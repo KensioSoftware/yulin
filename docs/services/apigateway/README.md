@@ -1174,9 +1174,9 @@ await srv.close();
 
 The API is named by `info.title`. `uri` is read as either the long
 `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form above
-or as the bare function ARN. Every imported method is declared with `AuthorizationType: "NONE"`, and
-a document naming an authorizer is refused. Gate a method with `CreateAuthorizer` and `PutMethod`
-instead, as [Authorizing a method](#authorizing-a-method) covers.
+or as the bare function ARN. An operation carrying no `security` becomes an open method, and one
+naming a security scheme is gated by the authorizer that scheme declares. See
+[Security schemes](#security-schemes).
 
 ### The catch-all operation key
 
@@ -1196,6 +1196,176 @@ the resource has no method of its own for, and OpenAPI has no operation key of i
 A `{proxy+}` segment becomes a greedy resource that matches the rest of the request path. One path
 of `/{proxy+}` carrying that extension is the whole of what CDK's `LambdaRestApi` builds.
 
+### Security schemes
+
+A `components.securitySchemes` member carrying `x-amazon-apigateway-authtype` becomes an authorizer,
+and `security` on an operation puts that authorizer in front of the method. The scheme key names it.
+One authorizer is created per scheme, shared by every operation naming it.
+
+```typescript sim-apigateway-openapi-authorizer
+/**
+ * Importing a REST API whose method is gated by a security scheme.
+ */
+
+import {
+  GetAuthorizersCommand,
+  GetMethodCommand,
+  GetResourcesCommand,
+  ImportRestApiCommand,
+} from "@aws-sdk/client-api-gateway";
+import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimRestApiTokenAuthorizerEvent } from "@kensio/yulin/apigateway";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+const { FunctionArn: petsArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pets",
+    Role: "arn:aws:iam::111111111111:role/PetsRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => ({
+        statusCode: 200,
+        body: "pets",
+      })),
+    },
+  }),
+);
+
+const { FunctionArn: authorizerArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pet-authorizer",
+    Role: "arn:aws:iam::111111111111:role/PetsRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: SimRestApiTokenAuthorizerEvent) => ({
+          principalId: "pet-owner",
+          policyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Action: "execute-api:Invoke",
+                Effect:
+                  event.authorizationToken === "Bearer valid"
+                    ? "Allow"
+                    : "Deny",
+                Resource: event.methodArn,
+              },
+            ],
+          },
+        }),
+      ),
+    },
+  }),
+);
+
+const openApi = {
+  openapi: "3.0.1",
+  info: { title: "pets", version: "1.0" },
+  paths: {
+    "/pets": {
+      get: {
+        security: [{ "pet-authorizer": [] }],
+        "x-amazon-apigateway-integration": {
+          type: "aws_proxy",
+          httpMethod: "POST",
+          uri: petsArn,
+        },
+      },
+    },
+  },
+  components: {
+    securitySchemes: {
+      "pet-authorizer": {
+        type: "apiKey",
+        name: "Authorization",
+        in: "header",
+        "x-amazon-apigateway-authtype": "custom",
+        "x-amazon-apigateway-authorizer": {
+          type: "token",
+          authorizerUri: authorizerArn,
+          authorizerResultTtlInSeconds: 300,
+        },
+      },
+    },
+  },
+};
+
+const apiGateway = simAws.apiGateway();
+
+const definition = new TextEncoder().encode(JSON.stringify(openApi));
+
+const { id: restApiId } = await apiGateway.importRestApi(
+  new ImportRestApiCommand({ body: definition }),
+);
+
+const authorizers = await apiGateway.getAuthorizers(
+  new GetAuthorizersCommand({ restApiId }),
+);
+
+console.log(authorizers.items.map((one) => [one.name, one.type]));
+// [ [ "pet-authorizer", "TOKEN" ] ]
+
+const resources = await apiGateway.getResources(
+  new GetResourcesCommand({ restApiId }),
+);
+const pets = resources.items.find((resource) => resource.path === "/pets");
+
+const method = await apiGateway.getMethod(
+  new GetMethodCommand({ restApiId, resourceId: pets?.id, httpMethod: "GET" }),
+);
+
+console.log(method.authorizationType);
+// "CUSTOM"
+```
+
+Three `x-amazon-apigateway-authtype` values are read, and each writes a different kind of gate on
+the method.
+
+| `x-amazon-apigateway-authtype` | The authorizer `type` under it | Method `AuthorizationType` |
+| ------------------------------ | ------------------------------ | -------------------------- |
+| `custom`                       | `token` or `request`           | `CUSTOM`                   |
+| `cognito_user_pools`           | `cognito_user_pools`           | `COGNITO_USER_POOLS`       |
+| `awsSigv4`                     | (the scheme carries none)      | `AWS_IAM`                  |
+
+A `cognito_user_pools` authorizer carries the `providerARNs` of the pools it accepts tokens from,
+and the scopes a requirement asks for (`security: [{ "pet-authorizer": ["pets.read"] }]`) become the
+method's `authorizationScopes`. `PutMethod` refuses scopes on every other kind of method, since a
+token is what they are checked against.
+
+An `awsSigv4` scheme names a header and leaves the deciding to IAM. `x-amazon-apigateway-auth` on an
+operation asks for the same gate, and is what an API Gateway console export writes:
+
+```json
+{ "x-amazon-apigateway-auth": { "type": "AWS_IAM" } }
+```
+
+A `token` or `cognito_user_pools` authorizer reads the one header the scheme's own `name` and `in`
+name, which for the scheme above is `method.request.header.Authorization`. That is where AWS reads
+it from, and an `identitySource` written inside either authorizer is refused. A `request` authorizer
+names its own `identitySource`, with as many comma-separated expressions as identify its callers.
+
+`authorizerResultTtlInSeconds` on a Lambda authorizer is how long its decisions are held for, the
+same as it is on `CreateAuthorizer`. See
+[Caching the authorizer's decision](#caching-the-authorizers-decision).
+
+A scheme whose `x-amazon-apigateway-authtype` and whose authorizer `type` disagree is refused,
+naming the pointer of the member they disagree about, such as
+`#/components/securitySchemes/pet-authorizer/x-amazon-apigateway-authorizer/type`. These are refused
+where a document writes them too:
+
+- An `apiKey` scheme carrying no `x-amazon-apigateway-authtype`. That is an API key, and API keys
+  and usage plans are outside this simulation.
+- An `http`, `oauth2` or `openIdConnect` scheme. A REST API method is gated by the three authtypes
+  above and by nothing else.
+- `authorizerCredentials` and `identityValidationExpression` on an authorizer. `CreateAuthorizer`
+  refuses both of them as well.
+- A `security` requirement at the root of the document. Write the requirement on each operation.
+- An operation naming two requirements, or one requirement naming two schemes. One authorizer
+  decides a method.
+
 ### Members that are ignored
 
 AWS sorts what an import finds into three categories, and the third is valid OpenAPI a REST API
@@ -1213,8 +1383,8 @@ pointer of the member, such as
 ### Replacing a definition
 
 `PutRestApiCommand` with `mode: "overwrite"` replaces an API's whole definition with the document's.
-The API keeps its id, its endpoint and the stages serving it, and its path tree is built again from
-the document.
+The API keeps its id, its endpoint and the stages serving it. Its path tree and its authorizers are
+built again from the document, and an authorizer the previous definition left behind goes with them.
 
 ```typescript
 await apiGateway.putRestApi(
@@ -1557,10 +1727,11 @@ and behave differently deployed. The refusals worth knowing about:
 - **Paging.** Every list command answers in full, and `limit` or `position` is refused.
 - **Endpoint types, request validators, models, mapping templates and WAF.** All refused.
 - **Updates.** `UpdateRestApi` replaces `/name` and `/description`. Any other patch path is refused.
-- **OpenAPI extensions.** An import reads `x-amazon-apigateway-integration` and
-  `x-amazon-apigateway-any-method`. Every other `x-amazon-apigateway-*` extension is refused, and so
-  is any integration member beyond `type`, `httpMethod` and `uri`. Each refusal names the JSON
-  pointer of the member.
+- **OpenAPI extensions.** An import reads `x-amazon-apigateway-integration`,
+  `x-amazon-apigateway-any-method`, `x-amazon-apigateway-authtype`,
+  `x-amazon-apigateway-authorizer` and `x-amazon-apigateway-auth`. Every other
+  `x-amazon-apigateway-*` extension is refused, and so is any integration member beyond `type`,
+  `httpMethod` and `uri`. Each refusal names the JSON pointer of the member.
 
 ## Available functionality
 
@@ -1597,9 +1768,8 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
   document and an `openapi: "3.1.0"` one by version. A `Body` carrying a Swagger 2.0 document is
   recorded and the API deploys without it. The body is JSON, and YAML is refused with the same
   message.
-- A security scheme carrying `x-amazon-apigateway-authorizer` is not read, and an operation with a
-  `security` requirement is refused. An imported method is open or the import did not happen. A
-  method gated by an authorizer is declared through `CreateAuthorizer` and `PutMethod` instead. See
-  [Authorizing a method](#authorizing-a-method).
+- A security scheme declares a Lambda authorizer, a Cognito one or IAM authorization. An `apiKey`
+  scheme carrying no `x-amazon-apigateway-authtype` is an API key and is refused, and so are the
+  `http`, `oauth2` and `openIdConnect` scheme types. See [Security schemes](#security-schemes).
 - `PutRestApi` replaces a definition and never merges one. `BodyS3Location` on the Resource, and a
   document held anywhere but inline, are outside this.

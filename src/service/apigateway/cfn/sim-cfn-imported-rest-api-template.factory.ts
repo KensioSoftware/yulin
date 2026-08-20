@@ -7,8 +7,8 @@ import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/va
  * What a test asks for when it wants a template declaring a REST API as an
  * OpenAPI document rather than as Resources.
  *
- * `paths` is the document's own, so a test states the one operation it is
- * about. The resources, methods and integrations they declare are created by
+ * `paths` and `components` are the document's own, so a test states the one
+ * operation or security scheme it is about. The resources, methods and integrations they declare are created by
  * the import, so the template carries no `AWS::ApiGateway::Resource` or
  * `Method` of its own.
  */
@@ -17,6 +17,7 @@ export interface SimCfnImportedRestApiTemplateInput {
   /** The inline function code the document's integrations point at. */
   readonly handlerSource: string;
   readonly paths: SimCfnTemplateValueRecord;
+  readonly components: SimCfnTemplateValueRecord;
   /** Merged into the Api Resource last, so a test states one property. */
   readonly apiProperties: SimCfnTemplateValueRecord;
   /** Resources the template carries beyond the ones built here. */
@@ -58,6 +59,7 @@ export const simCfnImportedRestApiTemplateFactory = new MappedFactory<
     functionName: "pets",
     handlerSource: "exports.handler = async () => 'pets';",
     paths: {},
+    components: {},
     apiProperties: {},
     resources: {},
   }),
@@ -95,6 +97,7 @@ export const simCfnImportedRestApiTemplateFactory = new MappedFactory<
             openapi: "3.0.1",
             info: { title: input.functionName, version: "1.0" },
             paths: input.paths,
+            components: input.components,
           },
           ...input.apiProperties,
         },

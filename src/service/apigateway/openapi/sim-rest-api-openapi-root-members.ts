@@ -12,8 +12,8 @@ export const simRestApiOpenApiRefusedRootMembers: readonly (readonly [
   ],
   [
     "security",
-    "a security requirement applying to every operation is not simulated, " +
-      "because authorizing a method is not simulated",
+    "a security requirement applying to every operation is not simulated. " +
+      "Declare the requirement on each operation instead.",
   ],
   [
     "x-amazon-apigateway-policy",

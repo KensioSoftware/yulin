@@ -1,10 +1,12 @@
 import type { SimRestApi } from "../api/sim-rest-api.js";
+import type { SimRestApiAuthorizerCommands } from "../command/authorizer/sim-rest-api-authorizer-commands.js";
 import type { SimRestApiResourceCommands } from "../command/resource/sim-rest-api-resource-commands.js";
 import type { SimRestApiOpenApiDocument } from "./sim-rest-api-openapi-document.js";
 import type { SimRestApiOpenApiImport } from "./sim-rest-api-openapi-import.js";
 
 interface SimRestApiOpenApiReplacementProperties {
   readonly resourceCommands: SimRestApiResourceCommands;
+  readonly authorizerCommands: SimRestApiAuthorizerCommands;
   readonly openApiImport: SimRestApiOpenApiImport;
 }
 
@@ -17,10 +19,12 @@ interface SimRestApiOpenApiReplacementProperties {
  */
 export class SimRestApiOpenApiReplacement {
   private readonly resourceCommands: SimRestApiResourceCommands;
+  private readonly authorizerCommands: SimRestApiAuthorizerCommands;
   private readonly openApiImport: SimRestApiOpenApiImport;
 
   constructor(properties: SimRestApiOpenApiReplacementProperties) {
     this.resourceCommands = properties.resourceCommands;
+    this.authorizerCommands = properties.authorizerCommands;
     this.openApiImport = properties.openApiImport;
   }
 
@@ -45,11 +49,14 @@ export class SimRestApiOpenApiReplacement {
   }
 
   /**
-   * Delete every resource under the root, through the ordinary command.
+   * Delete the whole definition, through the ordinary commands.
    *
    * Only the resources directly under the root are named, because deleting one
    * takes its subtree with it. The root itself stays, since every REST API has
-   * one.
+   * one. The authorizers go with the methods that named them, since a document
+   * declares the authorizers of the API it replaces along with everything
+   * else, and each import of the same document would otherwise create another
+   * authorizer nothing names.
    */
   private empty(restApi: SimRestApi): void {
     for (const child of restApi.resources.children(
@@ -57,6 +64,15 @@ export class SimRestApiOpenApiReplacement {
     )) {
       this.resourceCommands.deleteResource({
         input: { restApiId: restApi.apiId, resourceId: child.resourceId },
+      });
+    }
+
+    for (const authorizer of restApi.authorizers.list()) {
+      this.authorizerCommands.deleteAuthorizer({
+        input: {
+          restApiId: restApi.apiId,
+          authorizerId: authorizer.authorizerId,
+        },
       });
     }
   }

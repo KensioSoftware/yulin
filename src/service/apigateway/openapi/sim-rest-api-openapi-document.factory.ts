@@ -5,13 +5,15 @@ import type { JSONObject } from "../../../util/type-guard/json.js";
 /**
  * What a test asks for when it wants an OpenAPI document to import.
  *
- * `paths` is empty by default rather than carrying an operation of its own, so
- * a test states the one path item it is about and nothing is merged into it.
+ * `paths` and `components` are empty by default rather than carrying an
+ * operation of their own, so a test states the one path item or security
+ * scheme it is about and nothing is merged into it.
  */
 export interface SimRestApiOpenApiDocumentInput {
   readonly openapi: string;
   readonly title: string;
   readonly paths: JSONObject;
+  readonly components: JSONObject;
 }
 
 /**
@@ -35,10 +37,12 @@ export const simRestApiOpenApiDocumentFactory = new MappedFactory<
     openapi: "3.0.1",
     title: "pets",
     paths: {},
+    components: {},
   }),
   (input) => ({
     openapi: input.openapi,
     info: { title: input.title, version: "1.0" },
     paths: input.paths,
+    components: input.components,
   }),
 );
