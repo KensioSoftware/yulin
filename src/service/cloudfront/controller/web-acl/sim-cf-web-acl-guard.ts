@@ -17,12 +17,7 @@ import type { SimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl.js";
  * edge with the 403 the web ACL's block action describes.
  */
 export class SimCfWebAclGuard {
-  /**
-   * A guard with nothing to resolve a web ACL through stands in front of a
-   * simulation holding none, so a Distribution naming one is refused rather
-   * than served as though it named nothing.
-   */
-  constructor(private readonly resolveWebAcl?: SimCfWebAclResolver) {}
+  constructor(private readonly resolveWebAcl: SimCfWebAclResolver) {}
 
   /**
    * Answer with the request to carry on with, or the response a blocked
@@ -42,7 +37,7 @@ export class SimCfWebAclGuard {
       return request;
     }
 
-    const found = this.resolveWebAcl?.(webAclArn);
+    const found = this.resolveWebAcl(webAclArn);
 
     if (found === undefined) {
       throw new SimCloudFrontInvalidWebAclId(

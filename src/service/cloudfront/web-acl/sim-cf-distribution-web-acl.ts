@@ -39,15 +39,15 @@ export class SimCfDistributionWebAcl {
    */
   assertUsable(distributionConfig: SimCloudFrontDistributionConfig): void {
     const webAclArn = simCfWebAclArn(distributionConfig);
-    const resolve = this.resolve;
 
-    // A simulated CloudFront built on its own has no simulation around it to
-    // find a web ACL in, so there is nothing to check the ARN against.
-    if (webAclArn === undefined || resolve === undefined) {
+    if (webAclArn === undefined) {
       return;
     }
 
-    const found = resolve(webAclArn);
+    // A simulated CloudFront built on its own has no simulation around it
+    // holding web ACLs, and a resolver that finds nothing means the same thing
+    // here as one that looked and came back empty.
+    const found = this.resolve?.(webAclArn);
 
     if (found === undefined) {
       throw new SimCloudFrontInvalidWebAclId(

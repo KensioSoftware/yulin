@@ -19,6 +19,7 @@ import { simWafCreateWebAclFactory } from "../../wafv2/command/web-acl/sim-waf-c
 import { simWafCloudFrontRegion } from "../../wafv2/scope/sim-waf-scope.js";
 import { createSimWafWebAcl } from "../../wafv2/sim-wafv2.fixture.js";
 import { SimCloudFrontInvalidWebAclId } from "../error/sim-cloudfront.error.js";
+import { SimCloudFront } from "../sim-cloudfront.js";
 import {
   simCfSiteBucket,
   simCfSiteDistributionConfig,
@@ -128,6 +129,35 @@ describe("A sim CloudFront Distribution's web ACL", () => {
     assertInstanceOf(error, SimCloudFrontInvalidWebAclId);
     assertStringIncludes(error.message, missingWebAclArn);
     assertMapSize(simAws.cloudFront().getDistributions(), 0);
+  });
+
+  it("refuses a WebACLId on a CloudFront with no simulation around it", async () => {
+    // Given a simulated CloudFront built on its own, with no simulated WAFv2
+    // anywhere to hold a web ACL.
+    const cloudFront = new SimCloudFront();
+
+    // When a Distribution is created naming one.
+    const error = await assertThrowsErrorAsync(async () => {
+      await cloudFront.createDistribution(
+        new CreateDistributionCommand({
+          DistributionConfig: {
+            CallerReference: "standalone",
+            Comment: "Standalone Distribution",
+            Enabled: true,
+            WebACLId: missingWebAclArn,
+            Origins: { Quantity: 0, Items: [] },
+            DefaultCacheBehavior: {
+              TargetOriginId: "unused-origin",
+              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        }),
+      );
+    });
+
+    // Then it is refused at create, rather than taken on and then failing
+    // every request it has no way to decide.
+    assertInstanceOf(error, SimCloudFrontInvalidWebAclId);
   });
 
   it("refuses a Distribution naming a REGIONAL scope web ACL", async () => {

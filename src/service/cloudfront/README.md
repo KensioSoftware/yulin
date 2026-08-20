@@ -170,7 +170,8 @@ registry checks nothing.
 
 `web-acl/` holds what a Distribution's `WebACLId` means. `SimCfWebAclResolver` finds the web ACL an
 ARN names, in the Account and Region the ARN carries, through that scope's simulated WAFv2.
-`makeSimCfWebAclResolver` builds one over a `SimAws`, and a standalone `SimCloudFront` has none.
+`makeSimCfWebAclResolver` builds one over a `SimAws`. A standalone `SimCloudFront` has none, and
+refuses any `WebACLId` for want of anywhere to find the web ACL.
 
 `SimCfDistributionWebAcl` refuses a `DistributionConfig` naming a web ACL nothing created, and one
 naming a `REGIONAL` scope web ACL, both as `InvalidWebACLId`. The check runs at create and at

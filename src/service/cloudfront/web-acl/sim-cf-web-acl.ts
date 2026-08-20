@@ -18,10 +18,9 @@ export interface SimCfWebAcl {
 /**
  * Find the web ACL an ARN names, wherever in the simulation it was created.
  *
- * Nothing means no web ACL of that ARN, which is what a Distribution is
- * refused for. A CloudFront Distribution is created without one more often
- * than with one, so a simulated CloudFront built outside a SimAws has no
- * resolver at all and answers nothing.
+ * Nothing means no web ACL of that ARN, which is what a Distribution naming
+ * one is refused for. A simulated CloudFront built outside a SimAws has no
+ * resolver at all, and a `WebACLId` is refused there for the same reason.
  */
 export type SimCfWebAclResolver = (
   webAclArn: string,
