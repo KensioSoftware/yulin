@@ -9,6 +9,7 @@ import type {
   SimWafHeadersFieldInput,
 } from "./sim-waf-field-to-match.type.js";
 import type { SimWafFieldReader } from "./sim-waf-field-to-match.js";
+import { requiredSimWafPatternSelection } from "./sim-waf-match-pattern.js";
 import {
   type SimWafNameValue,
   requiredSimWafMatchScope,
@@ -70,13 +71,16 @@ function entriesReader(
     input.OversizeHandling,
     ruleName,
   );
-  const pattern = input.MatchPattern;
+  const selection = requiredSimWafPatternSelection(
+    input.MatchPattern,
+    ruleName,
+  );
 
   return (request): SimWafFieldContent =>
     simWafFieldContent(
       simWafPatternCandidates({
         entries: entries(request),
-        pattern,
+        selection,
         matchScope,
       }),
       oversize,

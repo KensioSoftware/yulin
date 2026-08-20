@@ -63,6 +63,6 @@ const response = simWafBlockedHttpResponse(decision.blocked!);
 // 404 "hide-admin" '{"message":"Not found"}'
 console.log(
   response.status,
-  response.headers.get("x-amzn-waf-rule"),
+  response.headers.get("rule"),
   await response.text(),
 );

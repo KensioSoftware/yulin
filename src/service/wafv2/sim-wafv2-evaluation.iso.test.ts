@@ -185,9 +185,10 @@ describe("SimWafV2 rule evaluation", () => {
     const response = simWafBlockedHttpResponse(decision.blocked);
 
     // Then the status, the body and the header the rule named all reach the
-    // client, with WAF's own prefix on the header name.
+    // client, under the name the rule gave it. The `x-amzn-waf-` prefix is for
+    // headers inserted into a request, not for a response.
     assertResponseStatus(response, 429);
-    assertIdentical(response.headers.get("x-amzn-waf-reason"), "too-many");
+    assertIdentical(response.headers.get("reason"), "too-many");
     assertIdentical(await response.text(), '{"message":"slow down"}');
   });
 
@@ -213,7 +214,10 @@ describe("SimWafV2 rule evaluation", () => {
     const rules = [
       pathRule("block-admin", 0, "/admin", {
         Block: {
-          CustomResponse: { CustomResponseBodyKey: "silence" },
+          CustomResponse: {
+            ResponseCode: 403,
+            CustomResponseBodyKey: "silence",
+          },
         },
       }),
     ];

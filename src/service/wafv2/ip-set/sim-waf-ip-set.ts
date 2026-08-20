@@ -94,6 +94,14 @@ export function requiredSimWafIpAddressVersion(
 }
 
 /**
+ * A prefix length as WAF writes one, which is digits and nothing else.
+ *
+ * Reading it as a number alone would take `192.0.2.0/` as `/0`, and would take
+ * a signed, spaced or hexadecimal prefix as well.
+ */
+const decimalPrefix = /^\d+$/u;
+
+/**
  * Check one address is written the way WAF wants it.
  *
  * WAF takes CIDR notation and nothing else, so a bare address is refused here
@@ -107,14 +115,13 @@ function checkedAddress(
   const isAddress = version === "IPV4" ? isIPv4 : isIPv6;
   const longestPrefix = version === "IPV4" ? 32 : 128;
   const separator = address.lastIndexOf("/");
-  const prefixLength = Number(address.slice(separator + 1));
+  const prefix = address.slice(separator + 1);
 
   if (
     separator === -1 ||
     !isAddress(address.slice(0, separator)) ||
-    !Number.isSafeInteger(prefixLength) ||
-    prefixLength < 0 ||
-    prefixLength > longestPrefix
+    !decimalPrefix.test(prefix) ||
+    Number(prefix) > longestPrefix
   ) {
     throw new SimWafInvalidParameterException(
       `Error reason: The IP address ${address} is not valid ${version} CIDR ` +

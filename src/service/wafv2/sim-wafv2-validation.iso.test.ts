@@ -134,7 +134,12 @@ describe("SimWafV2 input validation", () => {
         {
           ...simWafRuleFactory.make({ Name: "the-rule" }),
           Action: {
-            Block: { CustomResponse: { CustomResponseBodyKey: "missing" } },
+            Block: {
+              CustomResponse: {
+                ResponseCode: 404,
+                CustomResponseBodyKey: "missing",
+              },
+            },
           },
         },
       ],
@@ -156,6 +161,55 @@ describe("SimWafV2 input validation", () => {
     // Then it is refused, rather than inserting a header named after nothing.
     assertInstanceOf(error, SimWafInvalidParameterException);
     assertStringIncludes(error.message, "custom header");
+  });
+
+  it("refuses a custom response with no usable status", async () => {
+    // When a block action names no status, or one outside the range WAF
+    // answers with.
+    const missing = await refusalForRule({
+      ...simWafRuleFactory.make({ Name: "the-rule" }),
+      Action: { Block: { CustomResponse: {} } },
+    });
+    const outOfRange = await refusalForRule({
+      ...simWafRuleFactory.make({ Name: "the-rule" }),
+      Action: { Block: { CustomResponse: { ResponseCode: 700 } } },
+    });
+
+    // Then both are refused, rather than answering with WAF's own 403 under a
+    // rule that asked for something else.
+    assertInstanceOf(missing, SimWafInvalidParameterException);
+    assertStringIncludes(outOfRange.message, "200 to 599");
+  });
+
+  it("refuses a custom response setting its own content type", async () => {
+    // When a block action carries a content-type header.
+    const error = await refusalForRule({
+      ...simWafRuleFactory.make({ Name: "the-rule" }),
+      Action: {
+        Block: {
+          CustomResponse: {
+            ResponseCode: 403,
+            ResponseHeaders: [{ Name: "Content-Type", Value: "text/plain" }],
+          },
+        },
+      },
+    });
+
+    // Then it is refused. The custom response body decides the content type,
+    // and a header setting it again would contradict the body.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "content type");
+  });
+
+  it("refuses a rule at a negative priority", async () => {
+    // When a rule asks to run before the first one.
+    const error = await refusalForRule(
+      simWafRuleFactory.make({ Name: "the-rule", Priority: -1 }),
+    );
+
+    // Then it is refused. Real WAF numbers rules from zero upwards.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "zero or more");
   });
 
   it("refuses a statement with nothing to match against", async () => {

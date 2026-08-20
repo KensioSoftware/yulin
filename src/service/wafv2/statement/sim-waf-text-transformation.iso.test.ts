@@ -84,6 +84,18 @@ describe("SimWafV2 text transformations", () => {
     assertTrue(sending(spaced, "q=one+two"));
   });
 
+  it("decodes a run of escapes that spell one character", async () => {
+    // Given a statement that URL decodes first.
+    const matches = await simWafStatementMatches(
+      new SimAws().wafV2(),
+      transformed("café", [{ Priority: 0, Type: "URL_DECODE" }]),
+    );
+
+    // Then a non-ASCII character arriving as several escapes decodes to the
+    // character, which a byte at a time would not.
+    assertTrue(sending(matches, "q=caf%C3%A9"));
+  });
+
   it("leaves an escape that decodes to nothing as it stands", async () => {
     // Given a statement that URL decodes first.
     const matches = await simWafStatementMatches(

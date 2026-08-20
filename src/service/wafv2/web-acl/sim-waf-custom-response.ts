@@ -13,18 +13,46 @@ const contentTypes = new Map<string, string>([
 ]);
 
 /**
- * Read the headers a custom response or a custom request handling names.
+ * Read the headers a custom request handling asks to insert.
  *
- * WAF prefixes every one of them with `x-amzn-waf-`, so a header a rule
- * inserts cannot be mistaken for one the client sent.
+ * WAF prefixes every one of them with `x-amzn-waf-` as it inserts them, so a
+ * header a rule added cannot be mistaken for one the client sent.
  */
-export function simWafCustomHeaders(
+export function simWafInsertedHeaders(
   headers: readonly SimWafCustomHeaderInput[] | undefined,
 ): readonly SimWafHeader[] {
   return (headers ?? []).map((header) => ({
     name: `x-amzn-waf-${requiredHeaderName(header.Name)}`,
     value: header.Value ?? "",
   }));
+}
+
+/**
+ * Read the headers a custom response carries.
+ *
+ * These keep the names they were configured with. The `x-amzn-waf-` prefix is
+ * for request header insertion, where it tells a rule's header apart from the
+ * client's. `content-type` is refused, because the custom response body
+ * decides that and a header setting it again would contradict the body.
+ */
+export function simWafResponseHeaders(
+  headers: readonly SimWafCustomHeaderInput[] | undefined,
+): readonly SimWafHeader[] {
+  return (headers ?? []).map((header) => ({
+    name: refusedContentType(requiredHeaderName(header.Name)),
+    value: header.Value ?? "",
+  }));
+}
+
+function refusedContentType(name: string): string {
+  if (name.toLowerCase() === "content-type") {
+    throw new SimWafInvalidParameterException(
+      "Error reason: A custom response takes its content type from its body, " +
+        "field: CUSTOM_HTTP_HEADER, parameter: content-type",
+    );
+  }
+
+  return name;
 }
 
 function requiredHeaderName(name: string | undefined): string {

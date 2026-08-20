@@ -9,7 +9,7 @@ import type {
   SimWafActionKind,
   SimWafHandledActionInput,
 } from "./sim-waf-action.type.js";
-import { simWafCustomHeaders } from "./sim-waf-custom-response.js";
+import { simWafInsertedHeaders } from "./sim-waf-custom-response.js";
 import type {
   SimWafCustomResponseBodies,
   SimWafHeader,
@@ -74,7 +74,7 @@ export class SimWafAction {
   ): SimWafAction {
     return new SimWafAction({
       kind,
-      insertHeaders: simWafCustomHeaders(
+      insertHeaders: simWafInsertedHeaders(
         action.CustomRequestHandling?.InsertHeaders,
       ),
       blocked: undefined,
