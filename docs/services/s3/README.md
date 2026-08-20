@@ -744,13 +744,37 @@ The destination Bucket raises `s3:ObjectCreated:Copy`, and `s3:ObjectCreated:*` 
 Copying an Object onto itself without `REPLACE` is refused with `InvalidRequest`, as real S3 refuses
 it. The copy would leave the Object exactly as it found it.
 
+### Over a served endpoint
+
+Real S3 states a copy as a `PUT` on the destination carrying an `x-amz-copy-source` header and an
+empty body. The served endpoint reads that header and runs the operation an in-process caller
+reaches. `aws s3 cp` and `aws s3 mv` between two served Buckets then behave as they do against real
+S3, for a file under the CLI's eight megabyte multipart threshold.
+
+```bash
+aws s3 cp ./report.pdf s3://inbox/report.pdf
+aws s3 mv s3://inbox/report.pdf s3://archive/2026/report.pdf
+aws s3 ls s3://archive/2026/
+```
+
+The source is decoded one key segment at a time, the way a key in the request path is, and
+`x-amz-metadata-directive` carries `MetadataDirective`. A finished copy answers with the
+`CopyObjectResult` document holding the ETag and the write time.
+
+Real S3 answers a failed copy with `200` and an error document in the body (it has to start sending
+the response while the bytes are still moving). Sim S3 copies in memory and answers with the status
+the error maps to, and an SDK raises it as it raises any other S3 failure.
+
+See [Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost) for setting an endpoint up.
+
 ### Limitations
 
-- `UploadPartCopy` is left out. An Object cannot be copied into a multipart upload.
+- `UploadPartCopy` is left out. An Object cannot be copied into a multipart upload. A served
+  endpoint refuses one with `NotImplemented` rather than storing an empty part. The `aws` CLI
+  switches to it above eight megabytes, and a move of a file that size is refused.
 - Both Buckets have to belong to the same simulated S3. A copy across Accounts or Regions is left
   out.
-- The S3 REST endpoint does not serve a copy yet, which leaves `aws s3 mv` and
-  `aws s3 cp s3://a/k s3://b/k` unable to reach a served simulation.
+- A presigned copy is left out, and so is a copy reaching a Bucket through simulated CloudFront.
 - `CopySourceIfMatch`, `CopySourceIfNoneMatch`, `CopySourceIfModifiedSince` and
   `CopySourceIfUnmodifiedSince` are ignored. A conditional copy happens whatever the condition
   says.
@@ -2741,7 +2765,8 @@ Sim S3 currently supports:
 - `Range` on `GetObjectCommand`, answering with the bytes asked for and `206 Partial Content` over a
   served endpoint, so `aws s3 cp` downloads a file of real size unchanged
 - `CopyObjectCommand`, authorized as a read of the source and a write of the destination, with a
-  `MetadataDirective` deciding which metadata the copy carries
+  `MetadataDirective` deciding which metadata the copy carries, over the SDK and over a served
+  endpoint, letting `aws s3 cp` and `aws s3 mv` move an Object between two served Buckets
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS

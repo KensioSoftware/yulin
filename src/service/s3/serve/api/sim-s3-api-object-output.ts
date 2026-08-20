@@ -1,4 +1,27 @@
+import { xmlDocument, xmlValue } from "../../../../util/xml/xml-writer.js";
 import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-headers.js";
+
+interface CopyObjectOutput {
+  readonly CopyObjectResult?:
+    | { readonly ETag?: string; readonly LastModified?: Date }
+    | undefined;
+}
+
+/**
+ * Write a finished copy as the document real S3 answers it with.
+ *
+ * A copy says nothing in its headers about the Object it wrote, so a client
+ * reads the new ETag and write time out of this body and nowhere else.
+ */
+export function simS3CopyObjectXml(output: CopyObjectOutput): string {
+  const result = output.CopyObjectResult ?? {};
+
+  return xmlDocument(
+    "CopyObjectResult",
+    xmlValue("ETag", result.ETag) +
+      xmlValue("LastModified", result.LastModified),
+  );
+}
 
 /**
  * Answer a read with the Object itself, headers and all.

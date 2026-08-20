@@ -10,6 +10,12 @@ import type { SimS3ApiRequest } from "./sim-s3-api-request.js";
  */
 
 /**
+ * The header real S3 states a copy in, which is what separates a copy from the
+ * upload it shares a method and a path with.
+ */
+export const simS3CopySourceHeader = "x-amz-copy-source";
+
+/**
  * The input of an operation naming one Object.
  */
 export function objectInput(request: SimS3ApiRequest): object {
@@ -32,6 +38,25 @@ export function getObjectInput(request: SimS3ApiRequest): object {
  */
 export function putObjectInput(request: SimS3ApiRequest): object {
   return { ...createMultipartUploadInput(request), Body: request.body };
+}
+
+/**
+ * The input of a copy, which names its source in a header and carries no bytes
+ * of its own.
+ *
+ * The source is passed on as it arrived, percent-encoding and all, because the
+ * operation decodes it a key segment at a time the way the endpoint decodes a
+ * key out of a request path.
+ */
+export function copyObjectInput(request: SimS3ApiRequest): object {
+  return {
+    ...createMultipartUploadInput(request),
+    ...optional("CopySource", request.headers.get(simS3CopySourceHeader)),
+    ...optional(
+      "MetadataDirective",
+      request.headers.get("x-amz-metadata-directive"),
+    ),
+  };
 }
 
 /**

@@ -31,6 +31,24 @@ describe("Resolving an S3 REST operation from a request", () => {
     return resolveSimS3ApiRoute(apiRequest)?.input(apiRequest);
   }
 
+  function sent(
+    method: string,
+    path: string,
+    headers: Record<string, string>,
+  ): { command: string | undefined; input: object | undefined } {
+    const request = new Request(`http://localhost:1234${path}`, {
+      method,
+      headers,
+    });
+    const apiRequest = readSimS3ApiRequest(request, Buffer.alloc(0));
+    const matched = resolveSimS3ApiRoute(apiRequest);
+
+    return {
+      command: matched?.commandName,
+      input: matched?.input(apiRequest),
+    };
+  }
+
   it("reads the path depth as the level the request addressed", () => {
     assertIdentical(route("GET", "/"), "ListBucketsCommand");
     assertIdentical(route("GET", "/widgets"), "ListObjectsCommand");
@@ -140,6 +158,74 @@ describe("Resolving an S3 REST operation from a request", () => {
         ],
       },
     });
+  });
+
+  it("tells a copy apart from an upload by the source header", () => {
+    // Given the request real S3 states a copy as, which is a PUT on the
+    // destination naming the source in a header and carrying no bytes
+    assertIdentical(
+      sent("PUT", "/archive/2026/report.pdf", {
+        "x-amz-copy-source": "/inbox/report.pdf",
+      }).command,
+      "CopyObjectCommand",
+    );
+
+    // And the same PUT without that header is still the upload it has always
+    // been
+    assertIdentical(
+      route("PUT", "/archive/2026/report.pdf"),
+      "PutObjectCommand",
+    );
+  });
+
+  it("reads the source and the metadata directive a copy states", () => {
+    // Given a copy asking for the destination's own metadata rather than the
+    // source's
+    assertObjectEquals(
+      sent("PUT", "/archive/report.pdf", {
+        "x-amz-copy-source": "/inbox/a%20b/c%2Fd.pdf",
+        "x-amz-metadata-directive": "REPLACE",
+        "content-type": "application/pdf",
+      }).input,
+      {
+        Bucket: "archive",
+        Key: "report.pdf",
+        ContentType: "application/pdf",
+        CopySource: "/inbox/a%20b/c%2Fd.pdf",
+        MetadataDirective: "REPLACE",
+      },
+    );
+
+    // And a copy stating neither says nothing about a directive, so the
+    // operation's own default applies
+    assertObjectEquals(
+      sent("PUT", "/archive/report.pdf", {
+        "x-amz-copy-source": "inbox/report.pdf",
+      }).input,
+      {
+        Bucket: "archive",
+        Key: "report.pdf",
+        CopySource: "inbox/report.pdf",
+      },
+    );
+  });
+
+  it("refuses a copy into a part rather than reading it as a part upload", () => {
+    // Given the UploadPartCopy the CLI sends for a file over its multipart
+    // threshold, which is a part upload in every respect but the source header
+    assertIdentical(
+      sent("PUT", "/archive/big.bin?uploadId=U1&partNumber=2", {
+        "x-amz-copy-source": "/inbox/big.bin",
+      }).command,
+      "UploadPartCopyCommand",
+    );
+
+    // And the part upload it looks like is still reached without that header,
+    // rather than every part being refused
+    assertIdentical(
+      route("PUT", "/archive/big.bin?uploadId=U1&partNumber=2"),
+      "UploadPartCommand",
+    );
   });
 
   it("names no operation for a method S3 does not use here", () => {

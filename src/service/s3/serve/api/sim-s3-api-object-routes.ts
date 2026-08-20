@@ -1,8 +1,10 @@
 import {
+  copyObjectInput,
   createMultipartUploadInput,
   getObjectInput,
   objectInput,
   putObjectInput,
+  simS3CopySourceHeader,
 } from "./sim-s3-api-object-input.js";
 import {
   completeMultipartUploadInput,
@@ -49,11 +51,33 @@ export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
     input: completeMultipartUploadInput,
   },
   {
+    // Copying an Object into a part of a multipart upload, which simulated S3
+    // has no operation for. Named so it is refused rather than read as the
+    // part upload it otherwise looks exactly like, which would store an empty
+    // part and lose the bytes the copy was moving.
+    method: "PUT",
+    target: "object",
+    subResource: "uploadId",
+    header: simS3CopySourceHeader,
+    commandName: "UploadPartCopyCommand",
+    input: uploadPartInput,
+  },
+  {
     method: "PUT",
     target: "object",
     subResource: "uploadId",
     commandName: "UploadPartCommand",
     input: uploadPartInput,
+  },
+  {
+    // A copy and an upload are both a `PUT` on an Object path, and the copy
+    // names its source in a header. Matched first, so an upload carrying no
+    // such header still reaches PutObject below.
+    method: "PUT",
+    target: "object",
+    header: simS3CopySourceHeader,
+    commandName: "CopyObjectCommand",
+    input: copyObjectInput,
   },
   {
     method: "PUT",
