@@ -63,6 +63,17 @@ interface SimCognitoIssueTokensProperties {
 }
 
 /**
+ * Reissuing tokens for a refresh token the caller presented.
+ */
+interface SimCognitoRefreshTokensProperties extends SimCognitoIssueTokensProperties {
+  /**
+   * The refresh token the request was made with, which a rotating app client
+   * spends and replaces.
+   */
+  readonly spent: SimCognitoIssuedToken;
+}
+
+/**
  * Issues the tokens a successful authentication answers with.
  *
  * Every timestamp comes from the simulation's clock rather than from
@@ -92,6 +103,13 @@ export class SimCognitoTokenIssuer {
   }
 
   /**
+   * Mint an opaque refresh token, as real Cognito's is opaque.
+   */
+  private static mintRefreshToken(): string {
+    return randomBytes(refreshTokenBytes).toString("base64url");
+  }
+
+  /**
    * Sign an id token and an access token for a user, and mint a refresh
    * token to go with them.
    *
@@ -109,7 +127,7 @@ export class SimCognitoTokenIssuer {
     const { pool, client, user } = properties;
     const issuedAt = this.clock.now();
     const signed = await this.signTokens(properties, issuedAt);
-    const refreshToken = randomBytes(refreshTokenBytes).toString("base64url");
+    const refreshToken = SimCognitoTokenIssuer.mintRefreshToken();
 
     pool.auth.addRefreshToken(
       new SimCognitoIssuedToken({
@@ -142,6 +160,53 @@ export class SimCognitoTokenIssuer {
     properties: SimCognitoIssueTokensProperties,
   ): Promise<SimCognitoIssuedTokens> {
     return await this.signTokens(properties, this.clock.now());
+  }
+
+  /**
+   * Sign fresh tokens for a refresh token the caller presented.
+   *
+   * Whether a new refresh token comes back is the app client's to decide. A
+   * rotating client hands one out and spends the token that bought it, and a
+   * client with rotation off answers with the two JWTs alone, leaving the
+   * caller the refresh token it already has until that expires.
+   */
+  async refresh(
+    properties: SimCognitoRefreshTokensProperties,
+  ): Promise<SimCognitoIssuedTokens> {
+    const rotation = properties.client.refreshTokenRotation;
+
+    if (!rotation.enabled) {
+      return await this.reissue(properties);
+    }
+
+    return await this.rotate(properties, rotation.retryGracePeriodSeconds);
+  }
+
+  /**
+   * Sign fresh tokens and rotate the refresh token that bought them.
+   *
+   * The replacement runs out when the token it replaced would have, so a
+   * rotating session ends at the app client's `RefreshTokenValidity` however
+   * often it was renewed. The spent token is revoked after the replacement is
+   * stored, so it stays refusable for the grace period rather than being
+   * swept away with the tokens that have already run out.
+   */
+  private async rotate(
+    properties: SimCognitoRefreshTokensProperties,
+    gracePeriodSeconds: number,
+  ): Promise<SimCognitoIssuedTokens> {
+    const { pool, spent } = properties;
+    const issuedAt = this.clock.now();
+    const signed = await this.signTokens(properties, issuedAt);
+    const refreshToken = SimCognitoTokenIssuer.mintRefreshToken();
+
+    pool.auth.addRefreshToken(spent.replacedBy(refreshToken, issuedAt));
+    pool.auth.revokeRefreshTokenAt(
+      spent,
+      SimCognitoTokenIssuer.expiryOf(issuedAt, gracePeriodSeconds),
+    );
+
+    return { ...signed, refreshToken };
   }
 
   private async signTokens(

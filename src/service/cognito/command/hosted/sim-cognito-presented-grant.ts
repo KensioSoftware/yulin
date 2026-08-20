@@ -60,7 +60,7 @@ export class SimCognitoPresentedGrant {
     if (
       found === undefined ||
       !found.isFor(client.id) ||
-      found.isExpiredAt(now)
+      found.isSpentAt(now)
     ) {
       throw new SimCognitoOAuthError({
         code: "invalid_grant",

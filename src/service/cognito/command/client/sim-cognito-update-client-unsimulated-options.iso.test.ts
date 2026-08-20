@@ -46,11 +46,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "threat protection context data",
   },
   {
-    label: "RefreshTokenRotation",
-    input: { RefreshTokenRotation: { Feature: "ENABLED" } },
-    says: "refresh token rotation",
-  },
-  {
     label: "ReadAttributes",
     input: { ReadAttributes: ["email"] },
     says: "per-client attribute permissions",

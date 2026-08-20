@@ -113,6 +113,14 @@ export class SimCognitoPoolAuth {
   }
 
   /**
+   * Stop honouring a refresh token from a moment on, because a rotation has
+   * replaced it.
+   */
+  revokeRefreshTokenAt(token: SimCognitoIssuedToken, revokedAt: Date): void {
+    this.tokens.revokeRefreshTokenAt(token, revokedAt);
+  }
+
+  /**
    * Remember an access token this pool has issued.
    */
   addAccessToken(token: SimCognitoIssuedToken): void {

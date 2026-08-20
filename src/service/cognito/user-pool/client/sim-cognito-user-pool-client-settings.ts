@@ -6,6 +6,10 @@ import {
 } from "./sim-cognito-oauth-settings.js";
 import { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import {
+  SimCognitoRefreshTokenRotation,
+  type SimCognitoRefreshTokenRotationType,
+} from "./sim-cognito-refresh-token-rotation.js";
+import {
   SimCognitoTokenValidity,
   type SimCognitoTokenValidityInput,
 } from "./sim-cognito-token-validity.js";
@@ -22,6 +26,9 @@ export interface SimCognitoUserPoolClientSettingsProperties
   readonly ClientName?: string | undefined;
   readonly ExplicitAuthFlows?: readonly string[] | undefined;
   readonly PreventUserExistenceErrors?: string | undefined;
+  readonly RefreshTokenRotation?:
+    | SimCognitoRefreshTokenRotationType
+    | undefined;
 }
 
 /**
@@ -40,6 +47,12 @@ export class SimCognitoUserPoolClientSettings {
   public readonly tokenValidity: SimCognitoTokenValidity;
 
   /**
+   * Whether this client rotates its refresh tokens, which decides what
+   * renews a session made through it.
+   */
+  public readonly refreshTokenRotation: SimCognitoRefreshTokenRotation;
+
+  /**
    * What this client may do at the pool's hosted domain.
    */
   public readonly oauth: SimCognitoOAuthSettings;
@@ -56,6 +69,9 @@ export class SimCognitoUserPoolClientSettings {
       properties.PreventUserExistenceErrors,
     );
     this.tokenValidity = new SimCognitoTokenValidity(properties);
+    this.refreshTokenRotation = new SimCognitoRefreshTokenRotation(
+      properties.RefreshTokenRotation,
+    );
     this.oauth = new SimCognitoOAuthSettings(properties);
   }
 }

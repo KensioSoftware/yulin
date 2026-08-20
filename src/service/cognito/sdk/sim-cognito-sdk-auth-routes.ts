@@ -6,6 +6,7 @@ import type {
   SimAdminInitiateAuthCommand,
   SimAdminRespondToAuthChallengeCommand,
   SimAdminUserGlobalSignOutCommand,
+  SimGetTokensFromRefreshTokenCommand,
   SimGlobalSignOutCommand,
   SimInitiateAuthCommand,
   SimRespondToAuthChallengeCommand,
@@ -49,6 +50,13 @@ export function simCognitoSdkAuthRoutes(
       async (command): Promise<unknown> =>
         await simCognito.respondToAuthChallenge(
           command as SimRespondToAuthChallengeCommand,
+        ),
+    ],
+    [
+      "GetTokensFromRefreshTokenCommand",
+      async (command): Promise<unknown> =>
+        await simCognito.getTokensFromRefreshToken(
+          command as SimGetTokensFromRefreshTokenCommand,
         ),
     ],
     [

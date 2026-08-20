@@ -1,6 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimCognitoTokenValidityUnitsType } from "../../user-pool/client/sim-cognito-token-validity.js";
 import type { SimCognitoOAuthSettingsType } from "../../user-pool/client/sim-cognito-oauth-settings.js";
+import type { SimCognitoRefreshTokenRotationType } from "../../user-pool/client/sim-cognito-refresh-token-rotation.js";
 
 /**
  * An app client as sim Cognito reports it.
@@ -21,6 +22,9 @@ export interface SimCognitoUserPoolClientType extends SimCognitoOAuthSettingsTyp
   readonly AccessTokenValidity?: number | undefined;
   readonly IdTokenValidity?: number | undefined;
   readonly RefreshTokenValidity?: number | undefined;
+  readonly RefreshTokenRotation?:
+    | SimCognitoRefreshTokenRotationType
+    | undefined;
   readonly TokenValidityUnits?: SimCognitoTokenValidityUnitsType | undefined;
   readonly CreationDate?: Date | undefined;
   readonly LastModifiedDate?: Date | undefined;
@@ -59,7 +63,9 @@ export interface SimCognitoUserPoolClientSettingsInput {
   readonly LogoutURLs?: readonly string[] | undefined;
   readonly PreventUserExistenceErrors?: string | undefined;
   readonly ReadAttributes?: readonly string[] | undefined;
-  readonly RefreshTokenRotation?: object | undefined;
+  readonly RefreshTokenRotation?:
+    | SimCognitoRefreshTokenRotationType
+    | undefined;
   readonly SupportedIdentityProviders?: readonly string[] | undefined;
   readonly WriteAttributes?: readonly string[] | undefined;
 }

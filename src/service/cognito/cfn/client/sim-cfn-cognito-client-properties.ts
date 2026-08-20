@@ -6,6 +6,7 @@ import type {
 import type { SimCreateUserPoolClientCommandInput } from "../../command/client/user-pool-client.command.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
+import { SimCfnCognitoRefreshTokenRotation } from "./sim-cfn-cognito-refresh-token-rotation.js";
 import { SimCfnCognitoTokenValidityUnits } from "./sim-cfn-cognito-token-validity-units.js";
 
 /**
@@ -15,6 +16,10 @@ import { SimCfnCognitoTokenValidityUnits } from "./sim-cfn-cognito-token-validit
  * request at the pool's domain is checked against: which grant it may ask
  * for, which scopes, which URL it may be sent back to, and which identity
  * provider it may sign a user in through.
+ *
+ * `RefreshTokenRotation` is among them, because it decides which operation
+ * renews a session: a client deployed with rotation is renewed with
+ * `GetTokensFromRefreshToken` rather than `REFRESH_TOKEN_AUTH`.
  *
  * The managed login branding properties are not, because managed login is a
  * set of web pages rather than anything this simulation answers.
@@ -28,6 +33,7 @@ const simulatedProperties = [
   "AccessTokenValidity",
   "IdTokenValidity",
   "RefreshTokenValidity",
+  "RefreshTokenRotation",
   "TokenValidityUnits",
   "AllowedOAuthFlows",
   "AllowedOAuthFlowsUserPoolClient",
@@ -107,6 +113,10 @@ export class SimCfnCognitoClientProperties {
         this.properties["RefreshTokenValidity"],
         "RefreshTokenValidity",
       ),
+      RefreshTokenRotation: new SimCfnCognitoRefreshTokenRotation({
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      }).parse(this.properties["RefreshTokenRotation"]),
       TokenValidityUnits: new SimCfnCognitoTokenValidityUnits({
         resource: this.resource,
         propertyParser: this.propertyParser,

@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPoolId } from "../sim-cognito-user-pool-id.js";
 import type { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import type { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
+import type { SimCognitoRefreshTokenRotation } from "./sim-cognito-refresh-token-rotation.js";
 import type { SimCognitoTokenValidity } from "./sim-cognito-token-validity.js";
 import type { SimCognitoOAuthSettings } from "./sim-cognito-oauth-settings.js";
 import type { SimCognitoUserPoolClientSettings } from "./sim-cognito-user-pool-client-settings.js";
@@ -74,6 +75,14 @@ export class SimCognitoUserPoolClient {
    */
   get tokenValidity(): SimCognitoTokenValidity {
     return this.clientSettings.tokenValidity;
+  }
+
+  /**
+   * Whether this client rotates its refresh tokens, and how long it goes on
+   * honouring one it rotated out.
+   */
+  get refreshTokenRotation(): SimCognitoRefreshTokenRotation {
+    return this.clientSettings.refreshTokenRotation;
   }
 
   /**

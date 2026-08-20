@@ -1,5 +1,6 @@
 import {
   type CreateUserPoolClientCommandInput,
+  type FeatureType,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
   DescribeUserPoolClientCommand,
@@ -8,8 +9,10 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -258,6 +261,82 @@ describe("sim Cognito app client validation", () => {
     assertStringIncludes(missing.message, "ClientId is required");
     assertInstanceOf(malformed, SimCognitoInvalidParameterException);
     assertStringIncludes(malformed.message, "is not an app client id");
+  });
+
+  it("reports the refresh token rotation a client was created with", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client is created with rotation and a grace period.
+    const created = await withPool.cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientName: "web",
+        RefreshTokenRotation: {
+          Feature: "ENABLED",
+          RetryGracePeriodSeconds: 30,
+        },
+      }),
+    );
+
+    // Then it reports what it was given, and a client created without the
+    // setting reports none of it.
+    const plain = await withPool.cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientName: "mobile",
+      }),
+    );
+
+    assertObjectEquals(created.UserPoolClient?.RefreshTokenRotation, {
+      Feature: "ENABLED",
+      RetryGracePeriodSeconds: 30,
+    });
+    assertUndefined(plain.UserPoolClient?.RefreshTokenRotation);
+  });
+
+  it("refuses a refresh token rotation feature Cognito does not have", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client asks to rotate with a feature that is not a setting.
+    const error = await refusedClient(
+      withPool,
+      { RefreshTokenRotation: { Feature: "ON" as FeatureType } },
+      "a client rotating with an unknown feature",
+    );
+
+    // Then it is refused, naming the settings there are.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(
+      error.message,
+      "RefreshTokenRotation Feature 'ON' is not a Cognito setting",
+    );
+  });
+
+  it("refuses a retry grace period longer than a minute", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client asks for a grace period past the minute Cognito allows.
+    const error = await refusedClient(
+      withPool,
+      {
+        RefreshTokenRotation: {
+          Feature: "ENABLED",
+          RetryGracePeriodSeconds: 90,
+        },
+      },
+      "a client with too long a grace period",
+    );
+
+    // Then it is refused, naming the range.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(
+      error.message,
+      "outside the range Cognito allows: a whole number of seconds between " +
+        "0 and 60",
+    );
   });
 
   it("reports an app client that does not exist as missing", async () => {

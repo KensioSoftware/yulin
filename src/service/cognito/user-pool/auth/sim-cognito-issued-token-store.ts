@@ -46,9 +46,21 @@ export class SimCognitoIssuedTokenStore {
    */
   addRefreshToken(token: SimCognitoIssuedToken): void {
     SimCognitoIssuedTokenStore.forgetSpent(this.refreshTokens, (issued) =>
-      issued.isExpiredAt(token.issuedAt),
+      issued.isSpentAt(token.issuedAt),
     );
     this.refreshTokens.set(token.value, token);
+  }
+
+  /**
+   * Stop honouring a refresh token from a moment on, because a rotation has
+   * replaced it.
+   *
+   * The moment is the end of the app client's retry grace period rather than
+   * now, so a client that retried a request whose answer it never saw is
+   * answered with the tokens instead of being sent back to the sign-in page.
+   */
+  revokeRefreshTokenAt(token: SimCognitoIssuedToken, revokedAt: Date): void {
+    this.refreshTokens.set(token.value, token.rotatedOutAt(revokedAt));
   }
 
   /**
@@ -66,7 +78,8 @@ export class SimCognitoIssuedTokenStore {
    *
    * A token this pool never issued, one belonging to another app client, one
    * that has run out, and one the user has been signed out of all fail the
-   * same way, as they do on real Cognito.
+   * same way, as they do on real Cognito. A rotated-out token whose grace
+   * period is up is refused as a revoked one, which is what it now is.
    */
   requireRefreshToken(
     request: SimCognitoRefreshTokenRequest,
@@ -79,6 +92,12 @@ export class SimCognitoIssuedTokenStore {
 
     if (issued.isExpiredAt(request.now)) {
       throw new SimCognitoNotAuthorizedException("Refresh Token has expired.");
+    }
+
+    if (issued.isRevokedAt(request.now)) {
+      throw new SimCognitoNotAuthorizedException(
+        "Refresh Token has been revoked.",
+      );
     }
 
     return issued;
