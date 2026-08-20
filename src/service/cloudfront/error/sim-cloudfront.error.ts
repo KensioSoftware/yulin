@@ -217,3 +217,18 @@ export class SimCloudFrontFunctionSizeLimitExceeded extends SimCloudFrontError {
     super(message, { httpStatusCode: 413 });
   }
 }
+
+/**
+ * Simulated CloudFront InvalidWebACLId error.
+ *
+ * What CloudFront answers when a DistributionConfig's `WebACLId` names no
+ * `CLOUDFRONT` scope web ACL this simulation holds, at Distribution create or
+ * update time rather than when the first request needs a decision.
+ */
+export class SimCloudFrontInvalidWebAclId extends SimCloudFrontError {
+  public override readonly name = "InvalidWebACLId";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

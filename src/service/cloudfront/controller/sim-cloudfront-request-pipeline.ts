@@ -3,10 +3,11 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
 
 /**
  * Runs a single simulated CloudFront request through its lifecycle:
- * route to a Distribution, apply the default root object, resolve the matching
- * Behavior, run viewer-request hooks, fetch from the Origin, replace an error
- * response with the Distribution's custom error page, apply the Behavior's
- * response headers policy, then run viewer-response hooks.
+ * route to a Distribution, put the request through the Distribution's web ACL,
+ * apply the default root object, resolve the matching Behavior, run
+ * viewer-request hooks, fetch from the Origin, replace an error response with
+ * the Distribution's custom error page, apply the Behavior's response headers
+ * policy, then run viewer-response hooks.
  *
  * This is the request-processing core, kept separate from the service
  * controller so the controller stays a thin adapter to the shared
@@ -31,6 +32,19 @@ export class SimCloudFrontRequestPipeline {
     }
 
     const { cloudFront, distribution: distro } = route;
+
+    // Put the request through the Distribution's web ACL, if it has one.
+    // CloudFront asks WAF before any content handling, so a blocked request is
+    // answered at the edge without a Behavior, a CloudFront Function or the
+    // Origin ever seeing it.
+    const webAclResult = await this.stages.webAclGuard.apply(
+      requestReference,
+      distro,
+    );
+    if (webAclResult instanceof Response) {
+      return webAclResult;
+    }
+    requestReference = webAclResult;
 
     requestReference = simCfDefaultRootObjectRequest(requestReference, distro);
 

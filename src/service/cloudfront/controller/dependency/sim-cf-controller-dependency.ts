@@ -8,11 +8,14 @@ import { SimCffApplicator } from "../cff/sim-cff-applicator.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 import { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
 import { SimCfResponseHeadersApplicator } from "../response-headers/sim-cf-response-headers-applicator.js";
+import { SimCfWebAclGuard } from "../web-acl/sim-cf-web-acl-guard.js";
+import { makeSimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl-resolver.factory.js";
 
 export interface SimCloudFrontServiceControllerProperties {
   readonly simAws?: SimAws;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distroRouter?: SimCloudFrontDistroRouter;
+  readonly webAclGuard?: SimCfWebAclGuard;
   readonly behaviourResolver?: SimCloudFrontBehaviorResolver;
   readonly cffApplicator?: SimCffApplicator;
   readonly originFetcher?: SimCloudFrontOriginFetcher;
@@ -22,6 +25,7 @@ export interface SimCloudFrontServiceControllerProperties {
 
 export interface SimCloudFrontControllerDependencies {
   readonly distroRouter: SimCloudFrontDistroRouter;
+  readonly webAclGuard: SimCfWebAclGuard;
   readonly behaviourResolver: SimCloudFrontBehaviorResolver;
   readonly cffApplicator: SimCffApplicator;
   readonly originFetcher: SimCloudFrontOriginFetcher;
@@ -59,6 +63,9 @@ export class SimCloudFrontControllerDependenciesFactory {
           simAws,
           cloudFrontRegistry,
         }),
+      webAclGuard:
+        properties.webAclGuard ??
+        new SimCfWebAclGuard(makeSimCfWebAclResolver(simAws)),
       behaviourResolver,
       cffApplicator: properties.cffApplicator ?? new SimCffApplicator(),
       originFetcher,

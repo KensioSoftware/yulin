@@ -55,6 +55,8 @@ import {
 import type { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
+import type { SimCfDistributionConfigurationState } from "./distribution/sim-cf-distribution-configuration-state.js";
+import type { SimCfWebAclResolver } from "./web-acl/sim-cf-web-acl.js";
 import { SimCfKeyValueStoreAccess } from "./key-value-store/sim-cf-key-value-store-access.js";
 import { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 import { SimCloudFrontKeyValueStoreRegistry } from "./key-value-store/sim-cf-key-value-store-registry.js";
@@ -71,6 +73,8 @@ export interface SimCloudFrontProperties {
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
+  /** How a Distribution's `WebACLId` is resolved to the web ACL it names. */
+  readonly webAclResolver?: SimCfWebAclResolver | undefined;
   readonly background?: BackgroundScheduler;
 }
 
@@ -137,13 +141,7 @@ export class SimCloudFrontCommands {
 
   private readonly distributionState: SimCloudFrontDistributionState;
   private readonly functionState: SimCloudFrontFunctionState;
-  private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
-  private readonly customOriginDispatcher:
-    | SimCfCustomOriginDispatcher
-    | undefined;
-  private readonly acmRegistry: SimAcmRegistry | undefined;
-  private readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
-  private readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
+  private readonly configurationState: SimCfDistributionConfigurationState;
 
   constructor(properties: SimCloudFrontCommandsProperties) {
     const {
@@ -155,6 +153,7 @@ export class SimCloudFrontCommands {
       customOriginDispatcher,
       iam = new SimIamAllowAllAuth(),
       acmRegistry,
+      webAclResolver,
       background = new BackgroundTasks(),
     } = properties;
 
@@ -174,11 +173,14 @@ export class SimCloudFrontCommands {
       background,
       keyValueStores,
     };
-    this.s3OriginResolver = s3OriginResolver;
-    this.customOriginDispatcher = customOriginDispatcher;
-    this.acmRegistry = acmRegistry;
-    this.originAccessControls = properties.originAccessControls;
-    this.responseHeadersPolicies = properties.responseHeadersPolicies;
+    this.configurationState = {
+      s3OriginResolver,
+      customOriginDispatcher,
+      acmRegistry,
+      webAclResolver,
+      originAccessControls: properties.originAccessControls,
+      responseHeadersPolicies: properties.responseHeadersPolicies,
+    };
     const keyValueStoreAccess = new SimCfKeyValueStoreAccess({
       accountId,
       stores: keyValueStores,
@@ -206,7 +208,7 @@ export class SimCloudFrontCommands {
   ): Promise<SimCreateDistributionCommandOutput> {
     return await new CreateDistributionCommandHandler({
       ...this.distributionState,
-      ...this.originState(),
+      ...this.configurationState,
     }).handle(command, options);
   }
 
@@ -231,7 +233,7 @@ export class SimCloudFrontCommands {
   ): Promise<SimUpdateDistributionCommandOutput> {
     return await new UpdateDistributionCommandHandler({
       ...this.distributionState,
-      ...this.originState(),
+      ...this.configurationState,
     }).handle(command, options);
   }
 
@@ -271,24 +273,5 @@ export class SimCloudFrontCommands {
       command,
       options,
     );
-  }
-
-  /**
-   * How the commands that configure a Distribution reach its Origins.
-   */
-  private originState(): {
-    readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
-    readonly customOriginDispatcher: SimCfCustomOriginDispatcher | undefined;
-    readonly acmRegistry: SimAcmRegistry | undefined;
-    readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
-    readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
-  } {
-    return {
-      s3OriginResolver: this.s3OriginResolver,
-      customOriginDispatcher: this.customOriginDispatcher,
-      acmRegistry: this.acmRegistry,
-      originAccessControls: this.originAccessControls,
-      responseHeadersPolicies: this.responseHeadersPolicies,
-    };
   }
 }

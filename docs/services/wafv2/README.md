@@ -5,9 +5,9 @@ regex pattern sets, and it evaluates a request against a web ACL's rules to reac
 can assert that a request to `/admin` is blocked and one to `/` is allowed, without an AWS account
 and without a distribution in front of anything.
 
-Association comes separately. Putting a web ACL in front of a CloudFront distribution, an API
-Gateway REST API stage or a Cognito user pool arrives later. Until then a test asks the web ACL
-about a request itself.
+A CloudFront distribution takes a web ACL through its own `WebACLId`. An API Gateway REST API stage
+and a Cognito user pool arrive later. A test can also ask a web ACL about a request itself, with no
+association at all.
 
 WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
 
@@ -378,6 +378,15 @@ const created = await waf.createWebAcl(
 // arn:aws:wafv2:us-east-1:...:global/webacl/site-acl/...
 console.log(created.Summary?.ARN);
 ```
+
+## In front of a CloudFront distribution
+
+A distribution names its web ACL in `WebACLId` on its `DistributionConfig`. The ARN has to be a
+`CLOUDFRONT` scope one, and the distribution answers 403 to every request the web ACL blocks.
+
+CloudFront is associated this way and not through `AssociateWebACL`, which real WAF keeps for the
+regional resource types. See
+[web ACLs in the CloudFront docs](../cloudfront/README.md#web-acls) for the whole example.
 
 ## Lock tokens
 

@@ -9,6 +9,7 @@ import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 import { makeSimCfCustomOriginDispatcher } from "../../cloudfront/origin/custom/sim-cf-custom-origin-dispatcher.factory.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
+import { makeSimCfWebAclResolver } from "../../cloudfront/web-acl/sim-cf-web-acl-resolver.factory.js";
 import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
@@ -122,6 +123,10 @@ export class SimAwsAccountServiceCache {
           customOriginDispatcher: makeSimCfCustomOriginDispatcher(this.simAws),
           iam,
           acmRegistry: this.acmRegistry,
+          // A CLOUDFRONT scope web ACL is held by the WAFv2 of the Account and
+          // Region its ARN names, which CloudFront reaches through the
+          // simulation rather than holding itself.
+          webAclResolver: makeSimCfWebAclResolver(this.simAws),
           background: this.background,
         }),
     );
