@@ -1056,6 +1056,148 @@ headers.
 The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
 covers what the factories have in common.
 
+## Web ACLs
+
+A Distribution can put a WAFv2 web ACL in front of everything it serves. Name the web ACL's ARN in
+`WebACLId` and the Distribution evaluates it against every request that arrives. A request the web
+ACL blocks gets 403 from the edge. A request it allows carries on to the cache Behavior and the
+Origin.
+
+CloudFront takes its web ACL this way. WAFv2's `AssociateWebACL` covers the regional resource types.
+
+The web ACL has to be a `CLOUDFRONT` scope one, created in `us-east-1` (see
+[scopes](../wafv2/README.md#scopes)). A `WebACLId` naming a `REGIONAL` web ACL, or one this
+simulation never created, is refused with `InvalidWebACLId` at `CreateDistribution` and at
+`UpdateDistribution`.
+
+The web ACL decides before any other stage sees the request. A blocked request never reaches a
+viewer-request CloudFront Function, a cache Behavior, a response headers policy or the Origin.
+
+```typescript sim-cloudfront-web-acl
+/**
+ * Blocking a request to a Distribution with a web ACL.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.s3();
+  await simS3.createBucket(new CreateBucketCommand({ Bucket: "site-bucket" }));
+  await simS3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "site-bucket",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::site-bucket/*",
+        },
+      }),
+    }),
+  );
+  await simS3.putObject(
+    new PutObjectCommand({
+      Bucket: "site-bucket",
+      Key: "admin/users.html",
+      ContentType: "text/html",
+      Body: "<h1>Users</h1>",
+    }),
+  );
+
+  // A CLOUDFRONT scope web ACL lives in us-east-1, wherever the Distribution
+  // was created from.
+  const acl = await simAws
+    .accountRegionScope(simAws.defaultAccountId, "us-east-1")
+    .wafV2()
+    .createWebAcl(
+      new CreateWebACLCommand({
+        Name: "site-acl",
+        Scope: "CLOUDFRONT",
+        DefaultAction: { Allow: {} },
+        VisibilityConfig: {
+          SampledRequestsEnabled: false,
+          CloudWatchMetricsEnabled: false,
+          MetricName: "site",
+        },
+        Rules: [
+          {
+            Name: "block-admin",
+            Priority: 0,
+            Action: { Block: {} },
+            Statement: {
+              ByteMatchStatement: {
+                FieldToMatch: { UriPath: {} },
+                PositionalConstraint: "STARTS_WITH",
+                SearchString: Buffer.from("/admin"),
+                TextTransformations: [{ Priority: 0, Type: "LOWERCASE" }],
+              },
+            },
+            VisibilityConfig: {
+              SampledRequestsEnabled: false,
+              CloudWatchMetricsEnabled: false,
+              MetricName: "block-admin",
+            },
+          },
+        ],
+      }),
+    );
+
+  const creation = await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "guarded-site",
+        Comment: "Site behind a web ACL",
+        Enabled: true,
+        WebACLId: acl.Summary!.ARN,
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "site-origin",
+              DomainName: "site-bucket.s3.amazonaws.com",
+              S3OriginConfig: { OriginAccessIdentity: "" },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+        },
+      },
+    }),
+  );
+
+  const distroHostname = creation.Distribution!.DomainName!;
+
+  const blocked = await fetch(
+    srv.localUrl(`http://${distroHostname}/admin/users.html`),
+  );
+  console.log(blocked.status); // 403
+
+  // The Bucket still holds the page. The request never got as far as the
+  // Origin to ask for it.
+} finally {
+  await srv.close();
+}
+```
+
+See [simulated WAFv2](../wafv2/README.md) for what a rule can inspect and how a blocked request is
+answered.
+
 ## Response headers policies
 
 A response headers policy sets headers on everything a cache Behavior serves. Declare one as
@@ -1839,6 +1981,7 @@ Sim CloudFront currently supports:
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
 - `AWS::CloudFront::OriginAccessControl`, letting an Origin read a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
+- `WebACLId`, putting a simulated WAFv2 web ACL in front of everything a Distribution serves
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
 The simulator focuses on useful behaviour for tests and local development, ahead of full CloudFront
@@ -1879,6 +2022,11 @@ Where sim CloudFront knowingly behaves differently from AWS:
   does a hand-written `{ Items: [...] }` with the count left out. The AWS SDK types make omitting
   `Quantity` a compile error, so what arrives without one is a different mistake from the one this
   catches.
+- **A web ACL a Distribution names has to exist here.** `WebACLId` resolves to a web ACL created in
+  this simulation, and the ARN carries the Account and Region holding it. A managed web ACL, or one
+  from a real account, is refused at create and at update. Deleting a web ACL a Distribution still
+  names leaves the Distribution answering `InvalidWebACLId` on every request, because real WAF
+  refuses that deletion and nothing here tracks the association to refuse it.
 - **`IfMatch` ETags are ignored on a Distribution or a Function.** `UpdateDistributionCommand`,
   `DeleteDistributionCommand` and `DeleteFunctionCommand` all accept `IfMatch` and ignore it,
   leaving both `PreconditionFailed` and `InvalidIfMatchVersion` unused there. A stale ETag there

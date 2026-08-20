@@ -166,6 +166,17 @@ accepted: `ACMCertificateArn`/`SSLSupportMethod` from the API, and
 Certificates are resolved through `SimAcmRegistry`, so a standalone `SimCloudFront` with no
 registry checks nothing.
 
+### Web ACLs
+
+`web-acl/` holds what a Distribution's `WebACLId` means. `SimCfWebAclResolver` finds the web ACL an
+ARN names, in the Account and Region the ARN carries, through that scope's simulated WAFv2.
+`makeSimCfWebAclResolver` builds one over a `SimAws`. A standalone `SimCloudFront` has none, and
+refuses any `WebACLId` for want of anywhere to find the web ACL.
+
+`SimCfDistributionWebAcl` refuses a `DistributionConfig` naming a web ACL nothing created, and one
+naming a `REGIONAL` scope web ACL, both as `InvalidWebACLId`. The check runs at create and at
+update, before anything is applied, the way a missing response headers policy is refused.
+
 ## Request routing and handling
 
 HTTP request behaviour is split across a few directories:
@@ -181,6 +192,11 @@ HTTP request behaviour is split across a few directories:
   error response and before the viewer-response CloudFront Function. That ordering is CloudFront's
   own: an error page carries the policy's headers, and a function sees them in its event and can
   change them.
+  `controller/web-acl/` puts the request through the Distribution's web ACL, first of all the stages
+  and before Behavior resolution. CloudFront asks WAF ahead of every content-handling stage. A
+  blocked request is answered with the web ACL's 403, and no Behavior, viewer-request function or
+  Origin sees it. An allowing rule's custom request handling headers are added to the request that
+  carries on.
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
@@ -308,6 +324,8 @@ The key integration points are:
   `SimCloudFront` has no dispatcher, and refuses a custom Origin rather than reaching the network.
 - `SimAcmRegistry`, which resolves the ACM Certificate a Distribution's viewer certificate ARN
   names, wherever in the simulated AWS instance it lives.
+- `SimCfWebAclResolver`, which reaches the simulated WAFv2 holding the `CLOUDFRONT` scope web ACL a
+  Distribution names, and hands the request to `SimWafV2.evaluateRequest` for a decision.
 
 A standalone `SimCloudFront` instance can be used directly, but full CloudFront routing is usually
 most useful through `SimAws`, where CloudFront, S3, and the shared registry are wired together.

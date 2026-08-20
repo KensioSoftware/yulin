@@ -4,6 +4,7 @@ import type { SimCloudFrontS3OriginResolver } from "../origin/s3/sim-cloudfront-
 import type { SimCloudFrontOriginAccessControlRegistry } from "../origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import type { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
+import type { SimCfWebAclResolver } from "../web-acl/sim-cf-web-acl.js";
 import { makeSimCloudFrontDistributionConfigurator } from "./configurator/sim-cf-distribution-configurator.factory.js";
 import type { SimCloudFrontDistributionConfigurator } from "./configurator/sim-cloud-front-distribution-configurator.js";
 import type { SimCloudFrontDistribution } from "./sim-cloudfront-distribution.js";
@@ -14,6 +15,7 @@ interface SimCloudFrontDistributionReconfigurerProperties {
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
+  readonly webAclResolver?: SimCfWebAclResolver | undefined;
 }
 
 /**

@@ -5,9 +5,10 @@ regex pattern sets, and it evaluates a request against a web ACL's rules to reac
 can assert that a request to `/admin` is blocked and one to `/` is allowed, without an AWS account
 and without a distribution in front of anything.
 
-A web ACL can also go in front of a simulated API Gateway REST API stage, and every request that
-stage serves is then put through its rules. CloudFront distributions and Cognito user pools arrive
-later.
+A web ACL can also go in front of what serves the requests. A simulated API Gateway REST API stage
+takes one through `AssociateWebACL`, and a simulated CloudFront distribution takes one through its
+own `WebACLId`. Every request that stage or distribution serves is then put through the web ACL's
+rules. Cognito user pools arrive later.
 
 WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
 
@@ -369,6 +370,16 @@ An API Gateway HTTP API stage is refused. AWS WAF has no resource type for one, 
 accepted here would let a test cover protection AWS never applies. Application Load Balancer,
 AppSync, App Runner, Amplify and Verified Access resources are refused as unsimulated, each naming
 what it would have protected.
+
+## Protecting a CloudFront distribution
+
+A simulated CloudFront distribution names its web ACL in `WebACLId` on its `DistributionConfig`,
+and evaluates it against every request that reaches the distribution. A blocked request gets 403
+before a cache behaviour, a viewer-request CloudFront Function or the origin sees it.
+
+CloudFront is associated this way and not through `AssociateWebACL`, which real WAF keeps for the
+regional resource types. The ARN has to name a `CLOUDFRONT` [scope](#scopes) web ACL. See
+[web ACLs in the CloudFront docs](../cloudfront/README.md#web-acls) for the whole example.
 
 ## Regex pattern sets
 

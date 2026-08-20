@@ -64,6 +64,16 @@ export interface SimCloudFrontDistributionConfig {
           | undefined;
       };
   readonly ViewerCertificate?: SimCloudFrontViewerCertificate | undefined;
+  /**
+   * The ARN of the `CLOUDFRONT` scope WAFv2 web ACL in front of the
+   * Distribution.
+   *
+   * CloudFront names its web ACL here rather than through `AssociateWebACL`,
+   * which WAFv2 keeps for the regional resource types. The name is the one the
+   * CloudFront API uses, and an empty value means no web ACL, as it does in
+   * AWS.
+   */
+  readonly WebACLId?: string | undefined;
 }
 
 /**

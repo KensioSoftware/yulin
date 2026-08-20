@@ -14,6 +14,7 @@ import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfro
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../../response-headers-policy/sim-cf-response-headers-policy-registry.js";
+import type { SimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { makeSimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cf-distribution-configurator.factory.js";
 import type { SimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cloud-front-distribution-configurator.js";
@@ -39,6 +40,7 @@ interface CreateDistributionCommandHandlerProperties {
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
+  readonly webAclResolver?: SimCfWebAclResolver | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background: BackgroundScheduler;

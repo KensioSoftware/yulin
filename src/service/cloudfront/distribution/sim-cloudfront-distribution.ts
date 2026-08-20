@@ -44,6 +44,7 @@ export class SimCloudFrontDistribution {
   #distributionConfig: SimCloudFrontDistributionConfig | undefined;
   #enabled: boolean;
   #defaultRootObject: string | undefined;
+  #webAclArn: string | undefined;
   private readonly alternateDomainNames = new Set<string>();
 
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
@@ -101,6 +102,24 @@ export class SimCloudFrontDistribution {
   }
 
   /**
+   * The ARN of the web ACL this sim Distribution is behind, if any.
+   *
+   * CloudFront names its web ACL in the DistributionConfig rather than through
+   * WAFv2's AssociateWebACL, so this is read from the config the same way the
+   * default root object is.
+   */
+  get webAclArn(): string | undefined {
+    return this.#webAclArn;
+  }
+
+  /**
+   * Set the ARN of the web ACL this sim Distribution is behind.
+   */
+  set webAclArn(webAclArn: string | undefined) {
+    this.#webAclArn = webAclArn;
+  }
+
+  /**
    * Move the sim Distribution into Deployed status.
    */
   completeDeployment(): Promise<void> {
@@ -124,6 +143,7 @@ export class SimCloudFrontDistribution {
     this.#enabled = distributionConfig.Enabled ?? true;
     this.#status = "Deploying";
     this.#defaultRootObject = undefined;
+    this.#webAclArn = undefined;
     this.behaviors.length = 0;
     this.customErrorResponses.length = 0;
     this.alternateDomainNames.clear();

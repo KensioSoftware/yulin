@@ -5,6 +5,10 @@ import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavi
 import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 import { SimCloudFrontCustomErrorConfigurator } from "./sim-cloud-front-custom-error-configurator.js";
 import { SimCloudFrontInvalidDefaultRootObject } from "../../error/sim-cloudfront.error.js";
+import {
+  type SimCfDistributionWebAcl,
+  simCfWebAclArn,
+} from "../../web-acl/sim-cf-distribution-web-acl.js";
 
 /**
  * Applies top-level Distribution configuration to a sim CloudFront Distribution.
@@ -18,6 +22,10 @@ import { SimCloudFrontInvalidDefaultRootObject } from "../../error/sim-cloudfron
  *
  * Named Cache Behaviors must be added after the default so that the default
  * always acts as the fallback when no path pattern matches.
+ *
+ * The web ACL comes before all of it, because a web ACL decides a request
+ * before any of the above handles it, and a config naming one that is not
+ * there is refused rather than half applied.
  */
 export class SimCloudFrontDistributionConfigurator {
   private readonly customErrorConfigurator =
@@ -27,6 +35,7 @@ export class SimCloudFrontDistributionConfigurator {
     private readonly originConfigurator: SimCloudFrontOriginConfigurator,
     private readonly behaviorConfigurator: SimCloudFrontBehaviorConfigurator,
     private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
+    private readonly webAcl: SimCfDistributionWebAcl,
   ) {}
 
   /**
@@ -43,6 +52,7 @@ export class SimCloudFrontDistributionConfigurator {
     distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
     this.responseHeadersPolicy.assertAllExist(distributionConfig);
+    this.webAcl.assertUsable(distributionConfig);
   }
 
   /**
@@ -52,6 +62,11 @@ export class SimCloudFrontDistributionConfigurator {
     distribution: SimCloudFrontDistribution,
     distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
+    // A web ACL the simulation cannot find is refused before anything is
+    // applied, so a creation is turned away for it as an update already is.
+    this.webAcl.assertUsable(distributionConfig);
+    distribution.webAclArn = simCfWebAclArn(distributionConfig);
+
     const aliasItems = distributionConfig.Aliases?.Items ?? [];
     for (const alias of aliasItems) {
       distribution.addAlternateDomainName(alias);

@@ -3,8 +3,10 @@
 This directory contains the simulated AWS WAFv2 implementation. It holds web ACLs, IP sets and
 regex pattern sets, and it evaluates a request against a web ACL's rules to reach a decision.
 
-A web ACL can be put in front of an API Gateway REST API stage. CloudFront distributions and
-Cognito user pools come later.
+`SimWafV2.evaluateRequest` is the entry point a fronting service calls once it has a web ACL ARN to
+hand. An API Gateway REST API stage reaches it through `AssociateWebACL`. Simulated CloudFront calls
+it in `cloudfront/controller/web-acl/`, for every request to a distribution whose `WebACLId` names
+one. Cognito user pools come later.
 
 ## Entry points
 
