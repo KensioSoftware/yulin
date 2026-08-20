@@ -62,7 +62,11 @@ export class SimWafCfnResourceFactory implements SimCfnServiceResourceFactory {
         return await creators.webAcl.create(resource, properties);
       }
       case wafWebAclAssociationResourceTypeName: {
-        return await creators.association.create(resource, properties);
+        return await creators.association.create(
+          resource,
+          properties,
+          context.resources,
+        );
       }
       case wafIpSetResourceTypeName: {
         return await creators.ipSet.create(resource, properties);

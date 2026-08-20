@@ -1,14 +1,16 @@
-import { SimWafError } from "../error/sim-wafv2.error.js";
+import {
+  SimWafError,
+  SimWafUnsimulatedInputException,
+} from "../error/sim-wafv2.error.js";
 
 /**
  * Build the error a Resource of a simulated WAFv2 type is refused with.
  *
- * The wording is deliberate. Sim CloudFormation reads an error saying a
- * Resource is unsupported as one to record and step over, and stepping over a
- * web ACL that cannot be created as the template asked for it is the wrong
- * answer: the stack would look deployed while every request the rules were
- * written to stop went through. So a refusal here says the Resource is
- * invalid.
+ * Sim CloudFormation fails a stack on this one, so it is kept for a Resource
+ * nothing coherent could be deployed from: a `Rules` property that is not a
+ * list, a scope outside `REGIONAL` and `CLOUDFRONT`, an association naming no
+ * resource. Something WAFv2 cannot evaluate is a different thing and takes the
+ * skip below.
  */
 export function simCfnWafResourceError(
   resourceType: string,
@@ -19,6 +21,34 @@ export function simCfnWafResourceError(
   return new Error(`Invalid ${resourceType} Resource ${logicalId}: ${reason}`, {
     cause,
   });
+}
+
+/**
+ * Build the error a Resource carrying something WAFv2 cannot evaluate is
+ * skipped with.
+ *
+ * The "Unsupported sim ... CloudFormation" wording is what sim CloudFormation
+ * reads as a Resource to record and step over, so the Resource lands on
+ * `stack.skippedResources` carrying the reason WAFv2 gave, and the rest of the
+ * template deploys.
+ *
+ * Skipping keeps the caution the refusal was written with. A web ACL that
+ * accepted a rule it cannot evaluate would allow a request AWS blocks, and a
+ * web ACL that is missing allows exactly as much as a stack that never
+ * deployed. What it drops is the blast radius: a user pool, a table, a secret
+ * and two functions in the same template are no business of one rule.
+ */
+export function simCfnWafSkippedResourceError(
+  resourceType: string,
+  logicalId: string,
+  reason: string,
+  cause?: unknown,
+): Error {
+  return new Error(
+    `Unsupported sim WAFv2 CloudFormation ${resourceType} Resource ` +
+      `${logicalId}: ${reason}`,
+    { cause },
+  );
 }
 
 /**
@@ -33,6 +63,10 @@ export function simCfnWafResourceError(
  * a template can hold several. Only WAFv2's own errors are renamed, so a
  * refusal the CloudFormation layer decided keeps the wording it was written
  * with.
+ *
+ * The two kinds of refusal part company here. Input WAFv2 will not take is a
+ * failed Resource, and input it takes and this simulation cannot evaluate is a
+ * skipped one.
  */
 export async function simCfnWafResourceCommand<T>(
   resourceType: string,
@@ -42,6 +76,15 @@ export async function simCfnWafResourceCommand<T>(
   try {
     return await run();
   } catch (error) {
+    if (error instanceof SimWafUnsimulatedInputException) {
+      throw simCfnWafSkippedResourceError(
+        resourceType,
+        logicalId,
+        error.message,
+        error,
+      );
+    }
+
     if (error instanceof SimWafError) {
       throw simCfnWafResourceError(
         resourceType,

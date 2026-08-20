@@ -246,10 +246,29 @@ compilation of every rule that an SDK caller gets, and the same refusals.
 because a deployment failing on `Rule block-admin uses the statement kind SqliMatchStatement` says
 which rule and not which of a template's web ACLs declared it.
 
+The same file sorts the two kinds of refusal. A template and an SDK caller part company there. A
+`SimWafUnsimulatedInputException` skips the Resource, worded so sim CloudFormation records it and
+steps over it (see `resource/unsupported/sim-cfn-unsupported-resource.ts`). Every other
+`SimWafError` fails the stack, because the template asked for something WAFv2 itself will not
+take.
+
+Issue #823 is the reasoning behind that split, and #391 is the principle it comes from. A web ACL
+that accepted a rule it cannot evaluate would allow a request AWS blocks, and a web ACL that is
+missing allows exactly what a stack that never deployed allows. The caution was right and the blast
+radius was the mistake. One rate limiting rule used to take a user pool, a table, a secret and two
+functions down with it.
+
 The association hands `ResourceArn` straight to `AssociateWebACL`. What a web ACL may be put in
 front of is decided once, in `association/sim-waf-protected-resource.ts`, and the CloudFormation
-layer inherits every refusal in it. Deleting the association tolerates a resource that has gone
-already, which is what a REST API stage in one stack and the association in another leaves behind.
+layer inherits every answer in it. The same split runs through it. An HTTP API stage fails the
+stack, and a load balancer skips the association. Deleting the association tolerates a resource that
+has gone already, which is what a REST API stage in one stack and the association in another leaves
+behind.
+
+`association/sim-cfn-waf-skipped-web-acl.ts` catches the case the split leaves open. A skipped
+Resource reaches CREATE_COMPLETE and answers `Fn::GetAtt` with a stand-in, so an association naming
+a skipped web ACL would hand that stand-in to `AssociateWebACL` and fail the stack on a web ACL that
+does not exist. The association is skipped alongside the web ACL it depended on.
 
 Two shapes differ between a template and the API. `SearchString` is plain text in a template and
 bytes in the SDK, and `RegularExpressionList` is a list of strings in a template and a list of

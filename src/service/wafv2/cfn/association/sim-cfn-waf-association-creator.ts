@@ -2,9 +2,13 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimWafUnavailableEntityException } from "../../error/sim-wafv2.error.js";
 import type { SimWafV2 } from "../../sim-wafv2.js";
-import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
+import {
+  simCfnWafResourceCommand,
+  simCfnWafSkippedResourceError,
+} from "../sim-cfn-waf-resource-error.js";
 import { wafWebAclAssociationResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafAssociationConfig } from "./sim-cfn-waf-association-config.js";
+import { skippedSimCfnWafWebAcl } from "./sim-cfn-waf-skipped-web-acl.js";
 import { SimWafCfnWebAclAssociation } from "./sim-cfn-waf-web-acl-association.js";
 
 interface SimCfnWafAssociationCreatorProperties {
@@ -21,6 +25,9 @@ interface SimCfnWafAssociationCreatorProperties {
  * resource this simulation does not hold, and a `CLOUDFRONT` scope web ACL,
  * which reaches a distribution through the distribution's own `WebACLId`
  * rather than through an association.
+ *
+ * A resource type AWS WAF protects and this simulation does not is a skip
+ * rather than a failure, and so is an association whose web ACL was skipped.
  */
 export class SimCfnWafAssociationCreator {
   readonly #wafV2: SimWafV2;
@@ -35,7 +42,19 @@ export class SimCfnWafAssociationCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    resources: ReadonlyMap<string, SimCfnResource>,
   ): Promise<SimWafCfnWebAclAssociation> {
+    const skippedWebAcl = skippedSimCfnWafWebAcl(resource, resources);
+
+    if (skippedWebAcl !== undefined) {
+      throw simCfnWafSkippedResourceError(
+        wafWebAclAssociationResourceType,
+        resource.logicalId,
+        `the web ACL it names, ${skippedWebAcl.logicalId}, was skipped, so ` +
+          `there is nothing to put in front of the resource`,
+      );
+    }
+
     const config = new SimCfnWafAssociationConfig({ resource, properties });
     const association = new SimWafCfnWebAclAssociation({
       resourceArn: config.resourceArn(),

@@ -912,8 +912,28 @@ strings where the SDK takes a list of `RegexString` objects. Both are read here 
 CloudFormation writes them.
 
 Every rule is compiled while the stack deploys. A statement kind this simulator will not evaluate
-(see [Refusals](#refusals)) fails the deployment, and the failure names the logical ID along with
-the rule and the statement kind. The web ACL never reaches a request it cannot decide.
+(see [Refusals](#refusals)) skips the web ACL and the deployment carries on. The skip lands on
+`stack.skippedResources`, and its `skippedReason` names the logical ID, the rule and the statement
+kind. The web ACL never reaches a request it cannot decide.
+
+A skipped web ACL leaves whatever it was in front of unprotected. Requests its rules would have
+blocked are served, and the rest of the template still deploys around the gap. That is the size of
+what a test loses, and `stack.skippedResources` is where to read it.
+
+```typescript
+const skipped = stack.skippedResources.map(
+  (resource) => resource.skippedReason,
+);
+
+// "Unsupported sim WAFv2 CloudFormation AWS::WAFv2::WebACL Resource OrdersAcl:
+//  Rule account-creation-rate uses the statement kind RateBasedStatement, which
+//  Yulin does not simulate: ..."
+console.log(skipped[0]);
+```
+
+A web ACL nothing coherent could be deployed from still fails the stack. A `Scope` outside
+`REGIONAL` and `CLOUDFRONT`, a `Rules` that is not a list, a `Name` that is not a string. The
+failure names the logical ID.
 
 `Name` is optional on all three named types. An unnamed resource is named after the stack and the
 logical ID, as real CloudFormation names one, so `orders-acl` above would have deployed as
@@ -923,8 +943,13 @@ logical ID, as real CloudFormation names one, so `orders-acl` above would have d
 
 `AWS::WAFv2::WebACLAssociation` associates a web ACL with whatever its `ResourceArn` names, which
 covers an API Gateway REST API stage and a Cognito user pool. It goes through `AssociateWebACL` and
-inherits that command's refusals. An ARN naming an HTTP API stage or a load balancer fails the
-deployment with the reason WAF gives an SDK caller.
+inherits that command's answers. An ARN naming an HTTP API stage fails the deployment, because AWS
+WAF protects no HTTP API and neither does real CloudFormation. An ARN naming a load balancer or an
+AppSync API skips the association. AWS WAF protects both, and Yulin simulates a web ACL in front of
+neither.
+
+An association whose web ACL was skipped is skipped with it, having lost what it pointed at. Its
+`skippedReason` names the web ACL.
 
 ```json
 {
@@ -1162,6 +1187,10 @@ console.log(scoped.wafV2().allWebAcls("REGIONAL")[0]?.name);
 A rule Yulin cannot evaluate is refused by `CreateWebACL` and `UpdateWebACL`, naming the rule and
 what in it was refused. A web ACL that accepted such a rule would allow a request AWS blocks, and a
 silent hole in a security layer is worse than a missing one.
+
+A template carrying one of these keeps the caution and drops the blast radius. The Resource is
+skipped and the rest of the stack deploys. See
+[Deploying web ACLs with CloudFormation](#deploying-web-acls-with-cloudformation).
 
 These statement kinds are refused:
 

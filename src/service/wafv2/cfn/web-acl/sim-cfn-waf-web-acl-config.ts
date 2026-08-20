@@ -12,7 +12,7 @@ import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
  * default action and the custom response bodies are handed over as the
  * template wrote them. They are not read here at all: every rule is compiled
  * by CreateWebACL, which is where a statement kind Yulin cannot evaluate is
- * refused, and reading them twice would mean two answers to the same question.
+ * found, and reading them twice would mean two answers to the same question.
  */
 export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
   protected override get resourceType(): string {
@@ -24,7 +24,8 @@ export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
    *
    * The properties this simulation has no behaviour for are passed through
    * rather than dropped, so `CaptchaConfig` and the rest are refused by
-   * CreateWebACL as they are for an SDK caller.
+   * CreateWebACL as they are for an SDK caller, and skip the Resource
+   * carrying them.
    */
   createInput(): SimCreateWebAclCommandInput {
     return {

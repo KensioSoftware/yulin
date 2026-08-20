@@ -18,6 +18,11 @@ interface SimCfnWafWebAclCreatorProperties {
  * constructed directly, so one a template deployed is the same thing an SDK
  * caller would have got: the same compilation of every rule, and the same
  * refusal of a statement kind this simulation cannot evaluate.
+ *
+ * What the two do with that refusal differs. An SDK caller is told and has the
+ * web ACL refused; a template has this Resource skipped, so the rest of it
+ * still deploys and `stack.skippedResources` says which web ACL is missing and
+ * why.
  */
 export class SimCfnWafWebAclCreator {
   readonly #wafV2: SimWafV2;

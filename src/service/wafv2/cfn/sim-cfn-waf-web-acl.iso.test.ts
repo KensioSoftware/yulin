@@ -234,33 +234,33 @@ describe("AWS::WAFv2::WebACL", () => {
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
   });
 
-  it("refuses a statement kind the service refuses, naming the Resource", async () => {
+  it("skips a web ACL whose rule the service cannot evaluate", async () => {
     // Given a template whose rule inspects the client address, which every
     // request in this simulation shares.
     const simAws = new SimAws();
-    const error = await assertThrowsErrorAsync(async () => {
-      await deployWebAcl(simAws, {
-        Rules: [
-          {
-            ...blockAdmin,
-            Statement: {
-              IPSetReferenceStatement: {
-                ARN: "arn:aws:wafv2:us-east-1:111111111111:regional/ipset/o/1",
-              },
+    const stack = await deployWebAcl(simAws, {
+      Rules: [
+        {
+          ...blockAdmin,
+          Statement: {
+            IPSetReferenceStatement: {
+              ARN: "arn:aws:wafv2:us-east-1:111111111111:regional/ipset/o/1",
             },
           },
-        ],
-      });
+        },
+      ],
     });
 
-    // Then the deployment failed, naming the logical id alongside the rule and
-    // the statement kind WAFv2 would not compile.
-    assertStringIncludes(
-      error.message,
-      "AWS::WAFv2::WebACL Resource OrdersAcl",
-    );
-    assertStringIncludes(error.message, "Rule block-admin");
-    assertStringIncludes(error.message, "IPSetReferenceStatement");
+    // Then the stack deployed without the web ACL, and the skip names the
+    // logical id alongside the rule and the statement kind WAFv2 would not
+    // compile. Skips are covered in sim-cfn-waf-skips.iso.test.ts.
+    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
+
+    const reason = stack.skippedResources[0]?.skippedReason ?? "";
+
+    assertStringIncludes(reason, "AWS::WAFv2::WebACL Resource OrdersAcl");
+    assertStringIncludes(reason, "Rule block-admin");
+    assertStringIncludes(reason, "IPSetReferenceStatement");
   });
 
   it("refuses a Rules property that is not a list", async () => {
