@@ -633,8 +633,11 @@ one.
 
 `authorizerResultTtlInSeconds` holds a decision for that many seconds. A second request presenting
 the same identity within that period reaches the handler without the function running again. AWS
-accepts a whole number of seconds up to 3600. The default is 0, and an authorizer left at 0
-decides every request afresh.
+accepts a whole number of seconds up to 3600, and 0 switches the holding off.
+
+An authorizer that says nothing about the member gets 0 here and gets 300 on real API Gateway.
+Write the member out to have a test and a deployment agree on it. CDK writes it either way, at five
+minutes by default (see [CDK](#cdk)).
 
 A `TOKEN` authorizer is keyed on the token it was handed. A `REQUEST` authorizer is keyed on the
 values its identity sources found, in the order they were configured. Both are held per method,
@@ -718,8 +721,9 @@ console.log(await call());
 await srv.close();
 ```
 
-A `COGNITO_USER_POOLS` authorizer verifies each token as it arrives, and `CreateAuthorizer` refuses
-`authorizerResultTtlInSeconds` on one.
+A `COGNITO_USER_POOLS` authorizer verifies each token as it arrives here, and `CreateAuthorizer`
+refuses `authorizerResultTtlInSeconds` on one. Real API Gateway holds a Cognito authorizer's
+decision too, and a token that expires inside the period is still accepted there.
 
 ## Protecting a method with IAM
 
@@ -1543,6 +1547,9 @@ and behave differently deployed. The refusals worth knowing about:
   `COGNITO_USER_POOLS` authorizer. Real API Gateway holds that decision, and a token expiring
   during the period would still be accepted. A Lambda authorizer takes the member. See
   [Caching the authorizer's decision](#caching-the-authorizers-decision).
+- **The default period.** A Lambda authorizer written with no `authorizerResultTtlInSeconds` holds
+  no decision here, where real API Gateway would hold one for 300 seconds. An authorizer counting
+  its own invocations counts one per request until the member is written out.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
   `HTTP_PROXY` and the non-proxy `AWS` type each answer a request from somewhere this cannot reach.
 - **API keys and usage plans.** `apiKeyRequired: true` is refused, because a method requiring a key
