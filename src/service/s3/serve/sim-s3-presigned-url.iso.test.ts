@@ -81,6 +81,35 @@ describe("Presigned simulated S3 URLs", () => {
     assertIdentical(stored?.body.toString(), "uploaded through a link");
   });
 
+  it("serves an Object whose key holds a space", async () => {
+    // Given an Object under a key with a space in it, and a URL presigned for
+    // it. The space reaches the simulator percent-encoded, and S3 signs a path
+    // in the encoding it arrived in.
+    const { client, http, simAws } = await presignSimulation();
+    const key = "q3/quarterly report.pdf";
+
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: presignBucketName,
+        Key: key,
+        Body: presignObjectBody,
+      }),
+    );
+
+    const url = await getSignedUrl(
+      client,
+      new GetObjectCommand({ Bucket: presignBucketName, Key: key }),
+      { expiresIn: 900 },
+    );
+
+    // When it is fetched
+    const response = await http.fetch(url);
+
+    // Then the Object comes back, as it does for a key of plain characters
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), presignObjectBody);
+  });
+
   it("refuses a URL whose signature was tampered with", async () => {
     // Given a presigned URL for one Object, edited to name another
     const { client, http } = await presignSimulation();
