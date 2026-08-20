@@ -327,6 +327,96 @@ yet. A standalone `SimLambda` (constructed directly, outside `SimAws`) has no si
 fetch from. `SimAws`-created Lambda wires the same-scope sim S3 automatically, matching real
 Lambda's requirement for a same-region code bucket.
 
+## Replacing a function's code
+
+`UpdateFunctionCodeCommand` replaces the code `$LATEST` runs, taking the same four code shapes `CreateFunction` takes. It carries them at the top level of its input rather than under `Code`, as real Lambda does. A test that redeploys part-way through, or that wants a function to start failing after a few invocations, changes what runs without deleting the function.
+
+The function keeps everything else it holds. Its name, ARN, execution Role, environment variables, timeout, memory, [resource-based policy](#resource-based-policies), [Function URL](#function-urls), published versions and aliases all survive, which is what separates this from deleting the function and creating it again.
+
+```typescript sim-lambda-update-function-code
+/**
+ * Replacing the code a simulated Lambda function runs, part-way through.
+ */
+
+import {
+  CreateFunctionCommand,
+  InvokeCommand,
+  UpdateFunctionCodeCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => ({ ok: true })) },
+  }),
+);
+
+await lambda.updateFunctionCode(
+  new UpdateFunctionCodeCommand({
+    FunctionName: "orders",
+    ZipFile: makeLambdaZipFileInput(() => {
+      throw new Error("the order service is down");
+    }),
+  }),
+);
+
+const invoked = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "orders" }),
+);
+console.log(invoked.FunctionError);
+
+await simAws.backgroundTasksComplete();
+```
+
+Zip code runs under the `Handler` the function already has, because `UpdateFunctionCode` carries none of its own. Replacing a handler-reference function's code with a zip archive is refused for that reason, naming `UpdateFunctionConfiguration` as where a `Handler` would be set. That command is not simulated yet.
+
+A published version keeps the code it was published with, so a version published before an update goes on running it while `$LATEST` runs the replacement. `Publish: true` publishes a version of the replacement code and answers with that version rather than with `$LATEST`. See [Versions and aliases](#versions-and-aliases).
+
+## Listing the functions
+
+`ListFunctionsCommand` reports every function in the Account and Region, each described as `GetFunction` describes it. `FunctionVersion: "ALL"` adds each function's published versions to the listing.
+
+```typescript sim-lambda-list-functions
+/**
+ * Listing the simulated Lambda functions an Account and Region holds.
+ */
+
+import {
+  CreateFunctionCommand,
+  ListFunctionsCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+for (const functionName of ["orders", "invoices"]) {
+  await lambda.createFunction(
+    new CreateFunctionCommand({
+      FunctionName: functionName,
+      Role: "arn:aws:iam::111111111111:role/OrdersRole",
+      Code: { ZipFile: makeLambdaZipFileInput(() => functionName) },
+    }),
+  );
+}
+
+const listed = await lambda.listFunctions(new ListFunctionsCommand({}));
+console.log(listed.Functions.map((simFunction) => simFunction.FunctionName));
+
+await simAws.backgroundTasksComplete();
+```
+
+The listing is authorized as a whole, against `lambda:ListFunctions` on `*`, the way AWS documents the permission. A caller without it is denied rather than given a filtered list.
+
 ## The runtime-provided AWS SDK
 
 Like the real Lambda Node.js runtime, the simulated runtime provides AWS SDK v3 packages without
@@ -2812,6 +2902,10 @@ Sim Lambda currently supports:
 
 - `CreateFunctionCommand` and `GetFunctionCommand`, including a function created from the
   [simulated ECR](../ecr/ "Simulated ECR usage docs") image its `Code.ImageUri` names
+- `UpdateFunctionCodeCommand`, replacing the code `$LATEST` runs while the function keeps its
+  policy, Function URL, versions and aliases
+- `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
+  versions with `FunctionVersion: "ALL"`
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
@@ -2849,8 +2943,9 @@ Sim Lambda currently supports:
   `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke`,
   `GetFunction` and the permission commands, each qualified resource holding its own policy
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
-  `lambda:GetFunction`, `lambda:InvokeFunction`, the Function URL config actions, and the version
-  and alias actions)
+  `lambda:GetFunction`, `lambda:UpdateFunctionCode`, `lambda:InvokeFunction`, the Function URL
+  config actions, and the version and alias actions), and `lambda:ListFunctions` on `*` for the
+  listing
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
 - The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission`,
   `AWS::Lambda::Version`, `AWS::Lambda::Alias` and `AWS::Lambda::EventSourceMapping`
@@ -2866,10 +2961,15 @@ Sim Lambda currently supports:
 
 Current documented limitations:
 
-- Only `CreateFunctionCommand`, `GetFunctionCommand`, `DeleteFunctionCommand`, `InvokeCommand`, the
-  permission commands (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the
-  version and alias commands, the Function URL config commands and the event source mapping
-  commands are supported. `UpdateFunctionCode` and function listing are absent so far.
+- Only `CreateFunctionCommand`, `GetFunctionCommand`, `UpdateFunctionCodeCommand`,
+  `ListFunctionsCommand`, `DeleteFunctionCommand`, `InvokeCommand`, the permission commands
+  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the version and alias
+  commands, the Function URL config commands and the event source mapping commands are supported.
+  `UpdateFunctionConfiguration` is absent so far, so a function's Role, Handler, Runtime,
+  Description, Timeout, MemorySize and Environment are fixed at creation.
+- `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
+  along with `Architectures` and `SourceKMSKeyArn`. `ListFunctions` leaves out `Marker`/`MaxItems`
+  paging and `MasterRegion`.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
@@ -2889,10 +2989,10 @@ Current documented limitations:
   buffered.
 - A function has at most one Function URL, and qualified (version or alias) Function URLs are left
   out.
-- A published version keeps what it was published with, and `UpdateFunctionCode` is absent, so
-  `$LATEST` has no way to drift from it yet. The `CodeSha256` and `RevisionId` checks
-  `PublishVersion` makes are left out, along with alias `RoutingConfig` weights, provisioned
-  concurrency, and the `Marker`/`MaxItems` paging on the two listings. `CodeSha256`, `RuntimePolicy`
+- A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
+  alone. The `CodeSha256` and `RevisionId` checks `PublishVersion` makes are left out, along with
+  alias `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the
+  two listings. `CodeSha256`, `RuntimePolicy`
   and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig` and
   `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
   `AutoPublishAlias` is left out.
@@ -2938,7 +3038,10 @@ Current documented limitations:
 - A time read at module scope, like an environment variable read there, is read before any
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocation retries and failure destinations are left out, and handler errors are dropped.
-- `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
+- The S3 object version a code location names is accepted but ignored, as sim S3 has no object
+  versioning yet. That covers `Code.S3ObjectVersion` on `CreateFunction` and on a template
+  function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as
+  it stands.
 - SQS queues and DynamoDB streams are the only event sources. Kinesis, Kafka and DocumentDB sources
   are refused outright, and so are `FilterCriteria`,
   `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
@@ -2977,7 +3080,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves sixteen of these operations over HTTP, listed in the
+- `serveSimAws` serves eighteen of these operations over HTTP, listed in the
   [serving docs](../../serve/README.md#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](../../sdk/) instead.

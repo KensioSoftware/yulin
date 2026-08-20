@@ -5,8 +5,11 @@ import {
   InvokeCommand,
   LambdaClient,
   ListFunctionsCommand,
+  UpdateFunctionCodeCommand,
+  UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
@@ -106,16 +109,51 @@ describe("simulated Lambda SDK Command routing", () => {
     await simSdk.simAws.backgroundTasksComplete();
   });
 
+  it("routes UpdateFunctionCode and ListFunctions through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new LambdaClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateFunctionCommand({
+        FunctionName: "intercepted",
+        Role: "arn:aws:iam::111111111111:role/InterceptedRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "first") },
+      }),
+    );
+    await client.send(
+      new UpdateFunctionCodeCommand({
+        FunctionName: "intercepted",
+        ZipFile: makeLambdaZipFileInput(() => "second"),
+      }),
+    );
+
+    const invoked = await client.send(
+      new InvokeCommand({ FunctionName: "intercepted" }),
+    );
+    assertNonNullable(invoked.Payload);
+    assertIdentical(Buffer.from(invoked.Payload).toString(), '"second"');
+
+    const listed = await client.send(new ListFunctionsCommand({}));
+    assertNonNullable(listed.Functions);
+    assertArrayLength(listed.Functions, 1);
+    assertIdentical(listed.Functions[0].FunctionName, "intercepted");
+
+    await simSdk.simAws.backgroundTasksComplete();
+  });
+
   it("rejects a Command simulated Lambda does not support", async () => {
     using simSdk = new SimSdk();
     const client = new LambdaClient({ region: "eu-west-2" });
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new ListFunctionsCommand({}));
+      await client.send(
+        new UpdateFunctionConfigurationCommand({ FunctionName: "orders" }),
+      );
     });
 
-    assertStringIncludes(error.message, "ListFunctionsCommand");
+    assertStringIncludes(error.message, "UpdateFunctionConfigurationCommand");
     assertStringIncludes(error.message, "InvokeCommand");
   });
 });

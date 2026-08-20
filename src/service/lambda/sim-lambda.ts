@@ -75,6 +75,22 @@ export class SimLambda extends SimLambdaInspection {
     return await this.commands.functions.get(command, options);
   }
 
+  /** Handle an Update Function Code Command from the SDK. */
+  async updateFunctionCode(
+    command: simLambdaCommands.SimUpdateFunctionCodeCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimUpdateFunctionCodeCommandOutput> {
+    return await this.commands.functions.updateCode(command, options);
+  }
+
+  /** Handle a List Functions Command from the SDK. */
+  async listFunctions(
+    command: simLambdaCommands.SimListFunctionsCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimListFunctionsCommandOutput> {
+    return await this.commands.functions.list(command, options);
+  }
+
   /** Handle a Delete Function Command from the SDK. */
   async deleteFunction(
     command: simLambdaCommands.SimDeleteFunctionCommand,

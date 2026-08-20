@@ -42,7 +42,8 @@ export class SimLambdaVmZipCodeFactory {
   ): SimLambdaVmZipCode {
     assertDefined(
       context.handlerName,
-      "CreateFunctionCommand.input.Handler required for zip function code",
+      context.missingHandlerMessage ??
+        "CreateFunctionCommand.input.Handler required for zip function code",
     );
 
     return new SimLambdaVmZipCode({

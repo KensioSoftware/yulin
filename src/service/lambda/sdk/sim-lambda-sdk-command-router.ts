@@ -12,6 +12,8 @@ import type { SimListVersionsByFunctionCommand } from "../command/list-versions-
 import type { SimPublishVersionCommand } from "../command/publish-version/publish-version.command.js";
 import type { SimUpdateAliasCommand } from "../command/update-alias/update-alias.command.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
+import type { SimListFunctionsCommand } from "../command/list-functions/list-functions.command.js";
+import type { SimUpdateFunctionCodeCommand } from "../command/update-function-code/update-function-code.command.js";
 import type {
   SimCreateEventSourceMappingCommand,
   SimDeleteEventSourceMappingCommand,
@@ -51,6 +53,22 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.getFunction(
             command as SimGetFunctionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateFunctionCodeCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.updateFunctionCode(
+            command as SimUpdateFunctionCodeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListFunctionsCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.listFunctions(
+            command as SimListFunctionsCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -1,4 +1,3 @@
-import type { Brand } from "../../../util/brand.type.js";
 import type { SimAwsRunAsOwner } from "../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsRunAsContext } from "../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
@@ -18,64 +17,22 @@ import {
 } from "./code/sim-lambda-executable-code.js";
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
-import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
-import {
-  defaultLambdaHandler,
-  type SimLambdaHandler,
-} from "./sim-lambda-handler.type.js";
-
-export type SimLambdaFunctionName = Brand<string, "SimLambdaFunctionName">;
-
-export type SimLambdaFunctionMap = Map<
+import { defaultLambdaHandler } from "./sim-lambda-handler.type.js";
+import type {
   SimLambdaFunctionName,
-  SimLambdaFunction
->;
+  SimLambdaFunctionProperties,
+} from "./sim-lambda-function.type.js";
 
-interface SimLambdaFunctionProperties {
-  name: SimLambdaFunctionName | string;
-  roleArn: string;
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  handlerFunction?: SimLambdaHandler;
-  code?: SimLambdaExecutableCode | undefined;
-  state?: SimLambdaFunctionState;
-  handlerName?: string | undefined;
-  runtimeName?: string | undefined;
-  description?: string | undefined;
-  timeoutSeconds?: number | undefined;
-  memorySizeMb?: number | undefined;
-  environment?: SimLambdaEnvironment | undefined;
-  runAsOwner?: SimAwsRunAsOwner;
-  /**
-   * The version this is. A function is `$LATEST`, and a version published
-   * from one is a copy of it under the number it was published as.
-   */
-  version?: string | undefined;
-  /**
-   * Clock this function's invocations measure their remaining time against. A
-   * function built standalone, outside a SimAws instance, falls back to the
-   * real clock.
-   */
-  clock?: SimClock | undefined;
-  /**
-   * Where this function's handler output is recorded. A function built
-   * standalone, outside a SimAws instance, has nowhere to record to and writes
-   * only to the host streams.
-   */
-  logs?: SimLogsServiceWriter | undefined;
-  /**
-   * Where the HTTP requests this function's code makes to hostnames the
-   * simulation serves are answered. A function built standalone, outside a
-   * SimAws instance, has no simulation to answer them and reaches the network
-   * as any other code would.
-   */
-  outboundHttp?: SimLambdaOutboundHttp | undefined;
-}
+export type {
+  SimLambdaFunctionName,
+  SimLambdaFunctionMap,
+} from "./sim-lambda-function.type.js";
 
 /**
  * Simulated Lambda function resource.
@@ -107,8 +64,8 @@ export class SimLambdaFunction {
   public readonly resourcePolicy = new SimLambdaFunctionPolicy();
 
   #state: SimLambdaFunctionState;
+  #code: SimLambdaExecutableCode;
   private readonly properties: SimLambdaFunctionProperties;
-  private readonly code: SimLambdaExecutableCode;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly runner = new SimLambdaHandlerRunner();
   private readonly clock: SimClock;
@@ -141,7 +98,7 @@ export class SimLambdaFunction {
     this.name = name as SimLambdaFunctionName;
     this.roleArn = roleArn;
     this.accountRegionScope = accountRegionScope;
-    this.code = code ?? new SimLambdaHandlerReferenceCode(handlerFunction);
+    this.#code = code ?? new SimLambdaHandlerReferenceCode(handlerFunction);
     this.#state = state;
     this.handlerName = handlerName;
     this.runtimeName = runtimeName;
@@ -199,13 +156,25 @@ export class SimLambdaFunction {
   publishedAs(version: string, description?: string): SimLambdaFunction {
     return new SimLambdaFunction({
       ...this.properties,
-      code: this.code,
+      code: this.#code,
       environment: this.environment,
       runAsOwner: this.runAsOwner,
       state: "Active",
       description: description ?? this.description,
       version,
     });
+  }
+
+  /**
+   * Replace the code this function runs, keeping everything else about it.
+   *
+   * The function object survives the change. Its resource-based policy lives
+   * on the object, and the version, alias and Function URL stores hold it
+   * under its name. A version published beforehand keeps its own reference to
+   * the code it was published with.
+   */
+  updateCode(code: SimLambdaExecutableCode): void {
+    this.#code = code;
   }
 
   /**
@@ -259,7 +228,7 @@ export class SimLambdaFunction {
       logStreamName: this.logging.logStreamName(),
     });
 
-    this.logging.recordFrom(this.code);
+    this.logging.recordFrom(this.#code);
 
     return await simAwsRunAsContext.run(
       this.runAsOwner,
@@ -272,7 +241,7 @@ export class SimLambdaFunction {
                 await this.logging.around(
                   async () =>
                     await this.runner.run(
-                      this.code.handlerFunction(),
+                      this.#code.handlerFunction(),
                       event,
                       contextBuilder,
                     ),
@@ -288,7 +257,7 @@ export class SimLambdaFunction {
    * and the console and streams it prints through.
    */
   private async runInHostScope<T>(run: () => Promise<T>): Promise<T> {
-    if (!this.code.runsInHostScope) {
+    if (!this.#code.runsInHostScope) {
       return await run();
     }
 

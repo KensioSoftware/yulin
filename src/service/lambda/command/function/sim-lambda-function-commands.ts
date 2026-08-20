@@ -10,6 +10,7 @@ import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-
 import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
 import type { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import type { SimLambdaFunctionMap } from "../../function/sim-lambda-function.js";
+import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import { CreateFunctionCommandHandler } from "../create-function/create-function.handler.js";
@@ -32,10 +33,21 @@ import type {
   SimInvokeCommand,
   SimInvokeCommandOutput,
 } from "../invoke/invoke.command.js";
+import { ListFunctionsCommandHandler } from "../list-functions/list-functions.handler.js";
+import type {
+  SimListFunctionsCommand,
+  SimListFunctionsCommandOutput,
+} from "../list-functions/list-functions.command.js";
+import { UpdateFunctionCodeCommandHandler } from "../update-function-code/update-function-code.handler.js";
+import type {
+  SimUpdateFunctionCodeCommand,
+  SimUpdateFunctionCodeCommandOutput,
+} from "../update-function-code/update-function-code.command.js";
 
 interface SimLambdaFunctionCommandsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly functions: SimLambdaFunctionMap;
+  readonly functionLookup: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly runAsOwner: SimAwsRunAsOwner;
@@ -88,6 +100,51 @@ export class SimLambdaFunctionCommands {
     options?: SimLambdaFunctionCommandOptions,
   ): Promise<SimGetFunctionCommandOutput> {
     return await new GetFunctionCommandHandler(this.properties).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Replace the code a function runs.
+   */
+  async updateCode(
+    command: SimUpdateFunctionCodeCommand,
+    options?: SimLambdaFunctionCommandOptions,
+  ): Promise<SimUpdateFunctionCodeCommandOutput> {
+    const {
+      functionLookup,
+      versions,
+      iam,
+      background,
+      codeStore,
+      containerImages,
+      vmSdkModuleProvider,
+      outboundHttp,
+    } = this.properties;
+
+    return await new UpdateFunctionCodeCommandHandler({
+      // The lookup rather than the map itself, because this command resolves
+      // a name that may arrive as a function ARN.
+      functions: functionLookup,
+      versions,
+      iam,
+      background,
+      codeStore,
+      containerImages,
+      vmSdkModuleProvider,
+      outboundHttp,
+    }).handle(command, options);
+  }
+
+  /**
+   * List the functions that exist in this Account and Region.
+   */
+  async list(
+    command: SimListFunctionsCommand,
+    options?: SimLambdaFunctionCommandOptions,
+  ): Promise<SimListFunctionsCommandOutput> {
+    return await new ListFunctionsCommandHandler(this.properties).handle(
       command,
       options,
     );

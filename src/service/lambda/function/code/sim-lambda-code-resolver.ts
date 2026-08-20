@@ -49,6 +49,12 @@ export interface SimLambdaCodeResolveContext {
   readonly handlerName: string | undefined;
   readonly environment: SimLambdaEnvironment;
   readonly caller?: SimAwsCaller | undefined;
+  /**
+   * What to say when zip code arrives with no handler name to find its export
+   * in. CreateFunction takes the name on the request, while UpdateFunctionCode
+   * has only whatever the function was created with.
+   */
+  readonly missingHandlerMessage?: string | undefined;
 }
 
 /**

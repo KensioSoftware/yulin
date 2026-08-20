@@ -65,7 +65,26 @@ export type SimLambdaCodeSource =
   | SimLambdaContainerImageSource;
 
 /**
- * Validate CreateFunction code input into a sim Lambda code source.
+ * Where a command carries its code members, for validation failures to point
+ * at the request the caller actually made.
+ *
+ * CreateFunction nests them under `Code`, while UpdateFunctionCode carries
+ * them at the top level of its input.
+ */
+export interface SimLambdaCodeInputNaming {
+  /** The path to the members, such as `CreateFunctionCommand.input.Code`. */
+  readonly path: string;
+  /** What prefixes a member name, such as `Code.` or nothing at all. */
+  readonly memberPrefix: string;
+}
+
+const createFunctionCodeNaming: SimLambdaCodeInputNaming = {
+  path: "CreateFunctionCommand.input.Code",
+  memberPrefix: "Code.",
+};
+
+/**
+ * Validate function code input into a sim Lambda code source.
  *
  * Exactly one of ZipFile, an S3 object location or a container image URI must
  * be given, as on real AWS. S3ObjectVersion is accepted but ignored, as sim S3
@@ -73,20 +92,21 @@ export type SimLambdaCodeSource =
  */
 export function requireLambdaCodeSource(
   code: SimLambdaCodeInput | undefined,
+  naming: SimLambdaCodeInputNaming = createFunctionCodeNaming,
 ): SimLambdaCodeSource {
-  assertDefined(code, "CreateFunctionCommand.input.Code required");
+  assertDefined(code, `${naming.path} required`);
 
   if (code.ImageUri !== undefined) {
-    return containerImageSource(code.ImageUri, code);
+    return containerImageSource(code.ImageUri, code, naming);
   }
   if (code.ZipFile !== undefined) {
-    return zipFileSource(code.ZipFile, code);
+    return zipFileSource(code.ZipFile, code, naming);
   }
   if (code.S3Bucket !== undefined || code.S3Key !== undefined) {
-    return s3LocationSource(code);
+    return s3LocationSource(code, naming);
   }
   throw new SimLambdaInvalidParameterValueException(
-    "CreateFunctionCommand.input.Code requires either ZipFile bytes, an " +
+    `${naming.path} requires either ZipFile bytes, an ` +
       "S3Bucket and S3Key object location, or an ImageUri",
   );
 }
@@ -98,6 +118,7 @@ export function requireLambdaCodeSource(
 function containerImageSource(
   imageUri: string,
   code: SimLambdaCodeInput,
+  naming: SimLambdaCodeInputNaming,
 ): SimLambdaContainerImageSource {
   if (
     code.ZipFile !== undefined ||
@@ -106,7 +127,7 @@ function containerImageSource(
   ) {
     throw new SimLambdaInvalidParameterValueException(
       "Please do not provide ZipFile bytes or an S3 object location when " +
-        "using Code.ImageUri",
+        `using ${naming.memberPrefix}ImageUri`,
     );
   }
 
@@ -116,10 +137,12 @@ function containerImageSource(
 function zipFileSource(
   zipFile: Uint8Array,
   code: SimLambdaCodeInput,
+  naming: SimLambdaCodeInputNaming,
 ): SimLambdaCodeSource {
   if (code.S3Bucket !== undefined || code.S3Key !== undefined) {
     throw new SimLambdaInvalidParameterValueException(
-      "Please do not provide an S3 object location when using Code.ZipFile",
+      "Please do not provide an S3 object location when using " +
+        `${naming.memberPrefix}ZipFile`,
     );
   }
   if (zipFile instanceof LambdaZipFileStowaway) {
@@ -131,15 +154,12 @@ function zipFileSource(
   return { kind: "zip-bytes", zipBytes: zipFile };
 }
 
-function s3LocationSource(code: SimLambdaCodeInput): SimLambdaS3LocationSource {
-  assertDefined(
-    code.S3Bucket,
-    "CreateFunctionCommand.input.Code.S3Bucket required with S3Key",
-  );
-  assertDefined(
-    code.S3Key,
-    "CreateFunctionCommand.input.Code.S3Key required with S3Bucket",
-  );
+function s3LocationSource(
+  code: SimLambdaCodeInput,
+  naming: SimLambdaCodeInputNaming,
+): SimLambdaS3LocationSource {
+  assertDefined(code.S3Bucket, `${naming.path}.S3Bucket required with S3Key`);
+  assertDefined(code.S3Key, `${naming.path}.S3Key required with S3Bucket`);
   return {
     kind: "s3-location",
     bucketName: code.S3Bucket,

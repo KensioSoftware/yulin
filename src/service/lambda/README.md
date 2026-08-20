@@ -747,11 +747,14 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
-- `UpdateFunctionCode` and function listing
+- `UpdateFunctionConfiguration`, so a function's Role, Handler, Runtime, Description, Timeout,
+  MemorySize and Environment are fixed at creation
+- `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, and
+  `Marker`/`MaxItems` paging and `MasterRegion` on `ListFunctions`
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes the other sixteen
+- version and alias operations over the served HTTP API endpoint, which routes the other eighteen
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there
