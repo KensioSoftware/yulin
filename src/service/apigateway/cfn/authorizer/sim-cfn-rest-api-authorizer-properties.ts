@@ -6,11 +6,10 @@ import { SimCfnApiGatewayPropertyParser } from "../sim-cfn-api-gateway-property-
 /**
  * The AWS::ApiGateway::Authorizer properties this simulation deploys.
  *
- * `AuthorizerResultTtlInSeconds`, `AuthorizerCredentials`,
- * `IdentityValidationExpression` and `AuthType` are left out, so a template
- * carrying one has it recorded against the Resource. Each belongs to a piece
- * of work outside this one, and what an authorizer of a given `Type` requires
- * is stated by `CreateAuthorizer` rather than here.
+ * `AuthorizerCredentials`, `IdentityValidationExpression` and `AuthType` are
+ * left out, so a template carrying one has it recorded against the Resource.
+ * Each belongs to a piece of work outside this one, and what an authorizer of
+ * a given `Type` requires is stated by `CreateAuthorizer` rather than here.
  */
 const simulatedProperties = [
   "RestApiId",
@@ -19,6 +18,7 @@ const simulatedProperties = [
   "AuthorizerUri",
   "ProviderARNs",
   "IdentitySource",
+  "AuthorizerResultTtlInSeconds",
 ];
 
 interface SimCfnRestApiAuthorizerPropertiesProperties {
@@ -67,7 +67,6 @@ export class SimCfnRestApiAuthorizerProperties {
    *
    * `IdentitySource` is one comma-separated string, which is how a REST API
    * writes a list where an HTTP API takes one.
->>>>>>> d71bc9d5 (feat: gate a REST API method with a user pool)
    *
    * `AuthorizerUri` arrives as the wrapped
    * `arn:aws:apigateway:<region>:lambda:path/...` form CDK builds with
@@ -100,6 +99,11 @@ export class SimCfnRestApiAuthorizerProperties {
         this.resource,
         this.properties["IdentitySource"],
         "IdentitySource",
+      ),
+      authorizerResultTtlInSeconds: this.propertyParser.optionalNumber(
+        this.resource,
+        this.properties["AuthorizerResultTtlInSeconds"],
+        "AuthorizerResultTtlInSeconds",
       ),
     };
   }

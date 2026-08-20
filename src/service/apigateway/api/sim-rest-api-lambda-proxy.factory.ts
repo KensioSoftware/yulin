@@ -91,6 +91,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
     cognitoUserPoolArns: undefined,
     authorizationScopes: [],
     authorizerIdentitySource: "method.request.header.Authorization",
+    authorizerResultTtlSeconds: 0,
     authorizerInvokePermission: true,
     disableExecuteApiEndpoint: false,
     iamAuthorization: false,

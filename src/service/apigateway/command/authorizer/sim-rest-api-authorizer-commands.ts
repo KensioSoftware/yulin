@@ -30,6 +30,7 @@ const acceptedCreateOptions = [
   "authorizerUri",
   "providerARNs",
   "identitySource",
+  "authorizerResultTtlInSeconds",
 ];
 
 const simulatedAuthorizerTypes: readonly SimRestApiAuthorizerType[] = [

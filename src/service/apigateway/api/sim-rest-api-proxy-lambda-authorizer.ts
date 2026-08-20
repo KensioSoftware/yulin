@@ -69,6 +69,7 @@ export async function simRestApiProxyLambdaAuthorizer(
       type: authorizerFn.type,
       authorizerUri: created.FunctionArn,
       identitySource: input.authorizerIdentitySource,
+      authorizerResultTtlInSeconds: input.authorizerResultTtlSeconds,
     },
   });
 

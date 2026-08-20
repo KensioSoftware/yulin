@@ -17,6 +17,7 @@ export interface SimCreateAuthorizerCommandInput {
   readonly authorizerUri?: string | undefined;
   readonly providerARNs?: readonly string[] | undefined;
   readonly identitySource?: string | undefined;
+  readonly authorizerResultTtlInSeconds?: number | undefined;
 }
 
 export interface SimCreateAuthorizerCommandOutput extends SimRestApiAuthorizerView {

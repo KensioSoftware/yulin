@@ -6,6 +6,7 @@ import {
 } from "../../api/authorizer/sim-rest-api-authorization.js";
 import { SimRestApiLambdaAuthorizer } from "../../api/authorizer/sim-rest-api-lambda-authorizer.js";
 import { SimRestApiExecuteApiArn } from "../../api/sim-rest-api-execute-api-arn.js";
+import { SimRestApiAuthorizerDecisions } from "./sim-rest-api-authorizer-decisions.js";
 import {
   type SimRestApiAuthorizerFunctions,
   SimRestApiAuthorizerInvocation,
@@ -21,9 +22,10 @@ interface SimRestApiMethodAuthorizerProperties {
    */
   readonly functions: SimRestApiAuthorizerFunctions;
   /**
-   * Clock an authorizer's invocation event is stamped with, and a verified
-   * token's time claims are checked against, so advancing simulated time
-   * expires a token that was accepted before it.
+   * Clock an authorizer's invocation event is stamped with, a verified
+   * token's time claims are checked against, and a held decision expires
+   * against, so advancing simulated time expires a token that was accepted
+   * before it and drops a decision that was being reused.
    */
   readonly clock: SimClock;
 }
@@ -43,17 +45,27 @@ interface SimRestApiMethodAuthorizerProperties {
  * 1. the request has to carry something at every one of the authorizer's
  *    identity sources, or it is refused with a 401 and the function is never
  *    invoked;
- * 2. otherwise the function is asked, and the policy it answers with is
+ * 2. a decision already made for that same identity at that same method, and
+ *    not yet expired, is reused by `SimRestApiAuthorizerDecisions`, and
+ *    nothing further happens;
+ * 3. otherwise the function is asked, and the policy it answers with is
  *    evaluated against the ARN of the request being made.
+ *
+ * An authorizer with no `authorizerResultTtlInSeconds` holds nothing, so its
+ * function is invoked once per request reaching the method.
  */
 export class SimRestApiMethodAuthorizer {
   private readonly invocation: SimRestApiAuthorizerInvocation;
+  private readonly decisions: SimRestApiAuthorizerDecisions;
   private readonly iamAuthorizer = new SimRestApiIamMethodAuthorizer();
   private readonly cognito: SimRestApiCognitoMethodAuthorizer;
 
   constructor(properties: SimRestApiMethodAuthorizerProperties) {
     this.invocation = new SimRestApiAuthorizerInvocation({
       functions: properties.functions,
+      clock: properties.clock,
+    });
+    this.decisions = new SimRestApiAuthorizerDecisions({
       clock: properties.clock,
     });
     this.cognito = new SimRestApiCognitoMethodAuthorizer({
@@ -109,15 +121,22 @@ export class SimRestApiMethodAuthorizer {
       return SimRestApiRefused.unauthorized();
     }
 
-    return await this.invocation.invoke(
-      input,
+    const methodArn = SimRestApiExecuteApiArn.forRequest(
+      restApi,
+      match,
+      request.method,
+    ).toString();
+
+    return await this.decisions.decide(
       authorizer,
-      identityValues,
-      SimRestApiExecuteApiArn.forRequest(
-        restApi,
-        match,
-        request.method,
-      ).toString(),
+      { methodArn, identityValues },
+      async () =>
+        await this.invocation.invoke(
+          input,
+          authorizer,
+          identityValues,
+          methodArn,
+        ),
     );
   }
 }

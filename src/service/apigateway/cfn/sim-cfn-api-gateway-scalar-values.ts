@@ -83,6 +83,35 @@ export class SimCfnApiGatewayScalarValues {
   }
 
   /**
+   * Parse a property value that must be a number when present, which is the
+   * shape an authorizer's `AuthorizerResultTtlInSeconds` takes.
+   *
+   * CloudFormation carries template numbers as strings in places, the same way
+   * it does booleans, so a string holding a number is read as that number.
+   */
+  optionalNumber(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): number | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value === "number") {
+      return value;
+    }
+
+    const parsed = this.numberString(value);
+
+    if (parsed === undefined) {
+      throw this.invalidPropertyError(resource, label, "a number");
+    }
+
+    return parsed;
+  }
+
+  /**
    * Build the diagnostic error for a malformed property value.
    */
   invalidPropertyError(
@@ -94,5 +123,22 @@ export class SimCfnApiGatewayScalarValues {
       `Invalid ${this.resourceType} ${resource.logicalId}: ` +
         `${label} must be ${expected}`,
     );
+  }
+
+  /**
+   * The number a template string holds, when it holds one.
+   */
+  private numberString(value: SimCfnTemplateValue): number | undefined {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number(value);
+
+    if (Number.isNaN(parsed)) {
+      return undefined;
+    }
+
+    return parsed;
   }
 }

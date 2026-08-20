@@ -222,24 +222,61 @@ describe("Sim API Gateway REST API authorizer commands", () => {
     );
   });
 
-  it("refuses to hold a decision it was told to cache", async () => {
+  it("holds a decision for the seconds it was given", async () => {
     // Given a REST API
     const simAws = new SimAws();
     const restApiId = await givenRestApi(simAws.apiGateway());
 
-    // When an authorizer asks for its results to be held
-    const authorizer = simAws.apiGateway().createAuthorizer(
+    // When an authorizer asks for its decisions to be held for 5 minutes
+    const authorizer = await simAws.apiGateway().createAuthorizer(
       new CreateAuthorizerCommand({
         ...tokenAuthorizerInput(restApiId),
         authorizerResultTtlInSeconds: 300,
       }),
     );
 
-    // Then it is refused, because an authorizer invoked once per request here
-    // and once per five minutes on AWS is a difference a test would not see
-    await expect(authorizer).rejects.toThrow(SimApiGatewayBadRequest);
-    await expect(authorizer).rejects.toThrow(
-      "CreateAuthorizer authorizerResultTtlInSeconds is not simulated",
-    );
+    // Then it reports that period back
+    assertIdentical(authorizer.authorizerResultTtlInSeconds, 300);
   });
+
+  it("holds no decision for an authorizer that asked for none", async () => {
+    // Given a REST API
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+
+    // When an authorizer says nothing about holding its decisions
+    const authorizer = await simAws
+      .apiGateway()
+      .createAuthorizer(
+        new CreateAuthorizerCommand(tokenAuthorizerInput(restApiId)),
+      );
+
+    // Then it holds them for no time at all, which is what AWS defaults one to
+    assertIdentical(authorizer.authorizerResultTtlInSeconds, 0);
+  });
+
+  it.each([-1, 3601, 1.5, NaN])(
+    "refuses to hold a decision for %s seconds",
+    async (authorizerResultTtlInSeconds) => {
+      // Given a REST API
+      const simAws = new SimAws();
+      const restApiId = await givenRestApi(simAws.apiGateway());
+
+      // When an authorizer asks for a period AWS does not take
+      const authorizer = simAws.apiGateway().createAuthorizer(
+        new CreateAuthorizerCommand({
+          ...tokenAuthorizerInput(restApiId),
+          authorizerResultTtlInSeconds,
+        }),
+      );
+
+      // Then it is refused rather than holding a decision for a period no
+      // deployed authorizer could be configured with
+      await expect(authorizer).rejects.toThrow(SimApiGatewayBadRequest);
+      await expect(authorizer).rejects.toThrow(
+        "AWS holds an authorizer's decision for a whole number of seconds " +
+          "between 0 and 3600",
+      );
+    },
+  );
 });

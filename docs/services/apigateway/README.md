@@ -629,6 +629,102 @@ That ARN names no stage. A function used both as an integration and as an author
 permissions, as it does on AWS. CDK's `TokenAuthorizer` and `RequestAuthorizer` both write this
 one.
 
+### Caching the authorizer's decision
+
+`authorizerResultTtlInSeconds` holds a decision for that many seconds. A second request presenting
+the same identity within that period reaches the handler without the function running again. AWS
+accepts a whole number of seconds up to 3600, and 0 switches the holding off.
+
+An authorizer that says nothing about the member gets 0 here and gets 300 on real API Gateway.
+Write the member out to have a test and a deployment agree on it. CDK writes it either way, at five
+minutes by default (see [CDK](#cdk)).
+
+A `TOKEN` authorizer is keyed on the token it was handed. A `REQUEST` authorizer is keyed on the
+values its identity sources found, in the order they were configured. Both are held per method,
+because what is held is the admission or refusal the authorizer's policy produced for one method
+ARN, and that answer covers no other method. (An HTTP API keys on the identity source values alone,
+and one decision there covers every route using the authorizer.)
+
+A refusal is held the way an admission is. AWS holds whatever answer the authorizer gave. A failed
+authorizer holds no answer, and its function is asked again on the next request.
+
+Expiry follows simulated time. `simAws.clock().advanceBy(...)` drops a decision that was being
+reused a moment before.
+
+```typescript sim-apigateway-authorizer-cache
+/**
+ * Caching a simulated REST API Lambda authorizer's decision.
+ *
+ * The authorizer counts its own invocations and reports the count in its
+ * context, so the handler shows which decision served each request.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const counter = { invocations: 0 };
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders"],
+    authorizerResultTtlSeconds: 300,
+    authorizerHandler: (event) => {
+      counter.invocations += 1;
+
+      return {
+        principalId: "user-6",
+        context: { ...counter },
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Allow",
+              Resource: event.methodArn,
+            },
+          ],
+        },
+      };
+    },
+    handler: (event) => ({
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(event.requestContext.authorizer),
+    }),
+  },
+  simAws,
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders`);
+const call = async (): Promise<unknown> => {
+  const response = await fetch(url, {
+    headers: { authorization: "Bearer session-6" },
+  });
+
+  return await response.json();
+};
+
+console.log(await call());
+// { invocations: 1, principalId: 'user-6' }
+
+console.log(await call());
+// { invocations: 1, principalId: 'user-6' }, held rather than asked again
+
+await simAws.clock().advanceBy({ minutes: 6 });
+
+console.log(await call());
+// { invocations: 2, principalId: 'user-6' }
+
+await srv.close();
+```
+
+A `COGNITO_USER_POOLS` authorizer verifies each token as it arrives here, and `CreateAuthorizer`
+refuses `authorizerResultTtlInSeconds` on one. Real API Gateway holds a Cognito authorizer's
+decision too, and a token that expires inside the period is still accepted there.
+
 ## Protecting a method with IAM
 
 A method declared `authorizationType: "AWS_IAM"` reaches its integration only when the caller is
@@ -1403,9 +1499,9 @@ method on the root and another on a `{proxy+}` resource, both in front of one fu
 hostname through `AWS::URLSuffix`.
 
 `TokenAuthorizer` and `RequestAuthorizer` deploy too, with the `AWS::Lambda::Permission` each
-writes for its own function. Give either one `resultsCacheTtl: Duration.seconds(0)`, since CDK
-holds a decision for five minutes by default and `AuthorizerResultTtlInSeconds` is one of the
-recorded properties.
+writes for its own function. CDK holds a decision for five minutes by default, and
+`resultsCacheTtl` sets that period. See
+[Caching the authorizer's decision](#caching-the-authorizers-decision).
 
 `CognitoUserPoolsAuthorizer` deploys as it stands, naming the pools it was given by ARN. A method
 takes it with `authorizationType: apigateway.AuthorizationType.COGNITO`, and a user pool the same
@@ -1447,8 +1543,13 @@ and behave differently deployed. The refusals worth knowing about:
   `CreateAuthorizer`.
 - **Scopes on a method that checks none.** `authorizationScopes` is refused on a method that is not
   `COGNITO_USER_POOLS`, since a method carrying scopes nothing checks reads as gated by them.
-- **Holding an authorizer's decision.** `authorizerResultTtlInSeconds` is refused. The function is
-  invoked once per request reaching the method.
+- **Holding a Cognito authorizer's decision.** `authorizerResultTtlInSeconds` is refused on a
+  `COGNITO_USER_POOLS` authorizer. Real API Gateway holds that decision, and a token expiring
+  during the period would still be accepted. A Lambda authorizer takes the member. See
+  [Caching the authorizer's decision](#caching-the-authorizers-decision).
+- **The default period.** A Lambda authorizer written with no `authorizerResultTtlInSeconds` holds
+  no decision here, where real API Gateway would hold one for 300 seconds. An authorizer counting
+  its own invocations counts one per request until the member is written out.
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
   `HTTP_PROXY` and the non-proxy `AWS` type each answer a request from somewhere this cannot reach.
 - **API keys and usage plans.** `apiKeyRequired: true` is refused, because a method requiring a key

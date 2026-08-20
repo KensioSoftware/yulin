@@ -14,6 +14,7 @@ import {
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimRestApiLambdaAuthorizer } from "../api/authorizer/sim-rest-api-lambda-authorizer.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
 import { simCfnRestApiTemplateFactory } from "./sim-cfn-rest-api-template.factory.js";
 
@@ -181,14 +182,38 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     assertIdentical(method?.authorizerId, authorizer.authorizerId);
   });
 
-  it("records a property outside the simulated set", async () => {
-    // Given an authorizer asking for its decisions to be held
+  it("deploys the period the authorizer holds a decision for", async () => {
+    // Given an authorizer asking for its decisions to be held, written as the
+    // string CloudFormation carries a template number as
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const stack = await deployRestApi(
       simAws,
-      gatedTemplate({ AuthorizerResultTtlInSeconds: 300 }),
+      gatedTemplate({ AuthorizerResultTtlInSeconds: "300" }),
+    );
+    const restApi = stack.resources.get("Api")?.simResource as
+      | SimRestApi
+      | undefined;
+    assertNonNullable(restApi);
+
+    // Then the authorizer holds its decisions for that many seconds
+    const [authorizer] = restApi.authorizers.list();
+    assertNonNullable(authorizer);
+    assertIdentical(
+      (authorizer as SimRestApiLambdaAuthorizer).resultTtlSeconds,
+      300,
+    );
+  });
+
+  it("records a property outside the simulated set", async () => {
+    // Given an authorizer asking for a validation expression
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const stack = await deployRestApi(
+      simAws,
+      gatedTemplate({ IdentityValidationExpression: "^Bearer .+$" }),
     );
 
     // Then the API deploys and the record says which of its parts behaves
@@ -199,7 +224,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     );
     assertStringIncludes(
       ignoredReasons(stack).join("\n"),
-      "AWS::ApiGateway::Authorizer property AuthorizerResultTtlInSeconds is " +
+      "AWS::ApiGateway::Authorizer property IdentityValidationExpression is " +
         "not simulated",
     );
   });
