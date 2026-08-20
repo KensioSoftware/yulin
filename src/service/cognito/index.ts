@@ -49,6 +49,10 @@ export {
   type SimCognitoTokenValidityInput,
   type SimCognitoTokenValidityUnitsType,
 } from "./user-pool/client/sim-cognito-token-validity.js";
+export {
+  SimCognitoRefreshTokenRotation,
+  type SimCognitoRefreshTokenRotationType,
+} from "./user-pool/client/sim-cognito-refresh-token-rotation.js";
 export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
 export { SimCognitoFederation } from "./sim-cognito-federation.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";

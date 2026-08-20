@@ -1397,7 +1397,8 @@ console.log(refreshed.AuthenticationResult!.RefreshToken); // undefined
 `REFRESH_TOKEN_AUTH` exchanges a refresh token for a new access token and a new id token. No new
 refresh token comes back, as none does on real Cognito with refresh token rotation off. The client
 keeps the one it has until that expires. `REFRESH_TOKEN` is the same flow under its other
-name, and both `InitiateAuth` and `AdminInitiateAuth` run it.
+name, and both `InitiateAuth` and `AdminInitiateAuth` run it. An app client that rotates its refresh
+tokens renews through `GetTokensFromRefreshToken`, covered in the section below.
 
 The app client has to have `ALLOW_REFRESH_TOKEN_AUTH`, one of the flows a client created without
 `ExplicitAuthFlows` gets.
@@ -1408,6 +1409,132 @@ the simulated clock. Advancing time past that is what makes a refresh fail with
 
 A refresh token belongs to the app client that got it, so presenting one to another client in the
 same pool is refused. A refresh for a user that has been disabled or deleted is refused too.
+
+## Rotating refresh tokens
+
+An app client created with a `RefreshTokenRotation` renews its sessions through
+`GetTokensFromRefreshToken`. That operation takes the app client id, the refresh token and the app
+client's secret. It carries no `SECRET_HASH` and names no user, because the refresh token is what
+says whose session it is.
+
+Each renewal answers with a replacement refresh token, and the token that bought it stops working.
+`RetryGracePeriodSeconds` is how long the spent one keeps being accepted, up to the minute Cognito
+allows. A client that never saw the answer to a request can retry inside that window and be answered
+rather than sent back to the sign-in page.
+
+The replacement runs out when the token it replaced would have. A session on an app client whose
+`RefreshTokenValidity` is thirty days ends thirty days after the sign-in, however often it was
+renewed in between.
+
+```typescript sim-cognito-refresh-token-rotation
+/**
+ * Renewing a session on an app client that rotates its refresh tokens.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  GetTokensFromRefreshTokenCommand,
+  InitiateAuthCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+// A rotating client has no ALLOW_REFRESH_TOKEN_AUTH, which is what
+// aws-cdk-lib synthesizes for a refreshTokenRotationGracePeriod.
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+    RefreshTokenRotation: { Feature: "ENABLED", RetryGracePeriodSeconds: 30 },
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+const refreshToken = signedIn.AuthenticationResult!.RefreshToken!;
+
+// An hour on, the access token has expired and the session is renewed.
+await simAws.clock().advanceBy({ hours: 1 });
+
+const renewed = await cognito.getTokensFromRefreshToken(
+  new GetTokensFromRefreshTokenCommand({
+    ClientId: clientId,
+    RefreshToken: refreshToken,
+  }),
+);
+
+// A replacement came back, and the application holds that from now on.
+console.log(renewed.AuthenticationResult!.RefreshToken !== refreshToken); // true
+
+// The spent token is still accepted inside the thirty second grace period.
+await simAws.clock().advanceBy({ seconds: 10 });
+
+const retried = await cognito.getTokensFromRefreshToken(
+  new GetTokensFromRefreshTokenCommand({
+    ClientId: clientId,
+    RefreshToken: refreshToken,
+  }),
+);
+
+console.log(retried.AuthenticationResult!.AccessToken !== undefined); // true
+
+// A minute later it has been rotated out for good.
+await simAws.clock().advanceBy({ minutes: 1 });
+
+try {
+  await cognito.getTokensFromRefreshToken(
+    new GetTokensFromRefreshTokenCommand({
+      ClientId: clientId,
+      RefreshToken: refreshToken,
+    }),
+  );
+} catch (error) {
+  console.log((error as Error).message); // "Refresh Token has been revoked."
+}
+```
+
+`GetTokensFromRefreshToken` renews a session on an app client that does not rotate as well. There it
+answers with a new access token and id token and no refresh token, the way `REFRESH_TOKEN_AUTH`
+does.
+
+`REFRESH_TOKEN_AUTH` against a rotating app client is refused, and the refusal names the operation
+to use instead. `aws-cdk-lib` drops `ALLOW_REFRESH_TOKEN_AUTH` from a client the moment it is given
+a `refreshTokenRotationGracePeriod`, so a client synthesized from CDK is refused by the flow check
+before it reaches this.
+
+A confidential app client sends `ClientSecret` with the request, and a request carrying the wrong
+secret or none at all is refused with `NotAuthorizedException`. `DeviceKey` is refused, because
+device remembering is not simulated.
 
 ## Signing out
 
@@ -3021,8 +3148,8 @@ The properties each type reads are the ones this simulation models:
   records.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
-  `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
-  `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`, `DefaultRedirectURI` and
+  `RefreshTokenRotation`, `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`,
+  `AllowedOAuthFlows`, `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`, `DefaultRedirectURI` and
   `SupportedIdentityProviders`.
 - `AWS::Cognito::UserPoolGroup`: `UserPoolId`, `GroupName`, `Description`, `Precedence` and
   `RoleArn`.
@@ -3997,6 +4124,8 @@ Sim Cognito currently supports:
   `PreventUserExistenceErrors`
 - Refresh tokens that expire at the app client's `RefreshTokenValidity`, thirty days by default on
   the simulated clock
+- Refresh token rotation on an app client, renewed with `GetTokensFromRefreshToken`, including the
+  `RetryGracePeriodSeconds` a rotated-out token keeps working for
 - Authorization of the administrative operations by simulated IAM, against the real IAM action and
   ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -4009,12 +4138,19 @@ Current documented limitations:
   `AdminInitiateAuth`, and `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through `InitiateAuth`.
   SRP, `USER_AUTH` choice-based sign-in, custom authentication and device tracking are outside the
   simulation, and an `AuthFlow` naming one of them is refused, never run as a flow that is.
+  `GetTokensFromRefreshToken` runs beside them and is not a flow, as it is not one on real Cognito.
 - `NEW_PASSWORD_REQUIRED`, `SMS_MFA` and `SOFTWARE_TOKEN_MFA` are the challenges issued, so
   `MFA_SETUP`, `SELECT_MFA_TYPE` and the custom authentication challenges cannot be reached. A
   `ChallengeName` this simulation never issues is refused, never answered as one it does.
-- `GetTokensFromRefreshToken` and `RevokeToken` are unimplemented, and `RefreshTokenRotation` is
-  refused on an app client. Refreshing goes through `REFRESH_TOKEN_AUTH`, which issues no new
-  refresh token.
+- `RevokeToken` is unimplemented. A refresh token is revoked by signing the user out, or by the
+  rotation that replaces it.
+- `GetTokensFromRefreshToken` refuses a `DeviceKey`, because device remembering is unsimulated, and
+  passes a `ClientMetadata` to the pool's `PreTokenGeneration` trigger. `REFRESH_TOKEN_AUTH` passes
+  none, as real `InitiateAuth` passes none.
+- `REFRESH_TOKEN_AUTH` against a rotating app client is refused as an `InvalidParameterException`
+  naming `GetTokensFromRefreshToken`. Real Cognito was not checked for the exception it raises
+  there, and `aws-cdk-lib` keeps the combination from arising by dropping
+  `ALLOW_REFRESH_TOKEN_AUTH` from a rotating client.
 - Signing out revokes the user's tokens inside the simulation, and a token already handed to a
   verifier goes on verifying against the pool's JWKS until it expires. Verification happens in the
   caller's own verifier, which asks this simulation nothing and cannot be told the token was
@@ -4249,7 +4385,7 @@ Current documented limitations:
   refuses a second user holding an address another user already signs in by.
 - Unsimulated `CreateUserPoolClient` inputs are refused the same way. They are a `ClientSecret` of
   your own, `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
-  `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
+  `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
   `false`. `UpdateUserPoolClient` refuses the same inputs, in the same words.
 - The OAuth settings need `AllowedOAuthFlowsUserPoolClient` to be true before they can be set, as
   they do on real Cognito. `AllowedOAuthFlows` takes `code` alone: `implicit` hands tokens to the

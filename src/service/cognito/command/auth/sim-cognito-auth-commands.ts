@@ -7,6 +7,7 @@ import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.
 import { SimCognitoAdminInitiateAuth } from "./sim-cognito-admin-initiate-auth.js";
 import { SimCognitoAdminRespondToChallenge } from "./sim-cognito-admin-respond-to-challenge.js";
 import { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
+import { SimCognitoGetTokensFromRefreshToken } from "./sim-cognito-get-tokens-from-refresh-token.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
 import { SimCognitoInitiateAuth } from "./sim-cognito-initiate-auth.js";
@@ -16,6 +17,7 @@ import { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-chall
 import { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
 import { SimCognitoPasswordSignIn } from "./sim-cognito-password-sign-in.js";
 import { SimCognitoRefreshSignIn } from "./sim-cognito-refresh-sign-in.js";
+import { SimCognitoRefreshedTokens } from "./sim-cognito-refreshed-tokens.js";
 import { SimCognitoRespondToChallenge } from "./sim-cognito-respond-to-challenge.js";
 import { SimCognitoSignInCompletion } from "./sim-cognito-sign-in-completion.js";
 import { SimCognitoSignOutCommands } from "./sim-cognito-sign-out.js";
@@ -57,6 +59,7 @@ export class SimCognitoAuthCommands {
   public readonly adminRespondToChallenge: SimCognitoAdminRespondToChallenge;
   public readonly initiateAuth: SimCognitoInitiateAuth;
   public readonly respondToChallenge: SimCognitoRespondToChallenge;
+  public readonly getTokensFromRefreshToken: SimCognitoGetTokensFromRefreshToken;
   public readonly signOut: SimCognitoSignOutCommands;
 
   constructor(properties: SimCognitoAuthCommandsProperties) {
@@ -77,6 +80,10 @@ export class SimCognitoAuthCommands {
       triggers,
       mfaChallenge: new SimCognitoMfaChallenge({ messenger, clock }),
     });
+    // Both refresh operations answer the same way once the token is accepted,
+    // and which app client the refresh went through is what decides whether a
+    // new refresh token comes back.
+    const refreshedTokens = new SimCognitoRefreshedTokens({ tokenIssuer });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn: new SimCognitoPasswordSignIn({
         authResolver,
@@ -84,7 +91,7 @@ export class SimCognitoAuthCommands {
         challenge: new SimCognitoNewPasswordChallenge({ clock }),
         triggers,
       }),
-      refreshSignIn: new SimCognitoRefreshSignIn({ tokenIssuer, clock }),
+      refreshSignIn: new SimCognitoRefreshSignIn({ refreshedTokens, clock }),
     });
     const responses = new SimCognitoChallengeResponses({
       newPassword: new SimCognitoNewPasswordResponse({
@@ -110,6 +117,11 @@ export class SimCognitoAuthCommands {
     this.respondToChallenge = new SimCognitoRespondToChallenge({
       authResolver,
       responses,
+    });
+    this.getTokensFromRefreshToken = new SimCognitoGetTokensFromRefreshToken({
+      authResolver,
+      refreshedTokens,
+      clock,
     });
     this.signOut = new SimCognitoSignOutCommands({ resolver, pools, clock });
   }

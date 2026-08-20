@@ -46,11 +46,6 @@ export class SimCognitoUnsimulatedUserPoolClientOptions {
       "threat protection context data",
     );
     this.unsimulated.refuse(
-      "RefreshTokenRotation",
-      input.RefreshTokenRotation,
-      "refresh token rotation",
-    );
-    this.unsimulated.refuse(
       "ReadAttributes",
       input.ReadAttributes,
       "per-client attribute permissions",

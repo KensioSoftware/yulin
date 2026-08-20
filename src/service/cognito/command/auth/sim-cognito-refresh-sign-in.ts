@@ -1,16 +1,35 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import { requireSimCognitoSecretHash } from "../../user-pool/auth/sim-cognito-secret-hash.js";
-import { requireSimCognitoEnabled } from "../../user-pool/auth/sim-cognito-sign-in.js";
-import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
-import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
-import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
-import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
+import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
+import type { SimCognitoRefreshedTokens } from "./sim-cognito-refreshed-tokens.js";
 import type { SimCognitoAuthRequest } from "./sim-cognito-password-sign-in.js";
 import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 
 interface SimCognitoRefreshSignInProperties {
-  readonly tokenIssuer: SimCognitoTokenIssuer;
+  readonly refreshedTokens: SimCognitoRefreshedTokens;
   readonly clock: SimClock;
+}
+
+/**
+ * Refuse a refresh through an app client that rotates its refresh tokens.
+ *
+ * Rotation and `REFRESH_TOKEN_AUTH` do not go together on real Cognito, which
+ * is why `aws-cdk-lib` drops `ALLOW_REFRESH_TOKEN_AUTH` from a client the
+ * moment it is given a rotation grace period. A client that kept the flow
+ * anyway is told where the operation went rather than handed tokens the real
+ * pool would not have handed it.
+ */
+function requireSimCognitoNoRotation(client: SimCognitoUserPoolClient): void {
+  if (!client.refreshTokenRotation.enabled) {
+    return;
+  }
+
+  throw new SimCognitoInvalidParameterException(
+    `REFRESH_TOKEN_AUTH is not available on the client ${client.id}: it ` +
+      `rotates its refresh tokens, so renew the session with ` +
+      `GetTokensFromRefreshToken instead`,
+  );
 }
 
 /**
@@ -20,18 +39,13 @@ interface SimCognitoRefreshSignInProperties {
  * it is, which is why one presented to another app client is refused. Nothing
  * new comes back with the tokens, because real Cognito issues no new refresh
  * token here, so a client keeps the one it has until that expires.
- *
- * The pool's `PreTokenGeneration` trigger runs for the reissued tokens, as it
- * does on real Cognito, so a claim it changed since the sign-in is on the token
- * a refresh answers with rather than being stale for the life of the session.
  */
 export class SimCognitoRefreshSignIn {
-  private readonly tokenIssuer: SimCognitoTokenIssuer;
+  private readonly refreshedTokens: SimCognitoRefreshedTokens;
   private readonly clock: SimClock;
-  private readonly result = new SimCognitoAuthenticationResult();
 
   constructor(properties: SimCognitoRefreshSignInProperties) {
-    this.tokenIssuer = properties.tokenIssuer;
+    this.refreshedTokens = properties.refreshedTokens;
     this.clock = properties.clock;
   }
 
@@ -42,6 +56,9 @@ export class SimCognitoRefreshSignIn {
     request: SimCognitoAuthRequest,
   ): Promise<SimCognitoAuthenticationOutput> {
     const { pool, client, parameters } = request;
+
+    requireSimCognitoNoRotation(client);
+
     const refreshToken = pool.auth.requireRefreshToken({
       value: parameters.require("REFRESH_TOKEN"),
       clientId: client.id,
@@ -56,25 +73,16 @@ export class SimCognitoRefreshSignIn {
       parameters.find("SECRET_HASH"),
     );
 
-    const user = pool.requireUser(
-      requireSimCognitoUsername(refreshToken.username),
-    );
-
-    requireSimCognitoEnabled(user);
-
     // A refresh runs through `InitiateAuth`, whose `ClientMetadata` real
     // Cognito does not pass to the token trigger, so none travels with these
     // tokens.
     return {
       $metadata: {},
-      AuthenticationResult: this.result.of(
-        await this.tokenIssuer.reissue({
-          pool,
-          client,
-          user,
-          occasion: SimCognitoTriggerOccasion.refreshTokenGeneration,
-        }),
-      ),
+      AuthenticationResult: await this.refreshedTokens.issue({
+        pool,
+        client,
+        refreshToken,
+      }),
     };
   }
 }

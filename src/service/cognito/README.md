@@ -754,8 +754,9 @@ resource, here or on real AWS.
   only change that reaches an access token. The `V2_0` and `V3_0` access token claims and scopes are
   not customised.
 - A refresh answers with no new refresh token, as real Cognito does with refresh token rotation off.
-  `RefreshTokenRotation` is refused on an app client, and `GetTokensFromRefreshToken` and
-  `RevokeToken` are not implemented.
+  A client created with a `RefreshTokenRotation` renews through `GetTokensFromRefreshToken` and gets
+  a replacement, and `REFRESH_TOKEN_AUTH` against one is refused as an `InvalidParameterException`.
+  Real Cognito was not checked for the exception it raises there. `RevokeToken` is not implemented.
 - Signing out revokes the user's tokens here, and a token already handed to a verifier goes on
   verifying against the pool's JWKS until it expires. Verification asks this simulation nothing, so
   nothing here can tell a verifier the token was revoked.

@@ -141,6 +141,42 @@ export type SimRespondToAuthChallengeCommandOutput =
   SimCognitoAuthenticationOutput;
 
 /**
+ * The GetTokensFromRefreshToken inputs this simulation reads, and the ones it
+ * refuses.
+ *
+ * There is no `SECRET_HASH` and no username: the refresh token is what says
+ * whose session this is, and the client secret itself is what proves the
+ * caller, as it does on real Cognito.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/GetTokensFromRefreshTokenCommand/
+ */
+export interface SimGetTokensFromRefreshTokenCommandInput {
+  readonly RefreshToken?: string | undefined;
+  readonly ClientId?: string | undefined;
+  readonly ClientSecret?: string | undefined;
+  readonly DeviceKey?: string | undefined;
+  readonly ClientMetadata?: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * Minimal structural sim Cognito GetTokensFromRefreshToken command.
+ */
+export interface SimGetTokensFromRefreshTokenCommand {
+  readonly input: SimGetTokensFromRefreshTokenCommandInput;
+}
+
+/**
+ * What a token refresh answers with, which is the tokens and nothing else:
+ * this operation runs no challenge, so it never answers with one.
+ */
+export interface SimGetTokensFromRefreshTokenCommandOutput {
+  readonly AuthenticationResult?:
+    | SimCognitoAuthenticationResultType
+    | undefined;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
  * The GlobalSignOut inputs this simulation reads.
  *
  * The access token is what says which user and which pool the request is for,

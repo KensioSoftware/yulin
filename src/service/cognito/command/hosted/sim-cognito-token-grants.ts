@@ -67,9 +67,9 @@ export class SimCognitoTokenGrants {
   /**
    * Sign fresh tokens for an application that presented a refresh token.
    *
-   * No new refresh token comes back, as none does from real Cognito with
-   * refresh token rotation off, and the access token keeps the scopes the
-   * sign-in it came from was granted.
+   * A new refresh token comes back only where the app client rotates its
+   * refresh tokens, as one does from real Cognito, and the access token keeps
+   * the scopes the sign-in it came from was granted.
    */
   async refresh(
     pool: SimCognitoUserPool,
@@ -83,10 +83,11 @@ export class SimCognitoTokenGrants {
       now: this.clock.now(),
     });
     const user = this.presented.user(pool, refreshToken.username);
-    const issued = await this.tokenIssuer.reissue({
+    const issued = await this.tokenIssuer.refresh({
       pool,
       client,
       user,
+      spent: refreshToken,
       occasion: SimCognitoTriggerOccasion.refreshTokenGeneration,
       scopes: refreshToken.scopes,
     });

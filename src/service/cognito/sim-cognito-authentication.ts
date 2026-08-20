@@ -79,6 +79,20 @@ export abstract class SimCognitoAuthentication {
   }
 
   /**
+   * Handle a GetTokensFromRefreshToken Command from the SDK.
+   *
+   * No caller is read, because real Cognito authorizes this operation with no
+   * IAM policy at all: it is what an application calls to renew a session, and
+   * the refresh token and the client secret are what it is checked against.
+   */
+  async getTokensFromRefreshToken(
+    command: simCognitoCommands.SimGetTokensFromRefreshTokenCommand,
+  ): Promise<simCognitoCommands.SimGetTokensFromRefreshTokenCommandOutput> {
+    await this.background.sequence();
+    return this.commands.auth.getTokensFromRefreshToken.handle(command);
+  }
+
+  /**
    * Handle a GlobalSignOut Command from the SDK.
    *
    * The access token is what authorizes this, as it does on real Cognito.
