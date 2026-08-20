@@ -1,5 +1,7 @@
 import {
+  assertArrayLength,
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTypeString,
@@ -32,6 +34,36 @@ const visibility = {
 };
 
 /**
+ * The rule the site's web ACL carries, blocking whatever asks for an admin
+ * path.
+ */
+const blockAdmin = {
+  Name: "block-admin",
+  Priority: 0,
+  Action: { Block: {} },
+  Statement: {
+    ByteMatchStatement: {
+      FieldToMatch: { UriPath: {} },
+      PositionalConstraint: "CONTAINS",
+      SearchString: "/admin",
+      TextTransformations: [{ Priority: 0, Type: "NONE" }],
+    },
+  },
+  VisibilityConfig: { ...visibility, MetricName: "block-admin" },
+};
+
+/**
+ * A rule counting requests over a time window, which Yulin does not evaluate.
+ */
+const rateLimit = {
+  Name: "account-creation-rate",
+  Priority: 0,
+  Action: { Block: {} },
+  Statement: { RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" } },
+  VisibilityConfig: { ...visibility, MetricName: "account-creation-rate" },
+};
+
+/**
  * A template serving a bucket through a distribution the web ACL beside it
  * protects.
  *
@@ -43,6 +75,7 @@ const visibility = {
 function siteTemplate(
   webAclId: SimCfnTemplateValueRecord | string = webAclArnReference,
   scope = "CLOUDFRONT",
+  rules: readonly SimCfnTemplateValueRecord[] = [blockAdmin],
 ): CfnTemplateBodyRecord {
   return {
     Resources: {
@@ -53,22 +86,7 @@ function siteTemplate(
           Scope: scope,
           DefaultAction: { Allow: {} },
           VisibilityConfig: visibility,
-          Rules: [
-            {
-              Name: "block-admin",
-              Priority: 0,
-              Action: { Block: {} },
-              Statement: {
-                ByteMatchStatement: {
-                  FieldToMatch: { UriPath: {} },
-                  PositionalConstraint: "CONTAINS",
-                  SearchString: "/admin",
-                  TextTransformations: [{ Priority: 0, Type: "NONE" }],
-                },
-              },
-              VisibilityConfig: { ...visibility, MetricName: "block-admin" },
-            },
-          ],
+          Rules: [...rules],
         },
       },
       SiteDistribution: {
@@ -151,17 +169,52 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     assertIdentical(await allowed.text(), "<h1>Home</h1>");
   });
 
-  it("refuses a distribution naming a web ACL that is not there", async () => {
-    // Given a template whose WebACLId is a literal ARN nothing created.
+  it("serves from a distribution naming a web ACL that is not there", async () => {
+    // Given a template whose WebACLId is a literal ARN nothing created, which
+    // is what a stack deployed against a real account carries.
     const simAws = new SimAws();
-    const error = await assertThrowsErrorAsync(async () => {
-      await deploySite(simAws, missingWebAclArn);
+    const stack = await deploySite(simAws, missingWebAclArn);
+
+    // Then the distribution deployed with nothing in front of it and serves
+    // every request, including the ones the web ACL would have decided. The
+    // property it was deployed without says which web ACL went missing.
+    const response = await siteResponse(simAws, stack, "/admin/index.html");
+    const [ignoredProperty] = stack.ignoredProperties;
+
+    assertIdentical(response.status, 200);
+    assertNonNullable(ignoredProperty);
+    assertIdentical(ignoredProperty.path, "DistributionConfig.WebACLId");
+    assertStringIncludes(ignoredProperty.reason, missingWebAclArn);
+  });
+
+  it("serves from a distribution whose web ACL lost a rule", async () => {
+    // Given a template whose web ACL rate limits requests, which Yulin does
+    // not evaluate, in front of the distribution serving the site.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, bucketName, {
+      "index.html": "<h1>Home</h1>",
+      "admin/index.html": "<h1>Admin</h1>",
     });
 
-    // Then the deployment failed rather than leaving a distribution in front
-    // of nothing, naming the ARN it could not resolve.
-    assertStringIncludes(error.message, missingWebAclArn);
-    assertStringIncludes(error.message, "does not exist");
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rate-limited-site",
+      template: siteTemplate(webAclArnReference, "CLOUDFRONT", [
+        rateLimit,
+        blockAdmin,
+      ]),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the distribution deployed behind what the web ACL still holds. The
+    // rule it lost is recorded, and the rule it kept still blocks.
+    const blocked = await siteResponse(simAws, stack, "/admin/index.html");
+
+    assertArrayLength(stack.skippedResources, 0);
+    assertIdentical(blocked.status, 403);
+    assertIdentical(
+      stack.ignoredProperties[0]?.path,
+      "Rules.account-creation-rate",
+    );
   });
 
   it("refuses a distribution naming a REGIONAL scope web ACL", async () => {

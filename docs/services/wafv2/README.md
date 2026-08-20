@@ -763,6 +763,12 @@ CloudFront is associated this way and not through `AssociateWebACL`, which real 
 regional resource types. The ARN has to name a `CLOUDFRONT` [scope](#scopes) web ACL. See
 [web ACLs in the CloudFront docs](../cloudfront/README.md#web-acls) for the whole example.
 
+CloudFront has no association Resource, so in a template the reference is a property of the
+distribution itself. A `WebACLId` naming a web ACL from outside this simulation is left out and
+recorded on `stack.ignoredProperties`, and the distribution deploys and serves every request. The
+alternative would take a whole site down over a firewall, which is a worse answer than serving the
+site unprotected and saying so.
+
 ## Regex pattern sets
 
 A rule can point at a regex pattern set by ARN, and matches when any expression in the set matches.
@@ -911,9 +917,34 @@ plain text in a template where the SDK takes bytes, and a `RegularExpressionList
 strings where the SDK takes a list of `RegexString` objects. Both are read here the way
 CloudFormation writes them.
 
-Every rule is compiled while the stack deploys. A statement kind this simulator will not evaluate
-(see [Refusals](#refusals)) fails the deployment, and the failure names the logical ID along with
-the rule and the statement kind. The web ACL never reaches a request it cannot decide.
+Every rule is compiled while the stack deploys. A rule this simulator will not evaluate (see
+[Refusals](#refusals)) is left out of the web ACL, and the web ACL deploys with the rules that are
+left. The rule that went missing is recorded on `stack.ignoredProperties`, under the logical ID that
+declared it, and the reason is the one `CreateWebACL` gives an SDK caller.
+
+```typescript
+const [dropped] = stack.ignoredProperties;
+
+// "OrdersAcl Rules.account-creation-rate"
+console.log(`${dropped.logicalId} ${dropped.path}`);
+
+// "Rule account-creation-rate uses the statement kind RateBasedStatement, which
+//  Yulin does not simulate: ..."
+console.log(dropped.reason);
+```
+
+The web ACL is then real, and thinner than the one the template describes. Requests the dropped rule
+would have blocked are served by whatever the web ACL is in front of. That is the size of what a
+test loses, and `stack.ignoredProperties` is where to read it. An SDK caller writing the same rule
+is refused outright, because a request that was answered and then quietly emptied is a worse answer
+than a refusal.
+
+The same goes for a web ACL member with no behaviour behind it, such as `CaptchaConfig`. The web ACL
+deploys without it and the member is recorded.
+
+A web ACL nothing coherent could be deployed from still fails the stack. A `Scope` outside
+`REGIONAL` and `CLOUDFRONT`, a `Rules` written as an object, a `Name` written as a number. The
+failure names the logical ID.
 
 `Name` is optional on all three named types. An unnamed resource is named after the stack and the
 logical ID, as real CloudFormation names one, so `orders-acl` above would have deployed as
@@ -923,8 +954,15 @@ logical ID, as real CloudFormation names one, so `orders-acl` above would have d
 
 `AWS::WAFv2::WebACLAssociation` associates a web ACL with whatever its `ResourceArn` names, which
 covers an API Gateway REST API stage and a Cognito user pool. It goes through `AssociateWebACL` and
-inherits that command's refusals. An ARN naming an HTTP API stage or a load balancer fails the
-deployment with the reason WAF gives an SDK caller.
+inherits that command's answers. An ARN naming an HTTP API stage fails the deployment, because AWS
+WAF protects no HTTP API and neither does real CloudFormation. An ARN naming a load balancer or an
+AppSync API skips the association. AWS WAF protects both, and Yulin simulates a web ACL in front of
+neither.
+
+An association naming a web ACL from outside this simulation is skipped too, which covers a template
+naming one from a real account and one whose web ACL is in another Region. The stage or the pool
+deploys and serves, unprotected, and the association is the only Resource that goes missing.
+`skippedReason` names the ARN.
 
 ```json
 {
@@ -1162,6 +1200,10 @@ console.log(scoped.wafV2().allWebAcls("REGIONAL")[0]?.name);
 A rule Yulin cannot evaluate is refused by `CreateWebACL` and `UpdateWebACL`, naming the rule and
 what in it was refused. A web ACL that accepted such a rule would allow a request AWS blocks, and a
 silent hole in a security layer is worse than a missing one.
+
+A template carrying one of these keeps the caution and drops the blast radius. The rule is left out,
+the web ACL deploys with the rest of them, and the omission is recorded. See
+[Deploying web ACLs with CloudFormation](#deploying-web-acls-with-cloudformation).
 
 These statement kinds are refused:
 

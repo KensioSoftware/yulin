@@ -2,11 +2,15 @@ import {
   assertDefined,
   assertNotNull,
 } from "../../../../util/type-guard/defined.js";
-import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
+import type {
+  SimCfnResource,
+  SimCloudFormationResourceCreateContext,
+} from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnCfDistroConfigValidator } from "./sim-cfn-cf-distro-config-validator.js";
+import { simCfnCfDistroWithoutAbsentWebAcl } from "./sim-cfn-cf-distro-web-acl.js";
 
 interface SimCfnCfDistroCreatorProperties {
   readonly cloudFront: SimCloudFront;
@@ -14,6 +18,12 @@ interface SimCfnCfDistroCreatorProperties {
 
 /**
  * Creates simulated CloudFront Distributions from CloudFormation Resources.
+ *
+ * A `WebACLId` naming a web ACL this simulation does not hold is left out and
+ * recorded. CloudFront has no association Resource, so the reference lives on
+ * the Distribution itself, and refusing it would take the Distribution down
+ * over a web ACL that was never the point of the template. The site a local
+ * dev server and a suite of tests make requests to has to survive that.
  */
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;
@@ -29,6 +39,7 @@ export class SimCfnCfDistroCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    context: SimCloudFormationResourceCreateContext,
   ): Promise<SimCloudFrontDistribution> {
     const distributionConfigValue = properties["DistributionConfig"];
 
@@ -45,11 +56,13 @@ export class SimCfnCfDistroCreator {
       logicalId: resource.logicalId,
       distributionConfig: distributionConfigValue,
     });
-    const distributionConfig = validator.validate();
-
     const output = await this.cloudFront.createDistribution({
       input: {
-        DistributionConfig: distributionConfig,
+        DistributionConfig: simCfnCfDistroWithoutAbsentWebAcl(
+          resource,
+          validator.validate(),
+          context.simAws,
+        ),
       },
     });
 

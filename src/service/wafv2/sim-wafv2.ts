@@ -18,6 +18,11 @@ import {
 import { SimWafCfnResourceFactory } from "./cfn/sim-waf-cfn-resource-factory.js";
 import { SimWafSets } from "./sim-wafv2-sets.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
+import {
+  type SimWafUnevaluatableRule,
+  unevaluatableSimWafRules,
+} from "./web-acl/sim-waf-unevaluatable-rules.js";
+import type { SimWafWebAclWriteInput } from "./command/web-acl/web-acl.command.js";
 
 export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
 
@@ -132,6 +137,25 @@ export class SimWafV2 extends SimWafSets {
    */
   managedRules(): SimWafManagedRules {
     return this.commands.managedRules;
+  }
+
+  /**
+   * The rules of a web ACL input this simulation cannot evaluate.
+   *
+   * The simulator's own accessor rather than a WAFv2 operation. `CreateWebACL`
+   * refuses a web ACL carrying such a rule, because a web ACL that accepted
+   * one would allow a request AWS blocks. A template is deployed rule by rule
+   * instead, so the CloudFormation layer asks this first and leaves the rules
+   * it names out of the web ACL it writes.
+   */
+  unevaluatableWebAclRules(
+    input: SimWafWebAclWriteInput,
+  ): readonly SimWafUnevaluatableRule[] {
+    return unevaluatableSimWafRules(input.Rules, {
+      regexPatternSets: this.commands.regexPatternSets,
+      managedRules: this.commands.managedRules,
+      customResponseBodies: input.CustomResponseBodies ?? {},
+    });
   }
 
   /**

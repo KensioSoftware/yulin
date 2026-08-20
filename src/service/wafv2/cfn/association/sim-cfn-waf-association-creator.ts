@@ -5,6 +5,7 @@ import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafWebAclAssociationResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafAssociationConfig } from "./sim-cfn-waf-association-config.js";
+import { simCfnWafAssociationSkipError } from "./sim-cfn-waf-association-skip.js";
 import { SimWafCfnWebAclAssociation } from "./sim-cfn-waf-web-acl-association.js";
 
 interface SimCfnWafAssociationCreatorProperties {
@@ -21,6 +22,10 @@ interface SimCfnWafAssociationCreatorProperties {
  * resource this simulation does not hold, and a `CLOUDFRONT` scope web ACL,
  * which reaches a distribution through the distribution's own `WebACLId`
  * rather than through an association.
+ *
+ * Two things are a skip rather than a failure. A resource type AWS WAF
+ * protects and this simulation does not, and a web ACL that is not here at
+ * all.
  */
 export class SimCfnWafAssociationCreator {
   readonly #wafV2: SimWafV2;
@@ -41,6 +46,15 @@ export class SimCfnWafAssociationCreator {
       resourceArn: config.resourceArn(),
       webAclArn: config.webAclArn(),
     });
+    const skipError = simCfnWafAssociationSkipError(
+      this.#wafV2,
+      resource,
+      association.webAclArn,
+    );
+
+    if (skipError !== undefined) {
+      throw skipError;
+    }
 
     return await simCfnWafResourceCommand(
       wafWebAclAssociationResourceType,
