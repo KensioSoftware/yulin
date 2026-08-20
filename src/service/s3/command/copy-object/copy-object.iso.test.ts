@@ -295,4 +295,43 @@ describe("S3 CopyObjectCommand", () => {
     );
     assertIdentical(await copied.Body?.transformToString(), "intercepted");
   });
+
+  it("copies from a source that was never encoded", async () => {
+    // Given an Object under a key with a space in it. Real S3 wants a source
+    // URL-encoded, and a caller reaching the simulator directly writes the key
+    // out as it is.
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
+    const bucketName = `uploads-${faker.string.uuid()}`;
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: "invoices/100 discount.txt",
+        Body: "ten percent",
+      }),
+    );
+
+    // When the source carries that space unencoded.
+    await simS3.copyObject(
+      new CopyObjectCommand({
+        Bucket: bucketName,
+        Key: "invoices/latest.txt",
+        CopySource: `${bucketName}/invoices/100 discount.txt`,
+      }),
+    );
+
+    // Then it named the Object, because decoding a segment that holds no
+    // escape leaves it alone.
+    const copied = await simS3.getObject(
+      new GetObjectCommand({ Bucket: bucketName, Key: "invoices/latest.txt" }),
+    );
+
+    assertInstanceOf(copied.Body, Readable);
+    assertBufferEqual(
+      await simS3BodyToBuffer(copied.Body),
+      Buffer.from("ten percent"),
+    );
+  });
 });

@@ -146,7 +146,7 @@ describe("S3 CopyObjectCommand refusals", () => {
     assertIdentical(error.name, "InvalidArgument");
   });
 
-  it("refuses a source that is not URL-encoded", async () => {
+  it("refuses a source holding a malformed percent escape", async () => {
     // Given a Bucket a copy names a badly encoded key in.
     const simAws = new SimAws();
     const simS3 = simAws.s3();
