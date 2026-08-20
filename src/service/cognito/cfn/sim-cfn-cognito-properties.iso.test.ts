@@ -84,8 +84,10 @@ describe("Cognito CloudFormation property shapes", () => {
     assertIdentical(pool.findGroup("admins")?.precedence, 5);
   });
 
-  it("passes a sign-in policy through to the refusal that explains it", async () => {
-    // Given a template asking for a pool that chooses its first auth factor.
+  it("passes a factor name the pool refuses through to that refusal", async () => {
+    // Given a template naming a first auth factor Cognito does not have. The
+    // pool is what checks the names, so a template and an SDK caller are held
+    // to one rule.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -95,7 +97,7 @@ describe("Cognito CloudFormation property shapes", () => {
         Properties: {
           UserPoolName: "myapp-users",
           Policies: {
-            SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD"] },
+            SignInPolicy: { AllowedFirstAuthFactors: ["FINGER_CROSSING"] },
           },
         },
       },
@@ -105,7 +107,8 @@ describe("Cognito CloudFormation property shapes", () => {
     // property being dropped on the way there.
     assertStringIncludes(
       error.message,
-      "CreateUserPool Policies SignInPolicy is not simulated",
+      "AllowedFirstAuthFactors 'FINGER_CROSSING' is not a Cognito first " +
+        "authentication factor",
     );
   });
 

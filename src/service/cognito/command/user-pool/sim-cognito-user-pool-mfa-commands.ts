@@ -103,9 +103,13 @@ export class SimCognitoUserPoolMfaCommands {
    *
    * A pool here has no `EmailConfiguration` either, because `CreateUserPool`
    * refuses that, so real Cognito would refuse a code sent by email on a pool
-   * built the same way. A passkey is presented through the `USER_AUTH` flow,
-   * which is refused as a flow of its own, so a pool configured for one here
-   * would never be asked for it.
+   * built the same way.
+   *
+   * A `WebAuthnConfiguration` is accepted and recorded rather than refused.
+   * The two values in it decide what a passkey means rather than how a
+   * sign-in runs, and a pool that reports them describes itself the way the
+   * deployed pool does. Presenting a passkey goes through the `USER_AUTH`
+   * flow, which is refused where a sign-in asks for it.
    */
   private refuseUnsimulatedFactors(
     input: SimSetUserPoolMfaConfigCommandInput,
@@ -120,11 +124,6 @@ export class SimCognitoUserPoolMfaCommands {
       "EmailMfaConfiguration",
       input.EmailMfaConfiguration,
       "a second factor sent by email, which needs the pool's EmailConfiguration",
-    );
-    this.unsimulated.refuse(
-      "WebAuthnConfiguration",
-      input.WebAuthnConfiguration,
-      "signing in with a passkey, which the unsimulated USER_AUTH flow presents",
     );
   }
 }

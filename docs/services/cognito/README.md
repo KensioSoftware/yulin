@@ -4293,8 +4293,10 @@ Current documented limitations:
   `SmsConfiguration` inside the latter is refused, in the same words `CreateUserPool` refuses the
   pool's own. No message is delivered here, and the IAM role Cognito would assume to send one is
   never assumed. `EmailMfaConfiguration` is refused because a pool here has no `EmailConfiguration`
-  to send that message with, and `WebAuthnConfiguration` because a passkey is presented through the
-  `USER_AUTH` flow, itself refused as a flow of its own.
+  to send that message with. A `WebAuthnConfiguration` is recorded and reported back by
+  `GetUserPoolMfaConfig`, and nothing reads it. Its two values decide what a passkey means rather
+  than how a sign-in runs, and presenting a passkey goes through the `USER_AUTH` flow, itself
+  refused as a flow of its own.
 - `AssociateSoftwareToken` and `VerifySoftwareToken` take an `AccessToken` and refuse a `Session`,
   because the `MFA_SETUP` challenge that would issue one is outside the simulation. A
   `FriendlyDeviceName` is refused for the same kind of reason. Device tracking is outside the
@@ -4366,8 +4368,18 @@ Current documented limitations:
 - Unsimulated `CreateUserPool` inputs are refused, never ignored: `AliasAttributes`,
   `UsernameConfiguration`, `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`,
   `KeyConfiguration`, `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
-  `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
+  `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, and a
   `PasswordHistorySize`.
+- `Policies.SignInPolicy` is recorded and reported back by `DescribeUserPool`. The four factor names
+  Cognito accepts are `PASSWORD`, `EMAIL_OTP`, `SMS_OTP` and `WEB_AUTHN`, and `WEB_AUTHN` on its own
+  is refused, as AWS states it must be accompanied by at least one other option. Nothing here
+  presents a factor other than a password. Every other one is reached through the `USER_AUTH` flow,
+  which is refused by name, so a pool that allows passkeys deploys and describes itself the way the
+  deployed pool does while a passkey sign-in is refused where a sign-in asks for it.
+- `WebAuthnRelyingPartyID` and `WebAuthnUserVerification` deploy from an `AWS::Cognito::UserPool`
+  Resource. Real CloudFormation configures both in a `SetUserPoolMfaConfig` call once the pool
+  exists, and this deploys them the same way, so a stack declaring passkeys needs
+  `cognito-idp:SetUserPoolMfaConfig` as well as `cognito-idp:CreateUserPool`.
 - `AccountRecoverySetting` is recorded and reported back by `DescribeUserPool`, and no code reads
   it. Any mechanisms Cognito has are accepted, in any order, and a setting outside the shape Cognito
   states is refused. `ForgotPassword` picks its destination from the pool's `AutoVerifiedAttributes`

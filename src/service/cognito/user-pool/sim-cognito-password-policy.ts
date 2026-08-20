@@ -1,4 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../error/sim-cognito.error.js";
+import type { SimCognitoSignInPolicyType } from "./sim-cognito-sign-in-policy.js";
 
 /**
  * A user pool password policy, in the shape Cognito reports it.
@@ -13,16 +14,6 @@ export interface SimCognitoPasswordPolicyType {
   readonly RequireSymbols?: boolean | undefined;
   readonly PasswordHistorySize?: number | undefined;
   readonly TemporaryPasswordValidityDays?: number | undefined;
-}
-
-/**
- * The sign-in policy of a user pool, which chooses the first factor a user
- * may authenticate with.
- *
- * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_SignInPolicyType.html
- */
-export interface SimCognitoSignInPolicyType {
-  readonly AllowedFirstAuthFactors?: readonly string[] | undefined;
 }
 
 /**

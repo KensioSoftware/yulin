@@ -21,6 +21,13 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * CloudFormation sets a pool's MFA in a SetUserPoolMfaConfig call after the
  * pool exists, and this deploys them the same way.
  *
+ * `WebAuthnRelyingPartyID` and `WebAuthnUserVerification` reach the pool
+ * through that same second call, which is where the Cognito API takes them.
+ * They decide which hosts a passkey authenticates for and whether an
+ * authenticator that checks nobody may register one, and a pool that reports
+ * them describes itself the way the deployed pool does. No passkey is
+ * registered or presented here.
+ *
  * `UserPoolTier` is here because CreateUserPool accepts it at its AWS default
  * and refuses it otherwise, in words that say why. A CDK stack states it
  * routinely, and a pool created without it would be reported as behaving
@@ -64,6 +71,8 @@ const simulatedProperties = [
   "LambdaConfig",
   "MfaConfiguration",
   "EnabledMfas",
+  "WebAuthnRelyingPartyID",
+  "WebAuthnUserVerification",
   "UserPoolTier",
   "AdminCreateUserConfig",
   "AutoVerifiedAttributes",

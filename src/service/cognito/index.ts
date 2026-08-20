@@ -29,13 +29,22 @@ export {
   type SimCognitoSoftwareTokenMfaConfigType,
   type SimCognitoUserPoolMfaType,
 } from "./user-pool/mfa/sim-cognito-user-pool-mfa.js";
+export {
+  SimCognitoWebAuthnConfiguration,
+  type SimCognitoWebAuthnConfigurationType,
+  type SimCognitoWebAuthnUserVerification,
+} from "./user-pool/mfa/sim-cognito-web-authn-configuration.js";
 export { SimCognitoAutoVerifiedAttributes } from "./user-pool/sim-cognito-auto-verified-attributes.js";
 export {
   SimCognitoPasswordPolicy,
   type SimCognitoPasswordPolicyType,
-  type SimCognitoSignInPolicyType,
   type SimCognitoUserPoolPoliciesType,
 } from "./user-pool/sim-cognito-password-policy.js";
+export {
+  SimCognitoSignInPolicy,
+  type SimCognitoFirstAuthFactor,
+  type SimCognitoSignInPolicyType,
+} from "./user-pool/sim-cognito-sign-in-policy.js";
 export { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 export type { SimCognitoUserPoolClientId } from "./user-pool/client/sim-cognito-user-pool-client-id.js";
 export { SimCognitoExplicitAuthFlows } from "./user-pool/client/sim-cognito-explicit-auth-flows.js";

@@ -4,6 +4,7 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSetUserPoolMfaConfigCommandInput } from "../../command/user-pool/user-pool-mfa.command.js";
+import type { SimCognitoWebAuthnConfigurationType } from "../../user-pool/mfa/sim-cognito-web-authn-configuration.js";
 import type { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 
 /**
@@ -16,7 +17,7 @@ const enabledMfaValues = ["SMS_MFA", "SOFTWARE_TOKEN_MFA", "EMAIL_OTP"];
  */
 type SimCfnCognitoMfaFactors = Omit<
   SimSetUserPoolMfaConfigCommandInput,
-  "UserPoolId" | "MfaConfiguration"
+  "UserPoolId" | "MfaConfiguration" | "WebAuthnConfiguration"
 >;
 
 interface SimCfnCognitoUserPoolMfaProperties {
@@ -38,6 +39,11 @@ interface SimCfnCognitoUserPoolMfaProperties {
  * list into those configurations is what lets `SetUserPoolMfaConfig` decide
  * which of them are simulated, so the two factors this simulation cannot
  * deliver a message for are refused in one place rather than two.
+ *
+ * `WebAuthnRelyingPartyID` and `WebAuthnUserVerification` travel the same
+ * way. CloudFormation carries them as two flat properties of the pool and the
+ * Cognito API takes them as one `WebAuthnConfiguration`, so they are gathered
+ * here into the call that configures them.
  */
 export class SimCfnCognitoUserPoolMfa {
   private readonly resource: SimCfnResource;
@@ -63,8 +69,13 @@ export class SimCfnCognitoUserPoolMfa {
       "MfaConfiguration",
     );
     const factors = this.factors(properties["EnabledMfas"]);
+    const webAuthn = this.webAuthn(properties);
 
-    if (configuration === undefined && Object.keys(factors).length === 0) {
+    if (
+      configuration === undefined &&
+      webAuthn === undefined &&
+      Object.keys(factors).length === 0
+    ) {
       return undefined;
     }
 
@@ -72,6 +83,40 @@ export class SimCfnCognitoUserPoolMfa {
       UserPoolId: userPoolId,
       ...(configuration !== undefined && { MfaConfiguration: configuration }),
       ...factors,
+      ...(webAuthn !== undefined && { WebAuthnConfiguration: webAuthn }),
+    };
+  }
+
+  /**
+   * How the template asks for passkeys to be registered, or nothing where it
+   * names neither property.
+   *
+   * The user verification value is checked by the pool rather than here, so a
+   * template and an SDK caller are refused in the same words.
+   */
+  private webAuthn(
+    properties: SimCfnTemplateValueRecord,
+  ): SimCognitoWebAuthnConfigurationType | undefined {
+    const relyingPartyId = this.propertyParser.optionalString(
+      this.resource,
+      properties["WebAuthnRelyingPartyID"],
+      "WebAuthnRelyingPartyID",
+    );
+    const userVerification = this.propertyParser.optionalString(
+      this.resource,
+      properties["WebAuthnUserVerification"],
+      "WebAuthnUserVerification",
+    );
+
+    if (relyingPartyId === undefined && userVerification === undefined) {
+      return undefined;
+    }
+
+    return {
+      ...(relyingPartyId !== undefined && { RelyingPartyId: relyingPartyId }),
+      ...(userVerification !== undefined && {
+        UserVerification: userVerification,
+      }),
     };
   }
 

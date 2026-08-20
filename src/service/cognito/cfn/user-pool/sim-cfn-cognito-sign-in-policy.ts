@@ -1,10 +1,10 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimCognitoSignInPolicyType } from "../../user-pool/sim-cognito-password-policy.js";
+import type { SimCognitoSignInPolicyType } from "../../user-pool/sim-cognito-sign-in-policy.js";
 import type { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 
 /**
- * The `SignInPolicy` fields, which reach CreateUserPool to be refused there.
+ * The `SignInPolicy` fields this simulation reads, which are all of them.
  */
 const modelledFields = ["AllowedFirstAuthFactors"];
 
@@ -14,10 +14,11 @@ interface SimCfnCognitoSignInPolicyProperties {
 }
 
 /**
- * Reads the `Policies SignInPolicy` of an AWS::Cognito::UserPool Resource.
+ * Reads the `Policies SignInPolicy` of an AWS::Cognito::UserPool Resource
+ * into the shape CreateUserPool takes.
  *
- * Nothing here chooses a first authentication factor, so this is read only so
- * that CreateUserPool receives it and refuses it in the words that say why.
+ * The factor names are checked by the pool rather than here, so a template and
+ * an SDK caller are held to the same rule in the same words.
  */
 export class SimCfnCognitoSignInPolicy {
   private readonly resource: SimCfnResource;

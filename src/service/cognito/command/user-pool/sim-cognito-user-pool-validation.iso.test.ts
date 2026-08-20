@@ -34,13 +34,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "the Lite and Plus feature plans",
   },
   {
-    label: "SignInPolicy",
-    input: {
-      Policies: { SignInPolicy: { AllowedFirstAuthFactors: ["EMAIL_OTP"] } },
-    },
-    says: "which factors a user may sign in with first",
-  },
-  {
     label: "PasswordHistorySize",
     input: { Policies: { PasswordPolicy: { PasswordHistorySize: 3 } } },
     says: "a password the user has used before",

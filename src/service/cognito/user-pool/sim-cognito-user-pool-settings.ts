@@ -20,6 +20,7 @@ import {
 } from "./message/sim-cognito-verification-messages.js";
 import type { SimCognitoSchemaAttributeType } from "./schema/sim-cognito-schema-attribute.js";
 import { SimCognitoUserPoolSchema } from "./schema/sim-cognito-user-pool-schema.js";
+import { SimCognitoSignInPolicy } from "./sim-cognito-sign-in-policy.js";
 import { SimCognitoUsernameAttributes } from "./sim-cognito-username-attributes.js";
 import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
 
@@ -74,7 +75,8 @@ interface SimCognitoUserPoolSettingsProperties {
 
 /**
  * The settings of one simulated user pool that a request can change: the
- * password policy, the deletion protection, whether users may sign themselves
+ * password policy, the factors it allows at the first prompt, the deletion
+ * protection, whether users may sign themselves
  * up, what confirming a sign-up verifies, the Lambda triggers the pool runs,
  * whether it asks for a second factor, how it recovers an account and what its
  * messages say.
@@ -95,6 +97,17 @@ interface SimCognitoUserPoolSettingsProperties {
  */
 export class SimCognitoUserPoolSettings {
   public readonly passwordPolicy: SimCognitoPasswordPolicy;
+
+  /**
+   * The factors the pool allows at the first authentication prompt.
+   *
+   * A pool created without a `SignInPolicy` allows a password and reports no
+   * policy, as real Cognito reports one. Every factor beside a password is
+   * presented through the `USER_AUTH` flow, which is refused where a sign-in
+   * asks for it.
+   */
+  public readonly signInPolicy: SimCognitoSignInPolicy;
+
   public readonly deletionProtection: SimCognitoDeletionProtection;
   public readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
   public readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
@@ -135,6 +148,9 @@ export class SimCognitoUserPoolSettings {
 
     this.passwordPolicy = new SimCognitoPasswordPolicy(
       input.Policies?.PasswordPolicy,
+    );
+    this.signInPolicy = new SimCognitoSignInPolicy(
+      input.Policies?.SignInPolicy,
     );
     this.deletionProtection = new SimCognitoDeletionProtection(
       input.DeletionProtection,
