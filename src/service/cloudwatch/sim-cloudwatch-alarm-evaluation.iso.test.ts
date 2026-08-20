@@ -7,6 +7,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertNumberBetween,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -75,6 +76,27 @@ describe("SimCloudWatch alarm evaluation", () => {
     // When its state is read.
     // Then it has not evaluated anything yet, as on real CloudWatch.
     assertIdentical(await stateOf(simAws), "INSUFFICIENT_DATA");
+  });
+
+  it("skips a month of five-minute periods without costing seconds", async () => {
+    // Given an alarm on a five-minute period, watching a metric nothing ever
+    // publishes to.
+    const simAws = await withAlarm({
+      Period: 300,
+      EvaluationPeriods: 1,
+      DatapointsToAlarm: 1,
+    });
+
+    // When the clock is advanced by thirty days, crossing 8,640 of its
+    // period boundaries.
+    const realBefore = Date.now();
+
+    await simAws.clock().advanceBy({ days: 30 });
+
+    // Then it evaluated its way to the end of the interval, in a fraction of
+    // the host time a real timer per boundary used to cost.
+    assertIdentical(await stateOf(simAws), "INSUFFICIENT_DATA");
+    assertNumberBetween(Date.now() - realBefore, 0, 5000);
   });
 
   it("evaluates nothing while the clock stands still", async () => {
