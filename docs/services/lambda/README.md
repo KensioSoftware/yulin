@@ -2943,8 +2943,9 @@ Sim Lambda currently supports:
   `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke`,
   `GetFunction` and the permission commands, each qualified resource holding its own policy
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
-  `lambda:GetFunction`, `lambda:InvokeFunction`, the Function URL config actions, and the version
-  and alias actions)
+  `lambda:GetFunction`, `lambda:UpdateFunctionCode`, `lambda:InvokeFunction`, the Function URL
+  config actions, and the version and alias actions), and `lambda:ListFunctions` on `*` for the
+  listing
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
 - The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission`,
   `AWS::Lambda::Version`, `AWS::Lambda::Alias` and `AWS::Lambda::EventSourceMapping`
@@ -3037,7 +3038,10 @@ Current documented limitations:
 - A time read at module scope, like an environment variable read there, is read before any
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocation retries and failure destinations are left out, and handler errors are dropped.
-- `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
+- The S3 object version a code location names is accepted but ignored, as sim S3 has no object
+  versioning yet. That covers `Code.S3ObjectVersion` on `CreateFunction` and on a template
+  function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as
+  it stands.
 - SQS queues and DynamoDB streams are the only event sources. Kinesis, Kafka and DocumentDB sources
   are refused outright, and so are `FilterCriteria`,
   `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
@@ -3076,7 +3080,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves sixteen of these operations over HTTP, listed in the
+- `serveSimAws` serves eighteen of these operations over HTTP, listed in the
   [serving docs](../../serve/README.md#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](../../sdk/) instead.
