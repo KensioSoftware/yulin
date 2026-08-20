@@ -47,6 +47,23 @@ const refusedPolicies: readonly RefusedPolicy[] = [
     factors: [],
     says: "must name at least one factor",
   },
+  {
+    label: "passkeys standing in for their own companion",
+    factors: ["WEB_AUTHN", "WEB_AUTHN"],
+    says: "WEB_AUTHN has to be accompanied by at least one other factor",
+  },
+  {
+    label: "more factors than Cognito takes",
+    factors: [
+      "PASSWORD",
+      "EMAIL_OTP",
+      "SMS_OTP",
+      "WEB_AUTHN",
+      "PASSWORD",
+      "EMAIL_OTP",
+    ],
+    says: "must name no more than 5 factors",
+  },
 ];
 
 describe("sim Cognito sign-in policy", () => {

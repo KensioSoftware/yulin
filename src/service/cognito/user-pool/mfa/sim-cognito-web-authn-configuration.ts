@@ -18,6 +18,8 @@ const userVerificationValues: readonly SimCognitoWebAuthnUserVerification[] = [
   "preferred",
 ];
 
+const relyingPartyIdLength = { least: 1, most: 127 };
+
 /**
  * The passkey configuration of one simulated user pool.
  *
@@ -44,10 +46,38 @@ export class SimCognitoWebAuthnConfiguration {
     | undefined;
 
   constructor(configuration: SimCognitoWebAuthnConfigurationType) {
-    this.relyingPartyId = configuration.RelyingPartyId;
+    this.relyingPartyId = SimCognitoWebAuthnConfiguration.relyingPartyIn(
+      configuration.RelyingPartyId,
+    );
     this.userVerification = SimCognitoWebAuthnConfiguration.verificationIn(
       configuration.UserVerification,
     );
+  }
+
+  /**
+   * A relying party ID is a domain, and Cognito takes one of between one and
+   * 127 characters. A pool configured with an empty one would register
+   * passkeys against nothing.
+   */
+  private static relyingPartyIn(
+    requested: string | undefined,
+  ): string | undefined {
+    if (requested === undefined) {
+      return undefined;
+    }
+
+    if (
+      requested.length < relyingPartyIdLength.least ||
+      requested.length > relyingPartyIdLength.most
+    ) {
+      throw new SimCognitoInvalidParameterException(
+        "WebAuthnConfiguration RelyingPartyId must be between " +
+          `${String(relyingPartyIdLength.least)} and ` +
+          `${String(relyingPartyIdLength.most)} characters long`,
+      );
+    }
+
+    return requested;
   }
 
   private static verificationIn(

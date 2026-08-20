@@ -4371,15 +4371,17 @@ Current documented limitations:
   `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, and a
   `PasswordHistorySize`.
 - `Policies.SignInPolicy` is recorded and reported back by `DescribeUserPool`. The four factor names
-  Cognito accepts are `PASSWORD`, `EMAIL_OTP`, `SMS_OTP` and `WEB_AUTHN`, and `WEB_AUTHN` on its own
-  is refused, as AWS states it must be accompanied by at least one other option. Nothing here
+  Cognito accepts are `PASSWORD`, `EMAIL_OTP`, `SMS_OTP` and `WEB_AUTHN`, a list names five at most,
+  and a policy offering `WEB_AUTHN` and nothing else is refused however many times it repeats the
+  name, as AWS states it must be accompanied by at least one other option. Nothing here
   presents a factor other than a password. Every other one is reached through the `USER_AUTH` flow,
   which is refused by name, so a pool that allows passkeys deploys and describes itself the way the
   deployed pool does while a passkey sign-in is refused where a sign-in asks for it.
 - `WebAuthnRelyingPartyID` and `WebAuthnUserVerification` deploy from an `AWS::Cognito::UserPool`
   Resource. Real CloudFormation configures both in a `SetUserPoolMfaConfig` call once the pool
   exists, and this deploys them the same way, so a stack declaring passkeys needs
-  `cognito-idp:SetUserPoolMfaConfig` as well as `cognito-idp:CreateUserPool`.
+  `cognito-idp:SetUserPoolMfaConfig` as well as `cognito-idp:CreateUserPool`. A relying party ID is
+  a domain of between one and 127 characters, and one outside that is refused.
 - `AccountRecoverySetting` is recorded and reported back by `DescribeUserPool`, and no code reads
   it. Any mechanisms Cognito has are accepted, in any order, and a setting outside the shape Cognito
   states is refused. `ForgotPassword` picks its destination from the pool's `AutoVerifiedAttributes`

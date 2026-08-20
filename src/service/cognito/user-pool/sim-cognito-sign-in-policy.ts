@@ -29,6 +29,8 @@ const firstAuthFactors: readonly SimCognitoFirstAuthFactor[] = [
   "WEB_AUTHN",
 ];
 
+const mostFactors = 5;
+
 /**
  * The factors one simulated user pool allows at the first prompt.
  *
@@ -45,7 +47,8 @@ const firstAuthFactors: readonly SimCognitoFirstAuthFactor[] = [
  * refuses a passkey sign-in in words that say what could not be done.
  *
  * The validation is real Cognito's. The four factor names are the ones it
- * accepts, and `WEB_AUTHN` on its own is refused because AWS states that it
+ * accepts, a list may name five of them at most, and a policy offering
+ * passkeys and nothing else is refused because AWS states that `WEB_AUTHN`
  * "must be accompanied by at least one other option".
  */
 export class SimCognitoSignInPolicy {
@@ -71,6 +74,16 @@ export class SimCognitoSignInPolicy {
   private static factorsIn(
     requested: readonly string[],
   ): readonly SimCognitoFirstAuthFactor[] {
+    this.requireCount(requested);
+
+    const factors = requested.map((factor) => this.requireKnown(factor));
+
+    this.requireCompanionForPasskeys(factors);
+
+    return factors;
+  }
+
+  private static requireCount(requested: readonly string[]): void {
     if (requested.length === 0) {
       throw new SimCognitoInvalidParameterException(
         "SignInPolicy AllowedFirstAuthFactors must name at least one factor: " +
@@ -78,11 +91,12 @@ export class SimCognitoSignInPolicy {
       );
     }
 
-    const factors = requested.map((factor) => this.requireKnown(factor));
-
-    this.requireCompanionForPasskeys(factors);
-
-    return factors;
+    if (requested.length > mostFactors) {
+      throw new SimCognitoInvalidParameterException(
+        "SignInPolicy AllowedFirstAuthFactors must name no more than " +
+          `${String(mostFactors)} factors`,
+      );
+    }
   }
 
   private static requireKnown(factor: string): SimCognitoFirstAuthFactor {
@@ -100,11 +114,14 @@ export class SimCognitoSignInPolicy {
    * Refuse a policy offering passkeys and nothing else, as real Cognito
    * refuses one. A passkey has to be registered from a session that already
    * exists, so a pool with no other way in would have nobody able to register.
+   *
+   * The companion has to be a different factor, so naming `WEB_AUTHN` twice
+   * leaves the pool as shut as naming it once does.
    */
   private static requireCompanionForPasskeys(
     factors: readonly SimCognitoFirstAuthFactor[],
   ): void {
-    if (factors.includes("WEB_AUTHN") && factors.length === 1) {
+    if (factors.every((factor) => factor === "WEB_AUTHN")) {
       throw new SimCognitoInvalidParameterException(
         "SignInPolicy AllowedFirstAuthFactors WEB_AUTHN has to be " +
           "accompanied by at least one other factor",
