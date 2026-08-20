@@ -279,6 +279,6 @@ export class SimAwsServiceFactory {
 
   /** Create simulated WAFv2 for an Account Region scope. */
   createWafV2(scope: SimAwsAccountRegionContainer): SimWafV2 {
-    return this.selfContainedServices.createWafV2(scope);
+    return this.accountRegionServices.createWafV2(scope);
   }
 }

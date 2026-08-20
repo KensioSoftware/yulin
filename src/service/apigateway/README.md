@@ -87,11 +87,19 @@ departs from AWS.
 ```text
 SimApiGatewayServiceController   the entry point, and what a miss is answered with
 ├── SimApiGatewayRouter          an API id to its scope, an integration URI to its function
+├── SimRestApiWebAclInspection   the stage's web ACL, before anything else
 ├── SimRestApiMethodAuthorizer   what the client may have, in serve/auth/
 └── SimRestApiIntegrationInvocation   the invoke permission, the event, the response
 ```
 
-The client's own authorization runs first. A request presenting no credentials is refused whether or
+A web ACL in front of the stage runs before any of that, in
+`SimRestApiWebAclInspection`. Real API Gateway evaluates the stage's web ACL ahead of resource
+policies, IAM policies, Lambda authorizers and Cognito authorizers. A blocked request is answered
+before the method is matched here too. The API reaches WAFv2 through the `SimWafProtection` port it holds on
+`SimRestApi`, beside the user pools it holds for the same reason. The request body is buffered from
+a clone, leaving the integration a body to send on, and only for a stage a web ACL protects.
+
+The client's own authorization runs next. A request presenting no credentials is refused whether or
 not the integration behind the method would have worked. Whether the API may invoke a function is a
 separate question, asked afterwards, and it is the API's rather than the client's.
 

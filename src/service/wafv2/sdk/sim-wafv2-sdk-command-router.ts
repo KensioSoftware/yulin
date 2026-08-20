@@ -134,6 +134,38 @@ export class SimWafSdkCommandRouter implements SimSdkCommandRouter {
             simSdkCallerOptions(context),
           ),
       ],
+      [
+        "AssociateWebACLCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.associateWebAcl(
+            command as simWafCommands.SimAssociateWebAclCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DisassociateWebACLCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.disassociateWebAcl(
+            command as simWafCommands.SimDisassociateWebAclCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetWebACLForResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.getWebAclForResource(
+            command as simWafCommands.SimGetWebAclForResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListResourcesForWebACLCommand",
+        async (command, context): Promise<unknown> =>
+          await simWaf.listResourcesForWebAcl(
+            command as simWafCommands.SimListResourcesForWebAclCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
     ]);
   }
 

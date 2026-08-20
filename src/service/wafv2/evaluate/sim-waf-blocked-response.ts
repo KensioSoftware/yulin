@@ -14,10 +14,11 @@ export interface SimWafBlockedResponse {
  * The body a block action with no custom response of its own answers with.
  *
  * Real WAF hands the blocking off to whatever the web ACL is in front of, and
- * each of them writes its own page: CloudFront's error page, API Gateway's
- * `{"message":"Forbidden"}`. Nothing is associated with a web ACL yet, so this
- * is the simulator's own body until there is a fronting service to ask, and
- * the status is the 403 all of them answer with.
+ * each of them writes its own page. CloudFront writes an error page and API
+ * Gateway writes `{"message":"Forbidden"}`. This is the simulator's own body
+ * for all of them, which is a deliberate divergence recorded in
+ * `docs/services/wafv2`. The status is the 403 every one of them answers with,
+ * and a rule with a custom response replaces this whole thing anyway.
  */
 export function simWafDefaultBlockedResponse(): SimWafBlockedResponse {
   return {

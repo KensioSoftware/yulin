@@ -67,6 +67,9 @@ export class SimAwsRegisteredServiceBuilder {
       // id alone from the serving layer, whichever scope created it.
       registry: this.registries.restApi,
       userPools: simAwsRestApiUserPools(this.registries),
+      // A web ACL protecting a stage is in the same Account and Region as the
+      // API, as it is on AWS, so this scope's own WAFv2 is the one to ask.
+      webAcls: scope.wafV2().protection(),
     });
   }
 
