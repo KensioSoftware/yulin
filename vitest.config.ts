@@ -61,8 +61,10 @@ export default defineConfig({
           // Local tests spawn real processes, bind real ports and wait on real
           // filesystem events. On a loaded CI runner that is seconds where a
           // developer machine takes a fraction of one, so they get longer than
-          // an isolated test does before a slow run counts as a hang.
-          testTimeout: 30_000,
+          // an isolated test does before a slow run counts as a hang. This has
+          // to stay above twice `watchRunTimeoutMs`, since a supervised test
+          // waits for two runs of a spawned process inside one timeout.
+          testTimeout: 45_000,
           // globalSetup: ["./test/locTestGlobalSetUp.ts"],
         },
       },
