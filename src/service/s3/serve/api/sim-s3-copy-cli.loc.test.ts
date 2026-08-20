@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import {
@@ -190,6 +191,40 @@ describe("Moving an Object between simulated Buckets with the aws CLI", () => {
     // And the source is empty, which is the half of the move that made the
     // first half worth checking
     assertArrayLength(await stored("inbox", "moved.pdf"), 0);
+  });
+
+  it("copies a file to and from a key holding a space", async () => {
+    // Given a report under a key someone typed rather than a program generated
+    await givenReport("quarterly report.pdf");
+
+    // When the CLI downloads it and uploads it again under another such key
+    await aws(
+      "s3",
+      "cp",
+      "s3://inbox/quarterly report.pdf",
+      files.join("q.pdf"),
+    );
+    await aws(
+      "s3",
+      "cp",
+      files.join("q.pdf"),
+      "s3://archive/2026/quarterly report.pdf",
+    );
+
+    // Then the download and the upload both hold the report, having travelled
+    // a path carrying the space percent-encoded
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- a temporary directory this test just made
+    const downloaded = await readFile(files.join("q.pdf"), "utf8");
+    assertIdentical(downloaded, report);
+
+    const read = await simS3.getObject(
+      new GetObjectCommand({
+        Bucket: "archive",
+        Key: "2026/quarterly report.pdf",
+      }),
+    );
+    assertDefined(read.Body, "the uploaded Object body");
+    assertIdentical(await bodyText(read.Body), report);
   });
 
   it("moves an Object whose key is a path of its own", async () => {
