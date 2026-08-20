@@ -11,6 +11,7 @@ import {
 } from "../../../../../test/lambda/served-lambda-api.js";
 import { SimRestJsonApiEndpoint } from "../../../../serve/http/api/rest-json/sim-rest-json-endpoint.js";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { makeLambdaCodeZip } from "../../function/code/make-lambda-code-zip.js";
 
 /**
  * What the served Lambda endpoint does with a request, once the protocol has
@@ -73,6 +74,56 @@ describe("Serving the simulated Lambda control plane", () => {
     assertObjectMatches((await response.json()) as object, { ok: true });
   });
 
+  it("lists the functions the simulation holds", async () => {
+    // Given a served simulation
+    const { send } = await servedLambdaApi();
+
+    // When the functions are listed, as `aws lambda list-functions` lists them
+    const response = await send("GET", "/2015-03-31/functions");
+
+    // Then the one function the simulation holds is reported
+    assertIdentical(response.status, 200);
+    assertObjectMatches((await response.json()) as object, {
+      Functions: [{ FunctionName: "orders" }],
+    });
+  });
+
+  it("replaces a function's code from a base64 zip in the body", async () => {
+    // Given a served simulation holding a zip code function
+    const { send } = await servedLambdaApi({
+      Handler: "index.handler",
+      Runtime: "nodejs22.x",
+      Code: {
+        ZipFile: makeLambdaCodeZip("exports.handler = async () => 'replaced';"),
+      },
+    });
+
+    // When replacement code arrives the way JSON has to carry bytes
+    const replacement = makeLambdaCodeZip(
+      "exports.handler = async () => 'again';",
+    );
+    const response = await send("PUT", "/2015-03-31/functions/orders/code", {
+      body: JSON.stringify({
+        ZipFile: Buffer.from(replacement).toString("base64"),
+      }),
+    });
+
+    // Then the function is reported updated, and an invocation runs the
+    // replacement
+    assertIdentical(response.status, 200);
+    assertObjectMatches((await response.json()) as object, {
+      FunctionName: "orders",
+      Version: "$LATEST",
+    });
+
+    const invoked = await send(
+      "POST",
+      "/2015-03-31/functions/orders/invocations",
+      { body: "{}" },
+    );
+    assertIdentical(await invoked.text(), '"again"');
+  });
+
   it("reports a body that states itself as JSON and is not", async () => {
     // Given a served simulation
     const { send } = await servedLambdaApi();
@@ -102,7 +153,7 @@ describe("Serving the simulated Lambda control plane", () => {
         {
           method: "POST",
           path: "/2015-03-31/functions/{FunctionName}/code",
-          commandName: "UpdateFunctionCodeCommand",
+          commandName: "UpdateFunctionConfigurationCommand",
           input: (input) => ({ FunctionName: input.label("FunctionName") }),
         },
       ],
@@ -122,6 +173,9 @@ describe("Serving the simulated Lambda control plane", () => {
     // Then the endpoint says so rather than answering with a server error
     assertIdentical(response.status, 501);
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
-    assertStringIncludes(await response.text(), "UpdateFunctionCodeCommand");
+    assertStringIncludes(
+      await response.text(),
+      "UpdateFunctionConfigurationCommand",
+    );
   });
 });

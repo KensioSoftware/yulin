@@ -18,7 +18,10 @@ import {
   ListQueuesCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { LambdaClient, ListFunctionsCommand } from "@aws-sdk/client-lambda";
+import {
+  LambdaClient,
+  UpdateFunctionConfigurationCommand,
+} from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
   assertStringIncludes,
@@ -243,9 +246,9 @@ describe("Serving the general AWS API on one endpoint", () => {
     assertIdentical(written.Item?.["id"]?.S, "by-session");
   });
 
-  it("refuses a protocol it cannot read without asking the client to retry", async () => {
-    // Given a request signed for the Lambda control plane, which speaks
-    // REST-JSON rather than any protocol this endpoint reads
+  it("refuses an operation it does not serve without asking the client to retry", async () => {
+    // Given a request signed for the Lambda control plane, whose REST-JSON
+    // endpoint serves the operations simulated Lambda implements
     const client = new LambdaClient({
       region: simAws.defaultRegionName,
       endpoint,
@@ -253,9 +256,12 @@ describe("Serving the general AWS API on one endpoint", () => {
       maxAttempts: 1,
     });
 
-    // When it asks for something only REST-JSON could express
+    // When it asks for one this simulation has not implemented
     const error = await assertThrowsErrorAsync(
-      async () => await client.send(new ListFunctionsCommand({})),
+      async () =>
+        await client.send(
+          new UpdateFunctionConfigurationCommand({ FunctionName: "orders" }),
+        ),
     );
 
     // Then it is refused as unimplemented, which an SDK does not retry, and

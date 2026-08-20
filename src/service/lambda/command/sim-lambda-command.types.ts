@@ -74,6 +74,10 @@ export type {
   SimListAliasesCommandOutput,
 } from "./list-aliases/list-aliases.command.js";
 export type {
+  SimListFunctionsCommand,
+  SimListFunctionsCommandOutput,
+} from "./list-functions/list-functions.command.js";
+export type {
   SimListFunctionUrlConfigsCommand,
   SimListFunctionUrlConfigsCommandOutput,
 } from "./list-function-url-configs/list-function-url-configs.command.js";
@@ -93,6 +97,10 @@ export type {
   SimUpdateAliasCommand,
   SimUpdateAliasCommandOutput,
 } from "./update-alias/update-alias.command.js";
+export type {
+  SimUpdateFunctionCodeCommand,
+  SimUpdateFunctionCodeCommandOutput,
+} from "./update-function-code/update-function-code.command.js";
 export type {
   SimUpdateFunctionUrlConfigCommand,
   SimUpdateFunctionUrlConfigCommandOutput,

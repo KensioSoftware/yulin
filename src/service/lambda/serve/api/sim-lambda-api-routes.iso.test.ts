@@ -1,4 +1,5 @@
 import {
+  assertBufferEqual,
   assertIdentical,
   assertObjectEquals,
   assertObjectMatches,
@@ -87,6 +88,14 @@ describe("Resolving a Lambda operation from a served request", () => {
       command("POST", "/2015-03-31/functions/orders/invocations"),
       "InvokeCommand",
     );
+    assertIdentical(
+      command("GET", "/2015-03-31/functions"),
+      "ListFunctionsCommand",
+    );
+    assertIdentical(
+      command("PUT", "/2015-03-31/functions/orders/code"),
+      "UpdateFunctionCodeCommand",
+    );
   });
 
   it("routes the Function URL configuration operations", () => {
@@ -140,9 +149,10 @@ describe("Resolving a Lambda operation from a served request", () => {
     // Given the paths of Lambda operations this simulation has not
     // implemented, each sharing its method with one it has
     // Then none of them resolves to the operation beside it
-    assertUndefined(command("GET", "/2015-03-31/functions"));
     assertUndefined(command("POST", "/2015-03-31/functions/orders/versions"));
-    assertUndefined(command("PUT", "/2015-03-31/functions/orders/code"));
+    assertUndefined(
+      command("PUT", "/2015-03-31/functions/orders/configuration"),
+    );
     assertUndefined(
       command("GET", "/2015-03-31/functions/orders/configuration"),
     );
@@ -182,6 +192,29 @@ describe("Resolving a Lambda operation from a served request", () => {
       input("DELETE", "/2015-03-31/event-source-mappings/a-uuid"),
       mapping,
     );
+  });
+
+  it("reads the version listing a query asked for", () => {
+    // Given a listing whose only member travels in the query string
+    assertObjectEquals(input("GET", "/2015-03-31/functions"), {
+      FunctionVersion: undefined,
+    });
+    assertObjectEquals(
+      input("GET", "/2015-03-31/functions?FunctionVersion=ALL"),
+      { FunctionVersion: "ALL" },
+    );
+  });
+
+  it("reads replacement code from both the path and the body", () => {
+    // Given an UpdateFunctionCode request, whose zip travels base64 encoded
+    // the way JSON has to carry bytes
+    const zipFile = Buffer.from("a zip archive");
+    const read = input("PUT", "/2015-03-31/functions/orders/code", {
+      body: JSON.stringify({ ZipFile: zipFile.toString("base64") }),
+    });
+
+    assertIdentical(read["FunctionName"], "orders");
+    assertBufferEqual(read["ZipFile"] as Uint8Array, zipFile);
   });
 
   it("reads a write from both the path and the body", () => {
