@@ -6,11 +6,14 @@ import { TemporaryDirectory } from "../../src/util/filesystem/temporary-director
  *
  * A run is a real process, spawned through `tsx`, importing whatever the dev
  * script imports. On a loaded CI runner that is seconds rather than the
- * fraction of one it takes on a developer machine. Two of these fit inside the
- * local test timeout, so a test that waited for a restart it never got fails
- * saying how many times the process ran rather than with a bare timeout.
+ * fraction of one it takes on a developer machine, and the first spawn in a
+ * file pays for a cold `tsx` transform cache on top of that. Twelve seconds
+ * was not enough for it once the rest of the local suite grew. Two of these
+ * fit inside the local test timeout, so a test that waited for a restart it
+ * never got fails saying how many times the process ran rather than with a
+ * bare timeout.
  */
-export const watchRunTimeoutMs = 12_000;
+export const watchRunTimeoutMs = 20_000;
 
 /**
  * A throwaway project for `yulin watch` to supervise.

@@ -12,7 +12,10 @@ import {
   simS3ListObjectsXml,
 } from "./sim-s3-api-listing.js";
 import { simS3MultipartResponse } from "./sim-s3-api-multipart-output.js";
-import { simS3GetObjectResponse } from "./sim-s3-api-object-output.js";
+import {
+  simS3CopyObjectXml,
+  simS3GetObjectResponse,
+} from "./sim-s3-api-object-output.js";
 
 const xmlContentType = { "content-type": "application/xml" };
 
@@ -67,6 +70,12 @@ export async function simS3ApiResponse(
     }
     case "HeadBucketCommand": {
       return simS3HeadBucketResponse(value);
+    }
+    case "CopyObjectCommand": {
+      // A copy answers in a document rather than in headers, because real S3
+      // holds the connection open while the bytes move and cannot know the
+      // ETag by the time it has to send them.
+      return xml(simS3CopyObjectXml(value));
     }
     case "PutObjectCommand":
     case "UploadPartCommand": {

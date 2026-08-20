@@ -103,6 +103,7 @@ export function resolveSimS3ApiRoute(
       route.method === request.method &&
       route.target === target &&
       route.subResource === named &&
-      (route.matches?.(request.query) ?? true),
+      (route.matches?.(request.query) ?? true) &&
+      (route.header === undefined || request.headers.has(route.header)),
   );
 }

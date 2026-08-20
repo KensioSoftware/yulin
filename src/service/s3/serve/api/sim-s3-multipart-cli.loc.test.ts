@@ -100,15 +100,18 @@ describe("Copying a large file in and out of simulated S3 with the aws CLI", () 
       new CreateAccessKeyCommand({ UserName: "Copier" }),
     );
 
-    const { AWS_PROFILE: _profile, ...environment } = process.env;
+    // Every AWS variable the machine exports is dropped rather than only the
+    // profile. An inherited session token or endpoint would otherwise travel
+    // with the simulated access key and fail the signature.
+    const environment = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("AWS_")),
+    );
 
     return {
       ...environment,
       AWS_ACCESS_KEY_ID: created.AccessKey.AccessKeyId,
       AWS_SECRET_ACCESS_KEY: created.AccessKey.SecretAccessKey,
       AWS_DEFAULT_REGION: simAws.defaultRegionName,
-      // Whatever real AWS configuration the machine running this happens to
-      // have is not this test's, so the CLI is pointed away from it.
       AWS_CONFIG_FILE: files.join("aws-config"),
       AWS_SHARED_CREDENTIALS_FILE: files.join("aws-credentials"),
       AWS_EC2_METADATA_DISABLED: "true",
