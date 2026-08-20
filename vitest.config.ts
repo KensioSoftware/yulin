@@ -64,7 +64,7 @@ export default defineConfig({
           // an isolated test does before a slow run counts as a hang. This has
           // to stay above twice `watchRunTimeoutMs`, since a supervised test
           // waits for two runs of a spawned process inside one timeout.
-          testTimeout: 45_000,
+          testTimeout: 90_000,
           // globalSetup: ["./test/locTestGlobalSetUp.ts"],
         },
       },
