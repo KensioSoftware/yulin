@@ -73,10 +73,6 @@ export class SimCognitoServiceController implements SimAwsServiceController {
     const { request } = serviceRequest;
     const url = new URL(request.url);
 
-    if (!readMethods.has(request.method)) {
-      return this.response.notRead(request.method);
-    }
-
     // A path is exactly '<userPoolId>/.well-known/<document>' or
     // '<userPoolId>/messages'. Anything longer is a path nothing is served at,
     // rather than a prefix of one that is.
@@ -100,17 +96,25 @@ export class SimCognitoServiceController implements SimAwsServiceController {
       return this.response.noSuchUserPool(userPoolId);
     }
 
+    // The web ACL sits in front of the endpoint rather than behind it, so a
+    // request it blocks is answered before the method is judged. A write the
+    // rules turned away gets WAF's 403 and never learns the endpoint reads.
     const blocked = await this.blocked(pool, segment, request);
 
-    return (
-      blocked ??
-      this.documents.serve(pool, {
-        segment,
-        document,
-        url,
-        method: request.method,
-      })
-    );
+    if (blocked !== undefined) {
+      return blocked;
+    }
+
+    if (!readMethods.has(request.method)) {
+      return this.response.notRead(request.method);
+    }
+
+    return this.documents.serve(pool, {
+      segment,
+      document,
+      url,
+      method: request.method,
+    });
   }
 
   /**

@@ -463,9 +463,9 @@ caused is answered as any other authorize refusal is.
 serving side of `SimCognitoUserPool.sentMessages`, so a browser or a curl can read what a pool would
 have sent during local development, and it is a divergence for the same reason that accessor is one.
 
-`serve/sim-cognito-web-acl-inspection.ts` puts every one of those requests to whatever web ACL is in
-front of the pool, before the endpoint answers. `AssociateWebACL` on the WAFv2 side is what puts one
-there, named by the pool ARN. `SimCognitoIdentityProvider.webAcls()` is where the serving layer
+`serve/sim-cognito-web-acl-inspection.ts` puts a request to whatever web ACL is in front of the
+pool, before the endpoint answers and before the method is judged. `AssociateWebACL` on the WAFv2
+side is what puts one there, named by the pool ARN. `SimCognitoIdentityProvider.webAcls()` is where the serving layer
 reaches it. `simCognitoPoolScope` resolves the pool's own Account and Region first, because a
 request finds a pool by hostname or by id and both of those leave the scope open. The two
 `.well-known` documents are covered along with the hosted domain, since AWS WAF inspects every user

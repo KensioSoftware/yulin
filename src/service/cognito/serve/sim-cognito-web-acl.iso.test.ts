@@ -215,7 +215,7 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     assertNonNullable(pool.findUser(simCognitoLocalUsername));
   });
 
-  it("forwards the headers an allow rule inserted to the endpoint", async () => {
+  it("serves a request an allow rule claimed with custom request handling", async () => {
     // Given a pool protected by an allow rule with custom request handling.
     const setUp = await simCognitoHosted();
     await protect(setUp, [
@@ -244,8 +244,11 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     // When the sign-in page is fetched.
     const response = await get(setUp, "/oauth2/authorize");
 
-    // Then the endpoint answers the forwarded request, which carries the
-    // header the rule added under WAF's own prefix.
+    // Then the endpoint answers the request the rule asked to be forwarded.
+    // The header itself is asserted nowhere, because WAF prefixes an inserted
+    // request header with `x-amzn-waf-` and no endpoint a pool serves reads
+    // one. A REST API stage is where an inserted header is observable, since
+    // the integration hands the headers to the function behind the method.
     assertIdentical(response.status, 200);
     assertStringIncludes(await response.text(), 'name="username"');
   });

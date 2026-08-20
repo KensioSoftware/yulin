@@ -68,19 +68,35 @@ async function protectedPool(simAws: SimAws): Promise<string> {
 }
 
 /**
+ * Fetch one of the pool's endpoints, sending headers of the caller's choosing.
+ */
+async function fetchPoolPath(
+  simAws: SimAws,
+  userPoolId: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return await new SimAwsHttp({ simAws }).fetch(
+    new SimAwsLocalUrl({
+      input: `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}${path}`,
+    }).toString(),
+    init,
+  );
+}
+
+/**
  * Fetch one of the pool's endpoints as the scraper.
  */
 async function fetchAsScraper(
   simAws: SimAws,
   userPoolId: string,
   path: string,
+  method = "GET",
 ): Promise<Response> {
-  return await new SimAwsHttp({ simAws }).fetch(
-    new SimAwsLocalUrl({
-      input: `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}${path}`,
-    }).toString(),
-    { headers: { "user-agent": scraperUserAgent } },
-  );
+  return await fetchPoolPath(simAws, userPoolId, path, {
+    method,
+    headers: { "user-agent": scraperUserAgent },
+  });
 }
 
 describe("A web ACL in front of a sim Cognito user pool's documents", () => {
@@ -105,6 +121,26 @@ describe("A web ACL in front of a sim Cognito user pool's documents", () => {
     // pool covers every endpoint the pool serves.
     assertIdentical(jwks.status, 403);
     assertIdentical(configuration.status, 403);
+  });
+
+  it("blocks a write before the endpoint reports the methods it reads", async () => {
+    // Given a pool with a web ACL in front of it.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const userPoolId = await protectedPool(simAws);
+    const jwksPath = "/.well-known/jwks.json";
+
+    // When the scraper posts to the JWKS endpoint, and when a browser does.
+    const blocked = await fetchAsScraper(simAws, userPoolId, jwksPath, "POST");
+    const allowed = await fetchPoolPath(simAws, userPoolId, jwksPath, {
+      method: "POST",
+    });
+
+    // Then the web ACL decided the blocked one first, as it sits in front of
+    // the endpoint. The allowed one reaches the endpoint and is told what it
+    // reads.
+    assertIdentical(blocked.status, 403);
+    assertIdentical(allowed.status, 405);
+    assertIdentical(allowed.headers.get("allow"), "GET, HEAD");
   });
 
   it("leaves the recorded messages listing alone", async () => {

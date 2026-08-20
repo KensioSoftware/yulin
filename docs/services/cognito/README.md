@@ -2019,10 +2019,10 @@ that only the matching `code_verifier` exchanges. `plain` is refused, as it is b
 
 ### Putting a web ACL in front of the domain
 
-`AssociateWebACL` on simulated WAFv2 attaches a `REGIONAL` web ACL to a pool by its ARN, and every
-request the pool answers over HTTP is then evaluated against it. A blocked request gets 403 and the
-endpoint behind it never runs. A blocked sign-up creates no user. The two `.well-known` documents
-are covered along with the hosted domain pages. See
+`AssociateWebACL` on simulated WAFv2 attaches a `REGIONAL` web ACL to a pool by its ARN, and the
+pool's endpoints are then evaluated against it. A blocked request gets 403 and the endpoint behind
+it never runs. A blocked sign-up creates no user. The two `.well-known` documents are covered along
+with the hosted domain pages, and the `/<pool-id>/messages` listing is left outside. See
 [protecting a Cognito user pool](../wafv2/README.md#protecting-a-cognito-user-pool) for the whole
 example, including the request body that Cognito withholds from AWS WAF at a hosted domain.
 

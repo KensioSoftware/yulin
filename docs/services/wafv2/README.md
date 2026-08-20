@@ -7,8 +7,8 @@ and without a distribution in front of anything.
 
 A web ACL can also go in front of what serves the requests. A simulated API Gateway REST API stage
 and a simulated Cognito user pool each take one through `AssociateWebACL`, and a simulated
-CloudFront distribution takes one through its own `WebACLId`. Every request they serve is then put
-through the web ACL's rules.
+CloudFront distribution takes one through its own `WebACLId`. The requests that stage, pool or
+distribution serves are then put through the web ACL's rules.
 
 WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
 
@@ -605,12 +605,14 @@ what it would have protected.
 ARN. That ARN takes the form `arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>`, and
 `SimCognitoIdentityProvider.userPool(id).arn.value` is where to read it from.
 
-Every request the pool answers over HTTP then goes through the web ACL before the endpoint behind it
-runs. That covers the hosted domain (the authorize and token endpoints, `/logout`, and the managed
-login pages at `/signup`, `/confirm`, `/forgotPassword` and `/confirmForgotPassword`) along with the
-two documents the pool publishes at `/<pool-id>/.well-known/jwks.json` and
-`/<pool-id>/.well-known/openid-configuration`. A blocked request gets 403 with WAF's body. A blocked
-sign-up creates no user and records no message.
+The pool's endpoints then go through the web ACL before the one a request named runs. Those are the
+hosted domain (the authorize and token endpoints, `/logout`, and the managed login pages at
+`/signup`, `/confirm`, `/forgotPassword` and `/confirmForgotPassword`) and the two documents the
+pool publishes at `/<pool-id>/.well-known/jwks.json` and
+`/<pool-id>/.well-known/openid-configuration`. The `/<pool-id>/messages` listing is Yulin's own and
+sits outside the web ACL, as [below](#the-request-body-is-withheld-at-a-hosted-domain) says. A
+blocked request gets 403 with WAF's body, whatever method it used. A blocked sign-up creates no user
+and records no message.
 
 The pages are usually the point. `/signup`, `/confirm` and `/forgotPassword` are the ones that
 create an account or send an email, and a real web ACL on a user pool is usually written for them.
@@ -747,9 +749,9 @@ reach Yulin as SDK Commands and carry no HTTP request for a rule to read. No web
 for them at all. A test covering an API operation should reach for
 [`evaluateRequest`](#deciding-what-happens-to-a-request) with a request of its own.
 
-Two more paths are outside what the web ACL sees. `/<pool-id>/messages` is Yulin's own listing of
-the messages a pool would have sent, and real Cognito has no such endpoint. Managed login branding
-and its assets are outside the simulation.
+Two paths are outside what the web ACL sees. `/<pool-id>/messages` is Yulin's own listing of the
+messages a pool would have sent, and real Cognito has no such endpoint. Managed login branding and
+its assets are outside the simulation.
 
 ## Protecting a CloudFront distribution
 
