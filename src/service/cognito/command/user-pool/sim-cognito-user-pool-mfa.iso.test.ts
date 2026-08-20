@@ -310,26 +310,6 @@ describe("sim Cognito user pool MFA configuration", () => {
     assertStringIncludes(email.message, "EmailConfiguration");
   });
 
-  it("refuses a passkey, which no flow here would ask for", async () => {
-    // Given a pool. A passkey is presented through the USER_AUTH flow, which
-    // this simulation refuses as a flow of its own.
-    const { cognito, userPoolId } = await poolWithMfa();
-
-    // When the pool is configured for one.
-    const error = await assertThrowsErrorAsync(async () => {
-      await cognito.setUserPoolMfaConfig(
-        new SetUserPoolMfaConfigCommand({
-          UserPoolId: userPoolId,
-          MfaConfiguration: "OPTIONAL",
-          WebAuthnConfiguration: { RelyingPartyId: "example.com" },
-        }),
-      );
-    });
-
-    // Then it is refused rather than accepted and never asked for.
-    assertStringIncludes(error.message, "signing in with a passkey");
-  });
-
   it("refuses a request naming no pool", async () => {
     // Given simulated Cognito.
     const cognito = new SimAws().cognitoIdentityProvider();

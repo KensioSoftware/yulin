@@ -3,6 +3,10 @@ import {
   simCognitoLongestSmsMessage,
 } from "../message/sim-cognito-verification-wording.js";
 import { SimCognitoMfaConfiguration } from "./sim-cognito-mfa-configuration.js";
+import {
+  SimCognitoWebAuthnConfiguration,
+  type SimCognitoWebAuthnConfigurationType,
+} from "./sim-cognito-web-authn-configuration.js";
 
 /**
  * Whether a pool offers a time-based one-time password as a second factor.
@@ -40,6 +44,19 @@ export interface SimCognitoUserPoolMfaType {
     | SimCognitoSoftwareTokenMfaConfigType
     | undefined;
   readonly SmsMfaConfiguration?: SimCognitoSmsMfaConfigType | undefined;
+
+  /**
+   * How the pool registers passkeys, which is the relying party ID they are
+   * registered against and whether an authenticator has to check who is
+   * holding it.
+   *
+   * It sits among the MFA settings because that is where real Cognito puts
+   * it, and a passkey with user verification is what counts towards MFA
+   * there. Nothing here presents one.
+   */
+  readonly WebAuthnConfiguration?:
+    | SimCognitoWebAuthnConfigurationType
+    | undefined;
 }
 
 /**
@@ -56,6 +73,22 @@ function softwareTokenIn(
   }
 
   return requested.Enabled ?? false;
+}
+
+/**
+ * How a request asked for passkeys to be registered, and nothing where it
+ * configured them at all.
+ */
+function webAuthnIn(
+  input: SimCognitoUserPoolMfaType,
+): SimCognitoWebAuthnConfiguration | undefined {
+  const requested = input.WebAuthnConfiguration;
+
+  if (requested === undefined) {
+    return undefined;
+  }
+
+  return new SimCognitoWebAuthnConfiguration(requested);
 }
 
 /**
@@ -120,6 +153,12 @@ export class SimCognitoUserPoolMfa {
    */
   #sms: SimCognitoSmsMfaConfigType | undefined;
 
+  /**
+   * How the pool would register a passkey, where a request configured that at
+   * all.
+   */
+  #webAuthn: SimCognitoWebAuthnConfiguration | undefined;
+
   constructor(configuration: SimCognitoMfaConfiguration) {
     this.#configuration = configuration;
   }
@@ -144,6 +183,7 @@ export class SimCognitoUserPoolMfa {
     );
     this.#softwareToken = softwareTokenIn(input);
     this.#sms = smsIn(input);
+    this.#webAuthn = webAuthnIn(input);
   }
 
   /**
@@ -163,6 +203,15 @@ export class SimCognitoUserPoolMfa {
   keepFactorsOf(replaced: SimCognitoUserPoolMfa): void {
     this.#softwareToken = replaced.#softwareToken;
     this.#sms = replaced.#sms;
+    this.#webAuthn = replaced.#webAuthn;
+  }
+
+  /**
+   * How the pool registers passkeys, where a `SetUserPoolMfaConfig` request
+   * said. A pool no such request has reached has no answer to give.
+   */
+  get webAuthn(): SimCognitoWebAuthnConfiguration | undefined {
+    return this.#webAuthn;
   }
 
   /**
@@ -175,6 +224,9 @@ export class SimCognitoUserPoolMfa {
         SoftwareTokenMfaConfiguration: { Enabled: this.#softwareToken },
       }),
       ...(this.#sms !== undefined && { SmsMfaConfiguration: this.#sms }),
+      ...(this.#webAuthn !== undefined && {
+        WebAuthnConfiguration: this.#webAuthn.toOutput(),
+      }),
     };
   }
 }

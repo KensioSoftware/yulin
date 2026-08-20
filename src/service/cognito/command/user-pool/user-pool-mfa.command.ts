@@ -12,15 +12,15 @@ import type { SimCognitoUserPoolMfaType } from "../../user-pool/mfa/sim-cognito-
  * message is delivered here, so the IAM role that would send one is never
  * assumed.
  *
- * `WebAuthnConfiguration` is refused because a passkey is presented through
- * the `USER_AUTH` flow, which this simulation refuses as a flow of its own.
+ * `WebAuthnConfiguration` is read and recorded. Nothing here registers or
+ * presents a passkey, and the refusal for that is on the `USER_AUTH` flow
+ * rather than on the pool's configuration.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/SetUserPoolMfaConfigCommand/
  */
 export interface SimSetUserPoolMfaConfigCommandInput extends SimCognitoUserPoolMfaType {
   readonly UserPoolId?: string | undefined;
   readonly EmailMfaConfiguration?: object | undefined;
-  readonly WebAuthnConfiguration?: object | undefined;
 }
 
 /**

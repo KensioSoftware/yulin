@@ -21,6 +21,10 @@ export class SimCognitoUserPoolView {
    * `LambdaConfig` is reported only by a pool that was created with one, and
    * carries the triggers that pool runs.
    *
+   * `Policies` carries the pool's `SignInPolicy` only where it was created
+   * with one, as real Cognito reports it. A pool that named no policy signs
+   * its users in with a password.
+   *
    * `MfaConfiguration` is what the pool was asked for, and no pool here
    * challenges for a second factor whatever it says. Which factors a pool
    * offers is not reported here on real Cognito either:
@@ -42,12 +46,17 @@ export class SimCognitoUserPoolView {
    * it is what decides whether `SignUp` is allowed at all.
    */
   describe(pool: SimCognitoUserPool): SimCognitoUserPoolType {
+    const signInPolicy = pool.settings.signInPolicy.toOutput();
+
     return {
       Id: pool.id,
       Name: pool.name,
       Arn: pool.arn.value,
       AccountRecoverySetting: pool.settings.accountRecovery.toOutput(),
-      Policies: { PasswordPolicy: pool.settings.passwordPolicy.toOutput() },
+      Policies: {
+        PasswordPolicy: pool.settings.passwordPolicy.toOutput(),
+        ...(signInPolicy !== undefined && { SignInPolicy: signInPolicy }),
+      },
       DeletionProtection: pool.settings.deletionProtection.value,
       LambdaConfig: pool.settings.lambdaConfig.toOutput(),
       MfaConfiguration: pool.settings.mfa.configuration.value,
