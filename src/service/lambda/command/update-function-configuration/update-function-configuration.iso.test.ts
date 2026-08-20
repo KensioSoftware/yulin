@@ -14,6 +14,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { BackgroundTasks } from "../../../../util/background/background.js";
+import { SimFixedClock } from "../../../../util/clock/sim-clock.js";
 import {
   SimLambdaInvalidParameterValueException,
   SimLambdaResourceNotFoundException,
@@ -101,8 +103,13 @@ describe("Lambda UpdateFunctionConfigurationCommand", () => {
   });
 
   it("runs the next invocation under the new timeout and memory", async () => {
-    // Given a function whose handler reports what its context says.
-    const simLambda = new SimLambda();
+    // Given a function whose handler reports what its context says, on a
+    // simulation whose time is stopped so the remaining budget cannot drain
+    // between the invocation starting and the handler reading it.
+    const instant = new Date("2026-08-12T09:30:00.000Z");
+    const simLambda = new SimLambda({
+      background: new BackgroundTasks({ clock: new SimFixedClock(instant) }),
+    });
     await simLambda.createFunction(
       new CreateFunctionCommand({
         FunctionName: "orders",

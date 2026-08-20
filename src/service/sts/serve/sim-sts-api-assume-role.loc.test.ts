@@ -108,9 +108,11 @@ describe("Assuming a Role over the STS endpoint", () => {
   });
 
   it("expires the session on simulated time rather than on the host clock", async () => {
-    // Given a simulation whose clock has been moved days away from this machine's
+    // Given a simulation whose clock has been moved days away from this
+    // machine's, and stopped there so the expiry can be named exactly
     await createRole("Weekly", userArn);
     await simAws.clock().advanceBy({ days: 3 });
+    simAws.clock().freeze();
 
     // When a fifteen minute session is assumed over the endpoint
     const assumed = await client.send(
