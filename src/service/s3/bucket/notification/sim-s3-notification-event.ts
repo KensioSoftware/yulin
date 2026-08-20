@@ -13,6 +13,7 @@ import { SIM_S3_UNSIMULATED_NOTIFICATION_EVENTS } from "./sim-s3-unsimulated-not
  */
 export const SIM_S3_NOTIFICATION_EVENTS = [
   "s3:ObjectCreated:Put",
+  "s3:ObjectCreated:Copy",
   "s3:ObjectCreated:CompleteMultipartUpload",
   "s3:ObjectRemoved:Delete",
 ] as const;
@@ -35,9 +36,14 @@ export type SimS3NotificationEvent =
 const eventExpansions = new Map<string, readonly SimS3NotificationEvent[]>([
   [
     "s3:ObjectCreated:*",
-    ["s3:ObjectCreated:Put", "s3:ObjectCreated:CompleteMultipartUpload"],
+    [
+      "s3:ObjectCreated:Put",
+      "s3:ObjectCreated:Copy",
+      "s3:ObjectCreated:CompleteMultipartUpload",
+    ],
   ],
   ["s3:ObjectCreated:Put", ["s3:ObjectCreated:Put"]],
+  ["s3:ObjectCreated:Copy", ["s3:ObjectCreated:Copy"]],
   [
     "s3:ObjectCreated:CompleteMultipartUpload",
     ["s3:ObjectCreated:CompleteMultipartUpload"],

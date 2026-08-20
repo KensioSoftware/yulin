@@ -1,3 +1,4 @@
+import { CopyObjectCommandHandler } from "../copy-object/copy-object.handler.js";
 import { DeleteObjectCommandHandler } from "../delete-object/delete-object.handler.js";
 import { DeleteObjectsCommandHandler } from "../delete-objects/delete-objects.handler.js";
 import { GetObjectCommandHandler } from "../get-object/get-object.handler.js";
@@ -34,6 +35,19 @@ export class SimS3ObjectCommands {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimPutObjectCommandOutput> {
     return await new PutObjectCommandHandler(this.state).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Copy an Object to another key, in this Bucket or another one.
+   */
+  async copy(
+    command: simS3Commands.SimCopyObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimCopyObjectCommandOutput> {
+    return await new CopyObjectCommandHandler(this.state).handle(
       command,
       options,
     );

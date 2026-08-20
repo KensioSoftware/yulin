@@ -135,7 +135,7 @@ describe("What a simulated S3 notification destination refuses", () => {
           NotificationConfiguration: {
             LambdaFunctionConfigurations: [
               {
-                Events: ["s3:ObjectCreated:Copy"],
+                Events: ["s3:ObjectCreated:Post"],
                 LambdaFunctionArn: thumbnailerArn,
               },
             ],
@@ -147,7 +147,7 @@ describe("What a simulated S3 notification destination refuses", () => {
     // Then it is refused as unsimulated rather than accepted and never
     // delivered
     assertIdentical(error.name, "NotImplemented");
-    assertStringIncludes(error.message, "s3:ObjectCreated:Copy");
+    assertStringIncludes(error.message, "s3:ObjectCreated:Post");
   });
 
   it("refuses an event type S3 does not have", async () => {

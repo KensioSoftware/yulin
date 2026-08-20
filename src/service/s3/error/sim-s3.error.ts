@@ -236,3 +236,18 @@ export class SimS3InvalidRange extends SimS3Error {
     super(message, { httpStatusCode: 416 });
   }
 }
+
+/**
+ * Simulated S3 InvalidRequest error.
+ *
+ * A request real S3 understands and refuses to carry out. A CopyObject naming
+ * the same Object as its source and its destination, with nothing about the
+ * Object being changed, is the one sim S3 raises it for.
+ */
+export class SimS3InvalidRequest extends SimS3Error {
+  public override readonly name = "InvalidRequest";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

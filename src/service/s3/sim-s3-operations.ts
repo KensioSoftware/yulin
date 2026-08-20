@@ -36,6 +36,14 @@ export abstract class SimS3Operations {
     return await this.commands.objects.head(command, options);
   }
 
+  /** Handle a Copy Object Command from the SDK. */
+  async copyObject(
+    command: simS3Commands.SimCopyObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimCopyObjectCommandOutput> {
+    return await this.commands.objects.copy(command, options);
+  }
+
   /** Handle a Delete Bucket Command from the SDK. */
   async deleteBucket(
     command: simS3Commands.SimDeleteBucketCommand,

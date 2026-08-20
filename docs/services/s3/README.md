@@ -586,8 +586,8 @@ A completed upload raises `s3:ObjectCreated:CompleteMultipartUpload`. A single-r
 
 ### Limitations
 
-- `UploadPartCopy` is left out. It copies a byte range from another Object, and `CopyObject` is left
-  out too.
+- `UploadPartCopy` is left out. It copies a byte range from another Object into an upload.
+  `CopyObject` copies a whole Object, and is simulated. See [Copying Objects](#copying-objects).
 - Parts are held in memory, whatever storage the Bucket uses. A Bucket backed by a mounted directory
   writes whole files and has nowhere to put half of one.
 - Real S3 requires every part except the last to be at least five megabytes, and answers
@@ -672,6 +672,94 @@ Both the S3 REST endpoint and an endpoint URL a client is pointed at answer the 
   tag or the date the client held.
 - `PartNumber` is left out. A read names the bytes it wants, and the part they were uploaded in is
   not something it can ask for.
+
+## Copying Objects
+
+`CopyObjectCommand` reads one Object and writes its bytes under another key, in the same Bucket or
+in another one. A move and a rename are both a copy followed by a `DeleteObjectCommand`, and an
+archive is a copy on its own.
+
+`CopySource` names the source as `sourceBucket/sourceKey`, URL-encoded, and a leading slash on it is
+accepted. Everything after the first slash is the key. A key with slashes of its own needs nothing
+done to it.
+
+```typescript sim-s3-copy-object
+/**
+ * Copying an Object between simulated S3 Buckets.
+ */
+
+import {
+  CopyObjectCommand,
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "inbox-bucket" }));
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "archive-bucket" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "inbox-bucket",
+    Key: "report.pdf",
+    Body: "quarterly figures",
+    ContentType: "application/pdf",
+  }),
+);
+
+const copy = await simS3.copyObject(
+  new CopyObjectCommand({
+    Bucket: "archive-bucket",
+    Key: "2026/report.pdf",
+    CopySource: "inbox-bucket/report.pdf",
+  }),
+);
+
+console.log(copy.CopyObjectResult?.ETag);
+console.log(copy.CopyObjectResult?.LastModified);
+
+// The copy carries the source's content type, because MetadataDirective
+// defaults to COPY. Deleting the source turns the copy into a move.
+await simS3.deleteObject(
+  new DeleteObjectCommand({ Bucket: "inbox-bucket", Key: "report.pdf" }),
+);
+```
+
+A copy authorizes as two decisions. `s3:GetObject` on the source Object and `s3:PutObject` on the
+destination Object, each against its own Bucket policy. A caller holding one and not the other gets
+`AccessDenied`.
+
+`MetadataDirective` says where the copy's metadata comes from. The default, `COPY`, carries the
+source's content type, cache control and user metadata across. `REPLACE` takes all of it from the
+request and leaves the source's behind. A copy of an Object onto itself under `REPLACE` is how an
+Object's metadata gets corrected without uploading its bytes again.
+
+The destination Bucket raises `s3:ObjectCreated:Copy`, and `s3:ObjectCreated:*` covers it. See
+[Event notifications](#event-notifications).
+
+Copying an Object onto itself without `REPLACE` is refused with `InvalidRequest`, as real S3 refuses
+it. The copy would leave the Object exactly as it found it.
+
+### Limitations
+
+- `UploadPartCopy` is left out. An Object cannot be copied into a multipart upload.
+- Both Buckets have to belong to the same simulated S3. A copy across Accounts or Regions is left
+  out.
+- The S3 REST endpoint does not serve a copy yet, which leaves `aws s3 mv` and
+  `aws s3 cp s3://a/k s3://b/k` unable to reach a served simulation.
+- `CopySourceIfMatch`, `CopySourceIfNoneMatch`, `CopySourceIfModifiedSince` and
+  `CopySourceIfUnmodifiedSince` are ignored. A conditional copy happens whatever the condition
+  says.
+- `TaggingDirective`, `StorageClass`, `ACL` and the server-side encryption members are ignored. Sim
+  S3 models none of what they describe.
+- A `versionId` in `CopySource` is refused with `NotImplemented`.
+- A copy of an Object that was uploaded in parts gets a plain ETag rather than the multipart form.
+  Real S3 does the same for a copy under five gigabytes, because it rewrites the bytes as one
+  part.
 
 ## Deleting Objects
 
@@ -1540,11 +1628,11 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 - A destination goes where the group it was declared in says, and its ARN has no say. A queue ARN
   under `LambdaFunctionConfigurations` is refused for failing to be a function ARN, and never
   delivered to as a queue.
-- Three event types are raised: `s3:ObjectCreated:Put`,
-  `s3:ObjectCreated:CompleteMultipartUpload` and `s3:ObjectRemoved:Delete`. `Copy`, `Post`,
+- Four event types are raised: `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`,
+  `s3:ObjectCreated:CompleteMultipartUpload` and `s3:ObjectRemoved:Delete`. `Post`,
   `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`, `LifecycleExpiration:*` and
   `ObjectTagging:*` families, `LifecycleTransition`, `IntelligentTiering`, `ObjectAcl:Put` and
-  `ReducedRedundancyLostObject` are refused by name. `s3:ObjectCreated:*` expands to the two
+  `ReducedRedundancyLostObject` are refused by name. `s3:ObjectCreated:*` expands to the three
   creations and `s3:ObjectRemoved:*` to the one removal.
 - `userIdentity.principalId` carries the caller's ARN rather than the `AIDA...` unique id real S3
   puts there. Simulated IAM has no unique-id namespace to draw one from, and an ARN is what a test
@@ -2651,6 +2739,8 @@ Sim S3 currently supports:
   and `@aws-sdk/lib-storage` can upload a file of real size
 - `Range` on `GetObjectCommand`, answering with the bytes asked for and `206 Partial Content` over a
   served endpoint, so `aws s3 cp` downloads a file of real size unchanged
+- `CopyObjectCommand`, authorized as a read of the source and a write of the destination, with a
+  `MetadataDirective` deciding which metadata the copy carries
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS

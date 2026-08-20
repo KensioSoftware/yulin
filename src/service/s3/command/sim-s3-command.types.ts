@@ -20,6 +20,12 @@ export type {
   SimCreateBucketCommandOutput,
 } from "./create-bucket/create-bucket.command.js";
 export type {
+  SimCopyObjectCommand,
+  SimCopyObjectCommandInput,
+  SimCopyObjectCommandOutput,
+  SimCopyObjectResult,
+} from "./copy-object/copy-object.command.js";
+export type {
   SimDeleteBucketCommand,
   SimDeleteBucketCommandOutput,
 } from "./delete-bucket/delete-bucket.command.js";
