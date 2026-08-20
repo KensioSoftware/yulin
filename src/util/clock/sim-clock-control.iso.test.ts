@@ -158,6 +158,31 @@ describe("SimClockControl", () => {
     expect(background.dueTaskCount).toBe(0);
   });
 
+  it("crosses a long interval without waiting on a real timer per turn", async () => {
+    // Given work that takes a turn every simulated minute
+    const { control, background } = simulatedTime();
+    let turns = 0;
+    const everyMinute = async (): Promise<void> => {
+      turns += 1;
+      background.scheduleAt(
+        new Date(control.now().getTime() + 60_000),
+        everyMinute,
+      );
+
+      await Promise.resolve();
+    };
+    background.scheduleAt(new Date(start.getTime() + 60_000), everyMinute);
+
+    // When simulated time is advanced by a week
+    const realBefore = Date.now();
+    await control.advanceBy({ days: 7 });
+
+    // Then it took every one of its turns, in less host time than one real
+    // timer apiece would have cost
+    expect(turns).toBe(7 * 24 * 60);
+    expect(Date.now() - realBefore).toBeLessThan(5000);
+  });
+
   it("runs overdue work without dragging simulated time backwards", async () => {
     // Given work whose due time has already passed
     const { control, background } = simulatedTime();

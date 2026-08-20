@@ -122,13 +122,23 @@ export class SimClockControl implements SimClock {
    * draining does generally: a task that endlessly reschedules itself inside
    * the interval is asking for endless work, and cutting it off part way would
    * report a settled simulation that is nothing of the kind.
+   *
+   * Each due task is run here rather than handed to the scheduler's `schedule`.
+   * That defers by a real timer, and Node holds a zero millisecond `setTimeout`
+   * for about a millisecond. Every instant the interval steps through would
+   * then cost a millisecond of host time, and thirty simulated days over an
+   * alarm evaluating every five minutes steps through 8,640 of them. The timer
+   * buys nothing here, because the loop waits for each task to finish before it
+   * takes the next one.
    */
   private async runDueTasksUpTo(instant: Date): Promise<void> {
     let due = this.background.takeNextDueBy(instant);
 
     while (due !== undefined) {
       this.clock.setTo(this.laterOfNow(due.dueTime));
-      this.background.schedule(due.task);
+
+      // oxlint-disable-next-line no-await-in-loop
+      await due.task();
 
       // oxlint-disable-next-line no-await-in-loop
       await this.background.complete();
