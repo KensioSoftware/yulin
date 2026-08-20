@@ -27,6 +27,24 @@ function requestForTarget(target: string): SimSdkWireRequest {
   return requestWithHeaders(Object.fromEntries([["x-amz-target", target]]));
 }
 
+function requestSignedWith(credential: string): SimSdkWireRequest {
+  return requestWithHeaders(
+    Object.fromEntries([
+      [
+        "authorization",
+        `AWS4-HMAC-SHA256 Credential=${credential}, ` +
+          "SignedHeaders=host;x-amz-date, Signature=abc123",
+      ],
+    ]),
+  );
+}
+
+function presignedPathFor(credential: string): string {
+  return `/reports/q3/report.pdf?X-Amz-Credential=${encodeURIComponent(
+    credential,
+  )}`;
+}
+
 describe("simulated AWS SDK wire operation", () => {
   it("reads the service and Command a JSON protocol request names", () => {
     // Given a request as an AWS JSON protocol service is sent.
@@ -137,5 +155,37 @@ describe("simulated AWS SDK wire operation", () => {
         "/reports?X-Amz-Credential=AKIA%2Feu-west-2",
       ),
     );
+  });
+
+  it("reads nothing from a scope naming no Region or no service", () => {
+    // Given signatures whose scope leaves the Region or the service empty,
+    // saying nothing about where the request should go.
+    const emptyRegion = requestSignedWith("ASIA/20260817//sqs/aws4_request");
+    const emptyService = requestSignedWith(
+      "ASIA/20260817/us-east-1//aws4_request",
+    );
+
+    // Then none of them routes anywhere, in either form.
+    assertUndefined(readSimSdkWireCredentialScope(emptyRegion));
+    assertUndefined(readSimSdkWireCredentialScope(emptyService));
+    assertUndefined(
+      readSimSdkWirePresignedCredentialScope(
+        presignedPathFor("ASIA/20260817//s3/aws4_request"),
+      ),
+    );
+  });
+
+  it("routes a scope whose shape simulated IAM will refuse", () => {
+    // Given a signature scoped to a real Region and service, and terminated
+    // with something SigV4 never writes.
+    // When it is read for routing.
+    const scope = readSimSdkWirePresignedCredentialScope(
+      presignedPathFor("ASIA/20260817/eu-west-2/s3/not_aws4_request"),
+    );
+
+    // Then it still says which service to route to. Refusing it is signature
+    // verification's to do, and that names what was wrong with it.
+    assertNonNullable(scope);
+    assertIdentical(scope.signingName, "s3");
   });
 });

@@ -165,15 +165,20 @@ export function readSimSdkWirePresignedCredentialScope(
  * Read the Region and the signing name out of a credential scope value.
  *
  * The scope is `<date>/<region>/<signing name>/aws4_request` wherever it is
- * written. Anything of another shape yields nothing, since this answers a
- * routing question and a request that fails to say where it is going is one to
- * decline rather than one to fail.
+ * written. A value naming neither yields nothing, since a request that fails
+ * to say where it is going is one to decline.
+ *
+ * The rest of the shape goes unchecked here. Simulated IAM parses the same
+ * value again to verify the signature, and refuses a bad date or a missing
+ * `aws4_request` terminator by name. Refusing it here instead would answer a
+ * malformed signature with a 501 naming a hostname, which says nothing about
+ * what was actually wrong with it.
  */
 function simSdkWireCredentialScope(
   scope: string | undefined,
 ): SimSdkWireCredentialScope | undefined {
-  const [, regionName, signingName] = scope?.split("/") ?? [];
-  if (regionName === undefined || signingName === undefined) {
+  const [, regionName = "", signingName = ""] = scope?.split("/") ?? [];
+  if (regionName.length === 0 || signingName.length === 0) {
     return undefined;
   }
 

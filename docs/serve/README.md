@@ -413,7 +413,7 @@ The operations served are the ones simulated S3 implements: `CreateBucket`, `Del
 
 Simulated S3 also answers its own Bucket hostnames, covered above. That path is unchanged, and it is what a website visitor uses.
 
-A presigned URL reaches an Object either way. `getSignedUrl` signs for whatever endpoint its client was configured with, and a URL signed for this one states its credential scope in an `X-Amz-Credential` parameter. The endpoint reads the scope from there for a request carrying no `Authorization` header, which is every presigned URL. Set `forcePathStyle` on the presigning client for the same reason an ordinary request needs it.
+A presigned URL reaches an Object either way. `getSignedUrl` signs for whatever endpoint its client was configured with, and a URL signed for this one states its credential scope in an `X-Amz-Credential` parameter. The endpoint reads the scope from there whenever a URL states one, since a presigned URL carries no `Authorization` header of its own. Set `forcePathStyle` on the presigning client for the same reason an ordinary request needs it.
 
 ### SNS over the endpoint
 

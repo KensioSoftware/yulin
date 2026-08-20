@@ -59,6 +59,33 @@ describe("Presigned simulated S3 URLs", () => {
     assertIdentical(await response.text(), presignObjectBody);
   });
 
+  it("serves a presigned URL fetched with an application bearer token", async () => {
+    // Given a presigned URL signed for an endpoint URL
+    const { http, credentials } = await presignSimulation();
+    const url = await getSignedUrl(
+      presignClient({
+        endpoint: "http://localhost:4566",
+        credentials,
+        forcePathStyle: true,
+      }),
+      new GetObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When it is fetched by a client that sends an Authorization header of its
+    // own, which is the application's business and not a signature
+    const response = await http.fetch(url, {
+      headers: { authorization: "Bearer an-application-token" },
+    });
+
+    // Then the URL is still routed and verified by the signature it carries
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), presignObjectBody);
+  });
+
   it("stores an upload made to an endpoint URL through a presigned PUT", async () => {
     // Given a presigned PUT URL signed for an endpoint URL
     const { http, simAws, credentials } = await presignSimulation();
