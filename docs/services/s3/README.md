@@ -2101,6 +2101,11 @@ npm install --save-dev @aws-sdk/s3-request-presigner
 `getBucketUrl(...)` for the virtual-hosted endpoint of one Bucket, though a client adds the Bucket
 to the service endpoint for itself.
 
+A client pointed at an endpoint URL presigns too, the `http://localhost:<port>` form that
+`--endpoint-url` and `AWS_ENDPOINT_URL` take. Such a URL names no service in its hostname and is
+routed by the credential scope it carries, so sign it with `forcePathStyle` and the Bucket goes in
+the path. See [S3 over the endpoint](../../serve/README.md#s3-over-the-endpoint).
+
 ```typescript sim-s3-presigned-url
 /**
  * Downloading a simulated S3 Object through a presigned URL.

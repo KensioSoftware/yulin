@@ -115,7 +115,64 @@ export function readSimSdkWireCredentialScope(
     authorization ?? "",
   )?.groups?.["scope"];
 
-  const [, regionName, signingName] = credential?.split("/") ?? [];
+  return simSdkWireCredentialScope(credential);
+}
+
+/**
+ * The query parameter a presigned URL states its credential in, lower-cased.
+ *
+ * Signers emit the `X-Amz-` spelling. Names are compared without regard to
+ * case, matching how the signature verifier reads the same parameter.
+ */
+const presignedCredentialParameter = "x-amz-credential";
+
+/**
+ * Read the credential scope a presigned URL states in its query string.
+ *
+ * A presigned URL is fetched by whatever holds it, over plain HTTP and with no
+ * Authorization header to read. It states the same access key and scope in
+ * `X-Amz-Credential`, and that parameter is the only place such a request says
+ * which service and Region it was signed for.
+ *
+ * This is separate from the header form because the two answer different
+ * questions. A request carrying an Authorization header came from an AWS SDK.
+ * A presigned URL came from anything that can make an HTTP request, so a
+ * caller asking whether it holds a serialized Command wants the header form
+ * alone.
+ */
+export function readSimSdkWirePresignedCredentialScope(
+  path: string,
+): SimSdkWireCredentialScope | undefined {
+  const query = path.indexOf("?");
+  if (query === -1) {
+    return undefined;
+  }
+
+  const parameters = new URLSearchParams(path.slice(query + 1));
+
+  for (const [name, value] of parameters) {
+    if (name.toLowerCase() === presignedCredentialParameter) {
+      // The value is `<access key id>/<scope>`, as an Authorization header
+      // writes it.
+      return simSdkWireCredentialScope(value.slice(value.indexOf("/") + 1));
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Read the Region and the signing name out of a credential scope value.
+ *
+ * The scope is `<date>/<region>/<signing name>/aws4_request` wherever it is
+ * written. Anything of another shape yields nothing, since this answers a
+ * routing question and a request that fails to say where it is going is one to
+ * decline rather than one to fail.
+ */
+function simSdkWireCredentialScope(
+  scope: string | undefined,
+): SimSdkWireCredentialScope | undefined {
+  const [, regionName, signingName] = scope?.split("/") ?? [];
   if (regionName === undefined || signingName === undefined) {
     return undefined;
   }
