@@ -123,6 +123,9 @@ export class SimAwsAccountRegionServiceBuilder {
       userPoolRegistry: this.registries.cognito,
       domainRegistry: this.registries.cognitoDomains,
       triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
+      // A web ACL protecting a pool is in the same Account and Region as the
+      // pool, as it is on AWS, so this scope's own WAFv2 is the one to ask.
+      webAcls: scope.wafV2().protection(),
     });
   }
 

@@ -11,6 +11,7 @@ import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognit
 import { SimCognitoUserPoolTriggers } from "../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
 import type { SimCognitoDomainRegistry } from "../registry/sim-cognito-domain-registry.js";
+import type { SimWafProtection } from "../../wafv2/association/sim-waf-protection.js";
 import { SimCognitoTokenIssuer } from "../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoAuthCommands } from "./auth/sim-cognito-auth-commands.js";
 import { SimCognitoDomainCommands } from "./domain/sim-cognito-domain-commands.js";
@@ -42,6 +43,7 @@ interface SimCognitoCommandsProperties {
   readonly pools: SimCognitoUserPoolStore;
   readonly domains: SimCognitoDomainRegistry;
   readonly triggerFunctions: SimCognitoTriggerFunctions;
+  readonly webAcls: SimWafProtection;
 }
 
 /**
@@ -77,9 +79,19 @@ export class SimCognitoCommands {
    */
   public readonly registrations: SimCognitoRegistrations;
 
+  /**
+   * The web ACLs in front of this scope's pools. Held here because a request
+   * to a hosted domain reaches it without a Command, the way a fronting
+   * service reaches AWS WAF.
+   */
+  public readonly webAcls: SimWafProtection;
+
   constructor(properties: SimCognitoCommandsProperties) {
     const { accountRegionScope, iam, clock, pools, domains, triggerFunctions } =
       properties;
+
+    this.webAcls = properties.webAcls;
+
     const authorizer = new SimCognitoAuthorizer({ iam, accountRegionScope });
     const resolver = new SimCognitoRequestResolver({ pools, authorizer });
     const authResolver = new SimCognitoAuthResolver({ resolver, pools });
@@ -112,6 +124,7 @@ export class SimCognitoCommands {
       pools,
       poolFactory,
       authorizer,
+      webAcls: properties.webAcls,
     });
     this.userPoolMfa = new SimCognitoUserPoolMfaCommands({ pools, authorizer });
     this.listUserPools = new SimCognitoListUserPools({ pools, authorizer });

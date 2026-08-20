@@ -3,26 +3,47 @@ import {
   SimWafUnsimulatedInputException,
 } from "../error/sim-wafv2.error.js";
 import { SimWafRestApiStage } from "./sim-waf-rest-api-stage.js";
+import { SimWafUserPool } from "./sim-waf-user-pool.js";
 
 /**
  * A resource a `REGIONAL` web ACL can be put in front of.
  *
- * One type is simulated so far. A second one joins this union and the reader
- * below gains a branch for it, and everything that holds an association goes
- * on addressing a resource by its ARN.
+ * Two types are simulated. A third one joins this union and the reader below
+ * gains a branch for it, and everything that holds an association goes on
+ * addressing a resource by its ARN.
  */
-export type SimWafProtectedResource = SimWafRestApiStage;
+export type SimWafProtectedResource = SimWafRestApiStage | SimWafUserPool;
 
 /**
- * The type ListResourcesForWebACL lists a simulated resource under.
+ * The type ListResourcesForWebACL lists one simulated resource under.
+ */
+export type SimWafProtectedResourceType =
+  SimWafProtectedResource["resourceType"];
+
+/**
+ * The type ListResourcesForWebACL lists a simulated REST API stage under.
  */
 export const simWafApiGatewayResourceType = "API_GATEWAY";
+
+/**
+ * The type ListResourcesForWebACL lists a simulated user pool under.
+ */
+export const simWafUserPoolResourceType = "COGNITO_USER_POOL";
+
+/**
+ * The resource types this simulation holds, as a refusal names them.
+ */
+export const simWafProtectedResourceTypes: readonly SimWafProtectedResourceType[] =
+  [simWafApiGatewayResourceType, simWafUserPoolResourceType];
 
 const restApiStagePattern =
   /^arn:aws:apigateway:(?<regionName>[^:]+)::\/restapis\/(?<restApiId>[^/]+)\/stages\/(?<stageName>[^/]+)$/u;
 
 const httpApiStagePattern =
   /^arn:aws:apigateway:[^:]+::\/apis\/[^/]+\/stages\/[^/]+$/u;
+
+const userPoolPattern =
+  /^arn:aws:cognito-idp:(?<regionName>[^:]+):(?<accountId>[^:]+):userpool\/(?<userPoolId>[^/]+)$/u;
 
 /**
  * The resource types real WAF protects that this simulation does not, by the
@@ -31,7 +52,6 @@ const httpApiStagePattern =
 const unsimulatedResources = new Map<string, string>([
   ["elasticloadbalancing", "an Application Load Balancer"],
   ["appsync", "an AppSync GraphQL API"],
-  ["cognito-idp", "a Cognito user pool"],
   ["apprunner", "an App Runner service"],
   ["amplify", "an Amplify app"],
   ["ec2", "a Verified Access instance"],
@@ -48,15 +68,16 @@ const unsimulatedResources = new Map<string, string>([
  * the ordinary unsimulated refusal. Anything else is not a resource ARN.
  */
 export function simWafProtectedResource(arn: string): SimWafProtectedResource {
-  const { groups } = restApiStagePattern.exec(arn) ?? {};
+  const stage = restApiStage(arn);
 
-  if (groups !== undefined) {
-    return new SimWafRestApiStage({
-      arn,
-      regionName: groups["regionName"] ?? "",
-      restApiId: groups["restApiId"] ?? "",
-      stageName: groups["stageName"] ?? "",
-    });
+  if (stage !== undefined) {
+    return stage;
+  }
+
+  const userPool = simWafUserPool(arn);
+
+  if (userPool !== undefined) {
+    return userPool;
   }
 
   if (httpApiStagePattern.test(arn)) {
@@ -74,6 +95,42 @@ export function simWafProtectedResource(arn: string): SimWafProtectedResource {
       `includes other information separated by colons or slashes., ` +
       `field: RESOURCE_ARN, parameter: ${arn}`,
   );
+}
+
+/**
+ * The REST API stage an ARN names, or nothing when it names no stage.
+ */
+function restApiStage(arn: string): SimWafRestApiStage | undefined {
+  const { groups } = restApiStagePattern.exec(arn) ?? {};
+
+  if (groups === undefined) {
+    return undefined;
+  }
+
+  return new SimWafRestApiStage({
+    arn,
+    regionName: groups["regionName"] ?? "",
+    restApiId: groups["restApiId"] ?? "",
+    stageName: groups["stageName"] ?? "",
+  });
+}
+
+/**
+ * The user pool an ARN names, or nothing when it names no pool.
+ */
+function simWafUserPool(arn: string): SimWafUserPool | undefined {
+  const { groups } = userPoolPattern.exec(arn) ?? {};
+
+  if (groups === undefined) {
+    return undefined;
+  }
+
+  return new SimWafUserPool({
+    arn,
+    regionName: groups["regionName"] ?? "",
+    accountId: groups["accountId"] ?? "",
+    userPoolId: groups["userPoolId"] ?? "",
+  });
 }
 
 /**

@@ -6,9 +6,9 @@ can assert that a request to `/admin` is blocked and one to `/` is allowed, with
 and without a distribution in front of anything.
 
 A web ACL can also go in front of what serves the requests. A simulated API Gateway REST API stage
-takes one through `AssociateWebACL`, and a simulated CloudFront distribution takes one through its
-own `WebACLId`. Every request that stage or distribution serves is then put through the web ACL's
-rules. Cognito user pools arrive later.
+and a simulated Cognito user pool each take one through `AssociateWebACL`, and a simulated
+CloudFront distribution takes one through its own `WebACLId`. The requests that stage, pool or
+distribution serves are then put through the web ACL's rules.
 
 WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
 
@@ -598,6 +598,160 @@ An API Gateway HTTP API stage is refused. AWS WAF has no resource type for one, 
 accepted here would let a test cover protection AWS never applies. Application Load Balancer,
 AppSync, App Runner, Amplify and Verified Access resources are refused as unsimulated, each naming
 what it would have protected.
+
+## Protecting a Cognito user pool
+
+`AssociateWebACL` puts a `REGIONAL` web ACL in front of a simulated user pool, named by the pool's
+ARN. That ARN takes the form `arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>`, and
+`SimCognitoIdentityProvider.userPool(id).arn.value` is where to read it from.
+
+The pool's endpoints then go through the web ACL before the one a request named runs. Those are the
+hosted domain (the authorize and token endpoints, `/logout`, and the managed login pages at
+`/signup`, `/confirm`, `/forgotPassword` and `/confirmForgotPassword`) and the two documents the
+pool publishes at `/<pool-id>/.well-known/jwks.json` and
+`/<pool-id>/.well-known/openid-configuration`. The `/<pool-id>/messages` listing is Yulin's own and
+sits outside the web ACL, as [below](#the-request-body-is-withheld-at-a-hosted-domain) says. A
+blocked request gets 403 with WAF's body, whatever method it used. A blocked sign-up creates no user
+and records no message.
+
+The pages are usually the point. `/signup`, `/confirm` and `/forgotPassword` are the ones that
+create an account or send an email, and a real web ACL on a user pool is usually written for them.
+
+```typescript sim-wafv2-cognito-user-pool
+/**
+ * Blocking a request to a pool's hosted domain with a web ACL in front of it.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  CreateUserPoolDomainCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AssociateWebACLCommand,
+  CreateWebACLCommand,
+} from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+const waf = simAws.wafV2();
+
+const created = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = created.UserPool!.Id!;
+
+await cognito.createUserPoolDomain(
+  new CreateUserPoolDomainCommand({
+    UserPoolId: userPoolId,
+    Domain: "myapp-login",
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    AllowedOAuthFlowsUserPoolClient: true,
+    AllowedOAuthFlows: ["code"],
+    AllowedOAuthScopes: ["openid"],
+    CallbackURLs: ["https://www.example.com/user/callback"],
+    SupportedIdentityProviders: ["COGNITO"],
+  }),
+);
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "pool",
+};
+
+const webAcl = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "pool-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "block-scraper",
+        Priority: 0,
+        Action: { Block: {} },
+        Statement: {
+          ByteMatchStatement: {
+            FieldToMatch: { SingleHeader: { Name: "user-agent" } },
+            PositionalConstraint: "CONTAINS",
+            SearchString: Buffer.from("scraper"),
+            TextTransformations: [{ Priority: 0, Type: "NONE" }],
+          },
+        },
+        VisibilityConfig: { ...visibility, MetricName: "block-scraper" },
+      },
+    ],
+  }),
+);
+
+await waf.associateWebAcl(
+  new AssociateWebACLCommand({
+    WebACLArn: webAcl.Summary?.ARN,
+    ResourceArn: cognito.userPool(userPoolId).arn.value,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const parameters = new URLSearchParams({
+  response_type: "code",
+  client_id: appClient.UserPoolClient!.ClientId!,
+  redirect_uri: "https://www.example.com/user/callback",
+  scope: "openid",
+});
+const signInUrl = srv.localUrl(
+  `https://myapp-login.auth.eu-west-2.amazoncognito.com/oauth2/authorize?${parameters.toString()}`,
+);
+
+const blocked = await fetch(signInUrl, {
+  headers: { "user-agent": "scraper/1.0" },
+});
+const allowed = await fetch(signInUrl);
+
+console.log(blocked.status, allowed.status);
+// 403 200
+
+await srv.close();
+```
+
+`DisassociateWebACL` takes the web ACL back off. `GetWebACLForResource` reports the web ACL one pool
+carries, and `ListResourcesForWebACL` reports the pools one web ACL protects under a `ResourceType`
+of `COGNITO_USER_POOL`. Deleting the pool takes the association with it, and a web ACL still in
+front of a pool cannot be deleted.
+
+The web ACL and the pool belong to one Account and Region. A `CLOUDFRONT` scope web ACL is refused,
+because a distribution takes its web ACL from the distribution. A pool in another Account or another
+Region is refused as well.
+
+AWS also refuses a web ACL carrying `AWSManagedRulesATPRuleSet`, and it refuses the whole web ACL
+over the one rule group. Yulin turns that group away earlier, at `CreateWebACL`, along with every
+managed rule group outside the [three that are simulated](#the-aws-managed-rule-groups).
+
+### The request body is withheld at a hosted domain
+
+Cognito sends AWS WAF the headers and the path of a managed login request and none of its body. A
+`ByteMatchStatement`, `RegexMatchStatement` or `SizeConstraintStatement` on `Body` therefore
+inspects an empty field at a hosted domain, however well formed the rule is. Keying a rule on a
+username or a password is out for the same reason. Yulin withholds the body the same way. A rule
+written against it fails here as it fails on AWS.
+
+Real WAF does read the body of a user pool API request such as `SignUp` or `InitiateAuth`. Those
+reach Yulin as SDK Commands and carry no HTTP request for a rule to read. No web ACL is evaluated
+for them at all. A test covering an API operation should reach for
+[`evaluateRequest`](#deciding-what-happens-to-a-request) with a request of its own.
+
+Two paths are outside what the web ACL sees. `/<pool-id>/messages` is Yulin's own listing of the
+messages a pool would have sent, and real Cognito has no such endpoint. Managed login branding and
+its assets are outside the simulation.
 
 ## Protecting a CloudFront distribution
 

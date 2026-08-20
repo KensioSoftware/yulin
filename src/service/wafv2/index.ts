@@ -19,6 +19,9 @@ export {
   simWafApiGatewayResourceType,
   type SimWafProtectedResource,
   simWafProtectedResource,
+  type SimWafProtectedResourceType,
+  simWafProtectedResourceTypes,
+  simWafUserPoolResourceType,
 } from "./association/sim-waf-protected-resource.js";
 export {
   SimWafNoProtectedResources,
@@ -29,7 +32,12 @@ export {
   type SimWafProtectedRequest,
   type SimWafProtection,
 } from "./association/sim-waf-protection.js";
+export {
+  SimWafInspected,
+  SimWafRequestInspection,
+} from "./association/sim-waf-request-inspection.js";
 export { SimWafRestApiStage } from "./association/sim-waf-rest-api-stage.js";
+export { SimWafUserPool } from "./association/sim-waf-user-pool.js";
 export {
   SimWafResource,
   type SimWafResourceSummary,

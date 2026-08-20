@@ -12,8 +12,10 @@ login's own pages and device tracking are not.
 ## Entry points
 
 - `sim-cognito-identity-provider.ts` is the main in-memory service object for one account/region
-  scope. It holds the pool operations, and extends `sim-cognito-app-clients.ts`, which holds the
-  app client ones, and extends `sim-cognito-federation.ts`,
+  scope. It holds the wiring the whole service is built from and the simulator's own accessors, and
+  extends `sim-cognito-user-pools.ts`, which holds the pool operations, and extends
+  `sim-cognito-app-clients.ts`, which holds the app client ones, and extends
+  `sim-cognito-federation.ts`,
   which holds the domain and identity provider ones and the three hosted endpoints, and extends
   `sim-cognito-user-directory.ts`, which holds the user and group ones and extends
   `sim-cognito-user-factors.ts`, which holds the operations a signed-in user performs on itself, and
@@ -460,6 +462,19 @@ caused is answered as any other authorize refusal is.
 `/<userPoolId>/messages` is served alongside them, and real Cognito has no such endpoint. It is the
 serving side of `SimCognitoUserPool.sentMessages`, so a browser or a curl can read what a pool would
 have sent during local development, and it is a divergence for the same reason that accessor is one.
+
+`serve/sim-cognito-web-acl-inspection.ts` puts a request to whatever web ACL is in front of the
+pool, before the endpoint answers and before the method is judged. `AssociateWebACL` on the WAFv2
+side is what puts one there, named by the pool ARN. `SimCognitoIdentityProvider.webAcls()` is where the serving layer
+reaches it. `simCognitoPoolScope` resolves the pool's own Account and Region first, because a
+request finds a pool by hostname or by id and both of those leave the scope open. The two
+`.well-known` documents are covered along with the hosted domain, since AWS WAF inspects every user
+pool endpoint. The messages listing is left alone, because real Cognito has no such endpoint for a
+web ACL on AWS to cover.
+
+The request body is withheld from the web ACL. Cognito forwards the headers and the path of a
+managed login request to AWS WAF and none of its body. A `ByteMatchStatement` on `Body` therefore
+inspects an empty field here, and a rule has nowhere to read a username or a password from.
 
 The request hostname is `cognito-idp.<region>`, which names the regional endpoint rather than one
 pool, so the pool id comes from the path. That id says nothing about the Account that owns the pool,

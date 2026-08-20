@@ -2017,6 +2017,15 @@ out here is still signed in at Google.
 An authorize request carrying a `code_challenge` and a `code_challenge_method` of `S256` gets a code
 that only the matching `code_verifier` exchanges. `plain` is refused, as it is by real Cognito.
 
+### Putting a web ACL in front of the domain
+
+`AssociateWebACL` on simulated WAFv2 attaches a `REGIONAL` web ACL to a pool by its ARN, and the
+pool's endpoints are then evaluated against it. A blocked request gets 403 and the endpoint behind
+it never runs. A blocked sign-up creates no user. The two `.well-known` documents are covered along
+with the hosted domain pages, and the `/<pool-id>/messages` listing is left outside. See
+[protecting a Cognito user pool](../wafv2/README.md#protecting-a-cognito-user-pool) for the whole
+example, including the request body that Cognito withholds from AWS WAF at a hosted domain.
+
 ## Lambda triggers
 
 A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up, a sign-in or
@@ -3968,6 +3977,8 @@ Sim Cognito currently supports:
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
+- A `REGIONAL` web ACL in front of the pool, attached by `AssociateWebACL` on simulated WAFv2 and
+  evaluated against every request the hosted domain and the two `.well-known` documents answer
 - App client OAuth settings: `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
   `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`, `DefaultRedirectURI` and
   `SupportedIdentityProviders`, each of which an authorize or token request is checked against
@@ -4269,6 +4280,13 @@ Current documented limitations:
   form, and they start a reset rather than finishing one an administrator forced.
 - The implicit grant is refused, and so is the client credentials grant, which needs resource
   servers.
+- A web ACL in front of a pool sees the endpoints this simulation serves and no others. The
+  user-interactive endpoints real Cognito also has at `/login`, `/resendcode`, `/confirmUser` and
+  `/passkeys/add` are unserved here, so a rule written for one of them is never reached. The
+  `/<pool-id>/messages` listing is outside the web ACL, because real Cognito serves nothing there.
+- The public user pool API operations reached over the SDK, `SignUp` and `InitiateAuth` among them,
+  are evaluated against no web ACL. Real WAF inspects them, including their bodies. They arrive here
+  as SDK Commands and carry no HTTP request for a rule to read.
 - The served OpenID configuration names its `authorization_endpoint`, `token_endpoint` and
   `end_session_endpoint` once the pool has a domain, at that domain's local hostname. It carries no
   `userinfo_endpoint`, where real Cognito names one.

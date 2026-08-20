@@ -4,6 +4,7 @@ import type { SimCognitoUserPoolFactory } from "../../user-pool/sim-cognito-user
 import { requireSimCognitoUserPoolId } from "../../user-pool/sim-cognito-user-pool-id.js";
 import { SimCognitoUserPoolSettings } from "../../user-pool/sim-cognito-user-pool-settings.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
+import type { SimWafProtection } from "../../../wafv2/association/sim-waf-protection.js";
 import type { SimCognitoAuthorizer } from "../authorize/sim-cognito-authorizer.js";
 import { SimCognitoUnsimulatedUserPoolIdentity } from "./sim-cognito-unsimulated-pool-identity.js";
 import { SimCognitoUnsimulatedUserPoolOptions } from "./sim-cognito-unsimulated-pool-options.js";
@@ -24,6 +25,7 @@ interface SimCognitoUserPoolCommandsProperties {
   readonly pools: SimCognitoUserPoolStore;
   readonly poolFactory: SimCognitoUserPoolFactory;
   readonly authorizer: SimCognitoAuthorizer;
+  readonly webAcls: SimWafProtection;
 }
 
 interface SimCognitoCommandOptions {
@@ -38,6 +40,7 @@ export class SimCognitoUserPoolCommands {
   private readonly pools: SimCognitoUserPoolStore;
   private readonly poolFactory: SimCognitoUserPoolFactory;
   private readonly authorizer: SimCognitoAuthorizer;
+  private readonly webAcls: SimWafProtection;
   private readonly view = new SimCognitoUserPoolView();
   private readonly unsimulatedOptions =
     new SimCognitoUnsimulatedUserPoolOptions("CreateUserPool");
@@ -50,6 +53,7 @@ export class SimCognitoUserPoolCommands {
     this.pools = properties.pools;
     this.poolFactory = properties.poolFactory;
     this.authorizer = properties.authorizer;
+    this.webAcls = properties.webAcls;
   }
 
   /**
@@ -148,6 +152,10 @@ export class SimCognitoUserPoolCommands {
 
   /**
    * Delete a user pool, and with it every app client in it.
+   *
+   * A web ACL in front of the pool is let go of, as it is on AWS: the
+   * association names a pool that no longer exists, and nothing is left
+   * holding it.
    */
   delete(
     command: SimDeleteUserPoolCommand,
@@ -172,6 +180,7 @@ export class SimCognitoUserPoolCommands {
     }
 
     this.pools.remove(pool);
+    this.webAcls.release(pool.arn.value);
 
     return { $metadata: {} };
   }

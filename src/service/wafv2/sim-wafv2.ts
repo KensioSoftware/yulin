@@ -23,8 +23,9 @@ export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-requ
  *
  * A web ACL is a list of rules and a decision about the requests none of them
  * claims, and `evaluateRequest` is what that adds up to. `AssociateWebACL`
- * puts one in front of an API Gateway REST API stage, and the stage then asks
- * for that decision itself on every request it serves.
+ * puts one in front of an API Gateway REST API stage or a Cognito user pool,
+ * and the stage or the pool's hosted domain then asks for that decision itself
+ * on every request it serves.
  *
  * Resources are scoped to an Account and Region, and within that to
  * `CLOUDFRONT` or `REGIONAL`. The two scopes are separate namespaces rather
@@ -44,7 +45,9 @@ export class SimWafV2 extends SimWafSets {
    *
    * The simulator's own accessor rather than a WAFv2 operation. It is how a
    * simulated API Gateway reaches the web ACL protecting a stage it is about
-   * to serve, and how it lets go of one when the stage is deleted.
+   * to serve, and how a simulated Cognito reaches the one protecting a pool's
+   * hosted domain. It is also how each lets go of one when the resource is
+   * deleted.
    */
   protection(): SimWafProtection {
     return this.commands.associations;
