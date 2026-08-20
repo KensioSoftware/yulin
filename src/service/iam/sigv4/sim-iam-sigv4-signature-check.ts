@@ -36,7 +36,7 @@ export function simIamSigV4CheckSignature(
 
   const canonicalRequest = new SimIamSigV4CanonicalRequest(
     signedRequest,
-    statement.signedHeaderNames,
+    statement,
     payload,
   ).toString();
 

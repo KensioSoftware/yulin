@@ -37,26 +37,47 @@ describe("SigV4 byte ordering", () => {
 
 describe("SigV4 canonical path", () => {
   it("uses a single slash for an empty path", () => {
-    expect(simIamSigV4CanonicalPath("/")).toBe("/");
+    expect(simIamSigV4CanonicalPath("/", "lambda")).toBe("/");
+    expect(simIamSigV4CanonicalPath("", "s3")).toBe("/");
   });
 
   it("encodes the path a second time", () => {
     // Given a path whose slash is already encoded, so it is part of a segment
     // When it is canonicalized
     // Then the encoding is encoded again, keeping it distinct from a separator
-    expect(simIamSigV4CanonicalPath("/orders/a%2Fb")).toBe("/orders/a%252Fb");
+    expect(simIamSigV4CanonicalPath("/orders/a%2Fb", "lambda")).toBe(
+      "/orders/a%252Fb",
+    );
   });
 
   it("resolves dot segments before encoding", () => {
     // Given a path stepping down and back up again
     // When it is canonicalized
     // Then it names the same resource as the direct path would
-    expect(simIamSigV4CanonicalPath("/a/b/../c/./d")).toBe("/a/c/d");
+    expect(simIamSigV4CanonicalPath("/a/b/../c/./d", "lambda")).toBe("/a/c/d");
   });
 
   it("keeps a trailing slash but not an empty one", () => {
-    expect(simIamSigV4CanonicalPath("/a/b/")).toBe("/a/b/");
-    expect(simIamSigV4CanonicalPath("//")).toBe("/");
+    expect(simIamSigV4CanonicalPath("/a/b/", "lambda")).toBe("/a/b/");
+    expect(simIamSigV4CanonicalPath("//", "lambda")).toBe("/");
+  });
+
+  it("signs an S3 path with the single encoding it arrived in", () => {
+    // Given an Object key holding a space, which the S3 client encoded once
+    // When the path is canonicalized under an S3 credential scope
+    // Then it is signed as it arrived, matching what that client signed
+    expect(
+      simIamSigV4CanonicalPath("/reports/quarterly%20report.pdf", "s3"),
+    ).toBe("/reports/quarterly%20report.pdf");
+  });
+
+  it("leaves an S3 path unnormalized", () => {
+    // Given a key whose own characters read as path navigation. S3 stores it
+    // under those characters, and normalizing here would sign a different key
+    // from the one asked for.
+    expect(simIamSigV4CanonicalPath("/reports/a/../b//c.pdf", "s3")).toBe(
+      "/reports/a/../b//c.pdf",
+    );
   });
 });
 
