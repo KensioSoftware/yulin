@@ -17,10 +17,16 @@ interface ObjectSummary {
   readonly StorageClass?: string | undefined;
 }
 
+interface CommonPrefix {
+  readonly Prefix?: string | undefined;
+}
+
 interface ListObjectsOutput {
   readonly Contents?: readonly ObjectSummary[] | undefined;
+  readonly CommonPrefixes?: readonly CommonPrefix[] | undefined;
   readonly Name?: string | undefined;
   readonly Prefix?: string | undefined;
+  readonly Delimiter?: string | undefined;
   readonly MaxKeys?: number | undefined;
   readonly IsTruncated?: boolean | undefined;
   readonly KeyCount?: number | undefined;
@@ -71,15 +77,22 @@ export function simS3ListObjectsXml(
   version: 1 | 2,
 ): string {
   const contents = (output.Contents ?? []).map(objectSummaryXml).join("");
+  const commonPrefixes = (output.CommonPrefixes ?? [])
+    .map((commonPrefix) =>
+      xmlElement("CommonPrefixes", xmlValue("Prefix", commonPrefix.Prefix)),
+    )
+    .join("");
 
   return xmlDocument(
     "ListBucketResult",
     xmlValue("Name", output.Name) +
       xmlValue("Prefix", output.Prefix) +
+      xmlValue("Delimiter", output.Delimiter) +
       xmlValue("MaxKeys", output.MaxKeys) +
       xmlValue("IsTruncated", output.IsTruncated ?? false) +
       pagingXml(output, version) +
-      contents,
+      contents +
+      commonPrefixes,
   );
 }
 

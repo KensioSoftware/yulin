@@ -148,8 +148,8 @@ A HEAD response carries no body, so there is no document for an error code to tr
 ## Listing Objects
 
 Use `ListObjectsV2Command` to list the Objects in a Bucket. The simulator supports `Prefix`,
-`MaxKeys`, `ContinuationToken` and `StartAfter`, and answers with `Contents`, `KeyCount`,
-`IsTruncated` and `NextContinuationToken`.
+`Delimiter`, `MaxKeys`, `ContinuationToken` and `StartAfter`, and answers with `Contents`,
+`CommonPrefixes`, `KeyCount`, `IsTruncated` and `NextContinuationToken`.
 
 ```typescript sim-s3-list-objects-v2
 /**
@@ -296,6 +296,66 @@ const firstPage = await simS3.listObjectsV2(
 
 console.log(firstPage.IsTruncated, firstPage.KeyCount);
 ```
+
+### Walking a Bucket as a folder tree
+
+S3 stores keys flat and a `Delimiter` is what makes one look like a folder tree. Every key holding
+the delimiter somewhere after the `Prefix` is rolled up into a common prefix, running from the start
+of the key through the first delimiter. Those keys leave `Contents`, and the prefix appears once in
+`CommonPrefixes` however many keys sit beneath it.
+
+```typescript sim-s3-list-objects-v2-delimiter
+/**
+ * Walking a simulated S3 Bucket one folder at a time.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "site-assets" }));
+
+for (const key of ["img/logo.png", "img/icons/tick.png", "index.html"]) {
+  await simS3.putObject(
+    new PutObjectCommand({ Bucket: "site-assets", Key: key, Body: key }),
+  );
+}
+
+const top = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "site-assets", Delimiter: "/" }),
+);
+
+// One folder, and the one key that sits beside it.
+console.log(top.CommonPrefixes?.map((folder) => folder.Prefix)); // ["img/"]
+console.log(top.Contents?.map((object) => object.Key)); // ["index.html"]
+
+const folder = await simS3.listObjectsV2(
+  new ListObjectsV2Command({
+    Bucket: "site-assets",
+    Prefix: "img/",
+    Delimiter: "/",
+  }),
+);
+
+// A delimiter inside the Prefix is stepped over, so this lists what is
+// directly in `img/` rather than rolling the whole Bucket back up.
+console.log(folder.CommonPrefixes?.map((child) => child.Prefix)); // ["img/icons/"]
+console.log(folder.Contents?.map((object) => object.Key)); // ["img/logo.png"]
+```
+
+A listing that rolled nothing up has no `CommonPrefixes` at all, the way one that found no keys has
+no `Contents`. Reach for `CommonPrefixes ?? []`.
+
+A common prefix counts against `MaxKeys` as a key does, and `KeyCount` counts the two together. Keys
+and prefixes are ordered together, so a truncated page can end on either, and the continuation steps
+over the whole rolled-up prefix rather than listing its keys again. `aws s3 ls s3://bucket/` against
+[a simulation served on localhost](#serve-simulated-s3-on-localhost) prints these as `PRE` lines.
 
 ### The first version of the operation
 
@@ -2584,6 +2644,8 @@ Sim S3 currently supports:
 - `CreateBucketCommand` and `ListBucketsCommand`
 - `PutObjectCommand`, `GetObjectCommand`, `ListObjectsV2Command` and `ListObjectsCommand`, with an
   ETag and a last-modified time on every Object
+- `Delimiter` on a listing, rolling keys up into `CommonPrefixes` so a Bucket can be walked as a
+  folder tree, over the SDK and over a served endpoint
 - `CreateMultipartUploadCommand`, `UploadPartCommand`, `CompleteMultipartUploadCommand`,
   `AbortMultipartUploadCommand`, `ListMultipartUploadsCommand` and `ListPartsCommand`, so `aws s3 cp`
   and `@aws-sdk/lib-storage` can upload a file of real size
@@ -2626,8 +2688,7 @@ These apply across the page. The sections above each list what is specific to th
   any request or response.
 - A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
   left out, and every Object is in that one.
-- `Delimiter` and `CommonPrefixes` are left out, and a listing cannot be walked as a folder tree.
-  `EncodingType` is ignored, and keys come back unencoded.
+- `EncodingType` is ignored on a listing, and keys come back unencoded.
 - Object tags, ACLs, lifecycle rules, replication and server-side encryption are left out.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend in place of putting Objects.

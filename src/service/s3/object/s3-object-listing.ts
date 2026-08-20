@@ -11,6 +11,10 @@ export const simS3DefaultMaxKeysPerPage = 1000;
 
 interface SimS3ObjectPageRequest {
   readonly objects: readonly SimS3Object[];
+  /** The prefix the listing asked for, which a delimiter rolls up beneath. */
+  readonly prefix?: string | undefined;
+  /** The delimiter to roll keys up under, or nothing to list them flat. */
+  readonly delimiter?: string | undefined;
   /** The key to resume after, exclusive, or nothing to start at the first. */
   readonly startAfter?: string | undefined;
   readonly maxKeys: number;
@@ -21,12 +25,27 @@ interface SimS3ObjectPageRequest {
  */
 export interface SimS3ObjectPage {
   readonly objects: readonly SimS3Object[];
+  /** The prefixes keys were rolled up into, empty without a delimiter. */
+  readonly commonPrefixes: readonly string[];
   readonly isTruncated: boolean;
   /**
-   * The key the next page resumes after, which is there exactly when the
-   * listing is truncated, so a caller cannot be offered one that goes nowhere.
+   * The key or common prefix the next page resumes after, which is there
+   * exactly when the listing is truncated, so a caller cannot be offered one
+   * that goes nowhere.
    */
   readonly resumeAfter: string | undefined;
+}
+
+/**
+ * One thing a page of a listing holds: an Object, or a rolled-up prefix.
+ *
+ * A common prefix stands in for the keys beneath it and has no Object of its
+ * own. Both kinds sort and page together under the same name, which is how S3
+ * counts a rolled-up prefix against MaxKeys alongside a key.
+ */
+interface SimS3ListingEntry {
+  readonly name: string;
+  readonly object?: SimS3Object | undefined;
 }
 
 /**
@@ -44,29 +63,26 @@ export interface SimS3ObjectPage {
 export function simS3ObjectPage(
   request: SimS3ObjectPageRequest,
 ): SimS3ObjectPage {
-  const ordered = request.objects.toSorted(compareObjectKeys);
-  const startAfter = request.startAfter;
-  const remaining =
-    startAfter === undefined
-      ? ordered
-      : ordered.filter((object) => object.key > startAfter);
+  const entries = listingEntries(request);
 
-  // A negative page size would slice keys off the end rather than take none,
-  // so a page with no room is empty rather than backwards.
-  const objects = remaining.slice(0, Math.max(0, request.maxKeys));
-  const lastKey = objects.at(-1)?.key;
+  // A negative page size would slice entries off the end rather than take
+  // none, so a page with no room is empty rather than backwards.
+  const page = entries.slice(0, Math.max(0, request.maxKeys));
+  const last = page.at(-1);
 
-  // A page that returned no keys has nowhere for a caller to carry on from, so
+  // A page that returned nothing has nowhere for a caller to carry on from, so
   // it is complete however much the Bucket still holds. Reporting it truncated
   // would offer a continuation that cannot exist, and a caller looping until
   // the listing is complete would never stop.
-  const isTruncated =
-    lastKey !== undefined && objects.length < remaining.length;
+  const isTruncated = last !== undefined && page.length < entries.length;
 
   return {
-    objects,
+    objects: page.filter(hasObject).map((entry) => entry.object),
+    commonPrefixes: page
+      .filter((entry) => entry.object === undefined)
+      .map((entry) => entry.name),
     isTruncated,
-    resumeAfter: isTruncated ? lastKey : undefined,
+    resumeAfter: isTruncated ? last.name : undefined,
   };
 }
 
@@ -90,6 +106,89 @@ export function simS3EffectiveMaxKeys(
   }
 
   return Math.min(requestedMaxKeys ?? maxKeysPerPage, maxKeysPerPage);
+}
+
+/**
+ * The prefix a delimiter rolls a key up into, or nothing when it holds none.
+ *
+ * The search starts past the listing's own prefix, because a delimiter inside
+ * the prefix a caller asked for has already been walked past. Everything from
+ * the start of the key through the first delimiter after that becomes the
+ * common prefix, so `img/` covers `img/a.png` and `img/b.png` alike.
+ */
+function simS3CommonPrefix(
+  key: string,
+  prefix: string | undefined,
+  delimiter: string | undefined,
+): string | undefined {
+  // An empty delimiter appears in no key, and real S3 lists flat for one.
+  if (delimiter === undefined || delimiter === "") {
+    return undefined;
+  }
+
+  const at = key.indexOf(delimiter, (prefix ?? "").length);
+
+  return at === -1 ? undefined : key.slice(0, at + delimiter.length);
+}
+
+/**
+ * Everything a listing would return, in order, before the page is taken.
+ *
+ * Keys arrive sorted, so the keys of one common prefix are neighbours and a
+ * rolled-up prefix is recognised by the one before it.
+ */
+function listingEntries(request: SimS3ObjectPageRequest): SimS3ListingEntry[] {
+  const entries: SimS3ListingEntry[] = [];
+  let rolledUp: string | undefined;
+
+  for (const object of request.objects.toSorted(compareObjectKeys)) {
+    const commonPrefix = simS3CommonPrefix(
+      object.key,
+      request.prefix,
+      request.delimiter,
+    );
+    if (isBehindTheListing(request.startAfter, object.key, commonPrefix)) {
+      continue;
+    }
+
+    if (commonPrefix === undefined) {
+      entries.push({ name: object.key, object });
+      continue;
+    }
+
+    if (commonPrefix !== rolledUp) {
+      rolledUp = commonPrefix;
+      entries.push({ name: commonPrefix });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Whether a listing resuming after something has already passed a key.
+ *
+ * A page ending on a common prefix resumes after the prefix itself, and the
+ * whole of it is behind the listing however many keys it holds. Resuming after
+ * a key compares against the key, as a flat listing does, so a caller that
+ * picked its own StartAfter inside a folder still gets that folder back.
+ */
+function isBehindTheListing(
+  startAfter: string | undefined,
+  key: string,
+  commonPrefix: string | undefined,
+): boolean {
+  if (startAfter === undefined) {
+    return false;
+  }
+
+  return commonPrefix === startAfter || key <= startAfter;
+}
+
+function hasObject(
+  entry: SimS3ListingEntry,
+): entry is SimS3ListingEntry & { object: SimS3Object } {
+  return entry.object !== undefined;
 }
 
 function compareObjectKeys(a: SimS3Object, b: SimS3Object): number {

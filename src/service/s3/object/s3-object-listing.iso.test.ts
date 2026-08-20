@@ -122,6 +122,153 @@ describe("simS3ObjectPage", () => {
   });
 });
 
+describe("simS3ObjectPage under a delimiter", () => {
+  it("rolls keys holding the delimiter up into a common prefix", () => {
+    // Given a Bucket whose keys look like a folder tree.
+    const objects = objectsWithKeys(
+      "img/a.png",
+      "img/b.png",
+      "index.html",
+      "js/app.js",
+    );
+
+    // When the top of the tree is listed.
+    const page = simS3ObjectPage({ objects, delimiter: "/", maxKeys: 10 });
+
+    // Then each folder comes back once, and only the key at the top of the
+    // tree is listed as an Object.
+    assertIdentical(page.commonPrefixes.join(","), "img/,js/");
+    assertIdentical(keysOf(page.objects).join(","), "index.html");
+    assertFalse(page.isTruncated);
+  });
+
+  it("orders a common prefix among the keys rather than after them", () => {
+    // Given a folder whose name sorts in the middle of the keys beside it.
+    const objects = objectsWithKeys("a.txt", "m/one.txt", "z.txt");
+    const listing = { objects, delimiter: "/", maxKeys: 1 };
+
+    // When the top of the tree is listed one entry at a time.
+    const first = simS3ObjectPage(listing);
+    const second = simS3ObjectPage({
+      ...listing,
+      startAfter: first.resumeAfter,
+    });
+    const third = simS3ObjectPage({
+      ...listing,
+      startAfter: second.resumeAfter,
+    });
+
+    // Then the folder arrives in key order, between the two Objects.
+    assertIdentical(keysOf(first.objects).join(","), "a.txt");
+    assertIdentical(second.commonPrefixes.join(","), "m/");
+    assertIdentical(keysOf(third.objects).join(","), "z.txt");
+    assertFalse(third.isTruncated);
+  });
+
+  it("counts a common prefix against the page size, as a key counts", () => {
+    // Given two folders and a key, in a page with room for two entries.
+    const objects = objectsWithKeys("img/a.png", "index.html", "js/app.js");
+
+    // When the page is taken.
+    const page = simS3ObjectPage({ objects, delimiter: "/", maxKeys: 2 });
+
+    // Then the folder fills a place a key would have taken, and the listing is
+    // truncated after it.
+    assertIdentical(page.commonPrefixes.join(","), "img/");
+    assertIdentical(keysOf(page.objects).join(","), "index.html");
+    assertTrue(page.isTruncated);
+    assertIdentical(page.resumeAfter, "index.html");
+  });
+
+  it("resumes after a common prefix by stepping over the whole folder", () => {
+    // Given a page that ended on a folder holding more keys than it showed.
+    const objects = objectsWithKeys("img/a.png", "img/b.png", "index.html");
+    const first = simS3ObjectPage({ objects, delimiter: "/", maxKeys: 1 });
+
+    assertIdentical(first.resumeAfter, "img/");
+
+    // When the listing carries on from there.
+    const second = simS3ObjectPage({
+      objects,
+      delimiter: "/",
+      startAfter: first.resumeAfter,
+      maxKeys: 10,
+    });
+
+    // Then the folder's own keys are behind the listing rather than rolled up
+    // into the same folder again, which is what a marker compared against the
+    // key would do.
+    assertArrayLength(second.commonPrefixes, 0);
+    assertIdentical(keysOf(second.objects).join(","), "index.html");
+    assertFalse(second.isTruncated);
+  });
+
+  it("still rolls a folder up when resuming from a key inside it", () => {
+    // Given a listing resuming after a key a caller picked itself, which sits
+    // inside a folder rather than being a prefix a previous page ended on.
+    const objects = objectsWithKeys("img/a.png", "img/b.png", "index.html");
+
+    // When the page is taken.
+    const page = simS3ObjectPage({
+      objects,
+      delimiter: "/",
+      startAfter: "img/a.png",
+      maxKeys: 10,
+    });
+
+    // Then the folder still covers what is left of it, rather than vanishing
+    // because the folder's own name sorts before the key resumed from.
+    assertIdentical(page.commonPrefixes.join(","), "img/");
+    assertIdentical(keysOf(page.objects).join(","), "index.html");
+  });
+
+  it("rolls up beneath the prefix, past any delimiter inside it", () => {
+    // Given a listing of one folder, whose own name holds the delimiter.
+    const objects = objectsWithKeys(
+      "img/icons/small.png",
+      "img/icons/large.png",
+      "img/logo.png",
+    );
+
+    // When that folder is listed.
+    const page = simS3ObjectPage({
+      objects,
+      prefix: "img/",
+      delimiter: "/",
+      maxKeys: 10,
+    });
+
+    // Then the delimiter in the prefix is stepped over, and the folder inside
+    // is the one rolled up.
+    assertIdentical(page.commonPrefixes.join(","), "img/icons/");
+    assertIdentical(keysOf(page.objects).join(","), "img/logo.png");
+  });
+
+  it("rolls up under a delimiter of any length", () => {
+    // Given keys separated by something other than a slash.
+    const objects = objectsWithKeys("2024--q1.csv", "2024--q2.csv", "notes.md");
+
+    // When the Bucket is listed under that separator.
+    const page = simS3ObjectPage({ objects, delimiter: "--", maxKeys: 10 });
+
+    // Then the common prefix runs through the whole delimiter.
+    assertIdentical(page.commonPrefixes.join(","), "2024--");
+    assertIdentical(keysOf(page.objects).join(","), "notes.md");
+  });
+
+  it("lists flat for an empty delimiter, which appears in no key", () => {
+    // Given a caller passing an empty delimiter.
+    const objects = objectsWithKeys("img/a.png", "index.html");
+
+    // When the Bucket is listed.
+    const page = simS3ObjectPage({ objects, delimiter: "", maxKeys: 10 });
+
+    // Then every key comes back, and nothing is rolled up.
+    assertArrayLength(page.commonPrefixes, 0);
+    assertIdentical(keysOf(page.objects).join(","), "img/a.png,index.html");
+  });
+});
+
 describe("simS3EffectiveMaxKeys", () => {
   it("fills a page when the caller names no limit", () => {
     assertIdentical(simS3EffectiveMaxKeys(undefined, 1000), 1000);

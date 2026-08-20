@@ -435,9 +435,10 @@ client reading in pieces compares the value across them.
 4. sequences background work
 5. lists objects from storage using optional `Prefix`
 6. sorts objects lexicographically by key
-7. applies marker-based pagination
-8. returns `Contents`, `Name`, `Prefix`, `Marker`, `MaxKeys`, `IsTruncated`,
-   `NextMarker`, and `$metadata`
+7. rolls keys up under an optional `Delimiter`
+8. applies marker-based pagination
+9. returns `Contents`, `CommonPrefixes`, `Name`, `Prefix`, `Delimiter`, `Marker`, `MaxKeys`,
+   `IsTruncated`, `NextMarker`, and `$metadata`
 
 ### ListObjectsV2
 
@@ -447,8 +448,8 @@ in how a caller says where to carry on from and in what the response reports:
 
 1. resumes after the key a `ContinuationToken` stands for, or after `StartAfter` when there is no
    token, since a token in hand means the listing is already under way
-2. returns `Contents`, `Name`, `Prefix`, `MaxKeys`, `KeyCount`, `IsTruncated`, `ContinuationToken`,
-   `NextContinuationToken`, `StartAfter`, and `$metadata`
+2. returns `Contents`, `CommonPrefixes`, `Name`, `Prefix`, `Delimiter`, `MaxKeys`, `KeyCount`,
+   `IsTruncated`, `ContinuationToken`, `NextContinuationToken`, `StartAfter`, and `$metadata`
 
 `list-objects-v2/list-objects-v2-continuation-token.ts` encodes the resume key so a token looks
 opaque, and refuses one that does not decode back to itself rather than listing from somewhere
@@ -460,14 +461,23 @@ arbitrary.
 `object/s3-object-summary.ts` describes each one. Both versions of the operation go through them, so
 they cannot disagree about which keys a page holds or how an Object in one is described.
 
+A `Delimiter` rolls keys up in the same place. `object/s3-object-listing.ts` turns the ordered keys
+into entries, where an entry is either an Object or a common prefix standing in for every key
+beneath it, and pages the entries rather than the keys. That is what makes a common prefix count
+against `MaxKeys` alongside a key, and it puts the two in one order, so a page can end on either.
+Resuming compares against the entry name, which steps a marker over a whole rolled-up prefix instead
+of grouping its keys again. `object/s3-common-prefix.ts` describes them for a response.
+
 `object/s3-object-listing-limits.ts` holds the page size, on the shared `SimS3BucketCommandState` so
 that both versions see the same one. Real S3 fixes it at a thousand keys with no way to change it;
 `SimS3.configureMaxKeysPerPage` exists anyway, because a caller that never continues a listing is a
 caller whose pagination has never run, and provoking one honestly would mean storing a thousand and
 one Objects first.
 
-`MaxKeys` defaults to `1000`. `NextMarker` is set to the last returned key only when the result is
-truncated.
+`MaxKeys` defaults to `1000`. `NextMarker` is set to the last returned entry only when the result is
+truncated. Real S3 sets it only for a listing that carried a `Delimiter`, leaving a caller to use the
+last key otherwise. Sim S3 sets it whenever the listing is truncated. Both answer the same key, and
+a caller that reads `NextMarker` needs no branch for the delimited case.
 
 ### DeleteObject
 

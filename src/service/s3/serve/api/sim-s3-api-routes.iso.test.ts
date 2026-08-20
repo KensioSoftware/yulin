@@ -210,4 +210,24 @@ describe("Resolving an S3 REST operation from a request", () => {
       "ListObjectsV2Command",
     );
   });
+
+  it("carries a listing's delimiter through to the operation's input", () => {
+    // Given the listing `aws s3 ls s3://widgets/img/` sends, on either version
+    // of the operation.
+    assertObjectMatches(input("GET", "/widgets?prefix=img%2F&delimiter=%2F"), {
+      Bucket: "widgets",
+      Prefix: "img/",
+      Delimiter: "/",
+    });
+    assertObjectMatches(
+      input("GET", "/widgets?list-type=2&prefix=img%2F&delimiter=%2F"),
+      { Bucket: "widgets", Prefix: "img/", Delimiter: "/" },
+    );
+
+    // And a listing that named no delimiter says nothing about one, rather
+    // than asking for a rollup under an empty string.
+    assertObjectEquals(input("GET", "/widgets?list-type=2"), {
+      Bucket: "widgets",
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3CommonPrefix } from "../../object/s3-common-prefix.js";
 import type { SimS3ObjectSummary } from "../../object/s3-object-summary.js";
 
 export type { SimS3ObjectSummary } from "../../object/s3-object-summary.js";
@@ -12,10 +13,14 @@ export interface SimListObjectsCommand {
 
 /**
  * Minimal structural sim S3 ListObjects input.
+ *
+ * `Delimiter` rolls every key holding it after the `Prefix` up into a common
+ * prefix, which is how a Bucket is walked one folder at a time.
  */
 export interface SimListObjectsCommandInput {
   readonly Bucket?: string | undefined;
   readonly Prefix?: string | undefined;
+  readonly Delimiter?: string | undefined;
   readonly Marker?: string | undefined;
   readonly MaxKeys?: number | undefined;
 }
@@ -25,8 +30,10 @@ export interface SimListObjectsCommandInput {
  */
 export interface SimListObjectsCommandOutput {
   readonly Contents?: SimS3ObjectSummary[] | undefined;
+  readonly CommonPrefixes?: SimS3CommonPrefix[] | undefined;
   readonly Name?: string;
   readonly Prefix?: string | undefined;
+  readonly Delimiter?: string | undefined;
   readonly Marker?: string | undefined;
   readonly MaxKeys?: number;
   readonly IsTruncated?: boolean;
