@@ -153,13 +153,15 @@ still answers on it.
 `openapi/` reads an OpenAPI 3.0 document into the same commands an SDK caller sends:
 
 ```text
-SimRestApiOpenApiDocument        the root, the version check, and the paths
-├── SimRestApiOpenApiPathItem    one path: its segments and its operations
-├── SimRestApiOpenApiIntegration one x-amazon-apigateway-integration
-├── SimRestApiOpenApiPathTree    a resource per segment, shared between paths
-├── SimRestApiOpenApiMethods     PutMethod and PutIntegration for one operation
-├── SimRestApiOpenApiImport      the walk over the document
-└── SimRestApiOpenApiReplacement the overwrite PutRestApi asks for
+SimRestApiOpenApiDocument          the root, the version check, and the paths
+├── SimRestApiOpenApiPathItem      one path: its segments and its operations
+├── SimRestApiOpenApiIntegration   one x-amazon-apigateway-integration
+├── SimRestApiOpenApiPathTree      a resource per segment, shared between paths
+├── SimRestApiOpenApiSecurityScheme one components.securitySchemes member
+├── SimRestApiOpenApiAuthorization what an operation says about who may call it
+├── SimRestApiOpenApiMethods       PutMethod and PutIntegration for one operation
+├── SimRestApiOpenApiImport        the walk over the document
+└── SimRestApiOpenApiReplacement   the overwrite PutRestApi asks for
 ```
 
 `ImportRestApi`, `PutRestApi` and a `Body` on an `AWS::ApiGateway::RestApi` all arrive here with the
@@ -231,13 +233,14 @@ type other than `AWS_PROXY` are all refused there, so a request naming one fails
 been applied on real AWS.
 
 Authorization is refused the same way, in the two commands that carry it.
-`CreateAuthorizer` takes `TOKEN` and `COGNITO_USER_POOLS` and refuses `REQUEST`, and `PutMethod`
+`CreateAuthorizer` takes `TOKEN`, `REQUEST` and `COGNITO_USER_POOLS`, and `PutMethod`
 takes all four of its types. A method served open where AWS would have gated it lets a test pass on
 a request real AWS rejects, so a template asking for a type nothing enforces fails to deploy rather
 than deploying around it. A method naming an authorizer of the other kind is refused for the same
 reason.
 
 An imported document meets those refusals through the commands, and `openapi/` adds the ones about
-members no command sees. A document-level `security`, an operation's `security`, a Swagger 2
-document and every `x-amazon-apigateway-*` extension outside the two that are read are refused
-where they are written.
+members no command sees. A document-level `security`, a Swagger 2 document and every
+`x-amazon-apigateway-*` extension outside the five that are read are refused where they are
+written. A security scheme becomes an authorizer through `CreateAuthorizer`, so what a scheme may
+carry is what that command takes.

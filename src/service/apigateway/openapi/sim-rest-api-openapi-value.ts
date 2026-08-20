@@ -106,6 +106,22 @@ export class SimRestApiOpenApiValue {
   }
 
   /**
+   * This value as a number when the document carries one, which is the shape
+   * an authorizer's `authorizerResultTtlInSeconds` takes.
+   */
+  optionalNumber(): number | undefined {
+    if (this.value === undefined) {
+      return undefined;
+    }
+
+    if (typeof this.value !== "number") {
+      throw this.refusal("has to be a number");
+    }
+
+    return this.value;
+  }
+
+  /**
    * The entries of this value as an array, when the document carries one.
    */
   optionalArray(): readonly SimRestApiOpenApiValue[] | undefined {
@@ -124,5 +140,12 @@ export class SimRestApiOpenApiValue {
           value: entry,
         }),
     );
+  }
+
+  /**
+   * The entries of this value as strings, when the document carries them.
+   */
+  optionalStringList(): readonly string[] | undefined {
+    return this.optionalArray()?.map((entry) => entry.requiredString());
   }
 }

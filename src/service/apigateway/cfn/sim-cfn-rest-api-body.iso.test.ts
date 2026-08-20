@@ -1,7 +1,10 @@
 import {
+  GetAuthorizersCommand,
+  GetMethodCommand,
   GetResourcesCommand,
   GetRestApiCommand,
 } from "@aws-sdk/client-api-gateway";
+import { assertNonNullable } from "@kensio/smartass";
 import { assertIdentical, assertTypeString } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -247,5 +250,69 @@ describe("Deploying a sim REST API from an AWS::ApiGateway::RestApi Body", () =>
     expect(failure.message).toMatch(
       /#\/paths\/~1pets\/get\/x-amazon-apigateway-integration\/passthroughBehavior/,
     );
+  });
+
+  it("deploys the authorizer a security scheme declares", async () => {
+    // Given a template whose document gates its operation with a Lambda
+    // authorizer, pointed at the function the same stack deploys
+    const simAws = simAwsInEuWest2();
+    const stack = await deployRestApi(
+      simAws,
+      simCfnImportedRestApiTemplateFactory.make({
+        paths: {
+          "/pets": {
+            get: {
+              security: [{ "pet-authorizer": [] }],
+              "x-amazon-apigateway-integration":
+                simCfnImportedRestApiIntegration,
+            },
+          },
+        },
+        components: {
+          securitySchemes: {
+            "pet-authorizer": {
+              type: "apiKey",
+              name: "Authorization",
+              in: "header",
+              "x-amazon-apigateway-authtype": "custom",
+              "x-amazon-apigateway-authorizer": {
+                type: "token",
+                authorizerUri: { "Fn::GetAtt": ["Handler", "Arn"] },
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    // Then the deployed API carries the authorizer the scheme named, with the
+    // function URI the template resolved, and its method sends requests
+    // through it
+    const apiUrl = stack.outputs.get("ApiUrl")?.value;
+    assertTypeString(apiUrl);
+    const restApiId = apiIdOf(apiUrl);
+    const authorizers = await simAws
+      .apiGateway()
+      .getAuthorizers(new GetAuthorizersCommand({ restApiId }));
+    const [authorizer] = authorizers.items;
+    assertNonNullable(authorizer);
+    assertIdentical(authorizer.name, "pet-authorizer");
+    assertIdentical(authorizer.type, "TOKEN");
+    expect(authorizer.authorizerUri).toMatch(/:function:pets$/u);
+
+    const resources = await simAws
+      .apiGateway()
+      .getResources(new GetResourcesCommand({ restApiId }));
+    const pets = resources.items.find((resource) => resource.path === "/pets");
+    assertNonNullable(pets);
+    const method = await simAws.apiGateway().getMethod(
+      new GetMethodCommand({
+        restApiId,
+        resourceId: pets.id,
+        httpMethod: "GET",
+      }),
+    );
+    assertIdentical(method.authorizationType, "CUSTOM");
+    assertIdentical(method.authorizerId, authorizer.id);
   });
 });

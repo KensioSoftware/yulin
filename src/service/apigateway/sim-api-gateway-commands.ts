@@ -102,6 +102,7 @@ export class SimApiGatewayCommands {
       resourceCommands: this.resources,
       methodCommands: this.methods,
       integrationCommands: this.integrations,
+      authorizerCommands: this.authorizers,
     });
   }
 }

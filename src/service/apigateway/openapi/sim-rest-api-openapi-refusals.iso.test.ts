@@ -130,25 +130,6 @@ describe("Refusing an OpenAPI document a sim REST API cannot serve", () => {
     );
   });
 
-  it("refuses an operation that says who may call it", async () => {
-    // Given an operation naming a security scheme
-    const simAws = new SimAws();
-
-    // When it is imported
-    // Then it is refused, because authorizing a REST API method is not
-    // simulated and an open method is not what the document asked for
-    await expect(
-      importingPath(simAws, "/pets", {
-        get: {
-          security: [{ "pet-authorizer": [] }],
-          "x-amazon-apigateway-integration": integration,
-        },
-      }),
-    ).rejects.toThrow(
-      /#\/paths\/~1pets\/get\/security: a security requirement names the/,
-    );
-  });
-
   it("refuses an operation with no integration behind it", async () => {
     // Given an operation declaring only its responses
     const simAws = new SimAws();

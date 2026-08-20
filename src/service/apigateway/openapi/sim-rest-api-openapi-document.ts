@@ -2,6 +2,7 @@ import { simRestApiOpenApiRoot } from "./sim-rest-api-openapi-body.js";
 import { simRestApiOpenApiRefusedRootMembers } from "./sim-rest-api-openapi-root-members.js";
 import type { SimRestApiOpenApiObject } from "./sim-rest-api-openapi-object.js";
 import { SimRestApiOpenApiPaths } from "./sim-rest-api-openapi-paths.js";
+import { SimRestApiOpenApiValue } from "./sim-rest-api-openapi-value.js";
 
 /**
  * The OpenAPI versions a REST API is imported from.
@@ -49,6 +50,29 @@ export class SimRestApiOpenApiDocument {
    */
   paths(): SimRestApiOpenApiPaths {
     return new SimRestApiOpenApiPaths(this.root.member("paths"));
+  }
+
+  /**
+   * The security schemes an operation's security requirement can name.
+   */
+  securitySchemes(): SimRestApiOpenApiValue {
+    return this.component("securitySchemes");
+  }
+
+  /**
+   * One member of `components`, whether or not the document has any.
+   */
+  private component(name: string): SimRestApiOpenApiValue {
+    const components = this.root.member("components").optionalObject();
+
+    if (components === undefined) {
+      return new SimRestApiOpenApiValue({
+        pointer: this.root.pointer.child("components").child(name),
+        value: undefined,
+      });
+    }
+
+    return components.member(name);
   }
 
   /**

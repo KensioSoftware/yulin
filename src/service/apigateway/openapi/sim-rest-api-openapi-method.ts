@@ -2,38 +2,34 @@ import type { SimRestApiIntegrationCommands } from "../command/integration/sim-r
 import type { SimRestApiMethodCommands } from "../command/method/sim-rest-api-method-commands.js";
 import type { SimRestApiOpenApiCommand } from "./sim-rest-api-openapi-command.js";
 import { SimRestApiOpenApiIntegration } from "./sim-rest-api-openapi-integration.js";
+import type { SimRestApiOpenApiAuthorization } from "./sim-rest-api-openapi-method-authorization.js";
 import type { SimRestApiOpenApiOperation } from "./sim-rest-api-openapi-operation.js";
-
-/**
- * The authorization type every imported method is declared with.
- *
- * A document naming an authorizer is refused while reading one out of a
- * document is unsimulated, so an imported method is an open one or the import
- * did not happen. `CreateAuthorizer` and `PutMethod` gate a method that was
- * declared through the commands.
- */
-const importedAuthorizationType = "NONE";
+import type { SimRestApiOpenApiSecuritySchemes } from "./sim-rest-api-openapi-security-schemes.js";
 
 interface SimRestApiOpenApiMethodsProperties {
   readonly methodCommands: SimRestApiMethodCommands;
   readonly integrationCommands: SimRestApiIntegrationCommands;
+  readonly authorization: SimRestApiOpenApiAuthorization;
   readonly command: SimRestApiOpenApiCommand;
 }
 
 /**
- * Declares the method one operation becomes, and what it does with a request.
+ * Declares the method one operation becomes, who may call it, and what it does
+ * with a request.
  *
- * A REST API declares the two separately, so one operation is two commands,
- * both of them the ordinary ones.
+ * A REST API declares the method and its integration separately, so one
+ * operation is two commands, both of them the ordinary ones.
  */
 export class SimRestApiOpenApiMethods {
   private readonly methodCommands: SimRestApiMethodCommands;
   private readonly integrationCommands: SimRestApiIntegrationCommands;
+  private readonly authorization: SimRestApiOpenApiAuthorization;
   private readonly command: SimRestApiOpenApiCommand;
 
   constructor(properties: SimRestApiOpenApiMethodsProperties) {
     this.methodCommands = properties.methodCommands;
     this.integrationCommands = properties.integrationCommands;
+    this.authorization = properties.authorization;
     this.command = properties.command;
   }
 
@@ -48,16 +44,18 @@ export class SimRestApiOpenApiMethods {
     restApiId: string,
     resourceId: string,
     operation: SimRestApiOpenApiOperation,
+    schemes: SimRestApiOpenApiSecuritySchemes,
   ): void {
     const declared = operation.integration();
     const integration = new SimRestApiOpenApiIntegration(
       declared,
     ).putIntegrationInput();
+    const authorization = this.authorization.of(restApiId, operation, schemes);
     const address = { restApiId, resourceId, httpMethod: operation.httpMethod };
 
     this.command.run(operation.pointer(), () =>
       this.methodCommands.putMethod({
-        input: { ...address, authorizationType: importedAuthorizationType },
+        input: { ...address, ...authorization },
       }),
     );
 

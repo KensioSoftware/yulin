@@ -5,6 +5,7 @@ import type { SimRestApiOpenApiDocument } from "../../openapi/sim-rest-api-opena
 import { SimRestApiOpenApiImport } from "../../openapi/sim-rest-api-openapi-import.js";
 import { SimRestApiOpenApiReplacement } from "../../openapi/sim-rest-api-openapi-replacement.js";
 import type { SimRestApiRegistry } from "../../registry/sim-rest-api-registry.js";
+import type { SimRestApiAuthorizerCommands } from "../authorizer/sim-rest-api-authorizer-commands.js";
 import type { SimRestApiIntegrationCommands } from "../integration/sim-rest-api-integration-commands.js";
 import type { SimRestApiMethodCommands } from "../method/sim-rest-api-method-commands.js";
 import type { SimRestApiResourceCommands } from "../resource/sim-rest-api-resource-commands.js";
@@ -28,6 +29,7 @@ interface SimRestApiImportCommandsProperties {
   readonly resourceCommands: SimRestApiResourceCommands;
   readonly methodCommands: SimRestApiMethodCommands;
   readonly integrationCommands: SimRestApiIntegrationCommands;
+  readonly authorizerCommands: SimRestApiAuthorizerCommands;
 }
 
 /**
@@ -57,6 +59,7 @@ export class SimRestApiImportCommands {
     this.openApiImport = new SimRestApiOpenApiImport(properties);
     this.replacement = new SimRestApiOpenApiReplacement({
       resourceCommands: properties.resourceCommands,
+      authorizerCommands: properties.authorizerCommands,
       openApiImport: this.openApiImport,
     });
   }
