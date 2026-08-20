@@ -33,6 +33,7 @@ import type { SimSns } from "../../sns/index.js";
 import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
 import type { SimSts } from "../../sts/sim-sts.js";
+import type { SimWafV2 } from "../../wafv2/index.js";
 import { SimAwsAccountRegionServiceBuilder } from "./sim-aws-account-region-service-builder.js";
 import { SimAwsRegisteredServiceBuilder } from "./sim-aws-registered-service-builder.js";
 import { SimAwsSelfContainedServiceBuilder } from "./sim-aws-self-contained-service-builder.js";
@@ -274,5 +275,10 @@ export class SimAwsServiceFactory {
   /** Create simulated STS for an Account/Region scope. */
   createSts(scope: SimAwsAccountRegionContainer): SimSts {
     return this.accountRegionServices.createSts(scope);
+  }
+
+  /** Create simulated WAFv2 for an Account Region scope. */
+  createWafV2(scope: SimAwsAccountRegionContainer): SimWafV2 {
+    return this.selfContainedServices.createWafV2(scope);
   }
 }

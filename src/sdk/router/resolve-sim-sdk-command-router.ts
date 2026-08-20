@@ -108,6 +108,7 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
   ["SQS", (scoped): SimSdkCommandRouter => scoped.sqs().sdkCommandRouter()],
   ["SSM", (scoped): SimSdkCommandRouter => scoped.ssm().sdkCommandRouter()],
   ["STS", (scoped): SimSdkCommandRouter => scoped.sts().sdkCommandRouter()],
+  ["WAFV2", (scoped): SimSdkCommandRouter => scoped.wafV2().sdkCommandRouter()],
 ]);
 
 /**

@@ -1,0 +1,53 @@
+/**
+ * The sim WAFv2 Command types, gathered for the service facade.
+ */
+export type {
+  SimCreateIpSetCommand,
+  SimCreateIpSetCommandInput,
+  SimCreateIpSetCommandOutput,
+  SimDeleteIpSetCommand,
+  SimDeleteIpSetCommandInput,
+  SimDeleteIpSetCommandOutput,
+  SimGetIpSetCommand,
+  SimGetIpSetCommandInput,
+  SimGetIpSetCommandOutput,
+  SimListIpSetsCommand,
+  SimListIpSetsCommandInput,
+  SimListIpSetsCommandOutput,
+  SimWafIpSetOutput,
+} from "./ip-set/ip-set.command.js";
+export type {
+  SimCreateRegexPatternSetCommand,
+  SimCreateRegexPatternSetCommandInput,
+  SimCreateRegexPatternSetCommandOutput,
+  SimDeleteRegexPatternSetCommand,
+  SimDeleteRegexPatternSetCommandInput,
+  SimDeleteRegexPatternSetCommandOutput,
+  SimGetRegexPatternSetCommand,
+  SimGetRegexPatternSetCommandInput,
+  SimGetRegexPatternSetCommandOutput,
+  SimListRegexPatternSetsCommand,
+  SimListRegexPatternSetsCommandInput,
+  SimListRegexPatternSetsCommandOutput,
+  SimWafRegexPatternSetOutput,
+} from "./regex-pattern-set/regex-pattern-set.command.js";
+export type {
+  SimCreateWebAclCommand,
+  SimCreateWebAclCommandInput,
+  SimCreateWebAclCommandOutput,
+  SimDeleteWebAclCommand,
+  SimDeleteWebAclCommandInput,
+  SimDeleteWebAclCommandOutput,
+  SimGetWebAclCommand,
+  SimGetWebAclCommandInput,
+  SimGetWebAclCommandOutput,
+  SimListWebAclsCommand,
+  SimListWebAclsCommandInput,
+  SimListWebAclsCommandOutput,
+  SimUpdateWebAclCommand,
+  SimUpdateWebAclCommandInput,
+  SimUpdateWebAclCommandOutput,
+  SimWafSummaryOutput,
+  SimWafWebAclOutput,
+  SimWafWebAclWriteInput,
+} from "./web-acl/web-acl.command.js";

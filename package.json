@@ -164,6 +164,10 @@
       "import": "./dist/serve/index.js",
       "types": "./dist/serve/index.d.ts"
     },
+    "./wafv2": {
+      "import": "./dist/service/wafv2/index.js",
+      "types": "./dist/service/wafv2/index.d.ts"
+    },
     "./watch": {
       "import": "./dist/watch/index.js",
       "types": "./dist/watch/index.d.ts"
@@ -208,6 +212,7 @@
     "@aws-sdk/client-sqs": "^3.1101.0",
     "@aws-sdk/client-ssm": "^3.1101.0",
     "@aws-sdk/client-sts": "^3.1101.0",
+    "@aws-sdk/client-wafv2": "^3.1113.0",
     "@aws-sdk/lib-dynamodb": "^3.1101.0",
     "@aws-sdk/lib-storage": "^3.1112.0",
     "@aws-sdk/s3-request-presigner": "^3.1101.0",

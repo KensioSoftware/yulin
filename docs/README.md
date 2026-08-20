@@ -31,6 +31,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [SQS](./services/sqs/ "Simulated SQS usage docs")
 - [SSM Parameter Store](./services/ssm/ "Simulated SSM Parameter Store usage docs")
 - [STS](./services/sts/ "Simulated STS usage docs")
+- [WAFv2](./services/wafv2/ "Simulated WAFv2 usage docs")
 
 ## Feature documentation
 
