@@ -3,6 +3,7 @@
  */
 
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimLambdaDeadLetterConfigInput } from "../../function/event-invoke/lambda-dead-letter-target.js";
 import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function-configuration.js";
 import type { SimLambdaFunctionEnvironment } from "../create-function/create-function.command.js";
 
@@ -20,10 +21,10 @@ export interface SimUpdateFunctionConfigurationCommand {
  * value the function has, and `Environment` replaces the whole variable map
  * rather than merging into it, as on real AWS.
  *
- * Real Lambda also takes `Layers`, `VpcConfig`, `DeadLetterConfig`,
- * `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`,
- * `LoggingConfig` and a `RevisionId` precondition. None of those are
- * simulated, so all of them are left out rather than accepted and ignored.
+ * Real Lambda also takes `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
+ * `EphemeralStorage`, `SnapStart`, `LoggingConfig` and a `RevisionId`
+ * precondition. None of those are simulated, so all of them are left out
+ * rather than accepted and ignored.
  */
 export interface SimUpdateFunctionConfigurationCommandInput {
   readonly FunctionName?: string | undefined;
@@ -34,6 +35,7 @@ export interface SimUpdateFunctionConfigurationCommandInput {
   readonly Timeout?: number | undefined;
   readonly MemorySize?: number | undefined;
   readonly Environment?: SimLambdaFunctionEnvironment | undefined;
+  readonly DeadLetterConfig?: SimLambdaDeadLetterConfigInput | undefined;
 }
 
 /**

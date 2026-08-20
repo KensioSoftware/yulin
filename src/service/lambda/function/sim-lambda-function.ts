@@ -11,6 +11,7 @@ import {
   type SimLambdaFunctionConfiguration,
   type SimLambdaFunctionState,
 } from "./sim-lambda-function-configuration.js";
+import { simLambdaFunctionConfigurationOf } from "./sim-lambda-function-configuration.factory.js";
 import {
   type SimLambdaExecutableCode,
   SimLambdaHandlerReferenceCode,
@@ -65,6 +66,9 @@ export class SimLambdaFunction {
   public timeoutSeconds: number;
   public memorySizeMb: number;
   public environment: SimLambdaEnvironment;
+
+  /** Where this function's abandoned asynchronous events go, if anywhere. */
+  public deadLetterTargetArn: string | undefined;
   /**
    * This function's resource-based policy, which says who may act on it.
    *
@@ -98,6 +102,7 @@ export class SimLambdaFunction {
       timeoutSeconds = DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS,
       memorySizeMb = DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
       environment,
+      deadLetterTargetArn,
       runAsOwner = this,
       version = SIM_LAMBDA_LATEST_VERSION,
       clock = new SimRealClock(),
@@ -124,6 +129,7 @@ export class SimLambdaFunction {
         regionName: accountRegionScope.regionName,
         memorySizeMb,
       });
+    this.deadLetterTargetArn = deadLetterTargetArn;
     this.runAsOwner = runAsOwner;
     this.outboundHttp = outboundHttp;
     this.logging = new SimLambdaFunctionLogging({
@@ -175,6 +181,7 @@ export class SimLambdaFunction {
       memorySizeMb: this.memorySizeMb,
       code: this.#code,
       environment: this.environment,
+      deadLetterTargetArn: this.deadLetterTargetArn,
       runAsOwner: this.runAsOwner,
       state: "Active",
       description: description ?? this.description,
@@ -217,19 +224,7 @@ export class SimLambdaFunction {
    * Get the AWS-like function configuration for this sim Lambda function.
    */
   configuration(): SimLambdaFunctionConfiguration {
-    return {
-      FunctionName: this.name,
-      FunctionArn: this.arn,
-      Role: this.roleArn,
-      State: this.state,
-      Version: this.version,
-      Timeout: this.timeoutSeconds,
-      MemorySize: this.memorySizeMb,
-      Handler: this.handlerName,
-      Runtime: this.runtimeName,
-      Description: this.description,
-      Environment: this.environment.configuration(),
-    };
+    return simLambdaFunctionConfigurationOf(this);
   }
 
   /**

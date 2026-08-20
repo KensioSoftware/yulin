@@ -2,7 +2,13 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import {
+  type SimLambdaDestinationTargets,
+  SimLambdaNoDestinationTargets,
+} from "../../destination/sim-lambda-destination-targets.js";
+import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
+import { SimLambdaAsyncInvocations } from "./async/sim-lambda-async-invocations.js";
 import {
   functionErrorPayload,
   parseInvokeEvent,
@@ -15,6 +21,8 @@ import type {
 
 interface SimLambdaInvocationDispatcherProperties {
   background?: BackgroundScheduler;
+  eventInvokeConfigs?: SimLambdaEventInvokeConfigStore | undefined;
+  destinations?: SimLambdaDestinationTargets | undefined;
 }
 
 /**
@@ -25,19 +33,28 @@ interface SimLambdaInvocationDispatcherProperties {
  * for a published version reports that version as the one it ran.
  */
 export class SimLambdaInvocationDispatcher {
-  private readonly background: BackgroundScheduler;
+  private readonly asyncInvocations: SimLambdaAsyncInvocations;
 
   constructor(properties: SimLambdaInvocationDispatcherProperties = {}) {
-    const { background = new BackgroundTasks() } = properties;
-    this.background = background;
+    this.asyncInvocations = new SimLambdaAsyncInvocations({
+      background: properties.background ?? new BackgroundTasks(),
+      destinations:
+        properties.destinations ?? new SimLambdaNoDestinationTargets(),
+      eventInvokeConfigs: properties.eventInvokeConfigs,
+    });
   }
 
   /**
    * Dispatch the invocation and build the AWS-like Invoke output.
+   *
+   * An Event invocation is answered as soon as it is accepted, and how it goes
+   * from there reaches its destinations rather than its caller, as on real
+   * Lambda.
    */
   async dispatch(
     simFunction: SimLambdaFunction,
     command: SimInvokeCommand,
+    qualifier?: string,
   ): Promise<SimInvokeCommandOutput> {
     const invocationType = command.input.InvocationType ?? "RequestResponse";
 
@@ -46,7 +63,11 @@ export class SimLambdaInvocationDispatcher {
         return await this.requestResponse(simFunction, command);
       }
       case "Event": {
-        this.scheduleEventInvocation(simFunction, command);
+        this.asyncInvocations.start(
+          simFunction,
+          parseInvokeEvent(command.input.Payload),
+          qualifier,
+        );
         return { $metadata: {}, StatusCode: 202 };
       }
       case "DryRun": {
@@ -59,6 +80,8 @@ export class SimLambdaInvocationDispatcher {
     simFunction: SimLambdaFunction,
     command: SimInvokeCommand,
   ): Promise<SimInvokeCommandOutput> {
+    // Read before the attempt, so a payload that is not JSON reaches the
+    // caller as a request error rather than as a handler failure.
     const event = parseInvokeEvent(command.input.Payload);
 
     try {
@@ -78,21 +101,5 @@ export class SimLambdaInvocationDispatcher {
         Payload: functionErrorPayload(error),
       };
     }
-  }
-
-  private scheduleEventInvocation(
-    simFunction: SimLambdaFunction,
-    command: SimInvokeCommand,
-  ): void {
-    const event = parseInvokeEvent(command.input.Payload);
-
-    this.background.schedule(async () => {
-      try {
-        await simFunction.invoke(event);
-      } catch {
-        // As on real Lambda, asynchronous invocation errors are not surfaced
-        // to the caller. Failure destinations are not simulated yet.
-      }
-    });
   }
 }

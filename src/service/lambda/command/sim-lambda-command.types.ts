@@ -109,3 +109,23 @@ export type {
   SimUpdateFunctionUrlConfigCommand,
   SimUpdateFunctionUrlConfigCommandOutput,
 } from "./update-function-url-config/update-function-url-config.command.js";
+export type {
+  SimPutFunctionEventInvokeConfigCommand,
+  SimPutFunctionEventInvokeConfigCommandOutput,
+} from "./put-function-event-invoke-config/put-function-event-invoke-config.command.js";
+export type {
+  SimGetFunctionEventInvokeConfigCommand,
+  SimGetFunctionEventInvokeConfigCommandOutput,
+} from "./get-function-event-invoke-config/get-function-event-invoke-config.command.js";
+export type {
+  SimUpdateFunctionEventInvokeConfigCommand,
+  SimUpdateFunctionEventInvokeConfigCommandOutput,
+} from "./update-function-event-invoke-config/update-function-event-invoke-config.command.js";
+export type {
+  SimDeleteFunctionEventInvokeConfigCommand,
+  SimDeleteFunctionEventInvokeConfigCommandOutput,
+} from "./delete-function-event-invoke-config/delete-function-event-invoke-config.command.js";
+export type {
+  SimListFunctionEventInvokeConfigsCommand,
+  SimListFunctionEventInvokeConfigsCommandOutput,
+} from "./list-function-event-invoke-configs/list-function-event-invoke-configs.command.js";

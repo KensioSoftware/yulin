@@ -32,6 +32,7 @@ import type { SimListFunctionUrlConfigsCommand } from "../command/list-function-
 import type { SimRemovePermissionCommand } from "../command/remove-permission/remove-permission.command.js";
 import type { SimUpdateFunctionUrlConfigCommand } from "../command/update-function-url-config/update-function-url-config.command.js";
 import type { SimLambda } from "../sim-lambda.js";
+import { simLambdaEventInvokeConfigRoutes } from "./sim-lambda-event-invoke-config-routes.js";
 
 /**
  * Routes intercepted SDK Commands to one scoped simulated Lambda instance.
@@ -249,6 +250,7 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
             simSdkCallerOptions(context),
           ),
       ],
+      ...simLambdaEventInvokeConfigRoutes(simLambda),
     ]);
   }
 

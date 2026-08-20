@@ -847,8 +847,169 @@ const dryRunOutput = await lambda.invoke(
 console.log(dryRunOutput.StatusCode);
 ```
 
-`Event` invocation handler errors are dropped. Asynchronous retries and failure destinations are
-left out so far.
+`Event` invocation handler errors never reach the caller, who has already been answered. Where the
+handler keeps failing they reach the function's destinations instead, which is what the next section
+covers.
+
+## Asynchronous retries and destinations
+
+An `Event` invocation whose handler throws is retried twice, as real Lambda retries one. The retries
+wait on the simulated clock, about a minute before the first and two before the second, so a test
+reaches them by advancing time rather than by waiting for it.
+
+`PutFunctionEventInvokeConfigCommand` changes how many retries a function makes and where its
+results go. An invocation that fails its last attempt is sent to the `OnFailure` destination, and
+one whose handler returns is sent to `OnSuccess`. A destination ARN can name a simulated SQS queue,
+SNS topic, EventBridge event bus or Lambda function.
+
+```typescript sim-lambda-async-destinations
+/**
+ * Asynchronous invocation retries and an OnFailure destination.
+ */
+
+import {
+  CreateFunctionCommand,
+  InvokeCommand,
+  PutFunctionEventInvokeConfigCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const sqs = simAws.sqs();
+
+const created = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "order-failures" }),
+);
+
+const attempts: string[] = [];
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { id: number }) => {
+        attempts.push(`tried order ${event.id}`);
+        throw new Error("orders handler failed");
+      }),
+    },
+  }),
+);
+
+await lambda.putFunctionEventInvokeConfig(
+  new PutFunctionEventInvokeConfigCommand({
+    FunctionName: "orders",
+    MaximumRetryAttempts: 1,
+    DestinationConfig: {
+      OnFailure: {
+        Destination: "arn:aws:sqs:us-east-1:888888888888:order-failures",
+      },
+    },
+  }),
+);
+
+await lambda.invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    InvocationType: "Event",
+    Payload: JSON.stringify({ id: 7 }),
+  }),
+);
+
+// The first attempt runs behind the caller. The retry waits on the clock.
+await simAws.backgroundTasksComplete();
+console.log(attempts.length);
+
+await simAws.clock().advanceBy({ minutes: 2 });
+console.log(attempts.length);
+
+const received = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
+);
+const record = JSON.parse(String(received.Messages?.[0]?.Body)) as {
+  requestContext: { condition: string; approximateInvokeCount: number };
+  requestPayload: unknown;
+};
+console.log(record.requestContext.condition);
+console.log(record.requestContext.approximateInvokeCount);
+console.log(record.requestPayload);
+```
+
+The queue receives the record real Lambda sends, carrying the event that was invoked as
+`requestPayload`, the handler error as `responsePayload`, how many attempts were made, and a
+`condition` of `Success`, `RetriesExhausted` or `EventAgeExceeded`. An event that outlives
+`MaximumEventAgeInSeconds` is given up on before its next attempt and reported under that last
+condition.
+
+`GetFunctionEventInvokeConfigCommand`, `UpdateFunctionEventInvokeConfigCommand`,
+`DeleteFunctionEventInvokeConfigCommand` and `ListFunctionEventInvokeConfigsCommand` read and change
+what was written. `Put` writes the whole config, returning a setting it leaves out to its default,
+and `Update` changes only the settings it names. A `Qualifier` gives a published version or an alias
+a config of its own, and an invocation of a qualifier with no config of its own uses the function's.
+
+### Dead-letter targets
+
+`DeadLetterConfig` is the older way to keep a failed asynchronous invocation, and simulated Lambda
+takes it on `CreateFunction` and `UpdateFunctionConfiguration`. Its `TargetArn` names a simulated
+SQS queue or SNS topic, which receives the event as it was invoked rather than the destination
+record around it.
+
+```typescript sim-lambda-dead-letter-queue
+/**
+ * A simulated Lambda function with a dead-letter queue.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const sqs = simAws.sqs();
+
+const created = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "orders-dlq" }),
+);
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    DeadLetterConfig: {
+      TargetArn: "arn:aws:sqs:us-east-1:888888888888:orders-dlq",
+    },
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        throw new Error("orders handler failed");
+      }),
+    },
+  }),
+);
+
+await lambda.invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    InvocationType: "Event",
+    Payload: JSON.stringify({ id: 7 }),
+  }),
+);
+
+// Past both retries, so the invocation has been given up on.
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 5 });
+
+const received = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
+);
+console.log(received.Messages?.[0]?.Body);
+```
+
+A function carrying both a dead-letter target and an `OnFailure` destination sends to both.
 
 ## Versions and aliases
 
@@ -2967,6 +3128,14 @@ Sim Lambda currently supports:
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
+- Asynchronous invocation retries on the simulated clock, and `OnSuccess`/`OnFailure` destinations
+  written with `PutFunctionEventInvokeConfigCommand`, delivering the AWS destination record to a
+  simulated SQS queue, SNS topic, EventBridge event bus or Lambda function
+- `GetFunctionEventInvokeConfigCommand`, `UpdateFunctionEventInvokeConfigCommand`,
+  `DeleteFunctionEventInvokeConfigCommand` and `ListFunctionEventInvokeConfigsCommand`, each taking
+  a `Qualifier` for a version's or an alias's own config
+- `DeadLetterConfig` on `CreateFunction` and `UpdateFunctionConfiguration`, sending an abandoned
+  event to a simulated SQS queue or SNS topic
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
@@ -3029,9 +3198,21 @@ Current documented limitations:
   tagging commands are absent so far.
 - `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
   along with `Architectures` and `SourceKMSKeyArn`. `UpdateFunctionConfiguration` takes only the
-  settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `DeadLetterConfig`,
-  `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`.
-  `ListFunctions` leaves out `Marker`/`MaxItems` paging and `MasterRegion`.
+  settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
+  `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`. `ListFunctions` leaves out
+  `Marker`/`MaxItems` paging and `MasterRegion`.
+- A destination is delivered to without checking that the function's execution role may write to it.
+  Real Lambda delivers under that role and drops the record where the role cannot, which would be
+  silent, so simulated Lambda delivers instead. Nothing else about the destination has to be set up,
+  since a destination needs no resource policy on real AWS either.
+- `AWS::Lambda::EventInvokeConfig` and the `DeadLetterConfig` property of `AWS::Lambda::Function`
+  are not deployed from a template yet, so a CDK function's `onFailure`, `onSuccess` and
+  `deadLetterQueue` are left out of the simulated function. See
+  [issue 845](https://github.com/KensioSoftware/yulin/issues/845).
+- Throttling and timeouts do not drive a retry. A retry follows a handler that threw, and the
+  `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was accepted.
+- `DestinationConfig` on an event source mapping is left out. It is a different mechanism from the
+  asynchronous invocation destinations above.
 - A settings change takes effect at once. Real Lambda reports `LastUpdateStatus: "InProgress"` while
   it rolls the change out, and neither that member nor the wait it implies is simulated.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow

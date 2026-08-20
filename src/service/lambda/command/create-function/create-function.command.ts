@@ -3,6 +3,7 @@
  */
 
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimLambdaDeadLetterConfigInput } from "../../function/event-invoke/lambda-dead-letter-target.js";
 import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function-configuration.js";
 
 /**
@@ -47,6 +48,7 @@ export interface SimCreateFunctionCommandInput {
   readonly Timeout?: number | undefined;
   readonly MemorySize?: number | undefined;
   readonly Environment?: SimLambdaFunctionEnvironment | undefined;
+  readonly DeadLetterConfig?: SimLambdaDeadLetterConfigInput | undefined;
 }
 
 /**

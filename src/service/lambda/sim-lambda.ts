@@ -1,5 +1,4 @@
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
 import type { SimLambdaContainerImages } from "./function/code/image/sim-lambda-container-images.js";
@@ -9,12 +8,11 @@ import {
   SimLambdaCommands,
   type SimLambdaProperties,
 } from "./sim-lambda-commands.js";
-import { SimLambdaInspection } from "./sim-lambda-inspection.js";
+import { SimLambdaEventInvokeOperations } from "./sim-lambda-event-invoke-operations.js";
+import type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
 import { SimLambdaSdkCommandRouter } from "./sdk/sim-lambda-sdk-command-router.js";
 
-export interface SimLambdaRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
+export type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
 
 /**
  * Simulated Lambda. Handles SDK commands. Emulates AWS behaviour and state.
@@ -22,10 +20,11 @@ export interface SimLambdaRequestOptions {
  * Each command below carries a one line doc comment rather than a block. This
  * file grows by one delegating method per simulated operation and is close to
  * the max-lines limit, which is the same reason `SimDynamoDb` reads that way.
- * The simulator's own accessors are held apart in `SimLambdaInspection`, which
+ * The simulator's own accessors are held apart in `SimLambdaInspection`, and
+ * the event invoke config commands in `SimLambdaEventInvokeOperations`, which
  * this extends.
  */
-export class SimLambda extends SimLambdaInspection {
+export class SimLambda extends SimLambdaEventInvokeOperations {
   protected readonly functions: SimLambdaFunctionMap = new Map();
   protected readonly commands: SimLambdaCommands;
 
