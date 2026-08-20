@@ -8,6 +8,8 @@ import {
 import type { SimCognitoAuthorizationCode } from "./sim-cognito-authorization-code.js";
 import { SimCognitoAuthorizationCodeStore } from "./sim-cognito-authorization-code-store.js";
 import type { SimCognitoIssuedToken } from "./sim-cognito-issued-token.js";
+import type { SimCognitoManagedLoginSession } from "./sim-cognito-managed-login-session.js";
+import { SimCognitoManagedLoginSessionStore } from "./sim-cognito-managed-login-session-store.js";
 import {
   SimCognitoIssuedTokenStore,
   type SimCognitoRefreshTokenRequest,
@@ -34,6 +36,7 @@ export class SimCognitoPoolAuth {
   public readonly identityProviders = new SimCognitoIdentityProviderStore();
 
   private readonly sessions = new SimCognitoAuthSessionStore();
+  private readonly managedLogin = new SimCognitoManagedLoginSessionStore();
   private readonly codes = new SimCognitoAuthorizationCodeStore();
   private readonly tokens = new SimCognitoIssuedTokenStore();
 
@@ -142,7 +145,37 @@ export class SimCognitoPoolAuth {
   }
 
   /**
+   * Remember the managed login session a hosted sign-in started for a browser.
+   */
+  addManagedLoginSession(session: SimCognitoManagedLoginSession): void {
+    this.managedLogin.add(session);
+  }
+
+  /**
+   * The managed login session a browser presented, if this pool still holds
+   * it and it has not run out.
+   */
+  findManagedLoginSession(
+    value: string | undefined,
+    now: Date,
+  ): SimCognitoManagedLoginSession | undefined {
+    return this.managedLogin.find(value, now);
+  }
+
+  /**
+   * End the managed login session a browser presented at `/logout`.
+   */
+  endManagedLoginSession(value: string | undefined): void {
+    this.managedLogin.end(value);
+  }
+
+  /**
    * Sign a user out of every app client, forgetting the tokens it holds.
+   *
+   * The managed login sessions are left alone, because real `GlobalSignOut`
+   * and `AdminUserGlobalSignOut` leave them alone. They revoke tokens, and a
+   * browser still holding the `cognito` cookie signs in again at the authorize
+   * endpoint without a password. `/logout` is what ends that.
    */
   signOut(username: string): void {
     this.tokens.forgetUser(username);

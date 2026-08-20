@@ -1932,12 +1932,85 @@ stylesheet is part of the page. Nothing else is fetched to render one. There is 
 them, and no close match to what real managed login looks like. Real managed login is built on
 Cloudscape and draws components these pages have no equivalent for.
 
+### The browser's managed login session
+
+A sign-in at the hosted domain starts a session for that browser. Real managed login keeps it in a
+cookie named `cognito` on the pool's domain and holds it for an hour, and a served sign-in here sets
+the same cookie. An authorize request carrying it is answered with a code and asks for no
+credentials, which is what signs a returning browser back in without the form.
+
+A test driving the endpoints in process passes the session as a third argument, and reads what
+happened from `redirect.session`.
+
+```typescript sim-cognito-hosted-session
+/**
+ * A browser signing in once with its password, and again from its session.
+ */
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+const cognito = simAws.cognitoIdentityProvider();
+const pool = cognito.userPool(userPoolId);
+const parameters = {
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: "https://www.example.com/user/callback",
+  scope: "openid email",
+};
+
+const first = await cognito.hostedAuthorize(pool, {
+  ...parameters,
+  username: "alice",
+  password: "Sup3rSecret!",
+});
+
+console.log(first.session.outcome); // "started"
+
+// The same browser, sent back to authorize carrying no credentials.
+const second = await cognito.hostedAuthorize(
+  pool,
+  parameters,
+  first.session.startedSession,
+);
+
+console.log(second.session.outcome); // "reused"
+console.log(second.username); // "alice"
+```
+
+The `outcome` is `started` where the sign-in took credentials, `reused` where the browser's own
+session answered it, and `ended` at the logout endpoint. Asserting on it is how a test tells a
+sign-in that needed a password from one that did not.
+
+Three parts of the real behaviour are modelled with it.
+
+- Signing in from the session leaves the hour where the interactive sign-in put it. A browser coming
+  back at fifty minutes gets a code, and the same browser at seventy minutes gets the form.
+- The session belongs to the pool's domain. A browser that signed in for one app client is a
+  returning browser to every other app client of the same pool.
+- A sign-in at an identity provider starts one too, so a Google user comes back to a plain authorize
+  request already signed in.
+
+A user disabled since the session started is refused the way every other sign-in refuses one, and a
+user deleted since then leaves the session with nobody to sign in, so the form answers instead.
+Attribute and password changes go by without disturbing it.
+
 ### Signing out
 
-`GET /logout?client_id=...&logout_uri=...` redirects to the sign-out URL, once it has checked it is
-one of the app client's `LogoutURLs`. It ends no session, because there is no managed login cookie
-here. Every authorize request signs in afresh at the identity provider. `GlobalSignOut` and
-`AdminUserGlobalSignOut` are what revoke a user's tokens.
+`GET /logout?client_id=...&logout_uri=...` ends the browser's managed login session and redirects to
+the sign-out URL, once it has checked it is one of the app client's `LogoutURLs`. The served form
+clears the `cognito` cookie. After that the next authorize request asks for a password again.
+
+`GlobalSignOut` and `AdminUserGlobalSignOut` revoke a user's tokens and leave the managed login
+session alone, as they do on real Cognito. An application that clears its own cookies and revokes
+the tokens has not signed the browser out of the hosted domain, and the sign-in link takes it
+straight back in with no password. Sending the browser to `/logout` is what ends it.
+
+Nobody is signed out at the identity provider, which real Cognito also leaves undone. A user signed
+out here is still signed in at Google.
 
 ### PKCE
 
@@ -3887,6 +3960,8 @@ Sim Cognito currently supports:
   with PKCE and with a `refresh_token` grant
 - An authorize request naming no identity provider, signing one of the pool's own users in from a
   `username` and a `password` it carries
+- The managed login session a sign-in starts for the browser, held in the `cognito` cookie for an
+  hour, signing a returning browser in without credentials until `/logout` ends it
 - A served sign-in form at `/oauth2/authorize`, a sign-up form at `/signup`, a confirmation form at
   `/confirm`, and the two password reset forms at `/forgotPassword` and `/confirmForgotPassword`,
   each carrying the authorize parameters through to the next
@@ -4183,9 +4258,9 @@ Current documented limitations:
   at `/login` and confirms a sign-up within `/signup`, where here the authorize endpoint answers
   with the form itself and `/confirm` is a page. `/oauth2/userInfo`, `/oauth2/revoke`,
   `/oauth2/idpresponse` and the SAML endpoints go unserved.
-- The pages hold no session and set no cookie, so each of them carries the authorize parameters in
-  hidden inputs instead. Real managed login keeps a session cookie, which is what signs a returning
-  browser straight back in without the form.
+- The pages carry the authorize parameters in hidden inputs, where real managed login carries them
+  in a `page-data` cookie. The `cognito` session cookie is set and read, and the `XSRF-TOKEN`,
+  `csrf-state`, `lang` and `page-data` cookies real managed login also sets go unset.
 - A hosted sign-in that real managed login would answer with a further page is refused. That is a
   user which has registered a second factor, and a user holding a temporary password. Both
   challenges are simulated at `InitiateAuth` and `AdminInitiateAuth`, which is where a test drives
@@ -4203,9 +4278,13 @@ Current documented limitations:
 - A custom domain answers on its own hostname with no Route53 record of its own, where real AWS
   needs an alias record to the CloudFront distribution Cognito creates. The distribution name a
   domain reports is a name unserved here.
-- `/logout` redirects and ends no session. There is no managed login session cookie here, because
-  every authorize request signs in afresh at the identity provider, leaving it nothing to end. It
-  signs nobody out at the provider either, which real Cognito also leaves undone.
+- `/logout` ends the browser's managed login session and redirects. It signs nobody out at the
+  identity provider, which real Cognito also leaves undone, so a user signed out here is still
+  signed in at Google.
+- A managed login session is reused for any authorize request that names no identity provider and
+  carries no credentials. Real Cognito records which method started the session, and a request
+  naming a provider here signs in at that provider afresh whatever the browser is holding. `prompt`
+  goes unread, so there is no way to ask for a sign-in the session cannot answer.
 - A pool creates no group for each identity provider, where real Cognito creates one named
   `<userPoolId>_<ProviderName>` and puts each federated user in it. A `cognito:groups` claim here
   therefore names only the groups something added the user to.

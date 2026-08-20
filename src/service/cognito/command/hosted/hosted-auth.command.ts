@@ -1,3 +1,5 @@
+import type { SimCognitoSessionChange } from "./sim-cognito-session-change.js";
+
 /**
  * The `/oauth2/authorize` query parameters this simulation reads.
  *
@@ -38,6 +40,16 @@ export interface SimCognitoHostedRedirect {
 
   /** The user the redirect signed in, where one was signed in. */
   readonly username?: string | undefined;
+
+  /**
+   * What the request did to the browser's managed login session.
+   *
+   * A sign-in that took credentials starts one, a sign-in the browser's own
+   * session answered reuses it, and a sign-out ends it. Every request that
+   * reaches a redirect has done one of the three, so reading this is how a
+   * test tells a sign-in that needed a password from one that did not.
+   */
+  readonly session: SimCognitoSessionChange;
 }
 
 /**
