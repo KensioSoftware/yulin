@@ -149,4 +149,9 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.ssm().cfnResourceFactory(),
   ],
+  [
+    "WAFv2",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.wafV2().cfnResourceFactory(),
+  ],
 ]);

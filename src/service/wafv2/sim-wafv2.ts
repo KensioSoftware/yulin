@@ -6,13 +6,16 @@ import { SimWafNonexistentItemException } from "./error/sim-wafv2.error.js";
 import type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
 import type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
 import { simWafInspectedRequest } from "./evaluate/sim-waf-inspected-request.js";
+import type { SimWafIpSet } from "./ip-set/sim-waf-ip-set.js";
 import type { SimWafManagedRules } from "./managed/sim-waf-managed-rules.js";
+import type { SimWafRegexPatternSet } from "./regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafScope } from "./scope/sim-waf-scope.js";
 import { SimWafSdkCommandRouter } from "./sdk/sim-wafv2-sdk-command-router.js";
 import {
   SimWafCommands,
   type SimWafV2Properties,
 } from "./sim-wafv2-commands.js";
+import { SimWafCfnResourceFactory } from "./cfn/sim-waf-cfn-resource-factory.js";
 import { SimWafSets } from "./sim-wafv2-sets.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
 
@@ -34,6 +37,7 @@ export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-requ
  */
 export class SimWafV2 extends SimWafSets {
   readonly #sdkRouter = new SimWafSdkCommandRouter(this);
+  readonly #cfnFactory = new SimWafCfnResourceFactory({ wafV2: this });
 
   constructor(properties: SimWafV2Properties = {}) {
     super(new SimWafCommands(properties));
@@ -71,6 +75,28 @@ export class SimWafV2 extends SimWafSets {
    */
   findWebAclByArn(webAclArn: string): SimWafWebAcl | undefined {
     return this.commands.webAcls.findByArn(webAclArn);
+  }
+
+  /**
+   * Find an IP set by its ARN.
+   *
+   * The simulator's own accessor, and what the CloudFormation layer reaches
+   * for once CreateIPSet has reported the ARN of the set it made.
+   */
+  findIpSetByArn(ipSetArn: string): SimWafIpSet | undefined {
+    return this.commands.ipSets.findByArn(ipSetArn);
+  }
+
+  /**
+   * Find a regex pattern set by its ARN.
+   *
+   * The simulator's own accessor, and what a rule naming a pattern set is
+   * compiled against, since a reference carries the ARN and nothing else.
+   */
+  findRegexPatternSetByArn(
+    regexPatternSetArn: string,
+  ): SimWafRegexPatternSet | undefined {
+    return this.commands.regexPatternSets.findByArn(regexPatternSetArn);
   }
 
   /**
@@ -228,6 +254,13 @@ export class SimWafV2 extends SimWafSets {
       command,
       options,
     );
+  }
+
+  /**
+   * Get the CloudFormation Resource factory for AWS::WAFv2::* Resources.
+   */
+  cfnResourceFactory(): SimWafCfnResourceFactory {
+    return this.#cfnFactory;
   }
 
   /**

@@ -224,6 +224,46 @@ An IP set is held and reported, and no rule reads one, for the same reason
 `IPSetReferenceStatement` is refused. A stack that creates one still deploys, and a test can read
 back what it created.
 
+## CloudFormation
+
+`cfn/` builds the four `AWS::WAFv2::*` Resource types this simulation deploys. The arrangement is
+the one every other service uses. A factory dispatches on the Resource type name, and each type has
+a directory holding its creator and the config that reads its properties.
+
+```text
+SimWafCfnResourceFactory        create, dispatching on the Resource type name
+├── SimCfnWafResourceDeleter    delete, held apart to keep the factory under the FTA threshold
+├── SimCfnWafResourceConfig     name, scope and description, shared by the three named types
+├── web-acl/                    AWS::WAFv2::WebACL
+├── association/                AWS::WAFv2::WebACLAssociation
+├── ip-set/                     AWS::WAFv2::IPSet
+└── regex-pattern-set/          AWS::WAFv2::RegexPatternSet
+```
+
+Every Resource is created through the ordinary WAFv2 command for it. A template gets the same
+compilation of every rule that an SDK caller gets, and the same refusals.
+`sim-cfn-waf-resource-error.ts` catches a `SimWafError` on the way out and names the Resource in it,
+because a deployment failing on `Rule block-admin uses the statement kind SqliMatchStatement` says
+which rule and not which of a template's web ACLs declared it.
+
+The association hands `ResourceArn` straight to `AssociateWebACL`. What a web ACL may be put in
+front of is decided once, in `association/sim-waf-protected-resource.ts`, and the CloudFormation
+layer inherits every refusal in it. Deleting the association tolerates a resource that has gone
+already, which is what a REST API stage in one stack and the association in another leaves behind.
+
+Two shapes differ between a template and the API. `SearchString` is plain text in a template and
+bytes in the SDK, and `RegularExpressionList` is a list of strings in a template and a list of
+`RegexString` objects in the SDK. The first needs no work, since `sim-waf-byte-match.ts` already
+reads either. The second is wrapped in `regex-pattern-set/sim-cfn-waf-regex-set-config.ts`.
+
+`SimWafWebAcl` gained `capacity` and `labelNamespace` for the attributes `Fn::GetAtt` publishes, and
+`GetWebACL` reports both. `web-acl/sim-waf-web-acl-capacity.ts` walks the rules and
+`web-acl/sim-waf-statement-capacity.ts` holds the costs, which are AWS's published base cost per
+statement kind plus the surcharges for reading every query argument and for each text
+transformation. It sums where real WAF discounts whatever two rules can share, leaving the
+number an upper bound on what AWS reports. A CloudFront distribution is associated through its
+own `WebACLId` and reaches nothing here.
+
 ## Authorization
 
 `command/authorize/sim-wafv2-authorizer.ts` authorizes an operation on one resource against that

@@ -73,6 +73,8 @@ export interface SimWafWebAclOutput {
   readonly Name: string;
   readonly Id: string;
   readonly ARN: string;
+  readonly Capacity: number;
+  readonly LabelNamespace: string;
   readonly Description: string | undefined;
   readonly DefaultAction: SimWafActionInput | undefined;
   readonly Rules: readonly SimWafRuleInput[];

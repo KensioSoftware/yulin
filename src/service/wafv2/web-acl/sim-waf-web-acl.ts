@@ -12,6 +12,7 @@ import type { SimWafAction } from "./sim-waf-action.js";
 import type { SimWafRule } from "./sim-waf-rule.js";
 import type { SimWafWebAclRuleScope } from "./sim-waf-rule.type.js";
 import { compileSimWafWebAclRules } from "./sim-waf-rules.js";
+import { simWafWebAclCapacity } from "./sim-waf-web-acl-capacity.js";
 import {
   readSimWafDefaultAction,
   type SimWafWebAclConfiguration,
@@ -33,11 +34,22 @@ interface SimWafWebAclProperties
  * default action.
  */
 export class SimWafWebAcl extends SimWafResource {
+  /**
+   * The prefix every label a rule of this web ACL adds is qualified by.
+   *
+   * AWS writes it `awswaf:<account ID>:webacl:<web ACL name>:`, and a
+   * `LabelMatchStatement` in another web ACL is written against it. Nothing
+   * here prefixes a label with it, because a rule matching a label of its own
+   * web ACL matches the unqualified name.
+   */
+  public readonly labelNamespace: string;
+
   readonly #scope: SimWafWebAclRuleScope;
 
   #configuration: SimWafWebAclConfiguration;
   #defaultAction: SimWafAction;
   #rules: readonly SimWafRule[];
+  #capacity: number;
 
   constructor(properties: SimWafWebAclProperties) {
     super("webacl", properties);
@@ -49,6 +61,17 @@ export class SimWafWebAcl extends SimWafResource {
       properties.configuration,
       this.#scope,
     );
+    this.#capacity = simWafWebAclCapacity(properties.configuration.rules);
+    this.labelNamespace =
+      `awswaf:${properties.accountRegionScope.accountId}:webacl:` +
+      `${properties.name}:`;
+  }
+
+  /**
+   * What this web ACL's rules add up to in capacity units.
+   */
+  get capacity(): number {
+    return this.#capacity;
   }
 
   /**
@@ -76,6 +99,7 @@ export class SimWafWebAcl extends SimWafResource {
     this.#configuration = configuration;
     this.#defaultAction = defaultAction;
     this.#rules = rules;
+    this.#capacity = simWafWebAclCapacity(configuration.rules);
   }
 
   /**
