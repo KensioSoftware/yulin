@@ -42,6 +42,16 @@ export function updateFunctionCodeInput(
   };
 }
 
+/**
+ * Read an UpdateFunctionConfiguration request, which names the function in the
+ * path and states the settings to change in the body.
+ */
+export function updateFunctionConfigurationInput(
+  input: SimRestJsonInput,
+): Record<string, unknown> {
+  return { ...input.json(), FunctionName: input.label("FunctionName") };
+}
+
 function functionCode(code: Record<string, unknown>): Record<string, unknown> {
   const zipFile = code["ZipFile"];
 

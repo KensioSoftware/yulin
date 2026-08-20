@@ -102,6 +102,10 @@ export type {
   SimUpdateFunctionCodeCommandOutput,
 } from "./update-function-code/update-function-code.command.js";
 export type {
+  SimUpdateFunctionConfigurationCommand,
+  SimUpdateFunctionConfigurationCommandOutput,
+} from "./update-function-configuration/update-function-configuration.command.js";
+export type {
   SimUpdateFunctionUrlConfigCommand,
   SimUpdateFunctionUrlConfigCommandOutput,
 } from "./update-function-url-config/update-function-url-config.command.js";

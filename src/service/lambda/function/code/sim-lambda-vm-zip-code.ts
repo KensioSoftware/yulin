@@ -5,7 +5,10 @@ import {
   SimLambdaNoVmSdkModuleProvider,
   type SimLambdaVmSdkModuleProvider,
 } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
-import type { SimLambdaExecutableCode } from "./sim-lambda-executable-code.js";
+import type {
+  SimLambdaCodeConfiguration,
+  SimLambdaExecutableCode,
+} from "./sim-lambda-executable-code.js";
 import { parseLambdaHandlerName } from "./sim-lambda-handler-name.js";
 import {
   makeSimLambdaVmContext,
@@ -56,6 +59,23 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
    */
   recordOutputTo(sink: SimLambdaOutputSink): void {
     this.#sink = sink;
+  }
+
+  /**
+   * This archive under changed function settings, ready to cold start again.
+   *
+   * The sandbox is built from the environment and the export is found by the
+   * handler name, and both are fixed once the code has started. So a change to
+   * either produces code of its own, holding the same archive, which the next
+   * invocation cold starts. Whatever the running module had in memory goes,
+   * the way it goes on real Lambda when the configuration changes.
+   */
+  reconfigured(configuration: SimLambdaCodeConfiguration): SimLambdaVmZipCode {
+    return new SimLambdaVmZipCode({
+      ...this.properties,
+      environment: configuration.environment,
+      handlerName: configuration.handlerName ?? this.properties.handlerName,
+    });
   }
 
   /**

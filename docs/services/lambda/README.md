@@ -375,9 +375,67 @@ console.log(invoked.FunctionError);
 await simAws.backgroundTasksComplete();
 ```
 
-Zip code runs under the `Handler` the function already has, because `UpdateFunctionCode` carries none of its own. Replacing a handler-reference function's code with a zip archive is refused for that reason, naming `UpdateFunctionConfiguration` as where a `Handler` would be set. That command is not simulated yet.
+Zip code runs under the `Handler` the function already has, because `UpdateFunctionCode` carries none of its own. Replacing a handler-reference function's code with a zip archive is refused for that reason. Set a `Handler` with [`UpdateFunctionConfiguration`](#changing-a-functions-settings) first, then replace the code.
 
 A published version keeps the code it was published with, so a version published before an update goes on running it while `$LATEST` runs the replacement. `Publish: true` publishes a version of the replacement code and answers with that version rather than with `$LATEST`. See [Versions and aliases](#versions-and-aliases).
+
+## Changing a function's settings
+
+`UpdateFunctionConfigurationCommand` changes the settings simulated Lambda models: `Role`, `Handler`, `Runtime`, `Description`, `Timeout`, `MemorySize` and `Environment`. A member the request leaves out keeps the value the function has. Changing one setting says nothing about the rest.
+
+`Environment` replaces the whole variable map rather than merging into it, as on real AWS. A variable the request leaves out is gone, and `Variables: {}` clears them all. The names are validated the way `CreateFunction` validates them, down to the reserved ones the runtime owns.
+
+```typescript sim-lambda-update-function-configuration
+/**
+ * Changing a simulated Lambda function's timeout and environment variables.
+ */
+
+import {
+  CreateFunctionCommand,
+  InvokeCommand,
+  UpdateFunctionConfigurationCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Timeout: 30,
+    Environment: { Variables: { ORDERS_TABLE: "orders-v1" } },
+    Code: {
+      ZipFile: makeLambdaZipFileInput((_event, context) => ({
+        table: process.env["ORDERS_TABLE"],
+        remainingMs: context.getRemainingTimeInMillis(),
+      })),
+    },
+  }),
+);
+
+await lambda.updateFunctionConfiguration(
+  new UpdateFunctionConfigurationCommand({
+    FunctionName: "orders",
+    Timeout: 1,
+    Environment: { Variables: { ORDERS_TABLE: "orders-v2" } },
+  }),
+);
+
+const invoked = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "orders" }),
+);
+console.log(Buffer.from(invoked.Payload ?? new Uint8Array()).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+The function keeps its name, ARN, code, [resource-based policy](#resource-based-policies), [Function URL](#function-urls), published versions and aliases. A version published beforehand keeps the settings it was published with, and one published afterwards carries the changed ones. See [Versions and aliases](#versions-and-aliases).
+
+A changed `Environment`, `MemorySize` or `Handler` reaches the code itself. The next invocation of a [zip code function](#zip-packaged-code-and-the-vm-runtime) cold starts under the new settings. Whatever its module had in memory goes, the way it goes on real Lambda when the configuration changes. A `Handler` change picks a different export out of the archive already deployed, with no need to upload it again.
 
 ## Listing the functions
 
@@ -2904,6 +2962,8 @@ Sim Lambda currently supports:
   [simulated ECR](../ecr/ "Simulated ECR usage docs") image its `Code.ImageUri` names
 - `UpdateFunctionCodeCommand`, replacing the code `$LATEST` runs while the function keeps its
   policy, Function URL, versions and aliases
+- `UpdateFunctionConfigurationCommand`, changing the `Role`, `Handler`, `Runtime`, `Description`,
+  `Timeout`, `MemorySize` and `Environment` a function runs with
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
@@ -2962,14 +3022,18 @@ Sim Lambda currently supports:
 Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `UpdateFunctionCodeCommand`,
-  `ListFunctionsCommand`, `DeleteFunctionCommand`, `InvokeCommand`, the permission commands
-  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the version and alias
-  commands, the Function URL config commands and the event source mapping commands are supported.
-  `UpdateFunctionConfiguration` is absent so far, so a function's Role, Handler, Runtime,
-  Description, Timeout, MemorySize and Environment are fixed at creation.
+  `UpdateFunctionConfigurationCommand`, `ListFunctionsCommand`, `DeleteFunctionCommand`,
+  `InvokeCommand`, the permission commands (`AddPermissionCommand`, `RemovePermissionCommand`,
+  `GetPolicyCommand`), the version and alias commands, the Function URL config commands and the
+  event source mapping commands are supported. `GetFunctionConfiguration` and the concurrency and
+  tagging commands are absent so far.
 - `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
-  along with `Architectures` and `SourceKMSKeyArn`. `ListFunctions` leaves out `Marker`/`MaxItems`
-  paging and `MasterRegion`.
+  along with `Architectures` and `SourceKMSKeyArn`. `UpdateFunctionConfiguration` takes only the
+  settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `DeadLetterConfig`,
+  `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`.
+  `ListFunctions` leaves out `Marker`/`MaxItems` paging and `MasterRegion`.
+- A settings change takes effect at once. Real Lambda reports `LastUpdateStatus: "InProgress"` while
+  it rolls the change out, and neither that member nor the wait it implies is simulated.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
@@ -3080,7 +3144,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves eighteen of these operations over HTTP, listed in the
+- `serveSimAws` serves nineteen of these operations over HTTP, listed in the
   [serving docs](../../serve/README.md#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](../../sdk/) instead.

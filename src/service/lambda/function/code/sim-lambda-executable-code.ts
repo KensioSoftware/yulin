@@ -1,5 +1,17 @@
+import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+
+/**
+ * The function settings a change to which reaches the code itself.
+ *
+ * The environment is what the code reads its variables from, and the handler
+ * name is what finds the export to run inside a code archive.
+ */
+export interface SimLambdaCodeConfiguration {
+  readonly environment: SimLambdaEnvironment;
+  readonly handlerName: string | undefined;
+}
 
 /**
  * Executable code backing a sim Lambda function.
@@ -25,6 +37,18 @@ export interface SimLambdaExecutableCode {
    * output reaches the function's log group.
    */
   recordOutputTo(sink: SimLambdaOutputSink): void;
+
+  /**
+   * This code under changed function settings, cold rather than warm.
+   *
+   * UpdateFunctionConfiguration replaces a real function's execution
+   * environment, so the next invocation starts one afresh under the new
+   * settings. Code holding neither the environment nor the handler name has
+   * nothing to rebuild and answers with itself.
+   */
+  reconfigured(
+    configuration: SimLambdaCodeConfiguration,
+  ): SimLambdaExecutableCode;
 
   handlerFunction(): SimLambdaHandler;
 }
@@ -52,6 +76,17 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
    */
   recordOutputTo(): void {
     // Recorded by the invocation, from the process globals.
+  }
+
+  /**
+   * Answer with this code unchanged.
+   *
+   * A referenced handler was given directly rather than found by name, and it
+   * reads process.env, which the invocation applies from the function's
+   * current environment. Neither setting is held here.
+   */
+  reconfigured(): SimLambdaExecutableCode {
+    return this;
   }
 
   /**

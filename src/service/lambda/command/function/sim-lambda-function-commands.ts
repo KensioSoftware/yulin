@@ -43,6 +43,11 @@ import type {
   SimUpdateFunctionCodeCommand,
   SimUpdateFunctionCodeCommandOutput,
 } from "../update-function-code/update-function-code.command.js";
+import { UpdateFunctionConfigurationCommandHandler } from "../update-function-configuration/update-function-configuration.handler.js";
+import type {
+  SimUpdateFunctionConfigurationCommand,
+  SimUpdateFunctionConfigurationCommandOutput,
+} from "../update-function-configuration/update-function-configuration.command.js";
 
 interface SimLambdaFunctionCommandsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -134,6 +139,28 @@ export class SimLambdaFunctionCommands {
       containerImages,
       vmSdkModuleProvider,
       outboundHttp,
+    }).handle(command, options);
+  }
+
+  /**
+   * Change a function's settings.
+   */
+  async updateConfiguration(
+    command: SimUpdateFunctionConfigurationCommand,
+    options?: SimLambdaFunctionCommandOptions,
+  ): Promise<SimUpdateFunctionConfigurationCommandOutput> {
+    const { functionLookup, functions, iam, background, environmentConflicts } =
+      this.properties;
+
+    return await new UpdateFunctionConfigurationCommandHandler({
+      // The lookup rather than the map itself, because this command resolves
+      // a name that may arrive as a function ARN. The map comes too, for the
+      // environments a changed one is checked against.
+      functions: functionLookup,
+      functionMap: functions,
+      iam,
+      background,
+      environmentConflicts,
     }).handle(command, options);
   }
 

@@ -24,6 +24,10 @@ import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { defaultLambdaHandler } from "./sim-lambda-handler.type.js";
+import {
+  reconfigureSimLambdaFunction,
+  type SimLambdaFunctionConfigurationUpdate,
+} from "./sim-lambda-function-reconfiguration.js";
 import type {
   SimLambdaFunctionName,
   SimLambdaFunctionProperties,
@@ -44,15 +48,23 @@ export type {
  */
 export class SimLambdaFunction {
   public readonly name: SimLambdaFunctionName;
-  public readonly roleArn: string;
   public readonly accountRegionScope: SimAwsAccountRegionScope;
-  public readonly handlerName: string | undefined;
-  public readonly runtimeName: string | undefined;
-  public readonly description: string | undefined;
-  public readonly timeoutSeconds: number;
-  public readonly memorySizeMb: number;
-  public readonly environment: SimLambdaEnvironment;
   public readonly version: string;
+
+  /**
+   * The settings UpdateFunctionConfiguration changes, which is everything
+   * about the function that is neither its identity nor its code.
+   *
+   * They are read all over the simulation and written in one place, which is
+   * updateConfiguration below.
+   */
+  public roleArn: string;
+  public handlerName: string | undefined;
+  public runtimeName: string | undefined;
+  public description: string | undefined;
+  public timeoutSeconds: number;
+  public memorySizeMb: number;
+  public environment: SimLambdaEnvironment;
   /**
    * This function's resource-based policy, which says who may act on it.
    *
@@ -156,6 +168,11 @@ export class SimLambdaFunction {
   publishedAs(version: string, description?: string): SimLambdaFunction {
     return new SimLambdaFunction({
       ...this.properties,
+      roleArn: this.roleArn,
+      handlerName: this.handlerName,
+      runtimeName: this.runtimeName,
+      timeoutSeconds: this.timeoutSeconds,
+      memorySizeMb: this.memorySizeMb,
       code: this.#code,
       environment: this.environment,
       runAsOwner: this.runAsOwner,
@@ -163,6 +180,17 @@ export class SimLambdaFunction {
       description: description ?? this.description,
       version,
     });
+  }
+
+  /**
+   * Apply a settings change, as UpdateFunctionConfiguration makes one.
+   *
+   * The function object survives, so its resource-based policy stands and the
+   * version, alias and Function URL stores go on finding it under its name. A
+   * version published beforehand keeps the settings it was published with.
+   */
+  updateConfiguration(update: SimLambdaFunctionConfigurationUpdate): void {
+    this.#code = reconfigureSimLambdaFunction(this, update, this.#code);
   }
 
   /**

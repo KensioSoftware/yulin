@@ -7,6 +7,7 @@ import {
   ListFunctionsCommand,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
+  GetFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertArrayLength,
@@ -109,7 +110,7 @@ describe("simulated Lambda SDK Command routing", () => {
     await simSdk.simAws.backgroundTasksComplete();
   });
 
-  it("routes UpdateFunctionCode and ListFunctions through an intercepted client", async () => {
+  it("routes the function update and listing Commands through an intercepted client", async () => {
     using simSdk = new SimSdk();
     const client = new LambdaClient({ region: "eu-west-2" });
     simSdk.intercept(client);
@@ -134,10 +135,18 @@ describe("simulated Lambda SDK Command routing", () => {
     assertNonNullable(invoked.Payload);
     assertIdentical(Buffer.from(invoked.Payload).toString(), '"second"');
 
+    await client.send(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "intercepted",
+        Timeout: 5,
+      }),
+    );
+
     const listed = await client.send(new ListFunctionsCommand({}));
     assertNonNullable(listed.Functions);
     assertArrayLength(listed.Functions, 1);
     assertIdentical(listed.Functions[0].FunctionName, "intercepted");
+    assertIdentical(listed.Functions[0].Timeout, 5);
 
     await simSdk.simAws.backgroundTasksComplete();
   });
@@ -149,11 +158,11 @@ describe("simulated Lambda SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new UpdateFunctionConfigurationCommand({ FunctionName: "orders" }),
+        new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
       );
     });
 
-    assertStringIncludes(error.message, "UpdateFunctionConfigurationCommand");
+    assertStringIncludes(error.message, "GetFunctionConfigurationCommand");
     assertStringIncludes(error.message, "InvokeCommand");
   });
 });
