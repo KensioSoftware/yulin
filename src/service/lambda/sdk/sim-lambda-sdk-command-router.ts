@@ -14,6 +14,7 @@ import type { SimUpdateAliasCommand } from "../command/update-alias/update-alias
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
 import type { SimListFunctionsCommand } from "../command/list-functions/list-functions.command.js";
 import type { SimUpdateFunctionCodeCommand } from "../command/update-function-code/update-function-code.command.js";
+import type { SimUpdateFunctionConfigurationCommand } from "../command/update-function-configuration/update-function-configuration.command.js";
 import type {
   SimCreateEventSourceMappingCommand,
   SimDeleteEventSourceMappingCommand,
@@ -61,6 +62,14 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.updateFunctionCode(
             command as SimUpdateFunctionCodeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateFunctionConfigurationCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.updateFunctionConfiguration(
+            command as SimUpdateFunctionConfigurationCommand,
             simSdkCallerOptions(context),
           ),
       ],

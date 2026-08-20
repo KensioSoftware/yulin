@@ -479,10 +479,10 @@ aws lambda create-function --function-name orders \
   --zip-file fileb://orders.zip
 ```
 
-The operations served are eighteen of the ones simulated Lambda implements:
+The operations served are nineteen of the ones simulated Lambda implements:
 
-- **Functions** — `CreateFunction`, `GetFunction`, `UpdateFunctionCode`, `ListFunctions`,
-  `DeleteFunction`, `Invoke`
+- **Functions** — `CreateFunction`, `GetFunction`, `UpdateFunctionCode`,
+  `UpdateFunctionConfiguration`, `ListFunctions`, `DeleteFunction`, `Invoke`
 - **Function URLs** — `CreateFunctionUrlConfig`, `GetFunctionUrlConfig`,
   `UpdateFunctionUrlConfig`, `DeleteFunctionUrlConfig`, `ListFunctionUrlConfigs`
 - **Permissions** — `AddPermission`, `RemovePermission`, `GetPolicy`
@@ -493,8 +493,8 @@ The version and alias operations have no route here yet, and reach the simulatio
 or SDK interception instead.
 
 Anything else is refused as `NotImplemented`, which an SDK raises under that name. The refusal names
-the path it arrived at. `aws lambda update-function-configuration` reports that
-`PUT /2015-03-31/functions/{name}/configuration` is unserved, and an unimplemented operation sharing
+the path it arrived at. `aws lambda get-function-configuration` reports that
+`GET /2015-03-31/functions/{name}/configuration` is unserved, and an unimplemented operation sharing
 a method with one that is served gets the same answer.
 
 Simulated Lambda also answers its own Function URL hostnames, covered above. That path is unchanged,

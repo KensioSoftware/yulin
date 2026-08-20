@@ -1,5 +1,5 @@
-import { requireValidVariableNames } from "./create-function-environment-names.js";
-import type { SimLambdaFunctionEnvironment } from "./create-function.command.js";
+import { requireValidVariableNames } from "./lambda-environment-variable-names.js";
+import type { SimLambdaFunctionEnvironment } from "../../command/create-function/create-function.command.js";
 
 /**
  * Validate the Environment input into the variables declared for a function.

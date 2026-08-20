@@ -3,6 +3,7 @@ import {
   createFunctionInput,
   invokeInput,
   updateFunctionCodeInput,
+  updateFunctionConfigurationInput,
 } from "./sim-lambda-api-function-input.js";
 import { simLambdaInvokeResponse } from "./sim-lambda-api-invoke-output.js";
 
@@ -34,6 +35,12 @@ export const simLambdaFunctionApiRoutes: readonly SimRestJsonRoute[] = [
     path: "/2015-03-31/functions/{FunctionName}/code",
     commandName: "UpdateFunctionCodeCommand",
     input: updateFunctionCodeInput,
+  },
+  {
+    method: "PUT",
+    path: "/2015-03-31/functions/{FunctionName}/configuration",
+    commandName: "UpdateFunctionConfigurationCommand",
+    input: updateFunctionConfigurationInput,
   },
   {
     method: "DELETE",

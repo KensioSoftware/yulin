@@ -3,7 +3,7 @@ import {
   requireLambdaCodeSource,
   type SimLambdaCodeSource,
 } from "../../function/code/lambda-code-source.js";
-import { requireLambdaEnvironmentVariables } from "./create-function-environment.js";
+import { requireLambdaEnvironmentVariables } from "../../function/environment/lambda-environment-variables.js";
 import type { SimCreateFunctionCommand } from "./create-function.command.js";
 
 /**

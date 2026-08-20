@@ -228,10 +228,13 @@ callback, or using the legacy context `done`/`fail`/`succeed` methods.
 ### Environment variables
 
 `function/environment/` owns what a function runs with. `SimLambdaEnvironment` merges the
-AWS-provided runtime variables with the ones declared through `Environment.Variables`, and is built
-at creation time because vm zip code takes it into its sandbox. Name validation lives at
-CreateFunction (`command/create-function/create-function-environment.ts`) and follows AWS's two
-stages in order: the API name-pattern constraint (`ValidationException`), then the reserved names
+AWS-provided runtime variables with the ones declared through `Environment.Variables`, and vm zip
+code takes it into its sandbox at cold start. `UpdateFunctionConfiguration` builds a fresh one and
+hands the code a copy of itself to start again
+(`function/sim-lambda-function-reconfiguration.ts`). A changed variable or memory size reaches a
+sandbox that has already run that way. Name validation
+(`function/environment/lambda-environment-variables.ts`) is shared by both commands and follows
+AWS's two stages in order: the API name-pattern constraint (`ValidationException`), then the reserved names
 real Lambda refuses to let function configuration override
 (`InvalidParameterValueException`). Rejecting the reserved names means the AWS-provided runtime
 variables and the declared ones can never collide, so neither set needs to win over the other.
@@ -747,14 +750,17 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
-- `UpdateFunctionConfiguration`, so a function's Role, Handler, Runtime, Description, Timeout,
-  MemorySize and Environment are fixed at creation
-- `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, and
-  `Marker`/`MaxItems` paging and `MasterRegion` on `ListFunctions`
+- `GetFunctionConfiguration`, and the concurrency and tagging commands
+- `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, the
+  settings simulated Lambda does not model on `UpdateFunctionConfiguration` (`Layers`, `VpcConfig`,
+  `DeadLetterConfig`, `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`,
+  `LoggingConfig`, `RevisionId`), and `Marker`/`MaxItems` paging and `MasterRegion` on
+  `ListFunctions`
+- `LastUpdateStatus`, so a settings change takes effect at once, with no roll-out to wait on
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes the other eighteen
+- version and alias operations over the served HTTP API endpoint, which routes the other nineteen
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

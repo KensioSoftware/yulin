@@ -96,6 +96,10 @@ describe("Resolving a Lambda operation from a served request", () => {
       command("PUT", "/2015-03-31/functions/orders/code"),
       "UpdateFunctionCodeCommand",
     );
+    assertIdentical(
+      command("PUT", "/2015-03-31/functions/orders/configuration"),
+      "UpdateFunctionConfigurationCommand",
+    );
   });
 
   it("routes the Function URL configuration operations", () => {
@@ -150,9 +154,6 @@ describe("Resolving a Lambda operation from a served request", () => {
     // implemented, each sharing its method with one it has
     // Then none of them resolves to the operation beside it
     assertUndefined(command("POST", "/2015-03-31/functions/orders/versions"));
-    assertUndefined(
-      command("PUT", "/2015-03-31/functions/orders/configuration"),
-    );
     assertUndefined(
       command("GET", "/2015-03-31/functions/orders/configuration"),
     );
@@ -220,6 +221,12 @@ describe("Resolving a Lambda operation from a served request", () => {
   it("reads a write from both the path and the body", () => {
     // Given the operations naming their function in the path and stating what
     // to write in the body
+    assertObjectEquals(
+      input("PUT", "/2015-03-31/functions/orders/configuration", {
+        body: JSON.stringify({ Timeout: 5 }),
+      }),
+      { Timeout: 5, FunctionName: "orders" },
+    );
     assertObjectEquals(
       input("POST", "/2021-10-31/functions/orders/url", {
         body: JSON.stringify({ AuthType: "NONE" }),

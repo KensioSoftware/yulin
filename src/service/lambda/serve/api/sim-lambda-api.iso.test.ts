@@ -124,6 +124,27 @@ describe("Serving the simulated Lambda control plane", () => {
     assertIdentical(await invoked.text(), '"again"');
   });
 
+  it("changes a function's settings from the body", async () => {
+    // Given a served simulation
+    const { send } = await servedLambdaApi({ Timeout: 30 });
+
+    // When a settings change arrives, as `aws lambda
+    // update-function-configuration` sends one
+    const response = await send(
+      "PUT",
+      "/2015-03-31/functions/orders/configuration",
+      { body: JSON.stringify({ Timeout: 5, Description: "Takes orders" }) },
+    );
+
+    // Then the updated configuration comes back
+    assertIdentical(response.status, 200);
+    assertObjectMatches((await response.json()) as object, {
+      FunctionName: "orders",
+      Timeout: 5,
+      Description: "Takes orders",
+    });
+  });
+
   it("reports a body that states itself as JSON and is not", async () => {
     // Given a served simulation
     const { send } = await servedLambdaApi();
@@ -153,7 +174,7 @@ describe("Serving the simulated Lambda control plane", () => {
         {
           method: "POST",
           path: "/2015-03-31/functions/{FunctionName}/code",
-          commandName: "UpdateFunctionConfigurationCommand",
+          commandName: "GetFunctionConfigurationCommand",
           input: (input) => ({ FunctionName: input.label("FunctionName") }),
         },
       ],
@@ -175,7 +196,7 @@ describe("Serving the simulated Lambda control plane", () => {
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
     assertStringIncludes(
       await response.text(),
-      "UpdateFunctionConfigurationCommand",
+      "GetFunctionConfigurationCommand",
     );
   });
 });
