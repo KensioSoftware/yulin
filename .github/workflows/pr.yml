@@ -44,7 +44,7 @@ jobs:
           cache: true
       # The SAM expansion tests compare against real SAM. The CLI has no npm
       # package, so the workflow installs it beside the Node toolchain.
-      - uses: aws-actions/setup-sam@v2
+      - uses: aws-actions/setup-sam@v3
         with:
           use-installer: true
       - run: pnpm install --frozen-lockfile
