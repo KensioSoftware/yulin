@@ -9,14 +9,16 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import {
+  SimWafNoProtection,
+  type SimWafProtection,
+} from "../wafv2/association/sim-waf-protection.js";
 import { SimCognitoCfnResourceFactory } from "./cfn/sim-cfn-cognito-resource-factory.js";
-import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import { SimCognitoDomainRegistry } from "./registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-registry.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
-import { SimCognitoAppClients } from "./sim-cognito-app-clients.js";
-import type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
+import { SimCognitoUserPools } from "./sim-cognito-user-pools.js";
 import type { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
 import type {
@@ -63,6 +65,13 @@ interface SimCognitoIdentityProviderProperties {
    * ARN, and that ARN can name any Account and Region.
    */
   readonly triggerFunctions?: SimCognitoTriggerFunctions;
+
+  /**
+   * The web ACLs this scope's pools can be protected by. A standalone
+   * simulated Cognito has none, so a hosted domain serves the requests it
+   * always did.
+   */
+  readonly webAcls?: SimWafProtection;
 }
 
 /**
@@ -81,7 +90,7 @@ interface SimCognitoIdentityProviderProperties {
  * Only user pools are simulated. Cognito identity pools, which hand out AWS
  * credentials, are a different service and are not simulated at all.
  */
-export class SimCognitoIdentityProvider extends SimCognitoAppClients {
+export class SimCognitoIdentityProvider extends SimCognitoUserPools {
   private readonly pools: SimCognitoUserPoolStore;
   private readonly userPoolRegistry: SimCognitoUserPoolRegistry;
   private readonly domainRegistry: SimCognitoDomainRegistry;
@@ -98,6 +107,7 @@ export class SimCognitoIdentityProvider extends SimCognitoAppClients {
       userPoolRegistry = new SimCognitoUserPoolRegistry(),
       domainRegistry = new SimCognitoDomainRegistry(),
       triggerFunctions = new SimCognitoNoTriggerFunctions(),
+      webAcls = new SimWafNoProtection(),
     } = properties;
     const pools = new SimCognitoUserPoolStore({
       registry: userPoolRegistry,
@@ -112,6 +122,7 @@ export class SimCognitoIdentityProvider extends SimCognitoAppClients {
         pools,
         domains: domainRegistry,
         triggerFunctions,
+        webAcls,
       }),
       background,
     });
@@ -199,84 +210,15 @@ export class SimCognitoIdentityProvider extends SimCognitoAppClients {
   }
 
   /**
-   * Handle a CreateUserPool Command from the SDK.
-   */
-  async createUserPool(
-    command: simCognitoCommands.SimCreateUserPoolCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimCreateUserPoolCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPools.create(command, options);
-  }
-
-  /**
-   * Handle a DescribeUserPool Command from the SDK.
-   */
-  async describeUserPool(
-    command: simCognitoCommands.SimDescribeUserPoolCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimDescribeUserPoolCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPools.describe(command, options);
-  }
-
-  /**
-   * Handle an UpdateUserPool Command from the SDK.
-   */
-  async updateUserPool(
-    command: simCognitoCommands.SimUpdateUserPoolCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimUpdateUserPoolCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPools.update(command, options);
-  }
-
-  /**
-   * Handle a DeleteUserPool Command from the SDK.
-   */
-  async deleteUserPool(
-    command: simCognitoCommands.SimDeleteUserPoolCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimDeleteUserPoolCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPools.delete(command, options);
-  }
-
-  /**
-   * Handle a SetUserPoolMfaConfig Command from the SDK.
+   * The web ACLs in front of this scope's pools, as a served request sees
+   * them.
    *
-   * This is the second call real CloudFormation makes when a template declares
-   * a pool with MFA, and the only place the factors behind an `MfaConfiguration`
-   * are set.
+   * The simulator's own accessor rather than a Cognito operation: a request to
+   * a pool's hosted domain is served without a Command, so this is how the
+   * serving layer reaches whatever a web ACL decided about it.
    */
-  async setUserPoolMfaConfig(
-    command: simCognitoCommands.SimSetUserPoolMfaConfigCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimSetUserPoolMfaConfigCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPoolMfa.set(command, options);
-  }
-
-  /**
-   * Handle a GetUserPoolMfaConfig Command from the SDK.
-   */
-  async getUserPoolMfaConfig(
-    command: simCognitoCommands.SimGetUserPoolMfaConfigCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimGetUserPoolMfaConfigCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userPoolMfa.get(command, options);
-  }
-
-  /**
-   * Handle a ListUserPools Command from the SDK.
-   */
-  async listUserPools(
-    command: simCognitoCommands.SimListUserPoolsCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimListUserPoolsCommandOutput> {
-    await this.background.sequence();
-    return this.commands.listUserPools.handle(command, options);
+  webAcls(): SimWafProtection {
+    return this.commands.webAcls;
   }
 
   /**

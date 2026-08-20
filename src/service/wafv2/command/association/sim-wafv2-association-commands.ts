@@ -3,7 +3,7 @@ import { requiredSimWafArn } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { simWafWebAclOutput } from "../web-acl/sim-waf-web-acl-output.js";
 import type { SimWafAssociationAccess } from "./sim-wafv2-association-access.js";
-import { refuseUnsimulatedSimWafResourceType } from "./sim-wafv2-association-input.js";
+import { simWafListedResourceType } from "./sim-wafv2-association-input.js";
 import type {
   SimAssociateWebAclCommand,
   SimAssociateWebAclCommandOutput,
@@ -58,7 +58,7 @@ export class SimWafAssociationCommands {
     const webAcl = this.#access.webAcl(webAclArn);
 
     this.#access.requireResource(resource);
-    this.#associations.associate(resource.arn, webAcl);
+    this.#associations.associate(resource, webAcl);
 
     return { $metadata: {} };
   }
@@ -117,8 +117,7 @@ export class SimWafAssociationCommands {
   ): SimListResourcesForWebAclCommandOutput {
     const { input } = command;
     const webAclArn = requiredSimWafArn(input.WebACLArn, "WebACLArn");
-
-    refuseUnsimulatedSimWafResourceType(input.ResourceType);
+    const resourceType = simWafListedResourceType(input.ResourceType);
 
     this.#access.authorizeWebAcl(
       "wafv2:ListResourcesForWebACL",
@@ -130,6 +129,7 @@ export class SimWafAssociationCommands {
       $metadata: {},
       ResourceArns: this.#associations.resourceArnsFor(
         this.#access.webAcl(webAclArn),
+        resourceType,
       ),
     };
   }

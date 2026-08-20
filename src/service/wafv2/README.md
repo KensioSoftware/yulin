@@ -5,9 +5,9 @@ regex pattern sets, and it evaluates a request against a web ACL's rules to reac
 of the AWS managed rule groups are carried here, approximated to a tier each rule declares.
 
 `SimWafV2.evaluateRequest` is the entry point a fronting service calls once it has a web ACL ARN to
-hand. An API Gateway REST API stage reaches it through `AssociateWebACL`. Simulated CloudFront calls
-it in `cloudfront/controller/web-acl/`, for every request to a distribution whose `WebACLId` names
-one. Cognito user pools come later.
+hand. An API Gateway REST API stage and a Cognito user pool both reach it through
+`AssociateWebACL`. Simulated CloudFront calls it in `cloudfront/controller/web-acl/`, for every
+request to a distribution whose `WebACLId` names one.
 
 ## Entry points
 
@@ -79,28 +79,42 @@ name:
 ```text
 SimWafAssociations              resource ARN to web ACL, and what a fronting service asks it
 ├── SimWafProtectedResource     what an association ARN names, read from the ARN
-│   └── SimWafRestApiStage      the one resource type so far
+│   ├── SimWafRestApiStage      an API Gateway REST API stage
+│   └── SimWafUserPool          a Cognito user pool
 ├── SimWafProtectedResources    the port asking whether that resource is there
-└── SimWafProtection            the port a fronting service takes
+├── SimWafProtection            the port a fronting service takes
+└── SimWafRequestInspection     the serving half, shared by both fronting services
 ```
 
-The store holds the web ACL itself rather than its ARN. A request reaching a protected stage is then
-evaluated without a second lookup, and `DeleteWebACL` refuses a web ACL something still points at.
-Deleting the web ACL out from under a stage would leave the stage protected by rules nothing holds.
+The store holds the web ACL itself rather than its ARN. A request reaching a protected resource is
+then evaluated without a second lookup, and `DeleteWebACL` refuses a web ACL something still points
+at. Deleting the web ACL out from under a stage would leave the stage protected by rules nothing
+holds. Each association records the resource type alongside the web ACL, because
+`ListResourcesForWebACL` lists one type at a time and the ARN would otherwise have to be read again
+to say which type it named.
 
 Two ports run in opposite directions, and both are needed. `SimWafProtectedResources` is how
-WAFv2 asks whether a stage ARN names anything, since WAFv2 holds no API Gateway state of its own.
-`SimWafProtection` is how a simulated API Gateway reaches the web ACL in front of a stage it is
-about to serve, and how it lets go of one when the stage is deleted.
+WAFv2 asks whether a resource ARN names anything, since WAFv2 holds no API Gateway or Cognito state
+of its own. `SimWafProtection` is how a fronting service reaches the web ACL in front of the
+resource it is about to serve, and how it lets go of one when the resource is deleted.
 `SimAwsWafProtectedResources` is the implementation reading a simulated AWS instance, and a
 standalone `SimWafV2` gets `SimWafNoProtectedResources`, which finds nothing. A standalone
-`SimApiGateway` gets `SimWafNoProtection` and serves every request the way it did before web ACLs.
+`SimApiGateway` or `SimCognitoIdentityProvider` gets `SimWafNoProtection` and serves every request
+the way it did before web ACLs.
+
+`association/sim-waf-request-inspection.ts` is the serving half both fronting services share. It
+short-circuits on an unprotected resource, evaluates the rules, turns a block into the 403 response
+and adds an `Allow` rule's inserted headers to what is forwarded. Two things differ between the
+services and are asked for there. Where the resource ARN comes from, and whether the body is
+forwarded. API Gateway forwards it. Cognito forwards it for the user pool API and withholds it for
+managed login. `forwardBody` is `false` on the Cognito path, which leaves a `ByteMatchStatement` on
+`Body` inspecting an empty field at a hosted domain, as it inspects one on AWS.
 
 `sim-waf-protected-resource.ts` reads an ARN for what it names. The three refusals in it mean
 different things. An HTTP API stage is refused because AWS WAF protects no HTTP API, and an
 association accepted here would let a test cover protection AWS never applies. A load balancer and
-the other four resource types AWS does protect are refused as unsimulated. Anything else is refused
-as an ARN. A second target type joins the union and gains a branch in the reader, and everything
+the other three resource types AWS does protect are refused as unsimulated. Anything else is refused
+as an ARN. A third target type joins the union and gains a branch in the reader, and everything
 holding an association goes on addressing a resource by its ARN.
 
 ## Compiling a statement

@@ -1,12 +1,11 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
-import type { AwsRegionName } from "../../aws/sim-aws-region.js";
+import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimCognitoUserPoolDomain } from "../user-pool/domain/sim-cognito-user-pool-domain.js";
 import type { SimCognitoUserPool } from "../user-pool/sim-cognito-user-pool.js";
-import { simCognitoUserPoolRegionName } from "../user-pool/sim-cognito-user-pool-id.js";
-import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provider.js";
 import { SimCognitoDomainEndpoints } from "./sim-cognito-domain-endpoints.js";
+import { simCognitoPoolScope } from "./sim-cognito-pool-scope.js";
+import { SimCognitoWebAclInspection } from "./sim-cognito-web-acl-inspection.js";
 
 interface SimCognitoDomainControllerProperties {
   readonly simAws: SimAws;
@@ -23,10 +22,15 @@ interface SimCognitoDomainControllerProperties {
  * The pool's own scope answers each request, found from the domain rather than
  * assumed to be the default one, because a domain names a pool that any
  * Account and Region of the simulation could have created.
+ *
+ * A web ACL in front of the pool sees the request before any of the endpoints
+ * do, as it does on real Cognito. A blocked request is answered with 403 and
+ * reaches no endpoint.
  */
 export class SimCognitoDomainController {
   private readonly simAws: SimAws;
   private readonly endpoints = new SimCognitoDomainEndpoints();
+  private readonly webAcl = new SimCognitoWebAclInspection();
 
   constructor(properties: SimCognitoDomainControllerProperties) {
     this.simAws = properties.simAws;
@@ -48,14 +52,23 @@ export class SimCognitoDomainController {
       return undefined;
     }
 
-    const url = new URL(serviceRequest.request.url);
     const pool = this.pool(domain);
+    const cognito = simCognitoPoolScope(this.simAws, pool);
+    const inspected = await this.webAcl.inspect({
+      pool,
+      cognito,
+      request: serviceRequest.request,
+    });
+
+    if (inspected.blocked !== undefined) {
+      return inspected.blocked;
+    }
 
     return await this.endpoints.handleRequest({
       pool,
-      cognito: this.cognitoFor(pool),
-      serviceRequest,
-      url,
+      cognito,
+      serviceRequest: forwarded(serviceRequest, inspected.request),
+      url: new URL(inspected.request.url),
     });
   }
 
@@ -91,18 +104,29 @@ export class SimCognitoDomainController {
 
     return pool;
   }
+}
 
-  /**
-   * The simulated Cognito scope that owns a pool.
-   *
-   * The Account comes from the pool's ARN and the Region from its id, and each
-   * scope's services are made once and kept, so this is the same service
-   * object that created the pool rather than another view of it.
-   */
-  private cognitoFor(pool: SimCognitoUserPool): SimCognitoIdentityProvider {
-    return this.simAws
-      .account(pool.arn.accountId)
-      .region(simCognitoUserPoolRegionName(pool.id) as AwsRegionName)
-      .cognitoIdentityProvider();
+/**
+ * The request the endpoints answer, as the web ACL asked for it to be
+ * forwarded.
+ *
+ * A rule with custom request handling adds headers to what reaches the origin,
+ * and the hosted domain is the origin here. An allowed request no rule touched
+ * is the one that arrived.
+ */
+function forwarded(
+  serviceRequest: SimAwsServiceRequest,
+  request: Request,
+): SimAwsServiceRequest {
+  if (request === serviceRequest.request) {
+    return serviceRequest;
   }
+
+  return new SimAwsServiceRequest({
+    target: serviceRequest.target,
+    request,
+    caller: serviceRequest.caller,
+    source: serviceRequest.source,
+    body: serviceRequest.body,
+  });
 }
