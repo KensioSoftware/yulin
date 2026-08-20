@@ -1,6 +1,9 @@
 import { SimSdkUnbridgedWireRequestError } from "../../../sdk/error/sim-sdk.error.js";
 import { SimSdkWireDispatcher } from "../../../sdk/wire/sim-sdk-wire-dispatcher.js";
-import { readSimSdkWireCredentialScope } from "../../../sdk/wire/sim-sdk-wire-operation.js";
+import {
+  readSimSdkWireCredentialScope,
+  readSimSdkWirePresignedCredentialScope,
+} from "../../../sdk/wire/sim-sdk-wire-operation.js";
 import type { SimSdkWireRequest } from "../../../sdk/wire/sim-sdk-wire.types.js";
 import type { SimAws } from "../../../service/aws/sim-aws.js";
 import { SimAwsReceivedRequest } from "../request/sim-aws-received-request.js";
@@ -26,6 +29,9 @@ interface SimAwsApiEndpointProperties {
  *
  * So this endpoint routes on the credential scope. One endpoint URL then
  * serves every simulated service, which is the shape `--endpoint-url` wants.
+ * A presigned URL signed for the same endpoint states its scope in the query
+ * string, since it carries no Authorization header of its own, and it routes
+ * here on that.
  *
  * The scope also says which protocol to read the request with. Most simulated
  * services speak the AWS JSON protocol and name their operation in a header.
@@ -54,7 +60,13 @@ export class SimAwsApiEndpoint {
     const received = await SimAwsReceivedRequest.receive(request);
     const wireRequest = simAwsApiWireRequest(request, received.body);
 
-    const scope = readSimSdkWireCredentialScope(wireRequest);
+    // A presigned query signature is read first, because that is the order
+    // simulated IAM verifies the two in. Routing a request by one signature
+    // and checking its scope against the other would refuse a request over a
+    // disagreement the caller never stated.
+    const scope =
+      readSimSdkWirePresignedCredentialScope(wireRequest.path) ??
+      readSimSdkWireCredentialScope(wireRequest);
     if (scope === undefined) {
       return undefined;
     }

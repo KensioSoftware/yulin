@@ -61,6 +61,30 @@ describe("Presigned simulated S3 URLs over a local server", () => {
     assertIdentical(await response.text(), presignObjectBody);
   });
 
+  it("downloads through a URL signed for an endpoint URL", async () => {
+    // Given a URL presigned by a client pointed at the local server as an
+    // endpoint URL, the form --endpoint-url and AWS_ENDPOINT_URL take
+    const url = await getSignedUrl(
+      presignClient({
+        endpoint: `http://localhost:${srv.port}`,
+        credentials: simulation.credentials,
+        forcePathStyle: true,
+      }),
+      new GetObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When it is fetched over real HTTP
+    const response = await fetch(url);
+
+    // Then the Object comes back, with no hostname naming the service
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), presignObjectBody);
+  });
+
   it("uploads an Object through a presigned URL", async () => {
     // Given a presigned upload URL
     const url = await getSignedUrl(

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   presignBucketName,
+  presignClient,
   presignObjectBody,
   presignObjectKey,
   presignSimulation,
@@ -30,6 +31,90 @@ describe("Presigned simulated S3 URLs", () => {
     assertIdentical(response.status, 200);
     assertIdentical(await response.text(), presignObjectBody);
     assertIdentical(response.headers.get("content-type"), "application/pdf");
+  });
+
+  it("serves an Object through a URL signed for an endpoint URL", async () => {
+    // Given a client pointed at an endpoint URL, the form --endpoint-url and
+    // AWS_ENDPOINT_URL take, which names no service in its hostname
+    const { http, credentials } = await presignSimulation();
+    const url = await getSignedUrl(
+      presignClient({
+        endpoint: "http://localhost:4566",
+        credentials,
+        forcePathStyle: true,
+      }),
+      new GetObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When the presigned URL is fetched
+    const response = await http.fetch(url);
+
+    // Then simulated S3 serves the Object, having read which service the URL
+    // was signed for out of its X-Amz-Credential parameter
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), presignObjectBody);
+  });
+
+  it("serves a presigned URL fetched with an application bearer token", async () => {
+    // Given a presigned URL signed for an endpoint URL
+    const { http, credentials } = await presignSimulation();
+    const url = await getSignedUrl(
+      presignClient({
+        endpoint: "http://localhost:4566",
+        credentials,
+        forcePathStyle: true,
+      }),
+      new GetObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When it is fetched by a client that sends an Authorization header of its
+    // own, which is the application's business and not a signature
+    const response = await http.fetch(url, {
+      headers: { authorization: "Bearer an-application-token" },
+    });
+
+    // Then the URL is still routed and verified by the signature it carries
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), presignObjectBody);
+  });
+
+  it("stores an upload made to an endpoint URL through a presigned PUT", async () => {
+    // Given a presigned PUT URL signed for an endpoint URL
+    const { http, simAws, credentials } = await presignSimulation();
+    const url = await getSignedUrl(
+      presignClient({
+        endpoint: "http://localhost:4566",
+        credentials,
+        forcePathStyle: true,
+      }),
+      new PutObjectCommand({
+        Bucket: presignBucketName,
+        Key: "uploads/to-endpoint.txt",
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When something is uploaded to it
+    const response = await http.fetch(url, {
+      method: "PUT",
+      body: "uploaded to an endpoint URL",
+    });
+
+    // Then it is stored in the simulated Bucket
+    assertIdentical(response.status, 200);
+    const stored = await simAws
+      .s3()
+      .getSimBucketByName(presignBucketName)
+      ?.getObject("uploads/to-endpoint.txt");
+    assertIdentical(stored?.body.toString(), "uploaded to an endpoint URL");
   });
 
   it("attributes the request to the principal that signed the URL", async () => {

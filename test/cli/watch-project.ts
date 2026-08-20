@@ -5,15 +5,24 @@ import { TemporaryDirectory } from "../../src/util/filesystem/temporary-director
  * How long one run of a supervised process is waited for.
  *
  * A run is a real process, spawned through `tsx`, importing whatever the dev
- * script imports. On a loaded CI runner that is seconds rather than the
- * fraction of one it takes on a developer machine, and the first spawn in a
- * file pays for a cold `tsx` transform cache on top of that. Twelve seconds
- * was not enough for it once the rest of the local suite grew. Two of these
- * fit inside the local test timeout, so a test that waited for a restart it
- * never got fails saying how many times the process ran rather than with a
- * bare timeout.
+ * script imports. A dev script that imports Yulin costs about 1.5 seconds of
+ * that on an idle developer machine, nearly all of it transforming and
+ * executing the module graph. A bare script costs 0.3.
+ *
+ * What the budget has to cover is contention rather than that cost. The tests
+ * run on an eight vCPU runner, with the suite running files in parallel and
+ * each supervised test spawning processes of its own, so the machine is
+ * saturated and one spawn stretches by an order of magnitude. Measured under
+ * load, the same spawn takes over twice as long on eighteen cores, and a
+ * runner with eight has further to fall.
+ *
+ * So this has been raised twice, from twelve seconds, then from twenty after a
+ * first spawn failed to land inside it. Forty is roughly twenty-five times the
+ * unloaded cost. Two of these fit inside the local test timeout, so a test
+ * that waited for a restart it never got fails saying how many times the
+ * process ran rather than with a bare timeout.
  */
-export const watchRunTimeoutMs = 20_000;
+export const watchRunTimeoutMs = 40_000;
 
 /**
  * A throwaway project for `yulin watch` to supervise.
