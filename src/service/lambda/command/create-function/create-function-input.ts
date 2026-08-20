@@ -4,6 +4,7 @@ import {
   type SimLambdaCodeSource,
 } from "../../function/code/lambda-code-source.js";
 import { requireLambdaEnvironmentVariables } from "../../function/environment/lambda-environment-variables.js";
+import { requireLambdaDeadLetterTarget } from "../../function/event-invoke/lambda-dead-letter-target.js";
 import type { SimCreateFunctionCommand } from "./create-function.command.js";
 
 /**
@@ -19,6 +20,7 @@ export interface CreateFunctionInput {
   timeoutSeconds: number | undefined;
   memorySizeMb: number | undefined;
   environmentVariables: ReadonlyMap<string, string>;
+  deadLetterTargetArn: string | undefined;
 }
 
 /**
@@ -45,5 +47,6 @@ export function requireCreateFunctionInput(
     timeoutSeconds: input.Timeout,
     memorySizeMb: input.MemorySize,
     environmentVariables: requireLambdaEnvironmentVariables(input.Environment),
+    deadLetterTargetArn: requireLambdaDeadLetterTarget(input.DeadLetterConfig),
   };
 }

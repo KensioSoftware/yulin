@@ -59,4 +59,5 @@ export interface SimLambdaFunctionConfiguration {
   Runtime?: string | undefined;
   Description?: string | undefined;
   Environment?: { Variables: Record<string, string> } | undefined;
+  DeadLetterConfig?: { TargetArn: string } | undefined;
 }

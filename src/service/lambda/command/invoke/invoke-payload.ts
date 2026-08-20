@@ -4,6 +4,15 @@ import {
 } from "../../error/sim-lambda.error.js";
 import type { SimInvokePayload } from "./invoke.command.js";
 
+/**
+ * How a handler error is described to a caller and to a destination.
+ */
+export interface SimLambdaErrorDocument {
+  readonly errorType: string;
+  readonly errorMessage: string;
+  readonly trace: readonly string[];
+}
+
 function payloadText(payload: SimInvokePayload): string {
   if (typeof payload === "string") {
     return payload;
@@ -54,17 +63,26 @@ export function resultPayload(result: unknown): Uint8Array {
 }
 
 /**
- * Serialise a handler error into an AWS-like Invoke error response payload.
+ * Describe a handler error the way AWS reports one.
+ *
+ * Both the Invoke response payload and the record sent to a failure
+ * destination carry this, so it is built once and serialised where it is
+ * needed.
  */
-export function functionErrorPayload(error: unknown): Uint8Array {
+export function functionErrorDocument(error: unknown): SimLambdaErrorDocument {
   const handlerError =
     error instanceof Error ? error : new Error(String(error));
 
-  return Buffer.from(
-    JSON.stringify({
-      errorType: handlerError.name,
-      errorMessage: handlerError.message,
-      trace: (handlerError.stack ?? "").split("\n"),
-    }),
-  );
+  return {
+    errorType: handlerError.name,
+    errorMessage: handlerError.message,
+    trace: (handlerError.stack ?? "").split("\n"),
+  };
+}
+
+/**
+ * Serialise a handler error into an AWS-like Invoke error response payload.
+ */
+export function functionErrorPayload(error: unknown): Uint8Array {
+  return Buffer.from(JSON.stringify(functionErrorDocument(error)));
 }

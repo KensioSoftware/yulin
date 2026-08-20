@@ -1,3 +1,4 @@
+import { SimAwsLambdaDestinations } from "../../lambda/destination/sim-aws-lambda-destinations.js";
 import { SimDynamoDbEventSourceStreams } from "../../lambda/event-source/stream/sim-dynamodb-event-source-streams.js";
 import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs-event-source-queues.js";
 import { SimEcrLambdaContainerImages } from "../../lambda/function/code/image/sim-ecr-lambda-container-images.js";
@@ -31,6 +32,7 @@ interface SimAwsLambdaCollaborators {
   readonly vmSdkModuleProvider: SimSdkLambdaVmModuleProvider;
   readonly outboundHttp: SimLambdaOutboundHttp;
   readonly logs: SimLogsServiceWriter;
+  readonly destinations: SimAwsLambdaDestinations;
 }
 
 /**
@@ -49,6 +51,10 @@ interface SimAwsLambdaCollaborators {
  * A container image function's image is resolved in the whole simulation's ECR
  * rather than this scope's, because an image URI names the Account and Region
  * its registry is in, which need not be this one.
+ *
+ * An asynchronous invocation result is sent through the whole simulation
+ * rather than through this scope, because a destination ARN names the Account
+ * and Region it lives in, and real Lambda delivers across both.
  *
  * Handler output is recorded to the same Account/Region scope's simulated
  * CloudWatch Logs, since that is where `/aws/lambda/<name>` lives for a
@@ -72,6 +78,7 @@ export function simAwsLambdaCollaborators(
   return {
     outboundHttp,
     runAsOwner: simAws,
+    destinations: new SimAwsLambdaDestinations({ simAws }),
     logs: scope.logs().serviceWriter(),
     urlRegistry: properties.urlRegistry,
     codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),

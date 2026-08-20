@@ -10,7 +10,9 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimLambdaDestinationTargets } from "../../destination/sim-lambda-destination-targets.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
+import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import { simLambdaQualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type {
@@ -31,6 +33,8 @@ interface InvokeCommandHandlerProperties {
   versions: SimLambdaFunctionVersionStore;
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
+  eventInvokeConfigs?: SimLambdaEventInvokeConfigStore | undefined;
+  destinations?: SimLambdaDestinationTargets | undefined;
 }
 
 interface InvokeCommandHandlerOptions {
@@ -66,7 +70,11 @@ export class InvokeCommandHandler implements CommandHandler<
     this.versions = versions;
     this.authorizer = new InvokeAuthorizer({ iam });
     this.background = background;
-    this.dispatcher = new SimLambdaInvocationDispatcher({ background });
+    this.dispatcher = new SimLambdaInvocationDispatcher({
+      background,
+      eventInvokeConfigs: properties.eventInvokeConfigs,
+      destinations: properties.destinations,
+    });
   }
 
   /**
@@ -121,6 +129,7 @@ export class InvokeCommandHandler implements CommandHandler<
     return await this.dispatcher.dispatch(
       this.versions.require(simFunction, qualifier),
       command,
+      qualifier,
     );
   }
 }

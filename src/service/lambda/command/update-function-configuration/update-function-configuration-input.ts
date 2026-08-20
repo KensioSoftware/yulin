@@ -1,5 +1,6 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { requireLambdaEnvironmentVariables } from "../../function/environment/lambda-environment-variables.js";
+import { requireLambdaDeadLetterTarget } from "../../function/event-invoke/lambda-dead-letter-target.js";
 import type { SimLambdaFunctionConfigurationUpdate } from "../../function/sim-lambda-function-reconfiguration.js";
 import type { SimUpdateFunctionConfigurationCommand } from "./update-function-configuration.command.js";
 
@@ -45,6 +46,9 @@ export function requireUpdateFunctionConfigurationInput(
         input.Environment === undefined
           ? undefined
           : requireLambdaEnvironmentVariables(input.Environment),
+      deadLetterTargetArn: requireLambdaDeadLetterTarget(
+        input.DeadLetterConfig,
+      ),
     },
   };
 }

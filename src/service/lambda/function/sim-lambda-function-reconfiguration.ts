@@ -23,6 +23,11 @@ export interface SimLambdaFunctionConfigurationUpdate {
    * leaving this out, and real Lambda tells the two apart the same way.
    */
   readonly environmentVariables?: ReadonlyMap<string, string> | undefined;
+  /**
+   * The queue or topic to dead-letter to, or an empty string to stop
+   * dead-lettering, which is how AWS takes a target away.
+   */
+  readonly deadLetterTargetArn?: string | undefined;
 }
 
 /**
@@ -52,6 +57,10 @@ export function reconfigureSimLambdaFunction(
     update.timeoutSeconds ?? simFunction.timeoutSeconds;
   simFunction.memorySizeMb = update.memorySizeMb ?? simFunction.memorySizeMb;
   simFunction.environment = updatedEnvironment(simFunction, update);
+  simFunction.deadLetterTargetArn = updatedDeadLetterTarget(
+    simFunction,
+    update,
+  );
 
   if (
     simFunction.environment === previous.environment &&
@@ -92,4 +101,20 @@ function updatedEnvironment(
     declaredVariables:
       environmentVariables ?? simFunction.environment.declaredVariables,
   });
+}
+
+/**
+ * The dead-letter target a function has after a settings change.
+ */
+function updatedDeadLetterTarget(
+  simFunction: SimLambdaFunction,
+  update: SimLambdaFunctionConfigurationUpdate,
+): string | undefined {
+  if (update.deadLetterTargetArn === undefined) {
+    return simFunction.deadLetterTargetArn;
+  }
+
+  return update.deadLetterTargetArn === ""
+    ? undefined
+    : update.deadLetterTargetArn;
 }

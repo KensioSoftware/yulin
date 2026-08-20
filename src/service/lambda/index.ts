@@ -45,3 +45,9 @@ export type {
   SimLambdaDynamoDbImage,
 } from "./event-source/stream/sim-lambda-dynamodb-attribute-value.js";
 export { SimLambdaStreamCascadeError } from "./event-source/stream/sim-lambda-stream-cascade.error.js";
+export type {
+  SimLambdaDestinationRecord,
+  SimLambdaDestinationRequestContext,
+  SimLambdaDestinationResponseContext,
+} from "./destination/sim-lambda-destination-record.js";
+export type { SimLambdaInvocationCondition } from "./function/event-invoke/sim-lambda-event-invoke-config.js";

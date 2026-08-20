@@ -30,6 +30,11 @@ export interface SimLambdaFunctionProperties {
   timeoutSeconds?: number | undefined;
   memorySizeMb?: number | undefined;
   environment?: SimLambdaEnvironment | undefined;
+  /**
+   * The queue or topic this function's abandoned asynchronous events are sent
+   * to, which is what `DeadLetterConfig.TargetArn` names.
+   */
+  deadLetterTargetArn?: string | undefined;
   runAsOwner?: SimAwsRunAsOwner;
   /**
    * The version this is. A function is `$LATEST`, and a version published

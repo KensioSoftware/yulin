@@ -16,6 +16,7 @@ import type {
   SimLambdaFunctionName,
 } from "../../function/sim-lambda-function.js";
 import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
+import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import { DeleteFunctionAuthorizer } from "./delete-function-authorizer.js";
@@ -29,6 +30,7 @@ interface DeleteFunctionCommandHandlerProperties {
   readonly functions: SimLambdaFunctionMap;
   readonly functionUrls: SimLambdaFunctionUrlStore;
   readonly versions: SimLambdaFunctionVersionStore;
+  readonly eventInvokeConfigs?: SimLambdaEventInvokeConfigStore | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
@@ -50,6 +52,10 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
   private readonly functions: SimLambdaFunctionMap;
   private readonly functionUrls: SimLambdaFunctionUrlStore;
   private readonly versions: SimLambdaFunctionVersionStore;
+  private readonly eventInvokeConfigs:
+    | SimLambdaEventInvokeConfigStore
+    | undefined;
+
   private readonly authorizer: DeleteFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
 
@@ -67,6 +73,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
     this.functions = functions;
     this.functionUrls = functionUrls;
     this.versions = versions;
+    this.eventInvokeConfigs = properties.eventInvokeConfigs;
     this.authorizer = new DeleteFunctionAuthorizer({ iam });
     this.background = background;
   }
@@ -81,7 +88,8 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
    *
    * The resource policy the Add Permission command builds is held on the
    * function itself, so it goes at the same time. So do the versions published
-   * from it and the aliases pointing at those, as they do on real Lambda.
+   * from it, the aliases pointing at those, and the event invoke configs held
+   * under each qualifier, as they do on real Lambda.
    */
   async handle(
     command: SimDeleteFunctionCommand,
@@ -112,6 +120,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
 
     this.functionUrls.deleteIfPresent(simFunction);
     this.versions.forget(simFunction);
+    this.eventInvokeConfigs?.deleteForFunction(functionName);
     this.functions.delete(functionName);
 
     return { $metadata: {} };

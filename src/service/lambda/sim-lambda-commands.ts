@@ -11,6 +11,7 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaAliasCommands } from "./command/alias/sim-lambda-alias-commands.js";
+import { SimLambdaEventInvokeConfigCommands } from "./command/event-invoke-config/sim-lambda-event-invoke-config-commands.js";
 import { SimLambdaEventSourceMappingCommands } from "./command/event-source-mapping/sim-lambda-event-source-mapping-commands.js";
 import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-function-commands.js";
 import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
@@ -31,6 +32,11 @@ import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-la
 import type { SimLogsServiceWriter } from "../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "./function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
+import { SimLambdaEventInvokeConfigStore } from "./function/event-invoke/sim-lambda-event-invoke-config-store.js";
+import {
+  type SimLambdaDestinationTargets,
+  SimLambdaNoDestinationTargets,
+} from "./destination/sim-lambda-destination-targets.js";
 import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import { SimLambdaFunctionLookup } from "./function/url/sim-lambda-function-lookup.js";
 import { SimLambdaFunctionUrlStore } from "./function/url/sim-lambda-function-url-store.js";
@@ -60,6 +66,12 @@ export interface SimLambdaProperties {
   readonly urlRegistry?: SimLambdaUrlRegistry;
   readonly eventSourceQueues?: SimSqsPollQueues;
   readonly eventSourceStreams?: SimLambdaEventSourceStreams;
+  /**
+   * Where a function's asynchronous invocation results are sent. A standalone
+   * SimLambda has no simulated SQS, SNS or EventBridge beside it, so a
+   * destination configured on one has nowhere to deliver.
+   */
+  readonly destinations?: SimLambdaDestinationTargets;
 }
 
 interface SimLambdaCommandsProperties extends SimLambdaProperties {
@@ -89,12 +101,14 @@ export class SimLambdaCommands {
     versions: this.versionStore,
   });
   public readonly functionLookup: SimLambdaFunctionLookup;
+  public readonly eventInvokeConfigStore: SimLambdaEventInvokeConfigStore;
   public readonly functions: SimLambdaFunctionCommands;
   public readonly functionUrls: SimLambdaFunctionUrlCommands;
   public readonly permissions: SimLambdaPermissionCommands;
   public readonly versions: SimLambdaVersionCommands;
   public readonly aliases: SimLambdaAliasCommands;
   public readonly eventSourceMappings: SimLambdaEventSourceMappingCommands;
+  public readonly eventInvokeConfigs: SimLambdaEventInvokeConfigCommands;
 
   constructor(properties: SimLambdaCommandsProperties) {
     const {
@@ -117,9 +131,13 @@ export class SimLambdaCommands {
       // A standalone SimLambda has no simulated ECR beside it, so a container
       // image function created on one has nothing to resolve its image in.
       containerImages = new SimLambdaNoContainerImages(),
+      destinations = new SimLambdaNoDestinationTargets(),
     } = properties;
 
     this.containerImages = containerImages;
+    this.eventInvokeConfigStore = new SimLambdaEventInvokeConfigStore({
+      clock: background,
+    });
 
     this.functionLookup = new SimLambdaFunctionLookup({
       accountRegionScope,
@@ -169,6 +187,12 @@ export class SimLambdaCommands {
       iam,
       background,
     });
+    this.eventInvokeConfigs = new SimLambdaEventInvokeConfigCommands({
+      eventInvokeConfigs: this.eventInvokeConfigStore,
+      functions: this.functionLookup,
+      iam,
+      background,
+    });
     this.functions = new SimLambdaFunctionCommands({
       accountRegionScope,
       functions: properties.functions,
@@ -181,6 +205,8 @@ export class SimLambdaCommands {
       // Shared across function creations so a conflicting environment variable
       // is only reported once for this simulated Lambda.
       environmentConflicts: new SimLambdaEnvironmentConflicts(),
+      eventInvokeConfigs: this.eventInvokeConfigStore,
+      destinations,
       codeStore,
       containerImages,
       vmSdkModuleProvider,

@@ -8,7 +8,9 @@ import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-co
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
+import type { SimLambdaDestinationTargets } from "../../destination/sim-lambda-destination-targets.js";
 import type { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
+import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import type { SimLambdaFunctionMap } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
@@ -59,6 +61,8 @@ interface SimLambdaFunctionCommandsProperties {
   readonly functionUrls: SimLambdaFunctionUrlStore;
   readonly versions: SimLambdaFunctionVersionStore;
   readonly environmentConflicts: SimLambdaEnvironmentConflicts;
+  readonly eventInvokeConfigs: SimLambdaEventInvokeConfigStore;
+  readonly destinations: SimLambdaDestinationTargets;
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly containerImages?: SimLambdaContainerImages | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
