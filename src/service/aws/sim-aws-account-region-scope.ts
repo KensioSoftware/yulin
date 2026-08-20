@@ -33,6 +33,7 @@ import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
+import type { SimWafV2 } from "../wafv2/index.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
@@ -247,6 +248,11 @@ export class SimAwsAccountRegionContainer {
   /** Get simulated STS for this account and region. */
   sts(): SimSts {
     return this.memo.getOrCreate("sts", () => this.factory.createSts(this));
+  }
+
+  /** Get simulated WAFv2 for this account and region. */
+  wafV2(): SimWafV2 {
+    return this.memo.getOrCreate("wafV2", () => this.factory.createWafV2(this));
   }
 
   /**

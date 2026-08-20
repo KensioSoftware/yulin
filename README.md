@@ -44,6 +44,7 @@ npm i -D @kensio/yulin
 - [SQS](./docs/services/sqs "Simulated SQS docs")
 - [SSM Parameter Store](./docs/services/ssm "Simulated SSM Parameter Store docs")
 - [STS](./docs/services/sts "Simulated STS docs")
+- [WAFv2](./docs/services/wafv2 "Simulated WAFv2 docs")
 
 ## Feature specific docs
 

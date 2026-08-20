@@ -29,6 +29,7 @@ import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
+import type { SimWafV2 } from "../wafv2/index.js";
 
 /**
  * Per-service accessors for a default Account Region scope.
@@ -184,5 +185,10 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated STS in the default Account Region scope. */
   sts(): SimSts {
     return this.defaultAccountRegionScope().sts();
+  }
+
+  /** Get simulated WAFv2 in the default Account Region scope. */
+  wafV2(): SimWafV2 {
+    return this.defaultAccountRegionScope().wafV2();
   }
 }
