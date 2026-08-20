@@ -1,32 +1,19 @@
 import { findSimWafManagedRuleGroup } from "../managed/sim-waf-managed-rule-groups.js";
 import type { SimWafStatementInput } from "../statement/sim-waf-statement.type.js";
 import type { SimWafRuleInput } from "./sim-waf-rule.type.js";
-
-/**
- * The web ACL capacity units AWS charges for each statement kind.
- *
- * Only the kinds this simulation evaluates are listed. Every other kind is
- * refused where the rule is written, so a web ACL that has rules to add up
- * cannot hold one. The costs are AWS's published base costs, which is the
- * whole of the sum here: the surcharges for text transformations and for
- * inspecting a JSON body are left out, so a web ACL's capacity reads low
- * against the same rules on AWS.
- *
- * Nothing enforces the 1,500 unit limit on a web ACL. The number exists
- * because `Fn::GetAtt` on `Capacity` asks for one, and a template that outputs
- * it or writes it into an alarm deploys rather than failing on an attribute
- * with nothing behind it.
- */
-const statementCosts: ReadonlyMap<string, number> = new Map([
-  ["ByteMatchStatement", 1],
-  ["RegexMatchStatement", 3],
-  ["RegexPatternSetReferenceStatement", 25],
-  ["SizeConstraintStatement", 1],
-  ["LabelMatchStatement", 1],
-]);
+import { simWafMatchCapacity } from "./sim-waf-statement-capacity.js";
 
 /**
  * What a web ACL's rules add up to in capacity units.
+ *
+ * The costs are the ones AWS publishes for each statement kind, along with the
+ * surcharges for inspecting every query argument and for each text
+ * transformation. `sim-waf-statement-capacity.ts` holds them.
+ *
+ * The sum is an upper bound on what AWS would charge. Real WAF charges a web
+ * ACL the sum of its rules minus whatever work it can share between them, and
+ * publishes no description of when it shares any. Nothing here enforces the
+ * 5,000 unit maximum on a web ACL or the 1,500 units the base price covers.
  */
 export function simWafWebAclCapacity(
   rules: readonly SimWafRuleInput[] | undefined,
@@ -39,9 +26,6 @@ export function simWafWebAclCapacity(
 
 /**
  * What one statement costs, with whatever is nested inside it.
- *
- * A logical statement costs what its parts cost and nothing of its own, and a
- * rule group costs the group's fixed capacity plus its scope-down statement.
  */
 function statementCapacity(
   statement: SimWafStatementInput | undefined,
@@ -51,29 +35,16 @@ function statementCapacity(
   }
 
   return (
-    ownCapacity(statement) +
+    simWafMatchCapacity(statement) +
     nestedCapacity(statement) +
     managedGroupCapacity(statement)
   );
 }
 
 /**
- * What a statement costs before anything nested in it is counted.
- */
-function ownCapacity(statement: SimWafStatementInput): number {
-  let total = 0;
-
-  for (const [kind, value] of Object.entries(statement)) {
-    if (value !== undefined) {
-      total += statementCosts.get(kind) ?? 0;
-    }
-  }
-
-  return total;
-}
-
-/**
  * What the statements inside a logical statement cost.
+ *
+ * A logical statement costs what its parts cost and nothing of its own.
  */
 function nestedCapacity(statement: SimWafStatementInput): number {
   const joined = [
@@ -90,9 +61,10 @@ function nestedCapacity(statement: SimWafStatementInput): number {
 /**
  * What a rule naming a managed rule group costs.
  *
- * A group this simulation does not carry contributes nothing, which cannot
- * happen through a compiled web ACL: naming one is refused where the rule is
- * written.
+ * A group is fixed at the capacity its owner gave it, and a scope-down
+ * statement is charged on top. A group this simulation does not carry
+ * contributes nothing, which cannot happen through a compiled web ACL: naming
+ * one is refused where the rule is written.
  */
 function managedGroupCapacity(statement: SimWafStatementInput): number {
   const named = statement.ManagedRuleGroupStatement;

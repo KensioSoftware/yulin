@@ -88,6 +88,23 @@ function outputValue(stack: SimCfnStack, name: string): string {
   return value;
 }
 
+/**
+ * Deploy Resources that are expected to fail, and answer with the error.
+ */
+async function deploymentFailure(
+  resources: Record<string, SimCfnTemplateValue>,
+): Promise<Error> {
+  const simAws = new SimAws();
+
+  return await assertThrowsErrorAsync(async () => {
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "sets",
+      template: { Resources: resources },
+    });
+    await stack.waitForDeployComplete();
+  });
+}
+
 describe("AWS::WAFv2::IPSet and AWS::WAFv2::RegexPatternSet", () => {
   it("deploys both sets with what the template wrote in them", async () => {
     // Given a template declaring an IP set and a regex pattern set.
@@ -229,6 +246,47 @@ describe("AWS::WAFv2::IPSet and AWS::WAFv2::RegexPatternSet", () => {
       error.message,
       "Invalid AWS::WAFv2::IPSet Resource OfficeAddresses: Addresses must be " +
         "a list",
+    );
+  });
+
+  it("refuses a set whose required list the template left out", async () => {
+    // Given a template that misspells Addresses, which real CloudFormation
+    // refuses against the schema.
+    const error = await deploymentFailure({
+      OfficeAddresses: {
+        Type: "AWS::WAFv2::IPSet",
+        Properties: {
+          Name: "office-addresses",
+          Scope: "REGIONAL",
+          IPAddressVersion: "IPV4",
+          Address: ["192.0.2.0/24"],
+        },
+      },
+    });
+
+    // Then the deployment failed. Reading the omission as an empty list would
+    // deploy a set holding nothing, and a rule pointing at one matches no
+    // request at all.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::WAFv2::IPSet Resource OfficeAddresses: Addresses is " +
+        "required",
+    );
+  });
+
+  it("refuses a pattern set whose expressions the template left out", async () => {
+    // Given a template whose pattern set names no expressions.
+    const error = await deploymentFailure({
+      BotPatterns: {
+        Type: "AWS::WAFv2::RegexPatternSet",
+        Properties: { Name: "bot-patterns", Scope: "REGIONAL" },
+      },
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::WAFv2::RegexPatternSet Resource BotPatterns: " +
+        "RegularExpressionList is required",
     );
   });
 

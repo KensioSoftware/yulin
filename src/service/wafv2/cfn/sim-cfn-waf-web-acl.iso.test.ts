@@ -124,11 +124,11 @@ describe("AWS::WAFv2::WebACL", () => {
     assertNonNullable(webAcl);
 
     // Then each attribute answers with what the web ACL carries. The capacity
-    // is the one byte match rule's single unit, and the label namespace is
-    // the prefix AWS qualifies this web ACL's labels with.
+    // is what AWS charges for the one rule's CONTAINS byte match, and the
+    // label namespace is the prefix AWS qualifies this web ACL's labels with.
     assertIdentical(stack.outputs.get("AclArn")?.value, webAcl.arn);
     assertIdentical(stack.outputs.get("AclId")?.value, webAcl.id);
-    assertIdentical(stack.outputs.get("AclCapacity")?.value, 1);
+    assertIdentical(stack.outputs.get("AclCapacity")?.value, 10);
     assertIdentical(
       stack.outputs.get("AclLabels")?.value,
       `awswaf:${DEFAULT_SIM_AWS_ACCOUNT_ID}:webacl:orders-acl:`,

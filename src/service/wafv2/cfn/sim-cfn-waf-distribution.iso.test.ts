@@ -20,6 +20,11 @@ const bucketName = "acl-site";
 /** How a distribution names the web ACL beside it in the same template. */
 const webAclArnReference = { "Fn::GetAtt": ["SiteAcl", "Arn"] };
 
+/** An ARN of the right shape naming a web ACL nothing created. */
+const missingWebAclArn =
+  "arn:aws:wafv2:us-east-1:888888888888:global/webacl/gone/" +
+  "4a2b1c8d-0e6f-4a2b-9c8d-0e6f4a2b1c8d";
+
 const visibility = {
   SampledRequestsEnabled: false,
   CloudWatchMetricsEnabled: false,
@@ -37,6 +42,7 @@ const visibility = {
  */
 function siteTemplate(
   webAclId: SimCfnTemplateValueRecord | string = webAclArnReference,
+  scope = "CLOUDFRONT",
 ): CfnTemplateBodyRecord {
   return {
     Resources: {
@@ -44,7 +50,7 @@ function siteTemplate(
         Type: "AWS::WAFv2::WebACL",
         Properties: {
           Name: "site-acl",
-          Scope: "CLOUDFRONT",
+          Scope: scope,
           DefaultAction: { Allow: {} },
           VisibilityConfig: visibility,
           Rules: [
@@ -149,15 +155,29 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     // Given a template whose WebACLId is a literal ARN nothing created.
     const simAws = new SimAws();
     const error = await assertThrowsErrorAsync(async () => {
-      await deploySite(
-        simAws,
-        "arn:aws:wafv2:us-east-1:888888888888:global/webacl/gone/" +
-          "4a2b1c8d-0e6f-4a2b-9c8d-0e6f4a2b1c8d",
-      );
+      await deploySite(simAws, missingWebAclArn);
     });
 
     // Then the deployment failed rather than leaving a distribution in front
-    // of nothing.
-    assertStringIncludes(error.message, "web ACL");
+    // of nothing, naming the ARN it could not resolve.
+    assertStringIncludes(error.message, missingWebAclArn);
+    assertStringIncludes(error.message, "does not exist");
+  });
+
+  it("refuses a distribution naming a REGIONAL scope web ACL", async () => {
+    // Given a template whose web ACL is in the scope an API Gateway stage
+    // takes, named by the distribution beside it.
+    const simAws = new SimAws();
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "regional-site",
+        template: siteTemplate(webAclArnReference, "REGIONAL"),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the deployment failed on the scope, which is the mistake a
+    // distribution and an association are easiest to mix up over.
+    assertStringIncludes(error.message, "REGIONAL scope web ACL");
   });
 });

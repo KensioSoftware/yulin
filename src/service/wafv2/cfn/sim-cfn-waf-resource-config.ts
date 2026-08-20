@@ -128,6 +128,19 @@ export abstract class SimCfnWafResourceConfig {
   }
 
   /**
+   * One list-of-strings property the Resource type requires.
+   *
+   * An omitted list is refused rather than read as an empty one. Both places
+   * this is used name a list CloudFormation requires, and an empty IP set or
+   * pattern set matches nothing, so a template that misspells `Addresses`
+   * would otherwise deploy a set with nothing in it and a rule pointing at it
+   * that never fires.
+   */
+  protected requiredStrings(key: string): readonly string[] {
+    return this.strings(key) ?? this.refuse(`${key} is required`);
+  }
+
+  /**
    * Refuse this Resource, saying which part of it could not be read.
    */
   protected refuse(reason: string): never {

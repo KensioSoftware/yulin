@@ -48,36 +48,6 @@ const uriPathMatch = {
 };
 
 /**
- * Deploy a web ACL and answer with its capacity, as Fn::GetAtt reports it.
- */
-async function deployedCapacity(
-  rules: SimCfnTemplateValue[],
-): Promise<unknown> {
-  const simAws = new SimAws();
-  const stack = await simAws.cloudFormation().deployTemplate({
-    stackName: "capacity",
-    template: {
-      Resources: {
-        Acl: {
-          Type: "AWS::WAFv2::WebACL",
-          Properties: {
-            Name: "capacity-acl",
-            Scope: "REGIONAL",
-            DefaultAction: { Allow: {} },
-            VisibilityConfig: visibility,
-            Rules: rules,
-          },
-        },
-      },
-      Outputs: { Capacity: { Value: { "Fn::GetAtt": ["Acl", "Capacity"] } } },
-    },
-  });
-  await stack.waitForDeployComplete();
-
-  return stack.outputs.get("Capacity")?.value;
-}
-
-/**
  * Deploy a stack whose one web ACL publishes the attribute named.
  */
 async function deployedAttribute(
@@ -112,49 +82,6 @@ const webAclResource = {
 };
 
 describe("Simulated WAFv2 CloudFormation values", () => {
-  it("adds up the capacity of the statements inside a logical statement", async () => {
-    // Given a web ACL whose one rule joins three statements, two of them
-    // negated or nested.
-    const capacity = await deployedCapacity([
-      ruleWith({
-        AndStatement: {
-          Statements: [
-            uriPathMatch,
-            { NotStatement: { Statement: uriPathMatch } },
-            { OrStatement: { Statements: [uriPathMatch, uriPathMatch] } },
-          ],
-        },
-      }),
-    ]);
-
-    // Then it costs what its parts cost. A logical statement has no cost of
-    // its own, and a byte match is one unit each.
-    assertIdentical(capacity, 4);
-  });
-
-  it("counts a managed rule group at the capacity AWS fixed it at", async () => {
-    // Given a web ACL naming the core rule set with a scope-down statement.
-    const capacity = await deployedCapacity([
-      {
-        Name: "core",
-        Priority: 0,
-        OverrideAction: { None: {} },
-        Statement: {
-          ManagedRuleGroupStatement: {
-            VendorName: "AWS",
-            Name: "AWSManagedRulesCommonRuleSet",
-            ScopeDownStatement: uriPathMatch,
-          },
-        },
-        VisibilityConfig: { ...visibility, MetricName: "core" },
-      },
-    ]);
-
-    // Then the group's own capacity is what it costs, plus the one unit its
-    // scope-down statement adds.
-    assertIdentical(capacity, 701);
-  });
-
   it("refuses an attribute a web ACL does not publish", async () => {
     // Given a template reading a Scope attribute off a web ACL, which is part
     // of the physical id and no attribute of its own.

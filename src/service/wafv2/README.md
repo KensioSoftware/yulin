@@ -256,9 +256,13 @@ bytes in the SDK, and `RegularExpressionList` is a list of strings in a template
 `RegexString` objects in the SDK. The first needs no work, since `sim-waf-byte-match.ts` already
 reads either. The second is wrapped in `regex-pattern-set/sim-cfn-waf-regex-set-config.ts`.
 
-`SimWafWebAcl` gained `capacity` and `labelNamespace` for the attributes `Fn::GetAtt` publishes.
-The capacity is an approximation, and `web-acl/sim-waf-web-acl-capacity.ts` says what it leaves out.
-A CloudFront distribution is associated through its own `WebACLId` and reaches nothing here.
+`SimWafWebAcl` gained `capacity` and `labelNamespace` for the attributes `Fn::GetAtt` publishes, and
+`GetWebACL` reports both. `web-acl/sim-waf-web-acl-capacity.ts` walks the rules and
+`web-acl/sim-waf-statement-capacity.ts` holds the costs, which are AWS's published base cost per
+statement kind plus the surcharges for reading every query argument and for each text
+transformation. It sums where real WAF discounts whatever two rules can share, leaving the
+number an upper bound on what AWS reports. A CloudFront distribution is associated through its
+own `WebACLId` and reaches nothing here.
 
 ## Authorization
 

@@ -965,10 +965,15 @@ A CloudFront distribution is associated through the distribution. `WebACLId` on
 template usually wants, since an association and a distribution both name a web ACL by ARN. The two
 sets answer `Arn` and `Id`.
 
-`Capacity` is an approximation. It adds up the published cost of each rule's statement and leaves
-out the surcharges for text transformations and JSON body inspection, so it reads low against the
-same rules on AWS. Nothing here enforces the 1,500 unit limit on a web ACL. The attribute exists so
-that a template writing it into an output or an alarm deploys.
+`Capacity` adds up what AWS publishes for each rule. A byte match costs 2 or 10 depending on the
+match it makes, a regex match 3, a pattern set reference 25, a size constraint 1 and a label match
+1, with 10 more for reading every query argument and 10 for each text transformation other than
+`NONE`. A managed rule group costs the fixed capacity its owner gave it.
+
+The sum is an upper bound on the number AWS reports. Real WAF charges a web ACL the sum of its rules
+minus whatever work it can share between them, and publishes no description of when it shares any.
+Nothing here enforces the 5,000 unit maximum on a web ACL or the 1,500 units the base price covers.
+`GetWebACL` reports the same number.
 
 `Ref` answers the physical ID, which WAFv2 spells in three parts (`orders-acl|<id>|REGIONAL`). It
 reads oddly beside every other service, and it is what AWS answers. WAFv2 resources carry a
