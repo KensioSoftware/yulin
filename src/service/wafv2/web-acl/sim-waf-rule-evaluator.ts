@@ -1,6 +1,12 @@
 import { compileSimWafManagedRuleGroup } from "../managed/sim-waf-managed-group-statement.js";
+import type { SimWafMatcher } from "../statement/sim-waf-field-match.js";
+import { compileSimWafRateBasedStatement } from "../statement/sim-waf-rate-based.js";
 import { invalidSimWafRule } from "../statement/sim-waf-rule-refusals.js";
-import { compileSimWafStatement } from "../statement/sim-waf-statement.js";
+import {
+  compileSimWafStatement,
+  type SimWafStatementScope,
+} from "../statement/sim-waf-statement.js";
+import type { SimWafStatementInput } from "../statement/sim-waf-statement.type.js";
 import { SimWafAction } from "./sim-waf-action.js";
 import type {
   SimWafRuleEvaluator,
@@ -54,11 +60,31 @@ export function compileSimWafRuleEvaluator(
     ruleName,
     scope.customResponseBodies,
   );
-  const matches = compileSimWafStatement(input.Statement, {
+  const matches = compileRuleStatement(input.Statement, {
     regexPatternSets: scope.regexPatternSets,
+    clock: scope.clock,
     ruleName,
   });
 
   return (request): SimWafAction | undefined =>
     matches(request) ? action : undefined;
+}
+
+/**
+ * Compile the statement a rule carries.
+ *
+ * A `RateBasedStatement` is compiled here rather than wherever a statement is
+ * met, because it is the whole of a rule's statement on real WAFv2 and holds
+ * the counts that rule has taken. Nesting one is refused where the nesting
+ * would have happened.
+ */
+function compileRuleStatement(
+  statement: SimWafStatementInput | undefined,
+  scope: SimWafStatementScope,
+): SimWafMatcher {
+  const rateBased = statement?.RateBasedStatement;
+
+  return rateBased === undefined
+    ? compileSimWafStatement(statement, scope)
+    : compileSimWafRateBasedStatement(rateBased, scope);
 }

@@ -178,6 +178,115 @@ WAF stops reading a body, a header set or a cookie set at 8 KB. The rule's `Over
 what content past that point counts as. `MATCH` and `NO_MATCH` settle the statement without looking,
 and `CONTINUE` inspects as much as WAF would have read.
 
+## Rate limiting
+
+`RateBasedStatement` counts the requests one client makes and applies the rule's action once the
+count goes past `Limit`. A test sends requests until the rule trips, then moves the simulated clock
+past the window to watch it let go again.
+
+```typescript sim-wafv2-rate-limit
+/**
+ * Limiting how often one client may ask to create an account.
+ */
+
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const waf = simAws.wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "pool",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "pool-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "sign-up-rate",
+        Priority: 0,
+        Action: { Block: {} },
+        Statement: {
+          RateBasedStatement: {
+            Limit: 10,
+            EvaluationWindowSec: 300,
+            AggregateKeyType: "IP",
+            ScopeDownStatement: {
+              ByteMatchStatement: {
+                FieldToMatch: { UriPath: {} },
+                PositionalConstraint: "STARTS_WITH",
+                SearchString: Buffer.from("/signup"),
+                TextTransformations: [{ Priority: 0, Type: "LOWERCASE" }],
+              },
+            },
+          },
+        },
+        VisibilityConfig: { ...visibility, MetricName: "sign-up-rate" },
+      },
+    ],
+  }),
+);
+
+const webAclArn = created.Summary!.ARN;
+
+const signUp = (): string =>
+  waf.evaluateRequest({
+    webAclArn,
+    request: new Request("https://pool.example.test/signup"),
+  }).action;
+
+const decisions = Array.from({ length: 11 }, signUp);
+
+// "ALLOW" "BLOCK"
+console.log(decisions[9], decisions[10]);
+
+const login = waf.evaluateRequest({
+  webAclArn,
+  request: new Request("https://pool.example.test/login"),
+});
+
+// "ALLOW"
+console.log(login.action);
+
+await simAws.clock().advanceBy({ minutes: 6 });
+
+// "ALLOW"
+console.log(signUp());
+```
+
+`Limit` is how many requests one aggregation instance may make inside the window. AWS holds it
+between 10 and 2,000,000,000. The request that takes the count past the limit gets the rule's
+action, and the ones under it carry on to the next rule. A `Count` action records the match and
+lets evaluation continue, the way it does for every other statement kind.
+
+`EvaluationWindowSec` is 60, 120, 300 or 600 seconds. A statement naming none counts over 300. The
+window is measured against [simulated time](../../time/README.md), so `advanceBy` past it drops
+what the rule counted.
+
+`AggregateKeyType` is `IP` or `CONSTANT`. `IP` counts each client address on its own. Every request
+in this simulation reports `127.0.0.1`, leaving a web ACL with one client for the whole simulation.
+That is the case a rate limiting test is written about anyway (one client, sending until the rule
+trips), and it behaves here as it does on AWS. `CONSTANT` counts every request the statement sees
+together, and AWS requires a `ScopeDownStatement` alongside it to say which requests those are.
+
+A `ScopeDownStatement` narrows what the rule counts. Every statement kind in
+[What a statement can inspect](#what-a-statement-can-inspect) nests inside one. A request the
+scope-down statement leaves alone is neither counted nor limited. That is what keeps a limit on
+`/signup` off the rest of a site.
+
+The counts belong to the rule. Writing a new set of rules over a web ACL with `UpdateWebACL` starts
+them from nothing, as it does on AWS.
+
+A rate limit is the whole of a rule's statement, as it is on real WAFv2. Joining one to an
+`AndStatement` or nesting it in a `NotStatement` is refused where the rule is written.
+
 ## The AWS managed rule groups
 
 Three of the AWS managed rule groups are simulated, so a stack that turns them on deploys and its
@@ -925,10 +1034,10 @@ declared it, and the reason is the one `CreateWebACL` gives an SDK caller.
 ```typescript
 const [dropped] = stack.ignoredProperties;
 
-// "OrdersAcl Rules.account-creation-rate"
+// "OrdersAcl Rules.block-countries"
 console.log(`${dropped.logicalId} ${dropped.path}`);
 
-// "Rule account-creation-rate uses the statement kind RateBasedStatement, which
+// "Rule block-countries uses the statement kind GeoMatchStatement, which
 //  Yulin does not simulate: ..."
 console.log(dropped.reason);
 ```
@@ -1210,13 +1319,17 @@ These statement kinds are refused:
 - `IPSetReferenceStatement`, `GeoMatchStatement` and `AsnMatchStatement`. Every request in this
   simulation reports a source address of `127.0.0.1`, and a rule on where a request came from would
   see one client for the whole simulation.
-- `RateBasedStatement`. Counting requests over a time window against the simulated clock is
-  feasible and is not part of this yet.
 - `SqliMatchStatement` and `XssMatchStatement`. AWS publishes no description of the detection they
   run.
 - `RuleGroupReferenceStatement`. A rule group of your own is a resource in its own right, and none
   is simulated. The three simulated AWS managed rule groups are named in a statement rather than
   created.
+
+A `RateBasedStatement` is evaluated (see [Rate limiting](#rate-limiting)). Two of its aggregation
+key types are refused. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding
+header, which needs the source address variety an IP set is waiting on. `CUSTOM_KEYS` and
+`CustomKeys` aggregate on headers, cookies and query arguments, and are feasible and not part of
+this yet. `GetRateBasedStatementManagedKeys` is not simulated.
 
 `JsonBody`, `HeaderOrder`, `UriFragment`, `JA3Fingerprint` and `JA4Fingerprint` are refused as
 fields to match. The `Captcha` and `Challenge` actions are refused, along with the `CaptchaConfig`,

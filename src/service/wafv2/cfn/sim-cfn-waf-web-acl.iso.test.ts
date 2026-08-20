@@ -115,6 +115,53 @@ describe("AWS::WAFv2::WebACL", () => {
     assertIdentical(decisionFor(simAws, stack, "/orders"), "ALLOW");
   });
 
+  it("deploys a web ACL whose only rule limits a request rate", async () => {
+    // Given a template whose one rule counts sign-ups, which is what CDK's
+    // protection for a user pool writes and the whole of what such a web ACL
+    // holds.
+    const simAws = new SimAws();
+    const stack = await deployWebAcl(simAws, {
+      Rules: [
+        {
+          Name: "account-creation-rate",
+          Priority: 0,
+          Action: { Block: {} },
+          Statement: {
+            RateBasedStatement: {
+              Limit: 10,
+              EvaluationWindowSec: 300,
+              AggregateKeyType: "IP",
+              ScopeDownStatement: {
+                ByteMatchStatement: {
+                  FieldToMatch: { UriPath: {} },
+                  PositionalConstraint: "STARTS_WITH",
+                  SearchString: "/signup",
+                  TextTransformations: [{ Priority: 0, Type: "LOWERCASE" }],
+                },
+              },
+            },
+          },
+          VisibilityConfig: {
+            ...visibility,
+            MetricName: "account-creation-rate",
+          },
+        },
+      ],
+    });
+
+    // Then nothing was left out of the web ACL, and the rule limits what the
+    // template said it would.
+    assertArrayLength(stack.ignoredProperties, 0);
+
+    const decisions = Array.from({ length: 11 }, () =>
+      decisionFor(simAws, stack, "/signup"),
+    );
+
+    assertIdentical(decisions[9], "ALLOW");
+    assertIdentical(decisions[10], "BLOCK");
+    assertIdentical(decisionFor(simAws, stack, "/orders"), "ALLOW");
+  });
+
   it("answers Fn::GetAtt with the four attributes a web ACL publishes", async () => {
     // Given a deployed web ACL whose attributes are all outputs.
     const simAws = new SimAws();

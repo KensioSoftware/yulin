@@ -147,6 +147,31 @@ read.
 Matching is case sensitive throughout, as it is on AWS. A rule that means to ignore case says so
 with a `LOWERCASE` transformation and a lower case search string.
 
+## Rate limiting
+
+`statement/sim-waf-rate-based.ts` compiles a rule that counts requests. It is the one statement
+kind carrying state of its own, and the state is a closure over the compiled rule, so writing a new
+set of rules over a web ACL starts the counting from nothing.
+
+`sim-waf-rate-counter.ts` holds the counts, keyed by aggregation instance. Each request records the
+instant it arrived, and the instants that have fallen out of the evaluation window are dropped as
+the key is read. The clock is the simulation's own, reaching a rule through
+`SimWafRuleScope.clock`. `sim-wafv2-commands.ts` wires it from the background scheduler, a
+`BackgroundScheduler` being a `SimClock` as well. Advancing simulated time past the window is
+therefore all a test needs to watch a limited client be served again.
+
+`sim-waf-rate-based-input.ts` reads `Limit`, `EvaluationWindowSec` and `AggregateKeyType`, and holds
+the refusals for the two aggregation key types that need something this simulation has none of.
+`IP` reads `simAwsProxiedSourceIp`, the address every request in this simulation reports, leaving a
+web ACL with one client. That is the case a rate limiting test covers, and the keyed counter is the
+seam if source addresses ever vary.
+
+A rate-based statement is compiled at the rule level (`web-acl/sim-waf-rule-evaluator.ts`) for the
+reason a managed rule group is. Both are the whole of a rule's statement on real WAFv2, and
+`compileSimWafStatement` refuses either one nested inside another statement. A rate limit narrows
+what it counts with its own `ScopeDownStatement`. That goes through the ordinary statement path and
+gets every kind above it.
+
 ## The AWS managed rule groups
 
 `managed/` carries `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet` and
@@ -212,10 +237,13 @@ The reasons are worth knowing. `IPSetReferenceStatement`, `GeoMatchStatement` an
 `AsnMatchStatement` are refused because every request in this simulation reports a source address of
 `127.0.0.1` (`simAwsProxiedSourceIp`), and a rule on where a request came from would see one client
 for the whole simulation. `SqliMatchStatement` and `XssMatchStatement` are refused because AWS
-publishes no description of the detection they run. `RateBasedStatement` needs request counting over
-a window against the simulated clock (feasible, and not part of this).
-`RuleGroupReferenceStatement` is refused because a rule group of the reader's own is a resource in
-its own right, and none is simulated.
+publishes no description of the detection they run. `RuleGroupReferenceStatement` is refused because
+a rule group of the reader's own is a resource in its own right, and none is simulated.
+
+`statement/sim-waf-rate-based-input.ts` holds two more, for the same one-client-address reason and
+for scope. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding header.
+`CUSTOM_KEYS` and `CustomKeys` aggregate on headers, cookies and query arguments (feasible, and not
+part of this).
 
 `managed/sim-waf-managed-group-input.ts` refuses a managed rule group outside the three, naming the
 ones that are simulated. It also refuses `Version`, `ExcludedRules` and `ManagedRuleGroupConfigs`.
@@ -256,7 +284,7 @@ behind them go the same way, from `web-acl/sim-cfn-waf-web-acl-config.ts`.
 Issue #823 is the reasoning, and #391 is the principle it comes from. A web ACL that accepted a rule
 it cannot evaluate would allow a request AWS blocks, so `CreateWebACL` refuses one. Failing a whole
 stack over it is a different thing, and it cost one consumer twelve Resources and 25 test files over
-a single rate limiting rule. The unit is the rule, and everything larger than the rule deploys.
+a single rule. The unit is the rule, and everything larger than the rule deploys.
 
 `sim-cfn-waf-resource-error.ts` still sorts what is left. A `SimWafUnsimulatedInputException`
 reaching it skips the Resource, worded so sim CloudFormation records it and steps over it (see

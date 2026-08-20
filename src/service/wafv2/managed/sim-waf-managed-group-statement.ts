@@ -56,6 +56,7 @@ export function compileSimWafManagedRuleGroup(
       ? undefined
       : compileSimWafStatement(statement.ScopeDownStatement, {
           regexPatternSets: scope.regexPatternSets,
+          clock: scope.clock,
           ruleName,
         });
 

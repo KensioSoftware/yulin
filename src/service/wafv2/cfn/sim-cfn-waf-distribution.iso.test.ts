@@ -53,14 +53,15 @@ const blockAdmin = {
 };
 
 /**
- * A rule counting requests over a time window, which Yulin does not evaluate.
+ * A rule blocking whole countries, which Yulin does not evaluate: every
+ * request in this simulation comes from one address.
  */
-const rateLimit = {
-  Name: "account-creation-rate",
+const blockCountries = {
+  Name: "block-countries",
   Priority: 0,
   Action: { Block: {} },
-  Statement: { RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" } },
-  VisibilityConfig: { ...visibility, MetricName: "account-creation-rate" },
+  Statement: { GeoMatchStatement: { CountryCodes: ["CN", "RU"] } },
+  VisibilityConfig: { ...visibility, MetricName: "block-countries" },
 };
 
 /**
@@ -199,7 +200,7 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "rate-limited-site",
       template: siteTemplate(webAclArnReference, "CLOUDFRONT", [
-        rateLimit,
+        blockCountries,
         blockAdmin,
       ]),
     });
@@ -211,10 +212,7 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
 
     assertArrayLength(stack.skippedResources, 0);
     assertIdentical(blocked.status, 403);
-    assertIdentical(
-      stack.ignoredProperties[0]?.path,
-      "Rules.account-creation-rate",
-    );
+    assertIdentical(stack.ignoredProperties[0]?.path, "Rules.block-countries");
   });
 
   it("refuses a distribution naming a REGIONAL scope web ACL", async () => {

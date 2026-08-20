@@ -21,11 +21,6 @@ const refusedStatements = new Map<string, string>([
   ["SqliMatchStatement", undocumentedDetection],
   ["XssMatchStatement", undocumentedDetection],
   [
-    "RateBasedStatement",
-    "counting requests over a time window against the simulated clock is " +
-      "feasible and is not part of this",
-  ],
-  [
     "RuleGroupReferenceStatement",
     "a rule group is a resource in its own right, and none is simulated",
   ],

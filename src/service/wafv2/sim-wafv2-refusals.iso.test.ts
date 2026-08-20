@@ -72,17 +72,26 @@ describe("SimWafV2 refusals", () => {
     assertStringIncludes(geo.message, "127.0.0.1");
   });
 
-  it("refuses a rate based rule", async () => {
-    // When a rule limits by request rate.
-    const error = await refusalForStatement({
-      RateBasedStatement: { Limit: 100, AggregateKeyType: "IP" },
+  it("refuses a rate based rule aggregating on what it cannot read", async () => {
+    // When a rule counts by forwarded address or by a custom key.
+    const forwarded = await refusalForStatement({
+      RateBasedStatement: { Limit: 100, AggregateKeyType: "FORWARDED_IP" },
+    });
+    const custom = await refusalForStatement({
+      RateBasedStatement: {
+        Limit: 100,
+        AggregateKeyType: "CUSTOM_KEYS",
+        CustomKeys: [{ Header: { Name: "x-tenant" } }],
+      },
     });
 
-    // Then it is refused rather than accepted and never enforced. Counting
-    // requests over a window against the simulated clock is feasible and is
-    // not part of this.
-    assertInstanceOf(error, SimWafUnsimulatedInputException);
-    assertStringIncludes(error.message, "RateBasedStatement");
+    // Then both are refused, and the rate limiting Yulin does evaluate is
+    // left alone. A forwarded address needs the source address variety an IP
+    // set is waiting on, and a custom key aggregates on request content.
+    assertInstanceOf(forwarded, SimWafUnsimulatedInputException);
+    assertStringIncludes(forwarded.message, "FORWARDED_IP");
+    assertInstanceOf(custom, SimWafUnsimulatedInputException);
+    assertStringIncludes(custom.message, "CustomKeys");
   });
 
   it("refuses the injection detections AWS does not document", async () => {

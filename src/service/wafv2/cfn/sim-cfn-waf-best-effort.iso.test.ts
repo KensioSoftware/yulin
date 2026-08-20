@@ -87,9 +87,9 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     const property = simWafIgnoredProperty(stack);
 
     assertIdentical(property.logicalId, "OrdersAcl");
-    assertIdentical(property.path, "Rules.account-creation-rate");
-    assertStringIncludes(property.reason, "Rule account-creation-rate");
-    assertStringIncludes(property.reason, "RateBasedStatement");
+    assertIdentical(property.path, "Rules.block-countries");
+    assertStringIncludes(property.reason, "Rule block-countries");
+    assertStringIncludes(property.reason, "GeoMatchStatement");
     assertStringIncludes(property.reason, "which Yulin does not simulate");
   });
 
@@ -131,10 +131,7 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     assertIdentical(blocked.status, 403);
     assertIdentical(allowed.status, 200);
     assertIdentical(await allowed.text(), "orders");
-    assertIdentical(
-      simWafIgnoredProperty(stack).path,
-      "Rules.account-creation-rate",
-    );
+    assertIdentical(simWafIgnoredProperty(stack).path, "Rules.block-countries");
   });
 
   it("records a web ACL member it has no behaviour for", async () => {

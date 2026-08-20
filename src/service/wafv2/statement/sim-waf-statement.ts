@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimWafRegexPatternSet } from "../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafResourceStore } from "../resource/sim-waf-resource-store.js";
 import { simWafByteMatchTest } from "./sim-waf-byte-match.js";
@@ -25,6 +26,12 @@ import { refuseUnsimulatedSimWafStatement } from "./sim-waf-unsimulated-statemen
 export interface SimWafStatementScope {
   readonly regexPatternSets: SimWafResourceStore<SimWafRegexPatternSet>;
   readonly ruleName: string;
+
+  /**
+   * The simulation's sense of time, which a rate-based statement counts
+   * against.
+   */
+  readonly clock: SimClock;
 }
 
 /**
@@ -55,6 +62,18 @@ export function compileSimWafStatement(
       ruleName,
       "A ManagedRuleGroupStatement is the whole of a rule's statement, and " +
         "cannot be joined to or nested inside another one",
+    );
+  }
+
+  if (statement.RateBasedStatement !== undefined) {
+    // A rate-based statement is the whole of a rule's statement on real WAFv2
+    // as well. One nested inside another statement would count only the
+    // requests that reached it, which is not the rate the rule was written
+    // about.
+    invalidSimWafRule(
+      ruleName,
+      "A RateBasedStatement is the whole of a rule's statement, and cannot " +
+        "be joined to or nested inside another one",
     );
   }
 

@@ -80,6 +80,7 @@ export {
   simWafInspectedRequest,
 } from "./evaluate/sim-waf-inspected-request.js";
 export { simWafInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
+export type { SimWafRateBasedStatementInput } from "./statement/sim-waf-rate-based.type.js";
 export type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 export {
   SimWafAssociatedItemException,

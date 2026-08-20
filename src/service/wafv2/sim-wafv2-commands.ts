@@ -88,6 +88,9 @@ export class SimWafCommands {
       managedRules: this.managedRules,
       authorizer,
       accountRegionScope,
+      // The background scheduler is this simulation's source of time as well
+      // as its scheduler, and a rate-based rule counts against it.
+      clock: background,
     });
     this.managedRuleGroupCommands = new SimWafManagedRuleGroupCommands({
       authorizer,

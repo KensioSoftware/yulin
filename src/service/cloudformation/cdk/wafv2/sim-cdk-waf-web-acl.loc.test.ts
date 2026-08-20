@@ -80,6 +80,31 @@ const webAcl = new wafv2.CfnWebACL(stack, "ApiAcl", {
         metricName: "block-admin",
       },
     },
+    {
+      name: "orders-rate",
+      priority: 1,
+      action: { block: {} },
+      statement: {
+        rateBasedStatement: {
+          limit: 10,
+          evaluationWindowSec: 300,
+          aggregateKeyType: "IP",
+          scopeDownStatement: {
+            byteMatchStatement: {
+              fieldToMatch: { uriPath: {} },
+              positionalConstraint: "CONTAINS",
+              searchString: "/orders",
+              textTransformations: [{ priority: 0, type: "NONE" }],
+            },
+          },
+        },
+      },
+      visibilityConfig: {
+        sampledRequestsEnabled: false,
+        cloudWatchMetricsEnabled: false,
+        metricName: "orders-rate",
+      },
+    },
   ],
 });
 
@@ -139,6 +164,21 @@ describe("Sim CDK WAFv2 web ACL local integration", () => {
     assertStringIncludes(await blocked.text(), "Request blocked by AWS WAF");
     assertIdentical(allowed.status, 200);
     assertIdentical(await allowed.text(), "order orders/YL-1");
+
+    // And the rate limit the same template wrote counts the requests it
+    // scoped itself down to, so the eleventh in the window gets WAF's 403
+    // where the tenth was served.
+    const rated: Response[] = [];
+
+    for (let sent = 0; sent < 10; sent += 1) {
+      // A rate limit counts what arrives in order, and requests sent together
+      // arrive in no order at all.
+      // oxlint-disable-next-line no-await-in-loop
+      rated.push(await request("orders/YL-1"));
+    }
+
+    assertIdentical(rated[8]?.status, 200);
+    assertIdentical(rated[9]?.status, 403);
 
     // And the attributes CDK reads off the L1 resolved to the deployed web
     // ACL's own, rather than to a token nothing filled in.
