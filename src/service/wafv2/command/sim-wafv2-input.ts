@@ -51,3 +51,23 @@ export function refuseSimWafTags(
     );
   }
 }
+
+/**
+ * Read an ARN a request named, refusing a request with none.
+ *
+ * An association names both the web ACL and the resource it goes in front of
+ * by ARN, and neither has anything else to fall back on.
+ */
+export function requiredSimWafArn(
+  arn: string | undefined,
+  parameter: string,
+): string {
+  if (arn === undefined || arn === "") {
+    throw new SimWafInvalidParameterException(
+      `Error reason: A WAFv2 association names an ARN, ` +
+        `field: RESOURCE_ARN, parameter: ${parameter}`,
+    );
+  }
+
+  return arn;
+}

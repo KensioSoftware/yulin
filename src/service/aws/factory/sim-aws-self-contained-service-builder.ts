@@ -4,7 +4,6 @@ import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSesV2 } from "../../ses/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
-import { SimWafV2 } from "../../wafv2/index.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
 
@@ -77,17 +76,6 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
     return new SimSsm({ ...this.scoped(scope), kms: scope.kms() });
-  }
-
-  /**
-   * Create simulated WAFv2 for an Account Region scope.
-   *
-   * Web ACLs are Region-scoped on real AWS, and the `CLOUDFRONT` scope is held
-   * in `us-east-1` because CloudFront is global. Both fall out of the scope
-   * this is built in.
-   */
-  createWafV2(scope: SimAwsAccountRegionContainer): SimWafV2 {
-    return new SimWafV2(this.scoped(scope));
   }
 
   /**
