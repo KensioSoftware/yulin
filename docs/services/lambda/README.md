@@ -2600,6 +2600,9 @@ Supported function properties:
 - `Description`
 - `Timeout`
 - `MemorySize`
+- `Environment`
+- `DeadLetterConfig`, whose `TargetArn` names a queue or a topic. See
+  [retries and destinations in templates](#retries-and-destinations-in-templates)
 
 Code in a missing bucket fails the deploy AWS-style with a `NoSuchBucket` diagnostic.
 
@@ -2909,6 +2912,121 @@ Deleting the Stack deletes the alias. Lambda has no operation that deletes one p
 The version Resource has nothing of its own to do on teardown, and the version it published goes
 when the function does.
 
+## Retries and destinations in templates
+
+`AWS::Lambda::EventInvokeConfig` writes the event invoke config of the function, version or alias
+its `FunctionName` and `Qualifier` name. CDK emits one for `onFailure`, `onSuccess`, `retryAttempts`
+and `maxEventAge` on a function. `DeadLetterConfig` on `AWS::Lambda::Function` is what CDK's
+`deadLetterQueue` emits, and it sets the same dead-letter target `CreateFunction` takes.
+
+```typescript sim-lambda-cloudformation-event-invoke-config
+/**
+ * Deploying a Lambda failure destination and a dead-letter queue from a
+ * CloudFormation template.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimLambdaDestinationRecord } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrderFailures: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "order-failures" },
+      },
+      OrderDeadLetters: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "orders-dlq" },
+      },
+      OrdersFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: "arn:aws:iam::111111111111:role/OrdersRole",
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Code: {
+            ZipFile:
+              "exports.handler = async () => { throw new Error('failed'); };",
+          },
+          DeadLetterConfig: {
+            TargetArn: { "Fn::GetAtt": ["OrderDeadLetters", "Arn"] },
+          },
+        },
+      },
+      OrdersInvokeConfig: {
+        Type: "AWS::Lambda::EventInvokeConfig",
+        Properties: {
+          FunctionName: { Ref: "OrdersFunction" },
+          Qualifier: "$LATEST",
+          MaximumRetryAttempts: 0,
+          DestinationConfig: {
+            OnFailure: {
+              Destination: { "Fn::GetAtt": ["OrderFailures", "Arn"] },
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      FailuresQueueUrl: {
+        Value: { "Fn::GetAtt": ["OrderFailures", "QueueUrl"] },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    InvocationType: "Event",
+    Payload: JSON.stringify({ id: 7 }),
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const received = await simAws
+  .sqs()
+  .receiveMessage(
+    new ReceiveMessageCommand({ QueueUrl: stack.output("FailuresQueueUrl") }),
+  );
+const record = JSON.parse(
+  String(received.Messages?.[0]?.Body),
+) as SimLambdaDestinationRecord;
+
+console.log(record.requestContext.condition);
+console.log(record.requestPayload);
+```
+
+Supported `AWS::Lambda::EventInvokeConfig` properties:
+
+- `FunctionName`, as a `Ref` to the function giving its name or an `Fn::GetAtt` on it giving the ARN
+- `Qualifier`, naming a published version or an alias. `$LATEST` addresses the function itself
+- `MaximumRetryAttempts`
+- `MaximumEventAgeInSeconds`
+- `DestinationConfig`, holding `OnSuccess` and `OnFailure`
+
+A destination and a `DeadLetterConfig.TargetArn` name a queue or a topic by `Fn::GetAtt` on its ARN
+or by `Ref`. `Ref` on an `AWS::SQS::Queue` resolves to the queue URL, and both forms reach the same
+queue.
+
+Where a destination names something simulated Lambda has nowhere to send to, such as a service
+outside the template or a Resource the deployment skipped, the Resource is deployed without that
+destination and the omission is recorded in `stack.ignoredProperties` under the property that named
+it. The function still deploys, and a stack keeps the destination it can reach when the other end
+names one it cannot. Refusing a whole stack over one destination would leave a test with nothing to
+run.
+
+Deleting the Stack takes the config off the function, ahead of the function itself.
+
 ## Executable bindings
 
 Deploy-time `bindings` let a template function be backed by a real in-process handler instead of its
@@ -3179,14 +3297,18 @@ Sim Lambda currently supports:
   listing
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
 - The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission`,
-  `AWS::Lambda::Version`, `AWS::Lambda::Alias` and `AWS::Lambda::EventSourceMapping`
-  CloudFormation resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
+  `AWS::Lambda::Version`, `AWS::Lambda::Alias`, `AWS::Lambda::EventSourceMapping` and
+  `AWS::Lambda::EventInvokeConfig` CloudFormation resources, with `Ref`/`Fn::GetAtt` support and
+  deploy-time executable bindings
 - A CDK app built on `fn.currentVersion` or a `lambda.Alias`, which deploys with the alias its
   integrations point at, and where an `AWS::Lambda::Permission` naming that alias grants on the
   alias
 - `AWS::Lambda::EventSourceMapping` on a queue or on a table's stream, including the
   `StartingPosition` a stream mapping needs, so a CDK `SqsEventSource` or `DynamoEventSource`
   deploys as it is synthesised
+- A CDK function given `onFailure`, `onSuccess`, `retryAttempts`, `maxEventAge` or
+  `deadLetterQueue`, which deploys the `AWS::Lambda::EventInvokeConfig` and the `DeadLetterConfig`
+  those synthesise
 
 ## Limitations
 
@@ -3207,10 +3329,11 @@ Current documented limitations:
   Real Lambda delivers under that role and drops the record where the role cannot, which would be
   silent, so simulated Lambda delivers instead. Nothing else about the destination has to be set up,
   since a destination needs no resource policy on real AWS either.
-- `AWS::Lambda::EventInvokeConfig` and the `DeadLetterConfig` property of `AWS::Lambda::Function`
-  are not deployed from a template yet, so a CDK function's `onFailure`, `onSuccess` and
-  `deadLetterQueue` are left out of the simulated function. See
-  [issue 845](https://github.com/KensioSoftware/yulin/issues/845).
+- SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function` are left out. A
+  SAM application declaring either deploys a function with the default retries, no destinations and
+  no dead-letter target. The `AWS::Lambda::EventInvokeConfig` Resource and the `DeadLetterConfig`
+  property a CloudFormation or CDK template writes are both deployed. See
+  [retries and destinations in templates](#retries-and-destinations-in-templates).
 - Throttling and timeouts do not drive a retry. A retry follows a handler that threw, and the
   `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was accepted.
 - `DestinationConfig` on an event source mapping is left out. It is a different mechanism from the
@@ -3322,8 +3445,9 @@ Current documented limitations:
   here. A simulated stream has one shard and never splits, so a stream mapping has one thing to read
   either way.
 - CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url`,
-  `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping` (`Version`, `Alias`, ...) are
-  skipped with an "Unsupported" diagnostic.
+  `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias`,
+  `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig` (`LayerVersion`,
+  `CodeSigningConfig`, ...) are skipped with an "Unsupported" diagnostic.
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.

@@ -5,6 +5,7 @@ import type { SimLambdaFunctionUrl } from "../function/url/sim-lambda-function-u
 import type { SimLambdaEventSourceMapping } from "../event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambdaFunctionAlias } from "../function/version/sim-lambda-function-alias.js";
 import { simCfnLambdaCreatedResource } from "./sim-cfn-lambda-created-resource.js";
+import { simCfnLambdaRemoveEventInvokeConfig } from "./event-invoke-config/sim-cfn-lambda-event-invoke-config-remover.js";
 import { simCfnLambdaRevokePermission } from "./permission/sim-cfn-lambda-permission-revoker.js";
 import { simCfnLambdaTargetFunctionName } from "./function/sim-cfn-lambda-target-function.js";
 
@@ -44,6 +45,10 @@ export class SimCfnLambdaResourceDeleter {
       }
       case "EventSourceMapping": {
         await this.deleteEventSourceMapping(resource);
+        return;
+      }
+      case "EventInvokeConfig": {
+        await simCfnLambdaRemoveEventInvokeConfig(this.lambda, resource);
         return;
       }
       case "Permission": {

@@ -1,4 +1,5 @@
 import type { SimLambdaEventSourceMapping } from "./event-source/sim-lambda-event-source-mapping.js";
+import type { SimLambdaEventInvokeConfig } from "./function/event-invoke/sim-lambda-event-invoke-config.js";
 import type {
   SimLambdaFunction,
   SimLambdaFunctionMap,
@@ -30,6 +31,23 @@ export abstract class SimLambdaInspection {
     uuid: string,
   ): SimLambdaEventSourceMapping | undefined {
     return this.commands.eventSourceMappings.find(uuid);
+  }
+
+  /**
+   * Get the event invoke config one function name and qualifier hold, if they
+   * hold one.
+   *
+   * A config written without a qualifier belongs to `$LATEST`, which is how a
+   * function's own config is addressed.
+   */
+  getSimEventInvokeConfig(
+    functionName: SimLambdaFunctionName | string,
+    qualifier?: string,
+  ): SimLambdaEventInvokeConfig | undefined {
+    return this.commands.eventInvokeConfigStore.get({
+      functionName,
+      qualifier,
+    });
   }
 
   /** Get a simulated Lambda function instance by name. */

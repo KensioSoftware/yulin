@@ -2,11 +2,13 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { makeSimRoleArn } from "../../../iam/role/arn/sim-iam-role-arn.js";
 import type { SimIamRoleName } from "../../../iam/role/sim-iam-role.js";
+import type { SimLambdaDeadLetterConfigInput } from "../../function/event-invoke/lambda-dead-letter-target.js";
 import type {
   SimCreateFunctionCommandInput,
   SimLambdaFunctionCode,
   SimLambdaFunctionEnvironment,
 } from "../../command/create-function/create-function.command.js";
+import { SimCfnLambdaDeadLetterParser } from "./sim-cfn-lambda-dead-letter-parser.js";
 import { SimCfnLambdaEnvironmentParser } from "./sim-cfn-lambda-environment-parser.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
@@ -23,6 +25,7 @@ export interface SimCfnLambdaFunctionProperties {
   readonly timeoutSeconds: number | undefined;
   readonly memorySizeMb: number | undefined;
   readonly environment: SimLambdaFunctionEnvironment | undefined;
+  readonly deadLetterConfig: SimLambdaDeadLetterConfigInput | undefined;
 }
 
 /**
@@ -44,6 +47,7 @@ export function simCfnLambdaCreateFunctionInput(
     Timeout: functionProperties.timeoutSeconds,
     MemorySize: functionProperties.memorySizeMb,
     Environment: functionProperties.environment,
+    DeadLetterConfig: functionProperties.deadLetterConfig,
   };
 }
 
@@ -58,6 +62,7 @@ export class SimCfnLambdaFunctionPropertiesParser {
   private readonly propertyParser = new SimCfnLambdaPropertyParser();
   private readonly codeParser = new SimCfnLambdaFunctionCodeParser();
   private readonly environmentParser = new SimCfnLambdaEnvironmentParser();
+  private readonly deadLetterParser = new SimCfnLambdaDeadLetterParser();
 
   /**
    * Parse the resolved CloudFormation properties for an AWS::Lambda::Function.
@@ -106,6 +111,10 @@ export class SimCfnLambdaFunctionPropertiesParser {
       environment: this.environmentParser.parse(
         resource,
         properties["Environment"],
+      ),
+      deadLetterConfig: this.deadLetterParser.parse(
+        resource,
+        properties["DeadLetterConfig"],
       ),
     };
   }
