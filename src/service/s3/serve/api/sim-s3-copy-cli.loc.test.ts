@@ -80,7 +80,12 @@ describe("Moving an Object between simulated Buckets with the aws CLI", () => {
       new CreateAccessKeyCommand({ UserName: "Archivist" }),
     );
 
-    const { AWS_PROFILE: _profile, ...environment } = process.env;
+    // Every AWS variable the machine exports is dropped rather than only the
+    // profile. An inherited session token or endpoint would otherwise travel
+    // with the simulated access key and fail the signature.
+    const environment = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("AWS_")),
+    );
 
     return {
       ...environment,

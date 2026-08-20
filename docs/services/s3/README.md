@@ -749,7 +749,7 @@ it. The copy would leave the Object exactly as it found it.
 Real S3 states a copy as a `PUT` on the destination carrying an `x-amz-copy-source` header and an
 empty body. The served endpoint reads that header and runs the operation an in-process caller
 reaches. `aws s3 cp` and `aws s3 mv` between two served Buckets then behave as they do against real
-S3, for a file under the CLI's eight megabyte multipart threshold.
+S3, for a file under the CLI's eight-megabyte multipart threshold.
 
 ```bash
 aws s3 cp ./report.pdf s3://inbox/report.pdf

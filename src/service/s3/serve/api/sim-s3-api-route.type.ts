@@ -26,10 +26,10 @@ export interface SimS3ApiRoute {
    */
   readonly matches?: ((query: URLSearchParams) => boolean) | undefined;
   /**
-   * A header the request has to carry to reach this operation, for the one
-   * operation that shares a method, a path and a sub-resource with another and
-   * is told apart by a header. Only `CopyObject` is, and it is matched before
-   * the `PutObject` it would otherwise be read as.
+   * A header the request has to carry to reach this operation, for the
+   * operations that share a method, a path and a sub-resource with another and
+   * are told apart by a header. A copy is the only one, in both its forms, and
+   * each is matched before the upload it would otherwise be read as.
    */
   readonly header?: string | undefined;
   readonly commandName: string;
