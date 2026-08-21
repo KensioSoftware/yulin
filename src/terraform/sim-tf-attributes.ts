@@ -75,7 +75,7 @@ function referencedValue(
   );
 
   for (const reference of references) {
-    const resolved = resolver.resolve(reference, resource.modulePath);
+    const resolved = resolver.resolve(reference, resource);
 
     if (resolved !== undefined) {
       return resolved;

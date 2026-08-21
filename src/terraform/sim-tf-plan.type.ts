@@ -69,10 +69,20 @@ export interface TerraformResourceChange {
 export interface TerraformConfigModule {
   readonly resources?: readonly TerraformConfigResource[];
   readonly outputs?: Record<string, TerraformConfigOutput>;
-  readonly module_calls?: Record<
-    string,
-    { readonly module?: TerraformConfigModule }
-  >;
+  readonly module_calls?: Record<string, TerraformConfigModuleCall>;
+}
+
+/**
+ * One `module` block, holding the module it calls and what it sets on it.
+ *
+ * `expressions` is keyed by variable name and holds what the caller wrote for
+ * each one, in the same shape a resource attribute's expression takes. A
+ * variable set from a resource of the calling module carries the reference
+ * rather than a value.
+ */
+export interface TerraformConfigModuleCall {
+  readonly module?: TerraformConfigModule;
+  readonly expressions?: Record<string, unknown>;
 }
 
 export interface TerraformConfigResource {
@@ -82,6 +92,13 @@ export interface TerraformConfigResource {
   readonly name: string;
   readonly expressions?: Record<string, unknown>;
   readonly depends_on?: readonly string[];
+  /**
+   * What `for_each` iterates, as the references its expression holds.
+   *
+   * `planned_values` carries the instances rather than the collection, so this
+   * is the only place a plan says what `each` was iterating.
+   */
+  readonly for_each_expression?: unknown;
 }
 
 export interface TerraformConfigOutput {

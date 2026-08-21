@@ -12,6 +12,7 @@ import type {
   TerraformPlannedResource,
 } from "./sim-tf-plan.type.js";
 import type { TerraformResource } from "./sim-tf-resource.type.js";
+import { terraformExpressionReferences } from "./sim-tf-expression-references.js";
 import {
   childModuleCallName,
   childModuleSegment,
@@ -98,6 +99,7 @@ function joined(
     unknown: unknown.get(resource.address) ?? {},
     expressions: config?.expressions ?? {},
     dependsOn: config?.depends_on ?? [],
+    forEach: terraformExpressionReferences(config?.for_each_expression),
     modulePath,
   };
 }

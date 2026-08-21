@@ -5,6 +5,7 @@ import {
   assertMapSize,
   assertUndefined,
 } from "@kensio/smartass";
+import { terraformResourceFactory } from "../../test/terraform/plan/terraform-resource.factory.js";
 import {
   terraformPlanFactory,
   terraformPlanResourceFactory,
@@ -209,7 +210,7 @@ describe("settling which resources of a plan become Resources", () => {
     assertUndefined(
       plan.resolver.targetAddress(
         "aws_apigatewayv2_integration.processor.id",
-        [],
+        terraformResourceFactory.make({}),
       ),
     );
   });

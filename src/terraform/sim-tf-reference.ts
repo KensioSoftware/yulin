@@ -1,13 +1,14 @@
 import type { SimCfnTemplateValue } from "../service/cloudformation/template/value/sim-cfn-template-value.js";
 import type { TerraformResource } from "./sim-tf-resource.type.js";
-import { terraformAttributeReads } from "./sim-tf-attribute-reads.js";
+import { terraformAttributeIntrinsic } from "./sim-tf-attribute-intrinsic.js";
 import { TerraformLogicalIds } from "./sim-tf-logical-id.js";
-import {
-  longestFirst,
-  moduleOutputPath,
-  qualifiedReference,
-  withoutInstanceKeys,
-} from "./sim-tf-reference-address.js";
+import { TerraformResourceAddresses } from "./sim-tf-reference-addresses.js";
+import { TerraformModuleOutputWalk } from "./sim-tf-module-outputs.js";
+import { terraformScopeHops } from "./sim-tf-reference-scope.js";
+import { qualifiedReference } from "./sim-tf-reference-address.js";
+
+/** How far a chain of hops is followed before it is taken to be a loop. */
+const hopLimit = 8;
 
 /**
  * Resolves a Terraform reference against the resources a template declares.
@@ -16,25 +17,36 @@ import {
  * Terraform lists both forms for the same reference, so the longest address
  * matching a resource wins and what is left over is the attribute.
  *
+ * A reference naming no address at all is followed to one that does. Module
+ * outputs, module variables, `each` and an instance key left to `each.key` are
+ * each recorded somewhere else in the plan, and following them is a rewrite
+ * from one reference to another rather than an evaluation. Nothing here reads
+ * a Terraform expression, and a value the plan marked unknown stays unknown.
+ * What comes back is the resource that will produce it.
+ *
  * The resources given are the ones the template will hold, rather than every
  * resource of the plan. A reference to a resource the template does not
  * declare resolves to nothing, so no property can come out of this naming a
  * logical ID that is not there.
  */
 export class TerraformReferenceResolver {
-  private readonly byAddress: ReadonlyMap<string, TerraformResource>;
-  private readonly moduleOutputs: ReadonlyMap<string, readonly string[]>;
+  private readonly resources: TerraformResourceAddresses;
+  private readonly moduleOutputs: TerraformModuleOutputWalk;
+  private readonly moduleVariables: ReadonlyMap<string, readonly string[]>;
   private readonly logicalIds: TerraformLogicalIds;
 
   constructor(
     resources: readonly TerraformResource[],
     moduleOutputs: ReadonlyMap<string, readonly string[]> = new Map(),
+    moduleVariables: ReadonlyMap<string, readonly string[]> = new Map(),
   ) {
-    this.byAddress = new Map(
-      resources.map((resource) => [resource.address, resource]),
+    this.resources = new TerraformResourceAddresses(resources);
+    this.moduleOutputs = new TerraformModuleOutputWalk(
+      moduleOutputs,
+      this.resources,
     );
-    this.moduleOutputs = moduleOutputs;
-    this.logicalIds = new TerraformLogicalIds(this.byAddress.keys());
+    this.moduleVariables = moduleVariables;
+    this.logicalIds = new TerraformLogicalIds(this.resources.addresses());
   }
 
   /** The logical ID the template declares one address under. */
@@ -48,7 +60,7 @@ export class TerraformReferenceResolver {
    * own attribute refers to is what wants this.
    */
   public resource(address: string): TerraformResource | undefined {
-    return this.byAddress.get(address);
+    return this.resources.get(address);
   }
 
   /**
@@ -60,30 +72,20 @@ export class TerraformReferenceResolver {
    */
   public resolve(
     reference: string,
-    modulePath: readonly string[],
+    from: TerraformResource,
   ): SimCfnTemplateValue | undefined {
-    const qualified = qualifiedReference(reference, modulePath);
-    const target = this.target(qualified);
+    const qualified = this.named(reference, from.modulePath, from, 0);
+    const target = qualified === undefined ? undefined : this.target(qualified);
 
-    if (target === undefined) {
+    if (qualified === undefined || target === undefined) {
       return undefined;
     }
 
-    const attribute = this.attributeName(qualified, target.address);
-    const read =
-      attribute === undefined
-        ? "Ref"
-        : terraformAttributeReads.get(`${target.type}.${attribute}`);
-
-    if (read === undefined) {
-      return undefined;
-    }
-
-    const logicalId = this.logicalId(target.address);
-
-    return read === "Ref"
-      ? { Ref: logicalId }
-      : { "Fn::GetAtt": [logicalId, read] };
+    return terraformAttributeIntrinsic(
+      target.type,
+      this.attributeName(qualified, target.address),
+      this.logicalId(target.address),
+    );
   }
 
   /**
@@ -95,9 +97,83 @@ export class TerraformReferenceResolver {
    */
   public targetAddress(
     reference: string,
-    modulePath: readonly string[],
+    from: TerraformResource,
   ): string | undefined {
-    return this.target(qualifiedReference(reference, modulePath))?.address;
+    const qualified = this.named(reference, from.modulePath, from, 0);
+
+    return qualified === undefined
+      ? undefined
+      : this.target(qualified)?.address;
+  }
+
+  /**
+   * The same reference, written so that it names a resource of this plan.
+   *
+   * A reference that already names one is itself. One that names an instance
+   * without its key gains the key. One under a scope the plan resolves for
+   * itself is replaced by what was written where that scope was set, and then
+   * asked again.
+   */
+  private named(
+    reference: string,
+    modulePath: readonly string[],
+    from: TerraformResource,
+    depth: number,
+  ): string | undefined {
+    const qualified = qualifiedReference(reference, modulePath);
+
+    if (this.target(qualified) !== undefined) {
+      return qualified;
+    }
+
+    const keyed = this.resources.instance(qualified, from.index);
+
+    if (keyed !== undefined) {
+      return keyed;
+    }
+
+    return depth >= hopLimit
+      ? undefined
+      : this.throughScope(reference, modulePath, from, depth);
+  }
+
+  /**
+   * The one resource a scoped reference leads to, where there is only one.
+   *
+   * A plan records the references of a whole collection as one list and says
+   * nothing about which part of it a reader was reading, so a collection built
+   * out of two resources cannot say which of them `each.value.uri` holds.
+   * Guessing there would put a plausible logical ID into a property that names
+   * the wrong resource, which is worse than the property being absent. Two
+   * answers is therefore no answer, and the resource is left out and reported
+   * the way it is today.
+   */
+  private throughScope(
+    reference: string,
+    modulePath: readonly string[],
+    from: TerraformResource,
+    depth: number,
+  ): string | undefined {
+    const hops = terraformScopeHops(
+      reference,
+      modulePath,
+      from,
+      this.moduleVariables,
+      depth,
+    );
+    const found = new Map<string, string>();
+
+    for (const hop of hops) {
+      const named = this.named(hop.reference, hop.modulePath, from, depth + 1);
+      const address =
+        named === undefined ? undefined : this.target(named)?.address;
+
+      if (named !== undefined && address !== undefined && !found.has(address)) {
+        found.set(address, named);
+      }
+    }
+
+    return found.size === 1 ? found.values().next().value : undefined;
   }
 
   /**
@@ -116,92 +192,15 @@ export class TerraformReferenceResolver {
       return undefined;
     }
 
-    if (qualified.startsWith(`${address}.`)) {
-      return qualified.slice(address.length + 1);
-    }
-
-    const [longest] = longestFirst(this.moduleOutput(qualified) ?? []);
-
-    return longest?.split(".").pop();
+    return qualified.startsWith(`${address}.`)
+      ? qualified.slice(address.length + 1)
+      : this.moduleOutputs.attributeOf(qualified);
   }
 
   private target(qualified: string): TerraformResource | undefined {
-    return this.longestMatch(qualified) ?? this.throughModuleOutput(qualified);
-  }
-
-  /**
-   * The module output one reference names.
-   *
-   * The index is keyed by module call path, since a module declares its
-   * outputs once however many instances of the call there are. A reference
-   * made from inside one instance carries that instance's key, so the key
-   * comes off when the qualified form finds nothing.
-   */
-  private moduleOutput(qualified: string): readonly string[] | undefined {
     return (
-      this.moduleOutputs.get(qualified) ??
-      this.moduleOutputs.get(withoutInstanceKeys(qualified))
+      this.resources.longestMatch(qualified) ??
+      this.moduleOutputs.target(qualified)
     );
-  }
-
-  /**
-   * The resource a module output leads to.
-   *
-   * The output's own expression names it, in terms of the module declaring the
-   * output, so following one is resolving that expression again one module
-   * down. An output built out of several resources returns the first that
-   * resolves, and the depth limit stops a module whose outputs refer to each
-   * other from looping.
-   */
-  private throughModuleOutput(
-    qualified: string,
-    depth = 0,
-  ): TerraformResource | undefined {
-    const output = this.moduleOutput(qualified);
-
-    if (output === undefined || depth > 8) {
-      return undefined;
-    }
-
-    // The path the output was read through rather than the one it was
-    // declared under, so an output reached inside a `for_each` instance
-    // follows its own instance's resources.
-    const instance = moduleOutputPath(qualified);
-
-    for (const reference of longestFirst(output)) {
-      const nested = qualifiedReference(reference, instance);
-      const target =
-        this.longestMatch(nested) ??
-        this.throughModuleOutput(nested, depth + 1);
-
-      if (target !== undefined) {
-        return target;
-      }
-    }
-
-    return undefined;
-  }
-
-  /**
-   * The resource whose address is the longest prefix of this reference.
-   *
-   * `aws_iam_role.processor.arn` has to find `aws_iam_role.processor` and leave
-   * `arn` behind, and a `for_each` instance address carries a bracketed key
-   * that is part of the address rather than an attribute.
-   */
-  private longestMatch(qualified: string): TerraformResource | undefined {
-    let best: TerraformResource | undefined;
-
-    for (const [address, resource] of this.byAddress) {
-      if (qualified !== address && !qualified.startsWith(`${address}.`)) {
-        continue;
-      }
-
-      if (best === undefined || address.length > best.address.length) {
-        best = resource;
-      }
-    }
-
-    return best;
   }
 }

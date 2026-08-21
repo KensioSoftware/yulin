@@ -4,6 +4,7 @@ import {
   type TerraformResource,
 } from "./sim-tf-resource.type.js";
 import { terraformModuleOutputs } from "./sim-tf-module-outputs.js";
+import { terraformModuleVariables } from "./sim-tf-module-variables.js";
 import { TerraformReferenceResolver } from "./sim-tf-reference.js";
 import {
   terraformResourceFolds,
@@ -49,6 +50,7 @@ export function settledTerraformPlan(
   overrides: TerraformPlanOverrides,
 ): TerraformSettledPlan {
   const moduleOutputs = terraformModuleOutputs(plan);
+  const moduleVariables = terraformModuleVariables(plan);
   const refused = new Map<string, TerraformSkipReason>();
 
   let candidates = resources.flatMap((resource) => mappable(resource, refused));
@@ -58,6 +60,7 @@ export function settledTerraformPlan(
     const resolver = new TerraformReferenceResolver(
       candidates.map((declaration) => declaration.resource),
       moduleOutputs,
+      moduleVariables,
     );
     const dropped = new Map(
       candidates.flatMap((declaration) => {

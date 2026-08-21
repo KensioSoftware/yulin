@@ -10,10 +10,25 @@ import {
   terraformPlanResourceFactory,
   type TerraformPlanFixture,
 } from "../../test/terraform/plan/terraform-plan.factory.js";
+import { terraformResourceFactory } from "../../test/terraform/plan/terraform-resource.factory.js";
+import type { TerraformResource } from "./sim-tf-resource.type.js";
 import { terraformPlanResources } from "./sim-tf-plan-resources.js";
 import { terraformModuleOutputs } from "./sim-tf-module-outputs.js";
+import { terraformModuleVariables } from "./sim-tf-module-variables.js";
 import { TerraformReferenceResolver } from "./sim-tf-reference.js";
 import { qualifiedReference } from "./sim-tf-reference-address.js";
+
+/**
+ * The resource a reference is read from, where only the module it sits in
+ * matters. Every reference is written somewhere, and the resolver reads what
+ * `each` iterates and which instance is meant off the resource that wrote it.
+ */
+function readingFrom(
+  modulePath: readonly string[] = [],
+  properties: Partial<TerraformResource> = {},
+): TerraformResource {
+  return terraformResourceFactory.make({ modulePath, ...properties });
+}
 
 /** A resolver over the resources one plan fixture declares. */
 function resolverFor(
@@ -24,6 +39,7 @@ function resolverFor(
   return new TerraformReferenceResolver(
     terraformPlanResources(plan),
     terraformModuleOutputs(plan),
+    terraformModuleVariables(plan),
   );
 }
 
@@ -66,7 +82,10 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     });
 
     // When a reference to the queue's ARN is resolved
-    const resolved = resolver.resolve("aws_sqs_queue.orders.arn", []);
+    const resolved = resolver.resolve(
+      "aws_sqs_queue.orders.arn",
+      readingFrom(),
+    );
 
     // Then it is the Fn::GetAtt CloudFormation reads that ARN with
     assertObjectEquals(resolved, {
@@ -82,9 +101,12 @@ describe("resolving a Terraform reference against the resources of a plan", () =
 
     // When a reference naming the resource itself is resolved
     // Then it is the Ref, which for a queue is its URL
-    assertObjectEquals(resolver.resolve("aws_sqs_queue.orders", []), {
-      Ref: "AwsSqsQueueOrders",
-    });
+    assertObjectEquals(
+      resolver.resolve("aws_sqs_queue.orders", readingFrom()),
+      {
+        Ref: "AwsSqsQueueOrders",
+      },
+    );
   });
 
   it("reads an attribute whose Ref is not the same value as CloudFormation's", () => {
@@ -102,9 +124,12 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     // When the ARN is resolved
     // Then it comes back as a Ref rather than an Fn::GetAtt, because the two
     // services disagree about which value a Ref answers with
-    assertObjectEquals(resolver.resolve("aws_sns_topic.events.arn", []), {
-      Ref: "AwsSnsTopicEvents",
-    });
+    assertObjectEquals(
+      resolver.resolve("aws_sns_topic.events.arn", readingFrom()),
+      {
+        Ref: "AwsSnsTopicEvents",
+      },
+    );
   });
 
   it("resolves a reference made inside a module against that module", () => {
@@ -127,7 +152,7 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     // When the reference is resolved from inside that module
     // Then it reaches the resource planned_values addressed with the prefix
     assertObjectEquals(
-      resolver.resolve("aws_sqs_queue.this.arn", ["processing"]),
+      resolver.resolve("aws_sqs_queue.this.arn", readingFrom(["processing"])),
       { "Fn::GetAtt": ["ModuleProcessingAwsSqsQueueThis", "Arn"] },
     );
   });
@@ -150,7 +175,10 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     });
 
     // When the root module's reference to that output is resolved
-    const resolved = resolver.resolve("module.processing.queue_arn", []);
+    const resolved = resolver.resolve(
+      "module.processing.queue_arn",
+      readingFrom(),
+    );
 
     // Then it reads the attribute the output's own expression names, off the
     // Resource the module's queue became. No address of the plan is
@@ -178,9 +206,10 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     });
 
     // When a sibling of that queue resolves a reference to it
-    const resolved = resolver.resolve("aws_sqs_queue.this.arn", [
-      'workers["blue"]',
-    ]);
+    const resolved = resolver.resolve(
+      "aws_sqs_queue.this.arn",
+      readingFrom(['workers["blue"]']),
+    );
 
     // Then it reaches the instance's own queue. Every address under the module
     // carries the key, so a reference qualified without it reaches nothing
@@ -196,8 +225,12 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     // When a reference to it is resolved
     // Then nothing comes back, rather than an intrinsic naming a logical ID
     // the template never declares
-    assertUndefined(resolver.resolve("aws_sqs_queue.orders.arn", []));
-    assertUndefined(resolver.targetAddress("aws_sqs_queue.orders.arn", []));
+    assertUndefined(
+      resolver.resolve("aws_sqs_queue.orders.arn", readingFrom()),
+    );
+    assertUndefined(
+      resolver.targetAddress("aws_sqs_queue.orders.arn", readingFrom()),
+    );
   });
 
   it("resolves nothing for an attribute with no way to read it", () => {
@@ -209,7 +242,9 @@ describe("resolving a Terraform reference against the resources of a plan", () =
 
     // When the reference is resolved
     // Then nothing comes back, and the mapping decides what that means
-    assertUndefined(resolver.resolve("aws_sqs_queue.orders.policy", []));
+    assertUndefined(
+      resolver.resolve("aws_sqs_queue.orders.policy", readingFrom()),
+    );
   });
 
   it("names the resource a reference points at, for a caller that wants it", () => {
@@ -222,7 +257,7 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     // Then the address comes back, which is what a fold merging into that
     // resource needs rather than the value read off it
     assertIdentical(
-      resolver.targetAddress("aws_sqs_queue.orders.arn", []),
+      resolver.targetAddress("aws_sqs_queue.orders.arn", readingFrom()),
       "aws_sqs_queue.orders",
     );
   });
@@ -242,7 +277,9 @@ describe("resolving a reference through module outputs", () => {
 
     // When the output is resolved
     // Then nothing comes back, since no resource of the plan is behind it
-    assertUndefined(resolver.resolve("module.processing.queue_name", []));
+    assertUndefined(
+      resolver.resolve("module.processing.queue_name", readingFrom()),
+    );
   });
 
   it("follows an output read from inside a for_each module instance", () => {
@@ -269,9 +306,10 @@ describe("resolving a reference through module outputs", () => {
     });
 
     // When the output is resolved from inside the instance
-    const resolved = resolver.resolve("module.queue.queue_arn", [
-      'workers["blue"]',
-    ]);
+    const resolved = resolver.resolve(
+      "module.queue.queue_arn",
+      readingFrom(['workers["blue"]']),
+    );
 
     // Then it is found. A module declares its outputs once however many
     // instances the call has, so the index is keyed without the key
@@ -296,6 +334,8 @@ describe("resolving a reference through module outputs", () => {
 
     // When it is resolved
     // Then it stops rather than following itself forever
-    assertUndefined(resolver.resolve("module.processing.queue_arn", []));
+    assertUndefined(
+      resolver.resolve("module.processing.queue_arn", readingFrom()),
+    );
   });
 });

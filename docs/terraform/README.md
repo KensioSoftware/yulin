@@ -224,6 +224,24 @@ value that names a resource of the same plan and sits inside something Terraform
 such as a `jsonencode` document or a `for_each` map, is unknown in its entirety and its contents go
 with it.
 
+## What a reference cannot reach
+
+A value a plan resolved arrives as a value. A value the plan could not resolve arrives as a
+reference, and the import follows that reference to the resource that will produce it, through
+module outputs, module variables, `each.value` and `each.key`. That covers what a community module
+such as `terraform-aws-modules/apigateway-v2/aws` does with a `routes` map.
+
+Two shapes stop it, and both are recorded as `unresolved required attribute` on `report.skipped`.
+
+A plan records the references of a whole collection in one list, and the list says what the
+collection was built from without saying which entry holds which. A `routes` map naming one function
+is unambiguous. A `routes` map naming two functions leaves `each.value.uri` able to mean either, and
+the import declines. Setting the value with a resource of its own, or with one module call per
+function, gives each reference a collection to itself.
+
+A value reaching a resource through a `local` is out of range whatever it holds. A plan carries the
+locals' effects and none of their definitions, so there is nothing to follow.
+
 ## The scope of what it reads
 
 One plan JSON file, already produced. Reading HCL, reading `terraform.tfstate`, and running

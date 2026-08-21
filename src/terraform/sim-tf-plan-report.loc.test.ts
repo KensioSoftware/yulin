@@ -24,19 +24,13 @@ import type { TerraformImportReport } from "./sim-tf-report.type.js";
 /**
  * What each configuration leaves unreached, by configuration name.
  *
- * The application configuration leaves nothing. The modules configuration
- * packages its zip with `null_resource` and `local_file`, which belong to no
- * AWS service, and its integration and route read their values through an
- * `each.value` hop this import does not follow.
+ * Both are at their ceiling. The application configuration leaves nothing, and
+ * the modules configuration packages its zip with `null_resource` and
+ * `local_file`, which belong to no AWS service and no import can reach.
  */
 const unreachedTypes: Record<string, readonly string[]> = {
   app: [],
-  modules: [
-    "aws_apigatewayv2_integration",
-    "aws_apigatewayv2_route",
-    "local_file",
-    "null_resource",
-  ],
+  modules: ["local_file", "null_resource"],
 };
 
 /** The report each committed configuration's plan deploys to. */
