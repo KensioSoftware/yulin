@@ -3174,6 +3174,19 @@ behaves differently to the template. A stack that forgets `ALLOW_ADMIN_USER_PASS
 fails at the sign-in here as it would in a deployment, the point of deploying the template at
 all.
 
+A property one of the Cognito commands refuses by name is recorded in that command's own words.
+`EmailConfiguration`, `SmsConfiguration` and `SmsAuthenticationMessage` on a pool, and
+`AnalyticsConfiguration`, `EnablePropagateAdditionalUserContextData`, `ReadAttributes` and
+`WriteAttributes` on a client, all read as the refusal reads:
+
+```
+AWS::Cognito::UserPool property EmailConfiguration is not simulated: email delivery would be ignored here and applied on real AWS. The Resource is created without it.
+```
+
+`CreateUserPool` refuses that same input outright, and the template deploys. The two paths say the
+same thing about the property and differ in what they do about it. A direct API call has one
+request to fail, and a template has every other resource in it to think about.
+
 `UserPoolName` and `ClientName` are optional. A template that sets neither gets
 `<stack name>-<logical id>`, as real CloudFormation generates a name, trimmed to the 128 characters
 Cognito allows if the two are longer than that together. Real CloudFormation adds random characters

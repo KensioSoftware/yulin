@@ -1,6 +1,18 @@
 import { SimCognitoInvalidParameterException } from "../error/sim-cognito.error.js";
 
 /**
+ * Say what a request asking for an unsimulated input would have got on AWS.
+ *
+ * The CloudFormation layer records this same sentence against a property it
+ * drops, so a reader meets one wording for one limitation whichever path they
+ * came in on. It lives here because the refusal is what the wording was
+ * written for, and a second copy would drift.
+ */
+export function simCognitoUnsimulatedFeatureReason(feature: string): string {
+  return `${feature} would be ignored here and applied on real AWS`;
+}
+
+/**
  * Refuses a request input this simulation does not model.
  *
  * Both creation commands need the same two refusals, in the same words: one
@@ -28,8 +40,9 @@ export class SimCognitoUnsimulatedInput {
     }
 
     throw new SimCognitoInvalidParameterException(
-      `${this.operation} ${option} is not simulated: ${feature} would be ` +
-        `ignored here and applied on real AWS`,
+      `${this.operation} ${option} is not simulated: ${simCognitoUnsimulatedFeatureReason(
+        feature,
+      )}`,
     );
   }
 
@@ -48,7 +61,7 @@ export class SimCognitoUnsimulatedInput {
 
     throw new SimCognitoInvalidParameterException(
       `${this.operation} ${option} '${String(value)}' is not simulated: ` +
-        `${feature} would be ignored here and applied on real AWS. Only ` +
+        `${simCognitoUnsimulatedFeatureReason(feature)}. Only ` +
         `'${String(simulated)}' is supported.`,
     );
   }
