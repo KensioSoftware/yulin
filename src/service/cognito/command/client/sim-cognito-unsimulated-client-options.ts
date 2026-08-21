@@ -36,11 +36,6 @@ export class SimCognitoUnsimulatedUserPoolClientOptions {
       "Amazon Pinpoint analytics",
     );
     this.unsimulated.refuse(
-      "AuthSessionValidity",
-      input.AuthSessionValidity,
-      "the authentication session lifetime",
-    );
-    this.unsimulated.refuse(
       "EnablePropagateAdditionalUserContextData",
       input.EnablePropagateAdditionalUserContextData,
       "threat protection context data",

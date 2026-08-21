@@ -47,10 +47,8 @@ const refusedRelyingParties: readonly RefusedRelyingParty[] = [
  *
  * Both values arrive through `SetUserPoolMfaConfig`, because that is where the
  * Cognito API takes them, and a pool records them and reports them back the
- * way it records its MFA configuration. Nothing here registers or presents a
- * passkey. Both go through the `USER_AUTH` flow, which is refused where a
- * sign-in asks for it, and `sim-cognito-sign-in-policy.iso.test.ts` is where
- * that refusal is covered.
+ * way it records its MFA configuration. Registering a passkey against them is
+ * covered in `sim-cognito-web-authn-registration.iso.test.ts`.
  */
 describe("sim Cognito user pool passkey registration", () => {
   async function poolWithMfa(): Promise<SimCognitoWithPool> {
@@ -66,8 +64,8 @@ describe("sim Cognito user pool passkey registration", () => {
   }
 
   it("records how a passkey would be registered", async () => {
-    // Given a pool. Nothing here registers or presents a passkey, and these
-    // two values are what a passkey would mean rather than how a sign-in runs.
+    // Given a pool. These two values are what a passkey means rather than how
+    // a sign-in runs, and both arrive before either is registered.
     const { cognito, userPoolId } = await poolWithMfa();
 
     // When the pool is configured for one.

@@ -47,6 +47,7 @@ export {
 } from "./user-pool/sim-cognito-sign-in-policy.js";
 export { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 export type { SimCognitoUserPoolClientId } from "./user-pool/client/sim-cognito-user-pool-client-id.js";
+export { SimCognitoAuthSessionValidity } from "./user-pool/client/sim-cognito-auth-session-validity.js";
 export { SimCognitoExplicitAuthFlows } from "./user-pool/client/sim-cognito-explicit-auth-flows.js";
 export { SimCognitoPreventUserExistenceErrors } from "./user-pool/client/sim-cognito-prevent-user-existence-errors.js";
 export {
@@ -66,6 +67,16 @@ export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
 export { SimCognitoFederation } from "./sim-cognito-federation.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
+export { SimCognitoUserWebAuthn } from "./user-pool/user/web-authn/sim-cognito-user-web-authn.js";
+export {
+  SimCognitoWebAuthnCredential,
+  type SimCognitoWebAuthnCredentialDescription,
+} from "./user-pool/user/web-authn/sim-cognito-web-authn-credential.js";
+export type {
+  SimCognitoWebAuthnCreationOptions,
+  SimCognitoWebAuthnCredentialDescriptor,
+  SimCognitoWebAuthnCredentialDocument,
+} from "./user-pool/user/web-authn/sim-cognito-web-authn-document.js";
 export { SimCognitoConfirmationCode } from "./user-pool/user/sim-cognito-confirmation-code.js";
 export { SimCognitoUserPasswordReset } from "./user-pool/user/sim-cognito-user-password-reset.js";
 export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
@@ -150,6 +161,13 @@ export { SimCognitoTriggerOccasion } from "./user-pool/trigger/sim-cognito-trigg
 export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session.js";
 export { SimCognitoIssuedToken } from "./user-pool/auth/sim-cognito-issued-token.js";
 export { SimCognitoPoolAuth } from "./user-pool/auth/sim-cognito-pool-auth.js";
+export {
+  SimCognitoWebAuthnChallengeNotFoundException,
+  SimCognitoWebAuthnConfigurationMissingException,
+  SimCognitoWebAuthnCredentialNotSupportedException,
+  SimCognitoWebAuthnOriginNotAllowedException,
+  SimCognitoWebAuthnRelyingPartyMismatchException,
+} from "./error/sim-cognito-web-authn.error.js";
 export {
   isSimCognitoOAuthError,
   SimCognitoOAuthError,

@@ -51,6 +51,7 @@ describe("Cognito CloudFormation property shapes", () => {
               ClientName: "web",
               GenerateSecret: "true",
               AccessTokenValidity: "30",
+              AuthSessionValidity: "10",
               TokenValidityUnits: { AccessToken: "minutes" },
             },
           },
@@ -80,6 +81,7 @@ describe("Cognito CloudFormation property shapes", () => {
     assertNonNullable(client);
     assertTrue(client.hasSecret);
     assertIdentical(client.tokenValidity.accessToken.seconds, 30 * 60);
+    assertIdentical(client.authSessionValidity.minutes, 10);
 
     assertIdentical(pool.findGroup("admins")?.precedence, 5);
   });

@@ -38,13 +38,13 @@ const mostFactors = 5;
  * about it, which is how real Cognito reports one. A pool created with a
  * policy carries the factors it named, and reports them back under `Policies`.
  *
- * **Nothing here presents a factor other than a password.** The factors are
- * recorded the way an `MfaConfiguration` is recorded, and the sign-in that
- * would have to present one is where the refusal happens. Every factor beside
- * `PASSWORD` is reached through the `USER_AUTH` flow, and
- * `SimCognitoAuthFlows` refuses that flow by name. So a pool configured for
- * passkeys here deploys, describes itself the way the deployed pool does, and
- * refuses a passkey sign-in in words that say what could not be done.
+ * **The factor a sign-in presents is not settled here.** These are recorded
+ * the way an `MfaConfiguration` is recorded, and the sign-in that presents one
+ * is where they are read. Every factor beside `PASSWORD` is reached through
+ * the `USER_AUTH` flow, and `SimCognitoAuthFlows` still refuses that flow by
+ * name, so a pool configured for a code sent by email deploys, describes
+ * itself the way the deployed pool does, and refuses that sign-in in words
+ * that say what could not be done.
  *
  * The validation is real Cognito's. The four factor names are the ones it
  * accepts, a list may name five of them at most, and a policy offering

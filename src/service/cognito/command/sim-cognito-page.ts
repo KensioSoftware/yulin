@@ -1,7 +1,7 @@
 import { SimCognitoInvalidParameterException } from "../error/sim-cognito.error.js";
 
 /**
- * The most Cognito will return in one page of either listing.
+ * The most Cognito will return in one page of most listings.
  */
 const maxMaxResults = 60;
 
@@ -18,6 +18,12 @@ interface SimCognitoPageProperties {
    * `PaginationToken`.
    */
   readonly nextTokenField?: string;
+
+  /**
+   * The largest page this operation will hand back, where it is not the sixty
+   * most of them allow. `ListWebAuthnCredentials` stops at twenty.
+   */
+  readonly mostResults?: number;
 }
 
 /**
@@ -35,6 +41,7 @@ export class SimCognitoPage<TItem> {
     const maxResults = SimCognitoPage.maxResults(
       properties.maxResults,
       properties.maxResultsField ?? "MaxResults",
+      properties.mostResults ?? maxMaxResults,
     );
     const startIndex = SimCognitoPage.startIndex(
       properties.nextToken,
@@ -47,14 +54,14 @@ export class SimCognitoPage<TItem> {
     this.nextToken = SimCognitoPage.tokenFor(nextIndex, listed.length);
   }
 
-  private static maxResults(requested: number, field: string): number {
-    if (
-      !Number.isSafeInteger(requested) ||
-      requested < 1 ||
-      requested > maxMaxResults
-    ) {
+  private static maxResults(
+    requested: number,
+    field: string,
+    most: number,
+  ): number {
+    if (!Number.isSafeInteger(requested) || requested < 1 || requested > most) {
       throw new SimCognitoInvalidParameterException(
-        `${field} must be a whole number between 1 and ${String(maxMaxResults)}`,
+        `${field} must be a whole number between 1 and ${String(most)}`,
       );
     }
 

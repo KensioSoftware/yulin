@@ -1,19 +1,16 @@
 import { randomBytes } from "node:crypto";
-
-/**
- * How long a challenge session lasts.
- *
- * Real Cognito gives an app client an `AuthSessionValidity` of three minutes
- * unless the client says otherwise, and `CreateUserPoolClient` refuses that
- * input here, so three minutes is what every session gets.
- */
-const sessionMinutes = 3;
+import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 
 const sessionBytes = 48;
 
 interface SimCognitoAuthSessionProperties {
   readonly username: string;
-  readonly clientId: string;
+
+  /**
+   * The app client the sign-in is running through, which is what says how
+   * long the session lasts: its `AuthSessionValidity`.
+   */
+  readonly client: SimCognitoUserPoolClient;
   readonly challengeName: string;
   readonly issuedAt: Date;
 
@@ -34,7 +31,9 @@ interface SimCognitoAuthSessionProperties {
  * between the request that started it and the response that completes it.
  *
  * The session is opaque, single use, and tied to the user and app client that
- * got it: a session from one sign-in cannot complete another.
+ * got it: a session from one sign-in cannot complete another. How long it can
+ * be answered for is the app client's `AuthSessionValidity`, which is three
+ * minutes on a client that asked for none.
  */
 export class SimCognitoAuthSession {
   public readonly id: string;
@@ -43,15 +42,26 @@ export class SimCognitoAuthSession {
   public readonly challengeName: string;
   public readonly issuedAt: Date;
 
+  /**
+   * When this session runs out, which the app client's `AuthSessionValidity`
+   * decides. It is settled here rather than read back off the client, so a
+   * client updated mid-sign-in does not move the deadline of a challenge it
+   * has already issued.
+   */
+  public readonly expiresAt: Date;
+
   /** The code this challenge sent, where it sent one. */
   public readonly code: string | undefined;
 
   constructor(properties: SimCognitoAuthSessionProperties) {
     this.id = randomBytes(sessionBytes).toString("base64url");
     this.username = properties.username;
-    this.clientId = properties.clientId;
+    this.clientId = properties.client.id;
     this.challengeName = properties.challengeName;
     this.issuedAt = properties.issuedAt;
+    this.expiresAt = properties.client.authSessionValidity.expiryOf(
+      properties.issuedAt,
+    );
     this.code = properties.code;
   }
 
@@ -59,11 +69,7 @@ export class SimCognitoAuthSession {
    * Whether this session has run out by a given moment.
    */
   isExpiredAt(now: Date): boolean {
-    const expiresAt = new Date(
-      this.issuedAt.getTime() + sessionMinutes * 60 * 1000,
-    );
-
-    return now.getTime() >= expiresAt.getTime();
+    return now.getTime() >= this.expiresAt.getTime();
   }
 
   /**

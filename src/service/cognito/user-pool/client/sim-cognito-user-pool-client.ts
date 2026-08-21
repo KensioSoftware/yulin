@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPoolId } from "../sim-cognito-user-pool-id.js";
+import type { SimCognitoAuthSessionValidity } from "./sim-cognito-auth-session-validity.js";
 import type { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import type { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import type { SimCognitoRefreshTokenRotation } from "./sim-cognito-refresh-token-rotation.js";
@@ -75,6 +76,14 @@ export class SimCognitoUserPoolClient {
    */
   get tokenValidity(): SimCognitoTokenValidity {
     return this.clientSettings.tokenValidity;
+  }
+
+  /**
+   * How long a challenge this client issued can be answered for, which is
+   * what decides when an unfinished sign-in through it runs out.
+   */
+  get authSessionValidity(): SimCognitoAuthSessionValidity {
+    return this.clientSettings.authSessionValidity;
   }
 
   /**

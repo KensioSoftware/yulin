@@ -3,6 +3,7 @@ import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-i
 import { SimCognitoUserMfa } from "./mfa/sim-cognito-user-mfa.js";
 import { SimCognitoUserConfirmation } from "./sim-cognito-user-confirmation.js";
 import { SimCognitoUserPasswordReset } from "./sim-cognito-user-password-reset.js";
+import { SimCognitoUserWebAuthn } from "./web-authn/sim-cognito-user-web-authn.js";
 import type {
   SimCognitoAttributeType,
   SimCognitoUserAttributes,
@@ -53,6 +54,7 @@ export class SimCognitoUser {
   private readonly userAttributes: SimCognitoUserAttributes;
   private readonly confirmation: SimCognitoUserConfirmation;
   private readonly userMfa: SimCognitoUserMfa;
+  private readonly userWebAuthn: SimCognitoUserWebAuthn;
   private readonly reset: SimCognitoUserPasswordReset;
   private readonly federatedIdentity: SimCognitoFederatedIdentity | undefined;
   private userStatus: SimCognitoUserStatus;
@@ -72,12 +74,17 @@ export class SimCognitoUser {
     this.clock = properties.clock;
     this.creationDate = this.clock.now();
     this.modifiedDate = this.creationDate;
+    // Everything a user holds separately tells it when it has changed, so the
+    // user's last modified date moves on wherever the change was made.
+    const changed = (): void => {
+      this.touch();
+    };
+
     this.userMfa = new SimCognitoUserMfa({
       attributes: this.userAttributes.values,
-      changed: (): void => {
-        this.touch();
-      },
+      changed,
     });
+    this.userWebAuthn = new SimCognitoUserWebAuthn();
     this.reset = new SimCognitoUserPasswordReset({
       confirmation: this.confirmation,
       status: (): SimCognitoUserStatus => this.userStatus,
@@ -87,22 +94,16 @@ export class SimCognitoUser {
       chosen: (password): void => {
         this.setPassword(password, true);
       },
-      changed: (): void => {
-        this.touch();
-      },
+      changed,
     });
   }
 
-  /**
-   * When the user last changed.
-   */
+  /** When the user last changed. */
   get lastModifiedDate(): Date {
     return this.modifiedDate;
   }
 
-  /**
-   * Where the user is in the status lifecycle.
-   */
+  /** Where the user is in the status lifecycle. */
   get status(): SimCognitoUserStatus {
     return this.userStatus;
   }
@@ -177,6 +178,14 @@ export class SimCognitoUser {
   }
 
   /**
+   * The passkeys this user has registered. A passkey is a first factor rather
+   * than a second one, so it sits beside `mfa` rather than among it.
+   */
+  get webAuthn(): SimCognitoUserWebAuthn {
+    return this.userWebAuthn;
+  }
+
+  /**
    * The password reset this user can go through, which is what a forgotten
    * password is replaced by and what an administrator can force.
    */
@@ -221,9 +230,7 @@ export class SimCognitoUser {
     this.moveTo(SimCognitoUserStatus.confirmed);
   }
 
-  /**
-   * Confirm the sign-up without a code, as `AdminConfirmSignUp` does.
-   */
+  /** Confirm the sign-up without a code, as `AdminConfirmSignUp` does. */
   confirm(): void {
     this.userStatus.requireConfirmable();
     this.moveTo(SimCognitoUserStatus.confirmed);
@@ -253,9 +260,7 @@ export class SimCognitoUser {
     return this.userPassword?.matches(candidate) ?? false;
   }
 
-  /**
-   * Apply an attribute update to this user.
-   */
+  /** Apply an attribute update to this user. */
   updateAttributes(
     requested: readonly SimCognitoAttributeType[] | undefined,
   ): void {
@@ -263,17 +268,13 @@ export class SimCognitoUser {
     this.touch();
   }
 
-  /**
-   * Let the user authenticate again.
-   */
+  /** Let the user authenticate again. */
   enable(): void {
     this.isEnabled = true;
     this.touch();
   }
 
-  /**
-   * Stop the user authenticating.
-   */
+  /** Stop the user authenticating. */
   disable(): void {
     this.isEnabled = false;
     this.touch();

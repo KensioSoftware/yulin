@@ -90,7 +90,7 @@ export class SimCognitoPasswordSignIn {
     requireSimCognitoPasswordSet(user);
 
     if (user.status.mustChangePassword) {
-      return this.challenge.issue({ pool, clientId: client.id, user });
+      return this.challenge.issue({ pool, client, user });
     }
 
     // A user that has registered a second factor is challenged for it here
