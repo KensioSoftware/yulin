@@ -59,6 +59,29 @@ export class TestTerraformProject {
   }
 
   /**
+   * The path of a file holding this configuration's plan JSON.
+   *
+   * `TerraformAdapter.deployPlan` reads a path rather than a document, so a
+   * test of the deployment needs the JSON on disk. It goes to a temporary directory
+   * for the same reason the plan file does.
+   */
+  async planJsonPath(): Promise<string> {
+    this.requireInitialised();
+
+    const output = new TemporaryDirectory();
+    await output.resolvePath();
+    const planFile = output.join(`${this.name}.tfplan`);
+
+    await this.plan(planFile);
+    await output.writeFile(
+      `${this.name}.tfplan.json`,
+      await this.show(planFile),
+    );
+
+    return output.join(`${this.name}.tfplan.json`);
+  }
+
+  /**
    * Write the plan file.
    *
    * A configuration reading a `data` block that calls AWS cannot be planned

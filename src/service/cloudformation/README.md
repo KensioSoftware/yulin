@@ -38,9 +38,15 @@ familiar CloudFormation/CDK outputs.
   `update/`.
 - `cdk/` contains CDK-specific integration support, including synthesized output context and custom
   resource implementations.
+- `sam/` contains the SAM transform expansion a template naming `AWS::Serverless-2016-10-31` goes
+  through before anything else reads it.
 - `bind/` contains the binding types a deployment supplies real in-process handlers through, and
   what checks each one against the Stack it was given for.
 - `error/` contains CloudFormation-specific AWS-like errors.
+
+`src/terraform/` is not part of this service. It builds a template body out of a Terraform plan and
+deploys it through `deployTemplate`, so it is a caller of this code rather than a part of it, and
+nothing here knows Terraform exists.
 
 A `SimCloudFormation` instance owns a map of stacks for one account/region scope.
 
