@@ -86,21 +86,26 @@ export class SimCognitoHostedPasskeySignIn {
   /**
    * The user the presented credential signs in, having checked that this
    * user's passkey signed the challenge the pool issued.
+   *
+   * The user is resolved before the session is, because the form posts back
+   * whatever the page carried, and on a pool with `UsernameAttributes` that is
+   * the address the person signed in by rather than the username the pool
+   * generated. The session belongs to the user, so the username it is looked
+   * up by has to be the resolved one.
    */
   present(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     presented: SimCognitoPresentedPasskey,
   ): SimCognitoUser {
-    const { username } = presented;
+    const user = this.signingIn(pool, client, presented.username);
     const session = pool.auth.requireSession({
       sessionId: presented.session,
-      username,
+      username: user.username,
       clientId: client.id,
       challengeName: simCognitoWebAuthnChallenge,
       now: this.clock.now(),
     });
-    const user = this.signingIn(pool, client, username);
 
     requireSimCognitoWebAuthnAssertion(
       user.webAuthn.credentials,

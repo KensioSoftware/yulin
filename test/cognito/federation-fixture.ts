@@ -13,6 +13,7 @@ import type {
   AttributeType,
   PreventUserExistenceErrorTypes,
   SchemaAttributeType,
+  UsernameAttributeType,
   UserPoolMfaType,
   VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -94,6 +95,13 @@ export interface SimCognitoHostedSetUpOptions {
 
   /** What the app client does about a username the pool lacks. */
   readonly preventUserExistenceErrors?: PreventUserExistenceErrorTypes;
+
+  /**
+   * What the pool signs its users in by, its own usernames by default. A pool
+   * given one of these generates a username for every user and signs it in by
+   * the attribute instead.
+   */
+  readonly usernameAttributes?: readonly UsernameAttributeType[];
 }
 
 /**
@@ -138,6 +146,9 @@ export async function simCognitoHosted(
       PoolName: "myapp-users",
       ...(options.mfaConfiguration !== undefined && {
         MfaConfiguration: options.mfaConfiguration,
+      }),
+      ...(options.usernameAttributes !== undefined && {
+        UsernameAttributes: [...options.usernameAttributes],
       }),
       ...(options.schema !== undefined && { Schema: options.schema }),
       ...(options.autoVerifiedAttributes !== undefined && {
