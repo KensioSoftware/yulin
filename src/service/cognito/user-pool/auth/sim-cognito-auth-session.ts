@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { SimCognitoNotAuthorizedException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
+import type { SimCognitoWebAuthnRequestOptions } from "../user/web-authn/sim-cognito-web-authn-document.js";
 
 const sessionBytes = 48;
 
@@ -24,6 +26,16 @@ interface SimCognitoAuthSessionProperties {
    * app is showing.
    */
   readonly code?: string | undefined;
+
+  /**
+   * The options a `WEB_AUTHN` challenge asked a passkey to be presented
+   * against, for the challenge that asked.
+   *
+   * They live here for the same reason a code does. The challenge issued them,
+   * and a credential answering them can only complete the sign-in they belong
+   * to.
+   */
+  readonly webAuthnOptions?: SimCognitoWebAuthnRequestOptions | undefined;
 }
 
 /**
@@ -53,6 +65,9 @@ export class SimCognitoAuthSession {
   /** The code this challenge sent, where it sent one. */
   public readonly code: string | undefined;
 
+  /** What this challenge asked a passkey to be presented against. */
+  public readonly webAuthnOptions: SimCognitoWebAuthnRequestOptions | undefined;
+
   constructor(properties: SimCognitoAuthSessionProperties) {
     this.id = randomBytes(sessionBytes).toString("base64url");
     this.username = properties.username;
@@ -63,6 +78,7 @@ export class SimCognitoAuthSession {
       properties.issuedAt,
     );
     this.code = properties.code;
+    this.webAuthnOptions = properties.webAuthnOptions;
   }
 
   /**
@@ -70,6 +86,20 @@ export class SimCognitoAuthSession {
    */
   isExpiredAt(now: Date): boolean {
     return now.getTime() >= this.expiresAt.getTime();
+  }
+
+  /**
+   * The options this challenge asked a passkey to be presented against, or a
+   * refusal where it asked for no passkey at all.
+   */
+  requireWebAuthnOptions(): SimCognitoWebAuthnRequestOptions {
+    if (this.webAuthnOptions === undefined) {
+      throw new SimCognitoNotAuthorizedException(
+        "Invalid session for the user.",
+      );
+    }
+
+    return this.webAuthnOptions;
   }
 
   /**

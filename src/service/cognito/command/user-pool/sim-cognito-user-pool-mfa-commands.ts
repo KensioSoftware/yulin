@@ -106,10 +106,8 @@ export class SimCognitoUserPoolMfaCommands {
    * built the same way.
    *
    * A `WebAuthnConfiguration` is accepted and recorded rather than refused.
-   * The two values in it decide what a passkey means rather than how a
-   * sign-in runs, and a pool that reports them describes itself the way the
-   * deployed pool does. Presenting a passkey goes through the `USER_AUTH`
-   * flow, which is refused where a sign-in asks for it.
+   * The two values in it are what `StartWebAuthnRegistration` registers a
+   * passkey against and what a `WEB_AUTHN` challenge presents one to.
    */
   private refuseUnsimulatedFactors(
     input: SimSetUserPoolMfaConfigCommandInput,

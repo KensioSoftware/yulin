@@ -6,8 +6,9 @@ which exchange a token for AWS credentials, are a separate service and are not s
 The pool, the app client, the users and groups in it, self-service sign-up, the second factors a
 user registers, the sign-in flows on both sides of the API, the domain and identity providers a
 federated sign-in runs through, the password reset a user goes through when it cannot sign in, the
-messages it would have sent, the tokens it issues and the authorizer are all here. SRP, managed
-login's own pages and device tracking are not.
+messages it would have sent, the passkeys a user registers and signs in with, the tokens it issues
+and the authorizer are all here. SRP and device tracking are not, and managed login's own pages are
+approximated rather than served as they are.
 
 ## Entry points
 
@@ -282,12 +283,14 @@ it, in a basic authorization header or in the body, and a public client presents
 binds the grant with PKCE.
 
 `SimCognitoAuthorizeEndpoint` signs a user in and answers with the redirect back to the
-application. `SimCognitoHostedSignIn` is what decides which of the two sign-ins a request asked
-for. One naming an identity provider goes through `SimCognitoFederatedSignIn`, and one naming none
-goes through `SimCognitoHostedPasswordSignIn`, which checks the `username` and `password` the
-request carried with the checks `InitiateAuth` makes. A request carrying none is refused with
-`SimCognitoManagedLoginRequired`, which is the one refusal the serving layer answers with a page
-rather than with an error. `SimCognitoTokenEndpoint` exchanges the code,
+application. `SimCognitoHostedSignIn` is what decides which sign-in a request asked for. One naming
+an identity provider goes through `SimCognitoFederatedSignIn`. One carrying a `username` and a
+`password` goes through `SimCognitoHostedPasswordSignIn`, which checks them with the checks
+`InitiateAuth` makes. One asking for a passkey goes through `SimCognitoHostedPasskeySignIn`, which
+takes two requests: the first is refused with `SimCognitoPasskeyRequired` carrying the challenge the
+pool issued, and the second presents the credential answering it. A request carrying none of them is
+refused with `SimCognitoManagedLoginRequired`. Those two refusals are the ones the serving layer
+answers with a page rather than with an error. `SimCognitoTokenEndpoint` exchanges the code,
 through the pool's own token issuer rather than anything of its own, so a hosted sign-in and an API
 sign-in issue the same tokens and run the same `PreTokenGeneration` trigger.
 
@@ -612,11 +615,20 @@ The four sign-in commands are thin because the parts they share are collaborator
 `SimCognitoAuthFlow` knows a flow's name, the `ExplicitAuthFlows` entry that opens it and the legacy
 entry it replaced; `SimCognitoAuthFlows` is the set one entry point runs, which is why
 `ADMIN_USER_PASSWORD_AUTH` is refused for `InitiateAuth` as it is on real Cognito.
-`SimCognitoAuthFlowRunner` runs the resolved flow through `SimCognitoPasswordSignIn` or
-`SimCognitoRefreshSignIn`. `SimCognitoChallengeResponses` sends a response to whichever challenge it
-answers, `SimCognitoNewPasswordResponse` or `SimCognitoMfaResponse`, and both refuse a user disabled
-since the challenge was issued, because a disabled user cannot finish a sign-in any more than it can
-start one. What is left in each command is how it reaches the pool and what it is allowed to run.
+`SimCognitoAuthFlowRunner` runs the resolved flow through `SimCognitoPasswordSignIn`,
+`SimCognitoRefreshSignIn` or `SimCognitoUserAuthSignIn`. `SimCognitoChallengeResponses` sends a
+response to whichever challenge it answers, `SimCognitoNewPasswordResponse`, `SimCognitoMfaResponse`
+or `SimCognitoFirstFactorResponse`, and each refuses a user disabled since the challenge was issued,
+because a disabled user cannot finish a sign-in any more than it can start one. What is left in each
+command is how it reaches the pool and what it is allowed to run.
+
+`SimCognitoUserAuthSignIn` is choice-based sign-in. `simCognitoAvailableChallenges` is what the pool
+offers, drawn from its `AllowedFirstAuthFactors` and narrowed to the factors this user could
+present, and `SimCognitoFirstFactorChallenge` issues either the choice or the one factor a request
+preferred. `SimCognitoFirstFactorResponse` answers all three of the challenges that come out of it,
+through `SimCognitoPasswordResponse` and `SimCognitoWebAuthnResponse`. A `WEB_AUTHN` challenge
+carries its request options on the session as well as in the answer, because the challenge inside
+them is what the credential coming back has to have signed.
 
 `SimCognitoSignInCompletion` is where every sign-in ends, wherever it got to: it issues the tokens
 and runs `PostAuthentication`, and its `challengeOrComplete` is what answers with the MFA challenge
@@ -672,8 +684,11 @@ resource, here or on real AWS.
   registration it started, through `SimCognitoUserPool.webAuthnCredential`. The simulator holds the
   private half of every passkey because a test has neither a browser nor a phone. Real Cognito hands
   the options to a browser and the browser hands back what its authenticator made of them.
-- A passkey is registered and never presented. `USER_AUTH` is what presents one, and
-  `SimCognitoAuthFlows` refuses that flow by name.
+- A passkey signing in through `USER_AUTH` completes the sign-in on its own, where a password would
+  be held to the pool's second factor. Real Cognito counts a passkey as having met that requirement.
+- Managed login asks for the credential on a page of its own, where a real browser runs the WebAuthn
+  ceremony with the person's own authenticator between the two requests. The pages serve no script,
+  so the credential is a field on a form and a caller presents it.
 - A pool that configured no `RelyingPartyId` registers passkeys against its own hosted domain, which
   is what real Cognito falls back to. A pool with neither refuses the registration.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
@@ -750,10 +765,13 @@ resource, here or on real AWS.
   against, so the two disagree here and agree on real Cognito. Its `authorization_endpoint`,
   `token_endpoint` and `end_session_endpoint` name the pool's domain, once it has one, at that
   domain's local hostname. It names no `userinfo_endpoint`, which is not served.
-- The password and refresh flows run on both sides of the API, and `NEW_PASSWORD_REQUIRED`,
-  `SMS_MFA` and `SOFTWARE_TOKEN_MFA` are the challenges issued. SRP, `USER_AUTH`, custom
-  authentication and device tracking are refused rather than treated as a flow or challenge that is
-  simulated, and so are the `MFA_SETUP` and `SELECT_MFA_TYPE` challenges.
+- The password, refresh and choice-based flows run on both sides of the API, and
+  `NEW_PASSWORD_REQUIRED`, `SMS_MFA`, `SOFTWARE_TOKEN_MFA`, `SELECT_CHALLENGE`, `PASSWORD` and
+  `WEB_AUTHN` are the challenges issued. SRP, custom authentication and device tracking are refused
+  rather than treated as a flow that is simulated, and so are the `MFA_SETUP` and `SELECT_MFA_TYPE`
+  challenges. A `USER_AUTH` sign-in offers `EMAIL_OTP` and `SMS_OTP` where the pool's policy allows
+  them, because that is what the policy says, and choosing one is refused: nothing here delivers a
+  message.
 - A sign-in by a user of an `ON` pool that has registered no factor is refused, as real Cognito
   answers that one with `MFA_SETUP`. `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration`
   and `SmsMfaConfiguration`, and refuses the `SmsConfiguration` inside the second one in the same

@@ -102,9 +102,8 @@ export class SimCognitoUserPoolSettings {
    * The factors the pool allows at the first authentication prompt.
    *
    * A pool created without a `SignInPolicy` allows a password and reports no
-   * policy, as real Cognito reports one. Every factor beside a password is
-   * presented through the `USER_AUTH` flow, which is refused where a sign-in
-   * asks for it.
+   * policy, as real Cognito reports one. A `USER_AUTH` sign-in offers the
+   * factors this names, narrowed to the ones the user could present.
    */
   public readonly signInPolicy: SimCognitoSignInPolicy;
 

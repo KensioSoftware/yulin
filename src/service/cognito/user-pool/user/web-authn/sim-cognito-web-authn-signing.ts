@@ -2,6 +2,8 @@ import {
   createHash,
   generateKeyPairSync,
   randomBytes,
+  sign,
+  verify,
   type KeyObject,
 } from "node:crypto";
 
@@ -25,8 +27,10 @@ const credentialIdBytes = 16;
  * The authenticator data flags this simulation sets, which say the user was
  * present and the authenticator verified who was holding it.
  *
- * Real flags also say whether attested credential data follows. Nothing here
- * reads a registration's authenticator data beyond the relying party it names.
+ * Real flags also say whether attested credential data follows, which is a
+ * registration's own business. Nothing here reads a registration's
+ * authenticator data beyond the relying party it names, so the two ceremonies
+ * set the same flags.
  */
 const presentAndVerified = 0x05;
 
@@ -103,4 +107,50 @@ export function simCognitoWebAuthnAuthenticatorData(
     createHash("sha256").update(relyingPartyId).digest(),
     flags,
   ]);
+}
+
+/**
+ * What a passkey signs, which is the authenticator data followed by a hash of
+ * the client data.
+ */
+function signedBytes(
+  authenticatorData: Buffer,
+  clientDataJson: Buffer,
+): Buffer {
+  return Buffer.concat([
+    authenticatorData,
+    createHash("sha256").update(clientDataJson).digest(),
+  ]);
+}
+
+/**
+ * Sign one ceremony with a passkey's private half.
+ */
+export function simCognitoWebAuthnSignature(
+  privateKey: KeyObject,
+  authenticatorData: Buffer,
+  clientDataJson: Buffer,
+): string {
+  return sign(
+    "sha256",
+    signedBytes(authenticatorData, clientDataJson),
+    privateKey,
+  ).toString("base64url");
+}
+
+/**
+ * Whether a signature is the one this passkey would have produced.
+ */
+export function simCognitoWebAuthnVerified(
+  publicKey: KeyObject,
+  authenticatorData: Buffer,
+  clientDataJson: Buffer,
+  signature: Buffer,
+): boolean {
+  return verify(
+    "sha256",
+    signedBytes(authenticatorData, clientDataJson),
+    publicKey,
+    signature,
+  );
 }

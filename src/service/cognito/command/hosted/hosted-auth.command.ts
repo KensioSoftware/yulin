@@ -30,6 +30,31 @@ export interface SimCognitoAuthorizeInput {
    */
   readonly username?: string | undefined;
   readonly password?: string | undefined;
+
+  /**
+   * Whether the person pressed managed login's passkey button rather than
+   * filling in a password.
+   *
+   * The pool answers that with a challenge, and the credential answering it
+   * comes back in the next request.
+   */
+  readonly passkey?: string | undefined;
+
+  /**
+   * The credential a passkey was presented as, which is the JSON a browser
+   * serializes a `PublicKeyCredential` to.
+   *
+   * Real managed login collects this in the browser, from the person's own
+   * authenticator. These pages serve no script, so the form asks for it and
+   * `SimCognitoUserPool.webAuthnAssertion` is where a test reads it from.
+   */
+  readonly credential?: string | undefined;
+
+  /**
+   * The challenge session the presented credential answers, which the pool
+   * issued when the passkey was asked for.
+   */
+  readonly passkey_session?: string | undefined;
 }
 
 /**

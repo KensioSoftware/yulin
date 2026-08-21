@@ -12,9 +12,8 @@ import type { SimCognitoUserPoolMfaType } from "../../user-pool/mfa/sim-cognito-
  * message is delivered here, so the IAM role that would send one is never
  * assumed.
  *
- * `WebAuthnConfiguration` is read and recorded. Nothing here registers or
- * presents a passkey, and the refusal for that is on the `USER_AUTH` flow
- * rather than on the pool's configuration.
+ * `WebAuthnConfiguration` is read and recorded. It is what a passkey is
+ * registered against, and what one is presented to at a sign-in.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/SetUserPoolMfaConfigCommand/
  */

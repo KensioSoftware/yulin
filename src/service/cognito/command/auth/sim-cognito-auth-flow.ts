@@ -7,6 +7,7 @@ interface SimCognitoAuthFlowProperties {
   readonly legacySettings?: readonly string[];
   readonly aliases?: readonly string[];
   readonly exchangesRefreshToken?: boolean;
+  readonly offersChoice?: boolean;
 }
 
 /**
@@ -27,6 +28,12 @@ export class SimCognitoAuthFlow {
    */
   public readonly exchangesRefreshToken: boolean;
 
+  /**
+   * Whether the flow offers the user a choice of first factors rather than
+   * taking the one its name settles.
+   */
+  public readonly offersChoice: boolean;
+
   private readonly aliases: readonly string[];
   private readonly settings: readonly string[];
 
@@ -34,6 +41,7 @@ export class SimCognitoAuthFlow {
     this.name = properties.name;
     this.clientSetting = properties.clientSetting;
     this.exchangesRefreshToken = properties.exchangesRefreshToken ?? false;
+    this.offersChoice = properties.offersChoice ?? false;
     this.aliases = properties.aliases ?? [];
     this.settings = [
       properties.clientSetting,

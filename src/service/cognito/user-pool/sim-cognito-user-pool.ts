@@ -232,6 +232,24 @@ export class SimCognitoUserPool {
     return this.userNamed(username).webAuthn.registrationCredential();
   }
 
+  /**
+   * The credential a user's authenticator would have presented for the
+   * `WEB_AUTHN` challenge a session was issued with.
+   *
+   * The session is the `Session` the challenge answered with, because the
+   * challenge a passkey signs belongs to that one sign-in. Pass the result to
+   * `RespondToAuthChallenge` as its `CREDENTIAL`, which travels as JSON.
+   */
+  webAuthnAssertion(session: string): SimCognitoWebAuthnCredentialDocument {
+    const answering = this.auth.requireWebAuthnSession(session);
+    const user = this.userNamed(answering.username);
+
+    return user.webAuthn.device.present(
+      answering.requireWebAuthnOptions(),
+      Buffer.from(user.sub).toString("base64url"),
+    );
+  }
+
   /** Every message this pool would have sent, oldest first. */
   sentMessages(): readonly SimCognitoSentMessage[] {
     return this.messages.all;

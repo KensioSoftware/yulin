@@ -36,6 +36,19 @@ export const refreshTokenFlow = new SimCognitoAuthFlow({
 });
 
 /**
+ * Choice-based sign-in, where the pool offers the factors it allows first and
+ * the user presents one of them.
+ *
+ * This is the flow a passkey is presented through. It runs on both entry
+ * points, as it does on real Cognito.
+ */
+export const userAuthFlow = new SimCognitoAuthFlow({
+  name: "USER_AUTH",
+  clientSetting: "ALLOW_USER_AUTH",
+  offersChoice: true,
+});
+
+/**
  * The flows one entry point into authentication runs.
  *
  * `InitiateAuth` and `AdminInitiateAuth` do not run the same set, as real
@@ -69,8 +82,8 @@ export class SimCognitoAuthFlows {
 
     throw new SimCognitoInvalidParameterException(
       `AuthFlow '${String(authFlow)}' is not simulated: ${this.operation} ` +
-        `here runs ${this.flows.map((each) => each.name).join(" and ")}. SRP, ` +
-        `custom authentication and choice-based sign-in are not implemented.`,
+        `here runs ${this.flows.map((each) => each.name).join(" and ")}. SRP ` +
+        `and custom authentication are not implemented.`,
     );
   }
 }
@@ -81,6 +94,7 @@ export class SimCognitoAuthFlows {
 export const adminAuthFlows = new SimCognitoAuthFlows("AdminInitiateAuth", [
   adminUserPasswordFlow,
   refreshTokenFlow,
+  userAuthFlow,
 ]);
 
 /**
@@ -89,4 +103,5 @@ export const adminAuthFlows = new SimCognitoAuthFlows("AdminInitiateAuth", [
 export const clientAuthFlows = new SimCognitoAuthFlows("InitiateAuth", [
   userPasswordFlow,
   refreshTokenFlow,
+  userAuthFlow,
 ]);

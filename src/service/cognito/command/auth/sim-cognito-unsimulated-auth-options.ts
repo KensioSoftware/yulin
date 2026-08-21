@@ -66,7 +66,9 @@ export class SimCognitoUnsimulatedAuthOptions {
     this.adminInitiation.refuse(
       "Session",
       input.Session,
-      "continuing a USER_AUTH flow that offered a choice of factors",
+      "carrying a sign-in already part way through into a fresh " +
+        "AdminInitiateAuth, where a challenge this simulation issued is " +
+        "answered through AdminRespondToAuthChallenge",
     );
   }
 
@@ -98,7 +100,10 @@ export class SimCognitoUnsimulatedAuthOptions {
     this.initiation.refuse(
       "Session",
       input.Session,
-      "signing in directly from ConfirmSignUp",
+      "signing in directly from ConfirmSignUp, and carrying a sign-in " +
+        "already part way through into a fresh InitiateAuth, where a " +
+        "challenge this simulation issued is answered through " +
+        "RespondToAuthChallenge",
     );
   }
 

@@ -1845,7 +1845,8 @@ out.
 An authorize request naming no `identity_provider` signs in one of the pool's own users. Real
 managed login answers that request with a form and takes an email address and a password from it.
 Here the two arrive as a `username` and a `password` beside the parameters the request already
-carries, and everything after them is the same grant. The app client needs `COGNITO` among its
+carries, and everything after them is the same grant. A pool that allows passkeys offers one on the
+same form, which is covered in [A passkey at managed login](#a-passkey-at-managed-login). The app client needs `COGNITO` among its
 `SupportedIdentityProviders`, which is what real Cognito needs before managed login offers the form
 at all.
 
@@ -1916,10 +1917,10 @@ sign-up, password reset and sign-in without any of it being stubbed out.
 
 `GET /oauth2/authorize` naming no `identity_provider` answers HTML holding the sign-in form. The
 form has a username field, a password field, and the authorize parameters as hidden inputs, and it
-posts back to `/oauth2/authorize`. The pool's identity providers are links to the same endpoint with
-`identity_provider` set, so both ways in are on the one page. Posting the form redirects to the app
-client's callback URL with the code and the `state`, honouring a `code_challenge` the request
-carried.
+posts back to `/oauth2/authorize`. A pool that allows passkeys carries a second button beside them.
+The pool's identity providers are links to the same endpoint with `identity_provider` set, so every
+way in is on the one page. Posting the form redirects to the app client's callback URL with the code
+and the `state`, honouring a `code_challenge` the request carried.
 
 `/signup` is a link from that page. Its form asks for a username, a password and the attributes the
 pool needs, which are the ones its `Schema` made required and the ones its `AutoVerifiedAttributes`
@@ -4167,8 +4168,127 @@ whole page, which is what Cognito documents as its minimum. `FriendlyCredentialN
 party ID. Real Cognito reads the authenticator's own model out of the attestation and names the
 credential after it, and this simulation parses no attestation.
 
-Presenting a registered passkey at a sign-in is still refused. That goes through the `USER_AUTH`
-flow, and `SimCognitoAuthFlows` refuses it by name.
+## Signing in with a passkey
+
+`InitiateAuth` and `AdminInitiateAuth` run the `USER_AUTH` flow. That is choice-based sign-in, and
+it is the flow a passkey is presented through. An app client has to be created with
+`ALLOW_USER_AUTH` among its `ExplicitAuthFlows` before either will run it.
+
+A request naming only a `USERNAME` is answered with `SELECT_CHALLENGE` and an `AvailableChallenges`
+list. The factors in it come from the pool's `Policies.SignInPolicy.AllowedFirstAuthFactors`,
+narrowed to the ones this user could actually present. `WEB_AUTHN` appears once the user has
+registered a passkey, and `EMAIL_OTP` and `SMS_OTP` where the user has the address or the number a
+code would go to. A pool that named no policy allows a password, the fallback real Cognito
+applies.
+
+`RespondToAuthChallenge` picks one of them with an `ANSWER`. `WEB_AUTHN` is answered with the
+`WEB_AUTHN` challenge and the options a browser presents a passkey against, and `PASSWORD` carries
+the password in the same request and finishes the sign-in. A request that already knows which factor
+it wants skips the choice by naming a `PREFERRED_CHALLENGE` of `PASSWORD` or `WEB_AUTHN`, and one
+carrying a `PASSWORD` outright is signed in there and then.
+
+A `WEB_AUTHN` challenge carries `CREDENTIAL_REQUEST_OPTIONS` in its `ChallengeParameters`, as JSON,
+which is what a browser passes to `navigator.credentials.get()`. It names the relying party, the
+passkeys this user has under `allowCredentials`, and the challenge the authenticator signs. A test has no browser.
+`SimCognitoUserPool.webAuthnAssertion` reads the credential the user's own device would have handed
+back, taking the `Session` the challenge answered with. The response goes back as `CREDENTIAL`, JSON
+in the `ChallengeResponses`.
+
+```typescript sim-cognito-passkey-sign-in
+/**
+ * Signing in with a registered passkey.
+ */
+
+import {
+  InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import type { SimCognitoIdentityProvider } from "@kensio/yulin/cognito";
+
+declare const cognito: SimCognitoIdentityProvider;
+declare const userPoolId: string;
+declare const clientId: string;
+
+// The pool answers with the factors this user could sign in with. They are
+// what its SignInPolicy allows, narrowed to what the user has.
+const offered = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_AUTH",
+    AuthParameters: { USERNAME: "alice" },
+  }),
+);
+
+console.log(offered.ChallengeName); // "SELECT_CHALLENGE"
+console.log(offered.AvailableChallenges); // ["PASSWORD", "WEB_AUTHN"]
+
+// Choosing the passkey asks for one, carrying the options a browser would pass
+// to navigator.credentials.get().
+const challenged = await cognito.respondToAuthChallenge(
+  new RespondToAuthChallengeCommand({
+    ClientId: clientId,
+    ChallengeName: "SELECT_CHALLENGE",
+    Session: offered.Session,
+    ChallengeResponses: { USERNAME: "alice", ANSWER: "WEB_AUTHN" },
+  }),
+);
+
+console.log(challenged.ChallengeName); // "WEB_AUTHN"
+
+// The credential that browser's authenticator would have signed, read off the
+// pool because a test has neither.
+const presented = cognito
+  .userPool(userPoolId)
+  .webAuthnAssertion(challenged.Session!);
+
+const signedIn = await cognito.respondToAuthChallenge(
+  new RespondToAuthChallengeCommand({
+    ClientId: clientId,
+    ChallengeName: "WEB_AUTHN",
+    Session: challenged.Session,
+    ChallengeResponses: {
+      USERNAME: "alice",
+      CREDENTIAL: JSON.stringify(presented),
+    },
+  }),
+);
+
+console.log(typeof signedIn.AuthenticationResult?.AccessToken); // "string"
+```
+
+The signature is checked against the public key the registration stored. A credential another key
+signed is refused with `NotAuthorizedException`, and so is one presenting a passkey this user never
+registered. The challenge session lasts the app client's `AuthSessionValidity` and is spent when it
+is answered, as every other challenge session is.
+
+A passkey finishes the sign-in on its own. Real Cognito counts one as having met the pool's MFA
+requirement. A user that has registered a second factor presents its passkey and is signed in, where
+the same user signing in with a password would answer for that factor first.
+
+Choosing `EMAIL_OTP` or `SMS_OTP` is refused, because nothing here delivers a message. The pool
+offers them where its policy allows them, and the refusal lands on the choice.
+
+### A passkey at managed login
+
+Managed login's sign-in form offers a passkey where the pool allows one at the first prompt, beside
+the username and password it already asks for. It takes two requests, as it does on real managed
+login.
+
+Posting the form with that button is answered with a second page. The pool has issued a `WEB_AUTHN`
+challenge by then, and the page carries the session it belongs to in a hidden `passkey_session`
+input alongside a `credential` field. Posting that back signs the user in and sends the browser to
+the application with an authorization code, which exchanges for tokens the way a password sign-in's
+code does.
+
+Real managed login runs the WebAuthn ceremony between the two requests, in the browser, with the
+person's own authenticator. These pages serve no script, so the credential is a field on a form and
+`SimCognitoUserPool.webAuthnAssertion` is where a test reads it from, passing the session the page
+carried. The button alone signs nobody in. A passkey a caller does not hold is one it cannot
+present, so knowing a username reaches the challenge and no further.
+
+A credential the pool refuses sends the browser back to the sign-in form with the reason on it,
+where a wrong password would land, and the sign-in starts again.
 
 ## Available functionality
 
@@ -4190,6 +4310,8 @@ Sim Cognito currently supports:
 - The `SMS_MFA` and `SOFTWARE_TOKEN_MFA` challenges, issued to a user that has registered the
   factor and answered through `RespondToAuthChallengeCommand` or
   `AdminRespondToAuthChallengeCommand`, with the texted code recorded as a message on the pool
+- The `USER_AUTH` flow on both sides of the API, with the `SELECT_CHALLENGE`, `PASSWORD` and
+  `WEB_AUTHN` challenges it issues, and the passkey a test presents read off the pool
 - `StartWebAuthnRegistrationCommand`, `CompleteWebAuthnRegistrationCommand`,
   `ListWebAuthnCredentialsCommand` and `DeleteWebAuthnCredentialCommand`, which register and manage
   the signed-in user's passkeys, with the credential the user's own authenticator would have made
@@ -4284,17 +4406,23 @@ Sim Cognito currently supports:
 
 Current documented limitations:
 
-- Four authentication flows run: `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through
-  `AdminInitiateAuth`, and `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through `InitiateAuth`.
-  SRP, `USER_AUTH` choice-based sign-in, custom authentication and device tracking are outside the
+- Five authentication flows run: `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through
+  `AdminInitiateAuth`, `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through `InitiateAuth`, and
+  `USER_AUTH` through either. SRP, custom authentication and device tracking are outside the
   simulation, and an `AuthFlow` naming one of them is refused, never run as a flow that is.
   `GetTokensFromRefreshToken` runs beside them and is not a flow, as it is not one on real Cognito.
-- `NEW_PASSWORD_REQUIRED`, `SMS_MFA` and `SOFTWARE_TOKEN_MFA` are the challenges issued, so
-  `MFA_SETUP`, `SELECT_MFA_TYPE`, `WEB_AUTHN` and the custom authentication challenges cannot be
-  reached. A `ChallengeName` this simulation never issues is refused, never answered as one it does.
-- A passkey is registered and never presented. Signing in with one goes through `USER_AUTH`, which
-  is refused as a flow of its own, so a pool that allows passkeys registers them and refuses the
-  sign-in that would use one.
+- `NEW_PASSWORD_REQUIRED`, `SMS_MFA`, `SOFTWARE_TOKEN_MFA`, `SELECT_CHALLENGE`, `PASSWORD` and
+  `WEB_AUTHN` are the challenges issued, so `MFA_SETUP`, `SELECT_MFA_TYPE` and the custom
+  authentication challenges cannot be reached. A `ChallengeName` this simulation never issues is
+  refused, never answered as one it does.
+- `EMAIL_OTP` and `SMS_OTP` are named in a `USER_AUTH` sign-in's `AvailableChallenges` where the
+  pool's policy allows them, and choosing one is refused. Nothing here delivers a message, and the
+  pool's own `EmailConfiguration` and `SmsConfiguration` are refused for the same reason.
+- `PASSWORD_SRP` is absent from `AvailableChallenges`, where real Cognito names it beside `PASSWORD`
+  for a pool allowing the `PASSWORD` factor. SRP is outside the simulation.
+- A passkey completes a sign-in without a second factor being asked for, because real Cognito counts
+  one as having met the pool's MFA requirement. Whether it does so for a pool configured `ON` with a
+  `userVerification` of `preferred` was not checked against a live account.
 - A passkey's `attestationObject` is stored by nobody and parsed by nothing. The public key is read
   from `response.publicKey`, where a browser's own JSON serialization puts it, and the credential is
   named after the relying party because the authenticator model real Cognito names it after lives in
@@ -4537,11 +4665,9 @@ Current documented limitations:
 - `Policies.SignInPolicy` is recorded and reported back by `DescribeUserPool`. The four factor names
   Cognito accepts are `PASSWORD`, `EMAIL_OTP`, `SMS_OTP` and `WEB_AUTHN`, a list names five at most,
   and a policy offering `WEB_AUTHN` and nothing else is refused however many times it repeats the
-  name, as AWS states it must be accompanied by at least one other option. The policy is recorded
-  and no sign-in reads it yet. A password is the only factor presented here, and every other one is
-  reached through the `USER_AUTH` flow, which is still refused by name. A pool that allows passkeys
-  registers them and describes itself the way the deployed pool does, and presenting one at a
-  sign-in is refused where a sign-in asks for it.
+  name, as AWS states it must be accompanied by at least one other option. A `USER_AUTH` sign-in
+  reads the policy to decide what to offer, and `PASSWORD` and `WEB_AUTHN` are the two factors this
+  simulation presents.
 - `WebAuthnRelyingPartyID` and `WebAuthnUserVerification` deploy from an `AWS::Cognito::UserPool`
   Resource. Real CloudFormation configures both in a `SetUserPoolMfaConfig` call once the pool
   exists, and this deploys them the same way, so a stack declaring passkeys needs
@@ -4572,8 +4698,10 @@ Current documented limitations:
   refused. `AllowedOAuthScopes` takes the system scopes, and a custom scope is refused for the same
   reason.
 - Unsimulated authentication inputs are refused the same way. They are `AnalyticsMetadata` on all
-  four operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
-  on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow neither of them starts.
+  four operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a
+  `Session` on `InitiateAuth` or `AdminInitiateAuth`. A challenge this simulation issued is answered
+  through `RespondToAuthChallenge` or `AdminRespondToAuthChallenge` rather than by starting a fresh
+  sign-in that carries the session.
 - A pool's schema is settled when the pool is created. `AddCustomAttributes` is unimplemented, and
   an `UpdateUserPool` request carrying a `Schema` is refused, because real `UpdateUserPool` has no
   such input.

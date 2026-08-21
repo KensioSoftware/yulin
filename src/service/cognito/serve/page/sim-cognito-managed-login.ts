@@ -1,9 +1,13 @@
-import { isSimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-login.error.js";
+import {
+  isSimCognitoManagedLoginRequired,
+  isSimCognitoPasskeyRequired,
+} from "../../error/sim-cognito-managed-login.error.js";
 import { isSimCognitoOAuthError } from "../../error/sim-cognito-oauth.error.js";
 import type { SimCognitoDomainRequest } from "../sim-cognito-domain-request.js";
 import { SimCognitoConfirmPage } from "./sim-cognito-confirm-page.js";
 import { SimCognitoForgotPasswordPage } from "./sim-cognito-forgot-password-page.js";
 import { SimCognitoPageForm } from "./sim-cognito-page-form.js";
+import { SimCognitoPasskeyPage } from "./sim-cognito-passkey-page.js";
 import type { SimCognitoPageParameters } from "./sim-cognito-page-markup.js";
 import {
   simCognitoForgotPasswordPath,
@@ -30,6 +34,7 @@ import { SimCognitoSignUpPage } from "./sim-cognito-sign-up-page.js";
 export class SimCognitoManagedLogin {
   private readonly pageRequest = new SimCognitoPageRequest();
   private readonly signInPage = new SimCognitoSignInPage();
+  private readonly passkeyPage = new SimCognitoPasskeyPage();
   private readonly signUpPage = new SimCognitoSignUpPage();
   private readonly confirmPage = new SimCognitoConfirmPage();
   private readonly forgotPasswordPage = new SimCognitoForgotPasswordPage();
@@ -68,8 +73,9 @@ export class SimCognitoManagedLogin {
    * Answer a refused authorize request on the sign-in form, where the form is
    * what real managed login would have answered with.
    *
-   * A request carrying no credentials gets the empty form. One the person
-   * filled in wrongly gets it back with the refusal on it, because a wrong
+   * A request carrying no credentials gets the empty form. One asking for a
+   * passkey gets the page that asks for the credential. One the person filled
+   * in wrongly gets the form back with the refusal on it, because a wrong
    * password is theirs to correct rather than the application's to be told
    * about. Every other refusal belongs to the application, and nothing here
    * answers it.
@@ -81,6 +87,10 @@ export class SimCognitoManagedLogin {
   ): Response | undefined {
     if (isSimCognitoManagedLoginRequired(error)) {
       return this.signInPage.render(request.pool, parameters);
+    }
+
+    if (isSimCognitoPasskeyRequired(error)) {
+      return this.passkeyPage.render(parameters, error.username, error.session);
     }
 
     if (isSimCognitoOAuthError(error) || !simCognitoIsLocalSignIn(parameters)) {

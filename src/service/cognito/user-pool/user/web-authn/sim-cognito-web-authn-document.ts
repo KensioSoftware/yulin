@@ -67,6 +67,18 @@ export interface SimCognitoWebAuthnCreationOptions {
 }
 
 /**
+ * What a `WEB_AUTHN` challenge carries, which a browser passes straight to
+ * `navigator.credentials.get()`.
+ */
+export interface SimCognitoWebAuthnRequestOptions {
+  readonly challenge: string;
+  readonly rpId: string;
+  readonly timeout: number;
+  readonly allowCredentials: readonly SimCognitoWebAuthnCredentialDescriptor[];
+  readonly userVerification: string;
+}
+
+/**
  * The half of a credential an authenticator fills in when it creates one.
  *
  * `attestationObject` is where a real authenticator states what kind of device
@@ -85,8 +97,19 @@ export interface SimCognitoWebAuthnAttestationResponse {
 }
 
 /**
+ * The half of a credential an authenticator fills in when it presents one.
+ */
+export interface SimCognitoWebAuthnAssertionResponse {
+  [member: string]: SimCognitoWebAuthnDocumentValue;
+  readonly clientDataJSON: string;
+  readonly authenticatorData: string;
+  readonly signature: string;
+  readonly userHandle: string;
+}
+
+/**
  * A credential as a browser serializes one, which is what
- * `CompleteWebAuthnRegistration` carries.
+ * `CompleteWebAuthnRegistration` and a `WEB_AUTHN` challenge response carry.
  */
 export interface SimCognitoWebAuthnCredentialDocument {
   [member: string]: SimCognitoWebAuthnDocumentValue;
@@ -94,6 +117,8 @@ export interface SimCognitoWebAuthnCredentialDocument {
   readonly rawId: string;
   readonly type: "public-key";
   readonly authenticatorAttachment: string;
-  readonly response: SimCognitoWebAuthnAttestationResponse;
+  readonly response:
+    | SimCognitoWebAuthnAttestationResponse
+    | SimCognitoWebAuthnAssertionResponse;
   readonly clientExtensionResults: Record<string, never>;
 }

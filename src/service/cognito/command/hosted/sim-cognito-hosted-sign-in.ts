@@ -3,15 +3,23 @@ import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import type { SimCognitoFirstFactorChallenge } from "../auth/sim-cognito-first-factor-challenge.js";
 import { SimCognitoAuthorizeRequest } from "./sim-cognito-authorize-request.js";
 import { SimCognitoBrowserSession } from "./sim-cognito-browser-session.js";
 import { SimCognitoHostedCredentials } from "./sim-cognito-hosted-credentials.js";
+import { SimCognitoHostedPasskeySignIn } from "./sim-cognito-hosted-passkey-sign-in.js";
 import { SimCognitoHostedPasswordSignIn } from "./sim-cognito-hosted-password-sign-in.js";
 import type { SimCognitoHostedSignedIn } from "./sim-cognito-hosted-signed-in.js";
 import type { SimCognitoAuthorizeInput } from "./hosted-auth.command.js";
 
 interface SimCognitoHostedSignInProperties {
   readonly federatedSignIn: SimCognitoFederatedSignIn;
+
+  /**
+   * The challenge issuer the API sign-ins use, which a passkey at the hosted
+   * domain is asked for through.
+   */
+  readonly challenge: SimCognitoFirstFactorChallenge;
   readonly clock: SimClock;
 }
 
@@ -30,11 +38,16 @@ export class SimCognitoHostedSignIn {
   private readonly clock: SimClock;
   private readonly request = new SimCognitoAuthorizeRequest();
   private readonly passwordSignIn = new SimCognitoHostedPasswordSignIn();
+  private readonly passkeySignIn: SimCognitoHostedPasskeySignIn;
   private readonly browserSession = new SimCognitoBrowserSession();
 
   constructor(properties: SimCognitoHostedSignInProperties) {
     this.federatedSignIn = properties.federatedSignIn;
     this.clock = properties.clock;
+    this.passkeySignIn = new SimCognitoHostedPasskeySignIn({
+      challenge: properties.challenge,
+      clock: properties.clock,
+    });
   }
 
   /**
@@ -60,14 +73,16 @@ export class SimCognitoHostedSignIn {
   }
 
   /**
-   * Sign in one of the pool's own users, from a password or from the session
-   * the browser is already holding.
+   * Sign in one of the pool's own users, with a passkey, with a password, or
+   * from the session the browser is already holding.
    *
-   * Credentials win over a session, because a request carrying them is the
-   * sign-in form coming back and real managed login answers that with a fresh
-   * sign-in. A request carrying neither, from a browser holding no session, is
-   * one the sign-in form is shown for. The serving layer answers with that
-   * page, from this refusal.
+   * A passkey takes two requests. The first asks for one and is answered with
+   * a challenge, and the second presents the credential answering it. A
+   * password takes one. Either wins over a session the browser is holding,
+   * because real managed login answers a form post with a fresh sign-in. A
+   * request carrying none of them, from a browser holding no session, is one
+   * the sign-in form is shown for. The serving layer answers with that page,
+   * from this refusal.
    */
   private localSignIn(
     pool: SimCognitoUserPool,
@@ -76,6 +91,25 @@ export class SimCognitoHostedSignIn {
     presentedSession: string | undefined,
   ): SimCognitoHostedSignedIn {
     const now = this.clock.now();
+
+    const { username, credential } = input;
+
+    if (username !== undefined && credential !== undefined) {
+      return this.browserSession.start(
+        pool,
+        this.passkeySignIn.present(pool, client, {
+          username,
+          credential,
+          session: input.passkey_session,
+        }),
+        now,
+      );
+    }
+
+    if (username !== undefined && input.passkey !== undefined) {
+      this.passkeySignIn.ask(pool, client, username);
+    }
+
     const credentials = SimCognitoHostedCredentials.in(input);
 
     if (credentials === undefined) {

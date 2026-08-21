@@ -27,10 +27,10 @@ interface SimCognitoAuthorizeEndpointProperties {
  * A request naming a provider signs in the user that provider has been told is
  * signed in at it. A request naming none signs in one of the pool's own users,
  * with the username and password real managed login would have taken from its
- * form, or from the managed login session the browser presented. Nothing here
- * draws the form: the serving layer is what answers a browser with a page, and
- * a test calling this directly passes the two fields the form would have
- * posted.
+ * form, with a passkey presented against a challenge the pool issued, or from
+ * the managed login session the browser presented. Nothing here draws the
+ * form: the serving layer is what answers a browser with a page, and a test
+ * calling this directly passes the fields the form would have posted.
  */
 export class SimCognitoAuthorizeEndpoint {
   private readonly signIn: SimCognitoHostedSignIn;

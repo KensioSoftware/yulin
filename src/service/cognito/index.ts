@@ -68,6 +68,7 @@ export { SimCognitoFederation } from "./sim-cognito-federation.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
 export { SimCognitoUserWebAuthn } from "./user-pool/user/web-authn/sim-cognito-user-web-authn.js";
+export { SimCognitoWebAuthnDevice } from "./user-pool/user/web-authn/sim-cognito-web-authn-device.js";
 export {
   SimCognitoWebAuthnCredential,
   type SimCognitoWebAuthnCredentialDescription,
@@ -77,6 +78,7 @@ export type {
   SimCognitoWebAuthnDocumentValue,
   SimCognitoWebAuthnCredentialDescriptor,
   SimCognitoWebAuthnCredentialDocument,
+  SimCognitoWebAuthnRequestOptions,
 } from "./user-pool/user/web-authn/sim-cognito-web-authn-document.js";
 export { SimCognitoConfirmationCode } from "./user-pool/user/sim-cognito-confirmation-code.js";
 export { SimCognitoUserPasswordReset } from "./user-pool/user/sim-cognito-user-password-reset.js";

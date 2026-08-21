@@ -102,3 +102,18 @@ export function requireSimCognitoSignIn(
     );
   }
 }
+
+/**
+ * Refuse a user that cannot start a sign-in at all, whatever it is signing in
+ * with.
+ *
+ * A disabled user, one that has not confirmed its sign-up and one whose
+ * password an administrator has reset are each refused the way they are for a
+ * password sign-in. A factor that is not a password reaches these three on its
+ * own, because there is no password check to reach them from.
+ */
+export function requireSimCognitoReadyToSignIn(user: SimCognitoUser): void {
+  requireSimCognitoEnabled(user);
+  requireSimCognitoConfirmed(user);
+  requireSimCognitoPasswordSet(user);
+}
