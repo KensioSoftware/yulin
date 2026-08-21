@@ -21,6 +21,9 @@ import { SimCfnCognitoTokenValidityUnits } from "./sim-cfn-cognito-token-validit
  * renews a session: a client deployed with rotation is renewed with
  * `GetTokensFromRefreshToken` rather than `REFRESH_TOKEN_AUTH`.
  *
+ * `AuthSessionValidity` is among them, because it decides how long a user
+ * answering a challenge has before its session runs out.
+ *
  * The managed login branding properties are not, because managed login is a
  * set of web pages rather than anything this simulation answers.
  */
@@ -33,6 +36,7 @@ const simulatedProperties = [
   "AccessTokenValidity",
   "IdTokenValidity",
   "RefreshTokenValidity",
+  "AuthSessionValidity",
   "RefreshTokenRotation",
   "TokenValidityUnits",
   "AllowedOAuthFlows",
@@ -112,6 +116,10 @@ export class SimCfnCognitoClientProperties {
       RefreshTokenValidity: this.number(
         this.properties["RefreshTokenValidity"],
         "RefreshTokenValidity",
+      ),
+      AuthSessionValidity: this.number(
+        this.properties["AuthSessionValidity"],
+        "AuthSessionValidity",
       ),
       RefreshTokenRotation: new SimCfnCognitoRefreshTokenRotation({
         resource: this.resource,

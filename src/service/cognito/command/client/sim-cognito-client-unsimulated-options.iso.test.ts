@@ -44,11 +44,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "Amazon Pinpoint analytics",
   },
   {
-    label: "AuthSessionValidity",
-    input: { AuthSessionValidity: 5 },
-    says: "the authentication session lifetime",
-  },
-  {
     label: "EnablePropagateAdditionalUserContextData",
     input: { EnablePropagateAdditionalUserContextData: true },
     says: "threat protection context data",

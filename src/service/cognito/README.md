@@ -157,6 +157,20 @@ it offers and the user decides what it has. `SetUserMFAPreference` is what enabl
 verifying a token only registers it. `challengeFactor` is what a sign-in reads: the preferred
 factor, or the single enabled one where the user named no preference.
 
+`SimCognitoUserWebAuthn` under `user-pool/user/web-authn/` is the passkeys one user has registered,
+and the registration it is part way through. A passkey is a first factor, so it sits beside
+`SimCognitoUserMfa` rather than inside it, which is where real Cognito puts it too: the pool's
+`AllowedFirstAuthFactors` decide whether one can be presented and its `WebAuthnConfiguration`
+decides what it is registered against. `SimCognitoWebAuthnCredential` is one registered passkey as
+the pool holds it, which is the public half. `sim-cognito-web-authn-authenticator.ts` stands in for
+the user's own phone or laptop and makes the credential a browser would have handed back.
+
+`sim-cognito-web-authn-signing.ts` does the cryptography, `sim-cognito-web-authn-ceremony.ts` reads
+a credential a request carried, and `sim-cognito-web-authn-client-data.ts` holds it to the challenge
+the pool issued and the origin it was collected at. The key pairs are real ECDSA pairs over P-256,
+and the public half travels in the credential as base64url of its SubjectPublicKeyInfo, where a
+browser's own `PublicKeyCredential.toJSON()` puts it.
+
 `SimCognitoSoftwareToken` is one shared secret, and `sim-cognito-totp.ts` computes the code from it.
 The codes are real RFC 6238 time-based one-time passwords rather than a stand-in, so an
 authenticator library handed the `SecretCode` produces codes this accepts, and a secret from another
@@ -493,7 +507,10 @@ holding its contents.
 
 `SimCognitoAuthSession` is what an unfinished authentication carries between the request that started
 it and the response that completes it. A session is opaque, single use, tied to its user, its app
-client and the one challenge it was issued for, and lasts the three minutes real Cognito gives one.
+client and the one challenge it was issued for, and lasts the app client's `AuthSessionValidity`.
+`SimCognitoAuthSessionValidity` under `user-pool/client/` is that setting, three minutes on a client
+that asked for none. A session settles its own expiry when it is issued, so an app client updated
+mid-sign-in leaves the deadline of a challenge already issued where it was.
 It also holds the code an `SMS_MFA` challenge texted, because that code belongs to that challenge:
 it goes when the session goes.
 
@@ -573,8 +590,8 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
   `SimCognitoUserPoolMfaCommands`, because what they act on is not one of the pool's settings
 - `command/client/`: the same for app clients
 - `command/user/`: the same for users, split between the commands that create, read and delete one,
-  the commands that change one afterwards, the commands a user signs itself up with, and the
-  commands that register a second factor for one. The sign-up ones resolve their pool through an app
+  the commands that change one afterwards, the commands a user signs itself up with, the commands
+  that register a second factor for one, and the four that register and manage its passkeys. The sign-up ones resolve their pool through an app
   client id the way the client-side sign-in commands do, so they share `SimCognitoAuthResolver` with
   them, and the ones a signed-in user performs on itself resolve theirs through
   `SimCognitoTokenUser`, which is what `SimCognitoRequestResolver` is for an administrative request:
@@ -651,6 +668,14 @@ resource, here or on real AWS.
 - A user pool reports the confirmation code a signed-up user was issued, through
   `SimCognitoUserPool.confirmationCode`. Real Cognito sends it and never reports it to anyone.
   Nothing here delivers a message, so this is what makes a sign-up flow testable at all.
+- A user pool reports the credential a user's authenticator would have made for the passkey
+  registration it started, through `SimCognitoUserPool.webAuthnCredential`. The simulator holds the
+  private half of every passkey because a test has neither a browser nor a phone. Real Cognito hands
+  the options to a browser and the browser hands back what its authenticator made of them.
+- A passkey is registered and never presented. `USER_AUTH` is what presents one, and
+  `SimCognitoAuthFlows` refuses that flow by name.
+- A pool that configured no `RelyingPartyId` registers passkeys against its own hosted domain, which
+  is what real Cognito falls back to. A pool with neither refuses the registration.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
   verifies nothing on real Cognito. `ConfirmSignUp` sets `email_verified` and
   `phone_number_verified` where the user has the attribute to verify, and a `PreSignUp` trigger sets

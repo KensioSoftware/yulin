@@ -30,6 +30,7 @@ import { SimCognitoSignUpCommands } from "./user/sim-cognito-sign-up-commands.js
 import { SimCognitoTokenUser } from "./user/sim-cognito-token-user.js";
 import { SimCognitoUserCommands } from "./user/sim-cognito-user-commands.js";
 import { SimCognitoUserMfaCommands } from "./user/sim-cognito-user-mfa-commands.js";
+import { SimCognitoWebAuthnCommands } from "./user/sim-cognito-web-authn-commands.js";
 import { SimCognitoRequestResolver } from "./sim-cognito-request-resolver.js";
 import { SimCognitoUserUpdateCommands } from "./user/sim-cognito-user-update-commands.js";
 import { SimCognitoListUserPools } from "./user-pool/sim-cognito-list-user-pools.js";
@@ -61,6 +62,7 @@ export class SimCognitoCommands {
   public readonly listClients: SimCognitoListUserPoolClients;
   public readonly users: SimCognitoUserCommands;
   public readonly userMfa: SimCognitoUserMfaCommands;
+  public readonly webAuthn: SimCognitoWebAuthnCommands;
   public readonly signUp: SimCognitoSignUpCommands;
   public readonly passwordReset: SimCognitoPasswordResetCommands;
   public readonly userUpdates: SimCognitoUserUpdateCommands;
@@ -152,6 +154,7 @@ export class SimCognitoCommands {
       tokenUser,
       clock,
     });
+    this.webAuthn = new SimCognitoWebAuthnCommands({ tokenUser, clock });
     this.signUp = new SimCognitoSignUpCommands({
       authResolver,
       resolver,

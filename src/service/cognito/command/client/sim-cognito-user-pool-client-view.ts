@@ -36,6 +36,7 @@ export class SimCognitoUserPoolClientView {
       AccessTokenValidity: tokenValidity.accessToken.validity,
       IdTokenValidity: tokenValidity.idToken.validity,
       RefreshTokenValidity: tokenValidity.refreshToken.validity,
+      AuthSessionValidity: client.authSessionValidity.minutes,
       RefreshTokenRotation: client.refreshTokenRotation.toOutput(),
       TokenValidityUnits: tokenValidity.unitsOutput(),
       CreationDate: client.creationDate,

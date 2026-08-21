@@ -96,7 +96,7 @@ export class SimCognitoMfaChallenge {
     const code = factor === simCognitoSmsMfa ? simCognitoMfaCode() : undefined;
     const session = new SimCognitoAuthSession({
       username: user.username,
-      clientId: client.id,
+      client,
       challengeName: factor,
       code,
       issuedAt: this.clock.now(),

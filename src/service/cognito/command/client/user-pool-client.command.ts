@@ -22,6 +22,7 @@ export interface SimCognitoUserPoolClientType extends SimCognitoOAuthSettingsTyp
   readonly AccessTokenValidity?: number | undefined;
   readonly IdTokenValidity?: number | undefined;
   readonly RefreshTokenValidity?: number | undefined;
+  readonly AuthSessionValidity?: number | undefined;
   readonly RefreshTokenRotation?:
     | SimCognitoRefreshTokenRotationType
     | undefined;

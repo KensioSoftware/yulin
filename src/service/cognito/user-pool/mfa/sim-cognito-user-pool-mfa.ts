@@ -52,7 +52,7 @@ export interface SimCognitoUserPoolMfaType {
    *
    * It sits among the MFA settings because that is where real Cognito puts
    * it, and a passkey with user verification is what counts towards MFA
-   * there. Nothing here presents one.
+   * there.
    */
   readonly WebAuthnConfiguration?:
     | SimCognitoWebAuthnConfigurationType

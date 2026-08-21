@@ -1,4 +1,5 @@
 import { SimCognitoName } from "../sim-cognito-name.js";
+import { SimCognitoAuthSessionValidity } from "./sim-cognito-auth-session-validity.js";
 import { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import {
   SimCognitoOAuthSettings,
@@ -24,6 +25,7 @@ import {
 export interface SimCognitoUserPoolClientSettingsProperties
   extends SimCognitoTokenValidityInput, SimCognitoOAuthSettingsType {
   readonly ClientName?: string | undefined;
+  readonly AuthSessionValidity?: number | undefined;
   readonly ExplicitAuthFlows?: readonly string[] | undefined;
   readonly PreventUserExistenceErrors?: string | undefined;
   readonly RefreshTokenRotation?:
@@ -45,6 +47,11 @@ export class SimCognitoUserPoolClientSettings {
   public readonly explicitAuthFlows: SimCognitoExplicitAuthFlows;
   public readonly preventUserExistenceErrors: SimCognitoPreventUserExistenceErrors;
   public readonly tokenValidity: SimCognitoTokenValidity;
+
+  /**
+   * How long a challenge this client issued can be answered for.
+   */
+  public readonly authSessionValidity: SimCognitoAuthSessionValidity;
 
   /**
    * Whether this client rotates its refresh tokens, which decides what
@@ -69,6 +76,9 @@ export class SimCognitoUserPoolClientSettings {
       properties.PreventUserExistenceErrors,
     );
     this.tokenValidity = new SimCognitoTokenValidity(properties);
+    this.authSessionValidity = new SimCognitoAuthSessionValidity(
+      properties.AuthSessionValidity,
+    );
     this.refreshTokenRotation = new SimCognitoRefreshTokenRotation(
       properties.RefreshTokenRotation,
     );

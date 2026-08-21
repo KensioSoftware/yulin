@@ -22,6 +22,10 @@ interface SimCognitoUserFactorsProperties {
  * `AdminSetUserMFAPreference` is the administrative one, and authorizes
  * against the pool like every other admin operation.
  *
+ * The passkey operations are here for the same reason: a passkey is
+ * registered by the user it belongs to, from a session that already exists,
+ * and the access token is the whole of the authorization.
+ *
  * `SimCognitoUserDirectory` extends this, which extends
  * `SimCognitoAuthentication`.
  */
@@ -70,6 +74,51 @@ export abstract class SimCognitoUserFactors extends SimCognitoAuthentication {
   ): Promise<simCognitoCommands.SimSetUserMFAPreferenceCommandOutput> {
     await this.background.sequence();
     return this.commands.userMfa.setUserMfaPreference(command);
+  }
+
+  /**
+   * Handle a StartWebAuthnRegistration Command from the SDK.
+   *
+   * The options this answers with are what a browser passes to
+   * `navigator.credentials.create()`. A test with no browser reads the
+   * credential its own authenticator would have made off the pool, through
+   * `SimCognitoUserPool.webAuthnCredential`.
+   */
+  async startWebAuthnRegistration(
+    command: simCognitoCommands.SimStartWebAuthnRegistrationCommand,
+  ): Promise<simCognitoCommands.SimStartWebAuthnRegistrationCommandOutput> {
+    await this.background.sequence();
+    return this.commands.webAuthn.startWebAuthnRegistration(command);
+  }
+
+  /**
+   * Handle a CompleteWebAuthnRegistration Command from the SDK.
+   */
+  async completeWebAuthnRegistration(
+    command: simCognitoCommands.SimCompleteWebAuthnRegistrationCommand,
+  ): Promise<simCognitoCommands.SimCompleteWebAuthnRegistrationCommandOutput> {
+    await this.background.sequence();
+    return this.commands.webAuthn.completeWebAuthnRegistration(command);
+  }
+
+  /**
+   * Handle a ListWebAuthnCredentials Command from the SDK.
+   */
+  async listWebAuthnCredentials(
+    command: simCognitoCommands.SimListWebAuthnCredentialsCommand,
+  ): Promise<simCognitoCommands.SimListWebAuthnCredentialsCommandOutput> {
+    await this.background.sequence();
+    return this.commands.webAuthn.listWebAuthnCredentials(command);
+  }
+
+  /**
+   * Handle a DeleteWebAuthnCredential Command from the SDK.
+   */
+  async deleteWebAuthnCredential(
+    command: simCognitoCommands.SimDeleteWebAuthnCredentialCommand,
+  ): Promise<simCognitoCommands.SimDeleteWebAuthnCredentialCommandOutput> {
+    await this.background.sequence();
+    return this.commands.webAuthn.deleteWebAuthnCredential(command);
   }
 
   /**

@@ -106,6 +106,20 @@ export type {
   SimVerifySoftwareTokenCommandOutput,
 } from "./user/user-mfa.command.js";
 export type {
+  SimCompleteWebAuthnRegistrationCommand,
+  SimCompleteWebAuthnRegistrationCommandInput,
+  SimCompleteWebAuthnRegistrationCommandOutput,
+  SimDeleteWebAuthnCredentialCommand,
+  SimDeleteWebAuthnCredentialCommandInput,
+  SimDeleteWebAuthnCredentialCommandOutput,
+  SimListWebAuthnCredentialsCommand,
+  SimListWebAuthnCredentialsCommandInput,
+  SimListWebAuthnCredentialsCommandOutput,
+  SimStartWebAuthnRegistrationCommand,
+  SimStartWebAuthnRegistrationCommandInput,
+  SimStartWebAuthnRegistrationCommandOutput,
+} from "./user/web-authn.command.js";
+export type {
   SimListUsersCommand,
   SimListUsersCommandInput,
   SimListUsersCommandOutput,

@@ -1,7 +1,7 @@
 import { SimCognitoInvalidParameterException } from "../error/sim-cognito.error.js";
 
 /**
- * The most Cognito will return in one page of either listing.
+ * The most Cognito will return in one page of most listings.
  */
 const maxMaxResults = 60;
 
@@ -18,6 +18,18 @@ interface SimCognitoPageProperties {
    * `PaginationToken`.
    */
   readonly nextTokenField?: string;
+
+  /**
+   * The largest page this operation will hand back, where it is not the sixty
+   * most of them allow. `ListWebAuthnCredentials` stops at twenty.
+   */
+  readonly mostResults?: number;
+
+  /**
+   * The smallest page size this operation takes, where it is not one.
+   * `ListWebAuthnCredentials` documents a minimum of zero.
+   */
+  readonly leastResults?: number;
 }
 
 /**
@@ -35,6 +47,8 @@ export class SimCognitoPage<TItem> {
     const maxResults = SimCognitoPage.maxResults(
       properties.maxResults,
       properties.maxResultsField ?? "MaxResults",
+      properties.leastResults ?? 1,
+      properties.mostResults ?? maxMaxResults,
     );
     const startIndex = SimCognitoPage.startIndex(
       properties.nextToken,
@@ -47,18 +61,29 @@ export class SimCognitoPage<TItem> {
     this.nextToken = SimCognitoPage.tokenFor(nextIndex, listed.length);
   }
 
-  private static maxResults(requested: number, field: string): number {
+  private static maxResults(
+    requested: number,
+    field: string,
+    least: number,
+    most: number,
+  ): number {
     if (
       !Number.isSafeInteger(requested) ||
-      requested < 1 ||
-      requested > maxMaxResults
+      requested < least ||
+      requested > most
     ) {
       throw new SimCognitoInvalidParameterException(
-        `${field} must be a whole number between 1 and ${String(maxMaxResults)}`,
+        `${field} must be a whole number between ${String(least)} and ${String(
+          most,
+        )}`,
       );
     }
 
-    return requested;
+    // A page size of zero is the whole page. Real Cognito documents zero as a
+    // valid MaxResults for ListWebAuthnCredentials and says nothing about what
+    // it answers with, so this reads it the way a refresh token validity of
+    // zero is read, as the default rather than as none at all.
+    return requested === 0 ? most : requested;
   }
 
   /**

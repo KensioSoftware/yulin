@@ -35,9 +35,8 @@ const relyingPartyIdLength = { least: 1, most: 127 };
  * `WebAuthnRelyingPartyID` is deployed in two calls here as it is on real
  * CloudFormation.
  *
- * Recorded and reported. No passkey is registered or presented in this
- * simulation, because both go through the `USER_AUTH` flow that
- * `SimCognitoAuthFlows` refuses by name.
+ * `StartWebAuthnRegistration` reads both, and a pool that names no relying
+ * party has nothing to register a passkey against.
  */
 export class SimCognitoWebAuthnConfiguration {
   public readonly relyingPartyId: string | undefined;
