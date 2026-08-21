@@ -2786,6 +2786,56 @@ console.log(bucketResource?.simResource);
 This is useful in tests when you want to assert that a specific template resource created the
 expected simulated service resource.
 
+### Listing a Stack's Resources
+
+`stack.resources` holds every Resource the template declared, in the order it declared them. Each
+entry is the same `SimCfnDeployedResource` that `getResource` answers with, and a caller after a
+group of them filters the array itself.
+
+```typescript sim-cloudformation-list-resources
+/**
+ * Counting the Resources of one type in a deployed Stack.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "list-resources-stack",
+  template: {
+    Resources: {
+      UploadsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "list-resources-uploads" },
+      },
+      ArchiveBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "list-resources-archive" },
+      },
+      UploadsTopic: {
+        Type: "AWS::SNS::Topic",
+        Properties: { TopicName: "list-resources-uploads" },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const buckets = stack.resources.filter(
+  (resource) => resource.type === "AWS::S3::Bucket",
+);
+
+console.log(buckets.map((bucket) => bucket.logicalId));
+// ["UploadsBucket", "ArchiveBucket"]
+```
+
+`getResource` covers the Resources a test can name. Counting them is the other question. CDK
+hashes the logical ID it synthesizes, and a test asserting how many Resources of a type a Stack
+declared has no name to ask for in advance. The array is where that assertion goes. Yulin ships no
+filtering helpers on top of it (the shapes a test filters on vary too much for an API to guess).
+
 ### Naming the deployed Stack type
 
 A deployment answers with a `SimCfnDeployedStack`, and `getResource(...)` with a
@@ -2834,7 +2884,7 @@ A deployed Stack holds what the caller that deployed it reads back:
 
 - `stackName`, `status` and `error`
 - `outputs` and `output(...)`, covered under [Reading stack Outputs](#reading-stack-outputs)
-- `getResource(...)`
+- `resources` and `getResource(...)`
 - `ignoredProperties`, `skippedResources`, `inertResources`, `skippedResourceDeletions` and
   `retainedResources`
 - `waitForDeployComplete()`, `waitForUpdateComplete()` and `waitForDeleteComplete()`

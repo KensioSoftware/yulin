@@ -228,7 +228,7 @@ describe("IAM CloudFormation ManagedPolicy", () => {
     const resolvedWaitHandleProperties = await deployedResourceObject(
       waitHandleResource,
     ).resolvedProperties({
-      resources: deployedStackObject(stack).resources,
+      resources: deployedStackObject(stack).resourceMap,
     });
 
     assertIdentical(resolvedWaitHandleProperties["PolicyArn"], policyArn);

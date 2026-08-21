@@ -63,6 +63,14 @@ export function stackHandle(
   return stack.getResource("Handle");
 }
 
+export function stackHandles(
+  stack: SimCfnDeployedStack,
+): readonly SimCfnDeployedResource[] {
+  return stack.resources.filter(
+    (resource) => resource.type === "AWS::CloudFormation::WaitConditionHandle",
+  );
+}
+
 const bindings: readonly SimCfnBinding[] = [
   { logicalId: "Greeter", handler: (): string => "hello" },
   { cdkPath: "Packed/Rewrite", handler: (): string => "rewritten" },

@@ -225,7 +225,7 @@ describe("Route53 CloudFormation HostedZone", () => {
     const resolvedWaitHandleProperties = await deployedResourceObject(
       waitHandleResource,
     ).resolvedProperties({
-      resources: deployedStackObject(stack).resources,
+      resources: deployedStackObject(stack).resourceMap,
     });
 
     assertIdentical(resolvedWaitHandleProperties["HostedZoneId"], hostedZoneId);

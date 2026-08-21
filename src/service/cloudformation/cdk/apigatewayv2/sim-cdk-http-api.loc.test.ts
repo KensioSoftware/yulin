@@ -17,7 +17,6 @@ import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
-import { deployedStackObject } from "../../stack/sim-cfn-stack.fixture.js";
 
 /**
  * Inline function code, as CDK packages Code.fromInline source. The handler
@@ -129,9 +128,9 @@ describe("Sim CDK HTTP API deployment local integration", () => {
 
     // And the invocation was gated by the AWS::Lambda::Permission CDK pairs
     // with the integration, which is deployed rather than skipped.
-    const permissionResource = deployedStackObject(stack)
-      .resources.values()
-      .find((resource) => resource.type === "AWS::Lambda::Permission");
+    const permissionResource = stack.resources.find(
+      (resource) => resource.type === "AWS::Lambda::Permission",
+    );
     assertNonNullable(permissionResource);
     assertFalse(permissionResource.skipped);
 
