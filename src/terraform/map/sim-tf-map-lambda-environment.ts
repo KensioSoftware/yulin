@@ -63,6 +63,11 @@ function plannedVariables(
  * A function declaring no environment at all has lost nothing. One whose map
  * collapsed has lost names this cannot know, which is the case an override is
  * for.
+ *
+ * The map goes whole or not at all. Terraform 1.15.8 against AWS provider
+ * 5.100.0 writes `"variables": true` for a map holding one literal and one
+ * reference to a resource of the same plan, so there is no per-variable form
+ * of this to read.
  */
 function collapsed(context: TerraformMappingContext): boolean {
   const declared = field(context.resource.unknown, "environment");

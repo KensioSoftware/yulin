@@ -94,14 +94,25 @@ function policyName(context: TerraformMappingContext): string {
  * CloudFormation as an object.
  *
  * A document built with `jsonencode` around an ARN of the same plan is unknown
- * in its entirety, so this returns nothing rather than a partial policy.
+ * in its entirety, so this returns nothing rather than a partial policy. A
+ * string that will not parse answers the same way. The plan is a file on disk
+ * and one unreadable document is one attribute, and failing the whole import
+ * over it would take every other resource of the plan with it.
  */
 export function jsonDocument(value: unknown): SimCfnTemplateValue | undefined {
   if (typeof value !== "string") {
     return undefined;
   }
 
-  const parsed: unknown = JSON.parse(value);
+  const parsed = parsedDocument(value);
 
   return isRecord(parsed) ? templateValue(parsed) : undefined;
+}
+
+function parsedDocument(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 }

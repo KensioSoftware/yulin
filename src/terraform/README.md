@@ -93,7 +93,9 @@ survives and becomes a `Ref` or an `Fn::GetAtt`.
 
 What goes missing is everything the unknown value was inside. A Lambda `environment.variables` map
 holding one reference to a queue URL arrives as `"variables": true`, and the variable names go with
-it. `TABLE_NAME`, `QUEUE_URL` and `TOPIC_ARN` appear nowhere in the document.
+it. `TABLE_NAME`, `QUEUE_URL` and `TOPIC_ARN` appear nowhere in the document. The map goes whole
+even where some of its values are literals (measured on Terraform 1.15.8 against AWS provider
+5.100.0), so there is no per-variable form of the unknown mark to read.
 
 The same happens to every `jsonencode` result. An `aws_iam_role_policy` built around an ARN of the
 same plan is unknown in its entirety, and its actions and resources are gone with it.

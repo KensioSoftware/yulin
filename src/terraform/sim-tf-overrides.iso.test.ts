@@ -127,6 +127,31 @@ describe("supplying the environment variables a plan could not carry", () => {
     });
   });
 
+  it("adds a variable to the ones the plan resolved", () => {
+    // Given a function whose variables the plan resolved, and a deployment
+    // supplying one the map does not name
+    const context = processor(
+      { environment: [{ variables: { STAGE: "production" } }] },
+      {},
+      [
+        {
+          functionName: "orders-processor",
+          environment: { QUEUE_URL: "http://sqs.test/orders" },
+        },
+      ],
+    );
+
+    // When the function is mapped
+    // Then the function runs with both, since the two are merged one variable
+    // at a time
+    assertObjectEquals(lambdaFunction(context).Properties["Environment"], {
+      Variables: {
+        STAGE: "production",
+        QUEUE_URL: "http://sqs.test/orders",
+      },
+    });
+  });
+
   it("records the variables no override covered", () => {
     // Given a function whose variables map collapsed, and a deployment
     // supplying an environment for a different function
@@ -176,6 +201,31 @@ describe("supplying the inline role policy a plan could not carry", () => {
     // When it is folded
     // Then the role is created permissive and the attribute is recorded, so a
     // deployment that would otherwise be useful still goes ahead
+    assertObjectEquals(fold.properties(context), {
+      Policies: [
+        {
+          PolicyName: "reads",
+          PolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [{ Effect: "Allow", Action: "*", Resource: "*" }],
+          },
+        },
+      ],
+    });
+    assertArrayEquals(fold.lost?.(context) ?? [], ["policy"]);
+  });
+
+  it("falls back for a policy document the plan carries unparseable", () => {
+    // Given a plan whose policy attribute holds a string that will not parse,
+    // which a hand-edited or truncated plan file is how you get
+    const fold = iamRoleFolds.get("aws_iam_role_policy");
+    const context = inlinePolicy({ name: "reads", policy: "{not json" }, []);
+
+    assertDefined(fold, "The aws_iam_role_policy fold");
+
+    // When it is folded
+    // Then the one attribute is lost and the deployment goes ahead, rather
+    // than the parse taking the whole import with it
     assertObjectEquals(fold.properties(context), {
       Policies: [
         {
