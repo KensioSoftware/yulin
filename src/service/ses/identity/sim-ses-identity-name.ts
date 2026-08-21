@@ -83,7 +83,11 @@ export function simSesIdentityKey(emailIdentity: string): string {
   return `${emailIdentity.slice(0, emailIdentity.lastIndexOf("@"))}@${domain}`;
 }
 
-function isSimSesIdentityName(emailIdentity: string): boolean {
+/**
+ * Whether a name is an email address or a domain, which is the whole of what
+ * an SES identity may be.
+ */
+export function isSimSesIdentityName(emailIdentity: string): boolean {
   if (!emailIdentity.includes("@")) {
     return isDomain(emailIdentity);
   }
