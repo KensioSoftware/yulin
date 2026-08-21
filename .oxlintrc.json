@@ -51,7 +51,11 @@
     "test/.coverage/",
     "node_modules/",
     "**/*.config.ts",
-    ".claude/"
+    ".claude/",
+    // Terraform fixture sources. The JavaScript under test/terraform is
+    // Lambda handler content a Terraform module packages, not code this
+    // project builds or ships.
+    "test/terraform/"
   ],
 
   // Only the native plugins whose rules are named below. Oxlint's `unicorn`

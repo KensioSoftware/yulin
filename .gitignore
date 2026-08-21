@@ -310,3 +310,9 @@ dmypy.json
 tmp/
 *.tmp
 *.tmp.*
+
+# Terraform working directories and generated plans. The configurations under
+# test/terraform are in the repository; what terraform makes from them is not.
+test/terraform/**/.terraform/
+test/terraform/**/builds/
+*.tfplan
