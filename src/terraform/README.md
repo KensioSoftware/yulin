@@ -82,7 +82,7 @@ template would carry `{"Ref": "Processor"}`. The value is correct and the edge C
 from has gone with it.
 
 The edge survives in `configuration`, which records the reference whether or not the value resolved.
-`terraformDependsOn` in `sim-tf-declare.ts` walks every `references` array a resource declares and
+`terraformDependsOn` in `sim-tf-depends-on.ts` walks every `references` array a resource declares and
 turns them back into `DependsOn`. That pass is what puts the Stack in a deployable order.
 
 ### An unknown value takes its structure with it
@@ -122,19 +122,46 @@ An SQS `redrive_policy` loses its `maxReceiveCount` the same way. That one is dr
 carrying a made-up limit would give the queue different retry behaviour from the one the plan
 describes.
 
-### A reference can need an expression evaluator
+### A reference can name no address at all
 
-Resolving a reference to a resource works. Resolving one through a module sometimes needs more.
+A reference to a resource is a lookup. Some references name a scope Terraform resolves for itself,
+and finding the resource behind one of those takes several lookups in a row.
 
 The API module's integration URI reads `each.value.uri`. `each` iterates the module's `routes`
 variable, the module call sets that variable from `module.processor.lambda_function_arn`, and the
-processor module's output reads it off `aws_lambda_function.this[0].arn`. Following that means
-evaluating Terraform expressions, which is a step past reading references.
+processor module's output reads it off `aws_lambda_function.this[0].arn`. Four hops, and a plan
+records every one of them somewhere.
 
-`sim-tf-module-outputs.ts` follows the module-output hop. That one is tractable and worth having.
-The `each.value` hop needs an evaluator, and it is why the module plan skips its integration and its
-route. Community modules are how most Terraform is written, and `for_each` over a routes map is a
-normal thing for one to do. That is [#867](https://github.com/KensioSoftware/yulin/issues/867).
+`sim-tf-module-outputs.ts` indexes what a module publishes and `sim-tf-module-variables.ts` indexes
+what a call sets. Those are the two ways a value crosses a module boundary. A resource's
+`for_each_expression` says what `each` was iterating.
+`TerraformReferenceResolver` rewrites a reference under one of these scopes into the reference
+written where the scope was set, and asks again. `sim-tf-reference-scope.ts` holds that rewrite.
+
+None of this evaluates a Terraform expression, and a plan holds no expression to evaluate. The
+`configuration` section carries `references` arrays and no source. An attribute marked unknown
+stays unknown whatever is done to it, because the value has yet to exist. What the hops recover is
+the edge, and the edge is what an `Fn::GetAtt` is made of.
+
+A bare reference to a `for_each` resource is the same shape. Terraform writes
+`aws_apigatewayv2_integration.this[each.key]` into a plan as a reference to the resource and a
+separate reference to `each.key`, and the address in hand names no instance. The instance meant is
+the one keyed like the resource doing the reading (or the only one, where the reader carries no key
+of its own), and `sim-tf-reference-addresses.ts` holds that search.
+
+Two things the hops cannot recover are worth knowing about.
+
+A plan records the references of a whole collection in one list, and the list says what the
+collection was built from without saying which entry holds which. A `routes` map built from one
+function ARN gives one answer, and a map built from two gives two, where `each.value.uri` could be
+either. Two answers is treated as no answer, and the resource is left out with `unresolved required
+attribute` the way it was before any of this. A guess would put a plausible logical ID into a
+property naming the wrong resource.
+
+Anything reached through a `local.` is out of range. A plan carries no local definitions.
+`configuration.root_module` holds `module_calls`, and one module holds `outputs`, `resources`,
+`module_calls` and `variables`. Recovering a local means reading the module source beside the plan,
+which is a wider input than the plan path `deployPlan` takes.
 
 ### A service refuses properties it cannot act on
 
@@ -250,15 +277,13 @@ Two plans, both produced by Terraform 1.15.8 against AWS provider 5.100.0.
 |                   | resources | mapped | folded | skipped | reached |
 | ----------------- | --------- | ------ | ------ | ------- | ------- |
 | hand-written app  | 46        | 35     | 11     | 0       | 100%    |
-| community modules | 25        | 12     | 9      | 4       | 84%     |
+| community modules | 27        | 16     | 9      | 2       | 93%     |
 
 Reached means a simulated resource was created for it, either as a Resource of its own or as
 properties folded into one. The import maps 24 Terraform resource types and folds 11 more.
 
-The application plan is at its ceiling. Four resources of the module plan are left. `null_resource`
-and `local_file` package a zip and belong to no AWS service. The integration and the route read
-their values through the `each.value` hop described above, which is
-[#867](https://github.com/KensioSoftware/yulin/issues/867) and worth 2 more resources.
+Both plans are at their ceiling. The two resources the module plan leaves are `null_resource` and
+`local_file`, which package a zip and belong to no AWS service.
 
 Both figures are asserted in `sim-tf-plan-report.loc.test.ts`, by the resource types each plan
 leaves unreached. A mapping that stops reaching a type fails there.

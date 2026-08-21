@@ -11,11 +11,13 @@ import {
   terraformPlanHandlers as handlersFor,
   terraformPlannedPath as plannedPath,
 } from "../../test/terraform/plan/terraform-planned-configuration.js";
+import { GetApisCommand } from "@aws-sdk/client-apigatewayv2";
+import { serveSimAws } from "../serve/index.js";
 import { TerraformAdapter } from "./sim-tf-adapter.js";
 
 /*
- * What the application configuration under `test/terraform/app` reaches, one
- * simulated service at a time.
+ * What the configurations under `test/terraform` reach, one simulated service
+ * at a time.
  *
  * The deployment itself is covered beside this. These say that a resource the
  * import mapped is a resource the service it belongs to went on to create, and
@@ -106,5 +108,59 @@ describe("deploying a plan into the services it names", () => {
 
     assertNonNullable(table);
     assertIdentical(table.billing.mode, "PROVISIONED");
+  });
+
+  it("routes a request through the HTTP API a community module built", async () => {
+    // Given the community-module configuration, whose API module builds its
+    // integration and its route with for_each over a routes variable the
+    // caller set from the Lambda module's own output. Nothing in the plan
+    // resolves that URI, because the function has yet to exist
+    const simAws = new SimAws();
+    const received: string[] = [];
+
+    // When the plan is deployed and the API is served on localhost
+    await new TerraformAdapter(simAws).deployPlan({
+      planPath: await plannedPath("modules"),
+      stackName: "routed-modules",
+      bindings: [
+        {
+          functionName: "orders-processor-independent",
+          handler: (event: { rawPath?: string }) => {
+            received.push(event.rawPath ?? "");
+
+            return {
+              statusCode: 201,
+              headers: { "content-type": "text/plain" },
+              body: "ordered",
+            };
+          },
+        },
+      ],
+    });
+
+    const { Items } = await simAws
+      .apiGatewayV2()
+      .getApis(new GetApisCommand({}));
+    const endpoint = Items.find(
+      (item) => item.Name === "orders-api-independent",
+    )?.ApiEndpoint;
+
+    assertNonNullable(endpoint);
+
+    const srv = await serveSimAws({ simAws });
+
+    try {
+      // And a request is made to the route the module declared
+      const response = await fetch(srv.localUrl(`${endpoint}/orders`), {
+        method: "POST",
+      });
+
+      // Then it reached the function the routes variable named
+      assertIdentical(response.status, 201);
+      assertIdentical(await response.text(), "ordered");
+      assertArrayEquals(received, ["/orders"]);
+    } finally {
+      await srv.close();
+    }
   });
 });

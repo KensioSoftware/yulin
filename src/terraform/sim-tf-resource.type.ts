@@ -28,6 +28,14 @@ export interface TerraformResource {
   readonly expressions: Record<string, unknown>;
   /** Explicit `depends_on` addresses, relative to the declaring module. */
   readonly dependsOn: readonly string[];
+  /**
+   * What `for_each` iterates, as the references its expression holds.
+   *
+   * A resource expanded by `for_each` reads `each.value` and `each.key`, and
+   * neither names anything the plan resolved. What the collection was built
+   * from is the only thing behind them.
+   */
+  readonly forEach: readonly string[];
   /** The module call path this resource was declared under. */
   readonly modulePath: readonly string[];
 }

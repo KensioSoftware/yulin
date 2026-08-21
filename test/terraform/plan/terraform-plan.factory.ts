@@ -42,6 +42,13 @@ export interface TerraformPlanResourceFixture {
   >;
   /** Addresses named by an explicit `depends_on`. */
   readonly dependsOn: readonly string[];
+  /**
+   * What `for_each` iterates, as the references its expression holds.
+   *
+   * A plan carries the instances rather than the collection, so this is the
+   * only place it says what `each.value` and `each.key` were reading.
+   */
+  readonly forEach: readonly string[];
 }
 
 /**
@@ -54,6 +61,8 @@ export interface TerraformPlanModuleFixture {
   readonly resources: readonly TerraformPlanResourceFixture[];
   /** Output name to the references the output's own expression holds. */
   readonly outputs: Record<string, readonly string[]>;
+  /** Variable name to the references the caller set it from. */
+  readonly variables: Record<string, readonly string[]>;
   readonly modules: readonly TerraformPlanModuleFixture[];
 }
 
@@ -93,6 +102,7 @@ export const terraformPlanResourceFactory =
       unknown: {},
       references: {},
       dependsOn: [],
+      forEach: [],
     };
   });
 
@@ -105,6 +115,7 @@ export const terraformPlanModuleFactory =
     index: undefined,
     resources: [],
     outputs: {},
+    variables: {},
     modules: [],
   }));
 
@@ -220,7 +231,15 @@ function configModule(
     module_calls: Object.fromEntries(
       fixture.modules.map((module) => [
         module.name,
-        { module: configModule(module, module.outputs) },
+        {
+          module: configModule(module, module.outputs),
+          expressions: Object.fromEntries(
+            Object.entries(module.variables).map(([name, references]) => [
+              name,
+              { references },
+            ]),
+          ),
+        },
       ]),
     ),
   };
@@ -241,6 +260,10 @@ function configResource(
       ]),
     ),
     depends_on: resource.dependsOn,
+    for_each_expression:
+      resource.forEach.length === 0
+        ? undefined
+        : { references: resource.forEach },
   };
 }
 

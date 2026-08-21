@@ -49,7 +49,7 @@ export function terraformReferencedAddress(
   );
 
   for (const reference of references) {
-    const address = resolver.targetAddress(reference, resource.modulePath);
+    const address = resolver.targetAddress(reference, resource);
 
     if (address !== undefined) {
       return address;

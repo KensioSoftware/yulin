@@ -51,7 +51,7 @@ export function attributeList(
   const declared = longestFirst(references(resource.expressions[key]));
 
   for (const reference of declared) {
-    const value = resolver.resolve(reference, resource.modulePath);
+    const value = resolver.resolve(reference, resource);
 
     if (value !== undefined) {
       resolved.set(JSON.stringify(value), value);
@@ -85,7 +85,7 @@ export function blockAttribute(
   const declared = longestFirst(references(expression));
 
   for (const reference of declared) {
-    const value = resolver.resolve(reference, resource.modulePath);
+    const value = resolver.resolve(reference, resource);
 
     if (value !== undefined) {
       return value;

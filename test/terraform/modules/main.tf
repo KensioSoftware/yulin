@@ -112,6 +112,10 @@ module "processor" {
       principal  = "sqs.amazonaws.com"
       source_arn = module.processing_queue.queue_arn
     }
+    api = {
+      principal  = "apigateway.amazonaws.com"
+      source_arn = "${module.api.api_execution_arn}/*/*"
+    }
   }
 }
 
