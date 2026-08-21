@@ -216,6 +216,9 @@ A ranking no rule matches comes back as the `inputList` in the order it arrived,
 descend and sum to one across the list. A test that cares about the order declares a rule for it,
 and every other test gets a stable answer.
 
+A rule says exactly what comes back. Declaring two of the three items a request carries answers with
+those two, where real Personalize ranks everything it was given.
+
 ### Declaring against a campaign
 
 The campaign has to exist first. `recommendations()` and `rankings()` raise
