@@ -97,6 +97,14 @@ describe("SimAws", () => {
     assertIdentical(simAws.dynamoDb(), simAws.region().account().dynamoDb());
   });
 
+  it("returns the runtime API of the Personalize in the same scope", () => {
+    const simAws = new SimAws();
+    const runtime = simAws.personalize().runtime();
+
+    assertIdentical(simAws.personalizeRuntime(), runtime);
+    assertIdentical(simAws.account().region().personalizeRuntime(), runtime);
+  });
+
   it("returns the Streams API of the DynamoDB in the same scope", () => {
     const simAws = new SimAws();
     const streams = simAws.dynamoDb().streams();

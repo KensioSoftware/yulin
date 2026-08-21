@@ -1,3 +1,4 @@
+import { SimDeclaredResultRules } from "../../../util/rule/sim-declared-result-rules.js";
 import { SimRekognitionDeclarationError } from "../error/sim-rekognition.error.js";
 import { isSimRekognitionImageHash } from "../image/sim-rekognition-image-hash.js";
 import type { SimRekognitionImage } from "../image/sim-rekognition-image.js";
@@ -11,26 +12,25 @@ import type { SimRekognitionImage } from "../image/sim-rekognition-image.js";
  *
  * There are three kinds of rule and one order between them: a rule for an
  * exact content hash wins, then a rule for an exact S3 object name, then the
- * default. Matching is exact, with no pattern syntax, so which rule applies
- * never depends on how specific a pattern is thought to be.
+ * default. That ordering is `SimDeclaredResultRules`, which simulated
+ * Personalize matches recommendation requests with too. What is Rekognition's
+ * own is which key each tier holds and what makes one well formed.
  *
  * An image passed as `Image.Bytes` has no name, so it consults hash rules and
  * then the default.
  */
 export class SimRekognitionResultRules<TResult> {
-  private defaultResult: TResult;
-  private readonly resultsByName = new Map<string, TResult>();
-  private readonly resultsByHash = new Map<string, TResult>();
+  private readonly rules: SimDeclaredResultRules<TResult>;
 
   constructor(defaultResult: TResult) {
-    this.defaultResult = defaultResult;
+    this.rules = new SimDeclaredResultRules<TResult>(defaultResult);
   }
 
   /**
    * Answer with this result for any image no other rule matches.
    */
   byDefault(result: TResult): void {
-    this.defaultResult = result;
+    this.rules.byDefault(result);
   }
 
   /**
@@ -48,7 +48,7 @@ export class SimRekognitionResultRules<TResult> {
       );
     }
 
-    this.resultsByName.set(name, result);
+    this.rules.onTrailingKey(name, result);
   }
 
   /**
@@ -71,27 +71,16 @@ export class SimRekognitionResultRules<TResult> {
       );
     }
 
-    this.resultsByHash.set(digest, result);
+    this.rules.onLeadingKey(digest, result);
   }
 
   /**
    * The result for one image.
    */
   resultFor(image: SimRekognitionImage): TResult {
-    const byHash = this.resultsByHash.get(image.hash());
-
-    if (byHash !== undefined) {
-      return byHash;
-    }
-
-    return this.byNameOrDefault(image);
-  }
-
-  private byNameOrDefault(image: SimRekognitionImage): TResult {
-    if (image.name === undefined) {
-      return this.defaultResult;
-    }
-
-    return this.resultsByName.get(image.name) ?? this.defaultResult;
+    return this.rules.resultFor({
+      leading: image.hash(),
+      trailing: image.name,
+    });
   }
 }

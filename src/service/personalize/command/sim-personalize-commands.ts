@@ -1,6 +1,7 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimPersonalizeCampaignRules } from "../recommendation/sim-personalize-campaign-rules.js";
 import type { SimPersonalizeResources } from "../resource/sim-personalize-resources.js";
 import { SimPersonalizeAuthorizer } from "./authorize/sim-personalize-authorizer.js";
 import { SimPersonalizeCampaignReadCommands } from "./campaign/sim-personalize-campaign-read-commands.js";
@@ -9,6 +10,8 @@ import { SimPersonalizeDatasetGroupReadCommands } from "./dataset-group/sim-pers
 import { SimPersonalizeDatasetGroupWriteCommands } from "./dataset-group/sim-personalize-dataset-group-write-commands.js";
 import { SimPersonalizeDatasetReadCommands } from "./dataset/sim-personalize-dataset-read-commands.js";
 import { SimPersonalizeDatasetWriteCommands } from "./dataset/sim-personalize-dataset-write-commands.js";
+import { SimPersonalizeGetPersonalizedRankingHandler } from "./runtime/sim-personalize-get-personalized-ranking.js";
+import { SimPersonalizeGetRecommendationsHandler } from "./runtime/sim-personalize-get-recommendations.js";
 import { SimPersonalizeSchemaReadCommands } from "./schema/sim-personalize-schema-read-commands.js";
 import { SimPersonalizeSchemaWriteCommands } from "./schema/sim-personalize-schema-write-commands.js";
 import { SimPersonalizeSolutionReadCommands } from "./solution/sim-personalize-solution-read-commands.js";
@@ -30,6 +33,11 @@ interface SimPersonalizeCommandsProperties {
  * The handlers are grouped by the resource they are about and then split by
  * whether they change anything, and gathered here so the service facade stays
  * a list of the operations it answers.
+ *
+ * The two runtime handlers are built here as well, over the same resources
+ * and the same authorizer. What they answer with is declared against a
+ * campaign through the rules, which is why those are held here too: the
+ * declaration and the request that reads it have to reach the same rules.
  */
 export class SimPersonalizeCommands {
   public readonly datasetGroupWrites: SimPersonalizeDatasetGroupWriteCommands;
@@ -44,6 +52,9 @@ export class SimPersonalizeCommands {
   public readonly solutionVersionReads: SimPersonalizeSolutionVersionReadCommands;
   public readonly campaignWrites: SimPersonalizeCampaignWriteCommands;
   public readonly campaignReads: SimPersonalizeCampaignReadCommands;
+  public readonly rules: SimPersonalizeCampaignRules;
+  public readonly recommendations: SimPersonalizeGetRecommendationsHandler;
+  public readonly rankings: SimPersonalizeGetPersonalizedRankingHandler;
 
   constructor(properties: SimPersonalizeCommandsProperties) {
     const { resources, accountRegionScope, clock } = properties;
@@ -68,5 +79,14 @@ export class SimPersonalizeCommands {
     );
     this.campaignWrites = new SimPersonalizeCampaignWriteCommands(shared);
     this.campaignReads = new SimPersonalizeCampaignReadCommands(shared);
+
+    this.rules = new SimPersonalizeCampaignRules({
+      campaigns: resources.campaigns,
+    });
+
+    const runtime = { ...shared, rules: this.rules };
+
+    this.recommendations = new SimPersonalizeGetRecommendationsHandler(runtime);
+    this.rankings = new SimPersonalizeGetPersonalizedRankingHandler(runtime);
   }
 }
