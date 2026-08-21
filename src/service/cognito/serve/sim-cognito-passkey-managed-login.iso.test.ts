@@ -21,8 +21,11 @@ import {
 import {
   simCognitoExchangedTokens,
   simCognitoHostedAddress,
+  simCognitoPasskeyAsked,
   simCognitoPasskeyPosted,
+  simCognitoPasskeyPresented,
   simCognitoPasskeySessionIn,
+  simCognitoPasskeyUsernameIn,
   simCognitoWithHostedPasskey,
 } from "../../../../test/cognito/hosted-passkey-fixture.js";
 
@@ -84,20 +87,20 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
       username: simCognitoHostedAddress,
     });
 
-    // When the browser signs in with the passkey, posting the address back as
-    // the passkey page carried it.
-    const posted = await simCognitoPasskeyPosted(
-      setUp,
-      simCognitoHostedAddress,
-    );
+    // When the browser asks for the passkey and presents the credential,
+    // posting back what the passkey page carried.
+    const page = await simCognitoPasskeyAsked(setUp, simCognitoHostedAddress);
+    const posted = await simCognitoPasskeyPresented(setUp, page);
     const code = simCognitoRedirectedTo(posted).searchParams.get("code");
 
     assertNonNullable(code);
 
     const tokens = await simCognitoExchangedTokens(setUp, code);
 
-    // Then the address resolved to the user the challenge was issued for, so
-    // the sign-in finished and the code exchanged for tokens.
+    // Then the page carried the address the person signed in by, and the
+    // address resolved to the user the challenge was issued for, so the
+    // sign-in finished and the code exchanged for tokens.
+    assertIdentical(simCognitoPasskeyUsernameIn(page), simCognitoHostedAddress);
     assertIdentical(posted.status, 302);
     assertTypeString(tokens["access_token"]);
     assertTypeString(tokens["id_token"]);

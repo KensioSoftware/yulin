@@ -129,34 +129,57 @@ export function simCognitoPasskeyUsernameIn(page: string): string {
 }
 
 /**
- * Ask for a passkey and present the credential answering it, in the two
- * requests managed login takes, and answer with what came back from the
- * second.
- *
- * The second request carries the fields the passkey page carried, because
- * those are all a browser posting that page has.
+ * Post the sign-in form with the passkey button, and answer with the passkey
+ * page that comes back.
  */
-export async function simCognitoPasskeyPosted(
+export async function simCognitoPasskeyAsked(
   setUp: SimCognitoHostedSetUp,
   username: string,
-): Promise<Response> {
-  const parameters = simCognitoAuthorizeParameters(setUp);
+): Promise<string> {
   const asked = await simCognitoPostForm(setUp, "/oauth2/authorize", {
-    ...parameters,
+    ...simCognitoAuthorizeParameters(setUp),
     username,
     passkey: "passkey",
   });
-  const page = await asked.text();
+
+  return await asked.text();
+}
+
+/**
+ * Present the credential answering the challenge a passkey page carries.
+ *
+ * The request carries the fields that page carried, because those are all a
+ * browser posting it has.
+ */
+export async function simCognitoPasskeyPresented(
+  setUp: SimCognitoHostedSetUp,
+  page: string,
+): Promise<Response> {
   const session = simCognitoPasskeySessionIn(page);
 
   return await simCognitoPostForm(setUp, "/oauth2/authorize", {
-    ...parameters,
+    ...simCognitoAuthorizeParameters(setUp),
     username: simCognitoPasskeyUsernameIn(page),
     passkey_session: session,
     credential: JSON.stringify(
       setUp.cognito.userPool(setUp.userPoolId).webAuthnAssertion(session),
     ),
   });
+}
+
+/**
+ * Ask for a passkey and present the credential answering it, in the two
+ * requests managed login takes, and answer with what came back from the
+ * second.
+ */
+export async function simCognitoPasskeyPosted(
+  setUp: SimCognitoHostedSetUp,
+  username: string,
+): Promise<Response> {
+  return await simCognitoPasskeyPresented(
+    setUp,
+    await simCognitoPasskeyAsked(setUp, username),
+  );
 }
 
 /**
