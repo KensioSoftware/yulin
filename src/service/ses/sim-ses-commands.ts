@@ -3,6 +3,7 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import {
   SimIamAllowAllAuth,
@@ -30,6 +31,11 @@ export interface SimSesV2Properties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * Where each accepted message is announced, for a serving layer to print.
+   */
+  readonly messageLog?: SimAwsMessageLog;
 }
 
 /**
@@ -66,6 +72,7 @@ export class SimSesCommands {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      messageLog = new SimAwsMessageLog(),
     } = properties;
 
     const authorizer = new SimSesAuthorizer({ iam, accountRegionScope });
@@ -74,7 +81,7 @@ export class SimSesCommands {
     const configurationSets = new SimSesConfigurationSetStore({
       accountRegionScope,
     });
-    const sent = new SimSesSentEmailStore();
+    const sent = new SimSesSentEmailStore({ messageLog });
     const account = new SimSesAccount();
     const suppression = new SimSesSuppressionList();
 

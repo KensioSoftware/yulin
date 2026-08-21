@@ -1,7 +1,9 @@
 import type { SimAwsLoggedMessageKind } from "../../service/aws/message/sim-aws-logged-message.js";
+import { defaultEmailTextLimit } from "./sim-email-log-block.js";
 
 /**
- * Which kinds of message a served environment prints.
+ * Which kinds of message a served environment prints, and how much of an
+ * email it prints.
  *
  * One property per kind, each on unless it is turned off, so naming one kind
  * says nothing about the others.
@@ -12,6 +14,15 @@ export interface SimMessageLoggingProperties {
 
   /** The text messages simulated SNS would have sent. */
   readonly sns?: boolean;
+
+  /** The email simulated SES has accepted. */
+  readonly ses?: boolean;
+
+  /**
+   * How many characters of an email's text body are printed before it is cut
+   * off, 2000 by default. The rest is reported as a count.
+   */
+  readonly emailTextLimit?: number;
 }
 
 /**
@@ -25,26 +36,47 @@ export type SimMessageLoggingOption = boolean | SimMessageLoggingProperties;
 /**
  * The message logging a server was asked for.
  *
- * The option arrives in three shapes and this is the one thing the rest of the
- * serving layer asks: whether to print a message of this kind.
+ * The option arrives in three shapes and this is what the rest of the serving
+ * layer asks of it: whether to print a message of this kind, and how much of
+ * an email's text to print.
  */
 export class SimMessageLogging {
+  /**
+   * How many characters of an email's text body are printed.
+   */
+  readonly emailTextLimit: number;
+
   readonly #cognito: boolean;
   readonly #sns: boolean;
+  readonly #ses: boolean;
 
   constructor(option: SimMessageLoggingOption = true) {
-    const kinds: SimMessageLoggingProperties =
-      typeof option === "boolean" ? { cognito: option, sns: option } : option;
+    const properties: SimMessageLoggingProperties =
+      typeof option === "boolean"
+        ? { cognito: option, sns: option, ses: option }
+        : option;
 
-    this.#cognito = kinds.cognito !== false;
-    this.#sns = kinds.sns !== false;
+    this.#cognito = properties.cognito !== false;
+    this.#sns = properties.sns !== false;
+    this.#ses = properties.ses !== false;
+    this.emailTextLimit = properties.emailTextLimit ?? defaultEmailTextLimit;
   }
 
   /**
    * Whether messages of this kind are printed.
    */
   prints(kind: SimAwsLoggedMessageKind): boolean {
-    return kind === "cognito" ? this.#cognito : this.#sns;
+    switch (kind) {
+      case "cognito": {
+        return this.#cognito;
+      }
+      case "sns": {
+        return this.#sns;
+      }
+      case "ses": {
+        return this.#ses;
+      }
+    }
   }
 
   /**
@@ -54,6 +86,6 @@ export class SimMessageLogging {
    * wants output from does no work for it.
    */
   get any(): boolean {
-    return this.#cognito || this.#sns;
+    return this.#cognito || this.#sns || this.#ses;
   }
 }

@@ -1,7 +1,16 @@
+import { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
 import type { SimSesSentEmail } from "./sim-ses-sent-email.js";
 
 const hoursInADay = 24;
 const millisecondsInAnHour = 60 * 60 * 1000;
+
+interface SimSesSentEmailStoreProperties {
+  /**
+   * Where each message is announced as it is kept, for a serving layer to
+   * print.
+   */
+  readonly messageLog?: SimAwsMessageLog;
+}
 
 /**
  * The messages one simulated SES scope has accepted.
@@ -17,6 +26,11 @@ const millisecondsInAnHour = 60 * 60 * 1000;
  */
 export class SimSesSentEmailStore {
   readonly #sent: SimSesSentEmail[] = [];
+  readonly #messageLog: SimAwsMessageLog;
+
+  constructor(properties: SimSesSentEmailStoreProperties = {}) {
+    this.#messageLog = properties.messageLog ?? new SimAwsMessageLog();
+  }
 
   /**
    * Every message this scope has accepted, oldest first.
@@ -27,9 +41,25 @@ export class SimSesSentEmailStore {
 
   /**
    * Keep a message SES has accepted.
+   *
+   * Both ways a message is accepted come through here, a `SendEmail` from the
+   * SDK and another simulated service sending on the account's behalf, so this
+   * is the one place a message is announced from.
    */
   add(email: SimSesSentEmail): void {
     this.#sent.push(email);
+    // Announced after it is kept, so a listener that goes and reads the store
+    // finds the message it was just told about.
+    this.#messageLog.record({
+      kind: "ses",
+      fromEmailAddress: email.fromEmailAddress,
+      destination: email.destination,
+      subject: email.subject,
+      text: email.body.text,
+      html: email.body.html,
+      templateName: email.templateName,
+      templateData: email.templateData,
+    });
   }
 
   /**

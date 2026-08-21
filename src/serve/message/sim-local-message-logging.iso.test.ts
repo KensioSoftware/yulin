@@ -3,6 +3,7 @@ import {
   CreateUserPoolCommand,
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
   assertArrayLength,
@@ -48,9 +49,33 @@ async function signUpPool(
 }
 
 /**
- * Sign a user up and text a code, which is one message of each kind.
+ * Send one welcome message through a simulated SES.
  */
-async function sendBothKinds(simAws: SimAws): Promise<void> {
+async function emailAWelcome(simAws: SimAws): Promise<void> {
+  const ses = simAws.sesV2();
+
+  ses.verifyIdentity("hello@example.com");
+  ses.verifyIdentity("alice@example.com");
+
+  await ses.sendEmail(
+    new SendEmailCommand({
+      FromEmailAddress: "hello@example.com",
+      Destination: { ToAddresses: ["alice@example.com"] },
+      Content: {
+        Simple: {
+          Subject: { Data: "Welcome" },
+          Body: { Text: { Data: "Glad to have you here." } },
+        },
+      },
+    }),
+  );
+}
+
+/**
+ * Sign a user up, text a code and email a welcome, which is one message of
+ * each kind.
+ */
+async function sendEachKind(simAws: SimAws): Promise<void> {
   const { clientId } = await signUpPool(simAws);
 
   await simAws.cognitoIdentityProvider().signUp(
@@ -66,25 +91,28 @@ async function sendBothKinds(simAws: SimAws): Promise<void> {
     .publish(
       new PublishCommand({ PhoneNumber: phoneNumber, Message: "code 12345" }),
     );
+  await emailAWelcome(simAws);
 }
 
 describe("Logging the messages a served environment records", () => {
-  it("prints a pool message and a text message as they happen", async () => {
+  it("prints a message of each kind as it happens", async () => {
     // Given a simulated environment being served with message logging on.
     const simAws = new SimAws();
     const target = recordingConsole();
     const logging = new SimLocalMessageLogging({ simAws, target });
     logging.serving();
 
-    // When a user signs itself up and a code is texted.
-    await sendBothKinds(simAws);
+    // When a user signs itself up, a code is texted and a welcome is emailed.
+    await sendEachKind(simAws);
 
-    // Then both messages were printed, the verification code among them.
-    assertArrayLength(target.lines, 2);
+    // Then all three were printed, the verification code among them.
+    assertArrayLength(target.lines, 3);
     assertStringIncludes(target.lines[0], "sim Cognito");
     assertStringIncludes(target.lines[0], "alice@example.com");
     assertStringIncludes(target.lines[1], "sim SNS");
     assertStringIncludes(target.lines[1], "code 12345");
+    assertStringIncludes(target.lines[2], "sim SES");
+    assertStringIncludes(target.lines[2], "Glad to have you here.");
   });
 
   it("prints the confirmation code the pool recorded", async () => {
@@ -134,10 +162,11 @@ describe("Logging the messages a served environment records", () => {
   });
 
   it.each<[string, SimMessageLoggingOption, readonly string[]]>([
-    ["one kind turned off", { sns: false }, ["sim Cognito"]],
-    ["the other turned off", { cognito: false }, ["sim SNS"]],
-    ["both turned off", false, []],
-    ["everything turned on", true, ["sim Cognito", "sim SNS"]],
+    ["one kind turned off", { sns: false }, ["sim Cognito", "sim SES"]],
+    ["another turned off", { cognito: false }, ["sim SNS", "sim SES"]],
+    ["the email turned off", { ses: false }, ["sim Cognito", "sim SNS"]],
+    ["all of them turned off", false, []],
+    ["everything turned on", true, ["sim Cognito", "sim SNS", "sim SES"]],
   ])("prints what %s asks for", async (_, option, expected) => {
     // Given a served environment asked for those kinds of message.
     const simAws = new SimAws();
@@ -145,7 +174,7 @@ describe("Logging the messages a served environment records", () => {
     new SimLocalMessageLogging({ simAws, option, target }).serving();
 
     // When a message of each kind is recorded.
-    await sendBothKinds(simAws);
+    await sendEachKind(simAws);
 
     // Then only the kinds asked for were printed, in that order.
     assertArrayLength(target.lines, expected.length);
@@ -157,6 +186,28 @@ describe("Logging the messages a served environment records", () => {
     }
   });
 
+  it("prints as much of an email as the limit it was given", async () => {
+    // Given a served environment printing ten characters of email text.
+    const simAws = new SimAws();
+    const target = recordingConsole();
+
+    new SimLocalMessageLogging({
+      simAws,
+      option: { emailTextLimit: 10 },
+      target,
+    }).serving();
+
+    // When a longer message is emailed.
+    await emailAWelcome(simAws);
+
+    // Then the text stopped at the limit and the rest was counted.
+    assertStringIncludes(target.lines[0], "    Glad to ha");
+    assertStringIncludes(
+      target.lines[0],
+      "... 12 more characters, not printed",
+    );
+  });
+
   it("prints nothing once the server has stopped", async () => {
     // Given a served environment that has stopped serving.
     const simAws = new SimAws();
@@ -166,7 +217,7 @@ describe("Logging the messages a served environment records", () => {
     logging.stopping();
 
     // When messages are recorded afterwards.
-    await sendBothKinds(simAws);
+    await sendEachKind(simAws);
 
     // Then nothing reached the console.
     assertArrayLength(target.lines, 0);

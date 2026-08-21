@@ -768,11 +768,11 @@ service can serve anything at that path.
 
 ## Messages on the console
 
-A simulated Cognito user pool records the verification message it would have sent, and simulated SNS
-records the text message it would have texted. Reading either back takes test code, or the pool's
-`/<userPoolId>/messages` listing, and both are a detour when the sign-up form is open in a browser
-and the confirmation code is the one thing you want. A served environment prints them as they are
-recorded:
+A simulated Cognito user pool records the verification message it would have sent, simulated SNS
+records the text message it would have texted, and simulated SES records the email it accepted.
+Reading any of them back takes test code, or the pool's `/<userPoolId>/messages` listing. Either is
+a detour when the sign-up form is open in a browser and the confirmation code is the one thing you
+want. A served environment prints them as they are recorded:
 
 ```
 sim Cognito eu-west-2_aBcDeFgHi: email to alice@example.com (SignUp)
@@ -780,6 +780,10 @@ sim Cognito eu-west-2_aBcDeFgHi: email to alice@example.com (SignUp)
   Your confirmation code is 483920
 sim SNS: SMS to +15550100
   Your one-time code is 118221
+sim SES: hello@example.com to alice@example.com
+  Subject: Welcome to Example
+  Text body:
+    Glad to have you here.
 ```
 
 Nothing has to ask for that. Narrow it with `messageLogging`, which holds one property per kind of
@@ -816,9 +820,57 @@ sim SNS: SMS to +15550100 (suppressed, number opted out)
   Your one-time code is 118221
 ```
 
+### What an email prints as
+
+An email is summarised. Printing an HTML part in full would run to kilobytes of markup and push the
+sender, the recipients and the subject off the screen, and those are what say which send this was.
+The first line carries the sender and the three recipient lists. The subject follows indented under
+it, then the template the message was rendered from (where a stored template was) and its data, then
+the text part. An HTML part is measured and left out:
+
+```
+sim SES: hello@example.com to alice@example.com, bcc audit@example.com
+  Subject: Reset your password
+  Template: password-reset {"code":"483920"}
+  Text body:
+    Follow this link to reset your password.
+    https://app.example.com/reset?token=abc123
+  HTML body: 4.1 kB, not printed
+```
+
+A text part is printed up to 2000 characters. What runs past that is counted and left out:
+
+```
+  Text body:
+    Here is your monthly statement in full.
+    ... 4162 more characters, not printed
+```
+
+`emailTextLimit` moves that limit. It sits beside the per-kind switches on the same option:
+
+```typescript sim-serve-email-text-limit
+/**
+ * Serving with a shorter limit on the email text that reaches the console.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({
+  simAws,
+  port: 8787,
+  messageLogging: { emailTextLimit: 500 },
+});
+
+// Serve the pages that send the email here.
+
+await srv.close();
+```
+
 Only what happens while the server is up reaches the console. A message recorded before it started
-listening, or after `close()`, is on the service's own record and nowhere else, and `sentMessages()`
-and `sentSmsMessages()` are still where the whole history is.
+listening, or after `close()`, is on the service's own record and nowhere else. `sentMessages()`,
+`sentSmsMessages()` and `sentEmails()` are still where the whole history is.
 
 ## Restarting on a file change
 

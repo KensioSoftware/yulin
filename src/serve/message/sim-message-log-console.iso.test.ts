@@ -10,7 +10,7 @@ describe("Printing the messages a served environment would have sent", () => {
     const target = recordingConsole();
 
     // When a user pool's verification email is printed.
-    new SimMessageLogConsole(target).print({
+    new SimMessageLogConsole({ target }).print({
       kind: "cognito",
       userPoolId: "us-east-1_AbCd1234",
       medium: "EMAIL",
@@ -37,7 +37,7 @@ describe("Printing the messages a served environment would have sent", () => {
     const target = recordingConsole();
 
     // When a message with no subject is printed, as a text message has none.
-    new SimMessageLogConsole(target).print({
+    new SimMessageLogConsole({ target }).print({
       kind: "cognito",
       userPoolId: "us-east-1_AbCd1234",
       medium: "SMS",
@@ -62,7 +62,7 @@ describe("Printing the messages a served environment would have sent", () => {
     const target = recordingConsole();
 
     // When the body has line breaks in it.
-    new SimMessageLogConsole(target).print({
+    new SimMessageLogConsole({ target }).print({
       kind: "cognito",
       userPoolId: "us-east-1_AbCd1234",
       medium: "EMAIL",
@@ -89,7 +89,7 @@ describe("Printing the messages a served environment would have sent", () => {
     const target = recordingConsole();
 
     // When an SMS simulated SNS recorded is printed.
-    new SimMessageLogConsole(target).print({
+    new SimMessageLogConsole({ target }).print({
       kind: "sns",
       phoneNumber: "+15550100",
       message: "Your one-time code is 118221",
@@ -110,7 +110,7 @@ describe("Printing the messages a served environment would have sent", () => {
     const target = recordingConsole();
 
     // When an SMS the opt-out list suppressed is printed.
-    new SimMessageLogConsole(target).print({
+    new SimMessageLogConsole({ target }).print({
       kind: "sns",
       phoneNumber: "+15550100",
       message: "Your one-time code is 118221",

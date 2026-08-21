@@ -3,6 +3,8 @@ import type {
   SimCognitoLoggedMessage,
   SimSnsLoggedSms,
 } from "../../service/aws/message/sim-aws-logged-message.js";
+import { SimEmailLogBlock } from "./sim-email-log-block.js";
+import { bodyIndent, indented } from "./sim-message-indent.js";
 
 /**
  * The console a message is printed to, as much of it as printing needs.
@@ -11,10 +13,17 @@ export interface SimMessageConsole {
   log: (line: string) => void;
 }
 
-/**
- * How far a message body is indented under the line that introduces it.
- */
-const bodyIndent = "  ";
+interface SimMessageLogConsoleProperties {
+  /**
+   * Where the lines go. The process console unless a test wants to read them.
+   */
+  readonly target?: SimMessageConsole | undefined;
+
+  /**
+   * How much of an email's text body is printed. See `SimEmailLogBlock`.
+   */
+  readonly emailTextLimit?: number | undefined;
+}
 
 /**
  * Prints the messages a served environment would have sent.
@@ -29,21 +38,37 @@ const bodyIndent = "  ";
  */
 export class SimMessageLogConsole {
   private readonly console: SimMessageConsole;
+  private readonly email: SimEmailLogBlock;
 
-  constructor(target: SimMessageConsole = console) {
-    this.console = target;
+  constructor(properties: SimMessageLogConsoleProperties = {}) {
+    this.console = properties.target ?? console;
+    this.email = new SimEmailLogBlock({
+      emailTextLimit: properties.emailTextLimit,
+    });
   }
 
   /**
    * Print one message.
    */
   print(message: SimAwsLoggedMessage): void {
-    const block =
-      message.kind === "cognito"
-        ? this.cognitoBlock(message)
-        : this.smsBlock(message);
+    this.console.log(this.block(message).join("\n"));
+  }
 
-    this.console.log(block.join("\n"));
+  /**
+   * The lines one message prints as.
+   */
+  private block(message: SimAwsLoggedMessage): readonly string[] {
+    switch (message.kind) {
+      case "cognito": {
+        return this.cognitoBlock(message);
+      }
+      case "sns": {
+        return this.smsBlock(message);
+      }
+      case "ses": {
+        return this.email.lines(message);
+      }
+    }
   }
 
   /**
@@ -83,12 +108,4 @@ export class SimMessageLogConsole {
       ...indented(message.message),
     ];
   }
-}
-
-/**
- * A body indented under the line introducing it, line by line, so a message
- * running to several lines stays one readable block.
- */
-function indented(body: string): readonly string[] {
-  return body.split("\n").map((line) => `${bodyIndent}${line}`);
 }
