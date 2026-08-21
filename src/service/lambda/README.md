@@ -663,9 +663,9 @@ reachable afterwards through `simAws.lambda()` and invokable via the SDK `Invoke
 
 Supported `AWS::Lambda::Function` properties: `FunctionName` (defaults to the logical ID), `Role`
 (typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`), `Code`, `Handler`, `Runtime`,
-`Description`, `Timeout`, `MemorySize`, and `Environment`. Malformed property values fail AWS-style
-with a `TypeError` naming the property and logical ID, down to the individual variable for
-`Environment.Variables`.
+`Description`, `Timeout`, `MemorySize`, `Environment`, and `DeadLetterConfig`. Malformed property
+values fail AWS-style with a `TypeError` naming the property and logical ID, down to the individual
+variable for `Environment.Variables`.
 
 Template `Code` supports two source forms:
 
@@ -708,6 +708,25 @@ rule. `StartingPosition` and `StartingPositionTimestamp` are read and passed on 
 here, since a stream mapping has to have a position and a queue mapping is refused for naming one,
 and only `CreateEventSourceMapping` knows which source the ARN names.
 
+### Retries and destinations
+
+`cfn/event-invoke-config/` writes `AWS::Lambda::EventInvokeConfig` through
+`PutFunctionEventInvokeConfig`, and `cfn/function/sim-cfn-lambda-dead-letter-parser.ts` reads
+`DeadLetterConfig` off the function. CDK emits the first for `onFailure`, `onSuccess`,
+`retryAttempts` and `maxEventAge`, and the second for `deadLetterQueue`.
+
+Both name a queue or a topic, and both read it through `SimCfnLambdaTargetArn`. A `Ref` to an
+`AWS::SQS::Queue` resolves to the queue URL where everything downstream names a queue by ARN, so
+the URL form is converted there. A destination the simulation has nowhere to send to is recorded
+with `resource.ignoreProperty` and left off the Resource. That is what the reader's catch of
+`SimLambdaInvalidParameterValueException` is for. Failing the Resource would take a whole stack
+down over one destination, the outcome issue #823 was about, and the function itself is still worth
+deploying.
+
+`simCfnLambdaRemoveEventInvokeConfig` takes the config off on teardown. It checks the config is
+still there first, since deleting a function takes its configs with it and a Stack that reached the
+function first would otherwise fail a deletion over work it had already done.
+
 ### Versions and aliases
 
 `cfn/version/` publishes `AWS::Lambda::Version` through `PublishVersion`, and `cfn/alias/` creates
@@ -740,8 +759,8 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 ## Not simulated yet
 
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
-  `AWS::Lambda::Url`, `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias` and
-  `AWS::Lambda::EventSourceMapping`
+  `AWS::Lambda::Url`, `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias`,
+  `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig`
 - event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
   `UpdateEventSourceMapping`, and polling concurrency
 - Function URL `Cors` configuration and OPTIONS preflight handling
@@ -753,9 +772,8 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - `GetFunctionConfiguration`, and the concurrency and tagging commands
 - `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, the
   settings simulated Lambda does not model on `UpdateFunctionConfiguration` (`Layers`, `VpcConfig`,
-  `DeadLetterConfig`, `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`,
-  `LoggingConfig`, `RevisionId`), and `Marker`/`MaxItems` paging and `MasterRegion` on
-  `ListFunctions`
+  `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig`, `RevisionId`),
+  and `Marker`/`MaxItems` paging and `MasterRegion` on `ListFunctions`
 - `LastUpdateStatus`, so a settings change takes effect at once, with no roll-out to wait on
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
@@ -768,4 +786,4 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   redirect the simulation answered with
 - timers: `setTimeout` inside a handler is a host timer, not one the simulation's clock releases
 - timeouts interrupting handler execution
-- asynchronous invocation retries and failure destinations
+- SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function`

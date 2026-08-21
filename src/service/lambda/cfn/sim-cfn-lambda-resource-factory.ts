@@ -5,6 +5,7 @@ import type {
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimLambda } from "../sim-lambda.js";
 import { SimCfnLambdaAliasCreator } from "./alias/sim-cfn-lambda-alias-creator.js";
+import { SimCfnLambdaEventInvokeConfigCreator } from "./event-invoke-config/sim-cfn-lambda-event-invoke-config-creator.js";
 import { SimCfnLambdaEventSourceMappingCreator } from "./event-source-mapping/sim-cfn-lambda-event-source-mapping-creator.js";
 import { SimCfnLambdaFunctionCreator } from "./function/sim-cfn-lambda-function-creator.js";
 import { SimCfnLambdaPermissionCreator } from "./permission/sim-cfn-lambda-permission-creator.js";
@@ -22,6 +23,7 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
   private readonly versionCreator: SimCfnLambdaVersionCreator;
   private readonly aliasCreator: SimCfnLambdaAliasCreator;
   private readonly eventSourceMappingCreator: SimCfnLambdaEventSourceMappingCreator;
+  private readonly eventInvokeConfigCreator: SimCfnLambdaEventInvokeConfigCreator;
   private readonly deleter: SimCfnLambdaResourceDeleter;
 
   constructor(lambda: SimLambda) {
@@ -32,6 +34,9 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
     this.versionCreator = new SimCfnLambdaVersionCreator({ lambda });
     this.aliasCreator = new SimCfnLambdaAliasCreator({ lambda });
     this.eventSourceMappingCreator = new SimCfnLambdaEventSourceMappingCreator({
+      lambda,
+    });
+    this.eventInvokeConfigCreator = new SimCfnLambdaEventInvokeConfigCreator({
       lambda,
     });
   }
@@ -60,6 +65,12 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
       }
       case "EventSourceMapping": {
         return await this.eventSourceMappingCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
+      case "EventInvokeConfig": {
+        return await this.eventInvokeConfigCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
         );
