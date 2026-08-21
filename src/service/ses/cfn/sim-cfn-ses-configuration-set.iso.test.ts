@@ -35,14 +35,29 @@ async function deployConfigurationSet(
           Properties: properties,
         },
       },
-      Outputs: {
-        Name: { Value: { Ref: "Transactional" } },
-        Id: { Value: { "Fn::GetAtt": ["Transactional", "Id"] } },
-      },
+      Outputs: { Name: { Value: { Ref: "Transactional" } } },
     },
   });
 
   return { simAws, stack };
+}
+
+/** Deploy a set whose stack reads one attribute off it. */
+async function deployWithAttribute(attributeName: string): Promise<void> {
+  await new SimAws().cloudFormation().deployTemplate({
+    stackName: "orders",
+    template: {
+      Resources: {
+        Transactional: {
+          Type: "AWS::SES::ConfigurationSet",
+          Properties: { Name: "transactional" },
+        },
+      },
+      Outputs: {
+        Read: { Value: { "Fn::GetAtt": ["Transactional", attributeName] } },
+      },
+    },
+  });
 }
 
 describe("AWS::SES::ConfigurationSet", () => {
@@ -79,14 +94,28 @@ describe("AWS::SES::ConfigurationSet", () => {
     assertTrue(configurationSet.reputationOptions.reputationMetricsEnabled);
   });
 
-  it("answers a Ref and an Id with the set's name", async () => {
-    // Given a deployed set whose Ref and Id are outputs.
+  it("answers a Ref with the set's name", async () => {
+    // Given a deployed set whose Ref is an output.
     const { stack } = await deployConfigurationSet({ Name: "transactional" });
 
-    // Then both are the name, which is directly usable as the
+    // Then the Ref is the name, which is directly usable as the
     // ConfigurationSetName of a send.
     assertIdentical(stack.outputs.get("Name")?.value, "transactional");
-    assertIdentical(stack.outputs.get("Id")?.value, "transactional");
+  });
+
+  it("refuses the Id attribute, which this Resource type lacks", async () => {
+    // Given a template reading an Id off the set, which AWS::SES::Template has
+    // and this Resource type does not.
+    const error = await assertThrowsErrorAsync(async () => {
+      await deployWithAttribute("Id");
+    });
+
+    // Then the deploy fails. Answering it would let a template deploy here and
+    // fail on AWS.
+    assertStringIncludes(
+      error.message,
+      "Unsupported AWS::SES::ConfigurationSet attribute Id",
+    );
   });
 
   it("names an unnamed set after the stack and the logical ID", async () => {
@@ -157,25 +186,9 @@ describe("AWS::SES::ConfigurationSet", () => {
     assertStringIncludes(error.message, "BOUNCE, COMPLAINT");
   });
 
-  it("refuses an attribute the Resource type does not have", async () => {
-    // Given a template reading something off the set that is not its Id.
-    const simAws = new SimAws();
-
+  it("refuses any other attribute too", async () => {
     const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cloudFormation().deployTemplate({
-        stackName: "orders",
-        template: {
-          Resources: {
-            Transactional: {
-              Type: "AWS::SES::ConfigurationSet",
-              Properties: { Name: "transactional" },
-            },
-          },
-          Outputs: {
-            Arn: { Value: { "Fn::GetAtt": ["Transactional", "Arn"] } },
-          },
-        },
-      });
+      await deployWithAttribute("Arn");
     });
 
     assertStringIncludes(
@@ -254,6 +267,16 @@ describe("AWS::SES::ConfigurationSet property types", () => {
     {
       described: "a delivery deadline that is not a number",
       properties: { DeliveryOptions: { MaxDeliverySeconds: "soon" } },
+      message: "DeliveryOptions.MaxDeliverySeconds must be a number",
+    },
+    {
+      described: "a delivery deadline left blank",
+      properties: { DeliveryOptions: { MaxDeliverySeconds: "" } },
+      message: "DeliveryOptions.MaxDeliverySeconds must be a number",
+    },
+    {
+      described: "a delivery deadline of nothing but spaces",
+      properties: { DeliveryOptions: { MaxDeliverySeconds: " ".repeat(3) } },
       message: "DeliveryOptions.MaxDeliverySeconds must be a number",
     },
     {

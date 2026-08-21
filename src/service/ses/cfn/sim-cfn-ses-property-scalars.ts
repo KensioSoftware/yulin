@@ -58,7 +58,7 @@ export function sesCfnNumber(
     return undefined;
   }
 
-  const parsed = typeof value === "string" ? Number(value) : value;
+  const parsed = typeof value === "string" ? fromString(value) : value;
 
   if (typeof parsed !== "number" || !Number.isFinite(parsed)) {
     throw fail(`${path} must be a number`);
@@ -90,4 +90,14 @@ export function sesCfnStringList(
 
     return member;
   });
+}
+
+/**
+ * A number written as a string, or nothing where the string holds no number.
+ *
+ * `Number("")` and `Number("  ")` are both `0`, which would take a property
+ * left blank in a template and store it as a real zero.
+ */
+function fromString(value: string): number | undefined {
+  return value.trim().length === 0 ? undefined : Number(value);
 }

@@ -29,9 +29,12 @@ console.log(
   read.SendingOptions?.SendingEnabled,
 );
 
-// The simulator's own accessor, for a test that would rather skip a Command
+// The simulator's own accessors, for a test that would rather skip a Command
 // and its authorization.
 const configurationSet = ses.findConfigurationSet("transactional");
 
 // "REQUIRE"
 console.log(configurationSet?.deliveryOptions.tlsPolicy);
+
+// ["transactional"]
+console.log(ses.allConfigurationSets().map((set) => set.configurationSetName));

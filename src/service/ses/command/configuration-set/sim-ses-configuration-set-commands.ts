@@ -16,10 +16,8 @@ import type {
   SimListConfigurationSetsCommand,
   SimListConfigurationSetsCommandOutput,
 } from "./configuration-set.command.js";
-import {
-  readSimSesConfigurationSetOptions,
-  refuseUnsimulatedConfigurationSetInput,
-} from "./sim-ses-configuration-set-options.js";
+import { readSimSesConfigurationSetOptions } from "./sim-ses-configuration-set-options.js";
+import { refuseUnsimulatedConfigurationSetInput } from "./sim-ses-unsimulated-configuration-set-input.js";
 
 interface SimSesConfigurationSetCommandsProperties {
   readonly configurationSets: SimSesConfigurationSetStore;

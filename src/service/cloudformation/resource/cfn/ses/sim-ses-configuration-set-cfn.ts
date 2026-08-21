@@ -20,21 +20,20 @@ export class SimSesConfigurationSetCfn implements SimCfnResourceValueAdapter {
    * AWS::SES::ConfigurationSet Ref returns the set's name.
    *
    * A configuration set has no identifier apart from its name, so a Ref is
-   * directly usable as the `ConfigurationSetName` of a send. That is also what
-   * makes the `Id` attribute the same string, as it is for a template.
+   * directly usable as the `ConfigurationSetName` of a send.
    */
   refValue(): SimCfnTemplateValue {
     return this.#configurationSet.configurationSetName;
   }
 
   /**
-   * AWS::SES::ConfigurationSet attributes.
+   * AWS::SES::ConfigurationSet has no attributes at all.
+   *
+   * Unlike `AWS::SES::Template`, which answers an `Id`, this Resource type
+   * publishes nothing for `Fn::GetAtt` to read. Answering one anyway would let
+   * a template deploy here and fail on AWS.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
-    if (attributeName === "Id") {
-      return this.#configurationSet.configurationSetName;
-    }
-
     throw new Error(
       `Unsupported AWS::SES::ConfigurationSet attribute ${attributeName}`,
     );

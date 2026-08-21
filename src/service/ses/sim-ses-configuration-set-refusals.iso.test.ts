@@ -4,6 +4,7 @@ import {
   GetConfigurationSetCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -135,6 +136,69 @@ describe("simulated SES configuration set refusals", () => {
     assertInstanceOf(error, SimSesBadRequestException);
     assertStringIncludes(error.message, "REQUIRE, OPTIONAL");
   });
+
+  it.each(["my set", "orders/transactional", "sales*"])(
+    "refuses the name %s, which SES has no room for",
+    async (configurationSetName) => {
+      // Given a name carrying a character real SES refuses.
+      const ses = new SimAws().sesV2();
+
+      const error = await assertThrowsErrorAsync(async () => {
+        await ses.createConfigurationSet(
+          new CreateConfigurationSetCommand({
+            ConfigurationSetName: configurationSetName,
+          }),
+        );
+      });
+
+      // Then it is refused here too. Holding it would name a set no account
+      // would accept.
+      assertInstanceOf(error, SimSesBadRequestException);
+      assertStringIncludes(error.message, "regular expression pattern");
+    },
+  );
+
+  it.each([299, 50_401, 300.5])(
+    "refuses a delivery deadline of %s seconds",
+    async (MaxDeliverySeconds) => {
+      // Given a deadline outside the five minutes to fourteen hours real SES
+      // attempts delivery for, or one that is not whole seconds.
+      const ses = new SimAws().sesV2();
+
+      const error = await assertThrowsErrorAsync(async () => {
+        await ses.createConfigurationSet(
+          new CreateConfigurationSetCommand({
+            ConfigurationSetName: "transactional",
+            DeliveryOptions: { MaxDeliverySeconds },
+          }),
+        );
+      });
+
+      assertInstanceOf(error, SimSesBadRequestException);
+      assertStringIncludes(error.message, "between 300 and 50400");
+    },
+  );
+
+  it.each([300, 50_400])(
+    "accepts a delivery deadline of %s seconds",
+    async (MaxDeliverySeconds) => {
+      // Given a deadline at either end of what real SES allows.
+      const ses = new SimAws().sesV2();
+
+      await ses.createConfigurationSet(
+        new CreateConfigurationSetCommand({
+          ConfigurationSetName: "transactional",
+          DeliveryOptions: { MaxDeliverySeconds },
+        }),
+      );
+
+      assertIdentical(
+        ses.findConfigurationSet("transactional")?.deliveryOptions
+          .maxDeliverySeconds,
+        MaxDeliverySeconds,
+      );
+    },
+  );
 
   it("refuses tracking options, which rewrite no link here", async () => {
     const ses = new SimAws().sesV2();

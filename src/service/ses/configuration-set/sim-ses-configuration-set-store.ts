@@ -11,6 +11,15 @@ import {
 
 const maximumNameLength = 64;
 
+/**
+ * What real SES lets a configuration set be named.
+ *
+ * Letters, digits, dashes and underscores. A name with a space or a slash in
+ * it is refused by SES, so it is refused here rather than stored as a name no
+ * account would accept.
+ */
+const allowedCharacters = /^[A-Za-z0-9_-]+$/;
+
 interface SimSesConfigurationSetStoreProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -103,6 +112,14 @@ export function requiredSimSesConfigurationSetName(
     throw new SimSesBadRequestException(
       "1 validation error detected: Value at 'configurationSetName' failed " +
         "to satisfy constraint: Member must not be null",
+    );
+  }
+
+  if (!allowedCharacters.test(configurationSetName)) {
+    throw new SimSesBadRequestException(
+      `1 validation error detected: Value '${configurationSetName}' at ` +
+        `'configurationSetName' failed to satisfy constraint: Member must ` +
+        `satisfy regular expression pattern: ^[a-zA-Z0-9_-]+$`,
     );
   }
 
