@@ -11,11 +11,13 @@ import {
 import { SimSesAccount } from "./account/sim-ses-account.js";
 import { SimSesAccountCommands } from "./command/account/sim-ses-account-commands.js";
 import { SimSesAuthorizer } from "./command/authorize/sim-ses-authorizer.js";
+import { SimSesConfigurationSetCommands } from "./command/configuration-set/sim-ses-configuration-set-commands.js";
 import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-commands.js";
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
 import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-identities.js";
 import { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
+import { SimSesConfigurationSetStore } from "./configuration-set/sim-ses-configuration-set-store.js";
 import { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
 import { SimSesTemplateCommands } from "./command/template/sim-ses-template-commands.js";
 import { SimSesTemplateStore } from "./template/sim-ses-template-store.js";
@@ -37,10 +39,12 @@ export interface SimSesV2Properties {
 export class SimSesCommands {
   readonly identities: SimSesIdentityStore;
   readonly templates: SimSesTemplateStore;
+  readonly configurationSets: SimSesConfigurationSetStore;
   readonly sent: SimSesSentEmailStore;
   readonly account: SimSesAccount;
   readonly identityCommands: SimSesIdentityCommands;
   readonly templateCommands: SimSesTemplateCommands;
+  readonly configurationSetCommands: SimSesConfigurationSetCommands;
   readonly sendEmail: SimSesSendEmail;
   readonly accountCommands: SimSesAccountCommands;
   readonly background: BackgroundScheduler;
@@ -55,12 +59,16 @@ export class SimSesCommands {
     const authorizer = new SimSesAuthorizer({ iam, accountRegionScope });
     const identities = new SimSesIdentityStore({ accountRegionScope });
     const templates = new SimSesTemplateStore({ accountRegionScope });
+    const configurationSets = new SimSesConfigurationSetStore({
+      accountRegionScope,
+    });
     const sent = new SimSesSentEmailStore();
     const account = new SimSesAccount();
 
     this.background = background;
     this.identities = identities;
     this.templates = templates;
+    this.configurationSets = configurationSets;
     this.sent = sent;
     this.account = account;
     this.identityCommands = new SimSesIdentityCommands({
@@ -72,6 +80,10 @@ export class SimSesCommands {
       templates,
       authorizer,
       clock: background,
+    });
+    this.configurationSetCommands = new SimSesConfigurationSetCommands({
+      configurationSets,
+      authorizer,
     });
     this.sendEmail = new SimSesSendEmail({
       identities,

@@ -3,7 +3,11 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { simSesIdentityArn, simSesTemplateArn } from "../../sim-ses-arn.js";
+import {
+  simSesConfigurationSetArn,
+  simSesIdentityArn,
+  simSesTemplateArn,
+} from "../../sim-ses-arn.js";
 
 /**
  * The resource an action with no resource type authorizes against.
@@ -78,6 +82,25 @@ export class SimSesAuthorizer {
     return this.authorizeResource(
       action,
       simSesTemplateArn(this.#accountRegionScope, templateName),
+      caller,
+    );
+  }
+
+  /**
+   * Ensure the caller may perform an action on one configuration set.
+   *
+   * The set need not exist, for the same reason a template need not:
+   * CreateConfigurationSet authorizes against the ARN the set is about to
+   * have.
+   */
+  authorizeConfigurationSet(
+    action: string,
+    configurationSetName: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(
+      action,
+      simSesConfigurationSetArn(this.#accountRegionScope, configurationSetName),
       caller,
     );
   }

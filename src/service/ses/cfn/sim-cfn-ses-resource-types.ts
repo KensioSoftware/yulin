@@ -9,7 +9,11 @@ export const sesEmailIdentityResourceType = "AWS::SES::EmailIdentity";
 
 export const sesTemplateResourceType = "AWS::SES::Template";
 
+export const sesConfigurationSetResourceType = "AWS::SES::ConfigurationSet";
+
 /** The type name the CloudFormation layer dispatches on, without its prefix. */
 export const sesEmailIdentityResourceTypeName = "EmailIdentity";
 
 export const sesTemplateResourceTypeName = "Template";
+
+export const sesConfigurationSetResourceTypeName = "ConfigurationSet";

@@ -13,6 +13,12 @@ import type {
   SimGetEmailIdentityCommand,
   SimListEmailIdentitiesCommand,
 } from "../command/identity/identity.command.js";
+import type {
+  SimCreateConfigurationSetCommand,
+  SimDeleteConfigurationSetCommand,
+  SimGetConfigurationSetCommand,
+  SimListConfigurationSetsCommand,
+} from "../command/configuration-set/configuration-set.command.js";
 import type { SimSendEmailCommand } from "../command/send/send.command.js";
 import type {
   SimCreateEmailTemplateCommand,
@@ -100,6 +106,38 @@ export class SimSesSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSes.deleteEmailTemplate(
             command as SimDeleteEmailTemplateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateConfigurationSetCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.createConfigurationSet(
+            command as SimCreateConfigurationSetCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetConfigurationSetCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.getConfigurationSet(
+            command as SimGetConfigurationSetCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListConfigurationSetsCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.listConfigurationSets(
+            command as SimListConfigurationSetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteConfigurationSetCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.deleteConfigurationSet(
+            command as SimDeleteConfigurationSetCommand,
             simSdkCallerOptions(context),
           ),
       ],

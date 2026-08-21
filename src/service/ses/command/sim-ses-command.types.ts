@@ -57,3 +57,21 @@ export type {
   SimUpdateEmailTemplateCommandInput,
   SimUpdateEmailTemplateCommandOutput,
 } from "./template/template.command.js";
+export type {
+  SimCreateConfigurationSetCommand,
+  SimCreateConfigurationSetCommandInput,
+  SimCreateConfigurationSetCommandOutput,
+  SimDeleteConfigurationSetCommand,
+  SimDeleteConfigurationSetCommandInput,
+  SimDeleteConfigurationSetCommandOutput,
+  SimGetConfigurationSetCommand,
+  SimGetConfigurationSetCommandInput,
+  SimGetConfigurationSetCommandOutput,
+  SimListConfigurationSetsCommand,
+  SimListConfigurationSetsCommandInput,
+  SimListConfigurationSetsCommandOutput,
+  SimSesDeliveryOptions,
+  SimSesReputationOptions,
+  SimSesSendingOptions,
+  SimSesSuppressionOptions,
+} from "./configuration-set/configuration-set.command.js";

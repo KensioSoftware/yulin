@@ -13,7 +13,19 @@ export {
   type SimSesIdentityType,
   simSesIdentityType,
 } from "./identity/sim-ses-identity-name.js";
-export { simSesArnPrefix, simSesIdentityArn } from "./sim-ses-arn.js";
+export {
+  simSesArnPrefix,
+  simSesConfigurationSetArn,
+  simSesIdentityArn,
+} from "./sim-ses-arn.js";
+export {
+  SimSesConfigurationSet,
+  type SimSesConfigurationSetDeliveryOptions,
+  type SimSesConfigurationSetOptions,
+  type SimSesConfigurationSetReputationOptions,
+  type SimSesSuppressedReason,
+} from "./configuration-set/sim-ses-configuration-set.js";
+export { SimSesConfigurationSetStore } from "./configuration-set/sim-ses-configuration-set-store.js";
 export {
   SimSesSentEmail,
   type SimSesSentEmailBody,
