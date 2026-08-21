@@ -4,11 +4,7 @@ import {
   GetEmailIdentityCommand,
   ListEmailIdentitiesCommand,
 } from "@aws-sdk/client-sesv2";
-import {
-  assertIdentical,
-  assertInstanceOf,
-  assertThrowsErrorAsync,
-} from "@kensio/smartass";
+import { assertInstanceOf, assertThrowsErrorAsync } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../aws/sim-aws.js";
@@ -16,7 +12,6 @@ import {
   SimSesAlreadyExistsException,
   SimSesBadRequestException,
   SimSesNotFoundException,
-  SimSesUnsupportedOperationException,
 } from "./error/sim-ses.error.js";
 
 describe("SimSesV2 email identity refusals", () => {
@@ -125,78 +120,5 @@ describe("SimSesV2 email identity refusals", () => {
     });
 
     assertInstanceOf(error, SimSesBadRequestException);
-  });
-
-  it("refuses the identity inputs that are not simulated", async () => {
-    // Given a simulated SES.
-    const ses = new SimAws().sesV2();
-
-    // When an identity is created with DKIM signing attributes.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.createEmailIdentity(
-        new CreateEmailIdentityCommand({
-          EmailIdentity: "example.com",
-          DkimSigningAttributes: { DomainSigningSelector: "s1" },
-        }),
-      );
-    });
-
-    // Then it is refused by name rather than accepted and dropped, since an
-    // identity that looks configured to the request that made it and
-    // unconfigured to everything else is worse than a failure.
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-  });
-
-  it("refuses identity tags, which are not simulated", async () => {
-    // Given a simulated SES.
-    const ses = new SimAws().sesV2();
-
-    // When an identity is created with tags.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.createEmailIdentity(
-        new CreateEmailIdentityCommand({
-          EmailIdentity: "example.com",
-          Tags: [{ Key: "team", Value: "orders" }],
-        }),
-      );
-    });
-
-    // Then it is refused rather than accepted and dropped, since an identity
-    // that looks tagged to the request that made it and untagged to everything
-    // else is worse than a failure.
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-  });
-
-  it("refuses a configuration set on an identity", async () => {
-    // Given a simulated SES.
-    const ses = new SimAws().sesV2();
-
-    // When an identity is created naming a default configuration set.
-    const error = await assertThrowsErrorAsync(async () => {
-      await ses.createEmailIdentity(
-        new CreateEmailIdentityCommand({
-          EmailIdentity: "example.com",
-          ConfigurationSetName: "transactional",
-        }),
-      );
-    });
-
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
-  });
-
-  it("accepts an empty list of identity tags", async () => {
-    // Given a simulated SES.
-    const ses = new SimAws().sesV2();
-
-    // When an identity is created with a tag list with nothing in it.
-    const created = await ses.createEmailIdentity(
-      new CreateEmailIdentityCommand({
-        EmailIdentity: "example.com",
-        Tags: [],
-      }),
-    );
-
-    // Then it is accepted rather than refused for a feature it is not using.
-    assertIdentical(created.IdentityType, "DOMAIN");
   });
 });

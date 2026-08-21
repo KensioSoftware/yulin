@@ -22,15 +22,72 @@ export interface SimCreateEmailIdentityCommand {
 
 export interface SimCreateEmailIdentityCommandInput {
   readonly EmailIdentity?: string | undefined;
-  readonly Tags?: readonly unknown[] | undefined;
-  readonly DkimSigningAttributes?: unknown;
+  readonly Tags?: readonly SimSesTagInput[] | undefined;
+  readonly DkimSigningAttributes?: SimSesDkimSigningAttributes | undefined;
   readonly ConfigurationSetName?: string | undefined;
+}
+
+/**
+ * One tag as a request carries it, with both halves optional.
+ *
+ * The SDK's own `Tag` says the same, so a request holding half a tag typechecks
+ * on the way in and is dropped on the way through.
+ */
+export interface SimSesTagInput {
+  readonly Key?: string | undefined;
+  readonly Value?: string | undefined;
+}
+
+/**
+ * The Bring Your Own DKIM inputs, and the key length Easy DKIM rotates to.
+ *
+ * `DomainSigningPrivateKey` is read off the request and dropped. Nothing here
+ * signs a message, so keeping the key would mean holding a secret this
+ * simulation has no use for.
+ */
+export interface SimSesDkimSigningAttributes {
+  readonly DomainSigningSelector?: string | undefined;
+  readonly DomainSigningPrivateKey?: string | undefined;
+  readonly NextSigningKeyLength?: string | undefined;
+}
+
+/** One tag, in the shape SES and CloudFormation both use. */
+export interface SimSesTag {
+  readonly Key: string;
+  readonly Value: string;
 }
 
 export interface SimCreateEmailIdentityCommandOutput {
   readonly IdentityType?: string | undefined;
   readonly VerifiedForSendingStatus?: boolean | undefined;
+  readonly DkimAttributes?: SimSesDkimAttributes | undefined;
   readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * What SES reports about an identity's DKIM signing.
+ *
+ * `Tokens` are the three names Easy DKIM publishes CNAME records under. They
+ * are made up here, deterministically from the identity's own name, and no
+ * message is signed with anything.
+ */
+export interface SimSesDkimAttributes {
+  readonly SigningEnabled?: boolean | undefined;
+  readonly Status?: SimSesDkimStatusValue | undefined;
+  readonly Tokens?: readonly string[] | undefined;
+  readonly SigningAttributesOrigin?: string | undefined;
+  readonly NextSigningKeyLength?: string | undefined;
+}
+
+export type SimSesDkimStatusValue =
+  | SimSesVerificationStatusValue
+  | "NOT_STARTED";
+
+/** What SES reports about an identity's custom envelope sender domain. */
+export interface SimSesMailFromAttributes {
+  readonly MailFromDomain?: string | undefined;
+  readonly MailFromDomainStatus?: SimSesVerificationStatusValue | undefined;
+  readonly BehaviorOnMxFailure?: string | undefined;
 }
 
 /**
@@ -51,6 +108,10 @@ export interface SimGetEmailIdentityCommandOutput {
   readonly VerifiedForSendingStatus?: boolean | undefined;
   readonly VerificationStatus?: SimSesVerificationStatusValue | undefined;
   readonly FeedbackForwardingStatus?: boolean | undefined;
+  readonly DkimAttributes?: SimSesDkimAttributes | undefined;
+  readonly MailFromAttributes?: SimSesMailFromAttributes | undefined;
+  readonly ConfigurationSetName?: string | undefined;
+  readonly Tags?: readonly SimSesTag[] | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

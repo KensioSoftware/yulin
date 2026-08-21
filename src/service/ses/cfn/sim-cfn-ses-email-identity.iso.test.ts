@@ -227,33 +227,6 @@ describe("AWS::SES::EmailIdentity", () => {
     assertStringIncludes(error.message, "AWS::SES::EmailIdentity");
     assertStringIncludes(error.message, "SenderIdentity");
   });
-
-  it("deploys with DKIM and MAIL FROM properties, recording them as ignored", async () => {
-    // Given a template setting everything CDK readily writes on an identity.
-    const { simAws, stack } = await deployIdentity({
-      EmailIdentity: "example.com",
-      DkimAttributes: { SigningEnabled: true },
-      MailFromAttributes: {
-        MailFromDomain: "mail.example.com",
-        BehaviorOnMxFailure: "USE_DEFAULT_VALUE",
-      },
-      ConfigurationSetAttributes: { ConfigurationSetName: "transactional" },
-    });
-
-    // Then the identity is there, and each property it was deployed without
-    // acting on is recorded rather than passed over in silence.
-    assertNonNullable(simAws.sesV2().findIdentity("example.com"));
-
-    const ignored = stack.ignoredProperties.map((property) => property.path);
-
-    assertArrayLength(ignored, 3);
-    assertStringIncludes(
-      stack.ignoredProperties
-        .map((property) => `${property.path}: ${property.reason}`)
-        .join("\n"),
-      "DKIM is not simulated",
-    );
-  });
 });
 
 /**

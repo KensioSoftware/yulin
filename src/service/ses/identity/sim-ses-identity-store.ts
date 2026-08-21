@@ -7,6 +7,7 @@ import {
   simSesIdentityDomain,
   simSesIdentityKey,
 } from "./sim-ses-identity-name.js";
+import type { SimSesIdentitySettings } from "./sim-ses-identity-settings.js";
 import { SimSesIdentity } from "./sim-ses-identity.js";
 
 interface SimSesIdentityStoreProperties {
@@ -38,7 +39,11 @@ export class SimSesIdentityStore {
   /**
    * Make an identity, refusing one that is already there.
    */
-  create(emailIdentity: string, createdDate: Date): SimSesIdentity {
+  create(
+    emailIdentity: string,
+    createdDate: Date,
+    settings?: SimSesIdentitySettings,
+  ): SimSesIdentity {
     const key = simSesIdentityKey(emailIdentity);
 
     if (this.#identities.has(key)) {
@@ -51,6 +56,7 @@ export class SimSesIdentityStore {
       emailIdentity,
       accountRegionScope: this.#accountRegionScope,
       createdDate,
+      settings,
     });
 
     this.#identities.set(key, identity);

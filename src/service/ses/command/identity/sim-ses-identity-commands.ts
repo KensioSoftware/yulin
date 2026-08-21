@@ -1,6 +1,9 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimSesIdentityStore } from "../../identity/sim-ses-identity-store.js";
-import { requiredSimSesIdentityName } from "../../identity/sim-ses-identity-name.js";
+import {
+  requiredSimSesIdentityName,
+  simSesIdentityType,
+} from "../../identity/sim-ses-identity-name.js";
 import type { SimSesIdentity } from "../../identity/sim-ses-identity.js";
 import type { SimSesAuthorizer } from "../authorize/sim-ses-authorizer.js";
 import { SimSesPage } from "../sim-ses-page.js";
@@ -16,7 +19,11 @@ import type {
   SimListEmailIdentitiesCommandOutput,
   SimSesIdentityInfo,
 } from "./identity.command.js";
-import { refuseUnsimulatedIdentityInput } from "./sim-ses-unsimulated-identity-input.js";
+import {
+  simSesDkimAttributes,
+  simSesIdentityDetails,
+} from "./sim-ses-identity-attributes.js";
+import { simSesIdentityInputSettings } from "./sim-ses-identity-input-settings.js";
 
 interface SimSesIdentityCommandsProperties {
   readonly identities: SimSesIdentityStore;
@@ -54,24 +61,36 @@ export class SimSesIdentityCommands {
       command.input.EmailIdentity,
     );
 
-    refuseUnsimulatedIdentityInput(command.input);
     this.#authorizer.authorizeIdentity(
       "ses:CreateEmailIdentity",
       emailIdentity,
       options?.caller,
     );
 
-    const identity = this.#identities.create(emailIdentity, this.#clock.now());
+    const identity = this.#identities.create(
+      emailIdentity,
+      this.#clock.now(),
+      simSesIdentityInputSettings(
+        command.input,
+        simSesIdentityType(emailIdentity),
+      ),
+    );
 
     return {
       $metadata: {},
       IdentityType: identity.identityType,
       VerifiedForSendingStatus: identity.isVerified,
+      DkimAttributes: simSesDkimAttributes(identity),
     };
   }
 
   /**
-   * Read one identity and how far its verification has got.
+   * Read one identity, how far its verification has got, and what it was
+   * configured with.
+   *
+   * The DKIM, MAIL FROM, configuration set and tag settings are read straight
+   * back from what created the identity. This is where a test finds out that
+   * the identity a stack deployed is the one the stack described.
    */
   getEmailIdentity(
     command: SimGetEmailIdentityCommand,
@@ -89,13 +108,7 @@ export class SimSesIdentityCommands {
 
     const identity = this.#identities.require(emailIdentity);
 
-    return {
-      $metadata: {},
-      IdentityType: identity.identityType,
-      VerifiedForSendingStatus: identity.isVerified,
-      VerificationStatus: identity.verificationStatus,
-      FeedbackForwardingStatus: true,
-    };
+    return { $metadata: {}, ...simSesIdentityDetails(identity) };
   }
 
   /**

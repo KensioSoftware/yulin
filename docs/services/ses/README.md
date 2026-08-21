@@ -120,6 +120,65 @@ case-sensitive, per RFC 5321, so `Sales@example.com` and `sales@example.com` are
 proved it stop resolving. That gives a test somewhere to go when it wants to see sending fail after
 it once worked.
 
+## How an identity is configured
+
+An identity holds the DKIM signing, custom MAIL FROM domain, feedback forwarding, configuration set
+and tags it was created with, and `GetEmailIdentity` reads them back. None of it is acted on. Every
+one of these settings decides what happens to a message after it leaves AWS, which a test process
+has no way to watch.
+
+A test can ask one question of it. Is the identity configured the way the stack said? That catches a
+stack declaring DKIM wrongly, and a stack that stops declaring it.
+
+```typescript sim-ses-identity-settings
+/**
+ * Asserting on the DKIM signing an identity was created with.
+ */
+
+import {
+  CreateEmailIdentityCommand,
+  GetEmailIdentityCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+await ses.createEmailIdentity(
+  new CreateEmailIdentityCommand({
+    EmailIdentity: "example.com",
+    ConfigurationSetName: "transactional",
+    Tags: [{ Key: "team", Value: "orders" }],
+  }),
+);
+
+const identity = await ses.getEmailIdentity(
+  new GetEmailIdentityCommand({ EmailIdentity: "example.com" }),
+);
+
+// true "AWS_SES" 3
+console.log(
+  identity.DkimAttributes?.SigningEnabled,
+  identity.DkimAttributes?.SigningAttributesOrigin,
+  identity.DkimAttributes?.Tokens?.length,
+);
+
+// "transactional" "orders"
+console.log(identity.ConfigurationSetName, identity.Tags?.[0]?.Value);
+```
+
+Easy DKIM is on for a domain identity, as it is for one real SES creates through the v2 API, and its
+three tokens are the ones `Fn::GetAtt` publishes. An email address identity gets no DKIM, since the
+records carrying it belong to the domain rather than to one mailbox at it.
+`DkimSigningAttributes.DomainSigningSelector` switches the origin to `EXTERNAL` and leaves the
+identity with no tokens of its own, the way real SES answers for a key the caller brought. The
+private key beside it is dropped, because holding a secret nothing signs with is worse than
+forgetting it.
+
+`DkimAttributes.Status` and `MailFromAttributes.MailFromDomainStatus` both follow the identity's own
+verification. Real SES waits on separate DNS records for each, and `verifyIdentity` here stands for
+all of them at once.
+
 ## Email templates
 
 The assertion a test usually wants is "the welcome email went to this address, from this template,
@@ -316,19 +375,22 @@ Resources reading exactly these attributes. Refusing them would take an ordinary
 records this simulation never reads. The stack deploys with records of the right shape and no
 target.
 
-### What an identity Resource is deployed without
+### What an identity Resource carries
 
-`EmailIdentity` is the only property acted on. `DkimAttributes`, `DkimSigningAttributes`,
-`MailFromAttributes`, `FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are recorded as
-ignored and the identity is created without them. An identity lacking all of them still does the one
-thing an identity does here. It exists, it is verified, and it lets a send from it through.
+`EmailIdentity` names the identity. `DkimAttributes`, `DkimSigningAttributes`, `MailFromAttributes`,
+`FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are all held on the deployed identity
+and read back by `GetEmailIdentity`, as described under
+[How an identity is configured](#how-an-identity-is-configured). A stack that declares DKIM signing
+can assert the identity it deployed is the one it described.
 
-`stack.ignoredProperties` is where they are reported, each with the reason it was left alone. None
-is dropped in silence.
+The settings land on the identity after it is created, which is the order real CloudFormation works
+in. Two of them have no `CreateEmailIdentity` parameter on real SES either, and are put on the
+identity by a separate call once it exists.
 
-The SDK path is stricter on purpose. `CreateEmailIdentity` refuses `DkimSigningAttributes` outright,
-because a caller reaching for it directly is asking for that behaviour and deserves to hear it is
-absent. A template is a whole document, and one property in it should leave the deploy standing.
+`DkimSigningAttributes.DomainSigningPrivateKey` is the one part dropped, and it turns up on
+`stack.ignoredProperties` with the reason. A property this Resource type has no name for lands there
+too, which in practice catches a misspelling. Real CloudFormation refuses a property it does not
+recognise, and a stack failing over a property AWS added last week is a worse way to find out.
 
 A template Resource has no such list, because everything `AWS::SES::Template` can usefully say is
 wording and all of it is acted on. Anything else it says is still reported, at both levels. That
@@ -576,20 +638,20 @@ time forward past the window sees the count fall the way an account's would.
 
 ## Simulated commands
 
-| Command               | Notes                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `SendEmail`           | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                   |
-| `CreateEmailIdentity` | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are refused. |
-| `GetEmailIdentity`    |                                                                                            |
-| `ListEmailIdentities` | Paged with `PageSize` and `NextToken`.                                                     |
-| `DeleteEmailIdentity` |                                                                                            |
-| `CreateEmailTemplate` | Substitution only. `Tags` are refused.                                                     |
-| `GetEmailTemplate`    | Reports the wording with its placeholders unrendered.                                      |
-| `UpdateEmailTemplate` | Replaces the wording outright, keeping the creation time.                                  |
-| `ListEmailTemplates`  | Names and creation times only, paged.                                                      |
-| `DeleteEmailTemplate` |                                                                                            |
-| `GetAccount`          |                                                                                            |
-| `PutAccountDetails`   | `MailType` and `WebsiteURL` are required, as on real SES.                                  |
+| Command               | Notes                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `SendEmail`           | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                                  |
+| `CreateEmailIdentity` | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back. |
+| `GetEmailIdentity`    | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.             |
+| `ListEmailIdentities` | Paged with `PageSize` and `NextToken`.                                                                    |
+| `DeleteEmailIdentity` |                                                                                                           |
+| `CreateEmailTemplate` | Substitution only. `Tags` are refused.                                                                    |
+| `GetEmailTemplate`    | Reports the wording with its placeholders unrendered.                                                     |
+| `UpdateEmailTemplate` | Replaces the wording outright, keeping the creation time.                                                 |
+| `ListEmailTemplates`  | Names and creation times only, paged.                                                                     |
+| `DeleteEmailTemplate` |                                                                                                           |
+| `GetAccount`          |                                                                                                           |
+| `PutAccountDetails`   | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 
@@ -610,10 +672,16 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
   suppression list, no configuration sets and no event destinations. A configuration set named on a
   send is kept on the record so a test can assert the right one was used, and goes no further.
-- **DKIM tokens on `AWS::SES::EmailIdentity` are made up.** They are stable per identity so a test
-  can assert on them, and they prove no ownership of anything.
+- **DKIM tokens are made up.** They are stable per identity so a test can assert on them, and they
+  prove no ownership of anything.
 - **Only `AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy.** `AWS::SES::ConfigurationSet`,
   `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are left out.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is absent.
-- **DKIM, MAIL FROM domains and sending authorization policies are left out.** An identity created
-  with `DkimSigningAttributes` is refused, and never reported as configured.
+- **DKIM and MAIL FROM domains are recorded, never performed.** An identity reports the signing and
+  envelope sender settings it was created with. No message is signed, no signature is checked, and
+  no MX record is looked for. Deliverability is decided outside AWS, where a test process cannot
+  follow.
+- **The commands that change an identity's settings are absent.** `PutEmailIdentityDkimAttributes`,
+  `PutEmailIdentityMailFromAttributes` and `PutEmailIdentityFeedbackAttributes` have no counterpart
+  here. A CloudFormation deploy sets all three, and `CreateEmailIdentity` sets the rest.
+- **Sending authorization policies are left out.**
