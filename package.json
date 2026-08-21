@@ -28,7 +28,8 @@
     "examples:lint": "oxlint --type-aware --max-warnings=0 docs",
     "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",
     "fta": "./scripts/sh/fta.sh",
-    "check": "pnpm fmt && pnpm fta && pnpm build:check && pnpm examples:check && pnpm test:coverage"
+    "check": "pnpm fmt && pnpm fta && pnpm build:check && pnpm examples:check && pnpm test:coverage",
+    "tf:init": "./scripts/sh/tf-init.sh"
   },
   "keywords": [
     "aws",

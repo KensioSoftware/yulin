@@ -136,7 +136,23 @@ jobs:
       - uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
         with:
           use-installer: true
+      # The Terraform import tests plan real configurations under
+      # test/terraform. Committing the plan JSON instead would be thousands of
+      # generated lines per fixture, so the workflow installs Terraform and
+      # produces them. terraform_wrapper is off because the wrapper it installs
+      # writes to stdout, and `terraform show -json` output is parsed.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      # The AWS provider is one 650MB binary. Cached it costs about 126MB, and
+      # the key only changes when a lock file does.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ runner.os }}-${{ hashFiles('test/terraform/*/.terraform.lock.hcl') }}
       - run: pnpm install --frozen-lockfile
+      - run: pnpm tf:init
       - run: pnpm test:coverage
 
   build:
