@@ -4,11 +4,12 @@ import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
-import type { SimSesIdentity } from "../identity/sim-ses-identity.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSesV2 } from "../sim-ses-v2.js";
-import type { SimSesTemplate } from "../template/sim-ses-template.js";
+import { SimCfnSesConfigurationSetCreator } from "./configuration-set/sim-cfn-ses-configuration-set-creator.js";
 import { SimCfnSesIdentityCreator } from "./identity/sim-cfn-ses-identity-creator.js";
 import {
+  sesConfigurationSetResourceTypeName,
   sesEmailIdentityResourceTypeName,
   sesTemplateResourceTypeName,
 } from "./sim-cfn-ses-resource-types.js";
@@ -19,24 +20,51 @@ interface SimSesCfnResourceFactoryProperties {
 }
 
 /**
+ * What this factory does with one AWS::SES::* Resource type.
+ *
+ * Creating and deleting are held together rather than dispatched apart,
+ * because a type this factory can make is exactly a type it has to be able to
+ * remove, and two switches would be two places to keep in step.
+ */
+interface SimCfnSesResourceHandler {
+  create(
+    resource: SimCfnResource,
+    properties: SimCfnTemplateValueRecord,
+  ): Promise<object>;
+  delete(resource: SimCfnResource): Promise<void>;
+}
+
+/**
  * CloudFormation Resource factory for simulated SES resources.
  *
- * Email identities and templates are the two AWS::SES::* Resource types this
- * simulation models. Configuration sets, contact lists and receipt rules need
+ * Email identities, templates and configuration sets are the AWS::SES::*
+ * Resource types this simulation models. Contact lists and receipt rules need
  * machinery it does not have, so a template declaring one is reported as
  * unsupported rather than quietly treated as deployed.
  */
 export class SimSesCfnResourceFactory implements SimCfnServiceResourceFactory {
-  readonly #identityCreator: SimCfnSesIdentityCreator;
-  readonly #templateCreator: SimCfnSesTemplateCreator;
+  readonly #handlers: ReadonlyMap<string, SimCfnSesResourceHandler>;
 
   constructor(properties: SimSesCfnResourceFactoryProperties) {
-    this.#identityCreator = new SimCfnSesIdentityCreator({
-      ses: properties.ses,
-    });
-    this.#templateCreator = new SimCfnSesTemplateCreator({
-      ses: properties.ses,
-    });
+    const { ses } = properties;
+
+    this.#handlers = new Map([
+      [
+        sesEmailIdentityResourceTypeName,
+        handler(new SimCfnSesIdentityCreator({ ses }), "identity"),
+      ],
+      [
+        sesTemplateResourceTypeName,
+        handler(new SimCfnSesTemplateCreator({ ses }), "template"),
+      ],
+      [
+        sesConfigurationSetResourceTypeName,
+        handler(
+          new SimCfnSesConfigurationSetCreator({ ses }),
+          "configuration set",
+        ),
+      ],
+    ]);
   }
 
   /**
@@ -47,19 +75,10 @@ export class SimSesCfnResourceFactory implements SimCfnServiceResourceFactory {
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
-    const properties = context.resolvedProperties ?? resource.properties;
-
-    switch (resourceTypeName) {
-      case sesEmailIdentityResourceTypeName: {
-        return await this.#identityCreator.create(resource, properties);
-      }
-      case sesTemplateResourceTypeName: {
-        return await this.#templateCreator.create(resource, properties);
-      }
-      default: {
-        throw unsupportedResourceType(resourceTypeName, "");
-      }
-    }
+    return await this.handler(resourceTypeName, "").create(
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
   }
 
   /**
@@ -69,24 +88,49 @@ export class SimSesCfnResourceFactory implements SimCfnServiceResourceFactory {
     resourceTypeName: string,
     resource: SimCfnResource,
   ): Promise<void> {
-    switch (resourceTypeName) {
-      case sesEmailIdentityResourceTypeName: {
-        await this.#identityCreator.delete(
-          created<SimSesIdentity>(resource, "identity"),
-        );
-        return;
-      }
-      case sesTemplateResourceTypeName: {
-        await this.#templateCreator.delete(
-          created<SimSesTemplate>(resource, "template"),
-        );
-        return;
-      }
-      default: {
-        throw unsupportedResourceType(resourceTypeName, " deletion");
-      }
-    }
+    await this.handler(resourceTypeName, " deletion").delete(resource);
   }
+
+  private handler(
+    resourceTypeName: string,
+    operationSuffix: string,
+  ): SimCfnSesResourceHandler {
+    const handler = this.#handlers.get(resourceTypeName);
+
+    assertDefined(
+      handler,
+      `Unsupported sim SES CloudFormation Resource ` +
+        `${resourceTypeName}${operationSuffix}`,
+    );
+
+    return handler;
+  }
+}
+
+/**
+ * Adapt one creator to the handler this factory dispatches to.
+ *
+ * The delete side is where the type comes back. A Resource carries whatever
+ * its creator made as an opaque object, and this is the one place that knows
+ * which creator made which.
+ */
+function handler<T extends object>(
+  creator: {
+    create(
+      resource: SimCfnResource,
+      properties: SimCfnTemplateValueRecord,
+    ): Promise<T>;
+    delete(created: T): Promise<void>;
+  },
+  described: string,
+): SimCfnSesResourceHandler {
+  return {
+    create: async (resource, properties): Promise<T> =>
+      await creator.create(resource, properties),
+    delete: async (resource): Promise<void> => {
+      await creator.delete(created<T>(resource, described));
+    },
+  };
 }
 
 function created<T extends object>(
@@ -101,14 +145,4 @@ function created<T extends object>(
   );
 
   return simResource;
-}
-
-function unsupportedResourceType(
-  resourceTypeName: string,
-  operationSuffix: string,
-): Error {
-  return new Error(
-    `Unsupported sim SES CloudFormation Resource ` +
-      `${resourceTypeName}${operationSuffix}`,
-  );
 }

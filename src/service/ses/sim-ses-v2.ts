@@ -8,7 +8,7 @@ import type { SimSesTemplate } from "./template/sim-ses-template.js";
 import { SimSesCfnResourceFactory } from "./cfn/sim-ses-cfn-resource-factory.js";
 import { SimSesSdkCommandRouter } from "./sdk/sim-ses-sdk-command-router.js";
 import { SimSesCommands, type SimSesV2Properties } from "./sim-ses-commands.js";
-import { SimSesSuppression } from "./sim-ses-suppression.js";
+import { SimSesConfigurationSets } from "./sim-ses-configuration-sets.js";
 
 /**
  * Simulated Amazon SES, through its v2 API. Handles SDK commands. Emulates AWS
@@ -31,7 +31,7 @@ import { SimSesSuppression } from "./sim-ses-suppression.js";
  * an address in one region verifies nothing in another, and a message sent
  * through one region is invisible from the next.
  */
-export class SimSesV2 extends SimSesSuppression {
+export class SimSesV2 extends SimSesConfigurationSets {
   readonly #sdkRouter = new SimSesSdkCommandRouter(this);
   readonly #cfnFactory = new SimSesCfnResourceFactory({ ses: this });
 

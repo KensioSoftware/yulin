@@ -1,11 +1,15 @@
 import {
+  CreateConfigurationSetCommand,
   CreateEmailIdentityCommand,
   CreateEmailTemplateCommand,
+  DeleteConfigurationSetCommand,
   DeleteEmailIdentityCommand,
   DeleteEmailTemplateCommand,
   GetAccountCommand,
+  GetConfigurationSetCommand,
   GetEmailIdentityCommand,
   GetEmailTemplateCommand,
+  ListConfigurationSetsCommand,
   ListEmailIdentitiesCommand,
   ListEmailTemplatesCommand,
   PutAccountDetailsCommand,
@@ -53,6 +57,10 @@ describe("SimSesSdkCommandRouter", () => {
       "UpdateEmailTemplateCommand",
       "ListEmailTemplatesCommand",
       "DeleteEmailTemplateCommand",
+      "CreateConfigurationSetCommand",
+      "GetConfigurationSetCommand",
+      "ListConfigurationSetsCommand",
+      "DeleteConfigurationSetCommand",
     ]);
   });
 
@@ -206,6 +214,43 @@ describe("SES SDK interception", () => {
     assertIdentical(read.TemplateContent?.Subject, "Welcome, {{name}}");
     assertArrayLength(listed.TemplatesMetadata ?? [], 1);
     assertArrayLength(scoped.sesV2().allTemplates(), 0);
+  });
+
+  it("routes the configuration set commands through the client", async () => {
+    // Given an intercepted client.
+    using simSdk = new SimSdk();
+    simSdk.intercept(SESv2Client);
+
+    const client = new SESv2Client({ region: "eu-west-2" });
+    const scoped = simSdk.simAws.accountRegionScope(
+      simSdk.simAws.defaultAccountId,
+      "eu-west-2",
+    );
+
+    // When ordinary SDK code makes a set, reads it, lists them and removes it.
+    await client.send(
+      new CreateConfigurationSetCommand({
+        ConfigurationSetName: "transactional",
+        SuppressionOptions: { SuppressedReasons: ["BOUNCE"] },
+      }),
+    );
+    const read = await client.send(
+      new GetConfigurationSetCommand({ ConfigurationSetName: "transactional" }),
+    );
+    const listed = await client.send(new ListConfigurationSetsCommand({}));
+
+    await client.send(
+      new DeleteConfigurationSetCommand({
+        ConfigurationSetName: "transactional",
+      }),
+    );
+
+    // Then each one reached the simulated SES for that Region.
+    assertArrayEquals(read.SuppressionOptions?.SuppressedReasons ?? [], [
+      "BOUNCE",
+    ]);
+    assertArrayEquals(listed.ConfigurationSets ?? [], ["transactional"]);
+    assertArrayLength(scoped.sesV2().allConfigurationSets(), 0);
   });
 
   it("keeps sends in one Region out of another", async () => {

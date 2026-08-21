@@ -45,16 +45,16 @@ async function deployedIdentity(): Promise<{
 
 describe("simulated SES CloudFormation refusals", () => {
   it("steps over an SES Resource type it does not simulate", async () => {
-    // Given a template declaring a configuration set, which is a real SES
-    // Resource type this simulation has no machinery for.
+    // Given a template declaring a contact list, which is a real SES Resource
+    // type this simulation has no machinery for.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders",
       template: {
         Resources: {
-          Transactional: {
-            Type: "AWS::SES::ConfigurationSet",
-            Properties: { Name: "transactional" },
+          Subscribers: {
+            Type: "AWS::SES::ContactList",
+            Properties: { ContactListName: "subscribers" },
           },
         },
       },
@@ -63,7 +63,7 @@ describe("simulated SES CloudFormation refusals", () => {
     // Then the stack deployed with the Resource recorded as unsupported rather
     // than treated as deployed, which is how CloudFormation here handles every
     // Resource type no service claims.
-    const resource = stack.getResource("Transactional");
+    const resource = stack.getResource("Subscribers");
 
     assertNonNullable(resource);
     assertUndefined(resource.simResource);
@@ -78,12 +78,12 @@ describe("simulated SES CloudFormation refusals", () => {
       await simAws
         .sesV2()
         .cfnResourceFactory()
-        .delete("ConfigurationSet", deployedResourceObject(resource));
+        .delete("ReceiptRule", deployedResourceObject(resource));
     });
 
     assertStringIncludes(
       error.message,
-      "Unsupported sim SES CloudFormation Resource ConfigurationSet deletion",
+      "Unsupported sim SES CloudFormation Resource ReceiptRule deletion",
     );
   });
 

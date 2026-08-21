@@ -294,11 +294,92 @@ A send may name a stored template or write its wording out in `TemplateContent`,
 Naming both is refused. Which of them real SES renders is beyond what this simulator knows, and
 recording the message under a template it was not rendered from would be worse than failing.
 
-## Deploying identities and templates with CloudFormation
+## Configuration sets
 
-`AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy into simulated SES. A project that
-declares them in CDK or CloudFormation can deploy the same template its application deploys, with no
-hand-written test setup.
+A configuration set is a named group of settings a send can be made under. Suppression reasons, the
+sending switch, the delivery options and the reputation switch are all declared on one. Simulated
+SES holds a set as state. A test can then assert what a stack declared, with no AWS account to read
+it back from.
+
+Nothing acts on a set yet. A send naming one keeps the name on its record and goes no further, as it
+did before sets existed. The name now points at something a test can find.
+
+```typescript sim-ses-configuration-sets
+/**
+ * Creating a configuration set and reading its settings back.
+ */
+
+import {
+  CreateConfigurationSetCommand,
+  GetConfigurationSetCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+await ses.createConfigurationSet(
+  new CreateConfigurationSetCommand({
+    ConfigurationSetName: "transactional",
+    SuppressionOptions: { SuppressedReasons: ["BOUNCE", "COMPLAINT"] },
+    DeliveryOptions: { TlsPolicy: "REQUIRE" },
+  }),
+);
+
+const read = await ses.getConfigurationSet(
+  new GetConfigurationSetCommand({ ConfigurationSetName: "transactional" }),
+);
+
+// ["BOUNCE", "COMPLAINT"] true
+console.log(
+  read.SuppressionOptions?.SuppressedReasons,
+  read.SendingOptions?.SendingEnabled,
+);
+
+// The simulator's own accessors, for a test that would rather skip a Command
+// and its authorization.
+const configurationSet = ses.findConfigurationSet("transactional");
+
+// "REQUIRE"
+console.log(configurationSet?.deliveryOptions.tlsPolicy);
+
+// ["transactional"]
+console.log(ses.allConfigurationSets().map((set) => set.configurationSetName));
+```
+
+A set declaring only its name gets the defaults real SES applies. Sending is on, TLS is optional,
+reputation metrics are off and no reason is suppressed. `GetConfigurationSet` reports those defaults
+back rather than leaving the groups out of the answer.
+
+`findConfigurationSet` reaches one set by name and `allConfigurationSets` hands over every set in
+the scope, oldest first.
+
+Sets are managed with `CreateConfigurationSet`, `GetConfigurationSet`, `ListConfigurationSets` and
+`DeleteConfigurationSet`. There is no update. Real SES changes a set through a `Put` command per
+group of options, and none of those is here yet. A set holds what it was created with.
+
+`ListConfigurationSets` answers names alone, as real SES does. A caller after the settings reads one
+set at a time.
+
+`TrackingOptions` and `VdmOptions` are refused by name. Open and click tracking needs a redirect
+domain and the events that report a click. The Virtual Deliverability Manager reports on engagement,
+which this simulation never measures.
+
+A set's suppression reasons are held and read back, and that is all they do. On real SES they decide
+what a bounce or a complaint would add to the account suppression list. Both are absent here. The
+list itself is a separate thing, filled by hand.
+
+`TlsPolicy` accepts `REQUIRE` and `OPTIONAL` and refuses anything else, and a `SuppressedReasons`
+entry that is neither `BOUNCE` nor `COMPLAINT` is refused too. `MaxDeliverySeconds` takes whole
+seconds from 300 to 50400, the five minutes to fourteen hours real SES attempts delivery for. A name
+is letters, digits, dashes and underscores. All of it is validated in the command, so a template and
+an SDK caller hear the same answer.
+
+## Deploying SES resources with CloudFormation
+
+`AWS::SES::EmailIdentity`, `AWS::SES::Template` and `AWS::SES::ConfigurationSet` deploy into
+simulated SES. A project that declares them in CDK or CloudFormation can deploy the same template
+its application deploys, with no hand-written test setup.
 
 ```typescript sim-ses-cloudformation
 /**
@@ -361,8 +442,11 @@ CloudFormation is creating an identity that is already there.
 
 `Ref` on an identity returns the address or domain itself, directly usable as a
 `FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name.
+`Ref` on a configuration set returns its name. That Resource type has no `Fn::GetAtt` attributes at
+all, so reading one fails the deploy rather than answering something AWS would not. A set with no
+`Name` is named after the stack and the logical ID, as real CloudFormation names one.
 
-Deleting the stack removes both.
+Deleting the stack removes all three.
 
 ### DKIM tokens
 
@@ -400,6 +484,17 @@ no explanation for it.
 
 A template carrying Handlebars this simulator leaves unrendered is a different matter, and fails the
 deploy where it would otherwise sit in the stack waiting to fail at the first send.
+
+### What a configuration set Resource is deployed without
+
+`Name`, `SuppressionOptions`, `SendingOptions`, `DeliveryOptions` and `ReputationOptions` are acted
+on. `TrackingOptions` and `VdmOptions` are recorded as ignored and the set is created without them. That
+is the same split the identity Resource has. The SDK path refuses both by name, and a template
+is a whole document one property should leave standing.
+
+A set naming a suppression reason or a TLS policy SES has no meaning for does fail the deploy. The
+Resource is created through `CreateConfigurationSet`. The validation is the command's, and there is
+one answer whoever asked.
 
 ## The sandbox
 
@@ -753,6 +848,10 @@ time forward past the window sees the count fall the way an account's would.
 | `UpdateEmailTemplate`             | Replaces the wording outright, keeping the creation time.                                                 |
 | `ListEmailTemplates`              | Names and creation times only, paged.                                                                     |
 | `DeleteEmailTemplate`             |                                                                                                           |
+| `CreateConfigurationSet`          | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                                   |
+| `GetConfigurationSet`             | Reports the defaults it applied as well as what was declared.                                             |
+| `ListConfigurationSets`           | Names only, paged with `PageSize` and `NextToken`.                                                        |
+| `DeleteConfigurationSet`          |                                                                                                           |
 | `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                      |
 | `PutAccountDetails`               | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
 | `PutAccountSuppressionAttributes` | No reasons at all turns the suppression list off.                                                         |
@@ -777,19 +876,26 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   the template. Template data holding an object where the template wants a value is refused too,
   where real Handlebars would render `[object Object]`.
 - **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
-- **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
-  configuration sets and no event destinations. A configuration set named on a send is kept on the
-  record so a test can assert the right one was used, and goes no further.
+- **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events and no
+  event destinations. A configuration set named on a send is kept on the record so a test can assert
+  the right one was used, and goes no further.
+- **A configuration set is state, and no behaviour.** Its suppression reasons, sending switch,
+  delivery options and reputation switch are all held and read back. Every one of them is inert,
+  `SendingEnabled` included, and a send naming a set that was never created still succeeds.
+- **A configuration set holds what it was created with.** The `Put` commands that change one group
+  of options are absent. A set cannot be changed once it exists.
 - **The suppression list fills only by hand.** Every address on it was put there by a caller,
-  because no message here ever bounces.
+  because no message here ever bounces. A configuration set's `SuppressedReasons` name what a bounce
+  or a complaint would suppress for, and both are absent.
 - **Tenant-level suppression lists are left out.** A suppression command carrying `TenantName` is
   refused rather than answered from the account-level list.
 - **`PutSuppressedDestination` works in the sandbox.** Real SES refuses it until an account has
   production access.
 - **DKIM tokens are made up.** They are stable per identity so a test can assert on them, and they
   prove no ownership of anything.
-- **Only `AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy.** `AWS::SES::ConfigurationSet`,
-  `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are left out.
+- **Only `AWS::SES::EmailIdentity`, `AWS::SES::Template` and `AWS::SES::ConfigurationSet` deploy.**
+  `AWS::SES::ConfigurationSetEventDestination`, `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and
+  the rest are left out.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is absent.
 - **DKIM and MAIL FROM domains are recorded, never performed.** An identity reports the signing and
   envelope sender settings it was created with. No message is signed, no signature is checked, and

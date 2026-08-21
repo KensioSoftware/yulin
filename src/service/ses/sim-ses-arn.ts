@@ -32,3 +32,16 @@ export function simSesTemplateArn(
 ): string {
   return `${simSesArnPrefix(scope)}template/${templateName}`;
 }
+
+/**
+ * The ARN of a configuration set.
+ *
+ * This is the resource IAM evaluates a configuration set operation against, so
+ * a policy can allow a caller to manage one set and not the others.
+ */
+export function simSesConfigurationSetArn(
+  scope: SimAwsAccountRegionScope,
+  configurationSetName: string,
+): string {
+  return `${simSesArnPrefix(scope)}configuration-set/${configurationSetName}`;
+}
