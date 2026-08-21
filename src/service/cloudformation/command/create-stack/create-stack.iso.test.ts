@@ -4,7 +4,6 @@ import {
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
-  assertMapSize,
   assertInstanceOf,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -14,10 +13,7 @@ import {
   DescribeStacksCommand,
 } from "@aws-sdk/client-cloudformation";
 import { jsonStringify } from "../../../../util/type-guard/json.js";
-import {
-  deployedResourceObject,
-  deployedStackObject,
-} from "../../stack/sim-cfn-stack.fixture.js";
+import { deployedResourceObject } from "../../stack/sim-cfn-stack.fixture.js";
 
 describe("CloudFormation CreateStackCommand", () => {
   it("creates a CloudFormation Stack from a template body", async () => {
@@ -81,7 +77,7 @@ describe("CloudFormation CreateStackCommand", () => {
     const stack = cloudFormation.getStackByName("test-stack");
 
     assertNonNullable(stack);
-    assertMapSize(deployedStackObject(stack).resources, 1);
+    assertArrayLength(stack.resources, 1);
 
     const resource = stack.getResource("ExampleResource");
 

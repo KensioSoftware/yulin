@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import {
   assertArrayLength,
+  assertArrayEquals,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -182,6 +183,47 @@ describe("SimCfnStack", () => {
 
     assertNonNullable(resource);
     assertIdentical(resource.attributeValue("Arn"), "WaitHandle.Arn");
+  });
+
+  it("lists its Resources for a caller to filter", async () => {
+    // Given a Stack whose template declares two Resources of one type and one
+    // of another, which is what a caller counting a type has to sort out.
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "TestStack",
+      template: {
+        Resources: {
+          FirstHandle: {
+            Type: "AWS::CloudFormation::WaitConditionHandle",
+          },
+          SecondHandle: {
+            Type: "AWS::CloudFormation::WaitConditionHandle",
+          },
+          TestBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: "list-resources-bucket",
+            },
+          },
+        },
+      },
+    });
+
+    // When the deployed Stack's Resources are read back.
+    const handles = stack.resources.filter(
+      (resource) =>
+        resource.type === "AWS::CloudFormation::WaitConditionHandle",
+    );
+
+    // Then every declared Resource is there, in the order the template wrote
+    // them, and each one carries the logical ID it was declared under.
+    assertArrayLength(stack.resources, 3);
+    assertArrayLength(handles, 2);
+    assertArrayEquals(
+      stack.resources.map((resource) => resource.logicalId),
+      ["FirstHandle", "SecondHandle", "TestBucket"],
+    );
   });
 
   it("throws when deploy is called while create is in progress", async () => {

@@ -152,7 +152,7 @@ describe("CloudFront CloudFormation Distribution", () => {
     const resolvedWaitHandleProperties = await deployedResourceObject(
       waitHandleResource,
     ).resolvedProperties({
-      resources: deployedStackObject(stack).resources,
+      resources: deployedStackObject(stack).resourceMap,
     });
 
     assertIdentical(

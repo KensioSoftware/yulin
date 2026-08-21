@@ -48,7 +48,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
   public readonly updating: SimCfnStackUpdateLifecycle;
   public readonly deletion: SimCfnStackDeletionLifecycle;
   public readonly stackName: SimCloudFormationStackName;
-  public readonly resources: Map<string, SimCfnResource>;
+  public readonly resourceMap: Map<string, SimCfnResource>;
   public template: CfnTemplateBodyRecord;
   public outputs = new Map<string, SimCfnStackOutput>();
 
@@ -75,14 +75,14 @@ export class SimCfnStack implements SimCfnDeployedStack {
     this.stackOutputs = new SimCfnStackOutputs({ stackName, exports });
     this.cfnTemplate = template;
     this.template = this.cfnTemplate.template;
-    this.resources = makeSimCfnStackResourceMap({
+    this.resourceMap = makeSimCfnStackResourceMap({
       accountRegionScope,
       background,
       template: this.cfnTemplate,
     });
     validateSimCfnExecutableResourceBindings({
       stackName,
-      resources: this.resources,
+      resources: this.resourceMap,
       bindings,
     });
     this.operations = new SimCfnStackResourceOperations({
@@ -162,7 +162,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
 
     const updater = this.operations.updater({
       background: this.background,
-      resources: this.resources,
+      resources: this.resourceMap,
       current: this.cfnTemplate,
       updated: template,
     });
@@ -218,29 +218,25 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * the Stack name release that delete() puts on top of it.
    */
   async teardown(): Promise<void> {
-    await this.operations.deleteAll(this.resources);
+    await this.operations.deleteAll(this.resourceMap);
     this.stackOutputs.release();
+  }
+
+  /** Every Stack Resource, in the order the template declared them. */
+  public get resources(): readonly SimCfnResource[] {
+    return this.resourceMap.values().toArray();
   }
 
   /**
    * Get a Stack Resource by logical ID, or by the CDK construct ID a
    * synthesized logical ID was generated from.
-   *
-   * The construct ID is the identifier a binding takes. A caller that bound a
-   * handler by construct ID can ask the Stack what it bound, without holding
-   * the hash CDK appended.
    */
   getResource(logicalId: string): SimCfnResource | undefined {
-    return new SimCfnStackResourceLookup(this.resources).find(logicalId);
+    return new SimCfnStackResourceLookup(this.resourceMap).find(logicalId);
   }
 
   /**
    * Get one Stack Output's resolved value, as the string it is.
-   *
-   * The `outputs` map holds every resolved Output whole, including its
-   * description and its export name, typed as the union a parsed template can
-   * hold. A caller after the value alone wants the string CloudFormation would
-   * have answered with, and this hands it over already narrowed.
    *
    * An Output the template never declared throws, as does one that resolved to
    * something other than a string.
@@ -278,16 +274,19 @@ export class SimCfnStack implements SimCfnDeployedStack {
   }
 
   private get report(): SimCfnStackResourceReport {
-    return new SimCfnStackResourceReport(this.resources, this.cfnTemplate);
+    return new SimCfnStackResourceReport(this.resourceMap, this.cfnTemplate);
   }
 
   private async createResources(): Promise<void> {
-    await this.operations.createAll(this.resources);
+    await this.operations.createAll(this.resourceMap);
     this.resolveOutputs();
   }
 
   private resolveOutputs(): void {
-    this.outputs = this.stackOutputs.resolve(this.cfnTemplate, this.resources);
+    this.outputs = this.stackOutputs.resolve(
+      this.cfnTemplate,
+      this.resourceMap,
+    );
   }
 }
 

@@ -98,7 +98,7 @@ describe("simulated SES CloudFormation refusals", () => {
         .cfnResourceFactory()
         .create("ContactList", deployedResourceObject(resource), {
           simAws,
-          resources: deployedStackObject(stack).resources,
+          resources: deployedStackObject(stack).resourceMap,
         });
     });
 

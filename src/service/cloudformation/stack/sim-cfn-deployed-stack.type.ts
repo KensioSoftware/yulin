@@ -38,6 +38,15 @@ export interface SimCfnDeployedStack {
   output(outputKey: string): string;
 
   /**
+   * Every Stack Resource, in the order the template declared them.
+   *
+   * A caller after one Resource asks `getResource` for it by name. This is for
+   * the questions a name does not answer, such as how many Resources of a type
+   * the Stack declared, and the filtering is the caller's to do.
+   */
+  readonly resources: readonly SimCfnDeployedResource[];
+
+  /**
    * One Stack Resource, by logical ID or by the CDK construct ID a synthesized
    * logical ID was generated from.
    *

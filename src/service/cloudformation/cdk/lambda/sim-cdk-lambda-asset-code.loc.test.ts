@@ -19,7 +19,6 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
-import { deployedStackObject } from "../../stack/sim-cfn-stack.fixture.js";
 
 /**
  * A multi-module handler directory, as `Code.fromAsset` bundles one: CDK
@@ -247,13 +246,11 @@ app.synth();
     // because sim CloudFormation simulates the BucketDeployment custom resource
     // directly rather than running its provider, so there is nothing left for
     // the function to have done.
-    const providerResource = deployedStackObject(stack)
-      .resources.values()
-      .find(
-        (resource) =>
-          resource.type === "AWS::Lambda::Function" &&
-          resource.logicalId.startsWith("CustomCDKBucketDeployment"),
-      );
+    const providerResource = stack.resources.find(
+      (resource) =>
+        resource.type === "AWS::Lambda::Function" &&
+        resource.logicalId.startsWith("CustomCDKBucketDeployment"),
+    );
     assertNonNullable(providerResource);
     assertFalse(providerResource.skipped);
     assertTrue(providerResource.inert);
