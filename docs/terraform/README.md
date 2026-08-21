@@ -171,11 +171,21 @@ outright when its execution role cannot poll the queue). Supplying the policy ta
 off. The document is evaluated as it stands, and one omitting `sqs:ReceiveMessage` fails the mapping
 the way AWS fails it.
 
+## What it maps
+
+The adapter maps 24 Terraform resource types and folds 11 more into the resource they configure. The
+set covers API Gateway, CloudWatch (log groups, metric alarms and EventBridge rules), Cognito,
+DynamoDB, ECR, IAM, KMS, Lambda, S3, Secrets Manager, SNS, SQS and SSM Parameter Store.
+
+A hand-written application configuration of 46 resources deploys whole. A configuration built out of
+published `terraform-aws-modules` modules reaches 21 of its 25. Of the four it leaves, the Lambda
+module uses `null_resource` and `local_file` to package a zip, and an integration and a route read
+their values through a `for_each` hop the adapter steps over.
+
 ## What the report says
 
-The set of Terraform resource types the adapter maps is deliberately small. A type with no mapping,
-and a resource from a provider other than AWS, are recorded and stepped over rather than failing the
-deployment.
+A type with no mapping, and a resource from a provider other than AWS, are recorded and stepped over
+rather than failing the deployment.
 
 ```typescript terraform-plan-report
 /**

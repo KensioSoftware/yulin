@@ -315,4 +315,6 @@ tmp/
 # test/terraform are in the repository; what terraform makes from them is not.
 test/terraform/**/.terraform/
 test/terraform/**/builds/
+test/terraform/**/terraform.tfstate*
+test/terraform/**/.terraform.tfstate.lock.info
 *.tfplan

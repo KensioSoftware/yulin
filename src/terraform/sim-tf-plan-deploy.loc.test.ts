@@ -2,14 +2,15 @@ import { describe, it } from "vitest";
 import {
   assertArrayIncludes,
   assertArrayLength,
-  assertArrayMinLength,
-  assertIdentical,
   assertNonNullable,
   assertObjectEquals,
   assertObjectHasProperty,
 } from "@kensio/smartass";
 import { SimAws } from "../service/aws/sim-aws.js";
-import { TestTerraformProject } from "../util/filesystem/test-terraform-project.js";
+import {
+  terraformPlanHandlers as handlersFor,
+  terraformPlannedPath as plannedPath,
+} from "../../test/terraform/plan/terraform-planned-configuration.js";
 import { TerraformAdapter } from "./sim-tf-adapter.js";
 import { deployedStackObject } from "../service/cloudformation/stack/sim-cfn-stack.fixture.js";
 
@@ -19,45 +20,7 @@ import { deployedStackObject } from "../service/cloudformation/stack/sim-cfn-sta
  * import has a fixture of its own beside it. These cover the one thing a
  * fixture cannot say, which is that the format being read is the format
  * Terraform writes.
- *
- * The community modules read `aws_caller_identity`, which cannot be read
- * without credentials, so planning that configuration offline reports those
- * data sources as errors and still plans the managed resources.
  */
-const toleratedDataSourceFailures = new Set(["modules"]);
-
-/** The function each configuration declares, by configuration name. */
-const functionNames: Record<string, string> = {
-  app: "orders-processor",
-  modules: "orders-processor-independent",
-};
-
-/**
- * What the functions of one configuration run.
- *
- * A plan points a function at a zip, an S3 object or a container image, and
- * none of the three is a handler Yulin can run, so a plan holding a function
- * is deployed with a binding matched on the name the plan declares.
- */
-function handlersFor(
-  name: string,
-): readonly { functionName: string; handler: () => { ok: boolean } }[] {
-  return [
-    {
-      // oxlint-disable-next-line security/detect-object-injection
-      functionName: functionNames[name] ?? "",
-      handler: (): { ok: boolean } => ({ ok: true }),
-    },
-  ];
-}
-
-async function plannedPath(name: string): Promise<string> {
-  const project = new TestTerraformProject(name, {
-    toleratesDataSourceErrors: toleratedDataSourceFailures.has(name),
-  });
-
-  return await project.planJsonPath();
-}
 
 describe("deploying a plan Terraform itself produced", () => {
   it("deploys an application configuration into simulated AWS", async () => {
@@ -99,30 +62,6 @@ describe("deploying a plan Terraform itself produced", () => {
     );
     assertNonNullable(simAws.dynamoDb().findTable("orders-independent"));
     assertArrayLength(stack.skippedResources, 0);
-  });
-
-  it("accounts for every managed resource of a plan", async () => {
-    // Given both plans deployed
-    const adapter = new TerraformAdapter(new SimAws());
-    const deployments = await Promise.all(
-      ["app", "modules"].map(async (name) =>
-        adapter.deployPlan({
-          planPath: await plannedPath(name),
-          stackName: `counted-${name}`,
-          bindings: handlersFor(name),
-        }),
-      ),
-    );
-
-    // When each resource is mapped, folded into another, or skipped
-    // Then the three add up to the plan's managed resource count
-    for (const { report } of deployments) {
-      assertIdentical(
-        report.mapped.length + report.folded.length + report.skipped.length,
-        report.total,
-      );
-      assertArrayMinLength(report.mapped, 10);
-    }
   });
 
   it("folds the aws_s3_bucket_ resources into the bucket they configure", async () => {

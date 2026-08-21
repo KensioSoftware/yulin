@@ -77,8 +77,10 @@ export function terraformFoldedResources(
     }
 
     const context = { resource, resolver, overrides };
+    const existing = parent["Properties"];
+    const added = fold.properties(context, isRecord(existing) ? existing : {});
 
-    merged.set(parentId, mergedParent(parent, fold.properties(context)));
+    merged.set(parentId, mergedParent(parent, added));
     folded.push({ address: resource.address, type: resource.type });
     lost.push(
       ...(fold.lost?.(context) ?? []).map((attribute) => ({
@@ -96,7 +98,9 @@ export function terraformFoldedResources(
  *
  * The fold contributes whole CloudFormation properties, so a later fold on the
  * same parent replaces a property an earlier one set rather than merging into
- * it. No two folds of one resource type write the same property.
+ * it. Two folds writing the same property are two of one Terraform type, and a
+ * fold whose property is a list is handed what the parent already carries so
+ * it can add to it.
  */
 function mergedParent(
   parent: SimCfnTemplateValueRecord,
