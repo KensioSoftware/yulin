@@ -36,6 +36,10 @@ export interface TerraformImportResult {
  * type with no mapping is skipped and named, in the same spirit as the skipped
  * Resources a Stack records for a CloudFormation type no simulated service
  * models.
+ *
+ * This is spike code, kept so the measurement behind it stays reproducible.
+ * The README beside it says what is known to need work before this is a
+ * feature, and nothing here is exported from the package.
  */
 export function cfnTemplateFromTerraformPlan(
   plan: TerraformPlan,

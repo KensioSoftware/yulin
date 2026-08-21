@@ -2,7 +2,20 @@
 
 A spike for [#860](https://github.com/KensioSoftware/yulin/issues/860). It reads the JSON `terraform show -json` writes for a saved plan file, builds a CloudFormation template body from it, and hands that to `deployTemplate`. Everything below the template body is the machinery a CDK or SAM deployment already goes through.
 
-This is throwaway. It is on the branch to make the measurement reproducible, and the recommendation at the end says what should actually be built.
+## Status
+
+This is spike code that was kept, and it should be read that way. It was written to answer #860 and then merged so the measurement stays reproducible and so #864 starts from something running. It has not been designed as the feature.
+
+Nothing here is exported from the package, so there is no supported way to reach it. #864 is what turns it into a feature, and it should feel free to move or delete any of this.
+
+What is known to need work, and what #864 carries as a checklist:
+
+- There is no entry point. `deployTerraformPlan` does not exist, and a caller has to build the template with `cfnTemplateFromTerraformPlan` and pass it to `deployTemplate` itself.
+- The file boundaries are not a design. 32 source files is what it took to keep every one under the FTA threshold of 50, and several splits cut a module in a place nothing else would have.
+- Two addresses reaching one logical ID throws, rather than being disambiguated. That is the safe behaviour and not the right one.
+- A Resource can be built and then pruned, because whether it can be built depends on a resolver that was fixed before the pruning was known. One pass over a settled set of resources would say the same thing without the backtracking.
+- The two fixtures are whole applications. A fixture per mechanism would be smaller, would fail more precisely, and would not need a 648MB provider to plan.
+- Branch coverage in this directory is 72%, against 96% for the repository.
 
 ## What was measured
 
