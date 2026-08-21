@@ -8,6 +8,7 @@ import {
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
 import { simCognitoWebAuthnRequestOptions } from "../../user-pool/user/web-authn/sim-cognito-web-authn-assertion.js";
+import type { SimCognitoWebAuthnRequestOptions } from "../../user-pool/user/web-authn/sim-cognito-web-authn-document.js";
 import {
   requireSimCognitoAvailableChallenge,
   simCognitoAvailableChallenges,
@@ -139,7 +140,7 @@ export class SimCognitoFirstFactorChallenge {
     client: SimCognitoUserPoolClient,
     user: SimCognitoUser,
     challengeName: string,
-    webAuthnOptions?: ReturnType<typeof simCognitoWebAuthnRequestOptions>,
+    webAuthnOptions?: SimCognitoWebAuthnRequestOptions,
   ): SimCognitoAuthSession {
     const session = new SimCognitoAuthSession({
       username: user.username,

@@ -78,7 +78,7 @@ export function requireSimCognitoAvailableChallenge(
   challengeName: string,
   available: readonly string[],
   field: string,
-): string {
+): void {
   if (!available.includes(challengeName)) {
     throw new SimCognitoInvalidParameterException(
       `${field} '${challengeName}' is not available to this user: the ` +
@@ -94,6 +94,4 @@ export function requireSimCognitoAvailableChallenge(
         `${presentedChallenges.join(" or ")} instead.`,
     );
   }
-
-  return challengeName;
 }
