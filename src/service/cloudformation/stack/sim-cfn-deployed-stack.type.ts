@@ -7,13 +7,13 @@ import type { SimCloudFormationStackStatus } from "./sim-cfn-stack.type.js";
  * A Stack a deployment has put into simulated AWS.
  *
  * This is what `deployTemplate`, `deployTemplateFile`, `updateTemplateFile` and
- * `deployCdkOut` answer with, and it holds what the caller that deployed a
- * Stack reads back from it: its Outputs, its Resources, and the report of what
- * the deployment skipped, made inert or retained.
+ * `deployCdkOut` answer with. It holds the Stack's Outputs, its Resources, the
+ * report of what the deployment skipped, made inert or retained, and the two
+ * operations a caller asks for itself, which are deleting and tearing down.
  *
- * Driving the Stack through another CloudFormation operation belongs to the
- * simulation. The class implementing this owns creating, updating and deleting
- * a Stack, and it stays inside the package.
+ * Deploying a Stack and applying a changed template to one belong to the
+ * simulation. The class implementing this owns both, along with the Resource
+ * map and the parsed template, and it stays inside the package.
  */
 export interface SimCfnDeployedStack {
   /** What the Stack was deployed as. */
