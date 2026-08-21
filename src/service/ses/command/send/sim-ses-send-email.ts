@@ -17,6 +17,7 @@ import type {
   SimSendEmailCommandOutput,
   SimSesDestination,
 } from "./send.command.js";
+import type { SimSesConfigurationSetCheck } from "./sim-ses-configuration-set-check.js";
 import type { SimSesContentReader } from "./sim-ses-content.js";
 import type { SimSesSuppressionCheck } from "./sim-ses-suppression-check.js";
 import { refuseUnsimulatedSendInput } from "./sim-ses-unsimulated-send-input.js";
@@ -27,6 +28,7 @@ interface SimSesSendEmailProperties {
   readonly content: SimSesContentReader;
   readonly sent: SimSesSentEmailStore;
   readonly identityCheck: SimSesVerifiedIdentityCheck;
+  readonly configurationSetCheck: SimSesConfigurationSetCheck;
   readonly suppressionCheck: SimSesSuppressionCheck;
   readonly authorizer: SimSesAuthorizer;
   readonly clock: SimClock;
@@ -38,9 +40,9 @@ interface SimSesSendEmailProperties {
  * Nothing is delivered, so what this does is decide whether SES would have
  * accepted the message and, if it would, keep what it would have sent. The
  * order matters and follows real SES: IAM decides the request before the
- * service looks at it, then the identity check, then the message is recorded.
- * A caller with no permission is therefore refused whether or not its
- * identities are verified.
+ * service looks at it, then the identity check, then the configuration set's
+ * sending switch, then the message is recorded. A caller with no permission is
+ * therefore refused whether or not its identities are verified.
  *
  * The suppression list refuses nothing. SES accepts a message addressed to a
  * suppressed recipient and holds it back from that recipient, so the check
@@ -51,6 +53,7 @@ export class SimSesSendEmail {
   readonly #content: SimSesContentReader;
   readonly #sent: SimSesSentEmailStore;
   readonly #identityCheck: SimSesVerifiedIdentityCheck;
+  readonly #configurationSetCheck: SimSesConfigurationSetCheck;
   readonly #suppressionCheck: SimSesSuppressionCheck;
   readonly #authorizer: SimSesAuthorizer;
   readonly #clock: SimClock;
@@ -60,6 +63,7 @@ export class SimSesSendEmail {
     this.#content = properties.content;
     this.#sent = properties.sent;
     this.#identityCheck = properties.identityCheck;
+    this.#configurationSetCheck = properties.configurationSetCheck;
     this.#suppressionCheck = properties.suppressionCheck;
     this.#authorizer = properties.authorizer;
     this.#clock = properties.clock;
@@ -97,6 +101,13 @@ export class SimSesSendEmail {
 
     this.#identityCheck.check({ fromEmailAddress, recipients });
 
+    const configurationSetName = this.#configurationSetCheck.applying({
+      fromEmailAddress,
+      configurationSetName: input.ConfigurationSetName,
+    });
+
+    this.#configurationSetCheck.check(configurationSetName);
+
     const messageId = randomUUID();
 
     this.#sent.add(
@@ -109,7 +120,7 @@ export class SimSesSendEmail {
         body: content.body,
         templateName: content.templateName,
         templateData: content.templateData,
-        configurationSetName: input.ConfigurationSetName,
+        configurationSetName,
         suppressedRecipients: this.#suppressionCheck.withheldFrom(recipients),
         sentDate: this.#clock.now(),
       }),

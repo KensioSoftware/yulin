@@ -14,6 +14,7 @@ import { SimSesAccountCommands } from "./command/account/sim-ses-account-command
 import { SimSesAuthorizer } from "./command/authorize/sim-ses-authorizer.js";
 import { SimSesConfigurationSetCommands } from "./command/configuration-set/sim-ses-configuration-set-commands.js";
 import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-commands.js";
+import { SimSesConfigurationSetCheck } from "./command/send/sim-ses-configuration-set-check.js";
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
 import { SimSesServiceSend } from "./command/send/sim-ses-service-send.js";
@@ -118,11 +119,17 @@ export class SimSesCommands {
       account,
     });
 
+    const configurationSetCheck = new SimSesConfigurationSetCheck({
+      identities,
+      configurationSets,
+    });
+
     this.sendEmail = new SimSesSendEmail({
       identities,
       content: new SimSesContentReader({ templates }),
       sent,
       identityCheck,
+      configurationSetCheck,
       suppressionCheck,
       authorizer,
       clock: background,
@@ -130,6 +137,7 @@ export class SimSesCommands {
     this.serviceSend = new SimSesServiceSend({
       sent,
       identityCheck,
+      configurationSetCheck,
       suppressionCheck,
       clock: background,
     });
