@@ -65,22 +65,6 @@ export function httpApiIntegration(
   };
 }
 
-/** A route, which needs the integration it targets to have been created. */
-export function httpApiRoute(
-  context: TerraformMappingContext,
-): TerraformMappedResource {
-  return {
-    Type: "AWS::ApiGatewayV2::Route",
-    Properties: renamed(context, {
-      ApiId: "api_id",
-      RouteKey: "route_key",
-      Target: "target",
-      AuthorizationType: "authorization_type",
-    }),
-    requires: ["Target"],
-  };
-}
-
 /** A stage. */
 export function httpApiStage(
   context: TerraformMappingContext,

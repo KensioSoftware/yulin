@@ -3,6 +3,17 @@ import { execa } from "execa";
 import { repoPath } from "./path.js";
 import { TemporaryDirectory } from "./temporary-directory.js";
 
+export interface TestTerraformProjectProperties {
+  /**
+   * Whether this configuration is expected to fail its `data` blocks.
+   *
+   * Only a configuration known to read AWS at plan time sets this, and it
+   * limits the tolerance to that one. Every other configuration treats a
+   * non-zero exit as the failure it is.
+   */
+  readonly toleratesDataSourceErrors?: boolean;
+}
+
 /**
  * A Terraform configuration under `test/terraform`, planned on demand.
  *
@@ -18,9 +29,15 @@ import { TemporaryDirectory } from "./temporary-directory.js";
  */
 export class TestTerraformProject {
   private readonly directory: string;
+  private readonly toleratesDataSourceErrors: boolean;
 
-  constructor(public readonly name: string) {
+  constructor(
+    public readonly name: string,
+    properties: TestTerraformProjectProperties = {},
+  ) {
     this.directory = repoPath(`test/terraform/${name}`);
+    this.toleratesDataSourceErrors =
+      properties.toleratesDataSourceErrors ?? false;
   }
 
   /**
@@ -42,13 +59,13 @@ export class TestTerraformProject {
   }
 
   /**
-   * Write the plan file, tolerating a data source that could not be read.
+   * Write the plan file.
    *
-   * Planning offline fails every `data` block that calls AWS, and community
-   * modules commonly read `aws_caller_identity`. Terraform reports those as
-   * errors and exits non-zero, and it still writes a plan covering the managed
-   * resources. Whether the plan file arrived is the contract that matters here,
-   * because the managed resources are what an import reads.
+   * A configuration reading a `data` block that calls AWS cannot be planned
+   * offline. Terraform reports each one as an error and exits non-zero, and it
+   * still writes a plan covering the managed resources, which are what an
+   * import reads. A configuration expecting that says so. Every other failure
+   * is a failure, so a broken configuration cannot pass as a partial plan.
    */
   private async plan(planFile: string): Promise<void> {
     const result = await execa(
@@ -57,12 +74,16 @@ export class TestTerraformProject {
       { env: { TF_IN_AUTOMATION: "1" }, reject: false },
     );
 
-    // oxlint-disable-next-line security/detect-non-literal-fs-filename
-    if (!existsSync(planFile)) {
-      throw new Error(
-        `terraform plan wrote no plan for ${this.name}: ${result.stderr}`,
-      );
+    if (result.exitCode === 0) {
+      return;
     }
+
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
+    if (this.toleratesDataSourceErrors && existsSync(planFile)) {
+      return;
+    }
+
+    throw new Error(`terraform plan failed for ${this.name}: ${result.stderr}`);
   }
 
   private async show(planFile: string): Promise<string> {

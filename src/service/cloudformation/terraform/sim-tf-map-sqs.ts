@@ -7,7 +7,6 @@
 import { isRecord } from "../../../util/type-guard/record.js";
 import type { SimCfnTemplateValue } from "../template/value/sim-cfn-template-value.js";
 import {
-  attribute,
   field,
   properties,
   renamed,
@@ -63,14 +62,17 @@ function redrivePolicy(context: TerraformMappingContext): RedriveResult {
     };
   }
 
-  const referenced = attribute(context, "redrive_policy");
-
-  if (referenced === undefined) {
-    return { value: undefined, lost: [] };
-  }
-
+  /*
+   * The dead-letter queue is recoverable from the reference and the receive
+   * limit is not, and a redrive policy carrying a made-up limit would give the
+   * queue different retry behaviour from the one the plan describes. The whole
+   * policy is dropped and recorded instead.
+   */
   return {
-    value: { deadLetterTargetArn: referenced, maxReceiveCount: 10 },
-    lost: ["redrive_policy.maxReceiveCount"],
+    value: undefined,
+    lost:
+      context.resource.unknown["redrive_policy"] === true
+        ? ["redrive_policy"]
+        : [],
   };
 }

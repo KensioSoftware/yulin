@@ -140,9 +140,19 @@ export function field(record: Record<string, unknown>, key: string): unknown {
   return record[key];
 }
 
-/** A Terraform value, carried as the template value CloudFormation reads. */
+/**
+ * A Terraform value, carried as the template value CloudFormation reads.
+ *
+ * Only an absent value comes back undefined. `false`, `0` and `""` are values
+ * a resource was configured with, and a truthiness test here would drop
+ * `block_public_acls = false` as though it had never been written.
+ */
 export function templateValue(value: unknown): SimCfnTemplateValue | undefined {
-  return (value ?? undefined) ? (value as SimCfnTemplateValue) : undefined;
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  return value as SimCfnTemplateValue;
 }
 
 /**

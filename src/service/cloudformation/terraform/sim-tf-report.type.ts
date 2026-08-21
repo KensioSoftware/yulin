@@ -30,7 +30,8 @@ export type TerraformSkipReason =
   | "no mapping for resource type"
   | "not an AWS provider resource"
   | "fold target not found"
-  | "unresolved required attribute";
+  | "unresolved required attribute"
+  | "references a resource that was skipped";
 
 export interface TerraformLostAttribute {
   readonly address: string;

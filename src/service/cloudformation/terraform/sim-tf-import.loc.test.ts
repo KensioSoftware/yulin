@@ -12,8 +12,19 @@ import { TestTerraformProject } from "../../../util/filesystem/test-terraform-pr
 import { cfnTemplateFromTerraformPlan } from "./sim-tf-template.js";
 import type { TerraformPlan } from "./sim-tf-plan.type.js";
 
+/*
+ * The community modules read `aws_caller_identity`, which cannot be read
+ * without credentials, so planning that configuration offline reports those
+ * data sources as errors and still plans the managed resources.
+ */
+const toleratedDataSourceFailures = new Set(["modules"]);
+
 async function planned(name: string): Promise<TerraformPlan> {
-  return (await new TestTerraformProject(name).planJson()) as TerraformPlan;
+  const project = new TestTerraformProject(name, {
+    toleratesDataSourceErrors: toleratedDataSourceFailures.has(name),
+  });
+
+  return (await project.planJson()) as TerraformPlan;
 }
 
 describe("importing a Terraform plan", () => {

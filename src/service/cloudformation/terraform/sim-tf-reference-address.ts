@@ -30,19 +30,40 @@ export function moduleOutputAttribute(
 }
 
 /**
+ * Scopes that name something other than a resource of the same module.
+ *
+ * A reference under one of these is resolved by Terraform rather than by an
+ * address lookup, and prefixing it with the module path would invent an
+ * address no resource has.
+ */
+const unqualifiedScopes = [
+  "var.",
+  "local.",
+  "each.",
+  "count.",
+  "self.",
+  "data.",
+  "path.",
+  "terraform.",
+];
+
+/**
  * A module-relative reference turned into a plan-wide address.
  *
  * References inside a module name their own module's resources without the
- * module prefix that `planned_values` puts on them. A reference reaching out of
- * the module, through `var.` or a `module.` output, is left alone, because
- * resolving it means following the value through the call rather than
- * rewriting a name.
+ * module prefix that `planned_values` puts on them. A reference to another
+ * module's output is qualified the same way, because the output index is keyed
+ * by the full call path and a nested call would otherwise miss it.
  */
 export function qualifiedReference(
   reference: string,
   modulePath: readonly string[],
 ): string {
-  if (modulePath.length === 0 || reference.startsWith("module.")) {
+  if (modulePath.length === 0) {
+    return reference;
+  }
+
+  if (unqualifiedScopes.some((scope) => reference.startsWith(scope))) {
     return reference;
   }
 

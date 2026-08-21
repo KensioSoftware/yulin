@@ -15,9 +15,9 @@ import {
 import {
   httpApi,
   httpApiIntegration,
-  httpApiRoute,
   httpApiStage,
 } from "./sim-tf-map-http-api.js";
+import { httpApiRoute } from "./sim-tf-map-http-api-route.js";
 import { snsSubscription, snsTopic } from "./sim-tf-map-sns.js";
 import {
   secretsManagerFolds,

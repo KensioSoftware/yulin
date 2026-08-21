@@ -8,16 +8,10 @@ import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-templa
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { TerraformPlan } from "./sim-tf-plan.type.js";
 import { terraformPlanResources } from "./sim-tf-plan-resources.js";
-import {
-  TerraformReferenceResolver,
-  terraformLogicalId,
-} from "./sim-tf-reference.js";
-import { dependsOn } from "./sim-tf-template-graph.js";
-import { skip } from "./sim-tf-template-merge.js";
-import { terraformResourceMappings } from "./sim-tf-registry.js";
+import { mappableResolver } from "./sim-tf-template-resolver.js";
+import { applyMappings } from "./sim-tf-template-mappings.js";
+import { recordPrunedResources } from "./sim-tf-template-pruned.js";
 import { applyFolds } from "./sim-tf-template-folds.js";
-import { terraformResourceFolds } from "./sim-tf-registry.js";
-import { terraformModuleOutputs } from "./sim-tf-module-outputs.js";
 import type {
   TerraformImportReport,
   TerraformImportedResource,
@@ -29,8 +23,6 @@ export interface TerraformImportResult {
   readonly template: CfnTemplateBodyRecord;
   readonly report: TerraformImportReport;
 }
-
-const awsProvider = "hashicorp/aws";
 
 /**
  * A CloudFormation template body built from a Terraform plan.
@@ -50,79 +42,28 @@ export function cfnTemplateFromTerraformPlan(
 ): TerraformImportResult {
   const resources = terraformPlanResources(plan);
 
-  /*
-   * References are resolved only against resources that become a
-   * CloudFormation Resource of their own. A reference to a type with no
-   * mapping would otherwise produce an intrinsic naming a logical ID the
-   * template never declares, and the property carrying it would reach the
-   * service factory as an object where it wanted a string.
-   */
-  const resolver = new TerraformReferenceResolver(
-    resources.filter(
-      (resource) =>
-        resource.provider === awsProvider &&
-        terraformResourceMappings.has(resource.type),
-    ),
-    terraformModuleOutputs(plan),
-  );
+  const resolver = mappableResolver(plan, resources);
 
   const mapped: TerraformImportedResource[] = [];
   const folded: TerraformImportedResource[] = [];
   const skipped: TerraformSkippedResource[] = [];
   const lost: TerraformLostAttribute[] = [];
   const templates = new Map<string, SimCfnTemplateValueRecord>();
+  const claimedBy = new Map<string, string>();
 
-  for (const resource of resources) {
-    if (resource.provider !== awsProvider) {
-      skipped.push(skip(resource, "not an AWS provider resource"));
-      continue;
-    }
-
-    const mapping = terraformResourceMappings.get(resource.type);
-
-    if (mapping === undefined) {
-      if (!terraformResourceFolds.has(resource.type)) {
-        skipped.push(skip(resource, "no mapping for resource type"));
-      }
-      continue;
-    }
-
-    const built = mapping({ resource, resolver });
-    const missing = (built.requires ?? []).filter(
-      (name) => built.Properties[name] === undefined,
-    );
-
-    if (missing.length > 0) {
-      skipped.push(skip(resource, "unresolved required attribute"));
-      lost.push(
-        ...missing.map((name) => ({
-          address: resource.address,
-          attribute: name,
-        })),
-      );
-      continue;
-    }
-
-    templates.set(terraformLogicalId(resource.address), {
-      Type: built.Type,
-      Properties: built.Properties,
-      ...dependsOn(resource, resolver),
-    });
-
-    mapped.push({
-      address: resource.address,
-      type: resource.type,
-      cfnType: built.Type,
-    });
-
-    const lostAttributes = built.lost ?? [];
-
-    for (const attribute of lostAttributes) {
-      lost.push({ address: resource.address, attribute });
-    }
-  }
+  applyMappings({
+    resources,
+    resolver,
+    templates,
+    claimedBy,
+    mapped,
+    skipped,
+    lost,
+  });
 
   applyFolds({ resources, resolver, templates, folded, skipped });
+
+  recordPrunedResources({ templates, claimedBy, mapped, skipped });
 
   return {
     template: { Resources: Object.fromEntries(templates) },

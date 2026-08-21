@@ -26,8 +26,14 @@ export const terraformAttributeReads: ReadonlyMap<string, string> = new Map([
   ["aws_sns_topic.arn", "Ref"],
   ["aws_sns_topic.name", "TopicName"],
   ["aws_lambda_function.arn", "Arn"],
+  /*
+   * `invoke_arn` is the API Gateway invocation URI in Terraform, and the
+   * CloudFormation property it feeds, `IntegrationUri`, takes the function ARN
+   * itself. The ARN is what a synthesized template carries, so that is what
+   * this reads. `qualified_arn` has no entry, because it names a version and
+   * dropping the qualifier would point at the wrong code.
+   */
   ["aws_lambda_function.invoke_arn", "Arn"],
-  ["aws_lambda_function.qualified_arn", "Arn"],
   ["aws_lambda_function.function_name", "Ref"],
   ["aws_lambda_function.id", "Ref"],
   ["aws_iam_role.arn", "Arn"],

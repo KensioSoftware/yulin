@@ -12,8 +12,15 @@ import {
  * The CloudFormation logical ID standing for one Terraform address.
  *
  * A logical ID is alphanumeric, so the module path, the resource type, the name
- * and any `count` or `for_each` key are folded into one camel-run. The address
- * is unique within a plan, and this keeps it unique.
+ * and any `count` or `for_each` key are folded into one camel-run.
+ *
+ * Folding loses the separators, and two addresses can therefore arrive at one
+ * ID. `aws_s3_bucket.foo_bar` and `aws_s3_bucket.fooBar` both give
+ * `AwsS3BucketFooBar`, and so do the `for_each` keys `a-b` and `a_b`. Every
+ * caller derives the ID from the address alone, so a suffix here would have to
+ * be agreed between them. The template builder refuses a plan where two
+ * addresses collide instead, because the alternative is one Resource silently
+ * standing for two.
  */
 export function terraformLogicalId(address: string): string {
   const alphanumeric = address
