@@ -51,8 +51,8 @@ describe("CloudFormation Fn::GetAtt parser", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
@@ -94,8 +94,8 @@ describe("CloudFormation Fn::GetAtt parser", () => {
     const derivedBucket = simAws
       .s3()
       .getSimBucketByName("source-bucket.foo-derived");
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(derivedBucket);
     assertInstanceOf(derivedBucket, SimS3Bucket);

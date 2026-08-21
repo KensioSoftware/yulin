@@ -7,7 +7,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimIamUser } from "../../../iam/user/sim-iam-user.js";
 
 const accountIdOneOnes = "111111111111";
@@ -22,7 +22,7 @@ function simAwsInEuWest2(): SimAws {
 async function deployConsoleUser(
   simAws: SimAws,
   password: string,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "console-stack",
     template: {
@@ -42,7 +42,7 @@ async function deployConsoleUser(
   return stack;
 }
 
-function consolePassword(stack: SimCfnStack): string {
+function consolePassword(stack: SimCfnDeployedStack): string {
   const user = stack.getResource("ConsoleUser")?.simResource as
     | SimIamUser
     | undefined;
@@ -57,7 +57,7 @@ function consolePassword(stack: SimCfnStack): string {
  * A Resource can record properties of its own alongside this, so the reference
  * is picked out by what its reason quotes.
  */
-function dynamicReferenceRecord(stack: SimCfnStack): {
+function dynamicReferenceRecord(stack: SimCfnDeployedStack): {
   path: string;
   reason: string;
 } {

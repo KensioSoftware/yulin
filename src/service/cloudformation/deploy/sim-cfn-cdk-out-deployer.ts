@@ -1,6 +1,6 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import {
   cdkOutBoundTransform,
   cdkOutOptionsFor,
@@ -35,13 +35,13 @@ export class SimCfnCdkOutDeployer {
 
   async deploy(
     request: SimCloudFormationDeployCdkOutProperties | string,
-  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+  ): Promise<ReadonlyMap<string, SimCfnDeployedStack>> {
     const plan = await planCdkOutDeployment({
       request,
       defaultRegionName: this.scope.accountRegionScope.regionName,
     });
 
-    const deployed = new Map<string, SimCfnStack>();
+    const deployed = new Map<string, SimCfnDeployedStack>();
 
     for (const stack of plan.stacks) {
       // oxlint-disable-next-line no-await-in-loop -- one Stack at a time, since a later one may depend on an earlier one
@@ -56,8 +56,8 @@ export class SimCfnCdkOutDeployer {
   private async deployStack(
     stack: SimCfnCdkOutPlannedStack,
     plan: SimCfnCdkOutPlan,
-    deployed: ReadonlyMap<string, SimCfnStack>,
-  ): Promise<SimCfnStack> {
+    deployed: ReadonlyMap<string, SimCfnDeployedStack>,
+  ): Promise<SimCfnDeployedStack> {
     const { simAws, accountRegionScope } = this.scope;
     const { transform, ...options } = cdkOutOptionsFor(
       stack,

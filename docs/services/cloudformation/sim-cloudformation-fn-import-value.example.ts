@@ -43,4 +43,4 @@ const consumer = await cloudFormation.deployTemplate({
 await consumer.waitForDeployComplete();
 
 // shared-uploads, read from the export the producer Stack published
-console.log(consumer.resources.get("UploadsTopic")?.properties["DisplayName"]);
+console.log(consumer.getResource("UploadsTopic")?.properties["DisplayName"]);

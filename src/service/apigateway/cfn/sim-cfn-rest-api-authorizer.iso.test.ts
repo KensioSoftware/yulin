@@ -135,7 +135,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     // Given a deployed API whose method names an AWS::ApiGateway::Authorizer
     const simAws = simAwsInEuWest2();
     const stack = await deployRestApi(simAws, gatedTemplate());
-    const restApi = stack.resources.get("Api")?.simResource as
+    const restApi = stack.getResource("Api")?.simResource as
       | SimRestApi
       | undefined;
     assertNonNullable(restApi);
@@ -164,7 +164,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     // Given a deployed API gated by an authorizer
     const simAws = simAwsInEuWest2();
     const stack = await deployRestApi(simAws, gatedTemplate());
-    const restApi = stack.resources.get("Api")?.simResource as
+    const restApi = stack.getResource("Api")?.simResource as
       | SimRestApi
       | undefined;
     assertNonNullable(restApi);
@@ -192,7 +192,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
       simAws,
       gatedTemplate({ AuthorizerResultTtlInSeconds: "300" }),
     );
-    const restApi = stack.resources.get("Api")?.simResource as
+    const restApi = stack.getResource("Api")?.simResource as
       | SimRestApi
       | undefined;
     assertNonNullable(restApi);
@@ -218,10 +218,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
 
     // Then the API deploys and the record says which of its parts behaves
     // differently to the template
-    assertIdentical(
-      stack.resources.get("Authorizer")?.status,
-      "CREATE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("Authorizer")?.status, "CREATE_COMPLETE");
     assertStringIncludes(
       ignoredReasons(stack).join("\n"),
       "AWS::ApiGateway::Authorizer property IdentityValidationExpression is " +
@@ -233,7 +230,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     // Given a deployed API gated by an authorizer
     const simAws = simAwsInEuWest2();
     const stack = await deployRestApi(simAws, gatedTemplate());
-    const restApi = stack.resources.get("Api")?.simResource as
+    const restApi = stack.getResource("Api")?.simResource as
       | SimRestApi
       | undefined;
     assertNonNullable(restApi);
@@ -242,10 +239,7 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
     await stack.teardown();
 
     // Then the authorizer went through DeleteAuthorizer, and the API is gone
-    assertIdentical(
-      stack.resources.get("Authorizer")?.status,
-      "DELETE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("Authorizer")?.status, "DELETE_COMPLETE");
     assertUndefined(simAws.apiGateway().findRestApi(restApi.apiId));
   });
 

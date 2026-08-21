@@ -36,7 +36,7 @@ describe("ACM CloudFormation Resource teardown", () => {
 
     assertArrayLength(listed.CertificateSummaryList, 0);
     assertIdentical(
-      stack.resources.get("SiteCertificate")?.status,
+      stack.getResource("SiteCertificate")?.status,
       "DELETE_COMPLETE",
     );
   });

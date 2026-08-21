@@ -30,7 +30,7 @@ describe("CDK Bucket notifications teardown", () => {
     // takes it off on its own Delete event.
     assertArrayLength(bucket.getNotifications().lambdaNotifications, 0);
     assertIdentical(
-      stack.resources.get("BucketNotifications")?.status,
+      stack.getResource("BucketNotifications")?.status,
       "DELETE_COMPLETE",
     );
   });

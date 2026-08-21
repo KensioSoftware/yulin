@@ -107,7 +107,7 @@ app.synth();
       );
     await simAws.backgroundTasksComplete();
 
-    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
 
     // Then putting an Object into the deployed Bucket runs the deployed
     // function.

@@ -29,7 +29,7 @@ describe("Secrets Manager CloudFormation Resource teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const secret = stack.resources.get("ApiSecret")?.simResource as
+    const secret = stack.getResource("ApiSecret")?.simResource as
       | SimSecretsManagerSecret
       | undefined;
     assertNonNullable(secret);
@@ -39,9 +39,6 @@ describe("Secrets Manager CloudFormation Resource teardown", () => {
 
     // Then the secret is waiting out its recovery window.
     assertTrue(secret.isScheduledForDeletion);
-    assertIdentical(
-      stack.resources.get("ApiSecret")?.status,
-      "DELETE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("ApiSecret")?.status, "DELETE_COMPLETE");
   });
 });

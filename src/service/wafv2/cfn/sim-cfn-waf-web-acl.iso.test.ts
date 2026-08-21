@@ -14,7 +14,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValue } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
@@ -79,7 +79,7 @@ function webAclTemplate(
 async function deployWebAcl(
   simAws: SimAws,
   properties: Record<string, SimCfnTemplateValue> = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "orders",
     template: webAclTemplate(properties),
@@ -92,7 +92,11 @@ async function deployWebAcl(
 /**
  * What the deployed web ACL does with a request to one path.
  */
-function decisionFor(simAws: SimAws, stack: SimCfnStack, path: string): string {
+function decisionFor(
+  simAws: SimAws,
+  stack: SimCfnDeployedStack,
+  path: string,
+): string {
   const webAclArn = stack.outputs.get("AclArn")?.value;
   assertTypeString(webAclArn);
 

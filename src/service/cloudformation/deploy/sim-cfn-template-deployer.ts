@@ -2,6 +2,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
@@ -107,7 +108,7 @@ export class SimCloudFormationTemplateDeployer {
    */
   async deployTemplate(
     properties: SimCloudFormationCreateStackProperties,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     return await this.deployTemplateWithContext({
       stackName: properties.stackName ?? makeSimCloudFormationStackName(),
       template: properties.template,
@@ -129,7 +130,7 @@ export class SimCloudFormationTemplateDeployer {
    */
   async deployTemplateFile(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     const deployment = simCfnTemplateFileDeployment(properties);
     const stack = await this.deployTemplateWithContext(
       await this.templateFileLoader.load(deployment),
@@ -145,7 +146,7 @@ export class SimCloudFormationTemplateDeployer {
    */
   async deployCdkOut(
     properties: SimCloudFormationDeployCdkOutProperties | string,
-  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+  ): Promise<ReadonlyMap<string, SimCfnDeployedStack>> {
     return await this.cdkOutDeployer.deploy(properties);
   }
 
@@ -155,7 +156,7 @@ export class SimCloudFormationTemplateDeployer {
    */
   async updateTemplateFile(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     return await this.templateFileUpdater.update(
       simCfnTemplateFileDeployment(properties),
     );
@@ -181,7 +182,7 @@ export class SimCloudFormationTemplateDeployer {
     readonly parameters?: Record<string, string> | undefined;
     readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
     readonly cdkOutContext?: SimCdkOutContext | undefined;
-  }): Promise<SimCfnStack> {
+  }): Promise<SimCfnDeployedStack> {
     await this.createStackWithContext(
       {
         input: {

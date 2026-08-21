@@ -18,6 +18,7 @@ import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
+import { deployedStackObject } from "../../stack/sim-cfn-stack.fixture.js";
 
 /**
  * Inline function code, as CDK packages Code.fromInline source. The handler
@@ -145,8 +146,8 @@ app.synth();
     await simAws.backgroundTasksComplete();
 
     // Then the permission Resource is deployed rather than skipped.
-    const permissionResource = stack.resources
-      .values()
+    const permissionResource = deployedStackObject(stack)
+      .resources.values()
       .find((resource) => resource.type === "AWS::Lambda::Permission");
     assertNonNullable(permissionResource);
     assertFalse(permissionResource.skipped);

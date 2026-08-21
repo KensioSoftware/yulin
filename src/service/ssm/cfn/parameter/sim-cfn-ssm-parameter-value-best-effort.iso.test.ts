@@ -8,7 +8,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCfnIgnoredProperty } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const accountIdOneOnes = "111111111111";
@@ -25,7 +25,7 @@ async function deployReading(properties: {
   readonly type: string;
   readonly name: string;
   readonly value: SimCfnTemplateValue;
-}): Promise<SimCfnStack> {
+}): Promise<SimCfnDeployedStack> {
   const stack = await properties.simAws.cloudFormation().deployTemplate({
     stackName: "config-stack",
     template: {
@@ -59,7 +59,7 @@ function readValue(simAws: SimAws): string {
 /**
  * The one record the Stack made about a template Parameter.
  */
-function parameterRecord(stack: SimCfnStack): SimCfnIgnoredProperty {
+function parameterRecord(stack: SimCfnDeployedStack): SimCfnIgnoredProperty {
   const [ignored, ...rest] = stack.ignoredProperties;
   assertNonNullable(ignored, "a recorded template Parameter");
   assertArrayLength(rest, 0, "no second record");

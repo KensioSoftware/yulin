@@ -68,8 +68,9 @@ describe("CloudFront CloudFormation Resource teardown", () => {
       .deployTemplate({ stackName: "site-stack", template });
     await stack.waitForDeployComplete();
 
-    const distribution = stack.resources.get("SiteDistribution")
-      ?.simResource as SimCloudFrontDistribution | undefined;
+    const distribution = stack.getResource("SiteDistribution")?.simResource as
+      | SimCloudFrontDistribution
+      | undefined;
     assertNonNullable(distribution);
     // The template asked for an enabled Distribution, so a teardown that only
     // called DeleteDistribution would be refused.
@@ -83,7 +84,7 @@ describe("CloudFront CloudFormation Resource teardown", () => {
       simAws.cloudFront().getSimDistributionById(distribution.distributionId),
     );
     assertIdentical(
-      stack.resources.get("SiteDistribution")?.status,
+      stack.getResource("SiteDistribution")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -110,7 +111,7 @@ describe("CloudFront CloudFormation Resource teardown", () => {
       simAws.cloudFront().getCloudFrontFunctionByName(functionName),
     );
     assertIdentical(
-      stack.resources.get("SiteFunction")?.status,
+      stack.getResource("SiteFunction")?.status,
       "DELETE_COMPLETE",
     );
   });

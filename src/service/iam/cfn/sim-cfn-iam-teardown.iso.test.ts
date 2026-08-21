@@ -98,7 +98,7 @@ describe("IAM CloudFormation Resource teardown", () => {
       .cloudFormation()
       .deployTemplate({ stackName: "handler-stack", template });
 
-    const role = stack.resources.get("HandlerRole")?.simResource as
+    const role = stack.getResource("HandlerRole")?.simResource as
       | SimIamRole
       | undefined;
     assertIdentical(role?.roleName, "handler-role");
@@ -113,10 +113,7 @@ describe("IAM CloudFormation Resource teardown", () => {
       simAws.iam().getRole({ input: { RoleName: "handler-role" } }),
     );
     assertUndefined(simAws.iam().roles.get(role.roleName));
-    assertIdentical(
-      stack.resources.get("ReadPolicy")?.status,
-      "DELETE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("ReadPolicy")?.status, "DELETE_COMPLETE");
   });
 
   it("takes a User's policies off it before deleting the User", async () => {
@@ -128,7 +125,7 @@ describe("IAM CloudFormation Resource teardown", () => {
       template: userTemplate,
     });
 
-    const user = stack.resources.get("PublisherUser")?.simResource as
+    const user = stack.getResource("PublisherUser")?.simResource as
       | SimIamUser
       | undefined;
     assertIdentical(user?.userName, "publisher-user");
@@ -142,7 +139,7 @@ describe("IAM CloudFormation Resource teardown", () => {
     assertUndefined(simAws.iam().users.get(user.userName));
     assertMapSize(simAws.iam().policies, 0);
     assertIdentical(
-      stack.resources.get("PublisherUser")?.status,
+      stack.getResource("PublisherUser")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -163,7 +160,7 @@ describe("IAM CloudFormation Resource teardown", () => {
     });
 
     // Then the Stack reaches its User, with the name free to take again.
-    const user = second.resources.get("PublisherUser")?.simResource as
+    const user = second.getResource("PublisherUser")?.simResource as
       | SimIamUser
       | undefined;
     assertIdentical(user?.userName, "publisher-user");
@@ -209,7 +206,7 @@ describe("IAM CloudFormation Resource teardown", () => {
     // Then the inline policy is off the Role, which is still there.
     assertMapSize(role.inlinePolicies, 0);
     assertIdentical(
-      stack.resources.get("StandingPolicy")?.status,
+      stack.getResource("StandingPolicy")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -242,7 +239,7 @@ describe("IAM CloudFormation Resource teardown", () => {
       },
     });
 
-    const role = stack.resources.get("WorkerRole")?.simResource as
+    const role = stack.getResource("WorkerRole")?.simResource as
       | SimIamRole
       | undefined;
     assertSetSize(role?.attachedPolicyArns, 1);
@@ -252,7 +249,7 @@ describe("IAM CloudFormation Resource teardown", () => {
 
     // Then both the Managed Policy and the Role it was attached to are gone.
     assertIdentical(
-      stack.resources.get("WorkerReadPolicy")?.status,
+      stack.getResource("WorkerReadPolicy")?.status,
       "DELETE_COMPLETE",
     );
     assertUndefined(simAws.iam().roles.get(role.roleName));
@@ -296,7 +293,7 @@ describe("IAM CloudFormation Resource teardown", () => {
     // Managed Policy is deleted.
     assertSetSize(role.attachedPolicyArns, 0);
     assertIdentical(
-      stack.resources.get("StandingReadPolicy")?.status,
+      stack.getResource("StandingReadPolicy")?.status,
       "DELETE_COMPLETE",
     );
     assertMapSize(simAws.iam().policies, 0);

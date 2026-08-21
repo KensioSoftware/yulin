@@ -13,10 +13,12 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import { simCfnDnssecTemplate } from "../../../../../test/route53/dnssec-template.js";
 
-async function deployedDnssecStack(simAws: SimAws): Promise<SimCfnStack> {
+async function deployedDnssecStack(
+  simAws: SimAws,
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "dns-stack",
     template: simCfnDnssecTemplate(),
@@ -26,7 +28,7 @@ async function deployedDnssecStack(simAws: SimAws): Promise<SimCfnStack> {
   return stack;
 }
 
-function output(stack: SimCfnStack, name: string): string {
+function output(stack: SimCfnDeployedStack, name: string): string {
   const value = stack.outputs.get(name)?.value;
   assertTypeString(value);
 
@@ -44,9 +46,9 @@ describe("Route53 DNSSEC CloudFormation Resources", () => {
 
     // Then all three Resources were created rather than skipped, so the DNSSEC
     // half of the Stack is actually simulated.
-    assertFalse(stack.resources.get("ZoneSigningKey")?.skipped);
-    assertFalse(stack.resources.get("ZoneKeySigningKey")?.skipped);
-    assertFalse(stack.resources.get("ZoneDnssec")?.skipped);
+    assertFalse(stack.getResource("ZoneSigningKey")?.skipped);
+    assertFalse(stack.getResource("ZoneKeySigningKey")?.skipped);
+    assertFalse(stack.getResource("ZoneDnssec")?.skipped);
 
     // And the zone reports itself as signed, with a key a registrar could be
     // given the DS record for.
@@ -192,8 +194,8 @@ describe("Route53 DNSSEC CloudFormation Resources", () => {
 
     // Then every DNSSEC Resource came off, which only happens if signing
     // stopped before the key did and the key was deactivated before deletion.
-    assertTrue(stack.resources.get("ZoneDnssec")?.deleteComplete);
-    assertTrue(stack.resources.get("ZoneKeySigningKey")?.deleteComplete);
+    assertTrue(stack.getResource("ZoneDnssec")?.deleteComplete);
+    assertTrue(stack.getResource("ZoneKeySigningKey")?.deleteComplete);
     assertMapSize(simAws.route53().hostedZones, 0);
   });
 });

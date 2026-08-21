@@ -38,7 +38,7 @@ describe("CloudFormation Fn::Join Resource value", () => {
     assertInstanceOf(bucket, SimS3Bucket);
     assertIdentical(bucket.bucketName, "my-test-bucket");
 
-    const resource = stack.resources.get("TestBucket");
+    const resource = stack.getResource("TestBucket");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
@@ -206,7 +206,7 @@ describe("CloudFormation Fn::Join Resource value", () => {
     });
 
     // Then the Resource is created with the Fn::Join value already resolved.
-    const resource = stack.resources.get("WaitHandle");
+    const resource = stack.getResource("WaitHandle");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");

@@ -13,7 +13,7 @@ import {
   assemblyStackBucketName,
   simCdkCloudAssemblyFactory,
 } from "../cdk/sim-cdk-cloud-assembly.factory.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
 import type { SimCfnCdkOutTemplateTransform } from "./sim-cfn-cdk-out-stack-options.js";
@@ -176,7 +176,7 @@ describe("Deploying a CDK cloud assembly with per-Stack options [iso]", () => {
 
     // Then the Stack deployed the value the DNS Stack had just created.
     assertIdentical(
-      stacks.get("SiteStack")?.resources.get("SiteTopic")?.properties[
+      stacks.get("SiteStack")?.getResource("SiteTopic")?.properties[
         "DisplayName"
       ],
       assemblyStackBucketName("DnsStack"),
@@ -192,7 +192,10 @@ describe("Deploying a CDK cloud assembly with per-Stack options [iso]", () => {
       ],
     });
 
-    const deployments = new Map<string, ReadonlyMap<string, SimCfnStack>>();
+    const deployments = new Map<
+      string,
+      ReadonlyMap<string, SimCfnDeployedStack>
+    >();
 
     // When both Stacks record the deployment their transform was handed.
     const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
@@ -245,7 +248,7 @@ describe("Deploying a CDK cloud assembly with per-Stack options [iso]", () => {
 });
 
 function deployedOutput(
-  deployed: ReadonlyMap<string, SimCfnStack>,
+  deployed: ReadonlyMap<string, SimCfnDeployedStack>,
   stackName: string,
   outputKey: string,
 ): string {
@@ -271,7 +274,7 @@ function withTopicDisplayName(
 }
 
 function recordingTransform(
-  deployments: Map<string, ReadonlyMap<string, SimCfnStack>>,
+  deployments: Map<string, ReadonlyMap<string, SimCfnDeployedStack>>,
   stackName: string,
 ): SimCfnCdkOutTemplateTransform {
   return (template, deployed) => {
@@ -282,9 +285,9 @@ function recordingTransform(
 }
 
 function assertedDeployment(
-  deployments: ReadonlyMap<string, ReadonlyMap<string, SimCfnStack>>,
+  deployments: ReadonlyMap<string, ReadonlyMap<string, SimCfnDeployedStack>>,
   stackName: string,
-): ReadonlyMap<string, SimCfnStack> {
+): ReadonlyMap<string, SimCfnDeployedStack> {
   const deployment = deployments.get(stackName);
   assertNonNullable(deployment);
 

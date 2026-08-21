@@ -30,7 +30,7 @@ describe("KMS CloudFormation Resource teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const key = stack.resources.get("AppKey")?.simResource as
+    const key = stack.getResource("AppKey")?.simResource as
       | SimKmsKey
       | undefined;
     assertNonNullable(key);
@@ -43,6 +43,6 @@ describe("KMS CloudFormation Resource teardown", () => {
     assertUndefined(simAws.kms().findAlias("alias/app-key"));
     assertIdentical(simAws.kms().findKey(key.keyId), key);
     assertIdentical(key.keyState, "PendingDeletion");
-    assertIdentical(stack.resources.get("AppKey")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("AppKey")?.status, "DELETE_COMPLETE");
   });
 });

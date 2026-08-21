@@ -11,7 +11,7 @@ import { describe, it } from "vitest";
 import { SimFixedClock } from "../../../../../util/clock/sim-clock.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import type { SimEventRule } from "../../../../eventbridge/rule/sim-event-rule.js";
-import type { SimCfnStack } from "../../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import {
   samFunctionTemplateLogicalId,
@@ -36,7 +36,7 @@ async function deployScheduled(properties: {
   readonly simAws: SimAws;
   readonly events: SimCfnTemplateValueRecord;
   readonly received: unknown[];
-}): Promise<SimCfnStack> {
+}): Promise<SimCfnDeployedStack> {
   const stack = await properties.simAws.cloudFormation().deployTemplate({
     stackName: "reconciliation-stack",
     template: simCfnSamFunctionTemplateFactory.make({

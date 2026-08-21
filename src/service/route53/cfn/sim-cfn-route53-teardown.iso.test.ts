@@ -39,10 +39,7 @@ describe("Route53 CloudFormation Resource teardown", () => {
 
     // Then the zone is gone, which only happens once its record went first.
     assertMapSize(simAws.route53().hostedZones, 0);
-    assertIdentical(
-      stack.resources.get("SiteRecord")?.status,
-      "DELETE_COMPLETE",
-    );
-    assertIdentical(stack.resources.get("SiteZone")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("SiteRecord")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("SiteZone")?.status, "DELETE_COMPLETE");
   });
 });

@@ -11,6 +11,10 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 describe("Route53 CloudFormation HostedZone", () => {
   it("creates a Route53 Hosted Zone from AWS::Route53::HostedZone", async () => {
@@ -218,10 +222,11 @@ describe("Route53 CloudFormation HostedZone", () => {
 
     assertTypeString(hostedZoneId);
 
-    const resolvedWaitHandleProperties =
-      await waitHandleResource.resolvedProperties({
-        resources: stack.resources,
-      });
+    const resolvedWaitHandleProperties = await deployedResourceObject(
+      waitHandleResource,
+    ).resolvedProperties({
+      resources: deployedStackObject(stack).resources,
+    });
 
     assertIdentical(resolvedWaitHandleProperties["HostedZoneId"], hostedZoneId);
     assertIdentical(

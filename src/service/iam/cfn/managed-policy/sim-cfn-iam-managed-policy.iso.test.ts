@@ -10,6 +10,10 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
 import type { SimArn } from "../../../aws/arn.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 describe("IAM CloudFormation ManagedPolicy", () => {
   it("creates an IAM Managed Policy from AWS::IAM::ManagedPolicy", async () => {
@@ -221,10 +225,11 @@ describe("IAM CloudFormation ManagedPolicy", () => {
       `arn:aws:iam::${simAws.defaultAccountId}:policy/OutputPolicy`,
     );
 
-    const resolvedWaitHandleProperties =
-      await waitHandleResource.resolvedProperties({
-        resources: stack.resources,
-      });
+    const resolvedWaitHandleProperties = await deployedResourceObject(
+      waitHandleResource,
+    ).resolvedProperties({
+      resources: deployedStackObject(stack).resources,
+    });
 
     assertIdentical(resolvedWaitHandleProperties["PolicyArn"], policyArn);
     assertIdentical(stack.outputs.get("PolicyArn")?.value, policyArn);

@@ -41,8 +41,8 @@ describe("CloudFormation Resource Ref value", () => {
     // refValue(), so the derived Bucket name is based on the source Bucket
     // name.
     const sourceBucket = simAws.s3().getSimBucketByName("source-bucket");
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceBucket);
     assertInstanceOf(sourceBucket, SimS3Bucket);
@@ -80,8 +80,8 @@ describe("CloudFormation Resource Ref value", () => {
 
     // Then Ref resolves to the logical ID fallback.
     const bucket = simAws.s3().getSimBucketByName("handle");
-    const handleResource = stack.resources.get("handle");
-    const bucketResource = stack.resources.get("bucket");
+    const handleResource = stack.getResource("handle");
+    const bucketResource = stack.getResource("bucket");
 
     assertNonNullable(bucket);
     assertInstanceOf(bucket, SimS3Bucket);
@@ -127,8 +127,8 @@ describe("CloudFormation Resource Ref value", () => {
 
     // Then the Resource Ref contributes the logical ID fallback to the joined value.
     const bucket = simAws.s3().getSimBucketByName("handle-bucket");
-    const handleResource = stack.resources.get("handle");
-    const bucketResource = stack.resources.get("bucket");
+    const handleResource = stack.getResource("handle");
+    const bucketResource = stack.getResource("bucket");
 
     assertNonNullable(bucket);
     assertInstanceOf(bucket, SimS3Bucket);

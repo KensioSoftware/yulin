@@ -88,7 +88,7 @@ async function deployGatedApi(
     simAws,
     gatedTemplate(signedIn.userPoolArn, methodProperties),
   );
-  const restApi = stack.resources.get("Api")?.simResource as
+  const restApi = stack.getResource("Api")?.simResource as
     | SimRestApi
     | undefined;
   assertNonNullable(restApi);

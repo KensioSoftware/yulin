@@ -10,7 +10,7 @@ import { SimAwsHttp } from "../../../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../../../serve/http/url/sim-aws-local-url.js";
 import type { SimRestApi } from "../../../../apigateway/api/sim-rest-api.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import {
   samFunctionTemplateLogicalId,
@@ -48,7 +48,7 @@ function ratesHandler(request: RatesRequest): SimCfnTemplateValueRecord {
 /**
  * The implicit API the stack deployed, under the logical ID SAM gives it.
  */
-function implicitApi(stack: SimCfnStack): SimRestApi {
+function implicitApi(stack: SimCfnDeployedStack): SimRestApi {
   const api = stack.getResource(samImplicitRestApiLogicalId)
     ?.simResource as SimRestApi;
   assertNonNullable(api);

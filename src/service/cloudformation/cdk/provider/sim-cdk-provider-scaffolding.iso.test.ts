@@ -2,8 +2,8 @@ import { assertArrayEquals, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
-import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
-import type { SimCfnStack } from "../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedResource } from "../../resource/sim-cfn-deployed-resource.type.js";
+import type { SimCfnDeployedStack } from "../../stack/sim-cfn-deployed-stack.type.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { jsonStringify } from "../../../../util/type-guard/json.js";
@@ -142,7 +142,7 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
  */
 async function deployScaffoldedStack(
   resources: CfnTemplateBodyRecord["Resources"] = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const temporaryDirectory = new TemporaryDirectory();
   const siteAsset = "asset.aaaa1111";
   const fontsAsset = "asset.bbbb2222";
@@ -191,7 +191,7 @@ async function deployScaffoldedStack(
     .deployTemplateFile(temporaryDirectory.join(...templatePathParts));
 }
 
-function logicalIdsOf(resources: readonly SimCfnResource[]): string[] {
+function logicalIdsOf(resources: readonly SimCfnDeployedResource[]): string[] {
   return resources
     .map((resource) => resource.logicalId)
     .toSorted((left, right) => left.localeCompare(right));

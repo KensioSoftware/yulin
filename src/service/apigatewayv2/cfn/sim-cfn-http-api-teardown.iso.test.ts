@@ -25,9 +25,7 @@ describe("HTTP API CloudFormation Resource teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const api = stack.resources.get("Api")?.simResource as
-      | SimHttpApi
-      | undefined;
+    const api = stack.getResource("Api")?.simResource as SimHttpApi | undefined;
     assertNonNullable(api);
 
     // When the Stack's Resources are torn down.
@@ -44,7 +42,7 @@ describe("HTTP API CloudFormation Resource teardown", () => {
       "Api",
     ]) {
       assertIdentical(
-        stack.resources.get(logicalId)?.status,
+        stack.getResource(logicalId)?.status,
         "DELETE_COMPLETE",
         `${logicalId} status`,
       );
@@ -72,7 +70,7 @@ describe("HTTP API CloudFormation Resource teardown", () => {
     assertUndefined(simAws.lambda().getSimFunctionByName("orders"));
     assertUndefined(simAws.iam().roles.get("orders-role" as never));
     assertIdentical(
-      stack.resources.get("HandlerPermission")?.status,
+      stack.getResource("HandlerPermission")?.status,
       "DELETE_COMPLETE",
     );
   });

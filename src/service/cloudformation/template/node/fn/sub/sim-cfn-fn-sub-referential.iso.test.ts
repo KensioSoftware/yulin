@@ -45,7 +45,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertInstanceOf(bucket, SimS3Bucket);
     assertIdentical(bucket.bucketName, "my-prod-bucket");
 
-    const resource = stack.resources.get("TestBucket");
+    const resource = stack.getResource("TestBucket");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
@@ -93,8 +93,8 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertIdentical(sourceResource?.status, "CREATE_COMPLETE");
     assertIdentical(derivedResource?.status, "CREATE_COMPLETE");
@@ -152,8 +152,8 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
@@ -206,8 +206,8 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);

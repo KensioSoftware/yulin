@@ -1628,7 +1628,7 @@ definition, and a service's `NetworkConfiguration`, `CapacityProviderStrategy`,
 stack deploys, and each one is reported on the Resource:
 
 ```typescript
-console.log(stack.resources.get("OrdersCluster")?.ignoredProperties);
+console.log(stack.getResource("OrdersCluster")?.ignoredProperties);
 ```
 
 ## Authorization

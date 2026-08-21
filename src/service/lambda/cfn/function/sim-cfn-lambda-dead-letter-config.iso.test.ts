@@ -11,7 +11,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const ordersQueueArn = "arn:aws:sqs:us-east-1:888888888888:orders-dlq";
@@ -35,7 +35,7 @@ const assumeRolePolicyDocument = {
 async function deployOrders(
   simAws: SimAws,
   deadLetterConfig: SimCfnTemplateValue,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "orders-stack",
     template: {

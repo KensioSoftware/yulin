@@ -7,6 +7,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../../../aws/sim-aws.js";
 import { SimCfnTemplate } from "../../../sim-cfn-template.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
+import { deployedStackObject } from "../../../../stack/sim-cfn-stack.fixture.js";
 
 describe("SimCfnTemplate Fn::Select", () => {
   it("picks a value from a literal list", () => {
@@ -205,9 +206,10 @@ describe("SimCfnTemplate Fn::Select", () => {
     await stack.waitForDeployComplete();
 
     // Then the Fn::GetAtt inside made the read Resource a dependency.
-    assertArrayEquals(stack.getResource("LogsBucket")?.dependencies(), [
-      "SiteBucket",
-    ]);
+    assertArrayEquals(
+      deployedStackObject(stack).getResource("LogsBucket")?.dependencies(),
+      ["SiteBucket"],
+    );
 
     // And the Bucket was created with the selected part of the domain name.
     assertNonNullable(

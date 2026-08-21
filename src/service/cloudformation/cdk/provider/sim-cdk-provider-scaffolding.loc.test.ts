@@ -2,7 +2,7 @@ import { assertArrayEquals, assertNonNullable } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
-import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
+import type { SimCfnDeployedResource } from "../../resource/sim-cfn-deployed-resource.type.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
@@ -93,7 +93,9 @@ app.synth();
   });
 });
 
-function resourceTypesOf(resources: readonly SimCfnResource[]): string[] {
+function resourceTypesOf(
+  resources: readonly SimCfnDeployedResource[],
+): string[] {
   return resources
     .map((resource) => resource.type ?? "")
     .toSorted((left, right) => left.localeCompare(right));

@@ -258,7 +258,7 @@ describe("Sim ACM CloudFormation Certificate", () => {
     // Then the Stack completes, but records the unsupported resource as skipped.
     const skippedResource = stack.skippedResources[0];
 
-    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
     assertArrayLength(stack.skippedResources, 1);
     assertNonNullable(skippedResource);
     assertIdentical(skippedResource.logicalId, "UnsupportedAcmResource");

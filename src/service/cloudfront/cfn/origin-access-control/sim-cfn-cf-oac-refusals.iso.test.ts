@@ -88,7 +88,7 @@ describe("AWS::CloudFront::OriginAccessControl refusals", () => {
     });
     await stack.waitForDeployComplete();
 
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
 
     // When a Distribution attaches it to a custom Origin.

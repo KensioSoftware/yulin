@@ -35,7 +35,7 @@ describe("SSM CloudFormation Resource teardown", () => {
         .getParameter(new GetParameterCommand({ Name: "/app/api-url" })),
     );
     assertIdentical(
-      stack.resources.get("ApiUrlParameter")?.status,
+      stack.getResource("ApiUrlParameter")?.status,
       "DELETE_COMPLETE",
     );
   });

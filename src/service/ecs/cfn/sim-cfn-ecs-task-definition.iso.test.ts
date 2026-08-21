@@ -273,7 +273,7 @@ describe("AWS::ECS::TaskDefinition", () => {
     // than failing the stack.
     assertIdentical(simAws.ecs().taskDefinition("orders-worker").revision, 1);
 
-    const ignored = stack.resources.get(
+    const ignored = stack.getResource(
       "WorkerTaskDefinition",
     )?.ignoredProperties;
     assertNonNullable(ignored);

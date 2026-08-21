@@ -67,7 +67,7 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
       Statement: [publicReadStatement],
     });
 
-    const resource = stack.resources.get("ReportsBucketPolicy");
+    const resource = stack.getResource("ReportsBucketPolicy");
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
     assertArrayLength(stack.skippedResources, 0);
@@ -175,7 +175,7 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
     });
 
     // Then the policy still reaches the Bucket.
-    const resource = stack.resources.get("ReportsBucketPolicy");
+    const resource = stack.getResource("ReportsBucketPolicy");
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
 

@@ -11,6 +11,10 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 describe("CloudFront CloudFormation Distribution", () => {
   it("creates a CloudFront Distribution from AWS::CloudFront::Distribution", async () => {
@@ -145,10 +149,11 @@ describe("CloudFront CloudFormation Distribution", () => {
 
     assertTypeString(distributionId);
 
-    const resolvedWaitHandleProperties =
-      await waitHandleResource.resolvedProperties({
-        resources: stack.resources,
-      });
+    const resolvedWaitHandleProperties = await deployedResourceObject(
+      waitHandleResource,
+    ).resolvedProperties({
+      resources: deployedStackObject(stack).resources,
+    });
 
     assertIdentical(
       resolvedWaitHandleProperties["DistributionId"],

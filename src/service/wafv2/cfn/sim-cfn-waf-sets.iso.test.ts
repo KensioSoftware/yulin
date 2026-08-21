@@ -14,7 +14,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValue } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
@@ -66,7 +66,7 @@ async function deploySets(
   simAws: SimAws,
   ipSet: Record<string, SimCfnTemplateValue> = {},
   patternSet: Record<string, SimCfnTemplateValue> = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "sets",
     template: setsTemplate(ipSet, patternSet),
@@ -80,7 +80,7 @@ async function deploySets(
  * One output of the deployed stack, which every assertion here reaches an ARN
  * through.
  */
-function outputValue(stack: SimCfnStack, name: string): string {
+function outputValue(stack: SimCfnDeployedStack, name: string): string {
   const value = stack.outputs.get(name)?.value;
 
   assertTypeString(value);

@@ -13,7 +13,7 @@ import {
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { simCfnHttpApiTemplateFactory } from "./sim-cfn-http-api-template.factory.js";
 
@@ -136,7 +136,7 @@ function requestAuthorizerTemplate(
 
 function get(
   simAws: SimAws,
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
   cookie: string,
 ): Promise<Response> {
   const apiEndpoint = stack.outputs.get("ApiEndpoint")?.value as string;

@@ -290,7 +290,7 @@ describe("Deploying a CDK cloud assembly [iso]", () => {
     // Then the producer had published its export by the time the consumer
     // imported it, so the import resolved to the value the producer exported.
     assertIdentical(
-      stacks.get("ConsumerStack")?.resources.get("ConsumerTopic")?.properties[
+      stacks.get("ConsumerStack")?.getResource("ConsumerTopic")?.properties[
         "DisplayName"
       ],
       assemblyStackBucketName("ProducerStack"),

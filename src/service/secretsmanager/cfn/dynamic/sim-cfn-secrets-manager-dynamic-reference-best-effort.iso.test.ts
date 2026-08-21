@@ -7,7 +7,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 
 const accountIdOneOnes = "111111111111";
 
@@ -21,7 +21,7 @@ function simAwsInEuWest2(): SimAws {
 async function deployReading(
   simAws: SimAws,
   value: string,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "config-stack",
     template: {
@@ -51,7 +51,7 @@ function readValue(simAws: SimAws): string {
  * A Resource can record properties of its own alongside this, so the reference
  * is picked out by what its reason quotes.
  */
-function dynamicReferenceRecord(stack: SimCfnStack): {
+function dynamicReferenceRecord(stack: SimCfnDeployedStack): {
   path: string;
   reason: string;
 } {

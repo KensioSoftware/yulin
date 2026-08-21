@@ -156,7 +156,7 @@ describe("S3 CloudFormation PublicAccessBlockConfiguration", () => {
     });
 
     // Then the Stack deploys and the policy is attached.
-    const resource = stack.resources.get("SiteBucketPolicy");
+    const resource = stack.getResource("SiteBucketPolicy");
     assertStringIncludes(resource?.status ?? "", "CREATE_COMPLETE");
   });
 });

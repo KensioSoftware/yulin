@@ -9,6 +9,10 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimIamUser } from "../../user/sim-iam-user.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 describe("IAM CloudFormation User", () => {
   it("creates an IAM User from AWS::IAM::User", async () => {
@@ -268,10 +272,11 @@ describe("IAM CloudFormation User", () => {
 
     assertIdentical(userResource.refValue, "OutputUser");
 
-    const resolvedWaitHandleProperties =
-      await waitHandleResource.resolvedProperties({
-        resources: stack.resources,
-      });
+    const resolvedWaitHandleProperties = await deployedResourceObject(
+      waitHandleResource,
+    ).resolvedProperties({
+      resources: deployedStackObject(stack).resources,
+    });
 
     assertIdentical(resolvedWaitHandleProperties["UserName"], "OutputUser");
     assertIdentical(resolvedWaitHandleProperties["UserArn"], user.arn);

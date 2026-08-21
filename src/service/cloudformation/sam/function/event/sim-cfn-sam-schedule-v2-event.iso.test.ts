@@ -9,7 +9,7 @@ import { describe, it } from "vitest";
 
 import { SimFixedClock } from "../../../../../util/clock/sim-clock.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import {
   samFunctionTemplateLogicalId,
@@ -27,7 +27,7 @@ async function deployScheduled(properties: {
   readonly events: SimCfnTemplateValueRecord;
   readonly resources?: SimCfnTemplateValueRecord;
   readonly received: unknown[];
-}): Promise<SimCfnStack> {
+}): Promise<SimCfnDeployedStack> {
   const stack = await properties.simAws.cloudFormation().deployTemplate({
     stackName: "reporting-stack",
     template: simCfnSamFunctionTemplateFactory.make({

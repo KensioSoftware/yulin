@@ -76,10 +76,7 @@ describe("Route53 CloudFormation RecordSets with an unmodelled record type", () 
     );
 
     // And the records the test is about were created.
-    assertIdentical(
-      stack.resources.get("SiteRecord")?.status,
-      "CREATE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("SiteRecord")?.status, "CREATE_COMPLETE");
     const hostedZone = stack.getResource("SiteZone")?.simResource;
     assertInstanceOf(hostedZone, SimRoute53HostedZone);
     assertObjectMatches(hostedZone.records.get("www.example.test", "A"), {
@@ -136,18 +133,15 @@ describe("Route53 CloudFormation RecordSets with an unmodelled record type", () 
     // Then the teardown ran to the end, taking the created record and its zone
     // with it. The zone only goes if its records went first, because
     // DeleteHostedZone refuses a zone that still holds records.
-    assertIdentical(
-      stack.resources.get("SiteRecord")?.status,
-      "DELETE_COMPLETE",
-    );
-    assertIdentical(stack.resources.get("SiteZone")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("SiteRecord")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("SiteZone")?.status, "DELETE_COMPLETE");
     assertMapSize(simAws.route53().hostedZones, 0);
 
     // And the skipped record is delete-complete without a service being asked
     // to remove a record it never stored, so nothing was left behind. The skip
     // is still on the Stack to be read after the teardown.
     assertIdentical(
-      stack.resources.get("DelegationSigner")?.status,
+      stack.getResource("DelegationSigner")?.status,
       "DELETE_COMPLETE",
     );
     assertArrayLength(stack.skippedResourceDeletions, 0);

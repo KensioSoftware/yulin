@@ -132,7 +132,7 @@ describe("Lambda CloudFormation Resource teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const mapping = stack.resources.get("OrderConsumerMapping")?.simResource as
+    const mapping = stack.getResource("OrderConsumerMapping")?.simResource as
       | SimLambdaEventSourceMapping
       | undefined;
     assertNonNullable(mapping);
@@ -146,7 +146,7 @@ describe("Lambda CloudFormation Resource teardown", () => {
     assertUndefined(simAws.lambda().getSimFunctionByName("order-consumer"));
     assertArrayLength(stack.skippedResourceDeletions, 0);
     assertIdentical(
-      stack.resources.get("OrderConsumerMapping")?.status,
+      stack.getResource("OrderConsumerMapping")?.status,
       "DELETE_COMPLETE",
     );
   });

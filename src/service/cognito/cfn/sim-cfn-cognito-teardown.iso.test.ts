@@ -39,7 +39,7 @@ describe("Cognito CloudFormation Resource teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const userPoolId = stack.resources.get("AppPool")?.refValue;
+    const userPoolId = stack.getResource("AppPool")?.refValue;
     assertTypeString(userPoolId);
 
     // When the Stack's Resources are torn down.
@@ -55,7 +55,7 @@ describe("Cognito CloudFormation Resource teardown", () => {
     );
     for (const logicalId of ["AdminsGroup", "AppClient", "AppPool"]) {
       assertIdentical(
-        stack.resources.get(logicalId)?.status,
+        stack.getResource(logicalId)?.status,
         "DELETE_COMPLETE",
         `${logicalId} status`,
       );

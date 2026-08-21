@@ -2,7 +2,7 @@ import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const accountIdOneOnes = "111111111111";
@@ -22,7 +22,7 @@ async function deployReading(
   simAws: SimAws,
   value: SimCfnTemplateValue,
   parameters: Record<string, { Type: string; Default?: string }> = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "config-stack",
     template: {

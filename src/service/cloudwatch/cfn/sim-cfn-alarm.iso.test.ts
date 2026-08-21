@@ -18,7 +18,7 @@ import { describe, it } from "vitest";
 
 import { BackgroundTasks } from "../../../util/background/background.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const startedAt = new Date("2026-08-16T09:00:00.000Z");
@@ -45,7 +45,7 @@ const failingOrders: SimCfnTemplateValueRecord = {
 async function deployAlarm(
   properties: SimCfnTemplateValueRecord,
   simAws: SimAws = new SimAws(),
-): Promise<{ readonly simAws: SimAws; readonly stack: SimCfnStack }> {
+): Promise<{ readonly simAws: SimAws; readonly stack: SimCfnDeployedStack }> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "orders",
     template: {
