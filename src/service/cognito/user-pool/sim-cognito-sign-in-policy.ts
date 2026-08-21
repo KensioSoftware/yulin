@@ -32,19 +32,22 @@ const firstAuthFactors: readonly SimCognitoFirstAuthFactor[] = [
 const mostFactors = 5;
 
 /**
+ * What a pool allows at the first prompt when its policy named nothing, which
+ * is what real Cognito falls back to.
+ */
+const defaultFactors: readonly SimCognitoFirstAuthFactor[] = ["PASSWORD"];
+
+/**
  * The factors one simulated user pool allows at the first prompt.
  *
  * A pool created without a sign-in policy allows a password and says nothing
  * about it, which is how real Cognito reports one. A pool created with a
  * policy carries the factors it named, and reports them back under `Policies`.
  *
- * **The factor a sign-in presents is not settled here.** These are recorded
- * the way an `MfaConfiguration` is recorded, and the sign-in that presents one
- * is where they are read. Every factor beside `PASSWORD` is reached through
- * the `USER_AUTH` flow, and `SimCognitoAuthFlows` still refuses that flow by
- * name, so a pool configured for a code sent by email deploys, describes
- * itself the way the deployed pool does, and refuses that sign-in in words
- * that say what could not be done.
+ * A `USER_AUTH` sign-in reads these to decide what it can offer, and answers
+ * with the ones this user could actually present. `PASSWORD` and `WEB_AUTHN`
+ * are presented here. A code sent by email or by text is not, and a sign-in
+ * choosing one is refused in words that say what could not be done.
  *
  * The validation is real Cognito's. The four factor names are the ones it
  * accepts, a list may name five of them at most, and a policy offering
@@ -127,6 +130,14 @@ export class SimCognitoSignInPolicy {
           "accompanied by at least one other factor",
       );
     }
+  }
+
+  /**
+   * The factors a sign-in may offer, which is what the policy named or the
+   * password a pool with no policy allows.
+   */
+  get factors(): readonly SimCognitoFirstAuthFactor[] {
+    return this.#allowedFirstAuthFactors ?? defaultFactors;
   }
 
   /**

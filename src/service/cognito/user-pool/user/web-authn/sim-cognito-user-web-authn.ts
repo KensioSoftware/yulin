@@ -6,7 +6,7 @@ import {
   type SimCognitoWebAuthnRegistrationRequest,
 } from "./sim-cognito-web-authn-creation-options.js";
 import type { SimCognitoWebAuthnCredential } from "./sim-cognito-web-authn-credential.js";
-import { simCognitoWebAuthnCreated } from "./sim-cognito-web-authn-authenticator.js";
+import { SimCognitoWebAuthnDevice } from "./sim-cognito-web-authn-device.js";
 import type {
   SimCognitoWebAuthnCreationOptions,
   SimCognitoWebAuthnCredentialDocument,
@@ -26,14 +26,17 @@ interface SimCognitoUserWebAuthnProperties {
  * authenticator made from it. The challenge is spent either way, so a
  * credential cannot be replayed into a second registration.
  *
- * What the pool keeps of a registration is the public key, the relying party
- * and the identifier, and all of it is checked before any of it is stored.
+ * The device the credential comes from is here too, because a test has no
+ * browser and no phone. What it holds is only the private half. What the pool
+ * keeps of a registration is the public key, the relying party and the
+ * identifier, and all of it is checked before any of it is stored.
  *
  * Registering or deleting a passkey moves the user's `UserLastModifiedDate`
  * on, as every other change to a user does. Whether real Cognito moves it for
  * a passkey was not checked against a live account.
  */
 export class SimCognitoUserWebAuthn {
+  readonly #device = new SimCognitoWebAuthnDevice();
   readonly #credentials = new Map<string, SimCognitoWebAuthnCredential>();
 
   /**
@@ -47,6 +50,14 @@ export class SimCognitoUserWebAuthn {
 
   constructor(properties: SimCognitoUserWebAuthnProperties) {
     this.#changed = properties.changed;
+  }
+
+  /**
+   * The stand-in authenticator this user's passkeys live on, which is what
+   * makes one and what presents one.
+   */
+  get device(): SimCognitoWebAuthnDevice {
+    return this.#device;
   }
 
   /**
@@ -107,6 +118,7 @@ export class SimCognitoUserWebAuthn {
       );
     }
 
+    this.#device.forget(credentialId);
     this.#changed();
   }
 
@@ -119,7 +131,7 @@ export class SimCognitoUserWebAuthn {
    * browser hands back the credential.
    */
   registrationCredential(): SimCognitoWebAuthnCredentialDocument {
-    return simCognitoWebAuthnCreated(this.requirePending());
+    return this.#device.create(this.requirePending());
   }
 
   /**

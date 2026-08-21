@@ -51,6 +51,12 @@ export interface SimCognitoAuthenticationOutput {
   readonly ChallengeName?: string | undefined;
   readonly Session?: string | undefined;
   readonly ChallengeParameters?: Readonly<Record<string, string>> | undefined;
+
+  /**
+   * The factors a `USER_AUTH` sign-in offers, where the request named no
+   * preference and the pool answered with `SELECT_CHALLENGE`.
+   */
+  readonly AvailableChallenges?: readonly string[] | undefined;
   readonly AuthenticationResult?:
     | SimCognitoAuthenticationResultType
     | undefined;

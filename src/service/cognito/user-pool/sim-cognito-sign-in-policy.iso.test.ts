@@ -1,4 +1,6 @@
 import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
   CreateUserPoolCommand,
   CreateUserPoolClientCommand,
   DescribeUserPoolCommand,
@@ -8,9 +10,9 @@ import {
 import type { CreateUserPoolCommandInput } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
-  assertStringNotIncludes,
   assertThrowsErrorAsync,
   assertTypeString,
   assertUndefined,
@@ -171,19 +173,16 @@ describe("sim Cognito sign-in policy", () => {
   });
 
   /*
-   * The guard on everything above. A pool that allows passkeys deploys and
-   * describes itself, and nothing here can sign in with one. The refusal is on
-   * the flow every factor beside a password is presented through, so it says
-   * what could not be done rather than leaving a test to believe a passkey
-   * sign-in ran.
+   * The guard on everything above. A pool that allows passkeys is one a
+   * `USER_AUTH` sign-in reads, and a factor the policy leaves out is one the
+   * sign-in will not offer.
    */
-  it("goes on refusing the flow those factors are presented through", async () => {
-    // Given a pool allowing passkeys, with a client that permits the flow.
+  it("offers only the factors its policy allows", async () => {
+    // Given a pool allowing a password alone, with a client that permits the
+    // choice-based flow and a user to sign in.
     const cognito = simCognito();
     const userPoolId = await createdPoolId(cognito, {
-      Policies: {
-        SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD", "WEB_AUTHN"] },
-      },
+      Policies: { SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD"] } },
     });
     const client = await cognito.createUserPoolClient(
       new CreateUserPoolClientCommand({
@@ -193,21 +192,30 @@ describe("sim Cognito sign-in policy", () => {
       }),
     );
 
-    // When a sign-in asks for choice-based authentication.
-    const error = await assertThrowsErrorAsync(async () => {
-      await cognito.initiateAuth(
-        new InitiateAuthCommand({
-          ClientId: client.UserPoolClient?.ClientId,
-          AuthFlow: "USER_AUTH",
-          AuthParameters: { USERNAME: "someone@example.com" },
-        }),
-      );
-    });
+    await cognito.adminCreateUser(
+      new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+    await cognito.adminSetUserPassword(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+        Password: "Sup3rSecret!",
+        Permanent: true,
+      }),
+    );
 
-    // Then it is refused naming the flow, and the pool's own policy is left
-    // out of it.
-    assertStringIncludes(error.message, "'USER_AUTH' is not simulated");
-    assertStringIncludes(error.message, "choice-based sign-in");
-    assertStringNotIncludes(error.message, "SignInPolicy");
+    // When a sign-in asks what it can be answered with.
+    const offered = await cognito.initiateAuth(
+      new InitiateAuthCommand({
+        ClientId: client.UserPoolClient?.ClientId,
+        AuthFlow: "USER_AUTH",
+        AuthParameters: { USERNAME: "alice" },
+      }),
+    );
+
+    // Then the password is the whole of the choice, and the pool's own policy
+    // is what said so.
+    assertIdentical(offered.ChallengeName, "SELECT_CHALLENGE");
+    assertArrayEquals(offered.AvailableChallenges, ["PASSWORD"]);
   });
 });

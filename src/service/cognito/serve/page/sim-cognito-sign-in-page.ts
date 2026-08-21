@@ -12,6 +12,11 @@ import {
 import { simCognitoProviderLinks } from "./sim-cognito-provider-links.js";
 
 /**
+ * The factor a pool has to allow before the form offers a passkey.
+ */
+const webAuthnFactor = "WEB_AUTHN";
+
+/**
  * The other pages the sign-in form links to, in the order they are offered.
  */
 const linkedPages: readonly (readonly [string, string])[] = [
@@ -24,7 +29,9 @@ const linkedPages: readonly (readonly [string, string])[] = [
  * The sign-in form managed login answers an authorize request with.
  *
  * The form posts back to the authorize endpoint, carrying the parameters the
- * browser arrived on as hidden inputs and the two fields the person filled in.
+ * browser arrived on as hidden inputs and the fields the person filled in. A
+ * pool that allows a passkey at the first prompt offers one beside the
+ * password.
  * The pool's identity providers are links to the same endpoint with
  * `identity_provider` set, so both ways in are reachable from this one page,
  * and the other pages of the journey are links beside them.
@@ -48,7 +55,8 @@ export class SimCognitoSignInPage {
         this.markup.hidden(parameters) +
           this.markup.field("username", "Username") +
           this.markup.field("password", "Password", "password") +
-          this.markup.submit("signIn", "Sign in"),
+          this.markup.submit("signIn", "Sign in") +
+          this.passkeyButton(pool),
       ) +
       simCognitoProviderLinks(this.markup, pool, parameters) +
       linkedPages
@@ -56,5 +64,22 @@ export class SimCognitoSignInPage {
         .join("");
 
     return this.markup.page("Sign in", body);
+  }
+
+  /**
+   * The passkey button, where the pool allows one at the first prompt.
+   *
+   * It skips the browser's own validation so that the password field can be
+   * left empty, and posts the username the person typed. Real managed login
+   * runs the WebAuthn ceremony in the browser at this point, and this
+   * simulation serves no script, so the button is the whole of what the form
+   * sends.
+   */
+  private passkeyButton(pool: SimCognitoUserPool): string {
+    if (!pool.settings.signInPolicy.factors.includes(webAuthnFactor)) {
+      return "";
+    }
+
+    return this.markup.submit("passkey", "Sign in with a passkey", true);
   }
 }

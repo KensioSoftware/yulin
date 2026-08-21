@@ -3,6 +3,11 @@ import {
   simCognitoSmsMfa,
   simCognitoSoftwareTokenMfa,
 } from "../../user-pool/user/mfa/sim-cognito-mfa-factors.js";
+import {
+  simCognitoPasswordChallenge,
+  simCognitoWebAuthnChallenge,
+} from "./sim-cognito-available-challenges.js";
+import { simCognitoSelectChallenge } from "./sim-cognito-first-factor-challenge.js";
 
 /**
  * The challenge a user with a temporary password is answered with.
@@ -16,11 +21,18 @@ export const newPasswordRequiredChallenge = "NEW_PASSWORD_REQUIRED";
  * how Cognito names them: a user registered for a software token is
  * challenged with `SOFTWARE_TOKEN_MFA` and answers with a
  * `SOFTWARE_TOKEN_MFA_CODE`.
+ *
+ * The last three are the first factors of a `USER_AUTH` sign-in.
+ * `SELECT_CHALLENGE` is answered with the factor the user picked, and the
+ * other two with the factor itself.
  */
 const answerableChallenges: readonly string[] = [
   newPasswordRequiredChallenge,
   simCognitoSmsMfa,
   simCognitoSoftwareTokenMfa,
+  simCognitoSelectChallenge,
+  simCognitoPasswordChallenge,
+  simCognitoWebAuthnChallenge,
 ];
 
 /**

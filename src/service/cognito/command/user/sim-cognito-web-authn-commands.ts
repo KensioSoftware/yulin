@@ -1,6 +1,8 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import { SimCognitoWebAuthnConfigurationMissingException } from "../../error/sim-cognito-web-authn.error.js";
-import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import {
+  requireSimCognitoRelyingParty,
+  simCognitoUserVerification,
+} from "../../user-pool/mfa/sim-cognito-relying-party.js";
 import { SimCognitoPage } from "../sim-cognito-page.js";
 import type { SimCognitoTokenUser } from "./sim-cognito-token-user.js";
 import type {
@@ -26,37 +28,6 @@ interface SimCognitoWebAuthnCommandsProperties {
  * page.
  */
 const defaultMaxResults = 20;
-
-/**
- * What an authenticator is asked to check when the pool has said nothing,
- * which is the value real Cognito applies.
- */
-const defaultUserVerification = "preferred";
-
-/**
- * The relying party a pool registers passkeys against.
- *
- * A passkey belongs to a domain. A pool that configured a `RelyingPartyId`
- * uses that, and one that did not falls back to its own hosted domain, which
- * is what real Cognito falls back to. A pool with neither has nothing to
- * register a passkey against, and real Cognito refuses that with
- * `WebAuthnConfigurationMissingException`.
- */
-function requireRelyingParty(pool: SimCognitoUserPool): string {
-  const relyingPartyId =
-    pool.settings.mfa.webAuthn?.relyingPartyId ?? pool.auth.domain?.hostname;
-
-  if (relyingPartyId === undefined) {
-    throw new SimCognitoWebAuthnConfigurationMissingException(
-      `The user pool ${pool.id} registers passkeys against no relying party: ` +
-        `give it a hosted domain with CreateUserPoolDomain, or set one with ` +
-        `SetUserPoolMfaConfig WebAuthnConfiguration RelyingPartyId, which an ` +
-        `AWS::Cognito::UserPool Resource deploys as WebAuthnRelyingPartyID.`,
-    );
-  }
-
-  return relyingPartyId;
-}
 
 /**
  * The commands a signed-in user registers and manages its passkeys with.
@@ -97,13 +68,11 @@ export class SimCognitoWebAuthnCommands {
     return {
       $metadata: {},
       CredentialCreationOptions: user.webAuthn.startRegistration({
-        relyingPartyId: requireRelyingParty(pool),
+        relyingPartyId: requireSimCognitoRelyingParty(pool),
         relyingPartyName: pool.name,
         userHandle: user.sub,
         username: user.username,
-        userVerification:
-          pool.settings.mfa.webAuthn?.userVerification ??
-          defaultUserVerification,
+        userVerification: simCognitoUserVerification(pool),
       }),
     };
   }

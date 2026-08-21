@@ -6,6 +6,7 @@ import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.j
 import { SimCognitoAuthorizeRequest } from "./sim-cognito-authorize-request.js";
 import { SimCognitoBrowserSession } from "./sim-cognito-browser-session.js";
 import { SimCognitoHostedCredentials } from "./sim-cognito-hosted-credentials.js";
+import { SimCognitoHostedPasskeySignIn } from "./sim-cognito-hosted-passkey-sign-in.js";
 import { SimCognitoHostedPasswordSignIn } from "./sim-cognito-hosted-password-sign-in.js";
 import type { SimCognitoHostedSignedIn } from "./sim-cognito-hosted-signed-in.js";
 import type { SimCognitoAuthorizeInput } from "./hosted-auth.command.js";
@@ -30,6 +31,7 @@ export class SimCognitoHostedSignIn {
   private readonly clock: SimClock;
   private readonly request = new SimCognitoAuthorizeRequest();
   private readonly passwordSignIn = new SimCognitoHostedPasswordSignIn();
+  private readonly passkeySignIn = new SimCognitoHostedPasskeySignIn();
   private readonly browserSession = new SimCognitoBrowserSession();
 
   constructor(properties: SimCognitoHostedSignInProperties) {
@@ -60,12 +62,12 @@ export class SimCognitoHostedSignIn {
   }
 
   /**
-   * Sign in one of the pool's own users, from a password or from the session
-   * the browser is already holding.
+   * Sign in one of the pool's own users, with a passkey, with a password, or
+   * from the session the browser is already holding.
    *
-   * Credentials win over a session, because a request carrying them is the
-   * sign-in form coming back and real managed login answers that with a fresh
-   * sign-in. A request carrying neither, from a browser holding no session, is
+   * A passkey and a password are both the sign-in form coming back, and either
+   * wins over a session, because real managed login answers a form post with a
+   * fresh sign-in. A request carrying neither, from a browser holding no session, is
    * one the sign-in form is shown for. The serving layer answers with that
    * page, from this refusal.
    */
@@ -76,6 +78,15 @@ export class SimCognitoHostedSignIn {
     presentedSession: string | undefined,
   ): SimCognitoHostedSignedIn {
     const now = this.clock.now();
+
+    if (input.passkey !== undefined && input.username !== undefined) {
+      return this.browserSession.start(
+        pool,
+        this.passkeySignIn.signIn(pool, client, input.username),
+        now,
+      );
+    }
+
     const credentials = SimCognitoHostedCredentials.in(input);
 
     if (credentials === undefined) {

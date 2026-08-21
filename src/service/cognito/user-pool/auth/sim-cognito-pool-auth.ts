@@ -1,3 +1,4 @@
+import { SimCognitoNotAuthorizedException } from "../../error/sim-cognito.error.js";
 import { SimCognitoIdentityProviderStore } from "../idp/sim-cognito-identity-provider-store.js";
 import type { SimCognitoUserPoolDomain } from "../domain/sim-cognito-user-pool-domain.js";
 import type { SimCognitoAuthSession } from "./sim-cognito-auth-session.js";
@@ -96,6 +97,22 @@ export class SimCognitoPoolAuth {
    */
   requireSession(request: SimCognitoAuthSessionRequest): SimCognitoAuthSession {
     return this.sessions.require(request);
+  }
+
+  /**
+   * The `WEB_AUTHN` challenge session a test is reading a credential for, or a
+   * refusal where this pool has no such session.
+   */
+  requireWebAuthnSession(sessionId: string): SimCognitoAuthSession {
+    const session = this.sessions.find(sessionId);
+
+    if (session === undefined) {
+      throw new SimCognitoNotAuthorizedException(
+        "Invalid session for the user.",
+      );
+    }
+
+    return session;
   }
 
   /**

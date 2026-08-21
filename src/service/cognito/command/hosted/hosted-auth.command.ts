@@ -30,6 +30,16 @@ export interface SimCognitoAuthorizeInput {
    */
   readonly username?: string | undefined;
   readonly password?: string | undefined;
+
+  /**
+   * Whether the person pressed managed login's passkey button rather than
+   * filling in a password.
+   *
+   * Real managed login runs the WebAuthn ceremony in the browser and posts the
+   * credential back. This simulation serves no script, so the button is what
+   * the request carries and the simulator presents the passkey itself.
+   */
+  readonly passkey?: string | undefined;
 }
 
 /**

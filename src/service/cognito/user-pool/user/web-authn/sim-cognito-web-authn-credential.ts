@@ -1,6 +1,8 @@
 import type { KeyObject } from "node:crypto";
 
+import type { SimCognitoWebAuthnCeremony } from "./sim-cognito-web-authn-ceremony.js";
 import type { SimCognitoWebAuthnCredentialDescriptor } from "./sim-cognito-web-authn-document.js";
+import { simCognitoWebAuthnVerified } from "./sim-cognito-web-authn-signing.js";
 
 /**
  * One registered passkey as `ListWebAuthnCredentials` reports it.
@@ -58,6 +60,22 @@ export class SimCognitoWebAuthnCredential {
     this.transports = properties.transports;
     this.createdAt = properties.createdAt;
     this.publicKey = properties.publicKey;
+  }
+
+  /**
+   * Whether this passkey is what signed a ceremony.
+   *
+   * The signature covers the authenticator data and a hash of the client data,
+   * so a credential replayed with either of them changed fails here even
+   * though both were read successfully.
+   */
+  signed(ceremony: SimCognitoWebAuthnCeremony, signature: Buffer): boolean {
+    return simCognitoWebAuthnVerified(
+      this.publicKey,
+      ceremony.authenticatorData,
+      ceremony.clientDataJson,
+      signature,
+    );
   }
 
   /**

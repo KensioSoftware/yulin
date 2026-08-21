@@ -18,10 +18,9 @@ import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
  * is what refuses instead, where the refusal can say what it was that could
  * not be done.
  *
- * `Policies SignInPolicy` is absent for the same reason. A pool records the
- * factors it allows at the first prompt and reports them back, and every
- * factor beside a password is presented through the `USER_AUTH` flow, which
- * `SimCognitoAuthFlows` refuses by name. See `SimCognitoSignInPolicy`.
+ * `Policies SignInPolicy` is absent because a pool acts on it. It records the
+ * factors it allows at the first prompt, reports them back, and offers them to
+ * a `USER_AUTH` sign-in. See `SimCognitoSignInPolicy`.
  */
 export class SimCognitoUnsimulatedUserPoolOptions {
   private readonly unsimulated: SimCognitoUnsimulatedInput;
