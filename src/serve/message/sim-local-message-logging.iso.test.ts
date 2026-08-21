@@ -208,6 +208,57 @@ describe("Logging the messages a served environment records", () => {
     );
   });
 
+  it("prints both blocks for a pool that sends through SES", async () => {
+    // Given a served environment, and a pool emailing through the account's
+    // SES.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const target = recordingConsole();
+
+    new SimLocalMessageLogging({ simAws, target }).serving();
+    simAws.sesV2().verifyIdentity("example.com");
+    simAws.sesV2().verifyIdentity("alice@example.com");
+
+    const cognito = simAws.cognitoIdentityProvider();
+    const created = await cognito.createUserPool(
+      new CreateUserPoolCommand({
+        PoolName: "myapp-users",
+        AutoVerifiedAttributes: ["email"],
+        EmailConfiguration: {
+          EmailSendingAccount: "DEVELOPER",
+          From: "no-reply@example.com",
+          SourceArn: "arn:aws:ses:eu-west-2:111122223333:identity/example.com",
+        },
+      }),
+    );
+
+    assertNonNullable(created.UserPool?.Id);
+
+    const client = await cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: created.UserPool.Id,
+        ClientName: "web",
+      }),
+    );
+
+    assertNonNullable(client.UserPoolClient?.ClientId);
+
+    // When a user signs itself up.
+    await cognito.signUp(
+      new SignUpCommand({
+        ClientId: client.UserPoolClient.ClientId,
+        Username: "alice",
+        Password: "Sup3rSecret!",
+        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+      }),
+    );
+
+    // Then both services printed it, SES first, because both recorded it and
+    // the console says what each one holds.
+    assertArrayLength(target.lines, 2);
+    assertStringIncludes(target.lines[0], "sim SES: no-reply@example.com");
+    assertStringIncludes(target.lines[1], "sim Cognito");
+  });
+
   it("prints nothing once the server has stopped", async () => {
     // Given a served environment that has stopped serving.
     const simAws = new SimAws();

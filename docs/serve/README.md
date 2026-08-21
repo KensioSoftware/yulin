@@ -846,6 +846,10 @@ A text part is printed up to 2000 characters. What runs past that is counted and
     ... 4162 more characters, not printed
 ```
 
+A user pool sending its email through simulated SES prints twice, once for the SES send and once for
+the message the pool kept. Both services recorded it, and each block says what that service holds.
+See [Sending a pool's email through SES](../services/cognito/README.md#sending-a-pools-email-through-ses).
+
 `emailTextLimit` moves that limit. It sits beside the per-kind switches on the same option:
 
 ```typescript sim-serve-email-text-limit
