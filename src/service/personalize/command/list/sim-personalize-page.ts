@@ -1,4 +1,7 @@
-import { SimPersonalizeInvalidInputException } from "../../error/sim-personalize.error.js";
+import {
+  SimPersonalizeInvalidInputException,
+  SimPersonalizeInvalidNextTokenException,
+} from "../../error/sim-personalize.error.js";
 
 /**
  * The default page size every Personalize list operation shares.
@@ -30,9 +33,13 @@ export function simPersonalizePageOf<T>(
 ): SimPersonalizePage<T> {
   const maxResults = request.maxResults ?? defaultMaxResults;
 
-  if (maxResults < 1 || maxResults > maximumMaxResults) {
+  if (
+    !Number.isSafeInteger(maxResults) ||
+    maxResults < 1 ||
+    maxResults > maximumMaxResults
+  ) {
     throw new SimPersonalizeInvalidInputException(
-      `maxResults must be between 1 and ${maximumMaxResults}`,
+      `maxResults must be a whole number between 1 and ${maximumMaxResults}`,
     );
   }
 
@@ -54,7 +61,7 @@ function pageStart(nextToken: string | undefined): number {
   const start = Number(nextToken);
 
   if (!Number.isSafeInteger(start) || start < 0) {
-    throw new SimPersonalizeInvalidInputException(
+    throw new SimPersonalizeInvalidNextTokenException(
       `'${nextToken}' is not a Personalize pagination token`,
     );
   }

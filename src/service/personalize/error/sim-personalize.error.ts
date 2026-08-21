@@ -88,3 +88,17 @@ export class SimPersonalizeAccessDeniedException extends SimPersonalizeError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated Personalize InvalidNextTokenException error.
+ *
+ * This is the one error the list operations declare. A token real Personalize
+ * never handed out is reported this way rather than as invalid input.
+ */
+export class SimPersonalizeInvalidNextTokenException extends SimPersonalizeError {
+  public override readonly name = "InvalidNextTokenException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

@@ -128,7 +128,9 @@ console.log(dataset.datasetArn);
 ```
 
 The five types are `INTERACTIONS`, `ITEMS`, `USERS`, `ACTIONS` and `ACTION_INTERACTIONS`. A request
-names one case insensitively and Personalize upper-cases it.
+names one case insensitively and Personalize upper-cases it. `ACTIONS` and `ACTION_INTERACTIONS`
+belong to Next-Best-Action, and real Personalize allows them only in a custom dataset group. A
+domain dataset group refuses them here too.
 
 ## Domain dataset groups
 

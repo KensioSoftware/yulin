@@ -168,8 +168,108 @@ describe("Personalize list paging", () => {
           ),
     );
 
+    // Then Personalize reports it as the bad token it is, which is the one
+    // error its list operations declare.
+    assertIdentical(error.name, "InvalidNextTokenException");
+  });
+
+  it("refuses a page size that is not a whole number", async () => {
+    // Given a simulated AWS.
+    const simAws = new SimAws();
+
+    // When a list asks for a fraction of a page. A fractional size would slice
+    // to a fractional index and hand back a token the next call cannot use.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws
+          .personalize()
+          .listDatasetGroups({ input: { maxResults: 1.5 } }),
+    );
+
     // Then Personalize refuses it as invalid input.
     assertIdentical(error.name, "InvalidInputException");
+  });
+
+  it("refuses a page size that is not a number at all", async () => {
+    // Given a simulated AWS.
+    const simAws = new SimAws();
+
+    // When a list asks for NaN results, which passes a bare range check and
+    // would quietly answer with nothing.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws
+          .personalize()
+          .listDatasetGroups({ input: { maxResults: NaN } }),
+    );
+
+    // Then Personalize refuses it as invalid input.
+    assertIdentical(error.name, "InvalidInputException");
+  });
+});
+
+describe("Personalize domain dataset groups", () => {
+  it("refuses a Next-Best-Action dataset in a domain dataset group", async () => {
+    // Given a simulated AWS holding a domain dataset group and a schema.
+    const simAws = new SimAws();
+    const group = await simAws.personalize().createDatasetGroup(
+      new CreateDatasetGroupCommand({
+        name: "storefront",
+        domain: "ECOMMERCE",
+      }),
+    );
+    const schema = await simAws
+      .personalize()
+      .createSchema(
+        new CreateSchemaCommand({ name: "actions", schema: schemaDocument }),
+      );
+
+    // When an actions dataset is added to it.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.personalize().createDataset(
+          new CreateDatasetCommand({
+            name: "enrolments",
+            datasetGroupArn: group.datasetGroupArn,
+            schemaArn: schema.schemaArn,
+            datasetType: "Actions",
+          }),
+        ),
+    );
+
+    // Then Personalize refuses it. Next-Best-Action resources belong to a
+    // custom dataset group.
+    assertIdentical(error.name, "InvalidInputException");
+    assertStringIncludes(error.message, "custom dataset group");
+  });
+
+  it("holds a Next-Best-Action dataset in a custom dataset group", async () => {
+    // Given a simulated AWS holding a custom dataset group and a schema.
+    const simAws = new SimAws();
+    const group = await simAws
+      .personalize()
+      .createDatasetGroup(new CreateDatasetGroupCommand({ name: "app" }));
+    const schema = await simAws
+      .personalize()
+      .createSchema(
+        new CreateSchemaCommand({ name: "actions", schema: schemaDocument }),
+      );
+
+    // When an action interactions dataset is added to it.
+    const created = await simAws.personalize().createDataset(
+      new CreateDatasetCommand({
+        name: "enrolments",
+        datasetGroupArn: group.datasetGroupArn,
+        schemaArn: schema.schemaArn,
+        datasetType: "Action_Interactions",
+      }),
+    );
+
+    // Then it goes through, because a group with no domain is a custom one.
+    assertStringIncludes(
+      created.datasetArn ?? "",
+      "dataset/app/ACTION_INTERACTIONS",
+    );
   });
 });
 

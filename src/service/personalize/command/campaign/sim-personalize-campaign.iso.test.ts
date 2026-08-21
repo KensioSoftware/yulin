@@ -129,6 +129,27 @@ describe("Personalize CreateCampaign", () => {
     assertIdentical(error.name, "InvalidInputException");
   });
 
+  it("refuses a throughput that is not a whole number", async () => {
+    // Given a simulated AWS holding a solution version.
+    const simAws = new SimAws();
+    const { solutionVersionArn } = await givenASolutionVersion(simAws);
+
+    // When a campaign asks for a fraction of a request per second.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.personalize().createCampaign(
+          new CreateCampaignCommand({
+            name: "related-words",
+            solutionVersionArn,
+            minProvisionedTPS: 1.5,
+          }),
+        ),
+    );
+
+    // Then Personalize refuses it. Real Personalize takes an integer here.
+    assertIdentical(error.name, "InvalidInputException");
+  });
+
   it("refuses a campaign whose solution version is absent", async () => {
     // Given a simulated AWS holding no solution versions.
     const simAws = new SimAws();

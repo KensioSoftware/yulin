@@ -9,7 +9,7 @@ CloudFormation templates actually touch.
 ## Resources without models
 
 A dataset group holds schemas and datasets. A solution names a recipe on that group. A solution
-version stands for the trained model, and a campaign is the endpoint a runtime call names. All five
+version stands for the trained model, and a campaign is the endpoint a runtime call names. All six
 exist here as state, reach `ACTIVE` on creation, and report back what the request gave them.
 
 The recipe ARN is recorded and never looked up. There is no catalogue of recipes, because no model

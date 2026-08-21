@@ -44,3 +44,33 @@ export function requireSimPersonalizeDatasetType(
 
   return known;
 }
+
+/**
+ * The dataset types that belong to Next-Best-Action.
+ *
+ * Real Personalize refuses these in a Domain dataset group: "You can't create
+ * next best action resources, including Actions and Action Interactions
+ * datasets, in a domain dataset group." Only the custom Next-Best-Action
+ * recipe uses them.
+ */
+const nextBestActionTypes = new Set<string>(["ACTIONS", "ACTION_INTERACTIONS"]);
+
+/**
+ * Refuse a dataset type the dataset group it is going into cannot hold.
+ *
+ * The domain is what decides it. A dataset group created without one is a
+ * custom group and holds every type.
+ */
+export function requireDatasetTypeAllowed(
+  datasetType: SimPersonalizeDatasetType,
+  domain: string | undefined,
+): void {
+  if (domain === undefined || !nextBestActionTypes.has(datasetType)) {
+    return;
+  }
+
+  throw new SimPersonalizeInvalidInputException(
+    `A ${domain} domain dataset group cannot hold a ${datasetType} dataset. ` +
+      `Next-Best-Action resources belong to a custom dataset group.`,
+  );
+}

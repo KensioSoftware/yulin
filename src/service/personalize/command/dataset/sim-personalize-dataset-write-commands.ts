@@ -1,6 +1,9 @@
 import { SimPersonalizeResourceAlreadyExistsException } from "../../error/sim-personalize.error.js";
 import { simPersonalizeDatasetArn } from "../../resource/sim-personalize-arn.js";
-import { requireSimPersonalizeDatasetType } from "../../resource/sim-personalize-dataset-type.js";
+import {
+  requireDatasetTypeAllowed,
+  requireSimPersonalizeDatasetType,
+} from "../../resource/sim-personalize-dataset-type.js";
 import { SimPersonalizeDataset } from "../../resource/sim-personalize-dataset.js";
 import { requireSimPersonalizeName } from "../../resource/sim-personalize-name.js";
 import { simPersonalizeActiveStatus } from "../../resource/sim-personalize-status.js";
@@ -41,6 +44,9 @@ export class SimPersonalizeDatasetWriteCommands extends SimPersonalizeCommandGro
       input.datasetGroupArn,
     );
     const schema = this.resources.schemas.require(input.schemaArn);
+
+    requireDatasetTypeAllowed(datasetType, datasetGroup.domain);
+
     const arn = simPersonalizeDatasetArn(
       datasetGroup.name,
       datasetType,

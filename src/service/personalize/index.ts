@@ -12,6 +12,7 @@ export {
   SimPersonalizeAccessDeniedException,
   SimPersonalizeError,
   SimPersonalizeInvalidInputException,
+  SimPersonalizeInvalidNextTokenException,
   SimPersonalizeResourceAlreadyExistsException,
   SimPersonalizeResourceInUseException,
   SimPersonalizeResourceNotFoundException,

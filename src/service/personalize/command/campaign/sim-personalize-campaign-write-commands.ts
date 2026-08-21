@@ -75,9 +75,12 @@ export class SimPersonalizeCampaignWriteCommands extends SimPersonalizeCommandGr
 function readMinProvisionedTPS(
   minProvisionedTPS: number | undefined,
 ): number | undefined {
-  if (minProvisionedTPS !== undefined && minProvisionedTPS < 1) {
+  if (
+    minProvisionedTPS !== undefined &&
+    (!Number.isSafeInteger(minProvisionedTPS) || minProvisionedTPS < 1)
+  ) {
     throw new SimPersonalizeInvalidInputException(
-      "minProvisionedTPS must be at least 1",
+      "minProvisionedTPS must be a whole number of at least 1",
     );
   }
 
