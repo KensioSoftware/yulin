@@ -276,9 +276,9 @@ describe("sim Cognito user pool MFA configuration", () => {
     assertStringIncludes(error.message, "SmsAuthenticationMessage");
   });
 
-  it("refuses the second factors it could not deliver a message for", async () => {
-    // Given a pool. No pool here has an SmsConfiguration or an
-    // EmailConfiguration, because CreateUserPool refuses both.
+  it("refuses the second factors it does not challenge for", async () => {
+    // Given a pool. No pool here delivers a text message, and no sign-in here
+    // asks for a code sent by email.
     const { cognito, userPoolId } = await poolWithMfa();
 
     // When a factor needing one of them is asked for.
@@ -303,11 +303,11 @@ describe("sim Cognito user pool MFA configuration", () => {
       );
     });
 
-    // Then both are refused, saying what the pool would have needed.
+    // Then both are refused, saying why the factor is not simulated.
     assertStringIncludes(sms.message, "SmsMfaConfiguration.SmsConfiguration");
     assertStringIncludes(sms.message, "no message is delivered");
     assertStringIncludes(email.message, "a second factor sent by email");
-    assertStringIncludes(email.message, "EmailConfiguration");
+    assertStringIncludes(email.message, "this simulation does not run");
   });
 
   it("refuses a request naming no pool", async () => {

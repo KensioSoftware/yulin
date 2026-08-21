@@ -1,6 +1,10 @@
 export { SimSesV2 } from "./sim-ses-v2.js";
 export type { SimSesV2Properties } from "./sim-ses-commands.js";
 export type { SimSesRequestOptions } from "./command/sim-ses-request-options.js";
+export type {
+  SimSesServiceSendRequest,
+  SimSesServiceSendResult,
+} from "./command/send/sim-ses-service-send.js";
 export {
   SimSesIdentity,
   type SimSesDkimStatus,

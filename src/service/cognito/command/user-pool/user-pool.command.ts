@@ -2,6 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type { SimCognitoAccountRecoverySettingType } from "../../user-pool/sim-cognito-account-recovery.js";
 import type { SimCognitoAdminCreateUserConfigType } from "../../user-pool/sim-cognito-admin-create-user-config.js";
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
+import type { SimCognitoEmailConfigurationType } from "../../user-pool/message/sim-cognito-email-configuration.js";
 import type { SimCognitoVerificationMessagesType } from "../../user-pool/message/sim-cognito-verification-messages.js";
 import type { SimCognitoSchemaAttributeType } from "../../user-pool/schema/sim-cognito-schema-attribute.js";
 import type { SimCognitoUserPoolSettingsInput } from "../../user-pool/sim-cognito-user-pool-settings.js";
@@ -35,6 +36,7 @@ export interface SimCognitoUserPoolType extends SimCognitoVerificationMessagesTy
   readonly SchemaAttributes?:
     | readonly SimCognitoSchemaAttributeType[]
     | undefined;
+  readonly EmailConfiguration?: SimCognitoEmailConfigurationType | undefined;
   readonly EstimatedNumberOfUsers?: number | undefined;
   readonly CreationDate?: Date | undefined;
   readonly LastModifiedDate?: Date | undefined;
@@ -46,12 +48,12 @@ export interface SimCognitoUserPoolType extends SimCognitoVerificationMessagesTy
  * Every input real Cognito accepts on both is named here, whether or not it
  * is simulated, so a request carrying one this simulation does not model can
  * be refused rather than silently ignored. The ones a pool acts on are on the
- * settings input this extends, `MfaConfiguration` among them.
+ * settings input this extends, `MfaConfiguration` among them, and
+ * `EmailConfiguration` with them.
  */
 export interface SimCognitoUserPoolCommandInput extends SimCognitoUserPoolSettingsInput {
   readonly UserPoolTier?: string | undefined;
   readonly DeviceConfiguration?: object | undefined;
-  readonly EmailConfiguration?: object | undefined;
   readonly IssuerConfiguration?: object | undefined;
   readonly KeyConfiguration?: object | undefined;
   readonly SmsAuthenticationMessage?: string | undefined;

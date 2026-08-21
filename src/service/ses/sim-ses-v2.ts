@@ -1,6 +1,7 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type * as simSesCommands from "./command/sim-ses-command.types.js";
 import type { SimSesRequestOptions } from "./command/sim-ses-request-options.js";
+import type * as simSesServiceSend from "./command/send/sim-ses-service-send.js";
 import type { SimSesSentEmail } from "./email/sim-ses-sent-email.js";
 import type { SimSesIdentity } from "./identity/sim-ses-identity.js";
 import type { SimSesTemplate } from "./template/sim-ses-template.js";
@@ -115,6 +116,22 @@ export class SimSesV2 extends SimSesSuppression {
    */
   isInSandbox(): boolean {
     return this.commands.account.isInSandbox;
+  }
+
+  /**
+   * Accept a message another simulated service is sending on the account's
+   * behalf, such as a Cognito user pool with `EmailSendingAccount: DEVELOPER`.
+   *
+   * No SDK command reaches this. It is the inter-service seam, and what it
+   * leaves out is IAM: a service sending through a service-linked role is not
+   * the caller who started the request. Everything else matches `SendEmail`.
+   * See `SimSesServiceSendResult` for why a refusal comes back rather than
+   * being thrown.
+   */
+  acceptServiceEmail(
+    request: simSesServiceSend.SimSesServiceSendRequest,
+  ): simSesServiceSend.SimSesServiceSendResult {
+    return this.commands.serviceSend.send(request);
   }
 
   /**

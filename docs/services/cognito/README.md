@@ -717,10 +717,14 @@ password` and `Your username is {username} and temporary password is {####}.` fo
 rules real Cognito holds them to. A message carries `{####}`, and runs to 20,000 characters for an
 email and the 140 an SMS carries.
 
-This is Cognito's own delivery record, not a simulated SES. Real Cognito with the default
-`EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service, and `EmailConfiguration`
-and `SmsConfiguration` are refused here. No pool is configured for a delivery this record would
-misrepresent.
+A pool keeps this record whichever service sent the message. One sending through Cognito's own
+email stops there, exactly as on real AWS. One whose `EmailConfiguration` names `DEVELOPER` also
+went through simulated SES, covered under
+[Sending a pool's email through SES](#sending-a-pools-email-through-ses).
+
+`SmsConfiguration` is refused. It names the IAM role Cognito assumes to publish a text message
+through SNS. A pool here records the text message rather than publishing it, leaving that role to
+name a permission the simulation never exercises.
 
 ### The CustomMessage trigger
 
@@ -851,6 +855,126 @@ local development. Real Cognito serves nothing at that path. This is the serving
 
 The response is `{ "messages": [ ... ] }`, each message carrying `username`, `recipient`, `medium`,
 `subject` where it has one, `body`, `occasion` and an ISO `sentDate`.
+
+## Sending a pool's email through SES
+
+A pool created with `EmailConfiguration: { EmailSendingAccount: "DEVELOPER", ... }` sends its email
+through simulated SES, in the region its `SourceArn` names. That is the CDK
+`cognito.UserPoolEmail.withSES({ ... })` configuration. An account still in the
+[SES sandbox](../ses#the-sandbox) reaches only verified recipients, which is most of a real sign-up
+list turned away, and a pool recording only its own messages would report that as a working
+sign-up.
+
+The message is recorded in both places. `sesV2().sentEmails()` holds it as it went out, with the
+configured `From`, `ReplyToEmailAddress` and `ConfigurationSet`. `sentMessages()` on the pool holds
+it as well, which is what `GET /<userPoolId>/messages` lists for a developer reading a confirmation
+code out of a browser sign-up.
+
+```typescript sim-cognito-ses-email
+/**
+ * A user pool sending its verification message through simulated SES.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+const ses = simAws.sesV2();
+
+// The sending domain, and the applicant the sandbox would otherwise refuse.
+ses.verifyIdentity("example.com");
+ses.verifyIdentity("alice@example.org");
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AutoVerifiedAttributes: ["email"],
+    EmailConfiguration: {
+      EmailSendingAccount: "DEVELOPER",
+      From: "Acme <no-reply@example.com>",
+      // The Account in the ARN is read past: the pool resolves the identity in
+      // its own Account, so a synthesized template needs no rewriting.
+      SourceArn: "arn:aws:ses:eu-west-2:111122223333:identity/example.com",
+      ReplyToEmailAddress: "support@example.com",
+    },
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+  }),
+);
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: appClient.UserPoolClient!.ClientId!,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.org" }],
+  }),
+);
+
+const [email] = ses.sentEmails();
+
+console.log(email?.fromEmailAddress); // "Acme <no-reply@example.com>"
+console.log(email?.destination.toAddresses); // ["alice@example.org"]
+console.log(email?.replyToAddresses); // ["support@example.com"]
+
+// The pool kept it too, which is what the messages endpoint lists.
+console.log(cognito.userPool(userPoolId).sentMessages().length); // 1
+```
+
+### What fails, and how
+
+The identity is resolved when a message is sent rather than when the pool is created, so a pool can
+be created before the identity it names and a stack can deploy the two in either order.
+
+A `SourceArn` naming a domain has to come with a `From`, as it does on real Cognito. A domain
+identity covers every address at it and names none of them, so there is no one address for Cognito
+to write as. An address identity needs no `From`, and a pool without one sends as that address.
+
+A sign-up against a pool whose `SourceArn` identity is missing or still unverified fails with
+`InvalidEmailRoleAccessPolicyException`, which is what real Cognito raises when it cannot use the
+identity. A message SES then refuses fails with `CodeDeliveryFailureException`, which in a
+simulation means the sandbox turned down an unverified recipient. The two are kept apart because
+they are different problems. The first is an account set up wrong, and the second is one that has
+yet to leave the sandbox. Neither records a message on the pool or on SES.
+
+Real Cognito also needs an identity policy letting Cognito send as the identity. That part is left
+out, because simulated SES has no identity policies. A verified identity is as far as the check
+goes.
+
+The caller's own permissions decide none of this. Real Cognito sends through a service-linked role,
+so a Role allowed to call `AdminCreateUser` and nothing on SES still gets its invitation sent.
+
+### Which region, and which account
+
+`SourceArn` is read for its region and its identity name. The Account in it is read past, and the
+pool resolves the identity in its own Account instead. CDK synthesizes the Account the stack
+deploys to, which is a real one, while a simulation runs under
+`888888888888` unless it is told otherwise, so matching the whole ARN would leave every project
+rewriting the Account id in its template before a sign-up could send.
+
+The region is honoured. A pool in `eu-west-2` whose `SourceArn` names `us-east-1` sends through the
+`us-east-1` SES, and the identity has to be verified there. Real Cognito restricts which regions a
+pool may pair with, and this simulation accepts any of them.
+
+`COGNITO_DEFAULT` is the default and needs no `SourceArn`. Such a pool records its messages and
+reaches SES at no point, which is what real Cognito's built-in sending does. A
+`ReplyToEmailAddress` alongside it, which is what `UserPoolEmail.withCognito({ replyTo })` emits, is
+accepted and reported back.
+
+`DescribeUserPool` answers with the `EmailConfiguration` the request set, and a pool created without
+one describes itself without one.
 
 ## Listing users
 
@@ -3138,8 +3262,8 @@ The properties each type reads are the ones this simulation models:
 - `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `LambdaConfig`,
   `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `UsernameAttributes`, `Schema`,
   `MfaConfiguration`, `EnabledMfas`, `UserPoolTier`, `AccountRecoverySetting`,
-  `EmailVerificationMessage`, `EmailVerificationSubject`, `SmsVerificationMessage` and
-  `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a time. A template naming a
+  `EmailConfiguration`, `EmailVerificationMessage`, `EmailVerificationSubject`,
+  `SmsVerificationMessage` and `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a time. A template naming a
   trigger this simulation runs deploys, and one naming a trigger it lacks fails the stack.
   `UsernameAttributes` is what a CDK `UserPool` emits for its `signInAliases`, and a stack building
   an email sign-in pool deploys one that [identifies its
@@ -3150,8 +3274,10 @@ The properties each type reads are the ones this simulation models:
   exists, the way real CloudFormation deploys them and why a stack declaring MFA needs
   `cognito-idp:SetUserPoolMfaConfig` on its execution role. A template asking for neither makes no
   such call. `AccountRecoverySetting` is recorded as the template declared it, and a setting outside
-  the shape Cognito states fails the stack. The last four are the wording of the messages the pool
-  records.
+  the shape Cognito states fails the stack. `EmailConfiguration` is what a CDK `UserPool` emits for
+  its `email`, and a template naming `EmailSendingAccount: DEVELOPER` deploys a pool that [sends
+  through simulated SES](#sending-a-pools-email-through-ses). The last four are the wording of the
+  messages the pool records.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `AuthSessionValidity`, `RefreshTokenRotation`, `TokenValidityUnits`,
@@ -3175,12 +3301,12 @@ fails at the sign-in here as it would in a deployment, the point of deploying th
 all.
 
 A property one of the Cognito commands refuses by name is recorded in that command's own words.
-`EmailConfiguration`, `SmsConfiguration` and `SmsAuthenticationMessage` on a pool, and
-`AnalyticsConfiguration`, `EnablePropagateAdditionalUserContextData`, `ReadAttributes` and
-`WriteAttributes` on a client, all read as the refusal reads:
+`SmsConfiguration` and `SmsAuthenticationMessage` on a pool, and `AnalyticsConfiguration`,
+`EnablePropagateAdditionalUserContextData`, `ReadAttributes` and `WriteAttributes` on a client, all
+read as the refusal reads:
 
 ```
-AWS::Cognito::UserPool property EmailConfiguration is not simulated: email delivery would be ignored here and applied on real AWS. The Resource is created without it.
+AWS::Cognito::UserPool property SmsConfiguration is not simulated: SMS delivery would be ignored here and applied on real AWS. The Resource is created without it.
 ```
 
 `CreateUserPool` refuses that same input outright, and the template deploys. The two paths say the

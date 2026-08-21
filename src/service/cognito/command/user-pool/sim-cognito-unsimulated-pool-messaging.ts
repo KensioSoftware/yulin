@@ -11,12 +11,14 @@ const linkVerification = "confirming a sign-up by following a link";
  * The pool creation inputs nothing here delivers a message through, and what
  * each of them would have done on real AWS.
  *
- * `AWS::Cognito::UserPool` carries all three under the same names, and the
+ * `AWS::Cognito::UserPool` carries both under the same names, and the
  * CloudFormation layer reads this to say the same thing about a property it
  * drops as this says about an input it refuses.
+ *
+ * `EmailConfiguration` used to be here. It is simulated now, and a pool that
+ * names `DEVELOPER` sends through the account's SES.
  */
 export const simCognitoUnsimulatedPoolMessaging = {
-  EmailConfiguration: "email delivery",
   SmsConfiguration: "SMS delivery",
   SmsAuthenticationMessage: "multi-factor authentication messages",
 } as const;
@@ -24,15 +26,14 @@ export const simCognitoUnsimulatedPoolMessaging = {
 /**
  * Refuses the message delivery inputs this simulation does not model.
  *
- * Nothing here delivers an email or a text message. A pool records the message
- * it would have sent instead, which is Cognito's own delivery rather than
- * anything a delivery configuration points at: real Cognito with the default
- * `EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service.
+ * `SmsConfiguration` names the IAM role Cognito assumes to publish a text
+ * message through SNS. Nothing here delivers one: the pool records what it
+ * would have sent, which is where a test reads it, so a role recorded here
+ * would name a permission nothing ever exercises.
  *
- * So a pool configured to send through SES or through an SNS SMS role is
- * refused. Accepting the configuration would say the messages went that way,
- * and they would not: they would be recorded here exactly as a pool with no
- * configuration at all records them.
+ * `EmailConfiguration` is simulated rather than refused. A pool that named
+ * `DEVELOPER` sends through the account's SES, where the message is recorded
+ * a second time and the SES sandbox decides whether it goes at all.
  *
  * The wording of the messages is a different matter and is simulated. It is
  * read by SimCognitoVerificationMessages, which is what a recorded message
@@ -53,11 +54,6 @@ export class SimCognitoUnsimulatedUserPoolMessaging {
    * honour.
    */
   refuseIn(input: SimCognitoUserPoolCommandInput): void {
-    this.unsimulated.refuse(
-      "EmailConfiguration",
-      input.EmailConfiguration,
-      simCognitoUnsimulatedPoolMessaging.EmailConfiguration,
-    );
     this.unsimulated.refuse(
       "SmsConfiguration",
       input.SmsConfiguration,

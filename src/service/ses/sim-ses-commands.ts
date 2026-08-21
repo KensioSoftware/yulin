@@ -14,6 +14,7 @@ import { SimSesAuthorizer } from "./command/authorize/sim-ses-authorizer.js";
 import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-commands.js";
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
+import { SimSesServiceSend } from "./command/send/sim-ses-service-send.js";
 import { SimSesSuppressionCheck } from "./command/send/sim-ses-suppression-check.js";
 import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-identities.js";
 import { SimSesSuppressionCommands } from "./command/suppression/sim-ses-suppression-commands.js";
@@ -46,6 +47,12 @@ export class SimSesCommands {
   readonly identityCommands: SimSesIdentityCommands;
   readonly templateCommands: SimSesTemplateCommands;
   readonly sendEmail: SimSesSendEmail;
+
+  /**
+   * The way another simulated service reaches this SES, which is the send
+   * without the IAM authorization a caller's request goes through.
+   */
+  readonly serviceSend: SimSesServiceSend;
   readonly accountCommands: SimSesAccountCommands;
   readonly suppressionCommands: SimSesSuppressionCommands;
   readonly background: BackgroundScheduler;
@@ -80,17 +87,30 @@ export class SimSesCommands {
       authorizer,
       clock: background,
     });
+    const identityCheck = new SimSesVerifiedIdentityCheck({
+      identities,
+      account,
+      accountRegionScope,
+    });
+
+    const suppressionCheck = new SimSesSuppressionCheck({
+      suppression,
+      account,
+    });
+
     this.sendEmail = new SimSesSendEmail({
       identities,
       content: new SimSesContentReader({ templates }),
       sent,
-      identityCheck: new SimSesVerifiedIdentityCheck({
-        identities,
-        account,
-        accountRegionScope,
-      }),
-      suppressionCheck: new SimSesSuppressionCheck({ suppression, account }),
+      identityCheck,
+      suppressionCheck,
       authorizer,
+      clock: background,
+    });
+    this.serviceSend = new SimSesServiceSend({
+      sent,
+      identityCheck,
+      suppressionCheck,
       clock: background,
     });
     this.accountCommands = new SimSesAccountCommands({

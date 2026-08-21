@@ -91,7 +91,7 @@ describe("sim Cognito choice-based sign-in refusals", () => {
     assertStringIncludes(error.message, "PASSWORD");
   });
 
-  it("refuses a code sent by email, which no pool here delivers", async () => {
+  it("refuses a code sent by email, a challenge nothing here runs", async () => {
     // Given a pool allowing a code sent by email, with a user that has an
     // address to send one to.
     const setUp = await simCognitoSignedIn({
@@ -120,7 +120,7 @@ describe("sim Cognito choice-based sign-in refusals", () => {
     assertStringIncludes(offered.AvailableChallenges.join(","), "EMAIL_OTP");
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "is not simulated");
-    assertStringIncludes(error.message, "delivers no message");
+    assertStringIncludes(error.message, "this simulation does not run");
   });
 
   it("refuses a credential another key signed", async () => {

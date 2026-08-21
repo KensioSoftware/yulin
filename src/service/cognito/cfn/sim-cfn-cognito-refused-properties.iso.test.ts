@@ -16,9 +16,11 @@ import {
 /**
  * The AWS::Cognito::UserPool properties CreateUserPool refuses by name, and a
  * value real Cognito would take for each.
+ *
+ * `EmailConfiguration` is not among them. A pool sending through SES is
+ * simulated, so the property deploys rather than being recorded as dropped.
  */
 const refusedPoolProperties: Readonly<Record<string, SimCfnTemplateValue>> = {
-  EmailConfiguration: { EmailSendingAccount: "DEVELOPER" },
   SmsConfiguration: { SnsCallerArn: "arn:aws:iam::111122223333:role/sms" },
   SmsAuthenticationMessage: "Your code is {####}",
 };
@@ -54,7 +56,8 @@ describe("Cognito CloudFormation properties the Cognito commands refuse", () => 
   }
 
   it("deploys a pool asking for every one of them at once", async () => {
-    // Given the template a CDK pool moved onto SES and an SNS SMS role emits.
+    // Given the template a CDK pool with an SNS SMS role and its own MFA
+    // message emits.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.

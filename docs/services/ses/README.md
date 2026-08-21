@@ -563,6 +563,19 @@ either way. The sandbox is kept here so that a send to an unverified recipient f
 would in an account, and making every test that seeds this list leave the sandbox first buys
 nothing.
 
+## Messages another service sends
+
+A simulated Cognito user pool whose `EmailConfiguration` names `EmailSendingAccount: DEVELOPER`
+sends its verification messages and invitations through the SES of the region its `SourceArn` names.
+Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox and
+suppression rules above decide them the same way. See
+[Sending a pool's email through SES](../cognito#sending-a-pools-email-through-ses).
+
+Such a send skips IAM. Real Cognito sends through a service-linked role rather than as whoever
+called `SignUp`, so the permissions of that caller decide nothing about it. Nothing else about the
+send differs. The sender is checked, the sandbox checks the recipient, and the message is
+recorded.
+
 ## Permissions
 
 Every command authorizes through simulated IAM. A send authorizes against the identity being sent
@@ -785,4 +798,6 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 - **The commands that change an identity's settings are absent.** `PutEmailIdentityDkimAttributes`,
   `PutEmailIdentityMailFromAttributes` and `PutEmailIdentityFeedbackAttributes` have no counterpart
   here. A CloudFormation deploy sets all three, and `CreateEmailIdentity` sets the rest.
-- **Sending authorization policies are left out.**
+- **Sending authorization policies are left out.** A Cognito user pool sending through an identity
+  is checked only for that identity being verified, where real Cognito needs a policy on the
+  identity allowing it as well.

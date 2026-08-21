@@ -62,10 +62,11 @@ export interface SimVerifySoftwareTokenCommandOutput {
  * The SetUserMFAPreference inputs this simulation reads, and the one it
  * refuses.
  *
- * `EmailMfaSettings` is refused because a second factor sent by email needs
- * the pool's `EmailConfiguration`, which `CreateUserPool` refuses, and
+ * `EmailMfaSettings` is refused because the email one-time code challenge is
+ * not simulated: nothing here issues one, checks one or expires one.
  * `SetUserPoolMfaConfig` refuses the matching `EmailMfaConfiguration` for the
- * same reason.
+ * same reason. A pool that sends through SES still gets no such challenge,
+ * because what is missing is the challenge rather than the delivery.
  */
 export interface SimSetUserMFAPreferenceCommandInput extends SimCognitoMfaPreferenceType {
   readonly AccessToken?: string | undefined;

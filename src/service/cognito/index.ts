@@ -34,6 +34,27 @@ export {
   type SimCognitoWebAuthnConfigurationType,
   type SimCognitoWebAuthnUserVerification,
 } from "./user-pool/mfa/sim-cognito-web-authn-configuration.js";
+export {
+  SimCognitoEmailConfiguration,
+  simCognitoDefaultFromAddress,
+  type SimCognitoEmailConfigurationType,
+  type SimCognitoEmailSendingAccount,
+} from "./user-pool/message/sim-cognito-email-configuration.js";
+export {
+  simCognitoEmailSourceIdentity,
+  type SimCognitoEmailSourceIdentity,
+} from "./user-pool/message/sim-cognito-email-source-arn.js";
+export {
+  SimCognitoNoEmailSenders,
+  type SimCognitoEmailSendFailure,
+  type SimCognitoEmailSendFailureKind,
+  type SimCognitoEmailSendRequest,
+  type SimCognitoEmailSenders,
+} from "./user-pool/message/sim-cognito-email-senders.js";
+export {
+  simAwsCognitoEmailSenders,
+  SimAwsCognitoEmailSenders,
+} from "./user-pool/message/sim-aws-cognito-email-senders.js";
 export { SimCognitoAutoVerifiedAttributes } from "./user-pool/sim-cognito-auto-verified-attributes.js";
 export {
   SimCognitoPasswordPolicy,
