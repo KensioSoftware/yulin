@@ -5,6 +5,8 @@ import { settledTerraformPlan } from "./sim-tf-settle.js";
 import { terraformDeclaredResources } from "./sim-tf-declare.js";
 import { terraformFoldedResources } from "./sim-tf-fold.js";
 import { terraformImportReport } from "./sim-tf-report.js";
+import { TerraformPlanOverrides } from "./sim-tf-overrides.js";
+import type { TerraformPlanOverride } from "./sim-tf-override.type.js";
 import type { TerraformImportReport } from "./sim-tf-report.type.js";
 
 /** A CloudFormation template built from a plan, and what building it did. */
@@ -35,14 +37,17 @@ export interface TerraformImportResult {
  */
 export function cfnTemplateFromTerraformPlan(
   plan: TerraformPlan,
+  supplied: readonly TerraformPlanOverride[] = [],
 ): TerraformImportResult {
+  const overrides = new TerraformPlanOverrides(supplied);
   const resources = terraformPlanResources(plan);
-  const settled = settledTerraformPlan(plan, resources);
+  const settled = settledTerraformPlan(plan, resources, overrides);
   const declared = terraformDeclaredResources(settled);
   const folded = terraformFoldedResources(
     resources,
     declared.templates,
     settled.resolver,
+    overrides,
   );
 
   return {

@@ -5,6 +5,7 @@ import type {
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSetUserPoolMfaConfigCommandInput } from "../../command/user-pool/user-pool-mfa.command.js";
 import type { SimCreateUserPoolCommandInput } from "../../command/user-pool/user-pool.command.js";
+import { simCognitoUnsimulatedPoolMessaging } from "../../command/user-pool/sim-cognito-unsimulated-pool-messaging.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoAccountRecovery } from "./sim-cfn-cognito-account-recovery.js";
@@ -58,6 +59,12 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * declaring email-only recovery deploys, and CreateUserPool refuses a setting
  * outside the shape Cognito states for it.
  *
+ * `EmailConfiguration` is here because it decides which service the pool's
+ * email goes out through. A pool naming `DEVELOPER` sends through the
+ * account's simulated SES, so a stack that moved its pool onto SES deploys a
+ * pool that tests as one, rather than one indistinguishable from the pool it
+ * replaced.
+ *
  * The four from `EmailVerificationMessage` down are here because a CDK
  * `UserPool` construct emits them when it was asked for nothing in
  * particular. They are the wording of the messages the pool records, and
@@ -79,6 +86,7 @@ const simulatedProperties = [
   "UsernameAttributes",
   "Schema",
   "AccountRecoverySetting",
+  "EmailConfiguration",
   "EmailVerificationMessage",
   "EmailVerificationSubject",
   "SmsVerificationMessage",
@@ -104,6 +112,7 @@ export class SimCfnCognitoUserPoolProperties {
   private readonly propertyParser = new SimCfnCognitoPropertyParser({
     resourceType: "AWS::Cognito::UserPool",
     simulated: simulatedProperties,
+    refused: simCognitoUnsimulatedPoolMessaging,
   });
 
   constructor(properties: SimCfnCognitoUserPoolPropertiesProperties) {
@@ -160,6 +169,10 @@ export class SimCfnCognitoUserPoolProperties {
         resource: this.resource,
         propertyParser: this.propertyParser,
       }).parse(this.properties["Schema"]),
+      EmailConfiguration: this.record(
+        this.properties["EmailConfiguration"],
+        "EmailConfiguration",
+      ),
       VerificationMessageTemplate: this.record(
         this.properties["VerificationMessageTemplate"],
         "VerificationMessageTemplate",

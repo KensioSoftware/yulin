@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimAwsMessageLog } from "../../../aws/message/sim-aws-message-log.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { SimCognitoTriggerOccasion } from "../trigger/sim-cognito-trigger-occasion.js";
@@ -8,11 +9,19 @@ import { SimCognitoMessageDelivery } from "./sim-cognito-message-delivery.js";
 import type { SimCognitoMessageOccasion } from "./sim-cognito-message-occasion.js";
 import { SimCognitoMessagePlaceholders } from "./sim-cognito-message-placeholders.js";
 import { simCognitoOccasionWording } from "./sim-cognito-occasion-wording.js";
+import type { SimCognitoPoolEmailDelivery } from "./sim-cognito-pool-email-delivery.js";
 import { SimCognitoSentMessage } from "./sim-cognito-sent-message.js";
 
 interface SimCognitoPoolMessengerProperties {
   readonly triggers: SimCognitoUserPoolTriggers;
+
+  /**
+   * Where a message goes before it is recorded, which for a pool sending
+   * through SES is the account's SES.
+   */
+  readonly email: SimCognitoPoolEmailDelivery;
   readonly clock: SimClock;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -41,18 +50,27 @@ interface SimCognitoMessageRequest {
  * reads it back off the pool, which is what makes a verification message
  * something a test can assert about at all.
  *
- * This is Cognito's own delivery, not SES. Real Cognito with the default
- * `EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service,
- * and `EmailConfiguration` is refused here, so no pool is configured for one
- * that would.
+ * A pool sending its own email stops there. Real Cognito with the default
+ * `EmailSendingAccount` of `COGNITO_DEFAULT` reaches no other service, so the
+ * record is the whole of what happened.
+ *
+ * A pool whose `EmailConfiguration` named `DEVELOPER` sends through the
+ * account's SES first, and records the message only once SES has taken it.
+ * The record and `sesV2().sentEmails()` then agree with each other, and a
+ * sign-up against a pool SES would refuse fails here as it would in a
+ * deployment.
  */
 export class SimCognitoPoolMessenger {
   private readonly triggers: SimCognitoUserPoolTriggers;
+  private readonly email: SimCognitoPoolEmailDelivery;
   private readonly clock: SimClock;
+  private readonly messageLog: SimAwsMessageLog;
 
   constructor(properties: SimCognitoPoolMessengerProperties) {
     this.triggers = properties.triggers;
+    this.email = properties.email;
     this.clock = properties.clock;
+    this.messageLog = properties.messageLog;
   }
 
   /**
@@ -98,18 +116,31 @@ export class SimCognitoPoolMessenger {
       username: request.user.username,
       code: request.code,
     });
-    const wording = custom.wordingFor(medium, pooled);
+    const wording = custom.wordingFor(medium, pooled).filledWith(placeholders);
 
-    request.pool.messages.record(
-      new SimCognitoSentMessage({
-        username: request.user.username,
-        recipient: delivery.recipient,
-        medium,
-        wording: wording.filledWith(placeholders),
-        occasion: request.occasion,
-        sentDate: this.clock.now(),
-      }),
-    );
+    this.email.send({ pool: request.pool, delivery, wording });
+
+    const message = new SimCognitoSentMessage({
+      username: request.user.username,
+      recipient: delivery.recipient,
+      medium,
+      wording,
+      occasion: request.occasion,
+      sentDate: this.clock.now(),
+    });
+
+    request.pool.messages.record(message);
+    // Announced after it is recorded, so a listener that goes and reads the
+    // pool finds the message it was just told about.
+    this.messageLog.record({
+      kind: "cognito",
+      userPoolId: request.pool.id,
+      medium,
+      recipient: message.recipient,
+      occasion: message.occasion,
+      subject: message.subject,
+      body: message.body,
+    });
 
     return delivery;
   }

@@ -29,8 +29,17 @@ export interface TerraformPlanResourceFixture {
   readonly values: Record<string, unknown>;
   /** Attributes the plan could not resolve, as `after_unknown` marks them. */
   readonly unknown: Record<string, unknown>;
-  /** What each attribute refers to, keyed by attribute name. */
-  readonly references: Record<string, readonly string[]>;
+  /**
+   * What each attribute refers to, keyed by attribute name.
+   *
+   * An attribute inside a repeating nested block is given as a list of
+   * records, one entry per block, which is the shape `configuration` mirrors
+   * the block with.
+   */
+  readonly references: Record<
+    string,
+    readonly string[] | readonly Record<string, readonly string[]>[]
+  >;
   /** Addresses named by an explicit `depends_on`. */
   readonly dependsOn: readonly string[];
 }
@@ -226,15 +235,38 @@ function configResource(
     type: resource.type,
     name: resource.name,
     expressions: Object.fromEntries(
-      Object.entries(resource.references).map(
-        ([attribute, references]): [string, TerraformExpression] => [
-          attribute,
-          { references },
-        ],
-      ),
+      Object.entries(resource.references).map(([attribute, references]) => [
+        attribute,
+        referenceExpression(references),
+      ]),
     ),
     depends_on: resource.dependsOn,
   };
+}
+
+/**
+ * The expression one attribute's references become.
+ *
+ * A nested block's references sit at the same position in a list as the block
+ * they were written in, so a fixture giving a list of records makes a list of
+ * expression records rather than one expression.
+ */
+function referenceExpression(
+  references: readonly string[] | readonly Record<string, readonly string[]>[],
+): TerraformExpression | readonly Record<string, TerraformExpression>[] {
+  if (references.every((entry) => typeof entry === "string")) {
+    return { references };
+  }
+
+  return (references as readonly Record<string, readonly string[]>[]).map(
+    (entry) =>
+      Object.fromEntries(
+        Object.entries(entry).map(([name, nested]) => [
+          name,
+          { references: nested },
+        ]),
+      ),
+  );
 }
 
 /**

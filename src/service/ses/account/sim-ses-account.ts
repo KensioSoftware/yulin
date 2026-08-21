@@ -1,3 +1,5 @@
+import type { SimSesSuppressionReason } from "../suppression/sim-ses-suppression-reason.js";
+
 /**
  * How much an account may send, which is one of the two things leaving the
  * sandbox changes.
@@ -53,6 +55,10 @@ export interface SimSesAccountContactDetails {
 export class SimSesAccount {
   #productionAccessEnabled = false;
   #contactDetails: SimSesAccountContactDetails | undefined;
+  #suppressedReasons: readonly SimSesSuppressionReason[] = [
+    "BOUNCE",
+    "COMPLAINT",
+  ];
 
   /**
    * Whether this account has left the sandbox.
@@ -75,6 +81,36 @@ export class SimSesAccount {
 
   get contactDetails(): SimSesAccountContactDetails | undefined {
     return this.#contactDetails;
+  }
+
+  /**
+   * The reasons this account holds addresses back for.
+   *
+   * Both are set to begin with, which is where every account opened after
+   * November 2019 starts. An account with neither has the suppression list
+   * turned off, and a listed address is mailed anyway.
+   */
+  get suppressedReasons(): readonly SimSesSuppressionReason[] {
+    return this.#suppressedReasons;
+  }
+
+  /**
+   * Whether this account holds a message back from an address listed for a
+   * reason.
+   *
+   * The two have to match. An address on the list for `COMPLAINT` under an
+   * account suppressing only `BOUNCE` is mailed, which is the part of the
+   * suppression rules most easily got wrong.
+   */
+  isSuppressedFor(reason: SimSesSuppressionReason): boolean {
+    return this.#suppressedReasons.includes(reason);
+  }
+
+  /**
+   * Set the reasons this account holds addresses back for.
+   */
+  putSuppressedReasons(reasons: readonly SimSesSuppressionReason[]): void {
+    this.#suppressedReasons = [...reasons];
   }
 
   /**

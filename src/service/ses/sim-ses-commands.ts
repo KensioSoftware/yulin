@@ -15,7 +15,11 @@ import { SimSesConfigurationSetCommands } from "./command/configuration-set/sim-
 import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-commands.js";
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
+import { SimSesServiceSend } from "./command/send/sim-ses-service-send.js";
+import { SimSesSuppressionCheck } from "./command/send/sim-ses-suppression-check.js";
 import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-identities.js";
+import { SimSesSuppressionCommands } from "./command/suppression/sim-ses-suppression-commands.js";
+import { SimSesSuppressionList } from "./suppression/sim-ses-suppression-list.js";
 import { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
 import { SimSesConfigurationSetStore } from "./configuration-set/sim-ses-configuration-set-store.js";
 import { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
@@ -42,11 +46,19 @@ export class SimSesCommands {
   readonly configurationSets: SimSesConfigurationSetStore;
   readonly sent: SimSesSentEmailStore;
   readonly account: SimSesAccount;
+  readonly suppression: SimSesSuppressionList;
   readonly identityCommands: SimSesIdentityCommands;
   readonly templateCommands: SimSesTemplateCommands;
   readonly configurationSetCommands: SimSesConfigurationSetCommands;
   readonly sendEmail: SimSesSendEmail;
+
+  /**
+   * The way another simulated service reaches this SES, which is the send
+   * without the IAM authorization a caller's request goes through.
+   */
+  readonly serviceSend: SimSesServiceSend;
   readonly accountCommands: SimSesAccountCommands;
+  readonly suppressionCommands: SimSesSuppressionCommands;
   readonly background: BackgroundScheduler;
 
   constructor(properties: SimSesV2Properties = {}) {
@@ -64,6 +76,7 @@ export class SimSesCommands {
     });
     const sent = new SimSesSentEmailStore();
     const account = new SimSesAccount();
+    const suppression = new SimSesSuppressionList();
 
     this.background = background;
     this.identities = identities;
@@ -71,6 +84,7 @@ export class SimSesCommands {
     this.configurationSets = configurationSets;
     this.sent = sent;
     this.account = account;
+    this.suppression = suppression;
     this.identityCommands = new SimSesIdentityCommands({
       identities,
       authorizer,
@@ -85,21 +99,41 @@ export class SimSesCommands {
       configurationSets,
       authorizer,
     });
+
+    const identityCheck = new SimSesVerifiedIdentityCheck({
+      identities,
+      account,
+      accountRegionScope,
+    });
+
+    const suppressionCheck = new SimSesSuppressionCheck({
+      suppression,
+      account,
+    });
+
     this.sendEmail = new SimSesSendEmail({
       identities,
       content: new SimSesContentReader({ templates }),
       sent,
-      identityCheck: new SimSesVerifiedIdentityCheck({
-        identities,
-        account,
-        accountRegionScope,
-      }),
+      identityCheck,
+      suppressionCheck,
       authorizer,
+      clock: background,
+    });
+    this.serviceSend = new SimSesServiceSend({
+      sent,
+      identityCheck,
+      suppressionCheck,
       clock: background,
     });
     this.accountCommands = new SimSesAccountCommands({
       account,
       sent,
+      authorizer,
+      clock: background,
+    });
+    this.suppressionCommands = new SimSesSuppressionCommands({
+      suppression,
       authorizer,
       clock: background,
     });

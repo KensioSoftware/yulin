@@ -1,4 +1,11 @@
 export { SimIam } from "./sim-iam.js";
+export type {
+  SimIamConditionValue,
+  SimIamPolicyDocument,
+  SimIamPolicyDocumentCondition,
+  SimIamPolicyDocumentPrincipal,
+  SimIamPolicyDocumentStatement,
+} from "./policy/sim-iam-policy.js";
 export { SimIamAccessDenied, SimIamError } from "./error/sim-iam.error.js";
 export type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";
 export type { SimIamCredentialIdentity } from "./credential/sim-aws-credentials.js";

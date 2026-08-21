@@ -120,6 +120,65 @@ case-sensitive, per RFC 5321, so `Sales@example.com` and `sales@example.com` are
 proved it stop resolving. That gives a test somewhere to go when it wants to see sending fail after
 it once worked.
 
+## How an identity is configured
+
+An identity holds the DKIM signing, custom MAIL FROM domain, feedback forwarding, configuration set
+and tags it was created with, and `GetEmailIdentity` reads them back. None of it is acted on. Every
+one of these settings decides what happens to a message after it leaves AWS, which a test process
+has no way to watch.
+
+A test can ask one question of it. Is the identity configured the way the stack said? That catches a
+stack declaring DKIM wrongly, and a stack that stops declaring it.
+
+```typescript sim-ses-identity-settings
+/**
+ * Asserting on the DKIM signing an identity was created with.
+ */
+
+import {
+  CreateEmailIdentityCommand,
+  GetEmailIdentityCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+await ses.createEmailIdentity(
+  new CreateEmailIdentityCommand({
+    EmailIdentity: "example.com",
+    ConfigurationSetName: "transactional",
+    Tags: [{ Key: "team", Value: "orders" }],
+  }),
+);
+
+const identity = await ses.getEmailIdentity(
+  new GetEmailIdentityCommand({ EmailIdentity: "example.com" }),
+);
+
+// true "AWS_SES" 3
+console.log(
+  identity.DkimAttributes?.SigningEnabled,
+  identity.DkimAttributes?.SigningAttributesOrigin,
+  identity.DkimAttributes?.Tokens?.length,
+);
+
+// "transactional" "orders"
+console.log(identity.ConfigurationSetName, identity.Tags?.[0]?.Value);
+```
+
+Easy DKIM is on for a domain identity, as it is for one real SES creates through the v2 API, and its
+three tokens are the ones `Fn::GetAtt` publishes. An email address identity gets no DKIM, since the
+records carrying it belong to the domain rather than to one mailbox at it.
+`DkimSigningAttributes.DomainSigningSelector` switches the origin to `EXTERNAL` and leaves the
+identity with no tokens of its own, the way real SES answers for a key the caller brought. The
+private key beside it is dropped, because holding a secret nothing signs with is worse than
+forgetting it.
+
+`DkimAttributes.Status` and `MailFromAttributes.MailFromDomainStatus` both follow the identity's own
+verification. Real SES waits on separate DNS records for each, and `verifyIdentity` here stands for
+all of them at once.
+
 ## Email templates
 
 The assertion a test usually wants is "the welcome email went to this address, from this template,
@@ -277,17 +336,23 @@ console.log(
   read.SendingOptions?.SendingEnabled,
 );
 
-// The simulator's own accessor, for a test that would rather skip a Command
+// The simulator's own accessors, for a test that would rather skip a Command
 // and its authorization.
 const configurationSet = ses.findConfigurationSet("transactional");
 
 // "REQUIRE"
 console.log(configurationSet?.deliveryOptions.tlsPolicy);
+
+// ["transactional"]
+console.log(ses.allConfigurationSets().map((set) => set.configurationSetName));
 ```
 
 A set declaring only its name gets the defaults real SES applies. Sending is on, TLS is optional,
 reputation metrics are off and no reason is suppressed. `GetConfigurationSet` reports those defaults
 back rather than leaving the groups out of the answer.
+
+`findConfigurationSet` reaches one set by name and `allConfigurationSets` hands over every set in
+the scope, oldest first.
 
 Sets are managed with `CreateConfigurationSet`, `GetConfigurationSet`, `ListConfigurationSets` and
 `DeleteConfigurationSet`. There is no update. Real SES changes a set through a `Put` command per
@@ -297,14 +362,18 @@ group of options, and none of those is here yet. A set holds what it was created
 set at a time.
 
 `TrackingOptions` and `VdmOptions` are refused by name. Open and click tracking needs a redirect
-domain and the events that report a click. The Virtual Deliverability Manager needs engagement
-nothing here measures.
+domain and the events that report a click. The Virtual Deliverability Manager reports on engagement,
+which this simulation never measures.
 
-Which suppression reasons a set names is held and read back, and acted on by nothing. There is no
-account suppression list to put an address on. `TlsPolicy` accepts `REQUIRE` and `OPTIONAL` and
-refuses anything else, and a `SuppressedReasons` entry that is neither `BOUNCE` nor `COMPLAINT` is
-refused too. Both are validated in the command. A template and an SDK caller hear the same
-answer.
+A set's suppression reasons are held and read back, and that is all they do. On real SES they decide
+what a bounce or a complaint would add to the account suppression list. Both are absent here. The
+list itself is a separate thing, filled by hand.
+
+`TlsPolicy` accepts `REQUIRE` and `OPTIONAL` and refuses anything else, and a `SuppressedReasons`
+entry that is neither `BOUNCE` nor `COMPLAINT` is refused too. `MaxDeliverySeconds` takes whole
+seconds from 300 to 50400, the five minutes to fourteen hours real SES attempts delivery for. A name
+is letters, digits, dashes and underscores. All of it is validated in the command, so a template and
+an SDK caller hear the same answer.
 
 ## Deploying SES resources with CloudFormation
 
@@ -372,9 +441,10 @@ link or the DKIM records still to be dealt with out of band. Verify it afterward
 CloudFormation is creating an identity that is already there.
 
 `Ref` on an identity returns the address or domain itself, directly usable as a
-`FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name. A
-configuration set behaves the same way, and a set with no `Name` is named after the stack and the
-logical ID, as real CloudFormation names one.
+`FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name.
+`Ref` on a configuration set returns its name. That Resource type has no `Fn::GetAtt` attributes at
+all, so reading one fails the deploy rather than answering something AWS would not. A set with no
+`Name` is named after the stack and the logical ID, as real CloudFormation names one.
 
 Deleting the stack removes all three.
 
@@ -389,19 +459,22 @@ Resources reading exactly these attributes. Refusing them would take an ordinary
 records this simulation never reads. The stack deploys with records of the right shape and no
 target.
 
-### What an identity Resource is deployed without
+### What an identity Resource carries
 
-`EmailIdentity` is the only property acted on. `DkimAttributes`, `DkimSigningAttributes`,
-`MailFromAttributes`, `FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are recorded as
-ignored and the identity is created without them. An identity lacking all of them still does the one
-thing an identity does here. It exists, it is verified, and it lets a send from it through.
+`EmailIdentity` names the identity. `DkimAttributes`, `DkimSigningAttributes`, `MailFromAttributes`,
+`FeedbackAttributes`, `ConfigurationSetAttributes` and `Tags` are all held on the deployed identity
+and read back by `GetEmailIdentity`, as described under
+[How an identity is configured](#how-an-identity-is-configured). A stack that declares DKIM signing
+can assert the identity it deployed is the one it described.
 
-`stack.ignoredProperties` is where they are reported, each with the reason it was left alone. None
-is dropped in silence.
+The settings land on the identity after it is created, which is the order real CloudFormation works
+in. Two of them have no `CreateEmailIdentity` parameter on real SES either, and are put on the
+identity by a separate call once it exists.
 
-The SDK path is stricter on purpose. `CreateEmailIdentity` refuses `DkimSigningAttributes` outright,
-because a caller reaching for it directly is asking for that behaviour and deserves to hear it is
-absent. A template is a whole document, and one property in it should leave the deploy standing.
+`DkimSigningAttributes.DomainSigningPrivateKey` is the one part dropped, and it turns up on
+`stack.ignoredProperties` with the reason. A property this Resource type has no name for lands there
+too, which in practice catches a misspelling. Real CloudFormation refuses a property it does not
+recognise, and a stack failing over a property AWS added last week is a worse way to find out.
 
 A template Resource has no such list, because everything `AWS::SES::Template` can usefully say is
 wording and all of it is acted on. Anything else it says is still reported, at both levels. That
@@ -494,6 +567,109 @@ Real SES treats `ProductionAccessEnabled` as a request that a human at AWS then 
 account stays in the sandbox until that review lands. Granting it immediately is a deliberate
 divergence. The alternative is a simulator no test can get out of the sandbox in, and waiting for a
 review is beyond what a test can assert on anyway.
+
+## The suppression list
+
+Real SES holds an account-level suppression list and fills it from hard bounces and complaints.
+Nothing bounces here, so every address on this one was put there by a caller. That is what makes it
+worth having in a test. The support tool that lists suppressed addresses, the form that removes one
+and the script that seeds the list all have somewhere to run.
+
+`PutSuppressedDestination`, `GetSuppressedDestination`, `ListSuppressedDestinations` and
+`DeleteSuppressedDestination` manage it.
+
+```typescript sim-ses-suppression
+/**
+ * Suppressing an address, and what a send to it records.
+ */
+
+import {
+  PutSuppressedDestinationCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+ses.verifyIdentity("hello@example.com");
+ses.verifyIdentity("someone@example.org");
+
+await ses.putSuppressedDestination(
+  new PutSuppressedDestinationCommand({
+    EmailAddress: "someone@example.org",
+    Reason: "BOUNCE",
+  }),
+);
+
+// SES accepts this and holds it back from the recipient.
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Simple: {
+        Subject: { Data: "Welcome" },
+        Body: { Text: { Data: "Hi there" } },
+      },
+    },
+  }),
+);
+
+const [email] = ses.sentEmails();
+
+// "someone@example.org" "BOUNCE" true
+console.log(
+  email?.suppressedRecipients[0]?.emailAddress,
+  email?.suppressedRecipients[0]?.reason,
+  email?.isFullySuppressed,
+);
+```
+
+A send to a suppressed address is accepted. Real SES takes the message, holds it back from that
+recipient, and counts it toward the daily sending quota. The send succeeds here too, and the record
+carries the answer. `suppressedRecipients` names who was held back and why,
+and `isFullySuppressed` is the narrower question of whether the message reached nobody. A message to
+two recipients with one of them suppressed went to the other.
+
+`ListSuppressedDestinations` pages with `PageSize` and `NextToken`, and narrows with `Reasons`,
+`StartDate` and `EndDate`. Removing an address that was never on the list succeeds, so a form that
+removes one twice has no failure to handle.
+
+### What the account is suppressing for
+
+An address is held back only when the account is suppressing for the reason it was listed under. An
+address on the list for `COMPLAINT`, on an account suppressing only `BOUNCE`, is mailed. That is
+much the easiest part of the suppression rules to get wrong, and it is worth a test.
+
+`PutAccountSuppressionAttributes` sets the reasons and `GetAccount` reports them as
+`SuppressionAttributes`. An account here starts on both, where every real account opened after
+November 2019 starts. Putting the attributes with no reasons at all turns the list off, which is
+what the console's Enabled box does. The addresses stay on the list and SES stops reading it.
+
+### Case, and the sandbox
+
+Managing the list is case sensitive and sending is not, following real SES. `Someone@example.org` is
+stored as written and `DeleteSuppressedDestination` needs that spelling to remove it, while a
+message addressed to `SOMEONE@example.org` is held back by a listed `someone@example.org`.
+
+Real SES refuses `PutSuppressedDestination` until an account leaves the sandbox. This one accepts it
+either way. The sandbox is kept here so that a send to an unverified recipient fails the way it
+would in an account, and making every test that seeds this list leave the sandbox first buys
+nothing.
+
+## Messages another service sends
+
+A simulated Cognito user pool whose `EmailConfiguration` names `EmailSendingAccount: DEVELOPER`
+sends its verification messages and invitations through the SES of the region its `SourceArn` names.
+Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox and
+suppression rules above decide them the same way. See
+[Sending a pool's email through SES](../cognito#sending-a-pools-email-through-ses).
+
+Such a send skips IAM. Real Cognito sends through a service-linked role rather than as whoever
+called `SignUp`, so the permissions of that caller decide nothing about it. Nothing else about the
+send differs. The sender is checked, the sandbox checks the recipient, and the message is
+recorded.
 
 ## Permissions
 
@@ -660,24 +836,29 @@ time forward past the window sees the count fall the way an account's would.
 
 ## Simulated commands
 
-| Command                  | Notes                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------ |
-| `SendEmail`              | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                   |
-| `CreateEmailIdentity`    | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are refused. |
-| `GetEmailIdentity`       |                                                                                            |
-| `ListEmailIdentities`    | Paged with `PageSize` and `NextToken`.                                                     |
-| `DeleteEmailIdentity`    |                                                                                            |
-| `CreateEmailTemplate`    | Substitution only. `Tags` are refused.                                                     |
-| `GetEmailTemplate`       | Reports the wording with its placeholders unrendered.                                      |
-| `UpdateEmailTemplate`    | Replaces the wording outright, keeping the creation time.                                  |
-| `ListEmailTemplates`     | Names and creation times only, paged.                                                      |
-| `DeleteEmailTemplate`    |                                                                                            |
-| `CreateConfigurationSet` | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                    |
-| `GetConfigurationSet`    | Reports the defaults it applied as well as what was declared.                              |
-| `ListConfigurationSets`  | Names only, paged with `PageSize` and `NextToken`.                                         |
-| `DeleteConfigurationSet` |                                                                                            |
-| `GetAccount`             |                                                                                            |
-| `PutAccountDetails`      | `MailType` and `WebsiteURL` are required, as on real SES.                                  |
+| Command                           | Notes                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `SendEmail`                       | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                                  |
+| `CreateEmailIdentity`             | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back. |
+| `GetEmailIdentity`                | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.             |
+| `ListEmailIdentities`             | Paged with `PageSize` and `NextToken`.                                                                    |
+| `DeleteEmailIdentity`             |                                                                                                           |
+| `CreateEmailTemplate`             | Substitution only. `Tags` are refused.                                                                    |
+| `GetEmailTemplate`                | Reports the wording with its placeholders unrendered.                                                     |
+| `UpdateEmailTemplate`             | Replaces the wording outright, keeping the creation time.                                                 |
+| `ListEmailTemplates`              | Names and creation times only, paged.                                                                     |
+| `DeleteEmailTemplate`             |                                                                                                           |
+| `CreateConfigurationSet`          | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                                   |
+| `GetConfigurationSet`             | Reports the defaults it applied as well as what was declared.                                             |
+| `ListConfigurationSets`           | Names only, paged with `PageSize` and `NextToken`.                                                        |
+| `DeleteConfigurationSet`          |                                                                                                           |
+| `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                      |
+| `PutAccountDetails`               | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
+| `PutAccountSuppressionAttributes` | No reasons at all turns the suppression list off.                                                         |
+| `PutSuppressedDestination`        | Accepted in the sandbox, which real SES refuses.                                                          |
+| `GetSuppressedDestination`        |                                                                                                           |
+| `ListSuppressedDestinations`      | Paged, and narrowed by `Reasons`, `StartDate` and `EndDate`.                                              |
+| `DeleteSuppressedDestination`     | Removing an address that is not on the list succeeds.                                                     |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 
@@ -695,19 +876,34 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   the template. Template data holding an object where the template wants a value is refused too,
   where real Handlebars would render `[object Object]`.
 - **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
-- **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
-  account suppression list and no event destinations. A configuration set named on a send is kept on
-  the record so a test can assert the right one was used, and goes no further.
+- **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events and no
+  event destinations. A configuration set named on a send is kept on the record so a test can assert
+  the right one was used, and goes no further.
 - **A configuration set is state, and no behaviour.** Its suppression reasons, sending switch,
-  delivery options and reputation switch are all held and read back. Nothing acts on any of them,
-  including `SendingEnabled`, and a send naming a set that was never created still succeeds.
+  delivery options and reputation switch are all held and read back. Every one of them is inert,
+  `SendingEnabled` included, and a send naming a set that was never created still succeeds.
 - **A configuration set holds what it was created with.** The `Put` commands that change one group
   of options are absent. A set cannot be changed once it exists.
-- **DKIM tokens on `AWS::SES::EmailIdentity` are made up.** They are stable per identity so a test
-  can assert on them, and they prove no ownership of anything.
+- **The suppression list fills only by hand.** Every address on it was put there by a caller,
+  because no message here ever bounces. A configuration set's `SuppressedReasons` name what a bounce
+  or a complaint would suppress for, and both are absent.
+- **Tenant-level suppression lists are left out.** A suppression command carrying `TenantName` is
+  refused rather than answered from the account-level list.
+- **`PutSuppressedDestination` works in the sandbox.** Real SES refuses it until an account has
+  production access.
+- **DKIM tokens are made up.** They are stable per identity so a test can assert on them, and they
+  prove no ownership of anything.
 - **Only `AWS::SES::EmailIdentity`, `AWS::SES::Template` and `AWS::SES::ConfigurationSet` deploy.**
   `AWS::SES::ConfigurationSetEventDestination`, `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and
   the rest are left out.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is absent.
-- **DKIM, MAIL FROM domains and sending authorization policies are left out.** An identity created
-  with `DkimSigningAttributes` is refused, and never reported as configured.
+- **DKIM and MAIL FROM domains are recorded, never performed.** An identity reports the signing and
+  envelope sender settings it was created with. No message is signed, no signature is checked, and
+  no MX record is looked for. Deliverability is decided outside AWS, where a test process cannot
+  follow.
+- **The commands that change an identity's settings are absent.** `PutEmailIdentityDkimAttributes`,
+  `PutEmailIdentityMailFromAttributes` and `PutEmailIdentityFeedbackAttributes` have no counterpart
+  here. A CloudFormation deploy sets all three, and `CreateEmailIdentity` sets the rest.
+- **Sending authorization policies are left out.** A Cognito user pool sending through an identity
+  is checked only for that identity being verified, where real Cognito needs a policy on the
+  identity allowing it as well.

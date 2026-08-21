@@ -5,12 +5,13 @@ import type { SimCognitoUserPoolMfaType } from "../../user-pool/mfa/sim-cognito-
  * The SetUserPoolMfaConfig inputs this simulation reads, and the ones it
  * refuses.
  *
- * `EmailMfaConfiguration` is refused because a code sent by email needs the
- * pool's `EmailConfiguration`, which `CreateUserPool` refuses, so a pool here
- * could not deliver that message. The `SmsConfiguration` inside an
- * `SmsMfaConfiguration` is refused for the same reason the pool's own is: no
- * message is delivered here, so the IAM role that would send one is never
- * assumed.
+ * `EmailMfaConfiguration` is refused because the email one-time code challenge
+ * is not simulated: nothing here issues one, checks one or expires one. A pool
+ * whose `EmailConfiguration` sends through SES is no different, since what is
+ * missing is the challenge rather than somewhere for the message to go. The
+ * `SmsConfiguration` inside an `SmsMfaConfiguration` is refused for the reason
+ * the pool's own is: no text message is delivered here, so the IAM role that
+ * would send one is never assumed.
  *
  * `WebAuthnConfiguration` is read and recorded. It is what a passkey is
  * registered against, and what one is presented to at a sign-in.

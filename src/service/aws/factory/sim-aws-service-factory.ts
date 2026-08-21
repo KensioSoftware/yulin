@@ -40,6 +40,7 @@ import { SimAwsSelfContainedServiceBuilder } from "./sim-aws-self-contained-serv
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAwsRequestAuthWiring } from "./sim-aws-request-auth-wiring.js";
 import { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
+import { SimAwsMessageLog } from "../message/sim-aws-message-log.js";
 
 interface SimAwsServiceFactoryProperties {
   readonly simAws: SimAws;
@@ -109,6 +110,15 @@ export class SimAwsServiceFactory {
    */
   public readonly registries = new SimAwsScopedServiceRegistries();
 
+  /**
+   * Where the services that would have sent a message announce one.
+   *
+   * Shared by every scope in this simulation, so a serving layer listens once
+   * and hears the Cognito messages and text messages of all of them.
+   * @internal
+   */
+  public readonly messageLog = new SimAwsMessageLog();
+
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly accountRegionServices: SimAwsAccountRegionServiceBuilder;
   private readonly registeredServices: SimAwsRegisteredServiceBuilder;
@@ -135,6 +145,7 @@ export class SimAwsServiceFactory {
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
       accountServices: this.accountServices,
+      messageLog: this.messageLog,
     });
     this.registeredServices = new SimAwsRegisteredServiceBuilder({
       registries: this.registries,

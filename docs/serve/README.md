@@ -766,6 +766,60 @@ The reload channel is served at `/__sim-aws/live-reload` on every hostname the s
 page can ask for it relative to wherever it was served from. While live reload is on, no simulated
 service can serve anything at that path.
 
+## Messages on the console
+
+A simulated Cognito user pool records the verification message it would have sent, and simulated SNS
+records the text message it would have texted. Reading either back takes test code, or the pool's
+`/<userPoolId>/messages` listing, and both are a detour when the sign-up form is open in a browser
+and the confirmation code is the one thing you want. A served environment prints them as they are
+recorded:
+
+```
+sim Cognito eu-west-2_aBcDeFgHi: email to alice@example.com (SignUp)
+  Subject: Your verification code
+  Your confirmation code is 483920
+sim SNS: SMS to +15550100
+  Your one-time code is 118221
+```
+
+Nothing has to ask for that. Narrow it with `messageLogging`, which holds one property per kind of
+message:
+
+```typescript sim-serve-message-logging
+/**
+ * Serving with the text messages left off, and the pool messages still
+ * printed.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({
+  simAws,
+  port: 8787,
+  messageLogging: { sns: false },
+});
+
+// Serve the pages that sign a user up here.
+
+await srv.close();
+```
+
+`messageLogging: false` prints none of them.
+
+An SMS the opt-out list stopped is printed with the suppression named. The publish succeeded, and a
+handset that will never see the code is worth being told about rather than waited on:
+
+```
+sim SNS: SMS to +15550100 (suppressed, number opted out)
+  Your one-time code is 118221
+```
+
+Only what happens while the server is up reaches the console. A message recorded before it started
+listening, or after `close()`, is on the service's own record and nowhere else, and `sentMessages()`
+and `sentSmsMessages()` are still where the whole history is.
+
 ## Restarting on a file change
 
 Live reload gets a page back on its feet after the process restarts. `yulin watch` is what restarts
@@ -994,6 +1048,9 @@ it is without watch mode.
   hostname in a page body, in a JSON response or in a cookie `Domain` is left as the service wrote
   it.
 - `/__sim-aws/live-reload` is shadowed on every served hostname while live reload is on.
+- Console message logging covers simulated Cognito messages and simulated SNS text messages. An
+  email accepted by simulated SES is recorded and left unprinted, because a body can run to
+  kilobytes of HTML.
 - Injection decodes the HTML as UTF-8. A page stored in another encoding would be corrupted, so
   serve HTML as UTF-8.
 - An open reload connection uses one of the browser's six connections per origin per tab.

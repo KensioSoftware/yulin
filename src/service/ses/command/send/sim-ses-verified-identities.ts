@@ -44,6 +44,21 @@ export class SimSesVerifiedIdentityCheck {
    * verified.
    */
   check(send: SimSesCheckedSend): void {
+    const refusal = this.refusal(send);
+
+    if (refusal !== undefined) {
+      throw new SimSesMessageRejected(refusal);
+    }
+  }
+
+  /**
+   * Why SES would turn this message down, or nothing where it would take it.
+   *
+   * The reason rather than the exception, because a service sending on the
+   * account's behalf reports the refusal in its own vocabulary rather than
+   * letting an SES error cross the boundary.
+   */
+  refusal(send: SimSesCheckedSend): string | undefined {
     const checked = this.#account.isInSandbox
       ? [send.fromEmailAddress, ...send.recipients]
       : [send.fromEmailAddress];
@@ -53,12 +68,12 @@ export class SimSesVerifiedIdentityCheck {
       .filter((address) => !this.#identities.isAddressVerified(address));
 
     if (failed.length === 0) {
-      return;
+      return undefined;
     }
 
-    throw new SimSesMessageRejected(
+    return (
       `Email address is not verified. The following identities failed the ` +
-        `check in region ${this.#reportedRegion}: ${[...new Set(failed)].join(", ")}`,
+      `check in region ${this.#reportedRegion}: ${[...new Set(failed)].join(", ")}`
     );
   }
 

@@ -5,6 +5,7 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -21,6 +22,10 @@ import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router
 import { SimCognitoUserPools } from "./sim-cognito-user-pools.js";
 import type { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
+import {
+  SimCognitoNoEmailSenders,
+  type SimCognitoEmailSenders,
+} from "./user-pool/message/sim-cognito-email-senders.js";
 import type {
   SimCognitoUserPoolClientRegistration,
   SimCognitoUserPoolRegistration,
@@ -67,11 +72,25 @@ interface SimCognitoIdentityProviderProperties {
   readonly triggerFunctions?: SimCognitoTriggerFunctions;
 
   /**
+   * The simulated SES a pool with `EmailSendingAccount: DEVELOPER` sends
+   * through, which is the whole simulation rather than this scope for the same
+   * reason the trigger functions are: a `SourceArn` names its own region.
+   */
+  readonly emailSenders?: SimCognitoEmailSenders;
+
+  /**
    * The web ACLs this scope's pools can be protected by. A standalone
    * simulated Cognito has none, so a hosted domain serves the requests it
    * always did.
    */
   readonly webAcls?: SimWafProtection;
+
+  /**
+   * Where this scope announces the messages its pools would have sent, for a
+   * serving layer to print. A standalone simulated Cognito announces to a log
+   * nobody listens to.
+   */
+  readonly messageLog?: SimAwsMessageLog;
 }
 
 /**
@@ -107,7 +126,9 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
       userPoolRegistry = new SimCognitoUserPoolRegistry(),
       domainRegistry = new SimCognitoDomainRegistry(),
       triggerFunctions = new SimCognitoNoTriggerFunctions(),
+      emailSenders = new SimCognitoNoEmailSenders(),
       webAcls = new SimWafNoProtection(),
+      messageLog = new SimAwsMessageLog(),
     } = properties;
     const pools = new SimCognitoUserPoolStore({
       registry: userPoolRegistry,
@@ -122,7 +143,9 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
         pools,
         domains: domainRegistry,
         triggerFunctions,
+        emailSenders,
         webAcls,
+        messageLog,
       }),
       background,
     });

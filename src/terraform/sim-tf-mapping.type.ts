@@ -59,12 +59,19 @@ export interface TerraformDeclaration {
  * and CloudFormation carries all six as properties of one `AWS::S3::Bucket`.
  * A fold names the attribute holding the parent's address, and returns the
  * properties to merge into the parent.
+ *
+ * The properties the parent already carries are given along with the resource,
+ * for the fold that adds to a list rather than setting a property outright. An
+ * EventBridge rule's targets are one Terraform resource each and one `Targets`
+ * list on the Resource, so the second target of a rule has to find the first.
+ * A fold writing a property of its own ignores them.
  */
 export interface TerraformResourceFold {
   /** The attribute naming the resource these properties belong to. */
   readonly parentAttribute: string;
   readonly properties: (
     context: TerraformMappingContext,
+    parent?: Record<string, SimCfnTemplateValue>,
   ) => Record<string, SimCfnTemplateValue>;
 
   /**

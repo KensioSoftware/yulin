@@ -14,6 +14,7 @@ import {
   SimCognitoPasswordPolicy,
   type SimCognitoUserPoolPoliciesType,
 } from "./sim-cognito-password-policy.js";
+import { SimCognitoEmailConfiguration } from "./message/sim-cognito-email-configuration.js";
 import {
   SimCognitoVerificationMessages,
   type SimCognitoVerificationMessagesType,
@@ -42,6 +43,14 @@ export interface SimCognitoUserPoolSettingsInput extends SimCognitoVerificationM
     | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly LambdaConfig?: object | undefined;
+
+  /**
+   * Which service delivers the pool's messages, and what they are sent as.
+   *
+   * Both pool requests carry it, so a pool moved onto SES by an update sends
+   * through SES from then on.
+   */
+  readonly EmailConfiguration?: object | undefined;
 
   /**
    * The attributes the pool holds on its users beyond the standard ones.
@@ -134,6 +143,12 @@ export class SimCognitoUserPoolSettings {
   public readonly verificationMessages: SimCognitoVerificationMessages;
 
   /**
+   * How the pool's email goes out: through Cognito's own sending, or through
+   * the account's SES in the region the `SourceArn` names.
+   */
+  public readonly emailConfiguration: SimCognitoEmailConfiguration;
+
+  /**
    * How the pool recovers an account whose password was forgotten, kept so a
    * described pool reports it. Nothing here starts a recovery.
    */
@@ -168,6 +183,10 @@ export class SimCognitoUserPoolSettings {
       new SimCognitoMfaConfiguration(input.MfaConfiguration),
     );
     this.verificationMessages = new SimCognitoVerificationMessages(input);
+    this.emailConfiguration = new SimCognitoEmailConfiguration(
+      input.EmailConfiguration,
+      operation,
+    );
     this.accountRecovery = new SimCognitoAccountRecovery(
       input.AccountRecoverySetting,
       operation,

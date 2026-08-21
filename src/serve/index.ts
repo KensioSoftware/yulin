@@ -8,6 +8,10 @@ export {
 export { SimAwsLocalPortInUse } from "./http/local-server/sim-aws-local-port.error.js";
 export type { SimCloseOnSignalOptions } from "../util/process/close-on-signal.js";
 export { SimLiveReload } from "./http/live-reload/sim-live-reload.js";
+export type {
+  SimMessageLoggingOption,
+  SimMessageLoggingProperties,
+} from "./message/sim-message-logging.js";
 export {
   simLiveReloadConfig,
   simLiveReloadHeaderName,

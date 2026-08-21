@@ -6,7 +6,10 @@ import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-fac
 import { SimCognitoRegistrations } from "../user-pool/sim-cognito-registrations.js";
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
+import type { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
 import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-messenger.js";
+import type { SimCognitoEmailSenders } from "../user-pool/message/sim-cognito-email-senders.js";
+import { SimCognitoPoolEmailDelivery } from "../user-pool/message/sim-cognito-pool-email-delivery.js";
 import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognito-trigger-functions.js";
 import { SimCognitoUserPoolTriggers } from "../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
@@ -45,7 +48,9 @@ interface SimCognitoCommandsProperties {
   readonly pools: SimCognitoUserPoolStore;
   readonly domains: SimCognitoDomainRegistry;
   readonly triggerFunctions: SimCognitoTriggerFunctions;
+  readonly emailSenders: SimCognitoEmailSenders;
   readonly webAcls: SimWafProtection;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -90,8 +95,15 @@ export class SimCognitoCommands {
   public readonly webAcls: SimWafProtection;
 
   constructor(properties: SimCognitoCommandsProperties) {
-    const { accountRegionScope, iam, clock, pools, domains, triggerFunctions } =
-      properties;
+    const {
+      accountRegionScope,
+      iam,
+      clock,
+      pools,
+      domains,
+      triggerFunctions,
+      emailSenders,
+    } = properties;
 
     this.webAcls = properties.webAcls;
 
@@ -106,7 +118,12 @@ export class SimCognitoCommands {
     });
     // The messages a pool would have sent are recorded by the sign-up and user
     // commands alike, and both run the pool's CustomMessage trigger first.
-    const messenger = new SimCognitoPoolMessenger({ triggers, clock });
+    const messenger = new SimCognitoPoolMessenger({
+      triggers,
+      email: new SimCognitoPoolEmailDelivery({ senders: emailSenders }),
+      clock,
+      messageLog: properties.messageLog,
+    });
     // One token issuer serves the API sign-ins and the hosted endpoints, so a
     // token is the same thing however the user reached it.
     const tokenIssuer = new SimCognitoTokenIssuer({ clock, triggers });

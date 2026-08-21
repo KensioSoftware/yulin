@@ -7,30 +7,11 @@ import {
   assertThrowsErrorAsync,
   assertStringIncludes,
 } from "@kensio/smartass";
-import {
-  terraformPlanFactory,
-  terraformPlanResourceFactory,
-  type TerraformPlanFixture,
-} from "../../test/terraform/plan/terraform-plan.factory.js";
+import { terraformPlanResourceFactory } from "../../test/terraform/plan/terraform-plan.factory.js";
+import { terraformPlanFile as planFile } from "../../test/terraform/plan/terraform-plan-file.js";
 import { TemporaryDirectory } from "../util/filesystem/temporary-directory.js";
 import { SimAws } from "../service/aws/sim-aws.js";
 import { TerraformAdapter } from "./sim-tf-adapter.js";
-import { jsonStringify } from "../util/type-guard/json.js";
-
-/** Write a plan fixture out as the JSON `terraform show -json` writes. */
-async function planFile(
-  fixture: Partial<TerraformPlanFixture>,
-  fileName = "orders.tfplan.json",
-): Promise<string> {
-  const directory = new TemporaryDirectory();
-
-  await directory.writeFile(
-    fileName,
-    jsonStringify(terraformPlanFactory.make(fixture)),
-  );
-
-  return directory.join(fileName);
-}
 
 describe("deploying a Terraform plan into simulated AWS", () => {
   it("creates the resources of a plan file", async () => {

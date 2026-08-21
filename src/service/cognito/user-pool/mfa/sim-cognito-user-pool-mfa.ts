@@ -34,9 +34,8 @@ export interface SimCognitoSmsMfaConfigType {
  * `GetUserPoolMfaConfig` carry it.
  *
  * Real Cognito carries one more factor configuration here, for the code sent
- * by email. That one needs the pool's `EmailConfiguration`, which
- * `CreateUserPool` refuses, so the command refuses it rather than reporting it
- * back.
+ * by email. That challenge is not simulated, so the command refuses it rather
+ * than reporting back a factor no sign-in would ever ask for.
  */
 export interface SimCognitoUserPoolMfaType {
   readonly MfaConfiguration?: string | undefined;

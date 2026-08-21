@@ -35,7 +35,11 @@ export function terraformDeclaredResources(
   const lost: TerraformLostAttribute[] = [];
 
   for (const { resource, mapping } of settled.declared) {
-    const built = mapping({ resource, resolver: settled.resolver });
+    const built = mapping({
+      resource,
+      resolver: settled.resolver,
+      overrides: settled.overrides,
+    });
     const logicalId = settled.resolver.logicalId(resource.address);
 
     templates.set(logicalId, {

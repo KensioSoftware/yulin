@@ -6,13 +6,13 @@
 // oxlint-disable security/detect-object-injection
 import { isRecord } from "../util/type-guard/record.js";
 import type { SimCfnTemplateValueRecord } from "../service/cloudformation/template/value/sim-cfn-template-value.js";
-import type { TerraformExpression } from "./sim-tf-plan.type.js";
 import {
   terraformAwsProvider,
   type TerraformResource,
 } from "./sim-tf-resource.type.js";
 import type { TerraformReferenceResolver } from "./sim-tf-reference.js";
-import { longestFirst } from "./sim-tf-reference-address.js";
+import { terraformReferencedAddress } from "./sim-tf-referenced.js";
+import type { TerraformPlanOverrides } from "./sim-tf-overrides.js";
 import { terraformResourceFolds } from "./sim-tf-registry.js";
 import type {
   TerraformImportedResource,
@@ -44,6 +44,7 @@ export function terraformFoldedResources(
   resources: readonly TerraformResource[],
   templates: ReadonlyMap<string, SimCfnTemplateValueRecord>,
   resolver: TerraformReferenceResolver,
+  overrides: TerraformPlanOverrides,
 ): TerraformFoldedResources {
   const merged = new Map(templates);
   const folded: TerraformImportedResource[] = [];
@@ -57,11 +58,13 @@ export function terraformFoldedResources(
       continue;
     }
 
-    const parentId = foldTargetLogicalId(
+    const address = terraformReferencedAddress(
       resource,
       fold.parentAttribute,
       resolver,
     );
+    const parentId =
+      address === undefined ? undefined : resolver.logicalId(address);
     const parent = parentId === undefined ? undefined : merged.get(parentId);
 
     if (parentId === undefined || parent === undefined) {
@@ -73,13 +76,14 @@ export function terraformFoldedResources(
       continue;
     }
 
-    merged.set(
-      parentId,
-      mergedParent(parent, fold.properties({ resource, resolver })),
-    );
+    const context = { resource, resolver, overrides };
+    const existing = parent["Properties"];
+    const added = fold.properties(context, isRecord(existing) ? existing : {});
+
+    merged.set(parentId, mergedParent(parent, added));
     folded.push({ address: resource.address, type: resource.type });
     lost.push(
-      ...(fold.lost?.({ resource, resolver }) ?? []).map((attribute) => ({
+      ...(fold.lost?.(context) ?? []).map((attribute) => ({
         address: resource.address,
         attribute,
       })),
@@ -90,44 +94,13 @@ export function terraformFoldedResources(
 }
 
 /**
- * The logical ID of the resource a fold belongs to.
- *
- * The fold's parent attribute holds a reference rather than a value, because a
- * bucket or a role being created by the same plan has no name until it exists.
- * The reference names the resource directly, which is what a fold needs.
- */
-function foldTargetLogicalId(
-  resource: TerraformResource,
-  parentAttribute: string,
-  resolver: TerraformReferenceResolver,
-): string | undefined {
-  const expression = resource.expressions[parentAttribute];
-
-  if (!isRecord(expression)) {
-    return undefined;
-  }
-
-  const references = longestFirst(
-    (expression as TerraformExpression).references ?? [],
-  );
-
-  for (const reference of references) {
-    const address = resolver.targetAddress(reference, resource.modulePath);
-
-    if (address !== undefined) {
-      return resolver.logicalId(address);
-    }
-  }
-
-  return undefined;
-}
-
-/**
  * A resource template with a fold's properties merged into it.
  *
  * The fold contributes whole CloudFormation properties, so a later fold on the
  * same parent replaces a property an earlier one set rather than merging into
- * it. No two folds of one resource type write the same property.
+ * it. Two folds writing the same property are two of one Terraform type, and a
+ * fold whose property is a list is handed what the parent already carries so
+ * it can add to it.
  */
 function mergedParent(
   parent: SimCfnTemplateValueRecord,

@@ -13,6 +13,7 @@ import { lambdaFunction } from "./sim-tf-map-lambda.js";
 import { logGroup } from "./sim-tf-map-logs.js";
 import { httpApi } from "./sim-tf-map-http-api.js";
 import { httpApiRoute } from "./sim-tf-map-http-api-routes.js";
+import { ecrRepository } from "./sim-tf-map-ecr.js";
 import type { TerraformMappingContext } from "../sim-tf-attributes.js";
 
 const assumeRolePolicy = JSON.stringify({
@@ -365,6 +366,34 @@ describe("mapping an HTTP API", () => {
         "",
         ["integrations/", { Ref: "AwsApigatewayv2IntegrationProcessor" }],
       ],
+    });
+  });
+});
+
+describe("mapping an ECR repository", () => {
+  it("carries the image settings simulated ECR records rather than acts on", () => {
+    // Given a repository scanning on push and refusing tag moves
+    const context = contextFor({
+      resources: [
+        terraformPlanResourceFactory.make({
+          type: "aws_ecr_repository",
+          name: "processor",
+          values: {
+            name: "orders-processor",
+            image_tag_mutability: "IMMUTABLE",
+            image_scanning_configuration: [{ scan_on_push: true }],
+          },
+        }),
+      ],
+    });
+
+    // When it is mapped
+    // Then both go across, so the record simulated ECR keeps against the
+    // Resource names what the repository was asked for and is not doing
+    assertObjectEquals(ecrRepository(context).Properties, {
+      RepositoryName: "orders-processor",
+      ImageTagMutability: "IMMUTABLE",
+      ImageScanningConfiguration: { ScanOnPush: true },
     });
   });
 });

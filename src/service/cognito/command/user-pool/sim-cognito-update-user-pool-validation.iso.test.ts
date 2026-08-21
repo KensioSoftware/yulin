@@ -98,11 +98,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "tags",
   },
   {
-    label: "EmailConfiguration",
-    input: { EmailConfiguration: { EmailSendingAccount: "DEVELOPER" } },
-    says: "email delivery",
-  },
-  {
     label: "SmsConfiguration",
     input: { SmsConfiguration: { SnsCallerArn: "arn:aws:iam::1:role/sms" } },
     says: "SMS delivery",

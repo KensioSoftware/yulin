@@ -1,5 +1,5 @@
 import type { TerraformResource } from "./sim-tf-resource.type.js";
-import type { TerraformReferenceResolver } from "./sim-tf-reference.js";
+import type { TerraformBuildContext } from "./sim-tf-attributes.js";
 import { terraformResourceMappings } from "./sim-tf-registry.js";
 import type {
   TerraformDeclaration,
@@ -19,10 +19,10 @@ import type { TerraformSkipReason } from "./sim-tf-report.type.js";
  */
 export function terraformRefusal(
   declaration: TerraformDeclaration,
-  resolver: TerraformReferenceResolver,
+  build: TerraformBuildContext,
   unresolved: TerraformSkipReason,
 ): TerraformSkipReason | undefined {
-  const built = builtResource(declaration, resolver);
+  const built = builtResource(declaration, build);
 
   if (built.refused !== undefined) {
     return built.refused;
@@ -39,23 +39,24 @@ export function terraformRefusal(
  */
 export function terraformMissingProperties(
   resource: TerraformResource,
-  resolver: TerraformReferenceResolver,
+  build: TerraformBuildContext,
 ): readonly string[] {
   const mapping = terraformResourceMappings.get(resource.type);
 
   return mapping === undefined
     ? []
-    : missing(builtResource({ resource, mapping }, resolver));
+    : missing(builtResource({ resource, mapping }, build));
 }
 
-/** The Resource one declaration's mapping builds, against this resolver. */
+/** The Resource one declaration's mapping builds, against this plan. */
 function builtResource(
   declaration: TerraformDeclaration,
-  resolver: TerraformReferenceResolver,
+  build: TerraformBuildContext,
 ): TerraformMappedResource {
   return declaration.mapping({
     resource: declaration.resource,
-    resolver,
+    resolver: build.resolver,
+    overrides: build.overrides,
   });
 }
 

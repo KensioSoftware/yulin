@@ -14,7 +14,13 @@ export type {
   SimListEmailIdentitiesCommand,
   SimListEmailIdentitiesCommandInput,
   SimListEmailIdentitiesCommandOutput,
+  SimSesDkimAttributes,
+  SimSesDkimSigningAttributes,
+  SimSesDkimStatusValue,
   SimSesIdentityInfo,
+  SimSesMailFromAttributes,
+  SimSesTag,
+  SimSesTagInput,
   SimSesVerificationStatusValue,
 } from "./identity/identity.command.js";
 export type {
@@ -35,9 +41,29 @@ export type {
   SimPutAccountDetailsCommand,
   SimPutAccountDetailsCommandInput,
   SimPutAccountDetailsCommandOutput,
+  SimPutAccountSuppressionAttributesCommand,
+  SimPutAccountSuppressionAttributesCommandInput,
+  SimPutAccountSuppressionAttributesCommandOutput,
   SimSesAccountDetailsOutput,
   SimSesSendQuotaDetail,
+  SimSesSuppressionAttributes,
 } from "./account/account.command.js";
+export type {
+  SimDeleteSuppressedDestinationCommand,
+  SimDeleteSuppressedDestinationCommandInput,
+  SimDeleteSuppressedDestinationCommandOutput,
+  SimGetSuppressedDestinationCommand,
+  SimGetSuppressedDestinationCommandInput,
+  SimGetSuppressedDestinationCommandOutput,
+  SimListSuppressedDestinationsCommand,
+  SimListSuppressedDestinationsCommandInput,
+  SimListSuppressedDestinationsCommandOutput,
+  SimPutSuppressedDestinationCommand,
+  SimPutSuppressedDestinationCommandInput,
+  SimPutSuppressedDestinationCommandOutput,
+  SimSesSuppressedDestinationDetail,
+  SimSesSuppressedDestinationSummary,
+} from "./suppression/suppression.command.js";
 export type {
   SimCreateEmailTemplateCommand,
   SimCreateEmailTemplateCommandInput,

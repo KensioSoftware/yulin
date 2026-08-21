@@ -1,3 +1,4 @@
+import type { SimAwsAccountId } from "../../aws/sim-aws-account-id.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
 
@@ -35,9 +36,10 @@ export class SimCognitoUserPoolArn {
    *
    * This is kept alongside the ARN because it is what another service supplies
    * as `AWS:SourceAccount` when the pool reaches it, such as a Lambda trigger
-   * invocation.
+   * invocation, and it is the Account whose SES a pool sending through
+   * `DEVELOPER` email resolves its identity in.
    */
-  public readonly accountId: string;
+  public readonly accountId: SimAwsAccountId;
 
   constructor(properties: SimCognitoUserPoolArnProperties) {
     this.value =

@@ -21,6 +21,18 @@ export interface SimSesSentEmailBody {
   readonly html: string | undefined;
 }
 
+/**
+ * A recipient the account's suppression list held back.
+ *
+ * The address is kept as the message wrote it, which is what a test asserting
+ * on the send has to hand. The list may hold a different spelling of it, since
+ * sending matches without regard to case.
+ */
+export interface SimSesSuppressedRecipient {
+  readonly emailAddress: string;
+  readonly reason: string;
+}
+
 interface SimSesSentEmailProperties {
   readonly messageId: string;
   readonly fromEmailAddress: string;
@@ -31,6 +43,7 @@ interface SimSesSentEmailProperties {
   readonly templateName: string | undefined;
   readonly templateData: Readonly<Record<string, unknown>> | undefined;
   readonly configurationSetName: string | undefined;
+  readonly suppressedRecipients: readonly SimSesSuppressedRecipient[];
   readonly sentDate: Date;
 }
 
@@ -79,6 +92,16 @@ export class SimSesSentEmail {
 
   public readonly configurationSetName: string | undefined;
 
+  /**
+   * The recipients the account's suppression list held back, empty where it
+   * held back none.
+   *
+   * SES accepts a message addressed to a suppressed recipient and does not
+   * deliver it, so the message is recorded either way and this is how a test
+   * tells the two apart.
+   */
+  public readonly suppressedRecipients: readonly SimSesSuppressedRecipient[];
+
   public readonly sentDate: Date;
 
   constructor(properties: SimSesSentEmailProperties) {
@@ -91,6 +114,7 @@ export class SimSesSentEmail {
     this.templateName = properties.templateName;
     this.templateData = properties.templateData;
     this.configurationSetName = properties.configurationSetName;
+    this.suppressedRecipients = properties.suppressedRecipients;
     this.sentDate = properties.sentDate;
   }
 
@@ -103,5 +127,19 @@ export class SimSesSentEmail {
       ...this.destination.ccAddresses,
       ...this.destination.bccAddresses,
     ];
+  }
+
+  /**
+   * Whether the suppression list held this message back from every one of its
+   * recipients.
+   *
+   * A message with some recipients suppressed and some not was delivered to
+   * the rest, so this is the narrower question of whether it reached nobody.
+   */
+  get isFullySuppressed(): boolean {
+    return (
+      this.recipients.length > 0 &&
+      this.suppressedRecipients.length === this.recipients.length
+    );
   }
 }
