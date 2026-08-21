@@ -10,6 +10,11 @@ import type { TerraformPlan } from "./sim-tf-plan.type.js";
  * file at it is named as resolved, and a file that is not the JSON form is met
  * with the command that writes it, since `terraform plan -out` writes a binary
  * file whose name looks like the right one.
+ *
+ * A document that parses but is not a plan is refused the same way. Every
+ * `terraform show -json` document carries `format_version`, and without that
+ * check a JSON file of anything at all reads as a plan that creates nothing
+ * and deploys as an empty Stack.
  */
 export async function readTerraformPlanFile(
   planPath: string,
@@ -19,7 +24,7 @@ export async function readTerraformPlanFile(
   try {
     const parsed: unknown = JSON.parse(contents);
 
-    if (isRecord(parsed)) {
+    if (isPlanDocument(parsed)) {
       return parsed;
     }
   } catch (error) {
@@ -37,6 +42,10 @@ export async function readTerraformPlanFile(
  */
 export function terraformStackNameFromPlanPath(planPath: string): string {
   return path.basename(planPath).replace(/(?:\.tfplan|\.plan)?\.json$/u, "");
+}
+
+function isPlanDocument(parsed: unknown): parsed is TerraformPlan {
+  return isRecord(parsed) && typeof parsed["format_version"] === "string";
 }
 
 async function planFileContents(planPath: string): Promise<string> {

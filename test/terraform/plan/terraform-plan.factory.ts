@@ -40,6 +40,8 @@ export interface TerraformPlanResourceFixture {
  */
 export interface TerraformPlanModuleFixture {
   readonly name: string;
+  /** The `count` or `for_each` key, for one instance of an expanded call. */
+  readonly index: string | number | undefined;
   readonly resources: readonly TerraformPlanResourceFixture[];
   /** Output name to the references the output's own expression holds. */
   readonly outputs: Record<string, readonly string[]>;
@@ -91,6 +93,7 @@ export const terraformPlanResourceFactory =
 export const terraformPlanModuleFactory =
   new DynamicFactory<TerraformPlanModuleFixture>(() => ({
     name: "processor",
+    index: undefined,
     resources: [],
     outputs: {},
     modules: [],
@@ -146,7 +149,7 @@ function allResources(
       path: [...modulePath],
     })),
     ...fixture.modules.flatMap((module) =>
-      allResources(module, [...modulePath, module.name]),
+      allResources(module, [...modulePath, moduleInstance(module)]),
     ),
   ];
 }
@@ -167,7 +170,7 @@ function plannedModule(
   module: TerraformPlanModuleFixture,
   modulePath: readonly string[],
 ): TerraformPlannedChildModule {
-  const path = [...modulePath, module.name];
+  const path = [...modulePath, moduleInstance(module)];
 
   return {
     address: path.map((name) => `module.${name}`).join("."),
@@ -232,6 +235,22 @@ function configResource(
     ),
     depends_on: resource.dependsOn,
   };
+}
+
+/**
+ * One module call as `planned_values` addresses it.
+ *
+ * A call with `count` or `for_each` is addressed once per instance, and the
+ * key is part of the address every resource under it carries.
+ */
+function moduleInstance(module: TerraformPlanModuleFixture): string {
+  if (module.index === undefined) {
+    return module.name;
+  }
+
+  return typeof module.index === "number"
+    ? `${module.name}[${module.index}]`
+    : `${module.name}["${module.index}"]`;
 }
 
 /** One module-relative address as `planned_values` qualifies it. */

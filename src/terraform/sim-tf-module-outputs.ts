@@ -4,15 +4,6 @@ import type {
 } from "./sim-tf-plan.type.js";
 
 /**
- * What one module output is, in terms of the module that declares it.
- */
-export interface TerraformModuleOutput {
-  /** The module path the output's references are relative to. */
-  readonly modulePath: readonly string[];
-  readonly references: readonly string[];
-}
-
-/**
  * Every module output a plan declares, keyed by the address that reads it.
  *
  * A resource in one module reaching a resource in another goes through an
@@ -22,8 +13,8 @@ export interface TerraformModuleOutput {
  */
 export function terraformModuleOutputs(
   plan: TerraformPlan,
-): ReadonlyMap<string, TerraformModuleOutput> {
-  const outputs = new Map<string, TerraformModuleOutput>();
+): ReadonlyMap<string, readonly string[]> {
+  const outputs = new Map<string, readonly string[]>();
   const root = plan.configuration?.root_module;
 
   if (root !== undefined) {
@@ -36,7 +27,7 @@ export function terraformModuleOutputs(
 function collect(
   config: TerraformConfigModule,
   modulePath: readonly string[],
-  outputs: Map<string, TerraformModuleOutput>,
+  outputs: Map<string, readonly string[]>,
 ): void {
   const calls = Object.entries(config.module_calls ?? {});
 
@@ -53,10 +44,7 @@ function collect(
     const declared = Object.entries(child.outputs ?? {});
 
     for (const [name, output] of declared) {
-      outputs.set(`${address}.${name}`, {
-        modulePath: childPath,
-        references: output.expression?.references ?? [],
-      });
+      outputs.set(`${address}.${name}`, output.expression?.references ?? []);
     }
 
     collect(child, childPath, outputs);

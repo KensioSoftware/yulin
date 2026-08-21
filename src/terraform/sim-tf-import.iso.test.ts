@@ -9,6 +9,7 @@ import {
 } from "@kensio/smartass";
 import {
   terraformPlanFactory,
+  terraformPlanModuleFactory,
   terraformPlanResourceFactory,
   type TerraformPlanFixture,
 } from "../../test/terraform/plan/terraform-plan.factory.js";
@@ -235,6 +236,55 @@ describe("importing a Terraform plan as a CloudFormation template", () => {
     );
   });
 
+  it("resolves a reference between resources of a for_each module instance", () => {
+    // Given a module called once per colour, holding a topic and the
+    // subscription to it. Terraform addresses every resource under the module
+    // with the instance key
+    const { template } = imported({
+      modules: [
+        terraformPlanModuleFactory.make({
+          name: "workers",
+          index: "blue",
+          resources: [
+            terraformPlanResourceFactory.make({
+              address: "aws_sns_topic.events",
+              type: "aws_sns_topic",
+              name: "events",
+              values: { name: "worker-events" },
+            }),
+            terraformPlanResourceFactory.make({
+              address: "aws_sns_topic_subscription.queue",
+              type: "aws_sns_topic_subscription",
+              name: "queue",
+              values: { protocol: "sqs" },
+              unknown: { topic_arn: true },
+              references: {
+                topic_arn: ["aws_sns_topic.events.arn", "aws_sns_topic.events"],
+              },
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const subscription = template.Resources[
+      "ModuleWorkersBlueAwsSnsTopicSubscriptionQueue"
+    ] as unknown as {
+      Properties: Record<string, unknown>;
+      DependsOn?: readonly string[];
+    };
+
+    // When the plan is imported
+    // Then the subscription reaches its own instance's topic. A reference
+    // qualified without the key names an address no resource of the plan has
+    assertObjectEquals(subscription.Properties["TopicArn"], {
+      Ref: "ModuleWorkersBlueAwsSnsTopicEvents",
+    });
+    assertArrayEquals(subscription.DependsOn ?? [], [
+      "ModuleWorkersBlueAwsSnsTopicEvents",
+    ]);
+  });
+
   it("names the attribute a mapping could not carry", () => {
     // Given a function, whose code a plan points at as a zip, an S3 object or
     // a container image, and none of the three is a handler Yulin can run
@@ -253,11 +303,20 @@ describe("importing a Terraform plan as a CloudFormation template", () => {
     const { template, report } = imported({
       resources: [
         terraformPlanResourceFactory.make({
+          type: "aws_apigatewayv2_api",
+          name: "http",
+          values: { name: "orders-api", protocol_type: "HTTP" },
+        }),
+        terraformPlanResourceFactory.make({
           type: "aws_apigatewayv2_integration",
           name: "processor",
           values: { integration_type: "AWS_PROXY" },
-          unknown: { integration_uri: true },
+          unknown: { api_id: true, integration_uri: true },
           references: {
+            api_id: [
+              "aws_apigatewayv2_api.http.id",
+              "aws_apigatewayv2_api.http",
+            ],
             integration_uri: ["data.aws_lambda_function.existing.invoke_arn"],
           },
         }),
@@ -265,9 +324,11 @@ describe("importing a Terraform plan as a CloudFormation template", () => {
     });
 
     // When the plan is imported
-    // Then the template declares nothing for it, and the report says which
-    // value it was that the plan could not carry
-    assertArrayEquals(Object.keys(template.Resources), []);
+    // Then the template declares the API and nothing for the integration, and
+    // the report says which value it was that the plan could not carry
+    assertArrayEquals(Object.keys(template.Resources), [
+      "AwsApigatewayv2ApiHttp",
+    ]);
     assertObjectEquals(report.lost, [
       {
         address: "aws_apigatewayv2_integration.processor",

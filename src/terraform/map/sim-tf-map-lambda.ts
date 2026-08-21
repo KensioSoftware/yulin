@@ -106,6 +106,7 @@ export function lambdaPermission(
       Principal: "principal",
       SourceArn: "source_arn",
     }),
+    requires: ["FunctionName", "Action", "Principal"],
   };
 }
 
@@ -124,5 +125,6 @@ export function lambdaEventSourceMapping(
       BatchSize: "batch_size",
       Enabled: "enabled",
     }),
+    requires: ["EventSourceArn", "FunctionName"],
   };
 }

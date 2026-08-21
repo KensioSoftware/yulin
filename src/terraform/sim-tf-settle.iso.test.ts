@@ -104,17 +104,70 @@ describe("settling which resources of a plan become Resources", () => {
     assertMapSize(plan.refused, 0);
   });
 
+  it("refuses a resource whose value the target service will not take", () => {
+    // Given a SecureString parameter. Terraform stores one through Parameter
+    // Store's own encryption, and CloudFormation refuses the type because the
+    // plaintext value would sit in the template
+    const plan = settled({
+      resources: [
+        terraformPlanResourceFactory.make({
+          type: "aws_ssm_parameter",
+          name: "db_password",
+          values: {
+            name: "/orders/db-password",
+            type: "SecureString",
+            value: "hunter2",
+          },
+        }),
+      ],
+    });
+
+    // When it settles
+    // Then it is refused for the value rather than for a value that is
+    // missing, and the rest of the plan still deploys
+    assertArrayEquals(plan.declared, []);
+    assertIdentical(
+      plan.refused.get("aws_ssm_parameter.db_password"),
+      "a property value the service refuses",
+    );
+  });
+
+  it("declares a parameter of a type the service does take", () => {
+    // Given a plain String parameter
+    const plan = settled({
+      resources: [
+        terraformPlanResourceFactory.make({
+          type: "aws_ssm_parameter",
+          name: "api_url",
+          values: {
+            name: "/orders/api-url",
+            type: "String",
+            value: "https://api.example.com",
+          },
+        }),
+      ],
+    });
+
+    // When it settles
+    // Then it is one the template will declare
+    assertArrayEquals(
+      plan.declared.map((entry) => entry.resource.type),
+      ["aws_ssm_parameter"],
+    );
+  });
+
   it("refuses a resource whose required value the plan never resolved", () => {
     // Given an integration whose URI reads a function the plan does not
     // create, so nothing in the plan resolves it
-    const plan = settled({
-      resources: [integration()],
-    });
+    const plan = settled({ resources: [httpApi(), integration()] });
 
     // When it settles
     // Then it is refused, rather than deployed into the failure a simulated
     // service would answer a missing IntegrationUri with
-    assertArrayEquals(plan.declared, []);
+    assertArrayEquals(
+      plan.declared.map((entry) => entry.resource.type),
+      ["aws_apigatewayv2_api"],
+    );
     assertIdentical(
       plan.refused.get("aws_apigatewayv2_integration.processor"),
       "unresolved required attribute",
@@ -125,12 +178,16 @@ describe("settling which resources of a plan become Resources", () => {
     // Given a route whose target is that same integration. Its reference
     // resolves while the integration is still a candidate, and stops
     // resolving once the integration is refused
-    const plan = settled({ resources: [integration(), route()] });
+    const plan = settled({ resources: [httpApi(), integration(), route()] });
 
     // When it settles
-    // Then the route goes too, and says which of the two it is: it lost the
+    // Then the route goes too, and says which of the two it is. Its target
+    // resolved while the integration was still a candidate, so it lost the
     // resource it was reading rather than never having had one
-    assertArrayEquals(plan.declared, []);
+    assertArrayEquals(
+      plan.declared.map((entry) => entry.resource.type),
+      ["aws_apigatewayv2_api"],
+    );
     assertIdentical(
       plan.refused.get("aws_apigatewayv2_route.post_orders"),
       "references a resource that was skipped",
@@ -139,7 +196,7 @@ describe("settling which resources of a plan become Resources", () => {
 
   it("resolves references against the settled set and no wider", () => {
     // Given the same plan
-    const plan = settled({ resources: [integration(), route()] });
+    const plan = settled({ resources: [httpApi(), integration(), route()] });
 
     // When a reference to the refused integration is resolved
     // Then nothing comes back, so no property can be built naming a logical ID
@@ -153,14 +210,24 @@ describe("settling which resources of a plan become Resources", () => {
   });
 });
 
+/** The API both the integration and the route belong to. */
+function httpApi(): ReturnType<typeof terraformPlanResourceFactory.make> {
+  return terraformPlanResourceFactory.make({
+    type: "aws_apigatewayv2_api",
+    name: "http",
+    values: { name: "orders-api", protocol_type: "HTTP" },
+  });
+}
+
 /** An integration whose URI names a function outside the plan. */
 function integration(): ReturnType<typeof terraformPlanResourceFactory.make> {
   return terraformPlanResourceFactory.make({
     type: "aws_apigatewayv2_integration",
     name: "processor",
     values: { integration_type: "AWS_PROXY" },
-    unknown: { integration_uri: true },
+    unknown: { api_id: true, integration_uri: true },
     references: {
+      api_id: ["aws_apigatewayv2_api.http.id", "aws_apigatewayv2_api.http"],
       integration_uri: ["data.aws_lambda_function.existing.invoke_arn"],
     },
   });
@@ -172,8 +239,9 @@ function route(): ReturnType<typeof terraformPlanResourceFactory.make> {
     type: "aws_apigatewayv2_route",
     name: "post_orders",
     values: { route_key: "POST /orders" },
-    unknown: { target: true },
+    unknown: { api_id: true, target: true },
     references: {
+      api_id: ["aws_apigatewayv2_api.http.id", "aws_apigatewayv2_api.http"],
       target: [
         "aws_apigatewayv2_integration.processor.id",
         "aws_apigatewayv2_integration.processor",

@@ -14,6 +14,7 @@ import type {
 import type { TerraformResource } from "./sim-tf-resource.type.js";
 import {
   childModuleCallName,
+  childModuleSegment,
   configResourcesByKey,
   providerShortName,
   unknownAttributesByAddress,
@@ -63,12 +64,15 @@ function collectModule(
     .map((resource) => joined(resource, declared, modulePath, unknown));
 
   const nested = (values.child_modules ?? []).flatMap((child) => {
+    // The configuration is filed under the call name and the resources are
+    // addressed by the instance, so the two parts of the walk take different
+    // halves of the same segment.
     const callName = childModuleCallName(child.address, modulePath);
 
     return collectModule(
       child,
       config?.module_calls?.[callName]?.module,
-      [...modulePath, callName],
+      [...modulePath, childModuleSegment(child.address, modulePath)],
       unknown,
     );
   });

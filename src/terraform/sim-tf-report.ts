@@ -1,8 +1,6 @@
 import type { TerraformResource } from "./sim-tf-resource.type.js";
-import {
-  terraformMissingProperties,
-  type TerraformSettledPlan,
-} from "./sim-tf-settle.js";
+import type { TerraformSettledPlan } from "./sim-tf-settle.js";
+import { terraformMissingProperties } from "./sim-tf-refusal.js";
 import type { TerraformDeclaredResources } from "./sim-tf-declare.js";
 import type { TerraformFoldedResources } from "./sim-tf-fold.js";
 import type {

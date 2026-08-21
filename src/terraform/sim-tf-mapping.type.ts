@@ -1,5 +1,7 @@
 import type { SimCfnTemplateValue } from "../service/cloudformation/template/value/sim-cfn-template-value.js";
 import type { TerraformMappingContext } from "./sim-tf-attributes.js";
+import type { TerraformResource } from "./sim-tf-resource.type.js";
+import type { TerraformSkipReason } from "./sim-tf-report.type.js";
 
 /**
  * One CloudFormation Resource built from one Terraform resource.
@@ -23,11 +25,31 @@ export interface TerraformMappedResource {
    * cannot create.
    */
   readonly requires?: readonly string[];
+
+  /**
+   * Why this Resource is one the simulated service would refuse whatever the
+   * plan resolved.
+   *
+   * `requires` covers a property the service needs and the plan could not
+   * fill. This covers the other shape, where every property is there and one
+   * of them holds a value the target refuses. Terraform's `SecureString`
+   * parameter is the example. Real CloudFormation refuses that type on an
+   * `AWS::SSM::Parameter` because the plaintext would sit in the template, and
+   * so does the simulation, so a Resource built for one fails the Stack around
+   * it rather than only itself.
+   */
+  readonly refused?: TerraformSkipReason | undefined;
 }
 
 export type TerraformResourceMapping = (
   context: TerraformMappingContext,
 ) => TerraformMappedResource;
+
+/** One resource of a plan, with the mapping that will build its Resource. */
+export interface TerraformDeclaration {
+  readonly resource: TerraformResource;
+  readonly mapping: TerraformResourceMapping;
+}
 
 /**
  * How one Terraform resource contributes to another resource's properties.

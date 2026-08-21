@@ -160,6 +160,35 @@ describe("resolving a Terraform reference against the resources of a plan", () =
     });
   });
 
+  it("resolves a reference between resources of a for_each module instance", () => {
+    // Given a module called once per colour, holding a queue
+    const resolver = resolverFor({
+      modules: [
+        terraformPlanModuleFactory.make({
+          name: "workers",
+          index: "blue",
+          resources: [
+            terraformPlanResourceFactory.make({
+              address: "aws_sqs_queue.this",
+              name: "this",
+            }),
+          ],
+        }),
+      ],
+    });
+
+    // When a sibling of that queue resolves a reference to it
+    const resolved = resolver.resolve("aws_sqs_queue.this.arn", [
+      'workers["blue"]',
+    ]);
+
+    // Then it reaches the instance's own queue. Every address under the module
+    // carries the key, so a reference qualified without it reaches nothing
+    assertObjectEquals(resolved, {
+      "Fn::GetAtt": ["ModuleWorkersBlueAwsSqsQueueThis", "Arn"],
+    });
+  });
+
   it("resolves nothing for a reference to a resource the template lacks", () => {
     // Given a plan whose template will hold no resource of that address
     const resolver = resolverFor({ resources: [] });
@@ -214,6 +243,41 @@ describe("resolving a reference through module outputs", () => {
     // When the output is resolved
     // Then nothing comes back, since no resource of the plan is behind it
     assertUndefined(resolver.resolve("module.processing.queue_name", []));
+  });
+
+  it("follows an output read from inside a for_each module instance", () => {
+    // Given a module called once per colour, whose own module publishes a
+    // queue ARN, and a reference to that output made from inside the instance
+    const queue = terraformPlanModuleFactory.make({
+      name: "queue",
+      resources: [
+        terraformPlanResourceFactory.make({
+          address: "aws_sqs_queue.this",
+          name: "this",
+        }),
+      ],
+      outputs: { queue_arn: ["aws_sqs_queue.this.arn"] },
+    });
+    const resolver = resolverFor({
+      modules: [
+        terraformPlanModuleFactory.make({
+          name: "workers",
+          index: "blue",
+          modules: [queue],
+        }),
+      ],
+    });
+
+    // When the output is resolved from inside the instance
+    const resolved = resolver.resolve("module.queue.queue_arn", [
+      'workers["blue"]',
+    ]);
+
+    // Then it is found. A module declares its outputs once however many
+    // instances the call has, so the index is keyed without the key
+    assertObjectEquals(resolved, {
+      "Fn::GetAtt": ["ModuleWorkersBlueModuleQueueAwsSqsQueueThis", "Arn"],
+    });
   });
 
   it("gives up on an output that leads back to itself", () => {

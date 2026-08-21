@@ -1,11 +1,12 @@
 import type { SimCfnTemplateValue } from "../service/cloudformation/template/value/sim-cfn-template-value.js";
 import type { TerraformResource } from "./sim-tf-resource.type.js";
-import type { TerraformModuleOutput } from "./sim-tf-module-outputs.js";
 import { terraformAttributeReads } from "./sim-tf-attribute-reads.js";
 import { TerraformLogicalIds } from "./sim-tf-logical-id.js";
 import {
   longestFirst,
+  moduleOutputPath,
   qualifiedReference,
+  withoutInstanceKeys,
 } from "./sim-tf-reference-address.js";
 
 /**
@@ -22,12 +23,12 @@ import {
  */
 export class TerraformReferenceResolver {
   private readonly byAddress: ReadonlyMap<string, TerraformResource>;
-  private readonly moduleOutputs: ReadonlyMap<string, TerraformModuleOutput>;
+  private readonly moduleOutputs: ReadonlyMap<string, readonly string[]>;
   private readonly logicalIds: TerraformLogicalIds;
 
   constructor(
     resources: readonly TerraformResource[],
-    moduleOutputs: ReadonlyMap<string, TerraformModuleOutput> = new Map(),
+    moduleOutputs: ReadonlyMap<string, readonly string[]> = new Map(),
   ) {
     this.byAddress = new Map(
       resources.map((resource) => [resource.address, resource]),
@@ -110,14 +111,28 @@ export class TerraformReferenceResolver {
       return qualified.slice(address.length + 1);
     }
 
-    const output = this.moduleOutputs.get(qualified);
-    const [longest] = longestFirst(output?.references ?? []);
+    const [longest] = longestFirst(this.moduleOutput(qualified) ?? []);
 
     return longest?.split(".").pop();
   }
 
   private target(qualified: string): TerraformResource | undefined {
     return this.longestMatch(qualified) ?? this.throughModuleOutput(qualified);
+  }
+
+  /**
+   * The module output one reference names.
+   *
+   * The index is keyed by module call path, since a module declares its
+   * outputs once however many instances of the call there are. A reference
+   * made from inside one instance carries that instance's key, so the key
+   * comes off when the qualified form finds nothing.
+   */
+  private moduleOutput(qualified: string): readonly string[] | undefined {
+    return (
+      this.moduleOutputs.get(qualified) ??
+      this.moduleOutputs.get(withoutInstanceKeys(qualified))
+    );
   }
 
   /**
@@ -133,14 +148,19 @@ export class TerraformReferenceResolver {
     qualified: string,
     depth = 0,
   ): TerraformResource | undefined {
-    const output = this.moduleOutputs.get(qualified);
+    const output = this.moduleOutput(qualified);
 
     if (output === undefined || depth > 8) {
       return undefined;
     }
 
-    for (const reference of longestFirst(output.references)) {
-      const nested = qualifiedReference(reference, output.modulePath);
+    // The path the output was read through rather than the one it was
+    // declared under, so an output reached inside a `for_each` instance
+    // follows its own instance's resources.
+    const instance = moduleOutputPath(qualified);
+
+    for (const reference of longestFirst(output)) {
+      const nested = qualifiedReference(reference, instance);
       const target =
         this.longestMatch(nested) ??
         this.throughModuleOutput(nested, depth + 1);

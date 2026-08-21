@@ -9,14 +9,9 @@ import {
   terraformResourceFolds,
   terraformResourceMappings,
 } from "./sim-tf-registry.js";
-import type { TerraformResourceMapping } from "./sim-tf-mapping.type.js";
+import type { TerraformDeclaration } from "./sim-tf-mapping.type.js";
+import { terraformRefusal } from "./sim-tf-refusal.js";
 import type { TerraformSkipReason } from "./sim-tf-report.type.js";
-
-/** One resource of a plan, with the mapping that will build its Resource. */
-export interface TerraformDeclaration {
-  readonly resource: TerraformResource;
-  readonly mapping: TerraformResourceMapping;
-}
 
 /**
  * Which resources of a plan the template will declare, and what resolves
@@ -60,25 +55,25 @@ export function settledTerraformPlan(
       candidates.map((declaration) => declaration.resource),
       moduleOutputs,
     );
-    const kept = candidates.filter((declaration) =>
-      buildable(declaration, resolver),
+    const dropped = new Map(
+      candidates.flatMap((declaration) => {
+        const why = terraformRefusal(declaration, resolver, reason);
+
+        return why === undefined ? [] : [[declaration.resource.address, why]];
+      }),
     );
 
-    if (kept.length === candidates.length) {
-      return { declared: kept, resolver, refused };
+    if (dropped.size === 0) {
+      return { declared: candidates, resolver, refused };
     }
 
-    const keptAddresses = new Set(
-      kept.map((declaration) => declaration.resource.address),
+    for (const [address, why] of dropped) {
+      refused.set(address, why);
+    }
+
+    candidates = candidates.filter(
+      (declaration) => !dropped.has(declaration.resource.address),
     );
-
-    for (const { resource } of candidates) {
-      if (!keptAddresses.has(resource.address)) {
-        refused.set(resource.address, reason);
-      }
-    }
-
-    candidates = kept;
     // A resource that was buildable a round ago and is not now lost the
     // resource it was reading, rather than never having had one.
     reason = "references a resource that was skipped";
@@ -112,51 +107,4 @@ function mappable(
   }
 
   return [];
-}
-
-/**
- * Whether the Resource this mapping builds is one a service would accept.
- *
- * A plan can leave a value the service requires unresolvable, and a Resource
- * built without it fails and takes the Stack's other Resources with it. The
- * mapping names those properties, and a resource missing one is left out of
- * the template rather than deployed into a failure.
- */
-function buildable(
-  declaration: TerraformDeclaration,
-  resolver: TerraformReferenceResolver,
-): boolean {
-  return missingProperties(declaration, resolver).length === 0;
-}
-
-/**
- * The properties a mapping declares as required and could not fill.
- *
- * A resource with no mapping at all has none. It is refused for the type
- * before any value is read, and there is no mapping to ask what it needed.
- */
-export function terraformMissingProperties(
-  resource: TerraformResource,
-  resolver: TerraformReferenceResolver,
-): readonly string[] {
-  const mapping = terraformResourceMappings.get(resource.type);
-
-  return mapping === undefined
-    ? []
-    : missingProperties({ resource, mapping }, resolver);
-}
-
-function missingProperties(
-  declaration: TerraformDeclaration,
-  resolver: TerraformReferenceResolver,
-): readonly string[] {
-  const built = declaration.mapping({
-    resource: declaration.resource,
-    resolver,
-  });
-
-  return (built.requires ?? []).filter(
-    // oxlint-disable-next-line security/detect-object-injection
-    (name) => built.Properties[name] === undefined,
-  );
 }

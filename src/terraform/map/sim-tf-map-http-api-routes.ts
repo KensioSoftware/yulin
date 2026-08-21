@@ -28,7 +28,7 @@ export function httpApiIntegration(
       IntegrationUri: "integration_uri",
       PayloadFormatVersion: "payload_format_version",
     }),
-    requires: ["IntegrationUri"],
+    requires: ["ApiId", "IntegrationUri"],
   };
 }
 
@@ -46,7 +46,7 @@ export function httpApiRoute(
       }),
       ...properties({ Target: routeTarget(context) }),
     },
-    requires: ["Target"],
+    requires: ["ApiId", "Target"],
   };
 }
 

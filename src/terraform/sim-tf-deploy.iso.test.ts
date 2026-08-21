@@ -222,6 +222,27 @@ describe("deploying a Terraform plan into simulated AWS", () => {
     assertStringIncludes(error.message, "terraform show -json");
   });
 
+  it("refuses JSON that is not a plan document", async () => {
+    // Given a JSON file of something else entirely, such as a package.json a
+    // path went wrong and reached
+    const directory = new TemporaryDirectory();
+    await directory.writeFile(
+      "orders.tfplan.json",
+      '{"name":"orders","version":"1.0.0"}',
+    );
+
+    // When it is deployed
+    const error = await assertThrowsErrorAsync(async () => {
+      await new TerraformAdapter(new SimAws()).deployPlan(
+        directory.join("orders.tfplan.json"),
+      );
+    });
+
+    // Then it is refused, rather than read as a plan that creates nothing and
+    // deployed as an empty Stack
+    assertStringIncludes(error.message, "is not Terraform plan JSON");
+  });
+
   it("refuses JSON that is not a document at all", async () => {
     // Given a file holding valid JSON that is not an object
     const directory = new TemporaryDirectory();

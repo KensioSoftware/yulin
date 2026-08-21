@@ -29,6 +29,7 @@ export function httpApi(
         Tags: tags(context),
       }),
     },
+    requires: ["Name", "ProtocolType"],
   };
 }
 
@@ -57,5 +58,6 @@ export function httpApiStage(
       StageName: "name",
       AutoDeploy: "auto_deploy",
     }),
+    requires: ["ApiId", "StageName"],
   };
 }

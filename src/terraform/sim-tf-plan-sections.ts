@@ -8,6 +8,10 @@
  * than the name being read out of them. This is that reading, kept away from
  * the walk that uses it.
  */
+import {
+  addressSegments,
+  withoutInstanceKeys,
+} from "./sim-tf-reference-address.js";
 import type {
   TerraformConfigModule,
   TerraformConfigResource,
@@ -44,21 +48,33 @@ export function configResourcesByKey(
 }
 
 /**
- * The call name of a child module, taken off its fully qualified address.
+ * The child module segment of an address, as `planned_values` writes it.
  *
  * A child module address repeats its parents, so `module.a.module.b` under
- * `["a"]` is the call named `b`. A module called with `for_each` carries the
- * key on the address, and the key belongs to the instance rather than to the
- * call the configuration is filed under.
+ * `["a"]` is `b`. A module called with `count` or `for_each` carries the
+ * instance key here, and `module.workers["blue"]` gives `workers["blue"]`.
+ * That is the form every address under the module is written with, so it is
+ * the form a reference from inside it has to be qualified against.
+ */
+export function childModuleSegment(
+  address: string | undefined,
+  modulePath: readonly string[],
+): string {
+  return addressSegments(address ?? "")[modulePath.length * 2 + 1] ?? "";
+}
+
+/**
+ * The call name of a child module, without any instance key.
+ *
+ * The configuration files a module under the name it was called by, once,
+ * however many instances the call has, so this is the form its `module_calls`
+ * are keyed on.
  */
 export function childModuleCallName(
   address: string | undefined,
   modulePath: readonly string[],
 ): string {
-  const segments = (address ?? "").split(".");
-  const own = segments.slice(modulePath.length * 2);
-
-  return (own[1] ?? "").replace(/\[.*]$/, "");
+  return withoutInstanceKeys(childModuleSegment(address, modulePath));
 }
 
 /** The provider that owns a resource type, without the registry it came from. */

@@ -14,9 +14,9 @@ const { stack, report } = await new TerraformAdapter(simAws).deployPlan({
 ```
 
 This is not part of simulated CloudFormation and does not sit on its API. The adapter calls
-`deployTemplate`, which is the same public method a caller with a template of their own would use,
-and nothing under `src/service/cloudformation/` knows Terraform exists. A Stack deployed from a plan
-is an ordinary Stack, and the report of what the plan held that the template does not is returned
+`deployTemplate`, the same public method a caller with a template of their own would use, and
+nothing under `src/service/cloudformation/` knows Terraform exists. A Stack deployed from a plan is
+an ordinary Stack, and the report of what the plan held that the template does not is returned
 beside it rather than hung off it.
 
 ## The three passes
@@ -130,6 +130,12 @@ the value in a separate `aws_secretsmanager_secret_version`. CloudWatch Logs ref
 Each of these would fail the whole Stack. A mapping therefore has to know what its target service
 accepts, and that is per-type work on top of the rename. Where the service requires a property the
 plan could not resolve, the mapping names it under `requires`, and settling leaves the resource out.
+
+One case is still open. A property that arrives through a fold cannot be settled on, because folding
+runs after the set is settled and a fold's parent has to be in the template before it has anywhere
+to merge. A Secret whose `aws_secretsmanager_secret_version` is missing or unresolved is created
+without a value, and simulated Secrets Manager refuses that. Closing it means settling the folds
+along with the Resources they configure, which is the same fixed point run over a wider set.
 
 ## Adding a resource type
 
