@@ -7,8 +7,18 @@ export type {
 } from "./command/send/sim-ses-service-send.js";
 export {
   SimSesIdentity,
+  type SimSesDkimStatus,
   type SimSesVerificationStatus,
 } from "./identity/sim-ses-identity.js";
+export {
+  defaultSimSesIdentitySettings,
+  type SimSesDkimSettings,
+  type SimSesDkimSigningOrigin,
+  type SimSesIdentitySettings,
+  type SimSesIdentityTag,
+  type SimSesMailFromBehaviour,
+  type SimSesMailFromSettings,
+} from "./identity/sim-ses-identity-settings.js";
 export { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
 export {
   requiredSimSesIdentityName,

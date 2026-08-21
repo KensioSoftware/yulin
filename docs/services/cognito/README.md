@@ -718,12 +718,13 @@ rules real Cognito holds them to. A message carries `{####}`, and runs to 20,000
 email and the 140 an SMS carries.
 
 A pool keeps this record whichever service sent the message. One sending through Cognito's own
-email has been through nothing else, exactly as on real AWS. One whose `EmailConfiguration` names
-`DEVELOPER` also went through simulated SES, covered under
+email stops there, exactly as on real AWS. One whose `EmailConfiguration` names `DEVELOPER` also
+went through simulated SES, covered under
 [Sending a pool's email through SES](#sending-a-pools-email-through-ses).
 
 `SmsConfiguration` is refused. It names the IAM role Cognito assumes to publish a text message
-through SNS, and nothing here publishes one, so the role would name a permission nothing exercises.
+through SNS. A pool here records the text message rather than publishing it, leaving that role to
+name a permission the simulation never exercises.
 
 ### The CustomMessage trigger
 
@@ -859,9 +860,9 @@ The response is `{ "messages": [ ... ] }`, each message carrying `username`, `re
 
 A pool created with `EmailConfiguration: { EmailSendingAccount: "DEVELOPER", ... }` sends its email
 through simulated SES, in the region its `SourceArn` names. That is the CDK
-`cognito.UserPoolEmail.withSES({ ... })` configuration, and it is the one worth testing: an account
-set up for SES and still in the [SES sandbox](../ses#the-sandbox) delivers nothing, and a pool
-recording only its own messages would report that as a working sign-up.
+`cognito.UserPoolEmail.withSES({ ... })` configuration. An account set up for SES and still in the
+[SES sandbox](../ses#the-sandbox) delivers nothing, and a pool recording only its own messages
+would report that as a working sign-up.
 
 The message is recorded in both places. `sesV2().sentEmails()` holds it as it went out, with the
 configured `From`, `ReplyToEmailAddress` and `ConfigurationSet`. `sentMessages()` on the pool holds
@@ -940,7 +941,7 @@ A sign-up against a pool whose `SourceArn` identity is missing or still unverifi
 `InvalidEmailRoleAccessPolicyException`, which is what real Cognito raises when it cannot use the
 identity. A message SES then refuses fails with `CodeDeliveryFailureException`, which in a
 simulation means the sandbox turned down an unverified recipient. The two are kept apart because
-they are different problems: the first is an account set up wrong, and the second is one that has
+they are different problems. The first is an account set up wrong, and the second is one that has
 yet to leave the sandbox. Neither records a message on the pool or on SES.
 
 Real Cognito also needs an identity policy letting Cognito send as the identity. That part is left
@@ -960,7 +961,7 @@ rewriting the Account id in its template before a sign-up could send.
 
 The region is honoured. A pool in `eu-west-2` whose `SourceArn` names `us-east-1` sends through the
 `us-east-1` SES, and the identity has to be verified there. Real Cognito restricts which regions a
-pool may pair with, and nothing here does.
+pool may pair with, and this simulation accepts any of them.
 
 `COGNITO_DEFAULT` is the default and needs no `SourceArn`. Such a pool records its messages and
 reaches SES at no point, which is what real Cognito's built-in sending does. A

@@ -1,4 +1,7 @@
-import { SendEmailCommand } from "@aws-sdk/client-sesv2";
+import {
+  GetEmailIdentityCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
 import {
   assertArrayLength,
   assertIdentical,
@@ -128,17 +131,23 @@ describe("CDK-synthesised SES resources", () => {
     assertIdentical(ses.sentEmails().at(0)?.subject, "Welcome, Ada");
   });
 
-  it("records the MAIL FROM domain it deployed without acting on", async () => {
+  it("holds the MAIL FROM domain the CDK stack declared", async () => {
     // Given the deployed stack.
-    const { stack } = await deployCdkStack();
+    const { simAws, stack } = await deployCdkStack();
 
-    // Then the property CDK wrote and this simulation has nothing to do with
-    // is reported rather than passed over in silence.
-    const mailFrom = stack.ignoredProperties.find(
-      (property) => property.path === "MailFromAttributes",
+    // When the identity CDK wrote is read back.
+    const identity = await simAws
+      .sesV2()
+      .getEmailIdentity(
+        new GetEmailIdentityCommand({ EmailIdentity: "example.com" }),
+      );
+
+    // Then the envelope sender domain is reported the way the construct set it,
+    // and the stack ignored nothing along the way.
+    assertIdentical(
+      identity.MailFromAttributes?.MailFromDomain,
+      "mail.example.com",
     );
-
-    assertNonNullable(mailFrom);
-    assertStringIncludes(mailFrom.reason, "envelope sender");
+    assertArrayLength(stack.ignoredProperties, 0);
   });
 });

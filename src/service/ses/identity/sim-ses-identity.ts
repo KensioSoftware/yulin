@@ -1,10 +1,15 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { simSesIdentityArn } from "../sim-ses-arn.js";
+import { simSesDkimTokens } from "./sim-ses-dkim-tokens.js";
 import {
   simSesIdentityKey,
   simSesIdentityType,
   type SimSesIdentityType,
 } from "./sim-ses-identity-name.js";
+import {
+  defaultSimSesIdentitySettings,
+  type SimSesIdentitySettings,
+} from "./sim-ses-identity-settings.js";
 
 /**
  * How far along an identity's verification is, in SES's own vocabulary.
@@ -16,10 +21,14 @@ import {
  */
 export type SimSesVerificationStatus = "PENDING" | "SUCCESS";
 
+/** What DKIM signing reports when the identity was configured without it. */
+export type SimSesDkimStatus = SimSesVerificationStatus | "NOT_STARTED";
+
 interface SimSesIdentityProperties {
   readonly emailIdentity: string;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly createdDate: Date;
+  readonly settings?: SimSesIdentitySettings | undefined;
 }
 
 /**
@@ -46,6 +55,8 @@ export class SimSesIdentity {
 
   #verificationStatus: SimSesVerificationStatus = "PENDING";
 
+  #settings: SimSesIdentitySettings;
+
   constructor(properties: SimSesIdentityProperties) {
     this.emailIdentity = properties.emailIdentity;
     this.key = simSesIdentityKey(properties.emailIdentity);
@@ -55,10 +66,23 @@ export class SimSesIdentity {
       properties.emailIdentity,
     );
     this.createdDate = properties.createdDate;
+    this.#settings =
+      properties.settings ?? defaultSimSesIdentitySettings(this.identityType);
   }
 
   get verificationStatus(): SimSesVerificationStatus {
     return this.#verificationStatus;
+  }
+
+  /**
+   * What this identity was configured with beyond its name.
+   *
+   * Held and reported, never acted on. `GetEmailIdentity` reads it back so a
+   * test can assert that the identity a stack deployed is the one the stack
+   * described.
+   */
+  get settings(): SimSesIdentitySettings {
+    return this.#settings;
   }
 
   /**
@@ -70,6 +94,51 @@ export class SimSesIdentity {
    */
   get isVerified(): boolean {
     return this.#verificationStatus === "SUCCESS";
+  }
+
+  /**
+   * How far along DKIM signing is for this identity.
+   *
+   * An identity configured without signing reports `NOT_STARTED`. One
+   * configured with it follows the identity's own verification, since the DNS
+   * records that would prove either are published together and this simulator
+   * has one act standing for all of them.
+   */
+  get dkimStatus(): SimSesDkimStatus {
+    return this.settings.dkim.signingEnabled
+      ? this.#verificationStatus
+      : "NOT_STARTED";
+  }
+
+  /**
+   * The three Easy DKIM tokens for this identity, where it has any.
+   *
+   * Bring Your Own DKIM publishes one record under a selector the caller
+   * chose, so real SES reports no tokens for it. An email address identity
+   * has none either, since the records belong to the domain.
+   */
+  get dkimTokens(): readonly string[] | undefined {
+    if (
+      !this.settings.dkim.signingEnabled ||
+      this.settings.dkim.signingOrigin === "EXTERNAL" ||
+      this.identityType !== "DOMAIN"
+    ) {
+      return undefined;
+    }
+
+    return simSesDkimTokens(this.emailIdentity);
+  }
+
+  /**
+   * Replace what this identity is configured with.
+   *
+   * Real SES configures an identity after creating it, through
+   * `PutEmailIdentityDkimAttributes` and the two commands beside it, and real
+   * CloudFormation makes those calls itself. Neither of those commands is
+   * simulated, so a deploy reaches this instead.
+   */
+  configure(settings: SimSesIdentitySettings): void {
+    this.#settings = settings;
   }
 
   /**

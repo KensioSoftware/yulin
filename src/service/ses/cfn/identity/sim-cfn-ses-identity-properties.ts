@@ -1,12 +1,25 @@
 import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simSesIdentityType } from "../../identity/sim-ses-identity-name.js";
+import type { SimSesIdentitySettings } from "../../identity/sim-ses-identity-settings.js";
 import { simCfnSesResourceError } from "../sim-cfn-ses-resource-error.js";
 import { sesEmailIdentityResourceType } from "../sim-cfn-ses-resource-types.js";
-import { unsimulatedIdentityPropertyReasons } from "./sim-cfn-ses-identity-unsimulated-properties.js";
+import { simCfnSesIdentitySettings } from "./sim-cfn-ses-identity-settings.js";
 
-/** The one property an identity Resource is actually created from. */
+/** The one property an identity Resource is named from. */
 const emailIdentityPropertyName = "EmailIdentity";
+
+/** Everything an AWS::SES::EmailIdentity Resource is read from. */
+const readProperties = new Set([
+  emailIdentityPropertyName,
+  "DkimAttributes",
+  "DkimSigningAttributes",
+  "MailFromAttributes",
+  "FeedbackAttributes",
+  "ConfigurationSetAttributes",
+  "Tags",
+]);
 
 interface SimCfnSesIdentityPropertiesProperties {
   readonly resource: SimCfnResource;
@@ -16,10 +29,10 @@ interface SimCfnSesIdentityPropertiesProperties {
 /**
  * Reads AWS::SES::EmailIdentity CloudFormation properties.
  *
- * There is only one property to read. Everything else an identity Resource can
- * say is about DKIM, a MAIL FROM domain, a configuration set or feedback
- * forwarding, none of which this simulation acts on, so each is recorded as
- * ignored and the identity is created without it.
+ * `EmailIdentity` names the identity. Everything else is configuration the
+ * identity holds and reports back through `GetEmailIdentity` without acting
+ * on it, because DKIM signing, a custom MAIL FROM domain and feedback
+ * forwarding all decide what happens to a message after it leaves AWS.
  */
 export class SimCfnSesIdentityProperties {
   readonly #resource: SimCfnResource;
@@ -56,26 +69,34 @@ export class SimCfnSesIdentityProperties {
   }
 
   /**
+   * What the Resource configures the identity with beyond its name.
+   */
+  settings(emailIdentity: string): SimSesIdentitySettings {
+    return simCfnSesIdentitySettings(
+      this.#properties,
+      simSesIdentityType(emailIdentity),
+      this.#ignorer,
+    );
+  }
+
+  /**
    * Record the properties the identity is created without acting on.
    *
-   * A property this Resource type does not have is recorded too, rather than
-   * refused. Real CloudFormation refuses one, but the alternative here is a
-   * stack that fails on a property AWS added after this was written, which is
-   * a worse way to find out.
+   * Every property this Resource type has is read now, so in practice this
+   * catches a misspelling, and a property AWS adds after this was written.
+   * Real CloudFormation refuses the second one, and a stack failing over a
+   * property that arrived last week is a worse way to find out.
    */
   recordIgnoredProperties(): void {
     for (const name of Object.keys(this.#properties)) {
-      if (name === emailIdentityPropertyName) {
-        continue;
-      }
-
-      this.#ignorer.ignoreProperty(
-        name,
-        unsimulatedIdentityPropertyReasons.get(name) ??
+      if (!readProperties.has(name)) {
+        this.#ignorer.ignoreProperty(
+          name,
           `${name} is not a property simulated SES reads from ${
             sesEmailIdentityResourceType
           }`,
-      );
+        );
+      }
     }
   }
 
