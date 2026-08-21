@@ -9,6 +9,9 @@ import { SimAwsLocalLocation } from "./sim-aws-local-location.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
 import { SimLocalLiveReload } from "../live-reload/sim-local-live-reload.js";
+import { SimLocalMessageLogging } from "../../message/sim-local-message-logging.js";
+import type { SimMessageLoggingOption } from "../../message/sim-message-logging.js";
+import type { SimMessageConsole } from "../../message/sim-message-log-console.js";
 import {
   closeOnSignal,
   type SimCloseOnSignalOptions,
@@ -17,6 +20,20 @@ import {
 interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
   readonly liveReload?: boolean;
+
+  /**
+   * Which messages this server prints to the console while it serves.
+   *
+   * Every kind unless this narrows it. See `SimMessageLoggingProperties`.
+   */
+  readonly messageLogging?: SimMessageLoggingOption | undefined;
+
+  /**
+   * Where the message lines go. The process console unless something else is
+   * named, which is how a test reads what was printed.
+   * @internal
+   */
+  readonly messageConsole?: SimMessageConsole | undefined;
 }
 
 /**
@@ -30,11 +47,17 @@ export class SimAwsLocalServer {
   private readonly portBinder: NodeServerPortBinder;
   private readonly dnsServer: SimAwsDnsServer;
   private readonly liveReload: SimLocalLiveReload;
+  private readonly messageLogging: SimLocalMessageLogging;
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
     const { simAws = new SimAws(), liveReload = false } = properties;
     this.simAws = simAws;
     this.liveReload = new SimLocalLiveReload({ enabled: liveReload });
+    this.messageLogging = new SimLocalMessageLogging({
+      simAws,
+      option: properties.messageLogging,
+      target: properties.messageConsole,
+    });
     const channel = this.liveReload.channel();
     this.requestHandler = new SimAwsLocalRequestHandler({
       simAwsHttp: new SimAwsHttp({ simAws }),
@@ -73,6 +96,7 @@ export class SimAwsLocalServer {
     await this.dnsServer.listen(Number(this.port));
 
     this.liveReload.serving(this.port);
+    this.messageLogging.serving();
 
     return this;
   }
@@ -131,6 +155,8 @@ export class SimAwsLocalServer {
   async close(): Promise<void> {
     this.server.close();
     this.dnsServer.close();
+
+    this.messageLogging.stopping();
 
     await this.simAws.close();
     await this.liveReload.stopping();
@@ -195,6 +221,24 @@ interface ServeSimAwsProperties {
   readonly simAws?: SimAws;
   readonly port?: number;
   readonly liveReload?: boolean;
+
+  /**
+   * Which messages this server prints to the console while it serves.
+   *
+   * A simulated Cognito confirmation code and a simulated SNS text message are
+   * printed as they are recorded, which is what makes a code readable in the
+   * terminal the dev server is running in. Both unless this narrows it:
+   * `{ sns: false }` keeps the pool messages and drops the text messages, and
+   * `false` prints neither.
+   */
+  readonly messageLogging?: SimMessageLoggingOption | undefined;
+
+  /**
+   * Where the message lines go. The process console unless something else is
+   * named.
+   * @internal
+   */
+  readonly messageConsole?: SimMessageConsole | undefined;
 }
 
 /**
@@ -208,6 +252,11 @@ export async function serveSimAws(
     port = simAwsLocalConfig.defaultPort,
     liveReload = false,
   } = properties;
-  const server = new SimAwsLocalServer({ simAws, liveReload });
+  const server = new SimAwsLocalServer({
+    simAws,
+    liveReload,
+    messageLogging: properties.messageLogging,
+    messageConsole: properties.messageConsole,
+  });
   return server.listen(port);
 }
