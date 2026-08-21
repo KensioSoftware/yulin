@@ -13,7 +13,7 @@ import {
   simCfSiteRequest,
 } from "../../../../test/cloudfront/site-fixture.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
@@ -125,7 +125,7 @@ function siteTemplate(
 async function deploySite(
   simAws: SimAws,
   webAclId?: SimCfnTemplateValueRecord | string,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   await simCfSiteBucket(simAws, bucketName, {
     "index.html": "<h1>Home</h1>",
     "admin/index.html": "<h1>Admin</h1>",
@@ -142,7 +142,7 @@ async function deploySite(
 
 async function siteResponse(
   simAws: SimAws,
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
   path: string,
 ): Promise<Response> {
   const distributionId = stack.outputs.get("DistributionId")?.value;

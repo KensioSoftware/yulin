@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 
 import { jsonStringify } from "../../../../util/type-guard/json.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const accountIdOneOnes = "111111111111";
@@ -26,7 +26,7 @@ async function deployReading(properties: {
   readonly parameters: Record<string, { Type: string; Default?: string }>;
   readonly value: SimCfnTemplateValue;
   readonly names?: Record<string, string> | undefined;
-}): Promise<SimCfnStack> {
+}): Promise<SimCfnDeployedStack> {
   const stack = await properties.simAws.cloudFormation().deployTemplate({
     stackName: "config-stack",
     template: {

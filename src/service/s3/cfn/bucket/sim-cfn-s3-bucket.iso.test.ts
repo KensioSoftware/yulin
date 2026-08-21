@@ -51,7 +51,7 @@ describe("S3 CloudFormation Bucket Resource", () => {
     assertNonNullable(bucket);
     assertInstanceOf(bucket, SimS3Bucket);
 
-    const resource = stack.resources.get("TestBucket");
+    const resource = stack.getResource("TestBucket");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
@@ -83,7 +83,7 @@ describe("S3 CloudFormation Bucket Resource", () => {
     assertInstanceOf(bucket, SimS3Bucket);
     assertIdentical(bucket.bucketName, "testbucket");
 
-    const resource = stack.resources.get("TestBucket");
+    const resource = stack.getResource("TestBucket");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
@@ -180,7 +180,7 @@ describe("S3 CloudFormation Bucket Resource", () => {
     );
 
     // When the Resource's WebsiteURL attribute is read.
-    const bucketResource = stack.resources.get("WebsiteBucket");
+    const bucketResource = stack.getResource("WebsiteBucket");
     const bucket = simS3.getSimBucketByName("website-bucket");
 
     assertNonNullable(bucketResource);
@@ -216,7 +216,7 @@ describe("S3 CloudFormation Bucket Resource", () => {
       });
 
     // When the Resource's S3 Bucket attributes are read.
-    const bucketResource = stack.resources.get("AttributeBucket");
+    const bucketResource = stack.getResource("AttributeBucket");
 
     assertNonNullable(bucketResource);
 

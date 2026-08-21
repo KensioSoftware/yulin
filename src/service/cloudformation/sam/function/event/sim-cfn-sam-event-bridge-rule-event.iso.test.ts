@@ -10,7 +10,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
 import type { SimEventRule } from "../../../../eventbridge/rule/sim-event-rule.js";
-import type { SimCfnStack } from "../../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import {
   samFunctionTemplateLogicalId,
@@ -28,7 +28,7 @@ async function deployMatching(properties: {
   readonly events: SimCfnTemplateValueRecord;
   readonly resources?: SimCfnTemplateValueRecord;
   readonly received: unknown[];
-}): Promise<SimCfnStack> {
+}): Promise<SimCfnDeployedStack> {
   const stack = await properties.simAws.cloudFormation().deployTemplate({
     stackName: "rates-stack",
     template: simCfnSamFunctionTemplateFactory.make({

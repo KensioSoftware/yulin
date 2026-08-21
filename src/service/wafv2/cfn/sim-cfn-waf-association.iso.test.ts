@@ -18,7 +18,7 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimRestApi } from "../../apigateway/api/sim-rest-api.js";
 import { simCfnRestApiTemplateFactory } from "../../apigateway/cfn/sim-cfn-rest-api-template.factory.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 const visibility = {
@@ -101,7 +101,9 @@ function associationResource(
 /**
  * Deploy a REST API with the web ACL in front of its stage.
  */
-async function deployProtectedApi(simAws: SimAws): Promise<SimCfnStack> {
+async function deployProtectedApi(
+  simAws: SimAws,
+): Promise<SimCfnDeployedStack> {
   return await deployRestApi(
     simAws,
     simCfnRestApiTemplateFactory.make({
@@ -122,7 +124,7 @@ async function deployProtectedApi(simAws: SimAws): Promise<SimCfnStack> {
 /**
  * The deployed REST API, which is what a stage ARN has to be built from.
  */
-function deployedRestApi(stack: SimCfnStack): SimRestApi {
+function deployedRestApi(stack: SimCfnDeployedStack): SimRestApi {
   const restApi = stack.getResource("Api")?.simResource as
     | SimRestApi
     | undefined;
@@ -137,7 +139,7 @@ function deployedRestApi(stack: SimCfnStack): SimRestApi {
  */
 async function request(
   simAws: SimAws,
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
   path: string,
 ): Promise<Response> {
   const apiUrl = stack.outputs.get("ApiUrl")?.value;
@@ -204,7 +206,7 @@ describe("AWS::WAFv2::WebACLAssociation", () => {
     // web ACL be deleted after it.
     assertFalse(wafV2.protection().protects(restApi.stageArn("prod")));
     assertIdentical(
-      stack.resources.get("OrdersAclAssociation")?.status,
+      stack.getResource("OrdersAclAssociation")?.status,
       "DELETE_COMPLETE",
     );
   });

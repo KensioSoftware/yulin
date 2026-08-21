@@ -206,7 +206,7 @@ describe("ECS CloudFormation container bindings", () => {
     await stack.waitForDeployComplete();
 
     assertIdentical(
-      stack.resources.get("WorkerTaskDefinition")?.status,
+      stack.getResource("WorkerTaskDefinition")?.status,
       "CREATE_COMPLETE",
     );
 

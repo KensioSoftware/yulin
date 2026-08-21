@@ -9,6 +9,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { deployedResourceObject } from "../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 const policyDocument = {
   Version: "2012-10-17",
@@ -64,11 +65,11 @@ describe("SNS CloudFormation Resource teardown", () => {
     assertUndefined(simAws.sns().findTopic("orders"));
     assertArrayLength(simAws.sns().topicSubscriptions("orders"), 0);
     assertIdentical(
-      stack.resources.get("OrdersTopic")?.status,
+      stack.getResource("OrdersTopic")?.status,
       "DELETE_COMPLETE",
     );
     assertIdentical(
-      stack.resources.get("FulfilmentSubscription")?.status,
+      stack.getResource("FulfilmentSubscription")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -174,7 +175,7 @@ describe("SNS CloudFormation Resource teardown", () => {
       simAws
         .sns()
         .cfnResourceFactory()
-        .delete("PlatformApplication", resource, {
+        .delete("PlatformApplication", deployedResourceObject(resource), {
           simAws,
           resources: new Map(),
         }),

@@ -231,7 +231,7 @@ describe("AWS::ElasticLoadBalancingV2::Listener", () => {
     await stack.waitForDeployComplete();
 
     // Then the listener is created without them, and both are recorded.
-    const ignored = stack.resources.get("HttpListener")?.ignoredProperties;
+    const ignored = stack.getResource("HttpListener")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 2);
     assertStringIncludes(

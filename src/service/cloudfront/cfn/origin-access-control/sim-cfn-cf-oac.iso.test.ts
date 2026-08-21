@@ -74,7 +74,7 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
 
     // Then the Resource made a simulated origin access control, which sim
     // CloudFront holds by ID.
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
     assertIdentical(
       simAws.cloudFront().getOriginAccessControlById(originAccessControl.id),
@@ -92,7 +92,7 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
       .deployTemplate({ stackName: "site-stack", template });
     await stack.waitForDeployComplete();
 
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
 
     // Then both Outputs carry the origin access control's ID, which is what an
@@ -109,13 +109,14 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
       .deployTemplate({ stackName: "site-stack", template });
     await stack.waitForDeployComplete();
 
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
 
     // Then the Origin holds the origin access control itself, rather than the
     // ID the template wrote.
-    const distribution = stack.resources.get("SiteDistribution")
-      ?.simResource as SimCloudFrontDistribution | undefined;
+    const distribution = stack.getResource("SiteDistribution")?.simResource as
+      | SimCloudFrontDistribution
+      | undefined;
     assertNonNullable(distribution);
 
     const origin = distribution.getOrigin("SiteOrigin");
@@ -131,11 +132,12 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
       .deployTemplate({ stackName: "site-stack", template });
     await stack.waitForDeployComplete();
 
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
 
-    const distribution = stack.resources.get("SiteDistribution")
-      ?.simResource as SimCloudFrontDistribution | undefined;
+    const distribution = stack.getResource("SiteDistribution")?.simResource as
+      | SimCloudFrontDistribution
+      | undefined;
     assertNonNullable(distribution);
 
     // When GetDistribution is called.
@@ -191,8 +193,9 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
 
     // Then the Origin is created with none, rather than the empty ID being
     // looked up and refused.
-    const distribution = stack.resources.get("SiteDistribution")
-      ?.simResource as SimCloudFrontDistribution | undefined;
+    const distribution = stack.getResource("SiteDistribution")?.simResource as
+      | SimCloudFrontDistribution
+      | undefined;
     assertNonNullable(distribution);
 
     const origin = distribution.getOrigin("SiteOrigin");
@@ -208,7 +211,7 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
       .deployTemplate({ stackName: "site-stack", template });
     await stack.waitForDeployComplete();
 
-    const originAccessControl = stack.resources.get("SiteOac")?.simResource;
+    const originAccessControl = stack.getResource("SiteOac")?.simResource;
     assertInstanceOf(originAccessControl, SimCloudFrontOriginAccessControl);
 
     // When the Stack's Resources are torn down.
@@ -218,6 +221,6 @@ describe("AWS::CloudFront::OriginAccessControl", () => {
     assertUndefined(
       simAws.cloudFront().getOriginAccessControlById(originAccessControl.id),
     );
-    assertIdentical(stack.resources.get("SiteOac")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("SiteOac")?.status, "DELETE_COMPLETE");
   });
 });

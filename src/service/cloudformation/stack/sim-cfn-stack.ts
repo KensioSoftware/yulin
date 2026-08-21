@@ -15,6 +15,7 @@ import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deploymen
 import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
+import type { SimCfnDeployedStack } from "./sim-cfn-deployed-stack.type.js";
 import { SimCfnStackOutputs } from "./output/sim-cfn-stack-outputs.js";
 import { SimCfnStackOutputLookup } from "./output/sim-cfn-stack-output-lookup.js";
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
@@ -42,7 +43,7 @@ import type {
  *   simulated AWS, and SimCfnStackUpdater does some of each at once against a
  *   changed template.
  */
-export class SimCfnStack {
+export class SimCfnStack implements SimCfnDeployedStack {
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
   public readonly updating: SimCfnStackUpdateLifecycle;
   public readonly deletion: SimCfnStackDeletionLifecycle;

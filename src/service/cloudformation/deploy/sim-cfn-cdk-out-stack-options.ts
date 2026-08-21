@@ -1,6 +1,6 @@
 import type { SimCdkAssemblyStack } from "../cdk/sim-cdk-assembly-manifest.js";
 import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transform.js";
 
@@ -18,7 +18,7 @@ import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transf
  */
 export type SimCfnCdkOutTemplateTransform = (
   template: CfnTemplateBodyRecord,
-  deployed: ReadonlyMap<string, SimCfnStack>,
+  deployed: ReadonlyMap<string, SimCfnDeployedStack>,
 ) => CfnTemplateBodyRecord;
 
 /**
@@ -59,7 +59,7 @@ export function cdkOutOptionsFor(
  */
 export function cdkOutBoundTransform(
   transform: SimCfnCdkOutTemplateTransform | undefined,
-  deployed: ReadonlyMap<string, SimCfnStack>,
+  deployed: ReadonlyMap<string, SimCfnDeployedStack>,
 ): SimCfnTemplateFileTransform | undefined {
   if (transform === undefined) {
     return undefined;

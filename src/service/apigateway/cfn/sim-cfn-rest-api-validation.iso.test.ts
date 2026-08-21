@@ -185,7 +185,7 @@ describe("API Gateway REST API CloudFormation Resource types left out", () => {
     assertTypeString(apiId);
     assertNonNullable(simAws.apiGateway().findRestApi(apiId));
 
-    const account = stack.resources.get("ApiAccount");
+    const account = stack.getResource("ApiAccount");
     assertNonNullable(account);
     assertTrue(account.skipped);
     assertStringIncludes(

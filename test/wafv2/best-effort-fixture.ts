@@ -13,7 +13,7 @@
 import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimCfnIgnoredProperty } from "../../src/service/cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
-import type { SimCfnStack } from "../../src/service/cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../src/service/cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValueRecord } from "../../src/service/cloudformation/template/value/sim-cfn-template-value.js";
 
 const visibility = {
@@ -107,7 +107,7 @@ export function simWafAssociationResource(
  * The one property a deployment recorded as ignored.
  */
 export function simWafIgnoredProperty(
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
 ): SimCfnIgnoredProperty {
   const [property] = stack.ignoredProperties;
 

@@ -3,10 +3,11 @@ import { describe, it } from "vitest";
 /* oxlint-disable no-template-curly-in-string */
 import { assertIdentical, assertThrowsError } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
 import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
+import { deployedStackObject } from "../sim-cfn-stack.fixture.js";
 
 const stackName = "OutputAccessorStack";
 
@@ -47,7 +48,7 @@ describe("reading one sim CloudFormation Stack Output", () => {
     });
 
     // When an update resolves that Output to something else
-    await stack.update(
+    await deployedStackObject(stack).update(
       new SimCfnTemplate({
         stackName,
         template: templateBody({
@@ -177,7 +178,7 @@ function templateBody(
 /** A deployed Stack holding one Bucket and the Outputs a test declares. */
 async function deployedStack(
   outputs: OutputTemplates | undefined,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await new SimAws()
     .cloudFormation()
     .deployTemplate({ stackName, template: templateBody(outputs) });

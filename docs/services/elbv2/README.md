@@ -1645,7 +1645,7 @@ authentication and health check configuration are all in that group. Each one is
 Resource, where a reader can see which parts of the deployed load balancer are inert:
 
 ```typescript
-const ignored = stack.resources.get("ShopAlb")?.ignoredProperties;
+const ignored = stack.getResource("ShopAlb")?.ignoredProperties;
 ```
 
 Tearing the stack down removes all four in reverse dependency order. A rule comes down before its

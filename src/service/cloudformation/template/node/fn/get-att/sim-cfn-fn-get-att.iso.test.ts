@@ -53,8 +53,8 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
@@ -138,8 +138,8 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     });
 
     // Then dependency discovery waits for SourceBucket before DerivedBucket.
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
     const derivedBucket = simAws
       .s3()
       .getSimBucketByName("source-bucket.foo-derived");

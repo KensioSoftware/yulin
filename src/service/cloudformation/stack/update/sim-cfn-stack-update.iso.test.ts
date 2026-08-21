@@ -14,6 +14,7 @@ import {
 import { SimAws } from "../../../aws/sim-aws.js";
 import { jsonStringify } from "../../../../util/type-guard/json.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
+import { deployedStackObject } from "../sim-cfn-stack.fixture.js";
 
 const parameterisedTemplate = {
   Parameters: { BucketSuffix: { Type: "String", Default: "one" } },
@@ -173,7 +174,10 @@ describe("simulated CloudFormation Stack update", () => {
     assertNonNullable(stack);
 
     assertIdentical(stack.status, "UPDATE_COMPLETE");
-    assertIdentical(stack.template["Description"], "Where the reports go");
+    assertIdentical(
+      deployedStackObject(stack).template["Description"],
+      "Where the reports go",
+    );
     assertNonNullable(simAws.s3().getSimBucketByName("reports-one"));
   });
 

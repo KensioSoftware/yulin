@@ -101,7 +101,7 @@ describe("CloudFormation Fn::Sub literals", () => {
       template: subTemplate,
     });
 
-    const resource = stack.resources.get("WaitHandle");
+    const resource = stack.getResource("WaitHandle");
 
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");

@@ -181,7 +181,7 @@ describe("AWS::ElasticLoadBalancingV2::LoadBalancer", () => {
     // see what the deployed load balancer is not doing.
     assertNonNullable(simAws.elbV2().findLoadBalancerByName("shop-alb"));
 
-    const ignored = stack.resources.get("ShopAlb")?.ignoredProperties;
+    const ignored = stack.getResource("ShopAlb")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 3);
     assertStringIncludes(
@@ -211,7 +211,7 @@ describe("AWS::ElasticLoadBalancingV2::LoadBalancer", () => {
     await stack.waitForDeployComplete();
 
     // Then the load balancer is created without it, and the record says so.
-    const ignored = stack.resources.get("ShopAlb")?.ignoredProperties;
+    const ignored = stack.getResource("ShopAlb")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 1);
     assertStringIncludes(

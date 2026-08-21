@@ -204,7 +204,7 @@ describe("AWS::ECR::Repository", () => {
     // Then the repository goes with it, since nothing was holding on to it.
     assertFalse(simAws.ecr().hasRepository("orders"));
     assertIdentical(
-      stack.resources.get("OrdersRepository")?.status,
+      stack.getResource("OrdersRepository")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -233,7 +233,7 @@ describe("AWS::ECR::Repository", () => {
     // is recorded rather than failing the teardown.
     assertTrue(simAws.ecr().repository("orders").hasImage);
 
-    const resource = stack.resources.get("OrdersRepository");
+    const resource = stack.getResource("OrdersRepository");
 
     assertTrue(resource?.deletionSkipped ?? false);
     assertNonNullable(resource?.deletionSkippedReason);

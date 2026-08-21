@@ -17,7 +17,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimDynamoDbTableDescription } from "../../dynamodb/command/table/table.types.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import {
   samSimpleTableTemplateLogicalId,
   samSimpleTableTemplateTableName,
@@ -31,7 +31,7 @@ import {
 async function deploySimpleTable(
   simAws: SimAws,
   template: CfnTemplateBodyRecord,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws
     .cloudFormation()
     .deployTemplate({ stackName: "rates-stack", template });

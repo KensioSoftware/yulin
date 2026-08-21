@@ -45,8 +45,8 @@ describe("CloudFormation Ref Resource value", () => {
     assertInstanceOf(bucket, SimS3Bucket);
     assertIdentical(bucket.bucketName, "source-bucket");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const waitHandleResource = stack.resources.get("WaitHandle");
+    const sourceResource = stack.getResource("SourceBucket");
+    const waitHandleResource = stack.getResource("WaitHandle");
 
     assertNonNullable(sourceResource);
     assertNonNullable(waitHandleResource);
@@ -108,8 +108,8 @@ describe("CloudFormation Ref Resource value", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "source-bucket-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
@@ -173,8 +173,8 @@ describe("CloudFormation Ref Resource value", () => {
     assertIdentical(sourceBucket.bucketName, "source-bucket");
     assertIdentical(derivedBucket.bucketName, "prefix-source-bucket-derived");
 
-    const sourceResource = stack.resources.get("SourceBucket");
-    const derivedResource = stack.resources.get("DerivedBucket");
+    const sourceResource = stack.getResource("SourceBucket");
+    const derivedResource = stack.getResource("DerivedBucket");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
@@ -238,9 +238,9 @@ describe("CloudFormation Ref Resource value", () => {
     assertIdentical(secondBucket.bucketName, "bucket-a-b");
     assertIdentical(combinedBucket.bucketName, "bucket-a-bucket-a-b");
 
-    const firstResource = stack.resources.get("FirstBucket");
-    const secondResource = stack.resources.get("SecondBucket");
-    const combinedResource = stack.resources.get("CombinedBucket");
+    const firstResource = stack.getResource("FirstBucket");
+    const secondResource = stack.getResource("SecondBucket");
+    const combinedResource = stack.getResource("CombinedBucket");
 
     assertNonNullable(firstResource);
     assertNonNullable(secondResource);

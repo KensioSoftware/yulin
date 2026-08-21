@@ -58,9 +58,9 @@ describe("Fn::ImportValue between simulated Stacks", () => {
     });
 
     // Then the consumer's Resource was created holding the producer's value.
-    assertIdentical(consumer.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(consumer.status, "CREATE_COMPLETE");
     assertIdentical(
-      consumer.resources.get("Consumer")?.properties["DisplayName"],
+      consumer.getResource("Consumer")?.properties["DisplayName"],
       exportedUrl,
     );
   });
@@ -164,7 +164,7 @@ describe("Fn::ImportValue between simulated Stacks", () => {
       template: producerTemplate("SharedQueueUrl", "replacement"),
     });
 
-    assertIdentical(replacement.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(replacement.status, "CREATE_COMPLETE");
     assertNonNullable(replacement.outputs.get("SharedQueueUrl")?.exportName);
   });
 });

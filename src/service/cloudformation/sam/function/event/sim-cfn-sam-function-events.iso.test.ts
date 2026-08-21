@@ -7,7 +7,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
-import type { SimCfnStack } from "../../../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
 import {
   samFunctionTemplateLogicalId,
   simCfnSamFunctionTemplateFactory,
@@ -21,7 +21,7 @@ async function deployedEvents(
   stackName: string,
   events: SimCfnTemplateValueRecord,
   resources: SimCfnTemplateValueRecord = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await new SimAws().cloudFormation().deployTemplate({
     stackName,
     template: simCfnSamFunctionTemplateFactory.make({

@@ -10,7 +10,7 @@
 import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimRestApi } from "../../src/service/apigateway/api/sim-rest-api.js";
-import type { SimCfnStack } from "../../src/service/cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../src/service/cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../src/service/cloudformation/template/sim-cfn-template.js";
 import { testSamCliVersion } from "../../src/util/filesystem/test-sam-project.js";
 
@@ -114,7 +114,10 @@ export function stageLogicalIds(logicalIds: readonly string[]): string[] {
  * The methods one deployed API serves, as one `GET /rates/{currency}` per
  * method, which is the shape the SAM CLI reports its own in.
  */
-export function servedMethods(stack: SimCfnStack, logicalId: string): string[] {
+export function servedMethods(
+  stack: SimCfnDeployedStack,
+  logicalId: string,
+): string[] {
   const api = stack.getResource(logicalId)?.simResource as SimRestApi;
   assertNonNullable(api, `${logicalId} was not deployed as a REST API`);
 

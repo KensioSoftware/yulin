@@ -1,6 +1,6 @@
 import {
   assertArrayLength,
-  assertFalse,
+  assertUndefined,
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
@@ -23,11 +23,11 @@ describe("SimCfnStack Resource Condition", () => {
     });
 
     // Then that Resource is not in the Stack at all, unlike a skipped one.
-    assertFalse(stack.resources.has("Backups"));
+    assertUndefined(stack.getResource("Backups"));
     assertArrayLength(stack.skippedResources, 0);
 
     // And the Resource the Condition kept is created and named for dev.
-    const site = stack.resources.get("Site");
+    const site = stack.getResource("Site");
     assertNonNullable(site, "Site Resource");
     assertTrue(site.deployed);
     assertIdentical(
@@ -48,7 +48,7 @@ describe("SimCfnStack Resource Condition", () => {
     });
 
     // Then both Buckets are created, and the Fn::If took its true branch.
-    assertTrue(stack.resources.has("Backups"));
+    assertTrue(stack.getResource("Backups") !== undefined);
     assertIdentical(simAws.s3().getSimBucketByName("site")?.bucketName, "site");
   });
 
@@ -133,7 +133,7 @@ describe("SimCfnStack Resource Condition", () => {
     });
 
     // Then the branch that was not taken never had to resolve.
-    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
     assertIdentical(
       simAws.s3().getSimBucketByName("site-dev")?.bucketName,
       "site-dev",

@@ -30,7 +30,7 @@ describe("REST API CloudFormation Resource teardown", () => {
       }),
     );
 
-    const restApi = stack.resources.get("Api")?.simResource as
+    const restApi = stack.getResource("Api")?.simResource as
       | SimRestApi
       | undefined;
     assertNonNullable(restApi);
@@ -52,7 +52,7 @@ describe("REST API CloudFormation Resource teardown", () => {
       "Api",
     ]) {
       assertIdentical(
-        stack.resources.get(logicalId)?.status,
+        stack.getResource(logicalId)?.status,
         "DELETE_COMPLETE",
         `${logicalId} status`,
       );
@@ -75,7 +75,7 @@ describe("REST API CloudFormation Resource teardown", () => {
     // Then the deployment is reported rather than deleted, because API Gateway
     // deletes one and this simulation has no command for it. The deployment
     // goes with its API a moment later in the same teardown.
-    const deployment = stack.resources.get("Deployment");
+    const deployment = stack.getResource("Deployment");
     assertNonNullable(deployment);
     assertTrue(deployment.deletionSkipped);
     assertStringIncludes(
@@ -104,7 +104,7 @@ describe("REST API CloudFormation Resource teardown", () => {
     assertUndefined(simAws.lambda().getSimFunctionByName("orders"));
     assertUndefined(simAws.iam().roles.get("orders-role" as never));
     assertIdentical(
-      stack.resources.get("HandlerPermission")?.status,
+      stack.getResource("HandlerPermission")?.status,
       "DELETE_COMPLETE",
     );
   });

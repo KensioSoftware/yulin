@@ -913,7 +913,7 @@ const consumer = await cloudFormation.deployTemplate({
 await consumer.waitForDeployComplete();
 
 // shared-uploads, read from the export the producer Stack published
-console.log(consumer.resources.get("UploadsTopic")?.properties["DisplayName"]);
+console.log(consumer.getResource("UploadsTopic")?.properties["DisplayName"]);
 ```
 
 Deploy the producer first. An export is published once the producer's Outputs have resolved, which
@@ -994,7 +994,7 @@ await stack.waitForDeployComplete();
 console.log(simAws.s3().getSimBucketByName("site-dev")?.bucketName);
 
 // false, because IsProd is false
-console.log(stack.resources.has("Backups"));
+console.log(stack.getResource("Backups") !== undefined);
 ```
 
 ### Writing a condition
@@ -1032,7 +1032,7 @@ resource this deployment never creates.
 ### The resource `Condition` attribute
 
 A resource carrying a `Condition` attribute whose condition is false is never created. It is absent
-from `stack.resources`. A resource sim CloudFormation skips behaves differently. A skipped resource
+from `stack.getResource(...)`. A resource sim CloudFormation skips behaves differently. A skipped resource
 stays in the stack and answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
@@ -2725,6 +2725,63 @@ console.log(bucketResource?.simResource);
 This is useful in tests when you want to assert that a specific template resource created the
 expected simulated service resource.
 
+### Naming the deployed Stack type
+
+A deployment answers with a `SimCfnDeployedStack`, and `getResource(...)` with a
+`SimCfnDeployedResource`. A helper written away from the deploy call names both from
+`@kensio/yulin/cloudformation`.
+
+```typescript sim-cloudformation-deployed-stack-type
+/**
+ * Naming what a deployment answers with, for a helper written somewhere else.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import type {
+  SimCfnDeployedResource,
+  SimCfnDeployedStack,
+} from "@kensio/yulin/cloudformation";
+
+function deployedBucket(
+  stack: SimCfnDeployedStack,
+): SimCfnDeployedResource | undefined {
+  return stack.getResource("SiteBucket");
+}
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "named-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "named-site-bucket",
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(deployedBucket(stack)?.type);
+```
+
+A deployed Stack holds what the caller that deployed it reads back:
+
+- `stackName`, `status` and `error`
+- `outputs` and `output(...)`, covered under [Reading stack Outputs](#reading-stack-outputs)
+- `getResource(...)`
+- `ignoredProperties`, `skippedResources`, `inertResources`, `skippedResourceDeletions` and
+  `retainedResources`
+- `waitForDeployComplete()`, `waitForUpdateComplete()` and `waitForDeleteComplete()`
+- `delete()` and `teardown()`
+
+The same type is what a `deployCdkOut` transform is handed for the Stacks in front of the one it is
+adapting, as `ReadonlyMap<string, SimCfnDeployedStack>`.
+
 ### Looking a Resource up by CDK construct ID
 
 `getResource` takes the CDK construct ID as well as the synthesized logical ID. A construct named
@@ -2809,7 +2866,7 @@ console.log(stack.getResource("AlarmRule")?.skippedReason);
 // "Unsupported sim CloudFormation Resource service CloudWatch"
 ```
 
-A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
+A skipped Resource is still there for `stack.getResource(...)`, and still answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
 A skip is more than a whole Resource type nothing simulates. A service can decline one Resource of a
@@ -2871,7 +2928,7 @@ console.log(stack.getResource("AwsCliLayer")?.inertReason);
 //  module path"
 ```
 
-An inert Resource behaves in every other way like a skipped one. It is still in `stack.resources`,
+An inert Resource behaves in every other way like a skipped one. It is still there for `stack.getResource(...)`,
 it answers `Ref` and `Fn::GetAtt` with the same [stand-in values](#values-from-a-skipped-resource),
 and a teardown steps over it.
 

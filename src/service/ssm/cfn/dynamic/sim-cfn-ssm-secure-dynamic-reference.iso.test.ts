@@ -3,7 +3,7 @@ import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimIamUser } from "../../../iam/user/sim-iam-user.js";
 
@@ -27,7 +27,7 @@ async function deployConsoleUser(
   simAws: SimAws,
   password: SimCfnTemplateValue,
   parameters: Record<string, { Type: string; Default?: string }> = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "console-stack",
     template: {
@@ -51,7 +51,7 @@ async function deployConsoleUser(
 /**
  * The password the deployed User was created with.
  */
-function consolePassword(stack: SimCfnStack): string {
+function consolePassword(stack: SimCfnDeployedStack): string {
   const user = stack.getResource("ConsoleUser")?.simResource as
     | SimIamUser
     | undefined;

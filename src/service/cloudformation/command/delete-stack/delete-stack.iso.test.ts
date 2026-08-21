@@ -250,10 +250,7 @@ describe("CloudFormation DeleteStackCommand", () => {
     // CloudFormation reports one it stepped over, and the other has gone.
     assertNonNullable(simAws.s3().getSimBucketByName("kept"));
     assertUndefined(simAws.s3().getSimBucketByName("gone"));
-    assertIdentical(
-      stack.resources.get("KeptBucket")?.status,
-      "DELETE_SKIPPED",
-    );
+    assertIdentical(stack.getResource("KeptBucket")?.status, "DELETE_SKIPPED");
     assertArrayLength(stack.retainedResources, 1);
 
     // And the Stack itself is still gone, so its name is free again.

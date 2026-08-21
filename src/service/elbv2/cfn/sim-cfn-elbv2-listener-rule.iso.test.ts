@@ -297,7 +297,7 @@ describe("AWS::ElasticLoadBalancingV2::ListenerRule", () => {
     await stack.waitForDeployComplete();
 
     // Then it is created without it, and the record says so.
-    const ignored = stack.resources.get("OrdersRule")?.ignoredProperties;
+    const ignored = stack.getResource("OrdersRule")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 1);
     assertStringIncludes(

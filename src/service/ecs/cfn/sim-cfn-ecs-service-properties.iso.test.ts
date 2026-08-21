@@ -200,7 +200,7 @@ describe("AWS::ECS::Service properties", () => {
     // reader can see what the deployed service is not doing.
     assertTrue(simAws.ecs().service("orders-worker", "orders").isActive());
 
-    const ignored = stack.resources.get("WorkerService")?.ignoredProperties;
+    const ignored = stack.getResource("WorkerService")?.ignoredProperties;
 
     assertNonNullable(ignored);
     assertArrayLength(ignored, 3);

@@ -13,7 +13,7 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimHttpApiStage } from "../../apigatewayv2/api/stage/sim-http-api-stage.js";
 import type { SimHttpApi } from "../../apigatewayv2/api/sim-http-api.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import {
   samHttpApiTemplateLogicalId,
@@ -38,7 +38,7 @@ const documentIntegration = {
 async function deployHttpApi(
   simAws: SimAws,
   template: CfnTemplateBodyRecord,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws
     .cloudFormation()
     .deployTemplate({ stackName: "orders-stack", template });
@@ -53,7 +53,7 @@ async function deployHttpApi(
  */
 async function requestApi(
   simAws: SimAws,
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
   path: string,
 ): Promise<Response> {
   const apiEndpoint = stack.outputs.get("ApiEndpoint")?.value;

@@ -4,6 +4,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "./stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "./stack/sim-cfn-deployed-stack.type.js";
 import type {
   BackgroundCompleter,
   BackgroundScheduler,
@@ -98,12 +99,10 @@ export class SimCloudFormation {
     });
   }
 
-  /**
-   * Get a simulated CloudFormation Stack by name.
-   */
+  /** Get a deployed simulated CloudFormation Stack by name. */
   getStackByName(
     stackName: SimCloudFormationStackName | string,
-  ): SimCfnStack | undefined {
+  ): SimCfnDeployedStack | undefined {
     return this.stacks.get(stackName as SimCloudFormationStackName);
   }
 
@@ -215,7 +214,7 @@ export class SimCloudFormation {
    */
   async deployTemplate(
     properties: SimCloudFormationCreateStackProperties,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     return await this.templateDeployer.deployTemplate(properties);
   }
 
@@ -225,7 +224,7 @@ export class SimCloudFormation {
    */
   async deployTemplateFile(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     return await this.templateDeployer.deployTemplateFile(properties);
   }
 
@@ -235,7 +234,7 @@ export class SimCloudFormation {
    */
   async deployCdkOut(
     properties: SimCloudFormationDeployCdkOutProperties | string,
-  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+  ): Promise<ReadonlyMap<string, SimCfnDeployedStack>> {
     return await this.templateDeployer.deployCdkOut(properties);
   }
 
@@ -254,7 +253,7 @@ export class SimCloudFormation {
    */
   async updateTemplateFile(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
-  ): Promise<SimCfnStack> {
+  ): Promise<SimCfnDeployedStack> {
     return await this.templateDeployer.updateTemplateFile(properties);
   }
 

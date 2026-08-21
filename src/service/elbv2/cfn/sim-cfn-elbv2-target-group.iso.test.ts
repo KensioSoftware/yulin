@@ -214,7 +214,7 @@ describe("AWS::ElasticLoadBalancingV2::TargetGroup", () => {
     await stack.waitForDeployComplete();
 
     // Then the group is created without them, and the record says why.
-    const ignored = stack.resources.get("CheckoutTargets")?.ignoredProperties;
+    const ignored = stack.getResource("CheckoutTargets")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 1);
     assertStringIncludes(ignored[0].reason, "invokes the target instead");

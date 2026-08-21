@@ -41,10 +41,7 @@ describe("Route53 CloudFormation RecordSets for stored-only record types", () =>
 
     // Then the RecordSet deployed rather than failing the Stack, and the record
     // is on the Hosted Zone with its preference numbers intact.
-    assertIdentical(
-      stack.resources.get("MailRecord")?.status,
-      "CREATE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("MailRecord")?.status, "CREATE_COMPLETE");
     const hostedZone = stack.getResource("MailZone")?.simResource;
     assertInstanceOf(hostedZone, SimRoute53HostedZone);
     assertObjectMatches(hostedZone.records.get("example.test", "MX"), {

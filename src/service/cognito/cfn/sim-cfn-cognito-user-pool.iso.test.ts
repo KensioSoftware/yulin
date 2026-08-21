@@ -18,7 +18,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 
 const accountIdOneOnes = "111111111111";
 
@@ -67,7 +67,9 @@ const userPoolTemplate = {
   },
 };
 
-async function deployUserPoolStack(simAws: SimAws): Promise<SimCfnStack> {
+async function deployUserPoolStack(
+  simAws: SimAws,
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "app-stack",
     template: userPoolTemplate,
@@ -80,7 +82,7 @@ async function deployUserPoolStack(simAws: SimAws): Promise<SimCfnStack> {
 /**
  * A resolved Stack Output, which every Output in this template is a string.
  */
-function output(stack: SimCfnStack, outputKey: string): string {
+function output(stack: SimCfnDeployedStack, outputKey: string): string {
   const value = stack.outputs.get(outputKey)?.value;
   assertTypeString(value);
 

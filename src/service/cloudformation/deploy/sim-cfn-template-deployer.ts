@@ -2,6 +2,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
@@ -145,7 +146,7 @@ export class SimCloudFormationTemplateDeployer {
    */
   async deployCdkOut(
     properties: SimCloudFormationDeployCdkOutProperties | string,
-  ): Promise<ReadonlyMap<string, SimCfnStack>> {
+  ): Promise<ReadonlyMap<string, SimCfnDeployedStack>> {
     return await this.cdkOutDeployer.deploy(properties);
   }
 

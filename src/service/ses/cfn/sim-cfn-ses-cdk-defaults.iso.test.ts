@@ -9,7 +9,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 
 /**
  * What `aws-cdk-lib` emits for an SES construct set.
@@ -61,7 +61,7 @@ const cdkResources = {
 
 async function deployCdkStack(): Promise<{
   readonly simAws: SimAws;
-  readonly stack: SimCfnStack;
+  readonly stack: SimCfnDeployedStack;
 }> {
   const simAws = new SimAws();
   const stack = await simAws.cloudFormation().deployTemplate({

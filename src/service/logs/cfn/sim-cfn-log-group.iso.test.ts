@@ -16,7 +16,7 @@ import {
 import { describe, it } from "vitest";
 
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
@@ -25,7 +25,7 @@ const logGroupName = "/aws/lambda/orders";
 async function deployLogGroup(
   properties: SimCfnTemplateValueRecord,
   simAws: SimAws = new SimAws(),
-): Promise<{ readonly simAws: SimAws; readonly stack: SimCfnStack }> {
+): Promise<{ readonly simAws: SimAws; readonly stack: SimCfnDeployedStack }> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "orders",
     template: {

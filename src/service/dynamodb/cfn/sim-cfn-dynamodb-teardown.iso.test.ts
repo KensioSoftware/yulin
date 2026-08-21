@@ -34,7 +34,7 @@ describe("DynamoDB CloudFormation Resource teardown", () => {
         .describeTable(new DescribeTableCommand({ TableName: "orders" })),
     );
     assertIdentical(
-      stack.resources.get("OrdersTable")?.status,
+      stack.getResource("OrdersTable")?.status,
       "DELETE_COMPLETE",
     );
   });

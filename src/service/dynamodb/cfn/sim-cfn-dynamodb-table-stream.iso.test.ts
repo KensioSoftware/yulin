@@ -19,7 +19,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimDynamoDbStreamsRecord } from "../command/stream/stream.types.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import { simCfnDynamoDbTableResourceFactory } from "./table/sim-cfn-dynamodb-table-resource.factory.js";
 
 /**
@@ -32,7 +32,7 @@ async function deployTable(
   simAws: SimAws,
   properties: SimCfnTemplateValueRecord,
   outputs: SimCfnTemplateValueRecord = {},
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "orders-stack",
     template: {

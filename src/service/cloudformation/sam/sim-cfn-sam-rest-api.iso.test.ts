@@ -13,7 +13,7 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimRestApi } from "../../apigateway/api/sim-rest-api.js";
 import type { SimRestApiStage } from "../../apigateway/api/stage/sim-rest-api-stage.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import {
   samRestApiTemplateLogicalId,
@@ -28,7 +28,7 @@ import {
 async function deployRestApi(
   simAws: SimAws,
   template: CfnTemplateBodyRecord,
-): Promise<SimCfnStack> {
+): Promise<SimCfnDeployedStack> {
   const stack = await simAws
     .cloudFormation()
     .deployTemplate({ stackName: "orders-stack", template });
@@ -40,7 +40,7 @@ async function deployRestApi(
 /**
  * The API the stack deployed under the SAM logical ID.
  */
-function deployedApi(stack: SimCfnStack): SimRestApi {
+function deployedApi(stack: SimCfnDeployedStack): SimRestApi {
   const api = stack.getResource(samRestApiTemplateLogicalId)
     ?.simResource as SimRestApi;
   assertNonNullable(api);
@@ -53,7 +53,7 @@ function deployedApi(stack: SimCfnStack): SimRestApi {
  */
 async function requestApi(
   simAws: SimAws,
-  stack: SimCfnStack,
+  stack: SimCfnDeployedStack,
   path: string,
   stageName = samRestApiTemplateStageName,
 ): Promise<Response> {

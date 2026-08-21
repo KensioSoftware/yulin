@@ -14,6 +14,10 @@ import { SimAws } from "../../aws/sim-aws.js";
 import type { SimIamRole } from "../../iam/role/sim-iam-role.js";
 import { makeLambdaCodeZip } from "../function/code/make-lambda-code-zip.js";
 import type { SimLambdaFunction } from "../function/sim-lambda-function.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 const assumeRolePolicyDocument = {
   Version: "2012-10-17",
@@ -225,10 +229,11 @@ describe("Lambda CloudFormation Function deployment", () => {
 
     assertIdentical(functionResource.refValue, "output-function");
 
-    const resolvedWaitHandleProperties =
-      await waitHandleResource.resolvedProperties({
-        resources: stack.resources,
-      });
+    const resolvedWaitHandleProperties = await deployedResourceObject(
+      waitHandleResource,
+    ).resolvedProperties({
+      resources: deployedStackObject(stack).resources,
+    });
 
     assertIdentical(
       resolvedWaitHandleProperties["FunctionName"],

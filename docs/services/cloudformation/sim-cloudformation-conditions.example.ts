@@ -41,4 +41,4 @@ await stack.waitForDeployComplete();
 console.log(simAws.s3().getSimBucketByName("site-dev")?.bucketName);
 
 // false, because IsProd is false
-console.log(stack.resources.has("Backups"));
+console.log(stack.getResource("Backups") !== undefined);

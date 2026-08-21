@@ -49,7 +49,7 @@ describe("SQS CloudFormation Resource teardown", () => {
     // Then the queue is gone.
     assertUndefined(simAws.sqs().findQueue("orders"));
     assertIdentical(
-      stack.resources.get("OrdersQueue")?.status,
+      stack.getResource("OrdersQueue")?.status,
       "DELETE_COMPLETE",
     );
   });

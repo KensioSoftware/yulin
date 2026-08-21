@@ -156,7 +156,7 @@ describe("ECS CloudFormation property reading", () => {
     await stack.waitForDeployComplete();
 
     // Then the revision is registered without it, and it is recorded.
-    const ignored = stack.resources.get(
+    const ignored = stack.getResource(
       "WorkerTaskDefinition",
     )?.ignoredProperties;
     assertNonNullable(ignored);
@@ -189,7 +189,7 @@ describe("ECS CloudFormation property reading", () => {
     await stack.waitForDeployComplete();
 
     // Then the cluster is created without it, and it is recorded.
-    const ignored = stack.resources.get("OrdersCluster")?.ignoredProperties;
+    const ignored = stack.getResource("OrdersCluster")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 1);
     assertStringIncludes(
@@ -314,14 +314,14 @@ describe("ECS CloudFormation property reading", () => {
     // teardown steps over it.
     assertArrayLength(stack.skippedResources, 1);
     assertStringIncludes(
-      stack.resources.get("OrdersCapacity")?.skippedReason ?? "",
+      stack.getResource("OrdersCapacity")?.skippedReason ?? "",
       "Unsupported sim ECS CloudFormation Resource CapacityProvider",
     );
 
     await stack.teardown();
 
     assertIdentical(
-      stack.resources.get("OrdersCapacity")?.status,
+      stack.getResource("OrdersCapacity")?.status,
       "DELETE_COMPLETE",
     );
   });

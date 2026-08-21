@@ -141,7 +141,7 @@ describe("AWS::ECS::Cluster", () => {
     // reader can see what the deployed cluster is not doing.
     assertTrue(simAws.ecs().cluster("orders").isActive());
 
-    const ignored = stack.resources.get("OrdersCluster")?.ignoredProperties;
+    const ignored = stack.getResource("OrdersCluster")?.ignoredProperties;
     assertNonNullable(ignored);
     assertArrayLength(ignored, 2);
     assertStringIncludes(

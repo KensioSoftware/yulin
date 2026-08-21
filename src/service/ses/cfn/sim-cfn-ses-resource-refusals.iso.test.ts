@@ -9,16 +9,20 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedResource } from "../../cloudformation/resource/sim-cfn-deployed-resource.type.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import { SimSesNotFoundException } from "../error/sim-ses.error.js";
 import { simCfnSesResourceCreation } from "./sim-cfn-ses-resource-error.js";
+import {
+  deployedResourceObject,
+  deployedStackObject,
+} from "../../cloudformation/stack/sim-cfn-stack.fixture.js";
 
 /** A stack with one deployed identity, and the Resource record behind it. */
 async function deployedIdentity(): Promise<{
   readonly simAws: SimAws;
-  readonly stack: SimCfnStack;
-  readonly resource: SimCfnResource;
+  readonly stack: SimCfnDeployedStack;
+  readonly resource: SimCfnDeployedResource;
 }> {
   const simAws = new SimAws();
   const stack = await simAws.cloudFormation().deployTemplate({
@@ -32,7 +36,7 @@ async function deployedIdentity(): Promise<{
       },
     },
   });
-  const resource = stack.resources.get("SenderIdentity");
+  const resource = stack.getResource("SenderIdentity");
 
   assertNonNullable(resource);
 
@@ -59,7 +63,7 @@ describe("simulated SES CloudFormation refusals", () => {
     // Then the stack deployed with the Resource recorded as unsupported rather
     // than treated as deployed, which is how CloudFormation here handles every
     // Resource type no service claims.
-    const resource = stack.resources.get("Transactional");
+    const resource = stack.getResource("Transactional");
 
     assertNonNullable(resource);
     assertUndefined(resource.simResource);
@@ -74,7 +78,7 @@ describe("simulated SES CloudFormation refusals", () => {
       await simAws
         .sesV2()
         .cfnResourceFactory()
-        .delete("ConfigurationSet", resource);
+        .delete("ConfigurationSet", deployedResourceObject(resource));
     });
 
     assertStringIncludes(
@@ -92,9 +96,9 @@ describe("simulated SES CloudFormation refusals", () => {
       await simAws
         .sesV2()
         .cfnResourceFactory()
-        .create("ContactList", resource, {
+        .create("ContactList", deployedResourceObject(resource), {
           simAws,
-          resources: stack.resources,
+          resources: deployedStackObject(stack).resources,
         });
     });
 

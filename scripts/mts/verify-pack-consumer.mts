@@ -33,7 +33,12 @@ const typeUsageSource = `import {
   simAwsAccountId,
   type SimAwsAccountId,
 } from "@kensio/yulin";
-import type { CfnTemplateBodyRecord } from "@kensio/yulin/cloudformation";
+import type {
+  CfnTemplateBodyRecord,
+  SimCfnCdkOutTemplateTransform,
+  SimCfnDeployedResource,
+  SimCfnDeployedStack,
+} from "@kensio/yulin/cloudformation";
 
 const accountId: SimAwsAccountId = simAwsAccountId("111111111111");
 
@@ -43,12 +48,27 @@ const template: CfnTemplateBodyRecord = {
   },
 };
 
-export function deployStack(): Promise<unknown> {
+export function deployStack(): Promise<SimCfnDeployedStack> {
   return new SimAws()
     .account(accountId)
     .cloudFormation()
     .deployTemplate({ stackName: "packed-stack", template });
 }
+
+export function stackHandle(
+  stack: SimCfnDeployedStack,
+): SimCfnDeployedResource | undefined {
+  return stack.getResource("Handle");
+}
+
+export const substituteFromDeployed: SimCfnCdkOutTemplateTransform = (
+  body: CfnTemplateBodyRecord,
+  deployed: ReadonlyMap<string, SimCfnDeployedStack>,
+): CfnTemplateBodyRecord => {
+  deployed.get("packed-stack")?.output("Handle");
+
+  return body;
+};
 `;
 
 /**

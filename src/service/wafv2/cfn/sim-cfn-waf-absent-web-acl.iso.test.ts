@@ -21,7 +21,7 @@ import {
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { simCfnRestApiTemplateFactory } from "../../apigateway/cfn/sim-cfn-rest-api-template.factory.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 
 /**
  * The reason a skipped association gives, as far as it is worth asserting.
@@ -31,7 +31,7 @@ const absent = "which this simulation does not hold";
 /**
  * The one Resource a deployment skipped, and why.
  */
-function skippedReason(stack: SimCfnStack): string {
+function skippedReason(stack: SimCfnDeployedStack): string {
   assertArrayLength(stack.skippedResources, 1);
 
   return stack.skippedResources[0].skippedReason ?? "";
@@ -101,7 +101,7 @@ describe("An association naming a web ACL that is not here", () => {
     assertTypeString(poolArn);
 
     // Then the pool deployed with nothing in front of it.
-    assertIdentical(stack.resources.get("Pool")?.status, "CREATE_COMPLETE");
+    assertIdentical(stack.getResource("Pool")?.status, "CREATE_COMPLETE");
     assertFalse(simAws.wafV2().protection().protects(poolArn));
     assertStringIncludes(skippedReason(stack), simWafRealAccountAclArn);
   });

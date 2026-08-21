@@ -60,11 +60,11 @@ describe("S3 CloudFormation Resource teardown", () => {
 
     // And both Resources report a completed deletion.
     assertIdentical(
-      stack.resources.get("ReportsBucketPolicy")?.status,
+      stack.getResource("ReportsBucketPolicy")?.status,
       "DELETE_COMPLETE",
     );
     assertIdentical(
-      stack.resources.get("ReportsBucket")?.status,
+      stack.getResource("ReportsBucket")?.status,
       "DELETE_COMPLETE",
     );
   });
@@ -134,7 +134,7 @@ describe("S3 CloudFormation Resource teardown", () => {
     assertStringIncludes(error.message, "ReportsBucket");
     assertNonNullable(simAws.s3().getSimBucketByName("reports"));
     assertIdentical(
-      stack.resources.get("ReportsBucket")?.status,
+      stack.getResource("ReportsBucket")?.status,
       "DELETE_FAILED",
     );
   });

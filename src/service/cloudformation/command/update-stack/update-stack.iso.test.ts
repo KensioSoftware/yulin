@@ -17,6 +17,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { simS3BodyToBuffer } from "../../../s3/storage/s3-body-buffer.js";
 import { jsonStringify } from "../../../../util/type-guard/json.js";
 import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
+import { deployedStackObject } from "../../stack/sim-cfn-stack.fixture.js";
 
 const reportsBucket = {
   Type: "AWS::S3::Bucket",
@@ -224,7 +225,7 @@ describe("CloudFormation UpdateStackCommand", () => {
     const stack = cloudFormation.getStackByName("reports-stack");
     assertNonNullable(stack);
     assertIdentical(
-      jsonStringify(stack.template),
+      jsonStringify(deployedStackObject(stack).template),
       jsonStringify(updatedTemplate),
     );
 

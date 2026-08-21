@@ -10,6 +10,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import { SimCfnStackResourceDeleter } from "./sim-cfn-stack-resource-deleter.js";
+import { deployedResourceObject } from "../sim-cfn-stack.fixture.js";
 
 describe("SimCfnStack teardown", () => {
   it("deletes Resources in reverse dependency order", async () => {
@@ -40,7 +41,7 @@ describe("SimCfnStack teardown", () => {
     // Then every Resource reports a completed deletion.
     for (const logicalId of ["First", "Second", "Third"]) {
       assertIdentical(
-        stack.resources.get(logicalId)?.status,
+        stack.getResource(logicalId)?.status,
         "DELETE_COMPLETE",
         `${logicalId} status`,
       );
@@ -89,13 +90,10 @@ describe("SimCfnStack teardown", () => {
     // Then both are gone, which only happens if the policy went first: taking
     // a policy off a Bucket that is not there is refused by S3.
     assertIdentical(
-      stack.resources.get("DataBucketPolicy")?.status,
+      stack.getResource("DataBucketPolicy")?.status,
       "DELETE_COMPLETE",
     );
-    assertIdentical(
-      stack.resources.get("DataBucket")?.status,
-      "DELETE_COMPLETE",
-    );
+    assertIdentical(stack.getResource("DataBucket")?.status, "DELETE_COMPLETE");
   });
 
   it("steps over a Resource whose type was never created", async () => {
@@ -119,7 +117,7 @@ describe("SimCfnStack teardown", () => {
 
     // Then the skipped Resource is delete-complete without any service being
     // asked to delete something it never made.
-    assertIdentical(stack.resources.get("Network")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.getResource("Network")?.status, "DELETE_COMPLETE");
     assertArrayLength(stack.skippedResourceDeletions, 0);
   });
 
@@ -137,11 +135,13 @@ describe("SimCfnStack teardown", () => {
     });
     await stack.waitForDeployComplete();
 
-    const resource = stack.resources.get("Handle");
+    const resource = stack.getResource("Handle");
     assertNonNullable(resource);
 
     // When that Resource records a skipped deletion.
-    resource.markDeleteSkipped("nothing deletes a WaitConditionHandle");
+    deployedResourceObject(resource).markDeleteSkipped(
+      "nothing deletes a WaitConditionHandle",
+    );
 
     // Then the Stack reports it, so a teardown says what it left behind.
     assertArrayLength(stack.skippedResourceDeletions, 1);

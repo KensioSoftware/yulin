@@ -1,7 +1,7 @@
 import { AsyncMappedFactory } from "@kensio/part-factory";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
-import type { SimCfnStack } from "../../src/service/cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../src/service/cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import { handleOrdersRequest } from "./orders-service-handler.js";
 import { ordersServiceNames } from "./orders-service-names.js";
 import { ordersServiceTemplate } from "./orders-service-template.js";
@@ -19,7 +19,7 @@ export type OrdersServiceInput = Record<string, never>;
  */
 export interface OrdersService {
   readonly simAws: SimAws;
-  readonly stack: SimCfnStack;
+  readonly stack: SimCfnDeployedStack;
   /** The Route53 name the load balancer answers on. */
   readonly hostname: string;
 }

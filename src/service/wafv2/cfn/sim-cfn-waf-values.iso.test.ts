@@ -272,7 +272,7 @@ describe("Simulated WAFv2 CloudFormation values", () => {
     // let go of the web ACL, so there was nothing left to disassociate, and
     // the web ACL was free to be deleted after it.
     assertIdentical(
-      aclStack.resources.get("OrdersAclAssociation")?.status,
+      aclStack.getResource("OrdersAclAssociation")?.status,
       "DELETE_COMPLETE",
     );
     assertFalse(simAws.wafV2().protection().protects(stageArn));

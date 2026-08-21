@@ -22,7 +22,7 @@ import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { simCfnRestApiTemplateFactory } from "../../apigateway/cfn/sim-cfn-rest-api-template.factory.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnStack } from "../../cloudformation/stack/sim-cfn-stack.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
 
 /**
@@ -52,7 +52,7 @@ const poolTemplate: CfnTemplateBodyRecord = {
   Outputs: { PoolArn: { Value: { "Fn::GetAtt": ["Pool", "Arn"] } } },
 };
 
-async function deployPool(simAws: SimAws): Promise<SimCfnStack> {
+async function deployPool(simAws: SimAws): Promise<SimCfnDeployedStack> {
   const stack = await simAws
     .cloudFormation()
     .deployTemplate({ stackName: "pool", template: poolTemplate });
@@ -70,8 +70,8 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
 
     // Then everything deployed. One rule went missing rather than the web ACL,
     // and rather than the Resources that had nothing to do with it.
-    assertIdentical(stack.resources.get("Pool")?.status, "CREATE_COMPLETE");
-    assertIdentical(stack.resources.get("Orders")?.status, "CREATE_COMPLETE");
+    assertIdentical(stack.getResource("Pool")?.status, "CREATE_COMPLETE");
+    assertIdentical(stack.getResource("Orders")?.status, "CREATE_COMPLETE");
     assertArrayLength(stack.skippedResources, 0);
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
   });
