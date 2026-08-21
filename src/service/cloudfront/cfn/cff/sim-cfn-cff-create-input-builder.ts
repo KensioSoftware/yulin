@@ -2,7 +2,7 @@ import {
   assertDefined,
   assertNotNull,
 } from "../../../../util/type-guard/defined.js";
-import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { makeCffFunctionCodeInput } from "../../cff/function-code-input/cff-function-code-input.js";
@@ -15,7 +15,7 @@ import { findSimCfnCffBinding } from "./sim-cfn-cff-binding-lookup.js";
 interface SimCfnCfFunctionCreateInputBuilderProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }
 
 interface SimCfnCfFunctionCreateInput {
@@ -43,7 +43,7 @@ interface SimCfnCfFunctionCreateInput {
 export class SimCfnCffCreateInputBuilder {
   private readonly resource: SimCfnResource;
   private readonly properties: SimCfnTemplateValueRecord;
-  private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
+  private readonly bindings: readonly SimCfnBinding[] | undefined;
 
   constructor(properties: SimCfnCfFunctionCreateInputBuilderProperties) {
     this.resource = properties.resource;

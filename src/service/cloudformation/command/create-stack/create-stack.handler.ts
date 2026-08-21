@@ -19,7 +19,7 @@ import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
-import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 
 interface CreateStackCommandHandlerProperties {
@@ -28,7 +28,7 @@ interface CreateStackCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
   readonly exports?: SimCfnExports | undefined;
 }
 
@@ -46,7 +46,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
-  private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
+  private readonly bindings: readonly SimCfnBinding[] | undefined;
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: CreateStackCommandHandlerProperties) {

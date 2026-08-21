@@ -1,5 +1,5 @@
 import type { SimAws } from "../service/aws/sim-aws.js";
-import type { SimCfnDeployBinding } from "../service/cloudformation/bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../service/cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnDeployedStack } from "../service/cloudformation/stack/sim-cfn-deployed-stack.type.js";
 import type { SimCloudFormationStackName } from "../service/cloudformation/stack/sim-cfn-stack.type.js";
 import { cfnTemplateFromTerraformPlan } from "./sim-tf-import.js";
@@ -30,7 +30,7 @@ export interface TerraformPlanDeployProperties {
    * matching on the function name the plan carries is how a simulated function
    * gets its behaviour.
    */
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 
   /**
    * The values the plan could not carry.

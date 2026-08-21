@@ -1,5 +1,5 @@
 import type { SimCdkAssemblyStack } from "../cdk/sim-cdk-assembly-manifest.js";
-import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transform.js";
@@ -30,7 +30,7 @@ export type SimCfnCdkOutTemplateTransform = (
  */
 export interface SimCfnCdkOutStackOptions {
   readonly parameters?: Record<string, string> | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
   readonly transform?: SimCfnCdkOutTemplateTransform | undefined;
 }
 

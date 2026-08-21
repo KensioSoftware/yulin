@@ -1,4 +1,4 @@
-import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
@@ -40,7 +40,7 @@ export class SimCfnLambdaFunctionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
-    bindings?: readonly SimCfnDeployBinding[],
+    bindings?: readonly SimCfnBinding[],
   ): Promise<SimLambdaFunction> {
     const functionProperties = this.propertiesParser.parse(
       resource,

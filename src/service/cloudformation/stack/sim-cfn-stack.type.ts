@@ -4,7 +4,7 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 
 export type SimCloudFormationStackName = Brand<
@@ -41,7 +41,7 @@ export interface SimCloudFormationStackProperties {
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 
   /**
    * The export names published in the Account and Region this Stack deploys

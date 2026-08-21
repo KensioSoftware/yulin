@@ -167,12 +167,19 @@ The deployer is also where extra deployment context can enter the stack creation
 - executable resource bindings, used by custom-resource simulation that needs to connect a template
   resource to local executable behaviour.
 
-`SimCfnDeployBinding` is what one entry of that list may be, and there are two kinds because there
-are two kinds of thing a Stack declares that Yulin can run. An executable Resource, which is a Lambda
+`SimCfnBinding` is what one entry of that list may be, and there are two kinds because there are two
+kinds of thing a Stack declares that Yulin can run. An executable Resource, which is a Lambda
 function or a CloudFront Function, is one handler and carries it as `handler`. An ECS task definition
 declares containers, so its binding names a container and carries what that container does. They are
 one list because a Stack is deployed once and a realistic Stack holds both, and the handler is what
 tells them apart, since the two kinds share some of their target names.
+
+A binding is data the consumer writes. `SimCfnBinding` is exported from `./cloudformation` along
+with `SimCfnExecutableResourceBinding`, `SimCfnExecutableTargets`, `SimCfnExecutableResource` and
+`SimCfnEcsContainerBinding`. The five ways an executable binding names its Resource are the keys of
+`SimCfnExecutableTargets`, and `ExactlyOne` in `util/` turns those five keys into the union that
+gives one of them and refuses the rest. A sixth way to name a Resource is a sixth key on that
+interface.
 
 `validateSimCfnExecutableResourceBindings` checks every binding resolves to a Resource of the Stack
 before anything is created, sending each kind to its own matcher. The container matcher lives with

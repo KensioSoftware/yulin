@@ -1904,6 +1904,67 @@ function's execution Role as the ambient simulated caller, so downstream calls m
 `SimSdk`-intercepted clients are authorized by simulated IAM as on real Lambda. Functions without
 a matching binding keep their template code, running in the simulated vm runtime.
 
+### Naming the binding type
+
+One entry of a `bindings` list is a `SimCfnBinding`, exported from `@kensio/yulin/cloudformation`. A
+test that builds its bindings in a fixture, or a factory that returns one, names the type from the
+import. The same list passes to `deployTemplate`, `deployTemplateFile` and the per-Stack `bindings`
+of `deployCdkOut`.
+
+```typescript sim-cloudformation-binding-type
+/**
+ * Naming the bindings a deployment takes, for a list built somewhere else.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { SimAws } from "@kensio/yulin";
+import type { SimCfnBinding } from "@kensio/yulin/cloudformation";
+
+const orders: string[] = [];
+
+const bindings: readonly SimCfnBinding[] = [
+  {
+    logicalId: "PlaceOrderFunction",
+    handler: (event: { item: string }): void => {
+      orders.push(event.item);
+    },
+  },
+];
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      PlaceOrderFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "place-order",
+          Role: "arn:aws:iam::111111111111:role/PlaceOrderRole",
+        },
+      },
+    },
+  },
+  bindings,
+});
+
+await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "place-order",
+    Payload: JSON.stringify({ item: "sourdough" }),
+  }),
+);
+
+console.log(orders);
+```
+
+A binding names one of five targets. `logicalId`, `functionName`, `arn`, `cdkPath` and
+`imageRepository` are the five, and a literal naming two of them fails to compile. The same type
+covers a binding to a container an `AWS::ECS::TaskDefinition` declares, which carries `run`, `http`
+or `consumes` in place of `handler`. See
+[Deploying ECS from CloudFormation](../ecs/README.md#deploying-ecs-from-cloudformation) for those.
+
 ## SAM templates
 
 A template naming the `AWS::Serverless-2016-10-31` transform has its SAM resources expanded before

@@ -1,7 +1,7 @@
 import {
-  type SimCfnDeployBinding,
+  type SimCfnBinding,
   simCfnIsExecutableBinding,
-} from "../sim-cfn-deploy-binding.js";
+} from "../sim-cfn-binding.js";
 import type {
   SimCfnExecutableResource,
   SimCfnExecutableResourceBinding,
@@ -12,7 +12,7 @@ import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
 interface SimCfnExecBindingFinderProperties {
   readonly resource: SimCfnResource;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }
 
 /**

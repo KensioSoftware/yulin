@@ -5,6 +5,13 @@ export type { SimCfnStackOutput } from "./stack/output/sim-cfn-stack-output.js";
 export type { SimCloudFormationStackStatus } from "./stack/sim-cfn-stack.type.js";
 export type { SimCloudFormationResourceStatus } from "./resource/sim-cfn-resource.type.js";
 export type { SimCfnIgnoredProperty } from "./resource/ignore/sim-cfn-ignored-property.type.js";
+export type { SimCfnBinding } from "./bind/sim-cfn-binding.js";
+export type {
+  SimCfnExecutableResource,
+  SimCfnExecutableResourceBinding,
+  SimCfnExecutableTargets,
+} from "./bind/sim-cfn-exec-binding.type.js";
+export type { SimCfnEcsContainerBinding } from "../ecs/cfn/bind/sim-cfn-ecs-container-binding.type.js";
 export type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,

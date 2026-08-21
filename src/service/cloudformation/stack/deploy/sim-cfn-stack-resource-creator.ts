@@ -1,7 +1,7 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
-import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../bind/sim-cfn-binding.js";
 import { SimCfnStackResourceBatchCreator } from "./sim-cfn-stack-resource-batch-creator.js";
 import { SimCfnStackPendingResources } from "./sim-cfn-stack-pending-resources.js";
 
@@ -10,7 +10,7 @@ interface SimCfnStackResourceCreatorProperties {
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly stackName: string;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }
 
 /**

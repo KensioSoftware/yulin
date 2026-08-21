@@ -12,8 +12,15 @@ import type { SimCfnExecutableResourceBinding } from "./sim-cfn-exec-binding.typ
  *
  * They are one list because a Stack is deployed once, and a realistic Stack
  * holds both.
+ *
+ * ```typescript
+ * const bindings: readonly SimCfnBinding[] = [
+ *   { logicalId: "OrdersFunction", handler: ordersHandler },
+ *   { family: "orders-worker", containerName: "app", run: processOrders },
+ * ];
+ * ```
  */
-export type SimCfnDeployBinding =
+export type SimCfnBinding =
   | SimCfnExecutableResourceBinding
   | SimCfnEcsContainerBinding;
 
@@ -25,7 +32,7 @@ export type SimCfnDeployBinding =
  * the two kinds share some of their target names.
  */
 export function simCfnIsExecutableBinding(
-  binding: SimCfnDeployBinding,
+  binding: SimCfnBinding,
 ): binding is SimCfnExecutableResourceBinding {
   return "handler" in binding;
 }
@@ -34,7 +41,7 @@ export function simCfnIsExecutableBinding(
  * Whether a binding targets a container an ECS task definition declares.
  */
 export function simCfnIsContainerBinding(
-  binding: SimCfnDeployBinding,
+  binding: SimCfnBinding,
 ): binding is SimCfnEcsContainerBinding {
   return !simCfnIsExecutableBinding(binding);
 }
