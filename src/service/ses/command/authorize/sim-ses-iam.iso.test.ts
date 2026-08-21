@@ -3,6 +3,8 @@ import {
   CreateEmailIdentityCommand,
   GetAccountCommand,
   ListEmailIdentitiesCommand,
+  ListSuppressedDestinationsCommand,
+  PutSuppressedDestinationCommand,
   SendEmailCommand,
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
@@ -284,6 +286,47 @@ describe("SES IAM authorization", () => {
 
     // Then it is refused: GetAccount has no resource type, so only a policy
     // written against `*` allows it.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("needs a policy on every resource to suppress an address", async () => {
+    // Given a Role allowed to suppress an address on `*`. The only resource
+    // type real SES gives the suppression commands is a tenant, which is not
+    // simulated.
+    const simAws = await simAwsWithRole({
+      Action: "ses:PutSuppressedDestination",
+      Resource: "*",
+    });
+
+    // When it puts an address on the suppression list.
+    await simAws.sesV2().putSuppressedDestination(
+      new PutSuppressedDestinationCommand({
+        EmailAddress: "someone@example.org",
+        Reason: "BOUNCE",
+      }),
+      asRole,
+    );
+
+    assertArrayLength(simAws.sesV2().suppressedDestinations(), 1);
+  });
+
+  it("refuses a suppression listing to a policy naming an identity", async () => {
+    // Given a Role whose policy names an identity ARN.
+    const simAws = await simAwsWithRole({
+      Action: "ses:ListSuppressedDestinations",
+      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/example.com`,
+    });
+
+    // When it reads the suppression list.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .sesV2()
+        .listSuppressedDestinations(
+          new ListSuppressedDestinationsCommand({}),
+          asRole,
+        );
+    });
+
     assertInstanceOf(error, SimIamAccessDenied);
   });
 });

@@ -32,12 +32,19 @@ export {
   SimSesSentEmail,
   type SimSesSentEmailBody,
   type SimSesSentEmailDestination,
+  type SimSesSuppressedRecipient,
 } from "./email/sim-ses-sent-email.js";
 export { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
 export {
   requiredSimSesFromAddress,
   simSesBareAddress,
 } from "./email/sim-ses-address.js";
+export { SimSesSuppressedDestination } from "./suppression/sim-ses-suppressed-destination.js";
+export { SimSesSuppressionList } from "./suppression/sim-ses-suppression-list.js";
+export {
+  requiredSimSesSuppressionReason,
+  type SimSesSuppressionReason,
+} from "./suppression/sim-ses-suppression-reason.js";
 export {
   SimSesAccount,
   type SimSesAccountContactDetails,

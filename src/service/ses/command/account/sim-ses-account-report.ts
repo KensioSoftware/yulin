@@ -21,6 +21,9 @@ interface SimSesAccountReportInput {
  * `EnforcementStatus` is always `HEALTHY` and `SendingEnabled` always true,
  * because nothing here puts an account under enforcement or pauses its
  * sending.
+ *
+ * `SuppressionAttributes` reports the reasons the account holds addresses
+ * back for, which is what turns its suppression list on and off.
  */
 export function simSesAccountReport(
   input: SimSesAccountReportInput,
@@ -39,6 +42,7 @@ export function simSesAccountReport(
       MaxSendRate: quota.maxSendRate,
       SentLast24Hours: input.sentLast24Hours,
     },
+    SuppressionAttributes: { SuppressedReasons: account.suppressedReasons },
     Details: accountDetails(account),
   };
 }

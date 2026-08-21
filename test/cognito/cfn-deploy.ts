@@ -9,7 +9,12 @@
  * published build, not collected as a suite, and not counted in coverage.
  */
 
-import { assertInstanceOf, assertThrowsErrorAsync } from "@kensio/smartass";
+import { CreateUserPoolCommand } from "@aws-sdk/client-cognito-identity-provider";
+import {
+  assertInstanceOf,
+  assertNonNullable,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
 import type { SimCfnDeployedStack } from "../../src/service/cloudformation/stack/sim-cfn-deployed-stack.type.js";
@@ -74,4 +79,42 @@ export function ignoredReasons(stack: SimCfnDeployedStack): string[] {
   return stack.ignoredProperties.map((ignored) => {
     return `${ignored.logicalId} ${ignored.reason}`;
   });
+}
+
+/**
+ * The reason a deployed stack gave for one property it created a Resource
+ * without, found by the property's path.
+ */
+export function ignoredReason(
+  stack: SimCfnDeployedStack,
+  path: string,
+): string {
+  const ignored = stack.ignoredProperties.find(
+    (property) => property.path === path,
+  );
+  assertNonNullable(ignored);
+
+  return ignored.reason;
+}
+
+/**
+ * What CreateUserPool refuses one pool input with.
+ *
+ * A test comparing the CloudFormation record against this compares the two
+ * paths, rather than comparing both against a sentence the test wrote down.
+ */
+export async function createUserPoolRefusal(
+  option: string,
+  value: unknown,
+): Promise<string> {
+  const cognito = new SimAws().cognitoIdentityProvider();
+
+  const error = await assertThrowsErrorAsync(async () => {
+    await cognito.createUserPool(
+      new CreateUserPoolCommand({ PoolName: "myapp-users", [option]: value }),
+    );
+  });
+  assertInstanceOf(error, Error);
+
+  return error.message;
 }

@@ -473,12 +473,102 @@ account stays in the sandbox until that review lands. Granting it immediately is
 divergence. The alternative is a simulator no test can get out of the sandbox in, and waiting for a
 review is beyond what a test can assert on anyway.
 
+## The suppression list
+
+Real SES holds an account-level suppression list and fills it from hard bounces and complaints.
+Nothing bounces here, so every address on this one was put there by a caller. That is what makes it
+worth having in a test. The support tool that lists suppressed addresses, the form that removes one
+and the script that seeds the list all have somewhere to run.
+
+`PutSuppressedDestination`, `GetSuppressedDestination`, `ListSuppressedDestinations` and
+`DeleteSuppressedDestination` manage it.
+
+```typescript sim-ses-suppression
+/**
+ * Suppressing an address, and what a send to it records.
+ */
+
+import {
+  PutSuppressedDestinationCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+ses.verifyIdentity("hello@example.com");
+ses.verifyIdentity("someone@example.org");
+
+await ses.putSuppressedDestination(
+  new PutSuppressedDestinationCommand({
+    EmailAddress: "someone@example.org",
+    Reason: "BOUNCE",
+  }),
+);
+
+// SES accepts this and holds it back from the recipient.
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Simple: {
+        Subject: { Data: "Welcome" },
+        Body: { Text: { Data: "Hi there" } },
+      },
+    },
+  }),
+);
+
+const [email] = ses.sentEmails();
+
+// "someone@example.org" "BOUNCE" true
+console.log(
+  email?.suppressedRecipients[0]?.emailAddress,
+  email?.suppressedRecipients[0]?.reason,
+  email?.isFullySuppressed,
+);
+```
+
+A send to a suppressed address is accepted. Real SES takes the message, holds it back from that
+recipient, and counts it toward the daily sending quota. The send succeeds here too, and the record
+carries the answer. `suppressedRecipients` names who was held back and why,
+and `isFullySuppressed` is the narrower question of whether the message reached nobody. A message to
+two recipients with one of them suppressed went to the other.
+
+`ListSuppressedDestinations` pages with `PageSize` and `NextToken`, and narrows with `Reasons`,
+`StartDate` and `EndDate`. Removing an address that was never on the list succeeds, so a form that
+removes one twice has no failure to handle.
+
+### What the account is suppressing for
+
+An address is held back only when the account is suppressing for the reason it was listed under. An
+address on the list for `COMPLAINT`, on an account suppressing only `BOUNCE`, is mailed. That is
+much the easiest part of the suppression rules to get wrong, and it is worth a test.
+
+`PutAccountSuppressionAttributes` sets the reasons and `GetAccount` reports them as
+`SuppressionAttributes`. An account here starts on both, where every real account opened after
+November 2019 starts. Putting the attributes with no reasons at all turns the list off, which is
+what the console's Enabled box does. The addresses stay on the list and SES stops reading it.
+
+### Case, and the sandbox
+
+Managing the list is case sensitive and sending is not, following real SES. `Someone@example.org` is
+stored as written and `DeleteSuppressedDestination` needs that spelling to remove it, while a
+message addressed to `SOMEONE@example.org` is held back by a listed `someone@example.org`.
+
+Real SES refuses `PutSuppressedDestination` until an account leaves the sandbox. This one accepts it
+either way. The sandbox is kept here so that a send to an unverified recipient fails the way it
+would in an account, and making every test that seeds this list leave the sandbox first buys
+nothing.
+
 ## Messages another service sends
 
 A simulated Cognito user pool whose `EmailConfiguration` names `EmailSendingAccount: DEVELOPER`
 sends its verification messages and invitations through the SES of the region its `SourceArn` names.
-Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox rules
-above decide them the same way. See
+Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox and
+suppression rules above decide them the same way. See
 [Sending a pool's email through SES](../cognito#sending-a-pools-email-through-ses).
 
 Such a send skips IAM. Real Cognito sends through a service-linked role rather than as whoever
@@ -651,20 +741,25 @@ time forward past the window sees the count fall the way an account's would.
 
 ## Simulated commands
 
-| Command               | Notes                                                                                                     |
-| --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `SendEmail`           | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                                  |
-| `CreateEmailIdentity` | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back. |
-| `GetEmailIdentity`    | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.             |
-| `ListEmailIdentities` | Paged with `PageSize` and `NextToken`.                                                                    |
-| `DeleteEmailIdentity` |                                                                                                           |
-| `CreateEmailTemplate` | Substitution only. `Tags` are refused.                                                                    |
-| `GetEmailTemplate`    | Reports the wording with its placeholders unrendered.                                                     |
-| `UpdateEmailTemplate` | Replaces the wording outright, keeping the creation time.                                                 |
-| `ListEmailTemplates`  | Names and creation times only, paged.                                                                     |
-| `DeleteEmailTemplate` |                                                                                                           |
-| `GetAccount`          |                                                                                                           |
-| `PutAccountDetails`   | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
+| Command                           | Notes                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `SendEmail`                       | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                                  |
+| `CreateEmailIdentity`             | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back. |
+| `GetEmailIdentity`                | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.             |
+| `ListEmailIdentities`             | Paged with `PageSize` and `NextToken`.                                                                    |
+| `DeleteEmailIdentity`             |                                                                                                           |
+| `CreateEmailTemplate`             | Substitution only. `Tags` are refused.                                                                    |
+| `GetEmailTemplate`                | Reports the wording with its placeholders unrendered.                                                     |
+| `UpdateEmailTemplate`             | Replaces the wording outright, keeping the creation time.                                                 |
+| `ListEmailTemplates`              | Names and creation times only, paged.                                                                     |
+| `DeleteEmailTemplate`             |                                                                                                           |
+| `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                      |
+| `PutAccountDetails`               | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
+| `PutAccountSuppressionAttributes` | No reasons at all turns the suppression list off.                                                         |
+| `PutSuppressedDestination`        | Accepted in the sandbox, which real SES refuses.                                                          |
+| `GetSuppressedDestination`        |                                                                                                           |
+| `ListSuppressedDestinations`      | Paged, and narrowed by `Reasons`, `StartDate` and `EndDate`.                                              |
+| `DeleteSuppressedDestination`     | Removing an address that is not on the list succeeds.                                                     |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 
@@ -683,8 +778,14 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   where real Handlebars would render `[object Object]`.
 - **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events, no
-  suppression list, no configuration sets and no event destinations. A configuration set named on a
-  send is kept on the record so a test can assert the right one was used, and goes no further.
+  configuration sets and no event destinations. A configuration set named on a send is kept on the
+  record so a test can assert the right one was used, and goes no further.
+- **The suppression list fills only by hand.** Every address on it was put there by a caller,
+  because no message here ever bounces.
+- **Tenant-level suppression lists are left out.** A suppression command carrying `TenantName` is
+  refused rather than answered from the account-level list.
+- **`PutSuppressedDestination` works in the sandbox.** Real SES refuses it until an account has
+  production access.
 - **DKIM tokens are made up.** They are stable per identity so a test can assert on them, and they
   prove no ownership of anything.
 - **Only `AWS::SES::EmailIdentity` and `AWS::SES::Template` deploy.** `AWS::SES::ConfigurationSet`,

@@ -4,6 +4,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { simSesBareAddress } from "../../email/sim-ses-address.js";
 import { SimSesSentEmail } from "../../email/sim-ses-sent-email.js";
 import type { SimSesSentEmailStore } from "../../email/sim-ses-sent-email-store.js";
+import type { SimSesSuppressionCheck } from "./sim-ses-suppression-check.js";
 import type { SimSesVerifiedIdentityCheck } from "./sim-ses-verified-identities.js";
 
 /**
@@ -39,6 +40,7 @@ export interface SimSesServiceSendResult {
 interface SimSesServiceSendProperties {
   readonly sent: SimSesSentEmailStore;
   readonly identityCheck: SimSesVerifiedIdentityCheck;
+  readonly suppressionCheck: SimSesSuppressionCheck;
   readonly clock: SimClock;
 }
 
@@ -54,18 +56,24 @@ interface SimSesServiceSendProperties {
  * the same reason.
  *
  * The sandbox still applies. That is the point of routing a pool's messages
- * through here rather than recording them and calling it a send: an account
+ * through here rather than recording them and calling it a send. An account
  * configured for SES and still in the sandbox is the way this fails in a
  * deployment.
+ *
+ * The suppression list applies too, and refuses nothing. A pool's message to a
+ * suppressed recipient is accepted and recorded as held back, exactly as one
+ * an SDK caller sent would be.
  */
 export class SimSesServiceSend {
   readonly #sent: SimSesSentEmailStore;
   readonly #identityCheck: SimSesVerifiedIdentityCheck;
+  readonly #suppressionCheck: SimSesSuppressionCheck;
   readonly #clock: SimClock;
 
   constructor(properties: SimSesServiceSendProperties) {
     this.#sent = properties.sent;
     this.#identityCheck = properties.identityCheck;
+    this.#suppressionCheck = properties.suppressionCheck;
     this.#clock = properties.clock;
   }
 
@@ -99,6 +107,9 @@ export class SimSesServiceSend {
         templateName: undefined,
         templateData: undefined,
         configurationSetName: request.configurationSetName,
+        suppressedRecipients: this.#suppressionCheck.withheldFrom([
+          request.toAddress,
+        ]),
         sentDate: this.#clock.now(),
       }),
     );

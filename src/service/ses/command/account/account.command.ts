@@ -24,8 +24,17 @@ export interface SimGetAccountCommandOutput {
   readonly ProductionAccessEnabled?: boolean | undefined;
   readonly SendQuota?: SimSesSendQuotaDetail | undefined;
   readonly SendingEnabled?: boolean | undefined;
+  readonly SuppressionAttributes?: SimSesSuppressionAttributes | undefined;
   readonly Details?: SimSesAccountDetailsOutput | undefined;
   readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * The reasons an account holds addresses back for, as GetAccount reports them
+ * and PutAccountSuppressionAttributes sets them.
+ */
+export interface SimSesSuppressionAttributes {
+  readonly SuppressedReasons?: readonly string[] | undefined;
 }
 
 /**
@@ -59,5 +68,22 @@ export interface SimPutAccountDetailsCommandInput {
 }
 
 export interface SimPutAccountDetailsCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim SES v2 PutAccountSuppressionAttributes command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/sesv2/command/PutAccountSuppressionAttributesCommand/
+ */
+export interface SimPutAccountSuppressionAttributesCommand {
+  readonly input?: SimPutAccountSuppressionAttributesCommandInput | undefined;
+}
+
+export interface SimPutAccountSuppressionAttributesCommandInput {
+  readonly SuppressedReasons?: readonly string[] | undefined;
+}
+
+export interface SimPutAccountSuppressionAttributesCommandOutput {
   readonly $metadata: SimResponseMetadata;
 }

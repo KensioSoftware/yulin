@@ -3,11 +3,13 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCognitoUnsimulatedFeatureReason } from "../command/sim-cognito-unsimulated-input.js";
 import { SimCfnCognitoValueParser } from "./sim-cfn-cognito-value-parser.js";
 
 interface SimCfnCognitoPropertyParserProperties {
   readonly resourceType: string;
   readonly simulated: readonly string[];
+  readonly refused?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -26,10 +28,12 @@ interface SimCfnCognitoPropertyParserProperties {
  */
 export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   private readonly simulated: readonly string[];
+  private readonly refused: ReadonlyMap<string, string>;
 
   constructor(properties: SimCfnCognitoPropertyParserProperties) {
     super({ resourceType: properties.resourceType });
     this.simulated = properties.simulated;
+    this.refused = new Map(Object.entries(properties.refused ?? {}));
   }
 
   /**
@@ -116,11 +120,26 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
    * The modelled names are listed because a Cognito Resource type has a lot of
    * properties and few of them are simulated, so what this can act on is
    * shorter and more useful to read than what it cannot.
+   *
+   * A property the Cognito command would have refused says what the refusal
+   * says instead. The full list is no use to a reader who declared a property
+   * Cognito itself takes: what they need is the one sentence naming what a
+   * deployment would do that this does not.
    */
   private unsimulatedPropertyReason(
     label: string,
     modelled: readonly string[],
   ): string {
+    const refusedFeature = this.refused.get(label);
+
+    if (refusedFeature !== undefined) {
+      return (
+        `${this.resourceType} property ${label} is not simulated: ` +
+        `${simCognitoUnsimulatedFeatureReason(refusedFeature)}. The ` +
+        `Resource is created without it.`
+      );
+    }
+
     return (
       `${this.resourceType} property ${label} is not simulated, so the ` +
       `Resource is created without it and behaves differently here than on ` +

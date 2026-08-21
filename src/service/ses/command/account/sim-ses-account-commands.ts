@@ -3,10 +3,13 @@ import type { SimSesAccount } from "../../account/sim-ses-account.js";
 import type { SimSesSentEmailStore } from "../../email/sim-ses-sent-email-store.js";
 import type { SimSesAuthorizer } from "../authorize/sim-ses-authorizer.js";
 import type { SimSesRequestOptions } from "../sim-ses-request-options.js";
+import { requiredSimSesSuppressionReasons } from "../../suppression/sim-ses-suppression-reason.js";
 import type {
   SimGetAccountCommandOutput,
   SimPutAccountDetailsCommand,
   SimPutAccountDetailsCommandOutput,
+  SimPutAccountSuppressionAttributesCommand,
+  SimPutAccountSuppressionAttributesCommandOutput,
 } from "./account.command.js";
 import { readSimSesAccountDetails } from "./sim-ses-account-details-input.js";
 import { simSesAccountReport } from "./sim-ses-account-report.js";
@@ -21,9 +24,9 @@ interface SimSesAccountCommandsProperties {
 /**
  * The commands that read and change what a whole SES account may do.
  *
- * Both authorize against `*`, because real SES gives neither a resource type:
- * only a policy written against every resource allows them, and one naming an
- * identity ARN allows neither.
+ * All three authorize against `*`, because real SES gives none of them a
+ * resource type: only a policy written against every resource allows them, and
+ * one naming an identity ARN allows none.
  */
 export class SimSesAccountCommands {
   readonly #account: SimSesAccount;
@@ -66,6 +69,29 @@ export class SimSesAccountCommands {
     this.#account.putDetails(
       readSimSesAccountDetails(command.input),
       command.input.ProductionAccessEnabled ?? false,
+    );
+
+    return { $metadata: {} };
+  }
+
+  /**
+   * Set the reasons this account holds addresses back for.
+   *
+   * A request carrying no reasons turns the suppression list off, which is
+   * what the console's Enabled box does. The addresses stay on the list and
+   * SES stops reading it.
+   */
+  putAccountSuppressionAttributes(
+    command?: SimPutAccountSuppressionAttributesCommand,
+    options?: SimSesRequestOptions,
+  ): SimPutAccountSuppressionAttributesCommandOutput {
+    this.#authorizer.authorizeNoResource(
+      "ses:PutAccountSuppressionAttributes",
+      options?.caller,
+    );
+
+    this.#account.putSuppressedReasons(
+      requiredSimSesSuppressionReasons(command?.input?.SuppressedReasons),
     );
 
     return { $metadata: {} };

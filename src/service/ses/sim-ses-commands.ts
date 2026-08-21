@@ -15,7 +15,10 @@ import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-comm
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
 import { SimSesServiceSend } from "./command/send/sim-ses-service-send.js";
+import { SimSesSuppressionCheck } from "./command/send/sim-ses-suppression-check.js";
 import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-identities.js";
+import { SimSesSuppressionCommands } from "./command/suppression/sim-ses-suppression-commands.js";
+import { SimSesSuppressionList } from "./suppression/sim-ses-suppression-list.js";
 import { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
 import { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
 import { SimSesTemplateCommands } from "./command/template/sim-ses-template-commands.js";
@@ -40,6 +43,7 @@ export class SimSesCommands {
   readonly templates: SimSesTemplateStore;
   readonly sent: SimSesSentEmailStore;
   readonly account: SimSesAccount;
+  readonly suppression: SimSesSuppressionList;
   readonly identityCommands: SimSesIdentityCommands;
   readonly templateCommands: SimSesTemplateCommands;
   readonly sendEmail: SimSesSendEmail;
@@ -50,6 +54,7 @@ export class SimSesCommands {
    */
   readonly serviceSend: SimSesServiceSend;
   readonly accountCommands: SimSesAccountCommands;
+  readonly suppressionCommands: SimSesSuppressionCommands;
   readonly background: BackgroundScheduler;
 
   constructor(properties: SimSesV2Properties = {}) {
@@ -64,12 +69,14 @@ export class SimSesCommands {
     const templates = new SimSesTemplateStore({ accountRegionScope });
     const sent = new SimSesSentEmailStore();
     const account = new SimSesAccount();
+    const suppression = new SimSesSuppressionList();
 
     this.background = background;
     this.identities = identities;
     this.templates = templates;
     this.sent = sent;
     this.account = account;
+    this.suppression = suppression;
     this.identityCommands = new SimSesIdentityCommands({
       identities,
       authorizer,
@@ -86,22 +93,34 @@ export class SimSesCommands {
       accountRegionScope,
     });
 
+    const suppressionCheck = new SimSesSuppressionCheck({
+      suppression,
+      account,
+    });
+
     this.sendEmail = new SimSesSendEmail({
       identities,
       content: new SimSesContentReader({ templates }),
       sent,
       identityCheck,
+      suppressionCheck,
       authorizer,
       clock: background,
     });
     this.serviceSend = new SimSesServiceSend({
       sent,
       identityCheck,
+      suppressionCheck,
       clock: background,
     });
     this.accountCommands = new SimSesAccountCommands({
       account,
       sent,
+      authorizer,
+      clock: background,
+    });
+    this.suppressionCommands = new SimSesSuppressionCommands({
+      suppression,
       authorizer,
       clock: background,
     });
