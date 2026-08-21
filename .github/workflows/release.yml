@@ -70,11 +70,9 @@ permissions: {}
 # that were each green on their own can still break main together, and a
 # release is the first thing after that which anyone would notice.
 #
-# They are separate jobs from the publish for two reasons. One is the runner:
-# the checks want the Blacksmith machines pr.yml uses, and the publish wants a
-# GitHub-hosted one (see the note on the release job). The other is that four
-# jobs cost the slowest of them rather than the sum, and as one job the release
-# was spending most of its wall clock running checks end to end.
+# They are separate jobs from the publish because four jobs in parallel cost
+# the slowest of them. As one job the release spent most of its wall clock
+# running the checks end to end.
 #
 # The check names are deliberately not the bare "Lint"/"Test"/"Build"/"Pack"
 # pr.yml uses. Those four are the required status checks in the main ruleset,
@@ -88,7 +86,7 @@ permissions: {}
 jobs:
   lint:
     name: Release lint
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -113,11 +111,10 @@ jobs:
 
   test:
     name: Release test
-    # The same runner pr.yml gives the suite, kept in step with it rather than
-    # sized on its own. Since vitest.config.ts stopped isolating every test
-    # file the suite is no longer the long pole here, so if these two ever want
-    # tuning, measure before paying for the larger machine in either file.
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    # The same runner pr.yml gives the suite, kept in step with it. Since
+    # vitest.config.ts stopped isolating every test file the suite is no longer
+    # the long pole here.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -157,7 +154,7 @@ jobs:
 
   build:
     name: Release build
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -180,7 +177,7 @@ jobs:
 
   pack:
     name: Release pack
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -207,11 +204,6 @@ jobs:
     # tarball semantic-release is about to build.
     needs: [lint, test, build, pack]
 
-    # A GitHub-hosted runner rather than the Blacksmith ones the checks use.
-    # This is the job that mints the npm publish credential, and the publish
-    # path is the one place worth keeping third parties out of. The checks hold
-    # no credential and produce nothing this job consumes, so they can run
-    # wherever is fastest without that reach following them here.
     runs-on: ubuntu-latest
 
     # What the npm trusted publisher is scoped to, and where any approval

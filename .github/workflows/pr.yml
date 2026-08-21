@@ -13,10 +13,13 @@ defaults:
 env:
   CI: true
 
+# Every job below runs on GitHub's standard Ubuntu runner. It comes with 4 vCPU
+# and 16 GB, and on a public repository it costs nothing. The suite ran on a
+# larger third-party machine until August 2026.
 jobs:
   lint:
     name: Lint
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7.0.0
@@ -32,7 +35,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7.0.0
@@ -68,7 +71,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7.0.0
@@ -83,7 +86,7 @@ jobs:
 
   pack:
     name: Pack
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7.0.0
