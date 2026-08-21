@@ -43,3 +43,4 @@ behaviour and includes example code that can be copied into tests or local devel
 - [Non-AWS dependencies](./non-aws-dependencies/ "Dependencies Yulin does not simulate usage docs")
 - [Serving on localhost](./serve/ "Serving simulated AWS on localhost usage docs")
 - [Simulated time](./time/ "Simulated time usage docs")
+- [Terraform](./terraform/ "Deploying Terraform into simulated AWS usage docs")

@@ -161,6 +161,10 @@
       "import": "./dist/service/ssm/index.js",
       "types": "./dist/service/ssm/index.d.ts"
     },
+    "./terraform": {
+      "import": "./dist/terraform/index.js",
+      "types": "./dist/terraform/index.d.ts"
+    },
     "./serve": {
       "import": "./dist/serve/index.js",
       "types": "./dist/serve/index.d.ts"

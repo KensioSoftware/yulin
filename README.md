@@ -53,6 +53,7 @@ npm i -D @kensio/yulin
 - [AWS SDK interception](./docs/sdk "Simulated AWS SDK docs")
 - [Serving on localhost](./docs/serve "Serving simulated AWS on localhost docs")
 - [Simulated time](./docs/time "Simulated time docs")
+- [Terraform](./docs/terraform "Deploying Terraform into simulated AWS docs")
 
 ## Usage
 
@@ -386,3 +387,14 @@ brew install aws-sam-cli
 
 `pnpm test:iso` runs without it. `pnpm test:local` and `pnpm check` skip the comparison with a
 warning where the CLI is absent, and a CI run that cannot find it fails.
+
+The Terraform import tests plan real configurations under `test/terraform`, and need Terraform on
+the `PATH`. Initialise them once:
+
+```bash
+pnpm tf:init
+```
+
+That downloads the AWS provider, which is one binary of about 650MB, and takes a few minutes the
+first time. `pnpm test:iso` runs without it, and every mechanism of the import has a committed
+fixture covered there.
