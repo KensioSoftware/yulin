@@ -6,6 +6,7 @@ import {
 import type {
   SimGetAccountCommand,
   SimPutAccountDetailsCommand,
+  SimPutAccountSuppressionAttributesCommand,
 } from "../command/account/account.command.js";
 import type {
   SimCreateEmailIdentityCommand,
@@ -14,6 +15,12 @@ import type {
   SimListEmailIdentitiesCommand,
 } from "../command/identity/identity.command.js";
 import type { SimSendEmailCommand } from "../command/send/send.command.js";
+import type {
+  SimDeleteSuppressedDestinationCommand,
+  SimGetSuppressedDestinationCommand,
+  SimListSuppressedDestinationsCommand,
+  SimPutSuppressedDestinationCommand,
+} from "../command/suppression/suppression.command.js";
 import type {
   SimCreateEmailTemplateCommand,
   SimDeleteEmailTemplateCommand,
@@ -124,6 +131,46 @@ export class SimSesSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSes.putAccountDetails(
             command as SimPutAccountDetailsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutAccountSuppressionAttributesCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.putAccountSuppressionAttributes(
+            command as SimPutAccountSuppressionAttributesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutSuppressedDestinationCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.putSuppressedDestination(
+            command as SimPutSuppressedDestinationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetSuppressedDestinationCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.getSuppressedDestination(
+            command as SimGetSuppressedDestinationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListSuppressedDestinationsCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.listSuppressedDestinations(
+            command as SimListSuppressedDestinationsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteSuppressedDestinationCommand",
+        async (command, context): Promise<unknown> =>
+          await simSes.deleteSuppressedDestination(
+            command as SimDeleteSuppressedDestinationCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -18,6 +18,7 @@ import type {
   SimSesDestination,
 } from "./send.command.js";
 import type { SimSesContentReader } from "./sim-ses-content.js";
+import type { SimSesSuppressionCheck } from "./sim-ses-suppression-check.js";
 import { refuseUnsimulatedSendInput } from "./sim-ses-unsimulated-send-input.js";
 import type { SimSesVerifiedIdentityCheck } from "./sim-ses-verified-identities.js";
 
@@ -26,6 +27,7 @@ interface SimSesSendEmailProperties {
   readonly content: SimSesContentReader;
   readonly sent: SimSesSentEmailStore;
   readonly identityCheck: SimSesVerifiedIdentityCheck;
+  readonly suppressionCheck: SimSesSuppressionCheck;
   readonly authorizer: SimSesAuthorizer;
   readonly clock: SimClock;
 }
@@ -39,12 +41,17 @@ interface SimSesSendEmailProperties {
  * service looks at it, then the identity check, then the message is recorded.
  * A caller with no permission is therefore refused whether or not its
  * identities are verified.
+ *
+ * The suppression list refuses nothing. SES accepts a message addressed to a
+ * suppressed recipient and holds it back from that recipient, so the check
+ * runs last and its answer goes on the record.
  */
 export class SimSesSendEmail {
   readonly #identities: SimSesIdentityStore;
   readonly #content: SimSesContentReader;
   readonly #sent: SimSesSentEmailStore;
   readonly #identityCheck: SimSesVerifiedIdentityCheck;
+  readonly #suppressionCheck: SimSesSuppressionCheck;
   readonly #authorizer: SimSesAuthorizer;
   readonly #clock: SimClock;
 
@@ -53,6 +60,7 @@ export class SimSesSendEmail {
     this.#content = properties.content;
     this.#sent = properties.sent;
     this.#identityCheck = properties.identityCheck;
+    this.#suppressionCheck = properties.suppressionCheck;
     this.#authorizer = properties.authorizer;
     this.#clock = properties.clock;
   }
@@ -102,6 +110,7 @@ export class SimSesSendEmail {
         templateName: content.templateName,
         templateData: content.templateData,
         configurationSetName: input.ConfigurationSetName,
+        suppressedRecipients: this.#suppressionCheck.withheldFrom(recipients),
         sentDate: this.#clock.now(),
       }),
     );
