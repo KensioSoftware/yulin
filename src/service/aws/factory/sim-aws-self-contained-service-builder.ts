@@ -1,7 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
-import { SimSesV2 } from "../../ses/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
@@ -44,17 +43,6 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return new SimSecretsManager({ ...this.scoped(scope), kms: scope.kms() });
-  }
-
-  /**
-   * Create simulated SES for an Account Region scope.
-   *
-   * Identities are Region-scoped on real SES: verifying an address in one
-   * Region verifies nothing in another, and a message sent through one Region
-   * is invisible from the next.
-   */
-  createSesV2(scope: SimAwsAccountRegionContainer): SimSesV2 {
-    return new SimSesV2(this.scoped(scope));
   }
 
   /**

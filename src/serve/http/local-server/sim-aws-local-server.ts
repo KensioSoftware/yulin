@@ -225,11 +225,13 @@ interface ServeSimAwsProperties {
   /**
    * Which messages this server prints to the console while it serves.
    *
-   * A simulated Cognito confirmation code and a simulated SNS text message are
-   * printed as they are recorded, which is what makes a code readable in the
-   * terminal the dev server is running in. Both unless this narrows it:
-   * `{ sns: false }` keeps the pool messages and drops the text messages, and
-   * `false` prints neither.
+   * A simulated Cognito confirmation code, a simulated SNS text message and a
+   * message a simulated SES accepted are printed as they are recorded, which
+   * is what makes a code readable in the terminal the dev server is running
+   * in. All three unless this narrows it: `{ sns: false }` keeps the pool
+   * messages and the email and drops the text messages, and `false` prints
+   * none of them. `emailTextLimit` sets how much of an email's text is
+   * printed.
    */
   readonly messageLogging?: SimMessageLoggingOption | undefined;
 

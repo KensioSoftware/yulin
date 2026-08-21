@@ -25,6 +25,7 @@ import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-
 import { SimRekognition } from "../../rekognition/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimScheduler } from "../../scheduler/index.js";
+import { SimSesV2 } from "../../ses/index.js";
 import { simAwsEcsCollaborators } from "./sim-aws-ecs-collaborators.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
@@ -213,6 +214,21 @@ export class SimAwsAccountRegionServiceBuilder {
       iam: this.accountServices.createIam(scope),
       background: this.background,
       notificationDestinations: simAwsS3NotificationDestinations(this.simAws),
+    });
+  }
+
+  /**
+   * Create simulated SES for an Account Region scope.
+   *
+   * Identities are Region-scoped on real SES: verifying an address in one
+   * Region verifies nothing in another, and a message sent through one Region
+   * is invisible from the next. Each message it accepts is announced to the
+   * simulation-wide message log, where a local server picks it up to print.
+   */
+  createSesV2(scope: SimAwsAccountRegionContainer): SimSesV2 {
+    return new SimSesV2({
+      ...this.scoped(scope),
+      messageLog: this.messageLog,
     });
   }
 

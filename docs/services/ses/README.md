@@ -671,6 +671,35 @@ called `SignUp`, so the permissions of that caller decide nothing about it. Noth
 send differs. The sender is checked, the sandbox checks the recipient, and the message is
 recorded.
 
+## Messages on the console
+
+`sentEmails()` is test code. A dev server has the same messages going past and nothing to read them
+with, so `serveSimAws` prints a summary of each one as SES accepts it:
+
+```
+sim SES: hello@example.com to alice@example.com, bcc audit@example.com
+  Subject: Reset your password
+  Template: password-reset {"code":"483920"}
+  Text body:
+    Follow this link to reset your password.
+    https://app.example.com/reset?token=abc123
+  HTML body: 4.1 kB, not printed
+```
+
+The first line holds the sender and the three recipient lists, with an empty list left out. Under it
+come the subject, the template the message was rendered from and the data it was filled with, and
+the text part. An HTML part is measured and left out, because kilobytes of markup on the console
+bury the rest of the block.
+
+The text part is printed up to 2000 characters, and what runs past that is counted. Move the limit
+with `emailTextLimit`, and turn the SES lines off with `ses: false`, both on the `messageLogging`
+option. See [Messages on the console](../../serve/README.md#messages-on-the-console) for the rest of
+it.
+
+A user pool sending through SES prints twice, once for the SES send and once for the message the
+pool kept. Both services recorded it, and each block says what that service holds. See
+[Sending a pool's email through SES](../cognito/README.md#sending-a-pools-email-through-ses).
+
 ## Permissions
 
 Every command authorizes through simulated IAM. A send authorizes against the identity being sent

@@ -38,7 +38,10 @@ export class SimLocalMessageLogging {
   constructor(properties: SimLocalMessageLoggingProperties) {
     this.simAws = properties.simAws;
     this.logging = new SimMessageLogging(properties.option);
-    this.output = new SimMessageLogConsole(properties.target);
+    this.output = new SimMessageLogConsole({
+      target: properties.target,
+      emailTextLimit: this.logging.emailTextLimit,
+    });
   }
 
   /**

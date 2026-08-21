@@ -265,7 +265,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated SES for an Account Region scope. */
   createSesV2(scope: SimAwsAccountRegionContainer): SimSesV2 {
-    return this.selfContainedServices.createSesV2(scope);
+    return this.accountRegionServices.createSesV2(scope);
   }
 
   /** Create simulated SNS for an Account Region scope. */
