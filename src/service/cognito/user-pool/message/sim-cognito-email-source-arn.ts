@@ -21,13 +21,26 @@ export interface SimCognitoEmailSourceIdentity {
 
   /** The address or domain, as the ARN spelled it. */
   readonly identityName: string;
+
+  /**
+   * Whether the identity is a domain rather than one address.
+   *
+   * SES decides this by whether the name has an `@` in it, and so does this.
+   * A domain has no address for Cognito to send as, which is why a pool
+   * naming one has to say what its `From` is.
+   */
+  readonly isDomain: boolean;
 }
 
 /**
  * `arn:aws:ses:<region>:<account>:identity/<name>`, which is the only SES ARN
  * a `SourceArn` is allowed to be.
+ *
+ * The account segment is held to digits the way the AWS pattern holds it, even
+ * though the value is read past. A malformed ARN is worth refusing whether or
+ * not this goes on to use the part that is malformed.
  */
-const identityArnPattern = /^arn:[^:]*:ses:([^:]+):[^:]*:identity\/(.+)$/;
+const identityArnPattern = /^arn:[^:]*:ses:([^:]+):[0-9]+:identity\/(.+)$/;
 
 /**
  * Read the SES identity out of a pool's `SourceArn`, or nothing where the
@@ -50,5 +63,9 @@ export function simCognitoEmailSourceIdentity(
   // Read as a region name the way every other ARN parser here reads one. A
   // spelling no region has resolves to a scope with nothing in it, and the
   // pool then reports the identity as missing, which is what it is.
-  return { regionName: regionName as AwsRegionName, identityName };
+  return {
+    regionName: regionName as AwsRegionName,
+    identityName,
+    isDomain: !identityName.includes("@"),
+  };
 }

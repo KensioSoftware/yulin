@@ -43,11 +43,13 @@ interface SimCognitoSentMessageProperties {
  *
  * A pool keeps this record whichever service sent the message. One sending
  * through Cognito's own email has been through nothing else, and one whose
- * `EmailConfiguration` named `DEVELOPER` is recorded in
- * `sesV2().sentEmails()` as well. Both are kept because they answer different
- * questions: the SES record is the message as it went out, and this one is the
- * message with the confirmation code in it that the serve layer lists at
- * `/{userPoolId}/messages` for a browser sign-up during local dev.
+ * `EmailConfiguration` named `DEVELOPER` is recorded in `sesV2().sentEmails()`
+ * as well. The two carry the same wording, code and all, and differ in what
+ * they say around it. The SES record keeps the envelope, with the configured
+ * `From`, the reply-to addresses and the configuration set. This one keeps
+ * what Cognito knows, with the username and the occasion it sent on, and it is
+ * what the serve layer lists at `/{userPoolId}/messages` for a browser sign-up
+ * during local dev.
  */
 export class SimCognitoSentMessage {
   /** The user the message was addressed to. */

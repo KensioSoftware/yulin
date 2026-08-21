@@ -860,9 +860,10 @@ The response is `{ "messages": [ ... ] }`, each message carrying `username`, `re
 
 A pool created with `EmailConfiguration: { EmailSendingAccount: "DEVELOPER", ... }` sends its email
 through simulated SES, in the region its `SourceArn` names. That is the CDK
-`cognito.UserPoolEmail.withSES({ ... })` configuration. An account set up for SES and still in the
-[SES sandbox](../ses#the-sandbox) delivers nothing, and a pool recording only its own messages
-would report that as a working sign-up.
+`cognito.UserPoolEmail.withSES({ ... })` configuration. An account still in the
+[SES sandbox](../ses#the-sandbox) reaches only verified recipients, which is most of a real sign-up
+list turned away, and a pool recording only its own messages would report that as a working
+sign-up.
 
 The message is recorded in both places. `sesV2().sentEmails()` holds it as it went out, with the
 configured `From`, `ReplyToEmailAddress` and `ConfigurationSet`. `sentMessages()` on the pool holds
@@ -936,6 +937,10 @@ console.log(cognito.userPool(userPoolId).sentMessages().length); // 1
 
 The identity is resolved when a message is sent rather than when the pool is created, so a pool can
 be created before the identity it names and a stack can deploy the two in either order.
+
+A `SourceArn` naming a domain has to come with a `From`, as it does on real Cognito. A domain
+identity covers every address at it and names none of them, so there is no one address for Cognito
+to write as. An address identity needs no `From`, and a pool without one sends as that address.
 
 A sign-up against a pool whose `SourceArn` identity is missing or still unverified fails with
 `InvalidEmailRoleAccessPolicyException`, which is what real Cognito raises when it cannot use the
@@ -3296,12 +3301,12 @@ fails at the sign-in here as it would in a deployment, the point of deploying th
 all.
 
 A property one of the Cognito commands refuses by name is recorded in that command's own words.
-`EmailConfiguration`, `SmsConfiguration` and `SmsAuthenticationMessage` on a pool, and
-`AnalyticsConfiguration`, `EnablePropagateAdditionalUserContextData`, `ReadAttributes` and
-`WriteAttributes` on a client, all read as the refusal reads:
+`SmsConfiguration` and `SmsAuthenticationMessage` on a pool, and `AnalyticsConfiguration`,
+`EnablePropagateAdditionalUserContextData`, `ReadAttributes` and `WriteAttributes` on a client, all
+read as the refusal reads:
 
 ```
-AWS::Cognito::UserPool property EmailConfiguration is not simulated: email delivery would be ignored here and applied on real AWS. The Resource is created without it.
+AWS::Cognito::UserPool property SmsConfiguration is not simulated: SMS delivery would be ignored here and applied on real AWS. The Resource is created without it.
 ```
 
 `CreateUserPool` refuses that same input outright, and the template deploys. The two paths say the

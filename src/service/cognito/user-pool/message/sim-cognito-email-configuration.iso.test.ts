@@ -102,6 +102,7 @@ describe("sim Cognito user pool email configuration", () => {
         UserPoolId: userPoolId,
         EmailConfiguration: {
           EmailSendingAccount: "DEVELOPER",
+          From: "no-reply@example.com",
           SourceArn: sesArn,
         },
       }),
@@ -126,6 +127,61 @@ describe("sim Cognito user pool email configuration", () => {
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "CreateUserPool");
     assertStringIncludes(error.message, "SourceArn");
+  });
+
+  it("refuses a domain SourceArn with no From to send as", async () => {
+    // Given a simulated Cognito.
+    const cognito = new SimAws().cognitoIdentityProvider();
+
+    // When a pool sends through a verified domain and names no From address.
+    const error = await assertThrowsErrorAsync(async () => {
+      await createPool(cognito, {
+        EmailSendingAccount: "DEVELOPER",
+        SourceArn: sesArn,
+      });
+    });
+
+    // Then it is refused, as real Cognito refuses it: a domain identity gives
+    // Cognito no one address to write as.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "example.com");
+    assertStringIncludes(error.message, "needs a From address");
+  });
+
+  it("takes an address SourceArn with no From, which names one to send as", async () => {
+    // Given a simulated Cognito.
+    const cognito = new SimAws().cognitoIdentityProvider();
+
+    // When a pool sends through a verified address and names no From.
+    const userPoolId = await createPool(cognito, {
+      EmailSendingAccount: "DEVELOPER",
+      SourceArn:
+        "arn:aws:ses:eu-west-2:111122223333:identity/hello@example.com",
+    });
+
+    // Then the pool is created, because the identity is the address.
+    const reported = await describedEmail(cognito, userPoolId);
+    assertNonNullable(reported);
+    assertUndefined(reported.From);
+  });
+
+  it("refuses a SourceArn whose account is not an account id", async () => {
+    // Given a simulated Cognito.
+    const cognito = new SimAws().cognitoIdentityProvider();
+
+    // When a pool names an ARN with nothing where the account belongs.
+    const error = await assertThrowsErrorAsync(async () => {
+      await createPool(cognito, {
+        EmailSendingAccount: "DEVELOPER",
+        From: "no-reply@example.com",
+        SourceArn: "arn:aws:ses:eu-west-2::identity/example.com",
+      });
+    });
+
+    // Then it is refused as malformed, even though the account is read past
+    // when the ARN is well formed.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "SES email identity");
   });
 
   it("refuses a SourceArn that names something other than an identity", async () => {

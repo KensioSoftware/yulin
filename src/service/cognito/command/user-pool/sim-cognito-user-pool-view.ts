@@ -45,10 +45,11 @@ export class SimCognitoUserPoolView {
    * as real Cognito reports it, because the pool acts on it either way:
    * it is what decides whether `SignUp` is allowed at all.
    *
-   * `EmailConfiguration` is reported as the request set it, and only by a pool
-   * that was created with one. Real Cognito reports it the same way, so a pool
-   * that named none describes itself without one even though it sends from
-   * Cognito's own address.
+   * `EmailConfiguration` is reported as the request set it, whether that was
+   * the creation or a later `UpdateUserPool`, and only where one of them set
+   * it. Real Cognito reports it the same way, so a pool that named none
+   * describes itself without one even though it sends from Cognito's own
+   * address.
    */
   describe(pool: SimCognitoUserPool): SimCognitoUserPoolType {
     const signInPolicy = pool.settings.signInPolicy.toOutput();

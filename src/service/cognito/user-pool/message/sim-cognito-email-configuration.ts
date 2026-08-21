@@ -1,8 +1,6 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
-import {
-  simCognitoEmailSourceIdentity,
-  type SimCognitoEmailSourceIdentity,
-} from "./sim-cognito-email-source-arn.js";
+import { SimCognitoEmailConfigurationReader } from "./sim-cognito-email-configuration-reader.js";
+import type { SimCognitoEmailSourceIdentity } from "./sim-cognito-email-source-arn.js";
 
 /**
  * Which service delivers a pool's email.
@@ -12,7 +10,14 @@ import {
  */
 export type SimCognitoEmailSendingAccount = "COGNITO_DEFAULT" | "DEVELOPER";
 
-const sendingAccounts: readonly string[] = ["COGNITO_DEFAULT", "DEVELOPER"];
+/**
+ * The two values `EmailSendingAccount` has, which is also what a refusal of a
+ * third names.
+ */
+export const simCognitoEmailSendingAccounts: readonly string[] = [
+  "COGNITO_DEFAULT",
+  "DEVELOPER",
+];
 
 /**
  * The address real Cognito sends from when it is sending the email itself and
@@ -59,9 +64,10 @@ export class SimCognitoEmailConfiguration {
    * The address the messages come from, with the display name where the
    * configuration gave one.
    *
-   * A pool that named no `From` sends from the identity its `SourceArn` names,
+   * A pool that named no `From` sends from the address its `SourceArn` names,
    * as real Cognito does, and one with neither sends from Cognito's own
-   * address.
+   * address. A `SourceArn` naming a domain has no address to fall back on, so
+   * such a pool has to say what its `From` is.
    */
   public readonly from: string;
 
@@ -84,24 +90,19 @@ export class SimCognitoEmailConfiguration {
   constructor(declared: object | undefined, operation: string) {
     const read = new SimCognitoEmailConfigurationReader(declared, operation);
     const sourceIdentity = read.sourceIdentity();
+    const declaredFrom = read.string("From");
 
     this.#declared = read.declared;
     this.sendingAccount = read.sendingAccount();
     this.configurationSet = read.string("ConfigurationSet");
     this.replyToEmailAddress = read.string("ReplyToEmailAddress");
     this.from =
-      read.string("From") ??
-      sourceIdentity?.identityName ??
-      simCognitoDefaultFromAddress;
+      declaredFrom ?? addressOf(sourceIdentity) ?? simCognitoDefaultFromAddress;
     this.sourceIdentity =
       this.sendingAccount === "DEVELOPER" ? sourceIdentity : undefined;
 
-    if (sourceIdentity === undefined && this.sendingAccount === "DEVELOPER") {
-      throw new SimCognitoInvalidParameterException(
-        `${operation} EmailConfiguration with EmailSendingAccount ` +
-          `'DEVELOPER' needs a SourceArn naming the SES email identity the ` +
-          `pool sends through`,
-      );
+    if (this.sendingAccount === "DEVELOPER") {
+      refuseWithoutSender(operation, sourceIdentity, declaredFrom);
     }
   }
 
@@ -119,92 +120,44 @@ export class SimCognitoEmailConfiguration {
 }
 
 /**
- * Reads the keys of one `EmailConfiguration`, refusing a value Cognito would
- * refuse.
+ * The address an identity gives a pool to send as, and nothing for a domain.
  *
- * The configuration arrives as a bare object because CloudFormation hands one
- * over with whatever a template wrote in it, so every key is checked here
- * rather than trusted from the type.
+ * A domain identity covers every address at it and names none of them, so
+ * there is nothing here for a `From` to default to.
  */
-class SimCognitoEmailConfigurationReader {
-  /** The configuration as given, which is also what a describe reports. */
-  public readonly declared: SimCognitoEmailConfigurationType | undefined;
+function addressOf(
+  identity: SimCognitoEmailSourceIdentity | undefined,
+): string | undefined {
+  return identity === undefined || identity.isDomain
+    ? undefined
+    : identity.identityName;
+}
 
-  readonly #operation: string;
-
-  /**
-   * The keys as given, held in a Map rather than read off the object. What
-   * arrives is whatever a template wrote, so a key such as `__proto__` reaches
-   * here and a Map is where it means nothing.
-   */
-  readonly #values: ReadonlyMap<string, unknown>;
-
-  constructor(declared: object | undefined, operation: string) {
-    this.declared = declared;
-    this.#operation = operation;
-    this.#values = new Map(Object.entries(declared ?? {}));
+/**
+ * Refuse a pool that sends through SES without saying what it sends as.
+ *
+ * Real Cognito needs the `SourceArn`, because the identity is what the account
+ * has proved it owns. It needs the `From` as well where that identity is a
+ * domain, since a domain gives it no one address to write as.
+ */
+function refuseWithoutSender(
+  operation: string,
+  sourceIdentity: SimCognitoEmailSourceIdentity | undefined,
+  declaredFrom: string | undefined,
+): void {
+  if (sourceIdentity === undefined) {
+    throw new SimCognitoInvalidParameterException(
+      `${operation} EmailConfiguration with EmailSendingAccount 'DEVELOPER' ` +
+        `needs a SourceArn naming the SES email identity the pool sends ` +
+        `through`,
+    );
   }
 
-  /**
-   * One key that has to be a string where it is there at all.
-   */
-  string(key: string): string | undefined {
-    const value = this.#values.get(key);
-
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (typeof value !== "string") {
-      throw new SimCognitoInvalidParameterException(
-        `${this.#operation} EmailConfiguration ${key} must be a string`,
-      );
-    }
-
-    return value;
-  }
-
-  /**
-   * Which service the configuration asked to send through, refusing a value
-   * Cognito has no meaning for.
-   */
-  sendingAccount(): SimCognitoEmailSendingAccount {
-    const declared = this.string("EmailSendingAccount");
-
-    if (declared === undefined) {
-      return "COGNITO_DEFAULT";
-    }
-
-    if (!sendingAccounts.includes(declared)) {
-      throw new SimCognitoInvalidParameterException(
-        `${this.#operation} EmailConfiguration EmailSendingAccount ` +
-          `'${declared}' is not one of ${sendingAccounts.join(", ")}`,
-      );
-    }
-
-    return declared as SimCognitoEmailSendingAccount;
-  }
-
-  /**
-   * The identity a `SourceArn` names, refusing a value that names something
-   * other than an SES email identity.
-   */
-  sourceIdentity(): SimCognitoEmailSourceIdentity | undefined {
-    const sourceArn = this.string("SourceArn");
-
-    if (sourceArn === undefined) {
-      return undefined;
-    }
-
-    const identity = simCognitoEmailSourceIdentity(sourceArn);
-
-    if (identity === undefined) {
-      throw new SimCognitoInvalidParameterException(
-        `${this.#operation} EmailConfiguration SourceArn '${sourceArn}' is ` +
-          `not the ARN of an SES email identity`,
-      );
-    }
-
-    return identity;
+  if (declaredFrom === undefined && sourceIdentity.isDomain) {
+    throw new SimCognitoInvalidParameterException(
+      `${operation} EmailConfiguration with a SourceArn naming the domain ` +
+        `'${sourceIdentity.identityName}' needs a From address, because a ` +
+        `domain identity gives Cognito no one address to send as`,
+    );
   }
 }

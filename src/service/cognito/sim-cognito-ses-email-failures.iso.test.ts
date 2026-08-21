@@ -100,6 +100,7 @@ describe("sim Cognito user pool email SES failures", () => {
         AutoVerifiedAttributes: ["email"],
         EmailConfiguration: {
           EmailSendingAccount: "DEVELOPER",
+          From: "no-reply@example.com",
           SourceArn: sesSourceArn("us-east-1"),
         },
       }),
