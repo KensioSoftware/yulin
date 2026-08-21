@@ -1,0 +1,70 @@
+# Simulated Personalize implementation
+
+This directory contains the simulated Personalize service implementation.
+
+Personalize is a machine learning service, and none of the machine learning is here. What is here is
+the resource graph a recommendation is served from. That graph is the part application code and
+CloudFormation templates actually touch.
+
+## Resources without models
+
+A dataset group holds schemas and datasets. A solution names a recipe on that group. A solution
+version stands for the trained model, and a campaign is the endpoint a runtime call names. All five
+exist here as state, reach `ACTIVE` on creation, and report back what the request gave them.
+
+The recipe ARN is recorded and never looked up. There is no catalogue of recipes, because no model
+is fitted and one recipe would behave like another. That changes with domain recommenders, where the
+use case a recipe names decides which parameters a recommendation request has to carry.
+
+## Entry points
+
+- `sim-personalize.ts` is the main in-memory service object for one account/region scope. It is a
+  list of the operations Personalize answers, with the work delegated to the command groups.
+- `index.ts` exports the public Personalize simulator API for `@kensio/yulin/personalize`.
+
+## Resource model
+
+Resource state lives under `resource/`. Every resource carries an ARN, a name, a status and a pair
+of timestamps, gathered as `SimPersonalizeResource`. One generic `SimPersonalizeResourceStore` serves
+all six types on the strength of that shared shape, keyed by ARN with a secondary lookup by name.
+
+`SimPersonalizeResources` gathers the six stores. The stores sit together, away from the service
+facade, because most commands read more than one of them. Creating a dataset reaches its dataset
+group and its schema, and creating a campaign reaches a solution version and through it a solution.
+
+Two ARN shapes are worth knowing.
+
+A dataset ARN carries its dataset group and its type in place of the name the request gave. One
+group therefore holds one dataset of each type, and two groups can each hold an `INTERACTIONS`
+dataset.
+
+A solution version ARN is the solution's with a version on the end. That is why
+`simPersonalizeSolutionVersionArn` takes a solution ARN where the other builders take a name and a
+scope.
+
+## Commands
+
+Command handlers live under `command/`, grouped by the resource they are about.
+`SimPersonalizeCommands` builds all six groups over one set of resources and one authorizer. The
+service facade stays a list of operations because of it.
+
+Every group follows the same order. Read the ARN from the input, authorize against it, resolve the
+resource, then act. Authorizing before resolving is deliberate. A caller with no permission learns
+only that it has no permission, and the existence of the resource stays hidden.
+
+`command/list/sim-personalize-page.ts` is shared by all six list operations. The pagination token is
+the index the next page starts at, where real Personalize hands out an opaque string.
+
+## Deletion rules
+
+Real Personalize refuses to delete a resource other resources still depend on, and these do the
+same. A dataset group holding datasets or solutions, a schema a dataset still uses, and a solution a
+campaign still deploys are all reported as `ResourceInUseException`.
+
+Deleting a solution takes its versions with it. Real Personalize has no `DeleteSolutionVersion`
+either.
+
+## What comes next
+
+The runtime API, the events API, CloudFormation resource types and domain recommenders are all
+separate issues. Each of them builds on what is here.

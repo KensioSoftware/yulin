@@ -87,6 +87,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     (scoped): SimSdkCommandRouter => scoped.logs().sdkCommandRouter(),
   ],
   [
+    "Personalize",
+    (scoped): SimSdkCommandRouter => scoped.personalize().sdkCommandRouter(),
+  ],
+  [
     "Rekognition",
     (scoped): SimSdkCommandRouter => scoped.rekognition().sdkCommandRouter(),
   ],

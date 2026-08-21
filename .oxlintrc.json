@@ -737,6 +737,22 @@
       }
     },
     {
+      // The service registries. Each one lists every simulated service once,
+      // so their length tracks the number of services rather than the
+      // complexity of anything in them. Splitting them by alphabet would make
+      // a service harder to find for no gain, and the cap would only be hit
+      // again by the service after next.
+      "files": [
+        "src/service/aws/sim-aws-account-region-scope.ts",
+        "src/service/aws/sim-aws-service-accessors.ts",
+        "src/service/aws/factory/sim-aws-service-factory.ts",
+        "src/service/aws/factory/sim-aws-account-region-service-builder.ts"
+      ],
+      "rules": {
+        "eslint/max-lines": ["error", 500]
+      }
+    },
+    {
       "files": ["scripts/**/*.mts"],
       "rules": {
         "eslint/no-await-in-loop": "off",

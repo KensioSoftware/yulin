@@ -18,6 +18,7 @@ import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
+import type { SimPersonalize } from "../personalize/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
@@ -140,6 +141,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated CloudWatch Logs in the default Account Region scope. */
   logs(): SimLogs {
     return this.defaultAccountRegionScope().logs();
+  }
+
+  /** Get simulated Personalize in the default Account Region scope. */
+  personalize(): SimPersonalize {
+    return this.defaultAccountRegionScope().personalize();
   }
 
   /** Get simulated Rekognition in the default Account Region scope. */
