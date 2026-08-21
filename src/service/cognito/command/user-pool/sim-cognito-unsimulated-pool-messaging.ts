@@ -8,6 +8,20 @@ import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
 const linkVerification = "confirming a sign-up by following a link";
 
 /**
+ * The pool creation inputs nothing here delivers a message through, and what
+ * each of them would have done on real AWS.
+ *
+ * `AWS::Cognito::UserPool` carries all three under the same names, and the
+ * CloudFormation layer reads this to say the same thing about a property it
+ * drops as this says about an input it refuses.
+ */
+export const simCognitoUnsimulatedPoolMessaging = {
+  EmailConfiguration: "email delivery",
+  SmsConfiguration: "SMS delivery",
+  SmsAuthenticationMessage: "multi-factor authentication messages",
+} as const;
+
+/**
  * Refuses the message delivery inputs this simulation does not model.
  *
  * Nothing here delivers an email or a text message. A pool records the message
@@ -42,17 +56,17 @@ export class SimCognitoUnsimulatedUserPoolMessaging {
     this.unsimulated.refuse(
       "EmailConfiguration",
       input.EmailConfiguration,
-      "email delivery",
+      simCognitoUnsimulatedPoolMessaging.EmailConfiguration,
     );
     this.unsimulated.refuse(
       "SmsConfiguration",
       input.SmsConfiguration,
-      "SMS delivery",
+      simCognitoUnsimulatedPoolMessaging.SmsConfiguration,
     );
     this.unsimulated.refuse(
       "SmsAuthenticationMessage",
       input.SmsAuthenticationMessage,
-      "multi-factor authentication messages",
+      simCognitoUnsimulatedPoolMessaging.SmsAuthenticationMessage,
     );
 
     this.refuseLinkVerification(input.VerificationMessageTemplate);

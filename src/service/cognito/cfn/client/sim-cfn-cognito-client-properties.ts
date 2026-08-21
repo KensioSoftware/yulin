@@ -4,6 +4,7 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateUserPoolClientCommandInput } from "../../command/client/user-pool-client.command.js";
+import { simCognitoUnsimulatedClientOptions } from "../../command/client/sim-cognito-unsimulated-client-options.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoRefreshTokenRotation } from "./sim-cfn-cognito-refresh-token-rotation.js";
@@ -63,6 +64,7 @@ export class SimCfnCognitoClientProperties {
   private readonly propertyParser = new SimCfnCognitoPropertyParser({
     resourceType: "AWS::Cognito::UserPoolClient",
     simulated: simulatedProperties,
+    refused: simCognitoUnsimulatedClientOptions,
   });
 
   constructor(properties: SimCfnCognitoClientPropertiesProperties) {

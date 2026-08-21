@@ -399,8 +399,8 @@ event makes to one.
 `AWS::Cognito::UserPoolGroup`, `AWS::Cognito::UserPoolDomain` and
 `AWS::Cognito::UserPoolIdentityProvider`, one creator per type behind
 `SimCognitoCfnResourceFactory`. Each creator goes through the ordinary Command rather than
-constructing the model, so a deployed pool is the same thing an SDK caller would have got, refusals
-included.
+constructing the model, so a deployed pool is the same thing an SDK caller would have got. A
+Command refusal fails the stack with the Resource's logical ID in front of it.
 
 A properties class per type turns the template's properties into that Command's input.
 `UserPoolName` is the one property whose CloudFormation name differs from the API's `PoolName`.
@@ -411,6 +411,17 @@ Each type states the properties it simulates, and every other property is record
 Resource and left out of what is created. That is an allow-list rather than a list of
 known-unsimulated properties, because CloudFormation has properties the Cognito API does not, and
 those would otherwise be dropped on the way to a Command that has nowhere to record them.
+
+A property never reaches the Command it would have been refused by, because the allow-list drops it
+first. What the record says about it comes from the Command anyway.
+`simCognitoUnsimulatedPoolMessaging` and `simCognitoUnsimulatedClientOptions` hold what each refused
+input would have done on AWS, `SimCognitoUnsimulatedInput` builds the refusal from it and
+`SimCfnCognitoPropertyParser` builds the ignored-property reason from the same phrase. A template's
+`EmailConfiguration` is recorded in the sentence `CreateUserPool` refuses the same input with.
+
+The Resource is still created without it. Failing a stack over one property would take every other
+Resource in the template with it. A pool missing a delivery configuration says so on the record, and
+a stack that never deployed says nothing at all.
 
 `SimCfnCognitoUserPoolSchema` reads the `Schema` property a CDK `UserPool` emits for its
 `customAttributes` and `standardAttributes`. It passes the declarations on rather than judging them,
