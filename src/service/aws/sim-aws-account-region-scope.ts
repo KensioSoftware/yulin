@@ -17,6 +17,7 @@ import type { SimEcr } from "../ecr/index.js";
 import type { SimEcs } from "../ecs/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
+import type { SimPersonalize } from "../personalize/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
@@ -191,6 +192,13 @@ export class SimAwsAccountRegionContainer {
   lambda(): SimLambda {
     return this.memo.getOrCreate("lambda", () =>
       this.factory.createLambda(this),
+    );
+  }
+
+  /** Get simulated Personalize for this account and region. */
+  personalize(): SimPersonalize {
+    return this.memo.getOrCreate("personalize", () =>
+      this.factory.createPersonalize(this),
     );
   }
 

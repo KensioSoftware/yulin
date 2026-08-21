@@ -34,6 +34,7 @@ npm i -D @kensio/yulin
 - [KMS](./docs/services/kms "Simulated KMS docs")
 - [Lambda](./docs/services/lambda "Simulated Lambda docs")
 - [CloudWatch Logs](./docs/services/logs "Simulated CloudWatch Logs docs")
+- [Personalize](./docs/services/personalize "Simulated Amazon Personalize docs")
 - [Rekognition](./docs/services/rekognition "Simulated Rekognition docs")
 - [Route53](./docs/services/route53 "Simulated Route53 docs")
 - [S3](./docs/services/s3 "Simulated S3 docs")

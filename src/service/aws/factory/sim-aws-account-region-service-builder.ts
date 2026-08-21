@@ -22,6 +22,7 @@ import { SimLambda } from "../../lambda/index.js";
 import { SimLogs } from "../../logs/index.js";
 import { simAwsLogsCollaborators } from "./sim-aws-logs-collaborators.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
+import { SimPersonalize } from "../../personalize/index.js";
 import { SimRekognition } from "../../rekognition/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimScheduler } from "../../scheduler/index.js";
@@ -178,6 +179,15 @@ export class SimAwsAccountRegionServiceBuilder {
         urlRegistry: this.lambdaUrlRegistry,
         registries: this.registries,
       }),
+    });
+  }
+
+  /** Create simulated Personalize for an Account Region scope. */
+  createPersonalize(scope: SimAwsAccountRegionContainer): SimPersonalize {
+    return new SimPersonalize({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.accountServices.createIam(scope),
+      background: this.background,
     });
   }
 
