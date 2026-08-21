@@ -41,9 +41,13 @@ interface SimCognitoSentMessageProperties {
  * carrying the code, and what the wording a pool was created with is finally
  * read for.
  *
- * This is Cognito's own record rather than a simulated SES: real Cognito with
- * the default `EmailSendingAccount` of `COGNITO_DEFAULT` does not send through
- * SES at all, so a message here has been through no other service.
+ * A pool keeps this record whichever service sent the message. One sending
+ * through Cognito's own email has been through nothing else, and one whose
+ * `EmailConfiguration` named `DEVELOPER` is recorded in
+ * `sesV2().sentEmails()` as well. Both are kept because they answer different
+ * questions: the SES record is the message as it went out, and this one is the
+ * message with the confirmation code in it that the serve layer lists at
+ * `/{userPoolId}/messages` for a browser sign-up during local dev.
  */
 export class SimCognitoSentMessage {
   /** The user the message was addressed to. */

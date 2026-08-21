@@ -14,6 +14,7 @@ import { SimSesAuthorizer } from "./command/authorize/sim-ses-authorizer.js";
 import { SimSesIdentityCommands } from "./command/identity/sim-ses-identity-commands.js";
 import { SimSesContentReader } from "./command/send/sim-ses-content.js";
 import { SimSesSendEmail } from "./command/send/sim-ses-send-email.js";
+import { SimSesServiceSend } from "./command/send/sim-ses-service-send.js";
 import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-identities.js";
 import { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
 import { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
@@ -42,6 +43,12 @@ export class SimSesCommands {
   readonly identityCommands: SimSesIdentityCommands;
   readonly templateCommands: SimSesTemplateCommands;
   readonly sendEmail: SimSesSendEmail;
+
+  /**
+   * The way another simulated service reaches this SES, which is the send
+   * without the IAM authorization a caller's request goes through.
+   */
+  readonly serviceSend: SimSesServiceSend;
   readonly accountCommands: SimSesAccountCommands;
   readonly background: BackgroundScheduler;
 
@@ -73,16 +80,23 @@ export class SimSesCommands {
       authorizer,
       clock: background,
     });
+    const identityCheck = new SimSesVerifiedIdentityCheck({
+      identities,
+      account,
+      accountRegionScope,
+    });
+
     this.sendEmail = new SimSesSendEmail({
       identities,
       content: new SimSesContentReader({ templates }),
       sent,
-      identityCheck: new SimSesVerifiedIdentityCheck({
-        identities,
-        account,
-        accountRegionScope,
-      }),
+      identityCheck,
       authorizer,
+      clock: background,
+    });
+    this.serviceSend = new SimSesServiceSend({
+      sent,
+      identityCheck,
       clock: background,
     });
     this.accountCommands = new SimSesAccountCommands({

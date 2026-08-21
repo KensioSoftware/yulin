@@ -14,6 +14,7 @@ import { SimCloudWatch } from "../../cloudwatch/index.js";
 import { simAwsCloudWatchCollaborators } from "./sim-aws-cloudwatch-collaborators.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimEcs } from "../../ecs/index.js";
+import { simAwsCognitoEmailSenders } from "../../cognito/user-pool/message/sim-aws-cognito-email-senders.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
@@ -123,6 +124,9 @@ export class SimAwsAccountRegionServiceBuilder {
       userPoolRegistry: this.registries.cognito,
       domainRegistry: this.registries.cognitoDomains,
       triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
+      // A pool's SourceArn names its own Region, which need not be this one,
+      // so the SES it sends through comes from the whole simulation.
+      emailSenders: simAwsCognitoEmailSenders(this.simAws),
       // A web ACL protecting a pool is in the same Account and Region as the
       // pool, as it is on AWS, so this scope's own WAFv2 is the one to ask.
       webAcls: scope.wafV2().protection(),

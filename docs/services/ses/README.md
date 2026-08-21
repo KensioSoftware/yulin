@@ -411,6 +411,18 @@ account stays in the sandbox until that review lands. Granting it immediately is
 divergence. The alternative is a simulator no test can get out of the sandbox in, and waiting for a
 review is beyond what a test can assert on anyway.
 
+## Messages another service sends
+
+A simulated Cognito user pool whose `EmailConfiguration` names `EmailSendingAccount: DEVELOPER`
+sends its verification messages and invitations through the SES of the region its `SourceArn` names.
+Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox rules
+above decide them the same way. See
+[Sending a pool's email through SES](../cognito#sending-a-pools-email-through-ses).
+
+Such a send skips IAM. Real Cognito sends through a service-linked role rather than as whoever
+called `SignUp`, so the permissions of that caller decide nothing about it. Nothing else about the
+send differs: the sender is checked, the sandbox checks the recipient, and the message is recorded.
+
 ## Permissions
 
 Every command authorizes through simulated IAM. A send authorizes against the identity being sent
@@ -616,4 +628,6 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   `AWS::SES::ContactList`, `AWS::SES::ReceiptRule` and the rest are left out.
 - **SES v2 only.** The older `@aws-sdk/client-ses` API is absent.
 - **DKIM, MAIL FROM domains and sending authorization policies are left out.** An identity created
-  with `DkimSigningAttributes` is refused, and never reported as configured.
+  with `DkimSigningAttributes` is refused, and never reported as configured. A Cognito user pool
+  sending through an identity is therefore checked only for that identity being verified, where
+  real Cognito needs an identity policy allowing it as well.

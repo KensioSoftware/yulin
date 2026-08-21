@@ -74,7 +74,8 @@ function refuseEmailFactor(
   new SimCognitoUnsimulatedInput(operation).refuse(
     "EmailMfaSettings",
     settings,
-    "a second factor sent by email, which needs the pool's EmailConfiguration",
+    "a second factor sent by email, which is a challenge flow this " +
+      "simulation does not run",
   );
 }
 

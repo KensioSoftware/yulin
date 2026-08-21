@@ -101,9 +101,9 @@ export class SimCognitoUserPoolMfaCommands {
    * The factor itself is accepted without one, and the pool records the
    * message it would have sent in the way it records every other one.
    *
-   * A pool here has no `EmailConfiguration` either, because `CreateUserPool`
-   * refuses that, so real Cognito would refuse a code sent by email on a pool
-   * built the same way.
+   * `EmailMfaConfiguration` is refused because the challenge behind it is not
+   * simulated. A pool sending through SES has somewhere to deliver such a code
+   * and still no sign-in that asks for one.
    *
    * A `WebAuthnConfiguration` is accepted and recorded rather than refused.
    * The two values in it are what `StartWebAuthnRegistration` registers a
@@ -121,7 +121,8 @@ export class SimCognitoUserPoolMfaCommands {
     this.unsimulated.refuse(
       "EmailMfaConfiguration",
       input.EmailMfaConfiguration,
-      "a second factor sent by email, which needs the pool's EmailConfiguration",
+      "a second factor sent by email, which is a challenge flow this " +
+        "simulation does not run",
     );
   }
 }

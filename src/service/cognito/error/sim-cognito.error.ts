@@ -264,3 +264,34 @@ export class SimCognitoUserPoolClientAlreadyExists extends SimCognitoError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated Cognito InvalidEmailRoleAccessPolicyException error.
+ *
+ * Real Cognito reports a pool that cannot use the SES email identity its
+ * `EmailConfiguration` names this way, whether the identity is missing, still
+ * unverified, or carrying no policy letting Cognito send as it. Here it is the
+ * first two: simulated SES has no identity policies.
+ */
+export class SimCognitoInvalidEmailRoleAccessPolicyException extends SimCognitoError {
+  public override readonly name = "InvalidEmailRoleAccessPolicyException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito CodeDeliveryFailureException error.
+ *
+ * Real Cognito reports a verification message that failed to go out this way.
+ * Here it is SES refusing the message the pool handed it, which for an account
+ * still in the SES sandbox means an unverified recipient.
+ */
+export class SimCognitoCodeDeliveryFailureException extends SimCognitoError {
+  public override readonly name = "CodeDeliveryFailureException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

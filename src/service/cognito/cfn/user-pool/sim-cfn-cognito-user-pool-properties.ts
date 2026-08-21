@@ -58,6 +58,12 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * declaring email-only recovery deploys, and CreateUserPool refuses a setting
  * outside the shape Cognito states for it.
  *
+ * `EmailConfiguration` is here because it decides which service the pool's
+ * email goes out through. A pool naming `DEVELOPER` sends through the
+ * account's simulated SES, so a stack that moved its pool onto SES deploys a
+ * pool that tests as one, rather than one indistinguishable from the pool it
+ * replaced.
+ *
  * The four from `EmailVerificationMessage` down are here because a CDK
  * `UserPool` construct emits them when it was asked for nothing in
  * particular. They are the wording of the messages the pool records, and
@@ -79,6 +85,7 @@ const simulatedProperties = [
   "UsernameAttributes",
   "Schema",
   "AccountRecoverySetting",
+  "EmailConfiguration",
   "EmailVerificationMessage",
   "EmailVerificationSubject",
   "SmsVerificationMessage",
@@ -160,6 +167,10 @@ export class SimCfnCognitoUserPoolProperties {
         resource: this.resource,
         propertyParser: this.propertyParser,
       }).parse(this.properties["Schema"]),
+      EmailConfiguration: this.record(
+        this.properties["EmailConfiguration"],
+        "EmailConfiguration",
+      ),
       VerificationMessageTemplate: this.record(
         this.properties["VerificationMessageTemplate"],
         "VerificationMessageTemplate",

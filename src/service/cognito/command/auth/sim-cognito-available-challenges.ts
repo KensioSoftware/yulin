@@ -17,8 +17,10 @@ export const simCognitoWebAuthnChallenge = "WEB_AUTHN";
  * The two first factors this simulation presents.
  *
  * A code sent by email or by text is a `USER_AUTH` challenge too, and neither
- * is issued here. Nothing delivers a message, and the pool's own
- * `EmailConfiguration` and `SmsConfiguration` are refused for the same reason.
+ * is issued here. Signing in by one-time code is its own flow, with its own
+ * challenge, its own code and its own expiry, and none of it is built. A pool
+ * sending its messages through SES changes nothing about that: what is missing
+ * is the challenge rather than somewhere for the message to go.
  */
 const presentedChallenges: readonly string[] = [
   simCognitoPasswordChallenge,
@@ -88,10 +90,9 @@ export function requireSimCognitoAvailableChallenge(
 
   if (!presentedChallenges.includes(challengeName)) {
     throw new SimCognitoInvalidParameterException(
-      `${field} '${challengeName}' is not simulated: a code sent by email or ` +
-        `by text needs the pool's EmailConfiguration or SmsConfiguration, ` +
-        `and this simulation delivers no message. Sign in with ` +
-        `${presentedChallenges.join(" or ")} instead.`,
+      `${field} '${challengeName}' is not simulated: signing in with a code ` +
+        `sent by email or by text is a challenge flow this simulation does ` +
+        `not run. Sign in with ${presentedChallenges.join(" or ")} instead.`,
     );
   }
 }

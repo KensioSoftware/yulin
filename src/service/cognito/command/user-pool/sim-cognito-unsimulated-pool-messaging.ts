@@ -10,15 +10,14 @@ const linkVerification = "confirming a sign-up by following a link";
 /**
  * Refuses the message delivery inputs this simulation does not model.
  *
- * Nothing here delivers an email or a text message. A pool records the message
- * it would have sent instead, which is Cognito's own delivery rather than
- * anything a delivery configuration points at: real Cognito with the default
- * `EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service.
+ * `SmsConfiguration` names the IAM role Cognito assumes to publish a text
+ * message through SNS. Nothing here delivers one: the pool records what it
+ * would have sent, which is where a test reads it, so a role recorded here
+ * would name a permission nothing ever exercises.
  *
- * So a pool configured to send through SES or through an SNS SMS role is
- * refused. Accepting the configuration would say the messages went that way,
- * and they would not: they would be recorded here exactly as a pool with no
- * configuration at all records them.
+ * `EmailConfiguration` is simulated and no longer refused. A pool that named
+ * `DEVELOPER` sends through the account's SES, where the message is recorded
+ * a second time and the SES sandbox decides whether it goes at all.
  *
  * The wording of the messages is a different matter and is simulated. It is
  * read by SimCognitoVerificationMessages, which is what a recorded message
@@ -39,11 +38,6 @@ export class SimCognitoUnsimulatedUserPoolMessaging {
    * honour.
    */
   refuseIn(input: SimCognitoUserPoolCommandInput): void {
-    this.unsimulated.refuse(
-      "EmailConfiguration",
-      input.EmailConfiguration,
-      "email delivery",
-    );
     this.unsimulated.refuse(
       "SmsConfiguration",
       input.SmsConfiguration,
