@@ -1,0 +1,49 @@
+import type { SimCognitoMessageMedium } from "../../cognito/user-pool/message/sim-cognito-sent-message.js";
+import type { SimCognitoMessageOccasion } from "../../cognito/user-pool/message/sim-cognito-message-occasion.js";
+
+/**
+ * One message a simulated user pool has just recorded.
+ *
+ * The recipient and the body are what a local dev loop is after: the
+ * confirmation code is in the body, and the address or number it went to says
+ * which sign-up it belongs to.
+ */
+export interface SimCognitoLoggedMessage {
+  readonly kind: "cognito";
+  readonly userPoolId: string;
+  readonly medium: SimCognitoMessageMedium;
+  readonly recipient: string;
+  readonly occasion: SimCognitoMessageOccasion;
+  readonly subject: string | undefined;
+  readonly body: string;
+}
+
+/**
+ * One SMS a simulated SNS has just recorded.
+ *
+ * `suppressed` is the opt-out list having stopped this one. The publish
+ * succeeded and nothing arrived, and a reader watching for a code needs to be
+ * told that rather than left waiting.
+ */
+export interface SimSnsLoggedSms {
+  readonly kind: "sns";
+  readonly phoneNumber: string;
+  readonly message: string;
+  readonly suppressed: boolean;
+}
+
+/**
+ * A message a simulated service would have sent, in the shape the serving
+ * layer prints it.
+ *
+ * Each kind carries its own fields because the two are different things. A
+ * pool message has a subject and an occasion, and an SMS has neither and can
+ * be suppressed. Flattening both into one shape would mean printing fields
+ * that are always absent for half the messages.
+ */
+export type SimAwsLoggedMessage = SimCognitoLoggedMessage | SimSnsLoggedSms;
+
+/**
+ * Which kinds of message the serving layer prints.
+ */
+export type SimAwsLoggedMessageKind = SimAwsLoggedMessage["kind"];

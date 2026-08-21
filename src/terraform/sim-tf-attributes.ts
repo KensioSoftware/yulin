@@ -8,15 +8,25 @@ import { isRecord } from "../util/type-guard/record.js";
 import type { SimCfnTemplateValue } from "../service/cloudformation/template/value/sim-cfn-template-value.js";
 import type { TerraformResource } from "./sim-tf-resource.type.js";
 import type { TerraformReferenceResolver } from "./sim-tf-reference.js";
+import type { TerraformPlanOverrides } from "./sim-tf-overrides.js";
 import { longestFirst } from "./sim-tf-reference-address.js";
 import type { TerraformExpression } from "./sim-tf-plan.type.js";
 
 /**
+ * What a mapping resolves against, which is the same for every resource of one
+ * plan. A settled plan carries these two, so it is one of these.
+ */
+export interface TerraformBuildContext {
+  readonly resolver: TerraformReferenceResolver;
+  /** What the deployment supplied for the values the plan could not carry. */
+  readonly overrides: TerraformPlanOverrides;
+}
+
+/**
  * What a mapping function is given to build one CloudFormation Resource.
  */
-export interface TerraformMappingContext {
+export interface TerraformMappingContext extends TerraformBuildContext {
   readonly resource: TerraformResource;
-  readonly resolver: TerraformReferenceResolver;
 }
 
 /**

@@ -1,20 +1,10 @@
-/*
- * Reading a plan means reading records whose keys come from the document
- * rather than from this code, so the object-injection rule fires on every
- * lookup. The records are parsed JSON with no prototype of their own.
- */
-// oxlint-disable security/detect-object-injection
-import { isRecord } from "../../util/type-guard/record.js";
-import type { SimCfnTemplateValue } from "../../service/cloudformation/template/value/sim-cfn-template-value.js";
 import {
-  block,
-  field,
   properties,
   renamed,
   tags,
-  templateValue,
   type TerraformMappingContext,
 } from "../sim-tf-attributes.js";
+import { lambdaEnvironment } from "./sim-tf-map-lambda-environment.js";
 import type { TerraformMappedResource } from "../sim-tf-mapping.type.js";
 
 /**
@@ -28,7 +18,7 @@ import type { TerraformMappedResource } from "../sim-tf-mapping.type.js";
 export function lambdaFunction(
   context: TerraformMappingContext,
 ): TerraformMappedResource {
-  const variables = environmentVariables(context);
+  const environment = lambdaEnvironment(context);
 
   return {
     Type: "AWS::Lambda::Function",
@@ -42,11 +32,16 @@ export function lambdaFunction(
         MemorySize: "memory_size",
       }),
       ...properties({
-        Environment: variables && { Variables: variables },
+        Environment: environment.property,
         Tags: tags(context),
       }),
     },
-    lost: lost(context, variables),
+    /*
+     * The code is always lost, since a plan points at a zip, an S3 object or
+     * an image. The environment joins it only where the plan collapsed the
+     * variables map and no override supplied one.
+     */
+    lost: ["code", ...environment.lost],
     /*
      * A function whose execution role the plan does not create, such as one
      * read out of a data source, has no role for the template to name. Sim
@@ -55,43 +50,6 @@ export function lambdaFunction(
      */
     requires: ["Role"],
   };
-}
-
-function environmentVariables(
-  context: TerraformMappingContext,
-): Record<string, never> | undefined {
-  const environment = block(context, "environment");
-  const variables = environment && field(environment, "variables");
-
-  if (!isRecord(variables)) {
-    return undefined;
-  }
-
-  const value: SimCfnTemplateValue | undefined = templateValue(variables);
-
-  return value as Record<string, never> | undefined;
-}
-
-/**
- * What the mapping could not carry.
- *
- * The code is always one. The environment variables are another whenever any
- * value in the map names a resource of the same plan, because Terraform marks
- * the whole map unknown and the variable names go with it.
- */
-function lost(
-  context: TerraformMappingContext,
-  variables: Record<string, never> | undefined,
-): readonly string[] {
-  const declared = field(context.resource.unknown, "environment");
-  const entries: readonly unknown[] = Array.isArray(declared) ? declared : [];
-  const first = entries[0];
-  const collapsed =
-    isRecord(first) &&
-    field(first, "variables") === true &&
-    variables === undefined;
-
-  return collapsed ? ["code", "environment.variables"] : ["code"];
 }
 
 /** One permission to invoke a function. */

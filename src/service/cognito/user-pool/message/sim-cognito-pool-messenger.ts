@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimAwsMessageLog } from "../../../aws/message/sim-aws-message-log.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { SimCognitoTriggerOccasion } from "../trigger/sim-cognito-trigger-occasion.js";
@@ -20,6 +21,7 @@ interface SimCognitoPoolMessengerProperties {
    */
   readonly email: SimCognitoPoolEmailDelivery;
   readonly clock: SimClock;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -62,11 +64,13 @@ export class SimCognitoPoolMessenger {
   private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly email: SimCognitoPoolEmailDelivery;
   private readonly clock: SimClock;
+  private readonly messageLog: SimAwsMessageLog;
 
   constructor(properties: SimCognitoPoolMessengerProperties) {
     this.triggers = properties.triggers;
     this.email = properties.email;
     this.clock = properties.clock;
+    this.messageLog = properties.messageLog;
   }
 
   /**
@@ -116,16 +120,27 @@ export class SimCognitoPoolMessenger {
 
     this.email.send({ pool: request.pool, delivery, wording });
 
-    request.pool.messages.record(
-      new SimCognitoSentMessage({
-        username: request.user.username,
-        recipient: delivery.recipient,
-        medium,
-        wording,
-        occasion: request.occasion,
-        sentDate: this.clock.now(),
-      }),
-    );
+    const message = new SimCognitoSentMessage({
+      username: request.user.username,
+      recipient: delivery.recipient,
+      medium,
+      wording,
+      occasion: request.occasion,
+      sentDate: this.clock.now(),
+    });
+
+    request.pool.messages.record(message);
+    // Announced after it is recorded, so a listener that goes and reads the
+    // pool finds the message it was just told about.
+    this.messageLog.record({
+      kind: "cognito",
+      userPoolId: request.pool.id,
+      medium,
+      recipient: message.recipient,
+      occasion: message.occasion,
+      subject: message.subject,
+      body: message.body,
+    });
 
     return delivery;
   }

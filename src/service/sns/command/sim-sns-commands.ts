@@ -1,5 +1,6 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimSnsDeliveryRequests } from "../delivery/sim-sns-delivery-request.js";
 import { SimSnsFanOut } from "../delivery/sim-sns-fan-out.js";
@@ -34,6 +35,7 @@ interface SimSnsCommandsProperties {
   readonly background: BackgroundScheduler;
   readonly deliveryEndpoints: SimSnsOutwardDeliveryEndpoints;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -57,7 +59,7 @@ export class SimSnsCommands {
   public readonly signer: SimSnsMessageSigner;
 
   /** Every SMS this scope would have sent, delivered or suppressed. */
-  public readonly sentSms = new SimSnsSentSmsStore();
+  public readonly sentSms: SimSnsSentSmsStore;
 
   /** The numbers this scope will send no SMS to. */
   public readonly optOutList = new SimSnsOptOutList();
@@ -65,6 +67,10 @@ export class SimSnsCommands {
   constructor(properties: SimSnsCommandsProperties) {
     const { topics, subscriptions, accountRegionScope, background } =
       properties;
+
+    this.sentSms = new SimSnsSentSmsStore({
+      messageLog: properties.messageLog,
+    });
     const access = new SimSnsTopicAccess({
       topics,
       authorizer: new SimSnsAuthorizer({ iam: properties.iam }),

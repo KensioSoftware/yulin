@@ -5,6 +5,7 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -36,6 +37,13 @@ interface SimSnsProperties {
    * needs nothing here, because simulated SNS records those itself.
    */
   readonly deliveryEndpoints?: SimSnsOutwardDeliveryEndpoints;
+
+  /**
+   * Where this scope announces the text messages it would have sent, for a
+   * serving layer to print. A SimSns built on its own announces to a log
+   * nobody listens to.
+   */
+  readonly messageLog?: SimAwsMessageLog;
 }
 
 /**
@@ -59,6 +67,7 @@ export class SimSns extends SimSnsSms {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       deliveryEndpoints = simSnsNoDeliveryEndpoints(),
+      messageLog = new SimAwsMessageLog(),
     } = properties;
     const topics = new SimSnsTopicStore();
     const subscriptions = new SimSnsSubscriptionStore();
@@ -72,6 +81,7 @@ export class SimSns extends SimSnsSms {
         background,
         deliveryEndpoints,
         accountRegionScope,
+        messageLog,
       }),
     });
 

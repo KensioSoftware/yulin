@@ -5,6 +5,7 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -83,6 +84,13 @@ interface SimCognitoIdentityProviderProperties {
    * always did.
    */
   readonly webAcls?: SimWafProtection;
+
+  /**
+   * Where this scope announces the messages its pools would have sent, for a
+   * serving layer to print. A standalone simulated Cognito announces to a log
+   * nobody listens to.
+   */
+  readonly messageLog?: SimAwsMessageLog;
 }
 
 /**
@@ -120,6 +128,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
       triggerFunctions = new SimCognitoNoTriggerFunctions(),
       emailSenders = new SimCognitoNoEmailSenders(),
       webAcls = new SimWafNoProtection(),
+      messageLog = new SimAwsMessageLog(),
     } = properties;
     const pools = new SimCognitoUserPoolStore({
       registry: userPoolRegistry,
@@ -136,6 +145,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
         triggerFunctions,
         emailSenders,
         webAcls,
+        messageLog,
       }),
       background,
     });

@@ -95,6 +95,82 @@ naming a function the same plan creates carries the function's name as a plain s
 right and the edge CloudFormation orders from has gone with it. Every reference a resource declares
 becomes an ordering edge, whether or not the value resolved.
 
+## Supplying environment variables and role policies
+
+Terraform resolves nothing inside a value it could not build. A Lambda `environment.variables` map
+holding one reference to a queue of the same plan arrives unknown in its entirety, and the variable
+names go with it. An `aws_iam_role_policy` written with `jsonencode` around an ARN of the same plan
+arrives without its statements.
+
+Those two cost more than their count suggests (four attributes out of 154 on a hand-written
+application configuration). A handler reads its configuration out of environment variables, and
+simulated IAM evaluates authorization.
+
+`overrides` supplies them, matched on the name the plan carries, the way a binding is matched on a
+function name. An environment is matched on the function's name and an inline policy on the role's.
+
+```typescript terraform-plan-overrides
+/**
+ * Supplying the values a Terraform plan could not carry.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { TerraformAdapter } from "@kensio/yulin/terraform";
+
+const simAws = new SimAws();
+
+const { report } = await new TerraformAdapter(simAws).deployPlan({
+  planPath: "terraform/orders.tfplan.json",
+  bindings: [
+    {
+      functionName: "orders-processor",
+      handler: (): string => process.env["QUEUE_URL"] ?? "",
+    },
+  ],
+  overrides: [
+    {
+      functionName: "orders-processor",
+      environment: {
+        TABLE_NAME: "orders-orders",
+        QUEUE_URL:
+          "https://sqs.eu-west-1.amazonaws.com/123456789012/orders-processing",
+      },
+    },
+    {
+      roleName: "orders-processor",
+      policy: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: [
+              "sqs:ReceiveMessage",
+              "sqs:DeleteMessage",
+              "sqs:GetQueueAttributes",
+            ],
+            Resource: "*",
+          },
+        ],
+      },
+    },
+  ],
+});
+
+// The attributes the plan lost that no override covered.
+console.log(report.lost);
+```
+
+An override fills a gap. Where Terraform resolved the value, the plan wins, and environment
+variables are merged one variable at a time. A configuration that stops collapsing a value stops
+needing the override written for it.
+
+A role whose policy no override supplies is created allowing everything, and `policy` is named on
+the report's `lost`. Simulated IAM evaluates authorization, and a role holding no policy would deny
+what the configuration allowed and fail the resources using it (an event source mapping is refused
+outright when its execution role cannot poll the queue). Supplying the policy takes that default
+off. The document is evaluated as it stands, and one omitting `sqs:ReceiveMessage` fails the mapping
+the way AWS fails it.
+
 ## What the report says
 
 The set of Terraform resource types the adapter maps is deliberately small. A type with no mapping,
@@ -126,15 +202,17 @@ console.log(report.skipped);
 // The aws_s3_bucket_versioning and friends that became bucket properties.
 console.log(report.folded);
 
-// Attributes a mapping could not carry, such as a Lambda's environment
-// variables, which Terraform collapses whole when one of them is unknown.
+// Attributes a mapping could not carry and no override supplied, such as a
+// Lambda's environment variables, which Terraform collapses whole when one of
+// them is unknown.
 console.log(report.lost);
 ```
 
 `mapped`, `folded` and `skipped` add up to the plan's managed resource count. `lost` names the
-attributes that did not survive the plan, per resource. A Terraform value that names a resource of
-the same plan and sits inside something Terraform builds in one go, such as a `jsonencode` document
-or a `for_each` map, is unknown in its entirety and its contents go with it.
+attributes that did not survive the plan and that no override covered, per resource. A Terraform
+value that names a resource of the same plan and sits inside something Terraform builds in one go,
+such as a `jsonencode` document or a `for_each` map, is unknown in its entirety and its contents go
+with it.
 
 ## The scope of what it reads
 

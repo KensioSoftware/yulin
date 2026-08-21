@@ -6,6 +6,7 @@ import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-fac
 import { SimCognitoRegistrations } from "../user-pool/sim-cognito-registrations.js";
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
+import type { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
 import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoEmailSenders } from "../user-pool/message/sim-cognito-email-senders.js";
 import { SimCognitoPoolEmailDelivery } from "../user-pool/message/sim-cognito-pool-email-delivery.js";
@@ -49,6 +50,7 @@ interface SimCognitoCommandsProperties {
   readonly triggerFunctions: SimCognitoTriggerFunctions;
   readonly emailSenders: SimCognitoEmailSenders;
   readonly webAcls: SimWafProtection;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -120,6 +122,7 @@ export class SimCognitoCommands {
       triggers,
       email: new SimCognitoPoolEmailDelivery({ senders: emailSenders }),
       clock,
+      messageLog: properties.messageLog,
     });
     // One token issuer serves the API sign-ins and the hosted endpoints, so a
     // token is the same thing however the user reached it.

@@ -22,6 +22,7 @@ console.log(report.skipped);
 // The aws_s3_bucket_versioning and friends that became bucket properties.
 console.log(report.folded);
 
-// Attributes a mapping could not carry, such as a Lambda's environment
-// variables, which Terraform collapses whole when one of them is unknown.
+// Attributes a mapping could not carry and no override supplied, such as a
+// Lambda's environment variables, which Terraform collapses whole when one of
+// them is unknown.
 console.log(report.lost);

@@ -15,12 +15,17 @@ import {
   settledTerraformPlan,
   type TerraformSettledPlan,
 } from "./sim-tf-settle.js";
+import { TerraformPlanOverrides } from "./sim-tf-overrides.js";
 
 /** What one plan fixture settles to. */
 function settled(fixture: Partial<TerraformPlanFixture>): TerraformSettledPlan {
   const plan = terraformPlanFactory.make(fixture);
 
-  return settledTerraformPlan(plan, terraformPlanResources(plan));
+  return settledTerraformPlan(
+    plan,
+    terraformPlanResources(plan),
+    new TerraformPlanOverrides(),
+  );
 }
 
 describe("settling which resources of a plan become Resources", () => {

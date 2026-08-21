@@ -10,6 +10,7 @@ import {
   terraformResourceMappings,
 } from "./sim-tf-registry.js";
 import type { TerraformDeclaration } from "./sim-tf-mapping.type.js";
+import type { TerraformPlanOverrides } from "./sim-tf-overrides.js";
 import { terraformRefusal } from "./sim-tf-refusal.js";
 import type { TerraformSkipReason } from "./sim-tf-report.type.js";
 
@@ -22,6 +23,8 @@ export interface TerraformSettledPlan {
   readonly declared: readonly TerraformDeclaration[];
   /** A resolver that knows those resources and no others. */
   readonly resolver: TerraformReferenceResolver;
+  /** What the deployment supplied for the values the plan could not carry. */
+  readonly overrides: TerraformPlanOverrides;
   /** Why a resource is not one of them, by address. */
   readonly refused: ReadonlyMap<string, TerraformSkipReason>;
 }
@@ -43,6 +46,7 @@ export interface TerraformSettledPlan {
 export function settledTerraformPlan(
   plan: TerraformPlan,
   resources: readonly TerraformResource[],
+  overrides: TerraformPlanOverrides,
 ): TerraformSettledPlan {
   const moduleOutputs = terraformModuleOutputs(plan);
   const refused = new Map<string, TerraformSkipReason>();
@@ -57,14 +61,18 @@ export function settledTerraformPlan(
     );
     const dropped = new Map(
       candidates.flatMap((declaration) => {
-        const why = terraformRefusal(declaration, resolver, reason);
+        const why = terraformRefusal(
+          declaration,
+          { resolver, overrides },
+          reason,
+        );
 
         return why === undefined ? [] : [[declaration.resource.address, why]];
       }),
     );
 
     if (dropped.size === 0) {
-      return { declared: candidates, resolver, refused };
+      return { declared: candidates, resolver, overrides, refused };
     }
 
     for (const [address, why] of dropped) {

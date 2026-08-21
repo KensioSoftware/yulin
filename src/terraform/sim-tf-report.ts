@@ -83,8 +83,9 @@ function refusedAttributes(
   return resources
     .filter((resource) => settled.refused.has(resource.address))
     .flatMap((resource) =>
-      terraformMissingProperties(resource, settled.resolver).map(
-        (attribute) => ({ address: resource.address, attribute }),
-      ),
+      terraformMissingProperties(resource, settled).map((attribute) => ({
+        address: resource.address,
+        attribute,
+      })),
     );
 }

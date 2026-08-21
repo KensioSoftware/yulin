@@ -93,14 +93,30 @@ survives and becomes a `Ref` or an `Fn::GetAtt`.
 
 What goes missing is everything the unknown value was inside. A Lambda `environment.variables` map
 holding one reference to a queue URL arrives as `"variables": true`, and the variable names go with
-it. `TABLE_NAME`, `QUEUE_URL` and `TOPIC_ARN` appear nowhere in the document.
+it. `TABLE_NAME`, `QUEUE_URL` and `TOPIC_ARN` appear nowhere in the document. The map goes whole
+even where some of its values are literals (measured on Terraform 1.15.8 against AWS provider
+5.100.0), so there is no per-variable form of the unknown mark to read.
 
 The same happens to every `jsonencode` result. An `aws_iam_role_policy` built around an ARN of the
-same plan is unknown in its entirety, and its actions and resources are gone with it. Simulated IAM
-evaluates authorization. A role created without the policy would deny what the configuration allowed
-and fail the resources using it. The role is created holding a policy that allows everything, and
-the attribute is recorded as lost. That is what keeps a plan carrying a Lambda event source mapping
-deployable. Supplying the real values is [#865](https://github.com/KensioSoftware/yulin/issues/865).
+same plan is unknown in its entirety, and its actions and resources are gone with it.
+
+A deployment supplies both through `overrides`, matched on the name the plan carries the way a
+binding is matched on a function name. `TerraformPlanOverrides` indexes what was supplied, and a
+mapping asks it for the resource's own name. A name the plan itself could not resolve gets nothing
+back. The plan is read first. A supplied value fills a gap and never replaces what Terraform
+resolved, and environment variables merge one variable at a time (a map the plan resolved in part
+keeps its own values and takes the supplied ones for the rest). What no override covered stays on
+the report's `lost`.
+
+A role whose policy no override supplies is created holding a policy that allows everything, and
+`policy` is recorded as lost. Simulated IAM evaluates authorization, and a role created without the
+policy would deny what the configuration allowed and fail the resources using it. Allowing
+everything is what keeps a plan carrying a Lambda event source mapping deployable with no override
+at all. It is the same answer sim CloudFormation gives a Resource type it cannot create. Carry on,
+and say what was stepped over.
+
+A supplied policy is evaluated as it stands. A document omitting `sqs:ReceiveMessage` fails the
+event source mapping the way real Lambda fails it.
 
 An SQS `redrive_policy` loses its `maxReceiveCount` the same way. That one is dropped. A policy
 carrying a made-up limit would give the queue different retry behaviour from the one the plan

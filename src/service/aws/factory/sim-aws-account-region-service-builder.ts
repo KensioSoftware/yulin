@@ -33,6 +33,7 @@ import { simAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-deliv
 import { SimSts } from "../../sts/sim-sts.js";
 import { SimWafV2 } from "../../wafv2/index.js";
 import { SimAwsWafProtectedResources } from "../../wafv2/association/sim-aws-waf-protected-resources.js";
+import type { SimAwsMessageLog } from "../message/sim-aws-message-log.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
@@ -44,6 +45,7 @@ interface SimAwsAccountRegionServiceBuilderProperties {
   readonly iamRegistry: SimIamRegistry;
   readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
   readonly accountServices: SimAwsAccountServiceCache;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -75,6 +77,7 @@ export class SimAwsAccountRegionServiceBuilder {
   private readonly iamRegistry: SimIamRegistry;
   private readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
   private readonly accountServices: SimAwsAccountServiceCache;
+  private readonly messageLog: SimAwsMessageLog;
 
   constructor(properties: SimAwsAccountRegionServiceBuilderProperties) {
     this.simAws = properties.simAws;
@@ -83,6 +86,7 @@ export class SimAwsAccountRegionServiceBuilder {
     this.iamRegistry = properties.iamRegistry;
     this.lambdaUrlRegistry = properties.lambdaUrlRegistry;
     this.accountServices = properties.accountServices;
+    this.messageLog = properties.messageLog;
   }
 
   /** Create simulated ACM for an Account Region scope. */
@@ -127,6 +131,7 @@ export class SimAwsAccountRegionServiceBuilder {
       // A pool's SourceArn names its own Region, which need not be this one,
       // so the SES it sends through comes from the whole simulation.
       emailSenders: simAwsCognitoEmailSenders(this.simAws),
+      messageLog: this.messageLog,
       // A web ACL protecting a pool is in the same Account and Region as the
       // pool, as it is on AWS, so this scope's own WAFv2 is the one to ask.
       webAcls: scope.wafV2().protection(),
@@ -222,7 +227,11 @@ export class SimAwsAccountRegionServiceBuilder {
   createSns(scope: SimAwsAccountRegionContainer): SimSns {
     const endpoints = simAwsSnsDeliveryEndpoints({ simAws: this.simAws });
 
-    return new SimSns({ ...this.scoped(scope), deliveryEndpoints: endpoints });
+    return new SimSns({
+      ...this.scoped(scope),
+      deliveryEndpoints: endpoints,
+      messageLog: this.messageLog,
+    });
   }
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */
