@@ -674,6 +674,8 @@ resource, here or on real AWS.
   the options to a browser and the browser hands back what its authenticator made of them.
 - A passkey is registered and never presented. `USER_AUTH` is what presents one, and
   `SimCognitoAuthFlows` refuses that flow by name.
+- A pool that configured no `RelyingPartyId` registers passkeys against its own hosted domain, which
+  is what real Cognito falls back to. A pool with neither refuses the registration.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
   verifies nothing on real Cognito. `ConfirmSignUp` sets `email_verified` and
   `phone_number_verified` where the user has the attribute to verify, and a `PreSignUp` trigger sets

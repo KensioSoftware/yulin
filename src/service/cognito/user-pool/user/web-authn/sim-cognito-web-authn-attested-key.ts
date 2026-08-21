@@ -1,12 +1,11 @@
 import type { KeyObject } from "node:crypto";
 
 import { SimCognitoWebAuthnCredentialNotSupportedException } from "../../../error/sim-cognito-web-authn.error.js";
-import type { SimCognitoWebAuthnCeremony } from "./sim-cognito-web-authn-ceremony.js";
+import { requireSimCognitoWebAuthnCeremony } from "./sim-cognito-web-authn-ceremony.js";
 import { SimCognitoWebAuthnCredential } from "./sim-cognito-web-authn-credential.js";
-import {
-  simCognitoWebAuthnAlgorithm,
-  simCognitoWebAuthnKeyFrom,
-} from "./sim-cognito-web-authn-signing.js";
+import type { SimCognitoWebAuthnCreationOptions } from "./sim-cognito-web-authn-document.js";
+import { simCognitoWebAuthnKeyFrom } from "./sim-cognito-web-authn-public-key.js";
+import { simCognitoWebAuthnAlgorithm } from "./sim-cognito-web-authn-signing.js";
 
 /**
  * How a credential says it is attached when it says nothing, which is what a
@@ -56,16 +55,27 @@ function stringsOf(value: unknown): readonly string[] {
 /**
  * The passkey a pool keeps out of the credential a registration carried.
  *
- * A browser reports the public key as `response.publicKey`, base64url of its
- * SubjectPublicKeyInfo, and names the algorithm beside it. That is what is
- * read here rather than the attestation object, which a real relying party
- * parses out of CBOR and this simulation does not.
+ * The credential is read against the options the registration was issued with,
+ * which say which challenge it has to answer and which relying party it has to
+ * have been signed for. A browser reports the public key as
+ * `response.publicKey`, base64url of its SubjectPublicKeyInfo, and names the
+ * algorithm beside it. That is what is read here rather than the attestation
+ * object, which a real relying party parses out of CBOR and this simulation
+ * does not.
  */
-export function simCognitoWebAuthnAttested(
-  ceremony: SimCognitoWebAuthnCeremony,
-  relyingPartyId: string,
+export function simCognitoWebAuthnRegistered(
+  pending: SimCognitoWebAuthnCreationOptions,
+  credential: unknown,
   createdAt: Date,
 ): SimCognitoWebAuthnCredential {
+  const relyingPartyId = pending.rp.id;
+  const ceremony = requireSimCognitoWebAuthnCeremony({
+    credential,
+    field: "Credential",
+    type: "webauthn.create",
+    challenge: pending.challenge,
+    relyingPartyId,
+  });
   const attachment = ceremony.document["authenticatorAttachment"];
 
   return new SimCognitoWebAuthnCredential({

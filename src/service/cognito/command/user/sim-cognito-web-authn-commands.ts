@@ -21,7 +21,9 @@ interface SimCognitoWebAuthnCommandsProperties {
 
 /**
  * How many credentials a page holds when the request does not say, which is
- * also the most Cognito will return.
+ * also the most Cognito will return. Cognito documents this listing as taking
+ * a `MaxResults` of between zero and twenty, and a zero is read as the whole
+ * page.
  */
 const defaultMaxResults = 20;
 
@@ -34,20 +36,22 @@ const defaultUserVerification = "preferred";
 /**
  * The relying party a pool registers passkeys against.
  *
- * A passkey belongs to a domain, so a pool that names none has nothing to
- * register one against. Real Cognito falls back to the pool's own hosted
- * domain, and refuses with `WebAuthnConfigurationMissingException` where there
- * is neither.
+ * A passkey belongs to a domain. A pool that configured a `RelyingPartyId`
+ * uses that, and one that did not falls back to its own hosted domain, which
+ * is what real Cognito falls back to. A pool with neither has nothing to
+ * register a passkey against, and real Cognito refuses that with
+ * `WebAuthnConfigurationMissingException`.
  */
 function requireRelyingParty(pool: SimCognitoUserPool): string {
-  const relyingPartyId = pool.settings.mfa.webAuthn?.relyingPartyId;
+  const relyingPartyId =
+    pool.settings.mfa.webAuthn?.relyingPartyId ?? pool.auth.domain?.hostname;
 
   if (relyingPartyId === undefined) {
     throw new SimCognitoWebAuthnConfigurationMissingException(
       `The user pool ${pool.id} registers passkeys against no relying party: ` +
-        `set one with SetUserPoolMfaConfig WebAuthnConfiguration ` +
-        `RelyingPartyId, which an AWS::Cognito::UserPool Resource deploys as ` +
-        `WebAuthnRelyingPartyID.`,
+        `give it a hosted domain with CreateUserPoolDomain, or set one with ` +
+        `SetUserPoolMfaConfig WebAuthnConfiguration RelyingPartyId, which an ` +
+        `AWS::Cognito::UserPool Resource deploys as WebAuthnRelyingPartyID.`,
     );
   }
 
@@ -139,6 +143,7 @@ export class SimCognitoWebAuthnCommands {
     );
     const page = new SimCognitoPage(user.webAuthn.credentials, {
       maxResults: input.MaxResults ?? defaultMaxResults,
+      leastResults: 0,
       mostResults: defaultMaxResults,
       nextToken: input.NextToken,
     });

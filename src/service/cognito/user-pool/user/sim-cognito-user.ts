@@ -84,7 +84,7 @@ export class SimCognitoUser {
       attributes: this.userAttributes.values,
       changed,
     });
-    this.userWebAuthn = new SimCognitoUserWebAuthn();
+    this.userWebAuthn = new SimCognitoUserWebAuthn({ changed });
     this.reset = new SimCognitoUserPasswordReset({
       confirmation: this.confirmation,
       status: (): SimCognitoUserStatus => this.userStatus,

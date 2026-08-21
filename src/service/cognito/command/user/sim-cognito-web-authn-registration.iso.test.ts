@@ -1,5 +1,6 @@
 import {
   CompleteWebAuthnRegistrationCommand,
+  CreateUserPoolDomainCommand,
   DeleteWebAuthnCredentialCommand,
   ListWebAuthnCredentialsCommand,
   StartWebAuthnRegistrationCommand,
@@ -9,6 +10,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertTrue,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -20,7 +22,10 @@ import {
   simCognitoRelyingPartyId,
   simCognitoWithPasskeyPool,
 } from "../../../../../test/cognito/passkey-fixture.js";
-import { simCognitoUsername } from "../../../../../test/cognito/signed-in-fixture.js";
+import {
+  simCognitoSignedIn,
+  simCognitoUsername,
+} from "../../../../../test/cognito/signed-in-fixture.js";
 
 describe("sim Cognito passkey registration", () => {
   it("answers a signed-in user with the options a passkey is made from", async () => {
@@ -175,5 +180,67 @@ describe("sim Cognito passkey registration", () => {
       listed.Credentials?.[0]?.AuthenticatorTransports ?? [],
       0,
     );
+  });
+
+  it("registers against the pool's hosted domain where it names no relying party", async () => {
+    // Given a signed-in user of a pool with a hosted domain and no
+    // WebAuthnConfiguration of its own.
+    const setUp = await simCognitoSignedIn();
+
+    await setUp.cognito.createUserPoolDomain(
+      new CreateUserPoolDomainCommand({
+        UserPoolId: setUp.userPoolId,
+        Domain: "myapp-login",
+      }),
+    );
+
+    // When it registers a passkey.
+    await simCognitoRegisterPasskey(setUp);
+
+    const listed = await setUp.cognito.listWebAuthnCredentials(
+      new ListWebAuthnCredentialsCommand({ AccessToken: setUp.accessToken }),
+    );
+
+    // Then the passkey is registered against the domain, which is what real
+    // Cognito falls back to.
+    assertIdentical(
+      listed.Credentials?.[0]?.RelyingPartyId,
+      "myapp-login.auth.eu-west-2.amazoncognito.com",
+    );
+  });
+
+  it("takes a page size of zero as the whole page", async () => {
+    // Given a user with one registered passkey.
+    const setUp = await simCognitoWithPasskeyPool();
+    const registered = await simCognitoRegisterPasskey(setUp);
+
+    // When they are listed with the zero Cognito documents as a valid page
+    // size.
+    const listed = await setUp.cognito.listWebAuthnCredentials(
+      new ListWebAuthnCredentialsCommand({
+        AccessToken: setUp.accessToken,
+        MaxResults: 0,
+      }),
+    );
+
+    // Then the passkey comes back rather than the request being refused.
+    assertIdentical(listed.Credentials?.[0]?.CredentialId, registered.id);
+  });
+
+  it("moves the user's last modified date on when its passkeys change", async () => {
+    // Given a signed-in user of a pool that registers passkeys.
+    const setUp = await simCognitoWithPasskeyPool();
+    const user = setUp.cognito.userPool(setUp.userPoolId).users[0];
+
+    assertNonNullable(user);
+
+    const before = user.lastModifiedDate;
+
+    // When a passkey is registered a minute later.
+    await setUp.simAws.clock().advanceBy({ minutes: 1 });
+    await simCognitoRegisterPasskey(setUp);
+
+    // Then the user has changed, as it does for every other change to it.
+    assertTrue(user.lastModifiedDate > before);
   });
 });

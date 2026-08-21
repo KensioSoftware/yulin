@@ -11,13 +11,18 @@
  * published build.
  */
 
+import { createHash } from "node:crypto";
+
 import {
   CompleteWebAuthnRegistrationCommand,
   SetUserPoolMfaConfigCommand,
   StartWebAuthnRegistrationCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
-import type { SimCognitoWebAuthnCredentialDocument } from "../../src/service/cognito/index.js";
+import type {
+  SimCognitoWebAuthnCredentialDocument,
+  SimCognitoWebAuthnDocumentValue,
+} from "../../src/service/cognito/index.js";
 import type { SimCognitoSignedInSetUp } from "./signed-in-fixture.js";
 import { simCognitoSignedIn, simCognitoUsername } from "./signed-in-fixture.js";
 
@@ -79,4 +84,52 @@ export async function simCognitoRegisterPasskey(
   );
 
   return credential;
+}
+
+/**
+ * A JSON value as a credential carries one, which is base64url of its bytes.
+ */
+export function simCognitoBase64urlJson(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+/**
+ * The client data a credential was signed over, read back as the JSON it is.
+ */
+export function simCognitoClientDataOf(
+  credential: SimCognitoWebAuthnCredentialDocument,
+): Record<string, unknown> {
+  const encoded = credential.response.clientDataJSON;
+  const decoded = Buffer.from(encoded, "base64url").toString("utf8");
+
+  return JSON.parse(decoded) as Record<string, unknown>;
+}
+
+/**
+ * The authenticator data a credential would carry if it had been signed for
+ * another domain, which is the hash of that domain and the same flags.
+ */
+export function simCognitoAuthenticatorDataFor(relyingPartyId: string): string {
+  const flags = Buffer.alloc(5);
+
+  flags.writeUInt8(0x05, 0);
+  flags.writeUInt32BE(0, 1);
+
+  return Buffer.concat([
+    createHash("sha256").update(relyingPartyId).digest(),
+    flags,
+  ]).toString("base64url");
+}
+
+/**
+ * The credential a real authenticator made, with one member of it changed.
+ */
+export function simCognitoCredentialWith(
+  credential: SimCognitoWebAuthnCredentialDocument,
+  response: Record<string, SimCognitoWebAuthnDocumentValue>,
+): Record<string, SimCognitoWebAuthnDocumentValue> {
+  return {
+    ...credential,
+    response: { ...credential.response, ...response },
+  };
 }

@@ -2,13 +2,13 @@ import type {
   SimCognitoWebAuthnCreationOptions,
   SimCognitoWebAuthnCredentialDocument,
 } from "./sim-cognito-web-authn-document.js";
+import { simCognitoWebAuthnPublicKey } from "./sim-cognito-web-authn-public-key.js";
 import {
   simCognitoWebAuthnAlgorithm,
   simCognitoWebAuthnAuthenticatorData,
   simCognitoWebAuthnClientData,
   simCognitoWebAuthnCredentialId,
   simCognitoWebAuthnKeyPair,
-  simCognitoWebAuthnPublicKey,
 } from "./sim-cognito-web-authn-signing.js";
 
 /**

@@ -74,6 +74,7 @@ export {
 } from "./user-pool/user/web-authn/sim-cognito-web-authn-credential.js";
 export type {
   SimCognitoWebAuthnCreationOptions,
+  SimCognitoWebAuthnDocumentValue,
   SimCognitoWebAuthnCredentialDescriptor,
   SimCognitoWebAuthnCredentialDocument,
 } from "./user-pool/user/web-authn/sim-cognito-web-authn-document.js";

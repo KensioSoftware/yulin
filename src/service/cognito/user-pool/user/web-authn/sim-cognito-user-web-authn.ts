@@ -1,17 +1,21 @@
 import { SimCognitoResourceNotFoundException } from "../../../error/sim-cognito.error.js";
 import { SimCognitoWebAuthnChallengeNotFoundException } from "../../../error/sim-cognito-web-authn.error.js";
-import { simCognitoWebAuthnAttested } from "./sim-cognito-web-authn-attested-key.js";
+import { simCognitoWebAuthnRegistered } from "./sim-cognito-web-authn-attested-key.js";
 import {
   simCognitoWebAuthnCreationOptions,
   type SimCognitoWebAuthnRegistrationRequest,
 } from "./sim-cognito-web-authn-creation-options.js";
-import { requireSimCognitoWebAuthnCeremony } from "./sim-cognito-web-authn-ceremony.js";
 import type { SimCognitoWebAuthnCredential } from "./sim-cognito-web-authn-credential.js";
 import { simCognitoWebAuthnCreated } from "./sim-cognito-web-authn-authenticator.js";
 import type {
   SimCognitoWebAuthnCreationOptions,
   SimCognitoWebAuthnCredentialDocument,
 } from "./sim-cognito-web-authn-document.js";
+
+interface SimCognitoUserWebAuthnProperties {
+  /** What to call when the user's passkeys change. */
+  readonly changed: () => void;
+}
 
 /**
  * The passkeys one simulated user has, and the registration it is part way
@@ -25,10 +29,9 @@ import type {
  * What the pool keeps of a registration is the public key, the relying party
  * and the identifier, and all of it is checked before any of it is stored.
  *
- * Registering or deleting a passkey leaves the user's own
- * `UserLastModifiedDate` where it was, unlike registering a second factor. A
- * passkey is a credential of its own rather than a setting on the user, and
- * what real Cognito does to that date was not checked against a live account.
+ * Registering or deleting a passkey moves the user's `UserLastModifiedDate`
+ * on, as every other change to a user does. Whether real Cognito moves it for
+ * a passkey was not checked against a live account.
  */
 export class SimCognitoUserWebAuthn {
   readonly #credentials = new Map<string, SimCognitoWebAuthnCredential>();
@@ -38,6 +41,13 @@ export class SimCognitoUserWebAuthn {
    * with, which carry both the challenge and the relying party it answers to.
    */
   #pending: SimCognitoWebAuthnCreationOptions | undefined;
+
+  /** What to tell the user when its passkeys change. */
+  readonly #changed: () => void;
+
+  constructor(properties: SimCognitoUserWebAuthnProperties) {
+    this.#changed = properties.changed;
+  }
 
   /**
    * The passkeys this user has registered, oldest first.
@@ -72,38 +82,32 @@ export class SimCognitoUserWebAuthn {
    * challenge this user was issued.
    */
   completeRegistration(credential: unknown, now: Date): void {
+    // The challenge is spent before the credential is read, so a refused one
+    // cannot be retried against the same challenge. Real Cognito issues one
+    // challenge per registration, and StartWebAuthnRegistration is what issues
+    // another.
     const pending = this.requirePending();
-    const relyingPartyId = pending.rp.id;
-    const ceremony = requireSimCognitoWebAuthnCeremony({
-      credential,
-      field: "Credential",
-      type: "webauthn.create",
-      challenge: pending.challenge,
-      relyingPartyId,
-    });
 
-    // The challenge is spent whether or not the rest of the credential is
-    // usable, so a refused one cannot be retried against the same challenge.
     this.#pending = undefined;
 
-    this.#credentials.set(
-      ceremony.credentialId,
-      simCognitoWebAuthnAttested(ceremony, relyingPartyId, now),
-    );
+    const registered = simCognitoWebAuthnRegistered(pending, credential, now);
+
+    this.#credentials.set(registered.credentialId, registered);
+    this.#changed();
   }
 
   /**
    * Forget a passkey, or refuse an identifier this user has none for.
    */
   remove(credentialId: string | undefined): void {
-    if (credentialId === undefined || !this.#credentials.has(credentialId)) {
+    if (credentialId === undefined || !this.#credentials.delete(credentialId)) {
       throw new SimCognitoResourceNotFoundException(
         `This user has no registered passkey with the credential id ` +
           `'${String(credentialId)}'`,
       );
     }
 
-    this.#credentials.delete(credentialId);
+    this.#changed();
   }
 
   /**

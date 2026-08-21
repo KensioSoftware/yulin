@@ -4038,9 +4038,10 @@ Cognito evaluates no IAM policy for any of them. That is what makes a passkey so
 to an account it is already signed in to. The first one has to be registered from a session some
 other factor started.
 
-The pool needs a relying party ID before it can register anything. It arrives as
+The pool needs a relying party before it can register anything. It arrives as
 `WebAuthnConfiguration.RelyingPartyId` on `SetUserPoolMfaConfig`, or as `WebAuthnRelyingPartyID` on
-an `AWS::Cognito::UserPool` Resource. A pool that names none refuses the registration with
+an `AWS::Cognito::UserPool` Resource. A pool that names none falls back to its own hosted domain,
+which is what real Cognito falls back to, and a pool with neither refuses the registration with
 `WebAuthnConfigurationMissingException`.
 
 `StartWebAuthnRegistration` answers with the `CredentialCreationOptions` a browser passes to
@@ -4146,20 +4147,23 @@ console.log(listed.Credentials?.[0]?.RelyingPartyId); // "myapp.example.com"
 
 The keys are real. Every passkey is an ECDSA key pair over P-256, and the credential carries the
 public half as base64url of its SubjectPublicKeyInfo, where a browser's own
-`PublicKeyCredential.toJSON()` puts it. The pool stores that key against the credential id and
-checks signatures with it. A test that would rather hold its own key can build the credential
-document by hand, because nothing here reads a field a browser leaves out.
+`PublicKeyCredential.toJSON()` puts it. The pool reads the key itself rather than the algorithm the
+credential names beside it, so an RSA key labelled `-7` is refused. A test that would rather hold
+its own key can build the credential document by hand, because nothing here reads a field a browser
+leaves out.
 
 What the pool was sent is read rather than trusted. The client data has to name the ceremony, answer
 the challenge the pool issued and carry the relying party's own origin, and the authenticator data
 has to hash to the relying party the pool registers against. A spent or unknown challenge is refused
 with `WebAuthnChallengeNotFoundException`, another origin with
 `WebAuthnOriginNotAllowedException`, another domain with `WebAuthnRelyingPartyMismatchException`,
-and a key the pool cannot read with `WebAuthnCredentialNotSupportedException`.
+and a key the pool cannot use with `WebAuthnCredentialNotSupportedException`. A refusal spends the
+challenge, so a registration that was refused is started again rather than retried.
 
 `ListWebAuthnCredentials` reports each passkey with the credential id, the relying party, how the
 authenticator says it is attached and how it can be reached, and when it was registered. It pages by
-`MaxResults` and `NextToken`, twenty to a page at most. `FriendlyCredentialName` is the relying
+`MaxResults` and `NextToken`, twenty to a page at most, and a `MaxResults` of zero is read as the
+whole page, which is what Cognito documents as its minimum. `FriendlyCredentialName` is the relying
 party ID. Real Cognito reads the authenticator's own model out of the attestation and names the
 credential after it, and this simulation parses no attestation.
 
@@ -4294,8 +4298,11 @@ Current documented limitations:
 - A passkey's `attestationObject` is stored by nobody and parsed by nothing. The public key is read
   from `response.publicKey`, where a browser's own JSON serialization puts it, and the credential is
   named after the relying party because the authenticator model real Cognito names it after lives in
-  the attestation. `ES256` is the only algorithm accepted, and a credential naming another is
-  refused with `WebAuthnCredentialNotSupportedException`.
+  the attestation. `ES256` is the only algorithm accepted, and a key of another kind is refused with
+  `WebAuthnCredentialNotSupportedException` whatever the credential labels it.
+- `ListWebAuthnCredentials` reads a `MaxResults` of zero as the whole page. Cognito documents zero
+  as the minimum for this listing and says nothing about what it answers with, and what a real pool
+  does with it was not checked against a live account.
 - The private half of a passkey lives in the simulator, because a test has no authenticator to hold
   it. `SimCognitoUserPool.webAuthnCredential` is what reads a credential out of it, and it is a
   deliberate divergence rather than an operation to write application code against. The signatures

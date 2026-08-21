@@ -24,6 +24,12 @@ interface SimCognitoPageProperties {
    * most of them allow. `ListWebAuthnCredentials` stops at twenty.
    */
   readonly mostResults?: number;
+
+  /**
+   * The smallest page size this operation takes, where it is not one.
+   * `ListWebAuthnCredentials` documents a minimum of zero.
+   */
+  readonly leastResults?: number;
 }
 
 /**
@@ -41,6 +47,7 @@ export class SimCognitoPage<TItem> {
     const maxResults = SimCognitoPage.maxResults(
       properties.maxResults,
       properties.maxResultsField ?? "MaxResults",
+      properties.leastResults ?? 1,
       properties.mostResults ?? maxMaxResults,
     );
     const startIndex = SimCognitoPage.startIndex(
@@ -57,15 +64,26 @@ export class SimCognitoPage<TItem> {
   private static maxResults(
     requested: number,
     field: string,
+    least: number,
     most: number,
   ): number {
-    if (!Number.isSafeInteger(requested) || requested < 1 || requested > most) {
+    if (
+      !Number.isSafeInteger(requested) ||
+      requested < least ||
+      requested > most
+    ) {
       throw new SimCognitoInvalidParameterException(
-        `${field} must be a whole number between 1 and ${String(most)}`,
+        `${field} must be a whole number between ${String(least)} and ${String(
+          most,
+        )}`,
       );
     }
 
-    return requested;
+    // A page size of zero is the whole page. Real Cognito documents zero as a
+    // valid MaxResults for ListWebAuthnCredentials and says nothing about what
+    // it answers with, so this reads it the way a refresh token validity of
+    // zero is read, as the default rather than as none at all.
+    return requested === 0 ? most : requested;
   }
 
   /**
