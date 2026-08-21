@@ -7,6 +7,7 @@ import {
   readTerraformPlanFile,
   terraformStackNameFromPlanPath,
 } from "./sim-tf-plan-file.js";
+import type { TerraformPlanOverride } from "./sim-tf-override.type.js";
 import type { TerraformImportReport } from "./sim-tf-report.type.js";
 
 export interface TerraformPlanDeployProperties {
@@ -30,6 +31,20 @@ export interface TerraformPlanDeployProperties {
    * gets its behaviour.
    */
   readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+
+  /**
+   * The values the plan could not carry.
+   *
+   * Terraform resolves nothing inside a value it could not build, so a Lambda
+   * `environment.variables` map holding one reference to a queue of the same
+   * plan arrives without its variable names, and an `aws_iam_role_policy`
+   * document built with `jsonencode` arrives without its statements. An
+   * override supplies one of those against the name the plan carries, and is
+   * used only where the plan resolved nothing.
+   *
+   * What no override covers is named on the report's `lost`.
+   */
+  readonly overrides?: readonly TerraformPlanOverride[] | undefined;
 }
 
 /** What one plan deployed as, and what reading the plan made of it. */
@@ -81,10 +96,11 @@ export class TerraformAdapter {
   ): Promise<TerraformPlanDeployment> {
     const deployment =
       typeof properties === "string" ? { planPath: properties } : properties;
-    const { planPath, bindings } = deployment;
+    const { planPath, bindings, overrides } = deployment;
 
     const { template, report } = cfnTemplateFromTerraformPlan(
       await readTerraformPlanFile(planPath),
+      overrides,
     );
 
     const stack = await this.simAws.cloudFormation().deployTemplate({
