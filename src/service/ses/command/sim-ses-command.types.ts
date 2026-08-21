@@ -14,7 +14,13 @@ export type {
   SimListEmailIdentitiesCommand,
   SimListEmailIdentitiesCommandInput,
   SimListEmailIdentitiesCommandOutput,
+  SimSesDkimAttributes,
+  SimSesDkimSigningAttributes,
+  SimSesDkimStatusValue,
   SimSesIdentityInfo,
+  SimSesMailFromAttributes,
+  SimSesTag,
+  SimSesTagInput,
   SimSesVerificationStatusValue,
 } from "./identity/identity.command.js";
 export type {

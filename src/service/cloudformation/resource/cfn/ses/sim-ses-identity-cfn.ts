@@ -6,7 +6,7 @@ import {
   simSesDkimTokenName,
   simSesDkimTokens,
   simSesDkimTokenValue,
-} from "./sim-ses-dkim-tokens.js";
+} from "../../../../ses/identity/sim-ses-dkim-tokens.js";
 
 /**
  * The DKIM token attributes, and which of the three tokens each one reads.

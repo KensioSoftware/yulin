@@ -3,8 +3,18 @@ export type { SimSesV2Properties } from "./sim-ses-commands.js";
 export type { SimSesRequestOptions } from "./command/sim-ses-request-options.js";
 export {
   SimSesIdentity,
+  type SimSesDkimStatus,
   type SimSesVerificationStatus,
 } from "./identity/sim-ses-identity.js";
+export {
+  defaultSimSesIdentitySettings,
+  type SimSesDkimSettings,
+  type SimSesDkimSigningOrigin,
+  type SimSesIdentitySettings,
+  type SimSesIdentityTag,
+  type SimSesMailFromBehaviour,
+  type SimSesMailFromSettings,
+} from "./identity/sim-ses-identity-settings.js";
 export { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
 export {
   requiredSimSesIdentityName,

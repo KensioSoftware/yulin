@@ -20,6 +20,11 @@ interface SimCfnSesIdentityCreatorProperties {
  * may be named, and the same refusal of a name that is neither an address nor
  * a domain.
  *
+ * Its DKIM, MAIL FROM, feedback, configuration set and tag settings are
+ * applied afterwards, which is the order real CloudFormation works in. Two of
+ * those have no CreateEmailIdentity parameter on real SES either, and are put
+ * on the identity by a separate call once it exists.
+ *
  * It deploys unverified, which is what real CloudFormation leaves behind: the
  * confirmation link or the DKIM records still have to be dealt with out of
  * band. A test verifies it afterwards with `verifyIdentity`, which finds the
@@ -47,6 +52,8 @@ export class SimCfnSesIdentityCreator {
 
     identityProperties.recordIgnoredProperties();
 
+    const settings = identityProperties.settings(emailIdentity);
+
     return await simCfnSesResourceCreation(
       sesEmailIdentityResourceType,
       resource.logicalId,
@@ -61,6 +68,8 @@ export class SimCfnSesIdentityCreator {
           identity,
           `sim SES identity ${emailIdentity} after CloudFormation creation`,
         );
+
+        identity.configure(settings);
 
         return identity;
       },
