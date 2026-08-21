@@ -43,6 +43,15 @@ export class TerraformReferenceResolver {
   }
 
   /**
+   * The resource at one address, for a caller that needs the resource rather
+   * than a value read off it. A mapping reading a name out of the resource its
+   * own attribute refers to is what wants this.
+   */
+  public resource(address: string): TerraformResource | undefined {
+    return this.byAddress.get(address);
+  }
+
+  /**
    * The CloudFormation value one reference stands for.
    *
    * A reference to a resource the template does not declare returns undefined,

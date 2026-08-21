@@ -5,6 +5,7 @@ import {
   assertArrayMinLength,
   assertIdentical,
   assertNonNullable,
+  assertObjectEquals,
   assertObjectHasProperty,
 } from "@kensio/smartass";
 import { SimAws } from "../service/aws/sim-aws.js";
@@ -172,5 +173,54 @@ describe("deploying a plan Terraform itself produced", () => {
     // Then it is recorded as lost rather than guessed at, because Terraform
     // resolves nothing inside a value it could not build
     assertArrayIncludes(lost, "environment.variables");
+  });
+
+  it("takes the values a deployment supplies for what the plan collapsed", async () => {
+    // Given the same configuration, and a deployment supplying the two
+    // attributes Terraform could not carry: the function's environment and
+    // the role's inline policy
+    const planPath = await plannedPath("app");
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const { report } = await new TerraformAdapter(simAws).deployPlan({
+      planPath,
+      stackName: "supplied-app",
+      bindings: handlersFor("app"),
+      overrides: [
+        {
+          functionName: "orders-processor",
+          environment: { TABLE_NAME: "orders-orders", STAGE: "test" },
+        },
+        {
+          roleName: "orders-processor",
+          policy: {
+            Version: "2012-10-17",
+            Statement: [
+              { Effect: "Allow", Action: "dynamodb:*", Resource: "*" },
+              { Effect: "Allow", Action: "sqs:*", Resource: "*" },
+            ],
+          },
+        },
+      ],
+    });
+
+    // Then the function runs with the variables it was given, simulated IAM
+    // holds the statements the configuration meant, and neither attribute is
+    // named as lost any more
+    assertObjectEquals(
+      Object.fromEntries(
+        simAws.lambda().getSimFunctionByName("orders-processor")?.environment
+          .declaredVariables ?? [],
+      ),
+      { TABLE_NAME: "orders-orders", STAGE: "test" },
+    );
+
+    assertArrayLength(
+      report.lost.filter((entry) =>
+        ["environment.variables", "policy"].includes(entry.attribute),
+      ),
+      0,
+    );
   });
 });
