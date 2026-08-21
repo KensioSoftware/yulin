@@ -1,7 +1,7 @@
 import {
-  type SimCfnDeployBinding,
+  type SimCfnBinding,
   simCfnIsContainerBinding,
-} from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
+} from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimEcs } from "../../sim-ecs.js";
 import { simCfnEcsPropertyError } from "../property/sim-cfn-ecs-property-error.js";
@@ -12,7 +12,7 @@ import type { SimCfnEcsContainerBinding } from "./sim-cfn-ecs-container-binding.
 
 interface SimCfnEcsContainerBindingsProperties {
   readonly resource: SimCfnResource;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }
 
 /**

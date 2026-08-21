@@ -37,7 +37,7 @@ export type SimCfnEcsContainerBindingTarget =
  * ```typescript
  * await simAws.cloudFormation().deployTemplateFile({
  *   stackName: "orders",
- *   templateFile: "cdk.out/OrdersStack.template.json",
+ *   templatePath: "cdk.out/OrdersStack.template.json",
  *   bindings: [
  *     {
  *       family: "orders-worker",

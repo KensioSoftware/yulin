@@ -1,5 +1,5 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimRegisterTaskDefinitionCommandInput } from "../../command/register-task-definition/register-task-definition.command.js";
@@ -45,7 +45,7 @@ export class SimCfnEcsTaskDefinitionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
-    bindings?: readonly SimCfnDeployBinding[],
+    bindings?: readonly SimCfnBinding[],
   ): Promise<SimEcsTaskDefinition> {
     const taskDefinitionProperties = new SimCfnEcsTaskDefinitionProperties({
       resource,

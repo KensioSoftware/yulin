@@ -1,4 +1,4 @@
-import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnCfBinding } from "../../../cloudformation/bind/sim-cfn-exec-binding.type.js";
 import { SimCfnExecBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
@@ -6,7 +6,7 @@ import type { CloudFrontFunction } from "../../index.js";
 
 interface SimCfnCffBindingLookupProperties {
   readonly resource: SimCfnResource;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
   readonly cffName: string;
 }
 

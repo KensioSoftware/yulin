@@ -1,5 +1,5 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCfnDeployBinding } from "../../bind/sim-cfn-deploy-binding.js";
+import type { SimCfnBinding } from "../../bind/sim-cfn-binding.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
@@ -7,7 +7,7 @@ interface SimCfnStackResourceBatchCreatorProperties {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }
 
 /**
@@ -28,7 +28,7 @@ export class SimCfnStackResourceBatchCreator {
   private readonly simAws: SimAws;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
-  private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
+  private readonly bindings: readonly SimCfnBinding[] | undefined;
 
   constructor(properties: SimCfnStackResourceBatchCreatorProperties) {
     const { simAws, resources, cdkOutContext, bindings } = properties;

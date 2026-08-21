@@ -35,6 +35,8 @@ const typeUsageSource = `import {
 } from "@kensio/yulin";
 import type {
   CfnTemplateBodyRecord,
+  SimCfnBinding,
+  SimCfnCdkOutStackOptions,
   SimCfnCdkOutTemplateTransform,
   SimCfnDeployedResource,
   SimCfnDeployedStack,
@@ -60,6 +62,24 @@ export function stackHandle(
 ): SimCfnDeployedResource | undefined {
   return stack.getResource("Handle");
 }
+
+const bindings: readonly SimCfnBinding[] = [
+  { logicalId: "Greeter", handler: (): string => "hello" },
+  { cdkPath: "Packed/Rewrite", handler: (): string => "rewritten" },
+];
+
+export function deployWithBindings(): Promise<SimCfnDeployedStack> {
+  return new SimAws()
+    .account(accountId)
+    .cloudFormation()
+    .deployTemplateFile({
+      stackName: "packed-stack",
+      templatePath: "cdk.out/PackedStack.template.json",
+      bindings,
+    });
+}
+
+export const packedStackOptions: SimCfnCdkOutStackOptions = { bindings };
 
 export const substituteFromDeployed: SimCfnCdkOutTemplateTransform = (
   body: CfnTemplateBodyRecord,

@@ -1,8 +1,8 @@
 import { SimCfnEcsContainerBindingMatcher } from "../../../ecs/cfn/bind/sim-cfn-ecs-container-binding-matcher.js";
 import {
-  type SimCfnDeployBinding,
+  type SimCfnBinding,
   simCfnIsExecutableBinding,
-} from "../sim-cfn-deploy-binding.js";
+} from "../sim-cfn-binding.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import { SimCfnExecutableResourceBindingMatcher } from "./sim-cfn-exec-binding-matcher.js";
@@ -22,7 +22,7 @@ import { SimCfnExecutableResourceBindingMatcher } from "./sim-cfn-exec-binding-m
 export function validateSimCfnExecutableResourceBindings(properties: {
   readonly stackName: string;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
-  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
 }): void {
   const bindings = properties.bindings ?? [];
   const matcher = new SimCfnExecutableResourceBindingMatcher(
