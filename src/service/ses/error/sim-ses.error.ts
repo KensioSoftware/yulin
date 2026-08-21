@@ -92,3 +92,19 @@ export class SimSesUnsupportedOperationException extends SimSesError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated SES SendingPausedException error.
+ *
+ * SES reports a send it will not make because sending is switched off. Here
+ * that means a configuration set created with `SendingEnabled: false`. That
+ * switch is a declaration the caller wrote deliberately, and this simulation
+ * follows it.
+ */
+export class SimSesSendingPausedException extends SimSesError {
+  public override readonly name = "SendingPausedException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

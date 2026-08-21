@@ -76,6 +76,28 @@ the text of an HTML-only message finds nothing rather than the markup.
 subject or body and a recorded message with nothing in it would make a test pass for a reason
 unrelated to what it asserts.
 
+## Configuration set model
+
+Configuration set state lives under `configuration-set/`, and the send-side resolution under
+`command/send/sim-ses-configuration-set-check.ts`.
+
+`SimSesConfigurationSet` holds the suppression reasons, the sending switch, the delivery options and
+the reputation options a set was created with. The sending switch is the only one of them a send
+acts on. The others have nothing here to act on, because no message is delivered and no bounce is
+recorded.
+
+`SimSesConfigurationSetCheck` answers two questions about a send. Which set it goes through, and
+whether that set will carry it. The set is the one the send names, or the one the sending identity
+was created with. `SimSesIdentityStore.covering` picks the identity, giving an address's own set precedence over its
+domain's. That is the precedence IAM authorizes an address under.
+
+A name no `CreateConfigurationSet` created is accepted and recorded. Real SES refuses one, and
+refusing here would fail a test over a set the developer left out of their local setup.
+`SimSesV2.findConfigurationSet` is where a test wanting the strict reading goes.
+
+Both send paths go through the check. `SimSesSendEmail` throws `SimSesSendingPausedException`, and
+`SimSesServiceSend` hands the reason back for the calling service to report in its own vocabulary.
+
 ## Template model
 
 Template state lives under `template/`, and the send-side rendering under `command/send/`.

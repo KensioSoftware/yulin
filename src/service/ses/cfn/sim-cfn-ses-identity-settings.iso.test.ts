@@ -1,4 +1,7 @@
-import { GetEmailIdentityCommand } from "@aws-sdk/client-sesv2";
+import {
+  GetEmailIdentityCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
 import {
   assertArrayLength,
   assertFalse,
@@ -164,6 +167,41 @@ describe("AWS::SES::EmailIdentity settings", () => {
 
     assertArrayLength(identity.Tags, 1);
     assertIdentical(identity.Tags[0].Key, "team");
+  });
+
+  it("sends through the configuration set its template attached", async () => {
+    // Given an identity deployed with a configuration set on it, as CDK's
+    // `configurationSet` prop writes one.
+    const { simAws, stack } = await deployIdentity({
+      EmailIdentity: "example.com",
+      ConfigurationSetAttributes: { ConfigurationSetName: "transactional" },
+    });
+    const ses = simAws.sesV2();
+
+    ses.verifyIdentity("example.com");
+    ses.verifyIdentity("someone@example.org");
+
+    // When a message is sent from the identity, naming no set of its own.
+    await ses.sendEmail(
+      new SendEmailCommand({
+        FromEmailAddress: "hello@example.com",
+        Destination: { ToAddresses: ["someone@example.org"] },
+        Content: {
+          Simple: {
+            Subject: { Data: "Welcome" },
+            Body: { Text: { Data: "Hi there" } },
+          },
+        },
+      }),
+    );
+
+    // Then the message went through the set the stack attached, and the
+    // property is nowhere on the ignored list.
+    const [email] = ses.sentEmails();
+
+    assertNonNullable(email);
+    assertIdentical(email.configurationSetName, "transactional");
+    assertArrayLength(stack.ignoredProperties, 0);
   });
 
   it("records a property this Resource type does not have", async () => {

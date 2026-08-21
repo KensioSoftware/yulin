@@ -123,9 +123,11 @@ it once worked.
 ## How an identity is configured
 
 An identity holds the DKIM signing, custom MAIL FROM domain, feedback forwarding, configuration set
-and tags it was created with, and `GetEmailIdentity` reads them back. None of it is acted on. Every
-one of these settings decides what happens to a message after it leaves AWS, which a test process
-has no way to watch.
+and tags it was created with, and `GetEmailIdentity` reads them back. The configuration set is the
+one setting a send acts on, covered under
+[Sending through a configuration set](#sending-through-a-configuration-set). The others are held and
+reported. Each of them decides what happens to a message after it leaves AWS, where a test process
+cannot watch.
 
 A test can ask one question of it. Is the identity configured the way the stack said? That catches a
 stack declaring DKIM wrongly, and a stack that stops declaring it.
@@ -301,8 +303,8 @@ sending switch, the delivery options and the reputation switch are all declared 
 SES holds a set as state. A test can then assert what a stack declared, with no AWS account to read
 it back from.
 
-Nothing acts on a set yet. A send naming one keeps the name on its record and goes no further, as it
-did before sets existed. The name now points at something a test can find.
+A set is attached to an identity, or named on a send. `SendingEnabled` is the one option a send acts
+on. The rest are held for a test to read back.
 
 ```typescript sim-ses-configuration-sets
 /**
@@ -353,6 +355,75 @@ back rather than leaving the groups out of the answer.
 
 `findConfigurationSet` reaches one set by name and `allConfigurationSets` hands over every set in
 the scope, oldest first.
+
+### Sending through a configuration set
+
+An identity carries a configuration set from `CreateEmailIdentity`, and `AWS::SES::EmailIdentity`
+attaches one through `ConfigurationSetAttributes`. A send that names no set of its own goes through
+the set its sending identity carries, and the recorded message names whichever set applied. A test
+can then assert a message went through the right set without the code under test naming it at every
+send.
+
+A send that does name a set goes through that one. Where the sending address is an identity with a
+set of its own and its domain is another, the address's set applies, as the more specific identity
+does everywhere else here.
+
+```typescript sim-ses-configuration-set-attachment
+/**
+ * Attaching a configuration set to an identity, and sending through it.
+ */
+
+import {
+  CreateConfigurationSetCommand,
+  CreateEmailIdentityCommand,
+  SendEmailCommand,
+} from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const ses = new SimAws().sesV2();
+
+await ses.createConfigurationSet(
+  new CreateConfigurationSetCommand({ ConfigurationSetName: "transactional" }),
+);
+
+await ses.createEmailIdentity(
+  new CreateEmailIdentityCommand({
+    EmailIdentity: "example.com",
+    ConfigurationSetName: "transactional",
+  }),
+);
+
+// Standing in for the DNS records a real domain identity waits on.
+ses.verifyIdentity("example.com");
+ses.verifyIdentity("someone@example.org");
+
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Simple: {
+        Subject: { Data: "Welcome" },
+        Body: { Text: { Data: "Hi there" } },
+      },
+    },
+  }),
+);
+
+// "transactional", off the identity, with the send naming nothing.
+console.log(ses.sentEmails()[0]?.configurationSetName);
+```
+
+A name that `CreateConfigurationSet` never created is accepted on both paths, and the record keeps
+it. Real SES refuses one. Refusing here would fail a test over a set the developer left out of their
+local setup. A test that wants the strict reading asks `findConfigurationSet` for the set and finds
+nothing.
+
+A set created with `SendingOptions.SendingEnabled` set to `false` refuses every send made through
+it, with `SendingPausedException`. That switch is a declaration the developer wrote deliberately, and
+a send through the set honours it. The refusal reaches a send that named the set and a send that
+picked it up off its identity.
 
 Sets are managed with `CreateConfigurationSet`, `GetConfigurationSet`, `ListConfigurationSets` and
 `DeleteConfigurationSet`. There is no update. Real SES changes a set through a `Put` command per
@@ -906,11 +977,13 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   where real Handlebars would render `[object Object]`.
 - **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
 - **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events and no
-  event destinations. A configuration set named on a send is kept on the record so a test can assert
-  the right one was used, and goes no further.
-- **A configuration set is state, and no behaviour.** Its suppression reasons, sending switch,
-  delivery options and reputation switch are all held and read back. Every one of them is inert,
-  `SendingEnabled` included, and a send naming a set that was never created still succeeds.
+  event destinations.
+- **A configuration set acts on one send.** `SendingEnabled` refuses a send made through the set.
+  The suppression reasons, delivery options and reputation switch are held and read back, and
+  nothing acts on those.
+- **A set name nothing created is still accepted.** Real SES refuses one on an identity and on a
+  send. Both stand here and the name is recorded, because a test failing over a set missing from a
+  local setup fails for a reason unrelated to what it asserts.
 - **A configuration set holds what it was created with.** The `Put` commands that change one group
   of options are absent. A set cannot be changed once it exists.
 - **The suppression list fills only by hand.** Every address on it was put there by a caller,

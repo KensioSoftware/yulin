@@ -69,5 +69,6 @@ export {
   type SimSesErrorMetadata,
   SimSesMessageRejected,
   SimSesNotFoundException,
+  SimSesSendingPausedException,
   SimSesUnsupportedOperationException,
 } from "./error/sim-ses.error.js";

@@ -4,6 +4,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { simSesBareAddress } from "../../email/sim-ses-address.js";
 import { SimSesSentEmail } from "../../email/sim-ses-sent-email.js";
 import type { SimSesSentEmailStore } from "../../email/sim-ses-sent-email-store.js";
+import type { SimSesConfigurationSetCheck } from "./sim-ses-configuration-set-check.js";
 import type { SimSesSuppressionCheck } from "./sim-ses-suppression-check.js";
 import type { SimSesVerifiedIdentityCheck } from "./sim-ses-verified-identities.js";
 
@@ -40,6 +41,7 @@ export interface SimSesServiceSendResult {
 interface SimSesServiceSendProperties {
   readonly sent: SimSesSentEmailStore;
   readonly identityCheck: SimSesVerifiedIdentityCheck;
+  readonly configurationSetCheck: SimSesConfigurationSetCheck;
   readonly suppressionCheck: SimSesSuppressionCheck;
   readonly clock: SimClock;
 }
@@ -63,16 +65,22 @@ interface SimSesServiceSendProperties {
  * The suppression list applies too, and refuses nothing. A pool's message to a
  * suppressed recipient is accepted and recorded as held back, exactly as one
  * an SDK caller sent would be.
+ *
+ * The configuration set applies as it does to any other send. A pool that
+ * names none sends through the set its identity carries, and a set with
+ * sending switched off turns the message down.
  */
 export class SimSesServiceSend {
   readonly #sent: SimSesSentEmailStore;
   readonly #identityCheck: SimSesVerifiedIdentityCheck;
+  readonly #configurationSetCheck: SimSesConfigurationSetCheck;
   readonly #suppressionCheck: SimSesSuppressionCheck;
   readonly #clock: SimClock;
 
   constructor(properties: SimSesServiceSendProperties) {
     this.#sent = properties.sent;
     this.#identityCheck = properties.identityCheck;
+    this.#configurationSetCheck = properties.configurationSetCheck;
     this.#suppressionCheck = properties.suppressionCheck;
     this.#clock = properties.clock;
   }
@@ -81,10 +89,13 @@ export class SimSesServiceSend {
    * Accept the message, or say why SES would have refused it.
    */
   send(request: SimSesServiceSendRequest): SimSesServiceSendResult {
-    const refusedBecause = this.#identityCheck.refusal({
-      fromEmailAddress: simSesBareAddress(request.fromEmailAddress),
-      recipients: [request.toAddress],
-    });
+    const configurationSetName = this.#configurationSetCheck.applying(request);
+
+    const refusedBecause =
+      this.#identityCheck.refusal({
+        fromEmailAddress: simSesBareAddress(request.fromEmailAddress),
+        recipients: [request.toAddress],
+      }) ?? this.#configurationSetCheck.refusal(configurationSetName);
 
     if (refusedBecause !== undefined) {
       return { refusedBecause };
@@ -106,7 +117,7 @@ export class SimSesServiceSend {
         body: { text: request.body, html: undefined },
         templateName: undefined,
         templateData: undefined,
-        configurationSetName: request.configurationSetName,
+        configurationSetName,
         suppressedRecipients: this.#suppressionCheck.withheldFrom([
           request.toAddress,
         ]),
