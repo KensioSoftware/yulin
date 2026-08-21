@@ -22,9 +22,10 @@ const knownPropertyNames: ReadonlySet<string> = new Set([
 /**
  * Reads the properties of one Custom::S3BucketNotifications Resource.
  *
- * A property name CDK does not emit is refused rather than ignored. This
- * Resource is a private contract between CDK and its own provider function, so
- * a name that turns up here is a version of CDK asking for something this
+ * A property name neither CDK nor the Terraform plan import emits is refused
+ * rather than ignored. This Resource is a private contract between CDK and its
+ * own provider function, and the import writes into that same contract, so a
+ * name that turns up here is a version of CDK asking for something this
  * simulator has not been told about, and quietly dropping it would leave the
  * Bucket configured differently from the app that was deployed.
  */

@@ -153,13 +153,26 @@ to merge. A Secret whose `aws_secretsmanager_secret_version` is missing or unres
 without a value, and simulated Secrets Manager refuses that. Closing it means settling the folds
 along with the Resources they configure, which is the same fixed point run over a wider set.
 
+### CloudFormation cannot always hold what Terraform holds
+
+A bucket's event notification is a resource of its own in Terraform. The function's
+`aws_lambda_permission` names the bucket whose events it admits, and the notification names the
+function, so the three form a line. CloudFormation carries the notification on the `AWS::S3::Bucket`
+itself, and the bucket and the permission then wait for each other.
+
+CDK hits the same wall and answers it with `Custom::S3BucketNotifications`, a Resource that sits
+between the two and applies the configuration with one
+`PutBucketNotificationConfiguration` call. Simulated CloudFormation creates one, so
+`aws_s3_bucket_notification` maps onto that Resource and keeps the ordering Terraform describes. An
+uploaded object reaches the function the plan named.
+
 ## Adding a resource type
 
 A mapping is a function from one `TerraformResource` to one CloudFormation Resource, registered by
-Terraform type in `sim-tf-registry.ts`. The mappings live under `map/`, a file to a service. S3 and
-the HTTP API run to more than one file each, because FTA scores density and a file of mapping
-literals reaches the threshold of 50 at around 100 lines. Where that forced a split, the line drawn
-was between the flat renames and the sections CloudFormation holds as lists of rules.
+Terraform type in `sim-tf-registry.ts`. The mappings live under `map/`, a file to a service. S3,
+Cognito and the HTTP API run to more than one file each, because FTA scores density and a file of
+mapping literals reaches the threshold of 50 at around 100 lines. Where that forced a split, the
+line drawn was between the flat renames and the sections CloudFormation holds as lists of rules.
 
 Most of a mapping is the rename table `renamed()` applies. What needs more than a rename is added to
 what that returns. `attribute()` reads one attribute, answering with the value the plan resolved or
@@ -167,11 +180,39 @@ with the intrinsic that reads it off the Resource producing it. `requires` names
 target service will refuse the Resource without, and `lost` names the attributes the mapping could
 not carry.
 
+Two attribute shapes `attribute()` cannot read have readers of their own in
+`sim-tf-nested-attributes.ts`. A list whose entries name other resources arrives marked unknown as a
+whole list, and `attributeList()` puts the intrinsics back (an alarm's `alarm_actions` holding one
+topic ARN is the case it was written for). An attribute inside a repeating nested block has its own
+position in a list mirroring the block, and `blockAttribute()` reads the mark and the reference
+together from that position (a bucket notification's `lambda_function_arn` is that case).
+
 A resource that configures another resource is a fold. It names the attribute holding its parent's
-address and returns the properties to merge in.
+address and returns the properties to merge in. It is also handed the properties the parent already
+carries, for the fold whose property is a list. An EventBridge rule's targets are one Terraform
+resource each and one `Targets` list on the Resource, so the second target of a rule has to find the
+first.
 
 Measured over the two configurations below, a mapped type is about 35 lines. Finding out what the
 target service refuses takes longer than writing the mapping.
+
+Three questions are worth answering before the rename table.
+
+What does the target service do with a property it does not model? Most record it against the
+Resource and create it anyway, and a mapping can send those. Some refuse the Resource outright, and
+a mapping has to leave those off and name them under `lost`. Simulated EventBridge refuses `Tags` on
+a rule, simulated SNS refuses them on a topic, and simulated ECR and CloudWatch record them.
+
+What does it require? Simulated DynamoDB refuses a `PROVISIONED` table carrying no
+`ProvisionedThroughput`, and PutMetricAlarm requires seven properties before it will evaluate
+anything. Naming them under `requires` is also what steps over the shapes this simulation does not
+model, since an alarm built out of `metric_query` blocks carries no namespace, metric name or
+statistic of its own.
+
+Does the provider write an absent value or an empty one? An absent optional string inside a nested
+block arrives as `""` and an absent top-level one arrives as `null`. Taking the empty string at face
+value declares a secondary index with a nameless range key, a lifecycle rule whose prefix matches
+every object, and a notification filter that filters nothing.
 
 ## Testing
 
@@ -181,10 +222,17 @@ across. A test says each thing once, and the reader is still tested against the 
 plan. Those tests are isolated tests and need no Terraform installed.
 
 Two whole configurations are committed under `test/terraform/app` and `test/terraform/modules`, and
-`sim-tf-plan-deploy.loc.test.ts` plans them with `TestTerraformProject` and deploys the result. They
-cover the one thing a fixture cannot say. The format being read is the format Terraform writes. Run
-`pnpm tf:init` once before them. It downloads the AWS provider (one 648MB binary) and takes a few
-minutes the first time.
+the three `.loc.test.ts` files beside the import plan them with `TestTerraformProject` and deploy
+the result. They cover the one thing a fixture cannot say. The format being read is the format
+Terraform writes. `sim-tf-plan-deploy.loc.test.ts` covers the deployment, `-services` covers what
+each simulated service made of it, and `-report` asserts the fraction of each plan the import
+reaches. Run `pnpm tf:init` once before them. It downloads the AWS provider (one 648MB binary) and
+takes a few minutes the first time.
+
+Planning takes the state lock, and a configuration planned by three test files at once would fail on
+its own lock. These configurations have no state and are never applied, so `TestTerraformProject`
+plans with `-lock=false`, and each test file plans a configuration once however many of its tests
+deploy it.
 
 `test/terraform/app` is an application config written by hand. `test/terraform/modules` is built
 from published `terraform-aws-modules` modules, and it is the honest one. Every provider and module
@@ -201,18 +249,19 @@ Two plans, both produced by Terraform 1.15.8 against AWS provider 5.100.0.
 
 |                   | resources | mapped | folded | skipped | reached |
 | ----------------- | --------- | ------ | ------ | ------- | ------- |
-| hand-written app  | 41        | 23     | 7      | 11      | 73%     |
-| community modules | 25        | 12     | 6      | 7       | 72%     |
+| hand-written app  | 46        | 35     | 11     | 0       | 100%    |
+| community modules | 25        | 12     | 9      | 4       | 84%     |
 
 Reached means a simulated resource was created for it, either as a Resource of its own or as
-properties folded into one. The import maps 16 Terraform resource types and folds 7 more.
+properties folded into one. The import maps 24 Terraform resource types and folds 11 more.
 
-Most of what it skips is the size of the mapped set, which grows in
-[#866](https://github.com/KensioSoftware/yulin/issues/866). Cross-referencing every resource type in
-both plans against the 61 CloudFormation types Yulin models puts the ceiling at 41 of 41 for the
-application plan and 23 of 25 for the module plan. The two out of reach are `null_resource` and
-`local_file`, which the Lambda module uses to package a zip. Between 72% measured and that ceiling
-sits the `each.value` hop described above, worth 2 more resources on the module plan.
+The application plan is at its ceiling. Four resources of the module plan are left. `null_resource`
+and `local_file` package a zip and belong to no AWS service. The integration and the route read
+their values through the `each.value` hop described above, which is
+[#867](https://github.com/KensioSoftware/yulin/issues/867) and worth 2 more resources.
+
+Both figures are asserted in `sim-tf-plan-report.loc.test.ts`, by the resource types each plan
+leaves unreached. A mapping that stops reaching a type fails there.
 
 Planning offline fails every `data` block that reaches AWS. Both community modules read
 `aws_caller_identity`, and `terraform plan` reports an error and exits non-zero for each. It still

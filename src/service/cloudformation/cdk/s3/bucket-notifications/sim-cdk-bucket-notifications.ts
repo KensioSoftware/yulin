@@ -20,6 +20,11 @@ import { SimCdkBucketNotificationsRemover } from "./sim-cdk-bucket-notifications
  * call through the ordinary command path, so a CDK app and an SDK caller are
  * validated identically.
  *
+ * The Terraform plan import builds one too. Terraform declares a bucket's
+ * notification as a resource of its own, and a template carrying it on the
+ * bucket alongside the function's `AWS::Lambda::Permission` is the circular
+ * dependency this Resource type exists to break.
+ *
  * `ServiceToken` is read for the provider function it names, and otherwise
  * ignored. That function is declined on its runtime, as CDK's BucketDeployment
  * provider is, and recorded as inert rather than as a gap, since this factory

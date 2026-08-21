@@ -89,11 +89,24 @@ export class TestTerraformProject {
    * still writes a plan covering the managed resources, which are what an
    * import reads. A configuration expecting that says so. Every other failure
    * is a failure, so a broken configuration cannot pass as a partial plan.
+   *
+   * The state lock is not taken. These configurations have no state and are
+   * never applied, and several test files plan the same one at once.
    */
   private async plan(planFile: string): Promise<void> {
     const result = await execa(
       "terraform",
-      [`-chdir=${this.directory}`, "plan", "-input=false", "-out", planFile],
+      [
+        `-chdir=${this.directory}`,
+        "plan",
+        "-input=false",
+        // There is no state to protect. Nothing is ever applied here, and two
+        // test files planning the same configuration at once would otherwise
+        // fail on each other's state lock rather than on the configuration.
+        "-lock=false",
+        "-out",
+        planFile,
+      ],
       { env: { TF_IN_AUTOMATION: "1" }, reject: false },
     );
 

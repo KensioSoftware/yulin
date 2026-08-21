@@ -140,6 +140,35 @@ resource "aws_dynamodb_table" "orders" {
   tags = local.tags
 }
 
+# ---------- Reporting table, provisioned rather than on demand ----------
+
+resource "aws_dynamodb_table" "reports" {
+  name           = "${var.app}-reports"
+  billing_mode   = "PROVISIONED"
+  read_capacity  = 5
+  write_capacity = 2
+  hash_key       = "reportId"
+
+  attribute {
+    name = "reportId"
+    type = "S"
+  }
+  attribute {
+    name = "generatedAt"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "byGeneratedAt"
+    hash_key        = "generatedAt"
+    projection_type = "KEYS_ONLY"
+    read_capacity   = 3
+    write_capacity  = 1
+  }
+
+  tags = local.tags
+}
+
 # ---------- Queues and topics ----------
 
 resource "aws_sqs_queue" "dlq" {
@@ -155,6 +184,34 @@ resource "aws_sqs_queue" "processing" {
     maxReceiveCount     = 3
   })
   tags = local.tags
+}
+
+# The reporting queue states its redrive settings as resources of their own,
+# which is the other way the provider lets a queue name a dead-letter queue.
+
+resource "aws_sqs_queue" "reports_dlq" {
+  name = "${var.app}-reports-dlq"
+  tags = local.tags
+}
+
+resource "aws_sqs_queue" "reports" {
+  name = "${var.app}-reports"
+  tags = local.tags
+}
+
+resource "aws_sqs_queue_redrive_policy" "reports" {
+  queue_url = aws_sqs_queue.reports.id
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.reports_dlq.arn
+    maxReceiveCount     = 5
+  })
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "reports_dlq" {
+  queue_url = aws_sqs_queue.reports_dlq.id
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "allowAll"
+  })
 }
 
 resource "aws_sns_topic" "order_events" {
