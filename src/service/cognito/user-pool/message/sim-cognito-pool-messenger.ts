@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimAwsMessageLog } from "../../../aws/message/sim-aws-message-log.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { SimCognitoTriggerOccasion } from "../trigger/sim-cognito-trigger-occasion.js";
@@ -13,6 +14,7 @@ import { SimCognitoSentMessage } from "./sim-cognito-sent-message.js";
 interface SimCognitoPoolMessengerProperties {
   readonly triggers: SimCognitoUserPoolTriggers;
   readonly clock: SimClock;
+  readonly messageLog: SimAwsMessageLog;
 }
 
 /**
@@ -49,10 +51,12 @@ interface SimCognitoMessageRequest {
 export class SimCognitoPoolMessenger {
   private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly clock: SimClock;
+  private readonly messageLog: SimAwsMessageLog;
 
   constructor(properties: SimCognitoPoolMessengerProperties) {
     this.triggers = properties.triggers;
     this.clock = properties.clock;
+    this.messageLog = properties.messageLog;
   }
 
   /**
@@ -100,16 +104,27 @@ export class SimCognitoPoolMessenger {
     });
     const wording = custom.wordingFor(medium, pooled);
 
-    request.pool.messages.record(
-      new SimCognitoSentMessage({
-        username: request.user.username,
-        recipient: delivery.recipient,
-        medium,
-        wording: wording.filledWith(placeholders),
-        occasion: request.occasion,
-        sentDate: this.clock.now(),
-      }),
-    );
+    const message = new SimCognitoSentMessage({
+      username: request.user.username,
+      recipient: delivery.recipient,
+      medium,
+      wording: wording.filledWith(placeholders),
+      occasion: request.occasion,
+      sentDate: this.clock.now(),
+    });
+
+    request.pool.messages.record(message);
+    // Announced after it is recorded, so a listener that goes and reads the
+    // pool finds the message it was just told about.
+    this.messageLog.record({
+      kind: "cognito",
+      userPoolId: request.pool.id,
+      medium,
+      recipient: message.recipient,
+      occasion: message.occasion,
+      subject: message.subject,
+      body: message.body,
+    });
 
     return delivery;
   }

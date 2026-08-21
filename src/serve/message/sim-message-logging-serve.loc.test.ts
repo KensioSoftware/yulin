@@ -1,0 +1,72 @@
+import { PublishCommand } from "@aws-sdk/client-sns";
+import { assertArrayLength, assertStringIncludes } from "@kensio/smartass";
+import { describe, it } from "vitest";
+
+import { recordingConsole } from "../../../test/serve/recording-console.js";
+import { SimAws } from "../../service/aws/sim-aws.js";
+import { serveSimAws } from "../http/local-server/sim-aws-local-server.js";
+
+const phoneNumber = "+15550100";
+
+/**
+ * Text one code through a simulated SNS.
+ */
+async function textACode(simAws: SimAws): Promise<void> {
+  await simAws
+    .sns()
+    .publish(
+      new PublishCommand({ PhoneNumber: phoneNumber, Message: "code 12345" }),
+    );
+}
+
+describe("Message logging on a served simulated AWS environment", () => {
+  it("prints messages without being asked to", async () => {
+    // Given an environment served with nothing said about message logging.
+    const simAws = new SimAws();
+    const messageConsole = recordingConsole();
+    const srv = await serveSimAws({ simAws, port: 0, messageConsole });
+
+    // When a code is texted.
+    await textACode(simAws);
+    await srv.close();
+
+    // Then it reached the console, because a dev server is where these are
+    // worth seeing and asking for them means knowing the option is there.
+    assertArrayLength(messageConsole.lines, 1);
+    assertStringIncludes(messageConsole.lines[0], "code 12345");
+  });
+
+  it("prints nothing when the server was told not to", async () => {
+    // Given an environment served with message logging turned off.
+    const simAws = new SimAws();
+    const messageConsole = recordingConsole();
+    const srv = await serveSimAws({
+      simAws,
+      port: 0,
+      messageLogging: false,
+      messageConsole,
+    });
+
+    // When a code is texted.
+    await textACode(simAws);
+    await srv.close();
+
+    // Then nothing was printed, and the SMS was recorded as it always is.
+    assertArrayLength(messageConsole.lines, 0);
+    assertArrayLength(simAws.sns().sentSmsMessages(), 1);
+  });
+
+  it("stops printing once the server closes", async () => {
+    // Given a served environment that has been closed.
+    const simAws = new SimAws();
+    const messageConsole = recordingConsole();
+    const srv = await serveSimAws({ simAws, port: 0, messageConsole });
+    await srv.close();
+
+    // When a code is texted afterwards.
+    await textACode(simAws);
+
+    // Then the console the server was printing to is left alone.
+    assertArrayLength(messageConsole.lines, 0);
+  });
+});
