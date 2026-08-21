@@ -31,6 +31,17 @@ import {
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 
 /**
+ * The challenge session the passkey page carries, out of its hidden input.
+ */
+function passkeySessionIn(page: string): string {
+  const session = /name="passkey_session" value="([^"]+)"/u.exec(page)?.[1];
+
+  assertTypeString(session);
+
+  return session;
+}
+
+/**
  * A pool that allows a passkey at the first prompt, with a user holding one.
  *
  * The pool has a hosted domain and no `WebAuthnConfiguration`, so the passkey
@@ -106,11 +117,21 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
     // Given a pool that allows a passkey, with a user holding one.
     const setUp = await simCognitoWithHostedPasskey();
 
-    // When the browser posts the sign-in form with the passkey button.
-    const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", {
+    // When the browser posts the sign-in form with the passkey button, and
+    // presents the credential the page then asks for.
+    const asked = await simCognitoPostForm(setUp, "/oauth2/authorize", {
       ...simCognitoAuthorizeParameters(setUp),
       username: simCognitoLocalUsername,
       passkey: "passkey",
+    });
+    const session = passkeySessionIn(await asked.text());
+    const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", {
+      ...simCognitoAuthorizeParameters(setUp),
+      username: simCognitoLocalUsername,
+      passkey_session: session,
+      credential: JSON.stringify(
+        setUp.cognito.userPool(setUp.userPoolId).webAuthnAssertion(session),
+      ),
     });
     const redirect = simCognitoRedirectedTo(posted);
     const code = redirect.searchParams.get("code");
@@ -155,11 +176,69 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
       passkey: "passkey",
     });
 
-    // Then the sign-in form comes back saying what is missing, which is where
-    // real managed login puts a refusal the person can act on.
+    // Then the sign-in form comes back saying the passkey is not one this
+    // user could present, which is where real managed login puts a refusal the
+    // person can act on.
     assertStringIncludes(
       await posted.text(),
-      "registered no passkey the challenge would accept",
+      "&#39;WEB_AUTHN&#39; is not available to this user",
+    );
+  });
+
+  it("signs nobody in on the passkey button alone", async () => {
+    // Given a pool that allows a passkey, with a user holding one.
+    const setUp = await simCognitoWithHostedPasskey();
+
+    // When a caller posts the username and the button, and nothing else.
+    const asked = await simCognitoPostForm(setUp, "/oauth2/authorize", {
+      ...simCognitoAuthorizeParameters(setUp),
+      username: simCognitoLocalUsername,
+      passkey: "passkey",
+    });
+
+    // Then it is asked for the passkey rather than signed in, so knowing a
+    // username is not enough to reach the application with a code.
+    assertIdentical(asked.status, 200);
+    assertIdentical(asked.headers.get("location"), null);
+    assertStringIncludes(await asked.text(), "Present your passkey");
+  });
+
+  it("refuses a credential another passkey signed", async () => {
+    // Given two pools that allow passkeys, each with a user holding one.
+    const setUp = await simCognitoWithHostedPasskey();
+    const other = await simCognitoWithHostedPasskey();
+    const parameters = simCognitoAuthorizeParameters(setUp);
+    const asked = await simCognitoPostForm(setUp, "/oauth2/authorize", {
+      ...parameters,
+      username: simCognitoLocalUsername,
+      passkey: "passkey",
+    });
+    const session = passkeySessionIn(await asked.text());
+    const otherAsked = await simCognitoPostForm(other, "/oauth2/authorize", {
+      ...simCognitoAuthorizeParameters(other),
+      username: simCognitoLocalUsername,
+      passkey: "passkey",
+    });
+    const otherSession = passkeySessionIn(await otherAsked.text());
+
+    // When the first pool is answered with the other user's credential.
+    const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", {
+      ...parameters,
+      username: simCognitoLocalUsername,
+      passkey_session: session,
+      credential: JSON.stringify(
+        other.cognito
+          .userPool(other.userPoolId)
+          .webAuthnAssertion(otherSession),
+      ),
+    });
+
+    // Then the signature is what settles it, and the browser is answered with
+    // the form rather than a code.
+    assertIdentical(posted.status, 200);
+    assertStringIncludes(
+      await posted.text(),
+      "challenge this user pool did not",
     );
   });
 });

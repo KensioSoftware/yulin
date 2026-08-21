@@ -283,12 +283,14 @@ it, in a basic authorization header or in the body, and a public client presents
 binds the grant with PKCE.
 
 `SimCognitoAuthorizeEndpoint` signs a user in and answers with the redirect back to the
-application. `SimCognitoHostedSignIn` is what decides which of the two sign-ins a request asked
-for. One naming an identity provider goes through `SimCognitoFederatedSignIn`, and one naming none
-goes through `SimCognitoHostedPasswordSignIn`, which checks the `username` and `password` the
-request carried with the checks `InitiateAuth` makes. A request carrying none is refused with
-`SimCognitoManagedLoginRequired`, which is the one refusal the serving layer answers with a page
-rather than with an error. `SimCognitoTokenEndpoint` exchanges the code,
+application. `SimCognitoHostedSignIn` is what decides which sign-in a request asked for. One naming
+an identity provider goes through `SimCognitoFederatedSignIn`. One carrying a `username` and a
+`password` goes through `SimCognitoHostedPasswordSignIn`, which checks them with the checks
+`InitiateAuth` makes. One asking for a passkey goes through `SimCognitoHostedPasskeySignIn`, which
+takes two requests: the first is refused with `SimCognitoPasskeyRequired` carrying the challenge the
+pool issued, and the second presents the credential answering it. A request carrying none of them is
+refused with `SimCognitoManagedLoginRequired`. Those two refusals are the ones the serving layer
+answers with a page rather than with an error. `SimCognitoTokenEndpoint` exchanges the code,
 through the pool's own token issuer rather than anything of its own, so a hosted sign-in and an API
 sign-in issue the same tokens and run the same `PreTokenGeneration` trigger.
 
@@ -684,9 +686,9 @@ resource, here or on real AWS.
   the options to a browser and the browser hands back what its authenticator made of them.
 - A passkey signing in through `USER_AUTH` completes the sign-in on its own, where a password would
   be held to the pool's second factor. Real Cognito counts a passkey as having met that requirement.
-- Managed login runs the WebAuthn ceremony itself where a real browser would run it with the
-  person's own authenticator. The pages serve no script, so the passkey button is the whole of what
-  the form posts.
+- Managed login asks for the credential on a page of its own, where a real browser runs the WebAuthn
+  ceremony with the person's own authenticator between the two requests. The pages serve no script,
+  so the credential is a field on a form and a caller presents it.
 - A pool that configured no `RelyingPartyId` registers passkeys against its own hosted domain, which
   is what real Cognito falls back to. A pool with neither refuses the registration.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it

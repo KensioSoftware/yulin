@@ -1845,7 +1845,8 @@ out.
 An authorize request naming no `identity_provider` signs in one of the pool's own users. Real
 managed login answers that request with a form and takes an email address and a password from it.
 Here the two arrive as a `username` and a `password` beside the parameters the request already
-carries, and everything after them is the same grant. The app client needs `COGNITO` among its
+carries, and everything after them is the same grant. A pool that allows passkeys offers one on the
+same form, which is covered in [A passkey at managed login](#a-passkey-at-managed-login). The app client needs `COGNITO` among its
 `SupportedIdentityProviders`, which is what real Cognito needs before managed login offers the form
 at all.
 
@@ -1916,10 +1917,10 @@ sign-up, password reset and sign-in without any of it being stubbed out.
 
 `GET /oauth2/authorize` naming no `identity_provider` answers HTML holding the sign-in form. The
 form has a username field, a password field, and the authorize parameters as hidden inputs, and it
-posts back to `/oauth2/authorize`. The pool's identity providers are links to the same endpoint with
-`identity_provider` set, so both ways in are on the one page. Posting the form redirects to the app
-client's callback URL with the code and the `state`, honouring a `code_challenge` the request
-carried.
+posts back to `/oauth2/authorize`. A pool that allows passkeys carries a second button beside them.
+The pool's identity providers are links to the same endpoint with `identity_provider` set, so every
+way in is on the one page. Posting the form redirects to the app client's callback URL with the code
+and the `state`, honouring a `code_challenge` the request carried.
 
 `/signup` is a link from that page. Its form asks for a username, a password and the attributes the
 pool needs, which are the ones its `Schema` made required and the ones its `AutoVerifiedAttributes`
@@ -4271,13 +4272,23 @@ offers them where its policy allows them, and the refusal lands on the choice.
 ### A passkey at managed login
 
 Managed login's sign-in form offers a passkey where the pool allows one at the first prompt, beside
-the username and password it already asks for. Posting the form with that button signs the user in
-and sends the browser back to the application with an authorization code, which exchanges for tokens
-the way a password sign-in's code does.
+the username and password it already asks for. It takes two requests, as it does on real managed
+login.
 
-Real managed login runs the WebAuthn ceremony in the browser, with the person's own authenticator,
-before posting the credential back. These pages serve no script, so the simulator runs the ceremony
-itself against the user's registered passkey. What the form posts is the username and the button.
+Posting the form with that button is answered with a second page. The pool has issued a `WEB_AUTHN`
+challenge by then, and the page carries the session it belongs to in a hidden `passkey_session`
+input alongside a `credential` field. Posting that back signs the user in and sends the browser to
+the application with an authorization code, which exchanges for tokens the way a password sign-in's
+code does.
+
+Real managed login runs the WebAuthn ceremony between the two requests, in the browser, with the
+person's own authenticator. These pages serve no script, so the credential is a field on a form and
+`SimCognitoUserPool.webAuthnAssertion` is where a test reads it from, passing the session the page
+carried. The button alone signs nobody in. A passkey a caller does not hold is one it cannot
+present, so knowing a username reaches the challenge and no further.
+
+A credential the pool refuses sends the browser back to the sign-in form with the reason on it,
+where a wrong password would land, and the sign-in starts again.
 
 ## Available functionality
 

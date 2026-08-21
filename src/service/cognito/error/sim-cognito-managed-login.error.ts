@@ -34,3 +34,47 @@ export function isSimCognitoManagedLoginRequired(
 ): error is SimCognitoManagedLoginRequired {
   return error instanceof SimCognitoManagedLoginRequired;
 }
+
+/**
+ * An authorize request that has been asked for a passkey and has yet to
+ * present one.
+ *
+ * Real managed login runs the WebAuthn ceremony in the browser at this point,
+ * with the person's own authenticator, and posts the credential back. These
+ * pages serve no script, so the serving layer answers with a page carrying the
+ * challenge, and whatever holds the passkey presents it in the next request.
+ *
+ * The session is the challenge the pool issued, and the credential coming back
+ * has to have signed it.
+ */
+export class SimCognitoPasskeyRequired extends SimCognitoOAuthError {
+  /** The user the challenge was issued for. */
+  public readonly username: string;
+
+  /** The challenge session a credential answers. */
+  public readonly session: string;
+
+  constructor(username: string, session: string) {
+    super({
+      code: "invalid_request",
+      description:
+        "This request asked to sign in with a passkey, so the pool has " +
+        "issued a challenge and needs the credential answering it. Read the " +
+        "credential off the pool with SimCognitoUserPool.webAuthnAssertion, " +
+        "and post it back as credential with the passkey_session it answers.",
+      redirectable: false,
+    });
+    this.username = username;
+    this.session = session;
+  }
+}
+
+/**
+ * Whether an authorize request was one managed login would have asked for a
+ * passkey on.
+ */
+export function isSimCognitoPasskeyRequired(
+  error: unknown,
+): error is SimCognitoPasskeyRequired {
+  return error instanceof SimCognitoPasskeyRequired;
+}

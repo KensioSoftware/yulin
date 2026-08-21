@@ -1,10 +1,9 @@
 import {
-  requireSimCognitoConfirmed,
-  requireSimCognitoEnabled,
-  requireSimCognitoPasswordSet,
+  requireSimCognitoReadyToSignIn,
   requireSimCognitoSignInUser,
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
+import { requireSimCognitoAllowedPassword } from "./sim-cognito-available-challenges.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoFirstFactorChallenge } from "./sim-cognito-first-factor-challenge.js";
 import type {
@@ -28,6 +27,8 @@ interface SimCognitoUserAuthSignInProperties {
  * ones this user has. A request naming a `PREFERRED_CHALLENGE` is answered
  * with that factor's challenge instead, and one carrying a `PASSWORD` outright
  * is signed in there and then, which is what real Cognito does with all three.
+ * The pool's policy is what settles all three: a pool that allows no password
+ * first refuses one however the request sent it.
  *
  * This is the flow a passkey is presented through. It is also another way in
  * for a password, and `USER_PASSWORD_AUTH` goes on being the direct one.
@@ -60,6 +61,11 @@ export class SimCognitoUserAuthSignIn {
     const { pool, client, parameters, clientMetadata } = request;
 
     if (parameters.find("PASSWORD") !== undefined) {
+      // A password sent outright skips the choice, so the pool's policy is
+      // read here rather than out of the factors the choice would have
+      // offered.
+      requireSimCognitoAllowedPassword(pool);
+
       return await this.passwordSignIn.handle(request);
     }
 
@@ -73,17 +79,13 @@ export class SimCognitoUserAuthSignIn {
       clientMetadata,
     });
 
-    requireSimCognitoEnabled(user);
-    requireSimCognitoConfirmed(user);
-    requireSimCognitoPasswordSet(user);
+    requireSimCognitoReadyToSignIn(user);
 
     const preferred = parameters.find("PREFERRED_CHALLENGE");
     const offer = { pool, client, user };
 
-    if (preferred === undefined) {
-      return this.challenge.offer(offer);
-    }
-
-    return this.challenge.issue(offer, preferred, "PREFERRED_CHALLENGE");
+    return preferred === undefined
+      ? this.challenge.offer(offer)
+      : this.challenge.issue(offer, preferred, "PREFERRED_CHALLENGE");
   }
 }

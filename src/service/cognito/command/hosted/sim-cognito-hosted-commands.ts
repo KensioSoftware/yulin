@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
+import type { SimCognitoFirstFactorChallenge } from "../auth/sim-cognito-first-factor-challenge.js";
 import { SimCognitoAuthorizeEndpoint } from "./sim-cognito-authorize-endpoint.js";
 import { SimCognitoHostedSignIn } from "./sim-cognito-hosted-sign-in.js";
 import { SimCognitoLogoutEndpoint } from "./sim-cognito-logout-endpoint.js";
@@ -10,6 +11,12 @@ import { SimCognitoTokenEndpoint } from "./sim-cognito-token-endpoint.js";
 interface SimCognitoHostedCommandsProperties {
   readonly tokenIssuer: SimCognitoTokenIssuer;
   readonly userFactory: SimCognitoUserFactory;
+
+  /**
+   * What asks a user for a passkey, shared with the API sign-ins so a passkey
+   * at the hosted domain answers the same kind of challenge.
+   */
+  readonly challenge: SimCognitoFirstFactorChallenge;
   readonly clock: SimClock;
 }
 
@@ -28,11 +35,12 @@ export class SimCognitoHostedCommands {
   public readonly logout = new SimCognitoLogoutEndpoint();
 
   constructor(properties: SimCognitoHostedCommandsProperties) {
-    const { tokenIssuer, userFactory, clock } = properties;
+    const { tokenIssuer, userFactory, challenge, clock } = properties;
 
     this.authorize = new SimCognitoAuthorizeEndpoint({
       signIn: new SimCognitoHostedSignIn({
         federatedSignIn: new SimCognitoFederatedSignIn({ userFactory }),
+        challenge,
         clock,
       }),
       clock,

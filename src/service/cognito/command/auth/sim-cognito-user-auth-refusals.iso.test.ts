@@ -27,6 +27,7 @@ import {
   SimCognitoInvalidParameterException,
   SimCognitoNotAuthorizedException,
 } from "../../error/sim-cognito.error.js";
+import { SimCognitoWebAuthnChallengeNotFoundException } from "../../error/sim-cognito-web-authn.error.js";
 
 async function userAuth(
   setUp: SimCognitoSignedInSetUp,
@@ -147,6 +148,7 @@ describe("sim Cognito choice-based sign-in refusals", () => {
 
     // Then it answers a challenge this pool did not issue, which is the first
     // thing the credential is read for.
+    assertInstanceOf(error, SimCognitoWebAuthnChallengeNotFoundException);
     assertStringIncludes(error.message, "challenge this user pool did not");
   });
 
@@ -338,5 +340,46 @@ describe("sim Cognito choice-based sign-in refusals", () => {
     // Then the session carries no options a passkey could be presented
     // against.
     assertInstanceOf(error, SimCognitoNotAuthorizedException);
+  });
+
+  it("refuses a password at a pool whose policy allows none", async () => {
+    // Given a pool that allows a passkey and a code sent by email, and no
+    // password, with a user holding one anyway.
+    const setUp = await simCognitoSignedIn({
+      explicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_USER_AUTH"],
+      attributes: [{ Name: "email", Value: "alice@example.com" }],
+    });
+
+    await setUp.cognito.updateUserPool(
+      new UpdateUserPoolCommand({
+        UserPoolId: setUp.userPoolId,
+        Policies: {
+          SignInPolicy: {
+            AllowedFirstAuthFactors: ["EMAIL_OTP", "WEB_AUTHN"],
+          },
+        },
+      }),
+    );
+
+    // When a choice-based sign-in sends the password outright, skipping the
+    // choice the pool would have offered.
+    const error = await assertThrowsErrorAsync(async () => {
+      await setUp.cognito.initiateAuth(
+        new InitiateAuthCommand({
+          ClientId: setUp.clientId,
+          AuthFlow: "USER_AUTH",
+          AuthParameters: {
+            USERNAME: simCognitoUsername,
+            PASSWORD: simCognitoPassword,
+          },
+        }),
+      );
+    });
+
+    // Then the pool's policy refuses it, as it refuses a password picked out
+    // of the choice.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "not a first factor this user pool");
+    assertStringIncludes(error.message, "EMAIL_OTP, WEB_AUTHN");
   });
 });

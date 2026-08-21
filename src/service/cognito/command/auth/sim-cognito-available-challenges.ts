@@ -95,3 +95,23 @@ export function requireSimCognitoAvailableChallenge(
     );
   }
 }
+
+/**
+ * Refuse a password at a pool that allows none at the first prompt.
+ *
+ * A `USER_AUTH` request carrying a `PASSWORD` outright never reaches the
+ * choice, so the policy is read here instead. A pool that allows no password
+ * first refuses one, as it refuses one picked out of the choice.
+ */
+export function requireSimCognitoAllowedPassword(
+  pool: SimCognitoUserPool,
+): void {
+  const { factors } = pool.settings.signInPolicy;
+
+  if (!factors.includes(simCognitoPasswordChallenge)) {
+    throw new SimCognitoInvalidParameterException(
+      `AuthParameters PASSWORD is not a first factor this user pool allows: ` +
+        `its SignInPolicy AllowedFirstAuthFactors names ${factors.join(", ")}`,
+    );
+  }
+}

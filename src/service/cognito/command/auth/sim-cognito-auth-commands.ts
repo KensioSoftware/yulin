@@ -10,7 +10,7 @@ import { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
 import { SimCognitoGetTokensFromRefreshToken } from "./sim-cognito-get-tokens-from-refresh-token.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
-import { SimCognitoFirstFactorChallenge } from "./sim-cognito-first-factor-challenge.js";
+import type { SimCognitoFirstFactorChallenge } from "./sim-cognito-first-factor-challenge.js";
 import { SimCognitoFirstFactorResponse } from "./sim-cognito-first-factor-response.js";
 import { SimCognitoPasswordResponse } from "./sim-cognito-password-response.js";
 import { SimCognitoWebAuthnResponse } from "./sim-cognito-web-authn-response.js";
@@ -46,6 +46,12 @@ interface SimCognitoAuthCommandsProperties {
    * recorded the same way.
    */
   readonly messenger: SimCognitoPoolMessenger;
+
+  /**
+   * What asks a user for its first factor, shared with the hosted endpoints so
+   * a passkey presented at either answers the same kind of challenge.
+   */
+  readonly firstFactor: SimCognitoFirstFactorChallenge;
 }
 
 /**
@@ -76,6 +82,7 @@ export class SimCognitoAuthCommands {
       triggers,
       tokenIssuer,
       messenger,
+      firstFactor,
     } = properties;
     // Every sign-in ends the same way, wherever it finished: with the second
     // factor where the user owes one, and with the tokens and the
@@ -95,10 +102,6 @@ export class SimCognitoAuthCommands {
       challenge: new SimCognitoNewPasswordChallenge({ clock }),
       triggers,
     });
-    // The choice a USER_AUTH sign-in offers is issued in one place and
-    // answered in another, and the answer can issue the next challenge, so
-    // both halves share the one challenge issuer.
-    const firstFactor = new SimCognitoFirstFactorChallenge({ clock });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn,
       refreshSignIn: new SimCognitoRefreshSignIn({ refreshedTokens, clock }),

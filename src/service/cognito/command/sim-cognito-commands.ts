@@ -18,6 +18,7 @@ import { SimCognitoDomainCommands } from "./domain/sim-cognito-domain-commands.j
 import { SimCognitoHostedCommands } from "./hosted/sim-cognito-hosted-commands.js";
 import { SimCognitoIdentityProviderCommands } from "./idp/sim-cognito-identity-provider-commands.js";
 import { SimCognitoAuthResolver } from "./auth/sim-cognito-auth-resolver.js";
+import { SimCognitoFirstFactorChallenge } from "./auth/sim-cognito-first-factor-challenge.js";
 import { SimCognitoAuthorizer } from "./authorize/sim-cognito-authorizer.js";
 import { SimCognitoListUserPoolClients } from "./client/sim-cognito-list-user-pool-clients.js";
 import { SimCognitoGroupCommands } from "./group/sim-cognito-group-commands.js";
@@ -112,6 +113,9 @@ export class SimCognitoCommands {
     // The operations a signed-in user performs on itself name no pool at all:
     // the access token is what says which pool the request is for.
     const tokenUser = new SimCognitoTokenUser({ pools, clock });
+    // A USER_AUTH sign-in and a hosted one both ask for a passkey, and the
+    // challenge is the same one either way, so they share the issuer.
+    const firstFactor = new SimCognitoFirstFactorChallenge({ clock });
 
     // One factory each serves the create commands and the registrations, so a
     // pool the simulation is told about is built the same way as one it made.
@@ -184,6 +188,7 @@ export class SimCognitoCommands {
       triggers,
       tokenIssuer,
       messenger,
+      firstFactor,
     });
     this.domains = new SimCognitoDomainCommands({
       pools,
@@ -201,6 +206,7 @@ export class SimCognitoCommands {
     this.hosted = new SimCognitoHostedCommands({
       tokenIssuer,
       userFactory,
+      challenge: firstFactor,
       clock,
     });
   }
