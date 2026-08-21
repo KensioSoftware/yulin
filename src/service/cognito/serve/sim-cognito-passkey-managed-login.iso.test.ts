@@ -1,10 +1,4 @@
 import {
-  AdminInitiateAuthCommand,
-  CompleteWebAuthnRegistrationCommand,
-  StartWebAuthnRegistrationCommand,
-  UpdateUserPoolCommand,
-} from "@aws-sdk/client-cognito-identity-provider";
-import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -14,81 +8,26 @@ import {
 import { describe, it } from "vitest";
 
 import {
-  simCognitoCallbackUrl,
   simCognitoHosted,
-  simCognitoLocalPassword,
   simCognitoLocalUser,
   simCognitoLocalUsername,
-  type SimCognitoHostedSetUp,
 } from "../../../../test/cognito/federation-fixture.js";
 import {
   simCognitoAuthorizeParameters,
   simCognitoGetPage,
-  simCognitoPageUrl,
   simCognitoPostForm,
   simCognitoRedirectedTo,
 } from "../../../../test/cognito/managed-login-fixture.js";
-import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
-
-/**
- * The challenge session the passkey page carries, out of its hidden input.
- */
-function passkeySessionIn(page: string): string {
-  const session = /name="passkey_session" value="([^"]+)"/u.exec(page)?.[1];
-
-  assertTypeString(session);
-
-  return session;
-}
-
-/**
- * A pool that allows a passkey at the first prompt, with a user holding one.
- *
- * The pool has a hosted domain and no `WebAuthnConfiguration`, so the passkey
- * is registered against the domain, which is what real Cognito falls back to.
- */
-async function simCognitoWithHostedPasskey(): Promise<SimCognitoHostedSetUp> {
-  const setUp = await simCognitoHosted();
-
-  await simCognitoLocalUser(setUp);
-  await setUp.cognito.updateUserPool(
-    new UpdateUserPoolCommand({
-      UserPoolId: setUp.userPoolId,
-      Policies: {
-        SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD", "WEB_AUTHN"] },
-      },
-    }),
-  );
-
-  const signedIn = await setUp.cognito.adminInitiateAuth(
-    new AdminInitiateAuthCommand({
-      UserPoolId: setUp.userPoolId,
-      ClientId: setUp.clientId,
-      AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
-      AuthParameters: {
-        USERNAME: simCognitoLocalUsername,
-        PASSWORD: simCognitoLocalPassword,
-      },
-    }),
-  );
-  const AccessToken = signedIn.AuthenticationResult?.AccessToken;
-
-  assertTypeString(AccessToken);
-
-  await setUp.cognito.startWebAuthnRegistration(
-    new StartWebAuthnRegistrationCommand({ AccessToken }),
-  );
-  await setUp.cognito.completeWebAuthnRegistration(
-    new CompleteWebAuthnRegistrationCommand({
-      AccessToken,
-      Credential: setUp.cognito
-        .userPool(setUp.userPoolId)
-        .webAuthnCredential(simCognitoLocalUsername),
-    }),
-  );
-
-  return setUp;
-}
+import {
+  simCognitoExchangedTokens,
+  simCognitoHostedAddress,
+  simCognitoPasskeyAsked,
+  simCognitoPasskeyPosted,
+  simCognitoPasskeyPresented,
+  simCognitoPasskeySessionIn,
+  simCognitoPasskeyUsernameIn,
+  simCognitoWithHostedPasskey,
+} from "../../../../test/cognito/hosted-passkey-fixture.js";
 
 describe("Signing in with a passkey at sim Cognito managed login", () => {
   it("offers a passkey where the pool allows one", async () => {
@@ -119,39 +58,16 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
 
     // When the browser posts the sign-in form with the passkey button, and
     // presents the credential the page then asks for.
-    const asked = await simCognitoPostForm(setUp, "/oauth2/authorize", {
-      ...simCognitoAuthorizeParameters(setUp),
-      username: simCognitoLocalUsername,
-      passkey: "passkey",
-    });
-    const session = passkeySessionIn(await asked.text());
-    const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", {
-      ...simCognitoAuthorizeParameters(setUp),
-      username: simCognitoLocalUsername,
-      passkey_session: session,
-      credential: JSON.stringify(
-        setUp.cognito.userPool(setUp.userPoolId).webAuthnAssertion(session),
-      ),
-    });
+    const posted = await simCognitoPasskeyPosted(
+      setUp,
+      simCognitoLocalUsername,
+    );
     const redirect = simCognitoRedirectedTo(posted);
     const code = redirect.searchParams.get("code");
 
     assertNonNullable(code);
 
-    const exchanged = await new SimAwsHttp({ simAws: setUp.simAws }).fetch(
-      simCognitoPageUrl("/oauth2/token"),
-      {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          client_id: setUp.clientId,
-          code,
-          redirect_uri: simCognitoCallbackUrl,
-        }).toString(),
-      },
-    );
-    const tokens = (await exchanged.json()) as Record<string, unknown>;
+    const tokens = await simCognitoExchangedTokens(setUp, code);
 
     // Then the browser went back to the application with a code, and the code
     // exchanged for the tokens a password sign-in would have earned.
@@ -160,6 +76,34 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
     assertTypeString(tokens["access_token"]);
     assertTypeString(tokens["id_token"]);
     assertIdentical(tokens["token_type"], "Bearer");
+  });
+
+  it("signs in by the address a pool signs its users in by", async () => {
+    // Given a pool that signs its users in by email, allowing a passkey, with
+    // a user holding one. The username that user holds is a UUID the pool
+    // generated, and the address is all the browser knows it by.
+    const setUp = await simCognitoWithHostedPasskey({
+      usernameAttributes: ["email"],
+      username: simCognitoHostedAddress,
+    });
+
+    // When the browser asks for the passkey and presents the credential,
+    // posting back what the passkey page carried.
+    const page = await simCognitoPasskeyAsked(setUp, simCognitoHostedAddress);
+    const posted = await simCognitoPasskeyPresented(setUp, page);
+    const code = simCognitoRedirectedTo(posted).searchParams.get("code");
+
+    assertNonNullable(code);
+
+    const tokens = await simCognitoExchangedTokens(setUp, code);
+
+    // Then the page carried the address the person signed in by, and the
+    // address resolved to the user the challenge was issued for, so the
+    // sign-in finished and the code exchanged for tokens.
+    assertIdentical(simCognitoPasskeyUsernameIn(page), simCognitoHostedAddress);
+    assertIdentical(posted.status, 302);
+    assertTypeString(tokens["access_token"]);
+    assertTypeString(tokens["id_token"]);
   });
 
   it("shows the refusal on the form where the user has no passkey", async () => {
@@ -213,13 +157,13 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
       username: simCognitoLocalUsername,
       passkey: "passkey",
     });
-    const session = passkeySessionIn(await asked.text());
+    const session = simCognitoPasskeySessionIn(await asked.text());
     const otherAsked = await simCognitoPostForm(other, "/oauth2/authorize", {
       ...simCognitoAuthorizeParameters(other),
       username: simCognitoLocalUsername,
       passkey: "passkey",
     });
-    const otherSession = passkeySessionIn(await otherAsked.text());
+    const otherSession = simCognitoPasskeySessionIn(await otherAsked.text());
 
     // When the first pool is answered with the other user's credential.
     const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", {
