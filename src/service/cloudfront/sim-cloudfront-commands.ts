@@ -57,6 +57,7 @@ import type { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-head
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
 import type { SimCfDistributionConfigurationState } from "./distribution/sim-cf-distribution-configuration-state.js";
 import type { SimCfWebAclResolver } from "./web-acl/sim-cf-web-acl.js";
+import type { SimCfEdgeFunctions } from "./edge/sim-cf-edge-functions.js";
 import { SimCfKeyValueStoreAccess } from "./key-value-store/sim-cf-key-value-store-access.js";
 import { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 import { SimCloudFrontKeyValueStoreRegistry } from "./key-value-store/sim-cf-key-value-store-registry.js";
@@ -75,6 +76,8 @@ export interface SimCloudFrontProperties {
   readonly acmRegistry?: SimAcmRegistry | undefined;
   /** How a Distribution's `WebACLId` is resolved to the web ACL it names. */
   readonly webAclResolver?: SimCfWebAclResolver | undefined;
+  /** The Lambda functions a Behavior's `LambdaFunctionAssociations` can run. */
+  readonly edgeFunctions?: SimCfEdgeFunctions | undefined;
   readonly background?: BackgroundScheduler;
 }
 
@@ -139,6 +142,14 @@ export class SimCloudFrontCommands {
    */
   public readonly keyValueStoreApi: SimCloudFrontKeyValueStoreApi;
 
+  /**
+   * The Lambda functions this CloudFront's Behaviors can run at the edge.
+   *
+   * Read by the request pipeline, which invokes one for a viewer event, as
+   * well as by the Distribution commands, which check one can be associated.
+   */
+  public readonly edgeFunctions: SimCfEdgeFunctions | undefined;
+
   private readonly distributionState: SimCloudFrontDistributionState;
   private readonly functionState: SimCloudFrontFunctionState;
   private readonly configurationState: SimCfDistributionConfigurationState;
@@ -154,11 +165,13 @@ export class SimCloudFrontCommands {
       iam = new SimIamAllowAllAuth(),
       acmRegistry,
       webAclResolver,
+      edgeFunctions,
       background = new BackgroundTasks(),
     } = properties;
 
     const keyValueStores = new SimCloudFrontKeyValueStoreRegistry();
 
+    this.edgeFunctions = edgeFunctions;
     this.distributionState = {
       accountId,
       distributions,
@@ -178,6 +191,7 @@ export class SimCloudFrontCommands {
       customOriginDispatcher,
       acmRegistry,
       webAclResolver,
+      edgeFunctions,
       originAccessControls: properties.originAccessControls,
       responseHeadersPolicies: properties.responseHeadersPolicies,
     };

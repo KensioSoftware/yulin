@@ -1,5 +1,6 @@
 import { StaticFactory } from "@kensio/part-factory";
 import type { SimArn } from "../../aws/arn.js";
+import type { SimCfEdgeAssociations } from "../edge/sim-cf-edge-association.js";
 
 export interface SimCloudFrontBehavior {
   pathPattern?: string; // undefined/default = *
@@ -18,6 +19,10 @@ export interface SimCloudFrontBehavior {
         viewerRequest?: SimArn;
         viewerResponse?: SimArn;
       };
+  /**
+   * The Lambda@Edge functions this Behavior runs, by event type.
+   */
+  lambdaFunctionAssociations?: SimCfEdgeAssociations | undefined;
 }
 
 /**

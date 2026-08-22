@@ -28,6 +28,8 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateDistributionAuthorizer } from "./create-distribution-authorizer.js";
 import type { SimAcmRegistry } from "../../../acm/registry/sim-acm-registry.js";
 import { SimCloudFrontViewerCertificateValidator } from "../../distribution/viewer-certificate/sim-cf-viewer-certificate-validator.js";
+import { SimCfEdgeAssociationValidator } from "../../edge/sim-cf-edge-association-validator.js";
+import type { SimCfEdgeFunctions } from "../../edge/sim-cf-edge-functions.js";
 
 interface CreateDistributionCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
@@ -43,6 +45,7 @@ interface CreateDistributionCommandHandlerProperties {
   readonly webAclResolver?: SimCfWebAclResolver | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
+  readonly edgeFunctions?: SimCfEdgeFunctions | undefined;
   readonly background: BackgroundScheduler;
 }
 
@@ -68,6 +71,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   private readonly distributionConfigurator: SimCloudFrontDistributionConfigurator;
   private readonly authorizer: CreateDistributionAuthorizer;
   private readonly viewerCertificateValidator: SimCloudFrontViewerCertificateValidator;
+  private readonly edgeAssociationValidator: SimCfEdgeAssociationValidator;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: CreateDistributionCommandHandlerProperties) {
@@ -76,8 +80,11 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.distributionConfigurator =
       makeSimCloudFrontDistributionConfigurator(properties);
-    this.authorizer = new CreateDistributionAuthorizer({
-      iam: properties.iam ?? new SimIamAllowAllAuth(),
+    const iam = properties.iam ?? new SimIamAllowAllAuth();
+    this.authorizer = new CreateDistributionAuthorizer({ iam });
+    this.edgeAssociationValidator = new SimCfEdgeAssociationValidator({
+      iam,
+      edgeFunctions: properties.edgeFunctions,
     });
     this.viewerCertificateValidator =
       new SimCloudFrontViewerCertificateValidator({
@@ -109,9 +116,14 @@ export class CreateDistributionCommandHandler implements CommandHandler<
 
     this.authorizer.authorize(options?.caller);
 
-    // Reject an unusable viewer certificate before any Distribution state is
-    // allocated, as CloudFront rejects the whole request.
+    // Reject an unusable viewer certificate or Lambda@Edge association before
+    // any Distribution state is allocated, as CloudFront rejects the whole
+    // request.
     this.viewerCertificateValidator.validate(distributionConfig);
+    await this.edgeAssociationValidator.validate(
+      distributionConfig,
+      options?.caller,
+    );
 
     const distributionId = this.cloudFrontRegistry.allocateDistributionId();
     const distribution = new SimCloudFrontDistribution({

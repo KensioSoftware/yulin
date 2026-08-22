@@ -5,6 +5,7 @@ export {
 } from "./factory/cloudfront-functions.factory.js";
 export { cloudFrontFunctionSourceFromModule } from "./cff/function-code-module/cff-code-module-file.js";
 export type { CloudFrontFunction } from "./typings/cloudfront-functions.namespace.js";
+export type { LambdaAtEdge } from "./typings/lambda-at-edge.namespace.js";
 export type { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 export type { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 export type {

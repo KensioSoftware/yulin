@@ -9,6 +9,11 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
  * the Distribution's custom error page, apply the Behavior's response headers
  * policy, then run viewer-response hooks.
  *
+ * A viewer hook is a CloudFront Function or a Lambda@Edge function. A Behavior
+ * carries at most one of the two kinds at the viewer events, which
+ * `SimCfEdgeAssociationValidator` refuses to configure otherwise. The two
+ * applicators below run one after the other and only one of them acts.
+ *
  * This is the request-processing core, kept separate from the service
  * controller so the controller stays a thin adapter to the shared
  * service-controller interface and this class stays focused on the ordered
@@ -66,6 +71,19 @@ export class SimCloudFrontRequestPipeline {
     }
     requestReference = cffResult;
 
+    // Handle viewer-request Lambda@Edge, if any. A handler answers with the
+    // request to send to the Origin or with a response of its own, the same
+    // two outcomes a CloudFront Function has.
+    const edgeResult = await this.stages.edgeApplicator.applyViewerRequest(
+      requestReference,
+      distro,
+      behaviour,
+    );
+    if (edgeResult instanceof Response) {
+      return edgeResult;
+    }
+    requestReference = edgeResult;
+
     const originResponse = await this.stages.originFetcher.fetch(
       requestReference,
       distro,
@@ -95,10 +113,18 @@ export class SimCloudFrontRequestPipeline {
     // Handle viewer-response CFF, if any.
     // A viewer-response CFF can inspect the original request and replace or
     // modify the Origin response before it is returned to the caller.
-    return await this.stages.cffApplicator.applyViewerResponse(
+    const cffResponse = await this.stages.cffApplicator.applyViewerResponse(
       cloudFront,
       requestReference,
       response,
+      behaviour,
+    );
+
+    // Handle viewer-response Lambda@Edge, if any.
+    return await this.stages.edgeApplicator.applyViewerResponse(
+      requestReference,
+      cffResponse,
+      distro,
       behaviour,
     );
   }

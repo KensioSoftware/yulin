@@ -7,6 +7,7 @@ import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-beha
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 import { configureCffAssociations } from "./sim-cff-associations-configure.js";
+import { configureEdgeAssociations } from "../../edge/sim-cf-edge-associations-configure.js";
 import { assertConsistentQuantity } from "../../command/sim-cf-list-quantity.js";
 
 /**
@@ -43,6 +44,7 @@ export function simCfBehaviorProperties(
       responseHeadersPolicyId: ResponseHeadersPolicyId,
     }),
     functionAssociations: configureCffAssociations(cacheBehavior),
+    lambdaFunctionAssociations: configureEdgeAssociations(cacheBehavior),
   };
 }
 
