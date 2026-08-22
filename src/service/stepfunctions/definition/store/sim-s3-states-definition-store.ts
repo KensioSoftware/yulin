@@ -56,7 +56,7 @@ export class SimS3StatesDefinitionStore implements SimStatesDefinitionStore {
   /**
    * The object's body, or nothing where the bucket or the key is absent.
    */
-  async objectBody(
+  private async objectBody(
     location: SimStatesDefinitionLocation,
   ): Promise<Readable | undefined> {
     try {
