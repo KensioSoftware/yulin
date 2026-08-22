@@ -66,6 +66,21 @@ export class SimStatesIntrinsicFailure extends SimStepFunctionsError {
 }
 
 /**
+ * A state machine definition that Amazon States Language itself refuses.
+ *
+ * A malformed definition, a state type that does not exist, a transition to a
+ * state that is not there. Real Step Functions rejects each of these when the
+ * state machine is created, and so does this.
+ */
+export class SimStatesInvalidDefinition extends SimStepFunctionsError {
+  public override readonly name = "InvalidDefinition";
+
+  constructor(message: string) {
+    super(message, "States.QueryEvaluationError");
+  }
+}
+
+/**
  * An Amazon States Language construct this simulator does not run.
  *
  * Raised when a state machine is read rather than when a state runs. A
@@ -78,5 +93,74 @@ export class SimStatesUnsimulatedInput extends SimStepFunctionsError {
 
   constructor(message: string) {
     super(message, "States.QueryEvaluationError");
+  }
+}
+
+/**
+ * A state machine an ARN names nothing for.
+ */
+export class SimStatesResourceNotFound extends SimStepFunctionsError {
+  public override readonly name = "StateMachineDoesNotExist";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * An execution an ARN names nothing for.
+ *
+ * Real Step Functions tells this apart from a missing state machine, and a
+ * caller branching on the error name needs the same two names.
+ */
+export class SimStatesExecutionNotFound extends SimStepFunctionsError {
+  public override readonly name = "ExecutionDoesNotExist";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A name outside what Step Functions allows.
+ */
+export class SimStatesInvalidName extends SimStepFunctionsError {
+  public override readonly name = "InvalidName";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A state machine of that name is already there.
+ */
+export class SimStateMachineAlreadyExists extends SimStepFunctionsError {
+  public override readonly name = "StateMachineAlreadyExists";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * An execution of that name has already been started.
+ */
+export class SimStatesExecutionAlreadyExists extends SimStepFunctionsError {
+  public override readonly name = "ExecutionAlreadyExists";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A request whose own input is wrong, before anything is looked up.
+ */
+export class SimStatesInvalidRequest extends SimStepFunctionsError {
+  public override readonly name = "InvalidArn";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
   }
 }

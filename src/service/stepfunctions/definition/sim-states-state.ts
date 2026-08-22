@@ -1,0 +1,77 @@
+import type { JSONValue } from "../../../util/type-guard/json.js";
+import type { SimStatesDataFlowFields } from "../data/sim-states-data-flow.js";
+
+/**
+ * Every state type Amazon States Language defines.
+ *
+ * The ones this simulator has no implementation for are named here so a
+ * definition using one can be refused by its own name.
+ */
+export const simStatesStateTypes = [
+  "Pass",
+  "Succeed",
+  "Fail",
+  "Task",
+  "Choice",
+  "Wait",
+  "Parallel",
+  "Map",
+] as const;
+
+export type SimStatesStateType = (typeof simStatesStateTypes)[number];
+
+/**
+ * The state types this simulator runs.
+ */
+export const simStatesRunnableTypes = ["Pass", "Succeed", "Fail"] as const;
+
+export type SimStatesRunnableType = (typeof simStatesRunnableTypes)[number];
+
+/**
+ * What every state carries, whatever its type.
+ */
+interface SimStatesCommonState extends SimStatesDataFlowFields {
+  readonly Comment?: string;
+  readonly Next?: string;
+  readonly End?: boolean;
+}
+
+/**
+ * A `Pass` state, which produces a result without doing any work.
+ */
+export interface SimStatesPassState extends SimStatesCommonState {
+  readonly Type: "Pass";
+  readonly Result?: JSONValue;
+}
+
+/**
+ * A `Succeed` state, which ends an execution successfully.
+ */
+export interface SimStatesSucceedState extends SimStatesCommonState {
+  readonly Type: "Succeed";
+}
+
+/**
+ * A `Fail` state, which ends an execution with an error.
+ *
+ * Real Step Functions gives `Fail` no input or output processing, so the
+ * data-flow fields on it are refused when the definition is read.
+ */
+export interface SimStatesFailState {
+  readonly Type: "Fail";
+  readonly Comment?: string;
+  readonly Error?: string;
+  readonly Cause?: string;
+}
+
+export type SimStatesState =
+  | SimStatesPassState
+  | SimStatesSucceedState
+  | SimStatesFailState;
+
+/**
+ * Whether a state ends the execution when it is reached.
+ */
+export function isSimStatesTerminal(state: SimStatesState): boolean {
+  return state.Type === "Succeed" || state.Type === "Fail";
+}

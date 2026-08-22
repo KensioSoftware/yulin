@@ -31,6 +31,7 @@ import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKinesis } from "../kinesis/index.js";
+import type { SimStepFunctions } from "../stepfunctions/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
@@ -200,6 +201,13 @@ export class SimAwsAccountRegionContainer {
   kinesis(): SimKinesis {
     return this.memo.getOrCreate("kinesis", () =>
       this.factory.createKinesis(this),
+    );
+  }
+
+  /** Get simulated Step Functions for this account and region. */
+  stepFunctions(): SimStepFunctions {
+    return this.memo.getOrCreate("stepFunctions", () =>
+      this.factory.createStepFunctions(this),
     );
   }
 

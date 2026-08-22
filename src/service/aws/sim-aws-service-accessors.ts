@@ -17,6 +17,7 @@ import type { SimEcs } from "../ecs/index.js";
 import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKinesis } from "../kinesis/index.js";
+import type { SimStepFunctions } from "../stepfunctions/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
@@ -142,6 +143,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated Kinesis Data Streams in the default Account Region scope. */
   kinesis(): SimKinesis {
     return this.defaultAccountRegionScope().kinesis();
+  }
+
+  /** Get simulated Step Functions in the default Account Region scope. */
+  stepFunctions(): SimStepFunctions {
+    return this.defaultAccountRegionScope().stepFunctions();
   }
 
   /** Get simulated KMS in the default Account Region scope. */

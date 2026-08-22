@@ -114,6 +114,9 @@ importers:
       '@aws-sdk/client-sesv2':
         specifier: ^3.1111.0
         version: 3.1111.0
+      '@aws-sdk/client-sfn':
+        specifier: ^3.1115.0
+        version: 3.1115.0
       '@aws-sdk/client-sns':
         specifier: ^3.1104.0
         version: 3.1110.0
@@ -405,6 +408,10 @@ packages:
 
   '@aws-sdk/client-sesv2@3.1111.0':
     resolution: {integrity: sha512-RLraobtxTBIGOVNQzf9q6Irsx6OUSdLgmRw6cGTCoRZ5o8xrHbxA8KUgXLnoDRnVobSfxJaarqd+dS4DQl11rA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-sfn@3.1115.0':
+    resolution: {integrity: sha512-XNTNQYX5N1rurhRsSR46HdFOJXcU0j+UDpqTz6iWOn7mgcQBYs0zFC62wrl+2pkV0gVHiXh9eVplg+yPtOXT4g==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-sns@3.1110.0':
@@ -3966,6 +3973,17 @@ snapshots:
       '@smithy/core': 3.32.0
       '@smithy/fetch-http-handler': 5.7.0
       '@smithy/node-http-handler': 4.10.0
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/client-sfn@3.1115.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.8
+      '@aws-sdk/credential-provider-node': 3.972.80
+      '@aws-sdk/types': 3.974.4
+      '@smithy/core': 3.33.2
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.2
       '@smithy/types': 4.17.2
       tslib: 2.8.1
 

@@ -25,6 +25,7 @@ import type { SimElbV2 } from "../../elbv2/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKinesis } from "../../kinesis/index.js";
+import type { SimStepFunctions } from "../../stepfunctions/index.js";
 import type { SimKms } from "../../kms/index.js";
 import type { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
@@ -234,6 +235,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Kinesis Data Streams for an Account Region scope. */
   createKinesis(scope: SimAwsAccountRegionContainer): SimKinesis {
     return this.selfContainedServices.createKinesis(scope);
+  }
+
+  /** Create simulated Step Functions for an Account Region scope. */
+  createStepFunctions(scope: SimAwsAccountRegionContainer): SimStepFunctions {
+    return this.selfContainedServices.createStepFunctions(scope);
   }
 
   /** Create simulated Lambda for an Account Region scope. */

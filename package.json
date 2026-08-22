@@ -169,6 +169,10 @@
       "import": "./dist/service/sqs/index.js",
       "types": "./dist/service/sqs/index.d.ts"
     },
+    "./stepfunctions": {
+      "import": "./dist/service/stepfunctions/index.js",
+      "types": "./dist/service/stepfunctions/index.d.ts"
+    },
     "./ssm": {
       "import": "./dist/service/ssm/index.js",
       "types": "./dist/service/ssm/index.d.ts"
@@ -230,6 +234,7 @@
     "@aws-sdk/client-scheduler": "^3.1109.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",
     "@aws-sdk/client-sesv2": "^3.1111.0",
+    "@aws-sdk/client-sfn": "^3.1115.0",
     "@aws-sdk/client-sns": "^3.1104.0",
     "@aws-sdk/client-sqs": "^3.1101.0",
     "@aws-sdk/client-ssm": "^3.1101.0",
