@@ -9,23 +9,17 @@ import type {
   SimStatesState,
   SimStatesSucceedState,
 } from "../definition/sim-states-state.js";
+import { runSimStatesChoice } from "./sim-states-run-choice.js";
+import { runSimStatesWait } from "./sim-states-run-wait.js";
+import type {
+  SimStatesStateContext,
+  SimStatesStateOutcome,
+} from "./sim-states-state-outcome.js";
 
 /**
  * The default a `Fail` state reports when it names no error.
  */
 const unnamedFailError = "States.Unknown";
-
-/**
- * What running one state did to the execution.
- */
-export type SimStatesStateOutcome =
-  | { readonly kind: "next"; readonly output: JSONValue; readonly next: string }
-  | { readonly kind: "succeed"; readonly output: JSONValue }
-  | {
-      readonly kind: "fail";
-      readonly error: string;
-      readonly cause: string | undefined;
-    };
 
 /**
  * Run one state and say what happened.
@@ -36,6 +30,7 @@ export type SimStatesStateOutcome =
 export function runSimStatesState(
   state: SimStatesState,
   input: JSONValue,
+  context: SimStatesStateContext,
 ): SimStatesStateOutcome {
   if (state.Type === "Fail") {
     return runFail(state);
@@ -43,6 +38,14 @@ export function runSimStatesState(
 
   if (state.Type === "Succeed") {
     return runSucceed(state, input);
+  }
+
+  if (state.Type === "Choice") {
+    return runSimStatesChoice(state, input, context);
+  }
+
+  if (state.Type === "Wait") {
+    return runSimStatesWait(state, input, context);
   }
 
   return runPass(state, input);

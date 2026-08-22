@@ -108,4 +108,16 @@ describe("Step Functions definition refusals", () => {
       "End that is not a boolean",
     );
   });
+
+  it("refuses a Next that is not a state name", () => {
+    // Given a Pass state whose Next is a number.
+    // When it is read, it is refused as it was written.
+    assertStringIncludes(
+      refusalFor({
+        StartAt: "Only",
+        States: { Only: { Type: "Pass", Next: 2 } },
+      }),
+      "Next that is not a state name",
+    );
+  });
 });

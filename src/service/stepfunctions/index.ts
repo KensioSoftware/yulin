@@ -18,19 +18,24 @@ export {
   simStatesStateTypes,
 } from "./definition/sim-states-state.js";
 export type {
+  SimStatesChoiceState,
   SimStatesState,
   SimStatesStateType,
+  SimStatesWaitState,
 } from "./definition/sim-states-state.js";
+export { SimStatesChoiceRule } from "./choice/sim-states-choice-rule.js";
 export {
   SimStateMachineAlreadyExists,
   SimStatesExecutionAlreadyExists,
   SimStatesIntrinsicFailure,
   SimStatesInvalidDefinition,
   SimStatesInvalidRequest,
+  SimStatesNoChoiceMatched,
   SimStatesPathError,
   SimStatesPathMatchFailure,
   SimStatesResourceNotFound,
   SimStatesResultPathMatchFailure,
+  SimStatesRuntimeFailure,
   SimStatesUnsimulatedInput,
   SimStepFunctionsError,
 } from "./error/sim-step-functions.error.js";

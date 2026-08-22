@@ -39,14 +39,14 @@ describe("Step Functions state refusals", () => {
   it("refuses a state type this simulator does not run yet, by name", () => {
     // Given the state types still to come.
     // When each is read, each names itself and what does run.
-    for (const type of ["Task", "Choice", "Wait", "Parallel", "Map"]) {
+    for (const type of ["Task", "Parallel", "Map"]) {
       const refusal = refusalFor({
         StartAt: "Only",
         States: { Only: { Type: type, End: true } },
       });
 
       assertStringIncludes(refusal, `is a ${type} state`);
-      assertStringIncludes(refusal, "Pass, Succeed, Fail");
+      assertStringIncludes(refusal, "Pass, Succeed, Fail, Choice, Wait");
     }
   });
 

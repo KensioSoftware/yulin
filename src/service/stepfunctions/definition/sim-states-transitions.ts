@@ -1,5 +1,6 @@
 import { SimStatesInvalidDefinition } from "../error/sim-step-functions.error.js";
 import {
+  type SimStatesChoiceState,
   type SimStatesState,
   isSimStatesTerminal,
 } from "./sim-states-state.js";
@@ -17,6 +18,11 @@ export function checkSimStatesTransitions(
   for (const [name, state] of states) {
     if (isSimStatesTerminal(state)) {
       checkTerminal(name, state);
+      continue;
+    }
+
+    if (state.Type === "Choice") {
+      checkChoice(name, state, states);
       continue;
     }
 
@@ -68,6 +74,44 @@ function checkTransition(
     throw new SimStatesInvalidDefinition(
       `The state ${name} moves to ${next}, which is not one of this state ` +
         "machine's states.",
+    );
+  }
+}
+
+/**
+ * A `Choice` state moves on through its rules rather than through `Next`.
+ *
+ * Amazon States Language gives a `Choice` state neither `Next` nor `End` of
+ * its own. Every rule names where a match goes, and `Default` names where the
+ * execution goes when no rule holds.
+ */
+function checkChoice(
+  name: string,
+  state: SimStatesChoiceState,
+  states: ReadonlyMap<string, SimStatesState>,
+): void {
+  for (const field of ["Next", "End"]) {
+    if (Object.hasOwn(state, field)) {
+      throw new SimStatesInvalidDefinition(
+        `The Choice state ${name} carries ${field}. A Choice state moves on ` +
+          "through its Choices and its Default, and carries neither.",
+      );
+    }
+  }
+
+  for (const rule of state.Choices) {
+    if (!states.has(rule.next)) {
+      throw new SimStatesInvalidDefinition(
+        `A rule in the Choice state ${name} moves to ${rule.next}, which is ` +
+          "not one of this state machine's states.",
+      );
+    }
+  }
+
+  if (state.Default !== undefined && !states.has(state.Default)) {
+    throw new SimStatesInvalidDefinition(
+      `The Choice state ${name} has a Default of ${state.Default}, which is ` +
+        "not one of this state machine's states.",
     );
   }
 }
