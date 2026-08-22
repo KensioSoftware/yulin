@@ -5,6 +5,7 @@ import type { SimStatesExecutionStore } from "../../execution/sim-states-executi
 import { SimStatesInterpreter } from "../../execution/sim-states-interpreter.js";
 import { simStatesExecutionArn } from "../../machine/sim-state-machine-arn.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
+import type { SimStatesTaskTargets } from "../../task/sim-states-task-invocation.js";
 import { requireSimStateMachine } from "../machine/sim-state-machine-lookup.js";
 import type {
   SimStartExecutionCommand,
@@ -19,6 +20,7 @@ interface SimStatesExecutionStartProperties {
   readonly executions: SimStatesExecutionStore;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
+  readonly tasks: SimStatesTaskTargets;
 }
 
 /**
@@ -29,12 +31,14 @@ export class SimStatesExecutionStart {
   readonly #executions: SimStatesExecutionStore;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
   readonly #background: BackgroundScheduler;
+  readonly #tasks: SimStatesTaskTargets;
 
   constructor(properties: SimStatesExecutionStartProperties) {
     this.#stateMachines = properties.stateMachines;
     this.#executions = properties.executions;
     this.#accountRegionScope = properties.accountRegionScope;
     this.#background = properties.background;
+    this.#tasks = properties.tasks;
   }
 
   /**
@@ -93,6 +97,8 @@ export class SimStatesExecutionStart {
       definition: stateMachine.parsedDefinition,
       execution,
       background: this.#background,
+      tasks: this.#tasks,
+      roleArn: stateMachine.roleArn,
     }).run();
 
     return { executionArn: execution.arn, startDate };

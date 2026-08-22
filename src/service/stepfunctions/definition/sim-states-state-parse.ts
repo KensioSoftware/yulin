@@ -8,27 +8,20 @@ import {
   SimStatesInvalidDefinition,
   SimStatesUnsimulatedInput,
 } from "../error/sim-step-functions.error.js";
+import { checkSimStatesTaskFields } from "../task/sim-states-task-fields.js";
+import { parseSimStatesTaskResource } from "../task/sim-states-task-resource.js";
 import { checkSimStatesWaitFields } from "../wait/sim-states-wait-fields.js";
+import {
+  checkSimStatesRefusedFields,
+  checkSimStatesTransitionFields,
+} from "./sim-states-state-fields.js";
 import {
   type SimStatesChoiceState,
   type SimStatesState,
+  type SimStatesTaskState,
   simStatesRunnableTypes,
   simStatesStateTypes,
 } from "./sim-states-state.js";
-
-// Real Step Functions gives a Fail state no input or output processing at all,
-// and gives a Succeed state only the two paths.
-const stateFieldsRefused = new Map<string, readonly string[]>([
-  [
-    "Fail",
-    ["InputPath", "OutputPath", "Parameters", "ResultPath", "ResultSelector"],
-  ],
-  ["Succeed", ["Parameters", "ResultPath", "ResultSelector"]],
-  // A Choice state and a Wait state produce no result of their own, so they
-  // carry the two paths and nothing that reshapes a result.
-  ["Choice", ["Parameters", "ResultPath", "ResultSelector"]],
-  ["Wait", ["Parameters", "ResultPath", "ResultSelector"]],
-]);
 
 /**
  * Check one state's type, and the fields that type is allowed.
@@ -61,11 +54,15 @@ export function parseSimStatesState(
     );
   }
 
-  checkRefusedFields(name, type, state);
-  checkTransitionFields(name, state);
+  checkSimStatesRefusedFields(name, type, state);
+  checkSimStatesTransitionFields(name, state);
 
   if (type === "Choice") {
     return readChoiceState(name, state);
+  }
+
+  if (type === "Task") {
+    return readTaskState(name, state);
   }
 
   if (type === "Wait") {
@@ -94,52 +91,19 @@ function readChoiceState(
 }
 
 /**
- * Refuse the fields a state's type does not have.
+ * Read a `Task` state, whose `Resource` is read as the state is.
  *
- * A definition carrying one of these would behave differently here than it
- * does on AWS, where the field is simply not part of the state.
+ * The target becomes the object the state invokes through, so a `Task` state
+ * that runs has already had its `Resource` and its `Parameters` read.
  */
-function checkRefusedFields(
-  name: string,
-  type: string,
-  state: Record<string, JSONValue>,
-): void {
-  const refused = stateFieldsRefused.get(type) ?? [];
-  const present = refused.filter((field) => Object.hasOwn(state, field));
-
-  if (present.length > 0) {
-    throw new SimStatesInvalidDefinition(
-      `The ${type} state ${name} carries ${present.join(", ")}, which a ` +
-        `${type} state does not have.`,
-    );
-  }
-}
-
-/**
- * Check the two fields that say what happens after a state.
- *
- * This runs on the state as it was written, before it is read as one of the
- * state types. Once it has been, `End` is a boolean as far as the compiler is
- * concerned, and a definition carrying `"true"` would be taken at its word.
- */
-function checkTransitionFields(
+function readTaskState(
   name: string,
   state: Record<string, JSONValue>,
-): void {
-  const end = state["End"];
+): SimStatesTaskState {
+  checkSimStatesTaskFields(name, state);
 
-  if (end !== undefined && typeof end !== "boolean") {
-    throw new SimStatesInvalidDefinition(
-      `The state ${name} has an End that is not a boolean. Only true ends an ` +
-        "execution there.",
-    );
-  }
-
-  const next = state["Next"];
-
-  if (next !== undefined && typeof next !== "string") {
-    throw new SimStatesInvalidDefinition(
-      `The state ${name} has a Next that is not a state name.`,
-    );
-  }
+  return {
+    ...(state as unknown as SimStatesTaskState),
+    target: parseSimStatesTaskResource(name, state),
+  };
 }

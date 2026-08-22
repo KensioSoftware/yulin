@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 import { BackgroundTasks } from "../../../util/background/background.js";
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
 import type { SimStatesState } from "../definition/sim-states-state.js";
+import { SimStatesNoTaskTargets } from "../task/sim-states-no-task-targets.js";
 import { SimStatesExecution } from "./sim-states-execution.js";
 import { SimStatesInterpreter } from "./sim-states-interpreter.js";
 
@@ -23,7 +24,13 @@ async function runDefinition(
     startDate: background.now(),
   });
 
-  await new SimStatesInterpreter({ definition, execution, background }).run();
+  await new SimStatesInterpreter({
+    definition,
+    execution,
+    background,
+    tasks: new SimStatesNoTaskTargets(),
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+  }).run();
 
   return execution;
 }

@@ -1,4 +1,5 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
+import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
 
 /**
  * What a state leaves the execution to do once it has run.
@@ -41,4 +42,14 @@ export type SimStatesStateOutcome =
 export interface SimStatesStateContext {
   readonly stateName: string;
   readonly now: Date;
+
+  /**
+   * Where a `Task` state does its work.
+   */
+  readonly tasks: SimStatesTaskTargets;
+
+  /**
+   * The state machine's execution role, which a task assumes.
+   */
+  readonly roleArn: string;
 }

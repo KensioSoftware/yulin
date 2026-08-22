@@ -2,15 +2,15 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
 import type { SimStatesState } from "../definition/sim-states-state.js";
+import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
 import type { SimStatesExecution } from "./sim-states-execution.js";
 import {
   simStatesCycleFailure,
-  simStatesFailureFrom,
   simStatesMaximumTransitions,
   simStatesUnknownStateFailure,
 } from "./sim-states-failure.js";
-import { runSimStatesState } from "./sim-states-run-state.js";
 import { SimStatesSettlement } from "./sim-states-settlement.js";
+import { SimStatesStateRunner } from "./sim-states-state-runner.js";
 import type {
   SimStatesMoveOnOutcome,
   SimStatesNextOutcome,
@@ -21,6 +21,16 @@ interface SimStatesInterpreterProperties {
   readonly definition: SimStatesDefinition;
   readonly execution: SimStatesExecution;
   readonly background: BackgroundScheduler;
+
+  /**
+   * Where a `Task` state does its work.
+   */
+  readonly tasks: SimStatesTaskTargets;
+
+  /**
+   * The state machine's execution role, which a task assumes.
+   */
+  readonly roleArn: string;
 }
 
 /**
@@ -38,6 +48,7 @@ export class SimStatesInterpreter {
   readonly #definition: SimStatesDefinition;
   readonly #execution: SimStatesExecution;
   readonly #background: BackgroundScheduler;
+  readonly #runner: SimStatesStateRunner;
   readonly #settlement: SimStatesSettlement;
 
   /**
@@ -49,6 +60,11 @@ export class SimStatesInterpreter {
     this.#definition = properties.definition;
     this.#execution = properties.execution;
     this.#background = properties.background;
+    this.#runner = new SimStatesStateRunner({
+      background: properties.background,
+      tasks: properties.tasks,
+      roleArn: properties.roleArn,
+    });
     this.#settlement = new SimStatesSettlement({
       execution: properties.execution,
       background: properties.background,
@@ -86,7 +102,12 @@ export class SimStatesInterpreter {
       // oxlint-disable-next-line eslint/no-await-in-loop
       await this.#background.sequence();
 
-      const carrying = this.#resolve(this.#step(state, carried, current));
+      const carrying = this.#resolve(
+        // One state at a time, since each one's input is what the state
+        // before it produced.
+        // oxlint-disable-next-line eslint/no-await-in-loop
+        await this.#runner.run(state, carried, current),
+      );
 
       if (carrying === undefined) {
         return;
@@ -154,23 +175,5 @@ export class SimStatesInterpreter {
     });
 
     return undefined;
-  }
-
-  /**
-   * Run one state, reading a failure off whatever it raised.
-   */
-  #step(
-    state: SimStatesState,
-    input: JSONValue,
-    stateName: string,
-  ): SimStatesStateOutcome {
-    try {
-      return runSimStatesState(state, input, {
-        stateName,
-        now: this.#background.now(),
-      });
-    } catch (error) {
-      return simStatesFailureFrom(error);
-    }
   }
 }

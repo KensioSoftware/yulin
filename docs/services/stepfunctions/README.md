@@ -8,12 +8,14 @@ Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunc
 
 ## What runs today
 
-Five state types run. `Pass`, `Succeed`, `Fail`, `Choice` and `Wait`. A definition using any other
-is refused when the state machine is created, naming the state and its type. `Task`, `Parallel` and
-`Map` are on the way.
+Six state types run. `Pass`, `Task`, `Succeed`, `Fail`, `Choice` and `Wait`. A definition using
+`Parallel` or `Map` is refused when the state machine is created, naming the state and its type.
 
 The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
 `OutputPath` apply in that order, reading Reference Paths and the intrinsic functions.
+
+A `Task` state invokes a simulated Lambda function. Every other `Resource` is refused when the state
+machine is created, naming what the definition asked for.
 
 ## Running a state machine
 
@@ -108,6 +110,172 @@ A failing execution is recorded on the execution, and the call returns as it wou
 succeeded. Simulated EventBridge treats an undeliverable event the same way. An execution failing is
 as often the thing under test as it is a fault, and raising it would fail an unrelated `advanceBy`
 elsewhere in the same test.
+
+## Invoking a Lambda function
+
+A `Task` state invokes a simulated Lambda function, through either of the two `Resource` forms CDK's
+`LambdaInvoke` emits.
+
+`arn:aws:states:::lambda:invoke` is the integration Step Functions optimises. The state is talking to
+the Lambda API, so its `Parameters` are an `Invoke` request (`FunctionName` names the function and
+`Payload` carries what it is sent) and its result is an `Invoke` response, with the handler's answer
+under `Payload`.
+
+A function ARN sends the state's own input to the handler and answers with what the handler
+returned. CDK writes this form for `payloadResponseOnly`.
+
+```typescript sim-step-functions-task
+/**
+ * A workflow whose Task states invoke simulated Lambda functions.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "check-enrolment",
+    Role: "arn:aws:iam::123456789012:role/FunctionRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { term: number }) => ({
+        eligible: event.term > 1,
+      })),
+    },
+  }),
+);
+
+const enrol = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "enrol-student",
+    Role: "arn:aws:iam::123456789012:role/FunctionRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { student: string }) => ({
+        enrolled: event.student,
+      })),
+    },
+  }),
+);
+
+// The execution assumes this role, and invokes both functions as it.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "WorkflowRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "states.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "WorkflowRole",
+    PolicyName: "InvokeEnrolmentFunctions",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "lambda:InvokeFunction",
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: role.Role.Arn,
+    definition: JSON.stringify({
+      StartAt: "Check",
+      States: {
+        Check: {
+          Type: "Task",
+          Resource: "arn:aws:states:::lambda:invoke",
+          Parameters: { FunctionName: "check-enrolment", "Payload.$": "$" },
+          ResultSelector: { "eligible.$": "$.Payload.eligible" },
+          ResultPath: "$.outcome",
+          Next: "Eligible",
+        },
+        Eligible: {
+          Type: "Choice",
+          Choices: [
+            {
+              Variable: "$.outcome.eligible",
+              BooleanEquals: true,
+              Next: "Enrol",
+            },
+          ],
+          Default: "Decline",
+        },
+        Enrol: { Type: "Task", Resource: enrol.FunctionArn, End: true },
+        Decline: { Type: "Fail", Error: "NotEligible" },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei", term: 3 }),
+  },
+});
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.output); // {"enrolled":"Wei"}
+```
+
+The five data-flow fields apply around a task the way they apply around a `Pass` state.
+`InputPath` and `Parameters` build what the task is sent, and `ResultSelector`, `ResultPath` and
+`OutputPath` shape what comes back. `ResultPath` reads the state's raw input. `Check` above keeps
+the student it was given, alongside the one field its `ResultSelector` picked out of the response.
+
+A handler runs on the simulation's clock. A timestamp a handler stamps and a `TimestampPath` a later
+`Wait` state reads agree.
+
+`FunctionName` takes a function name or a function ARN, as the Lambda API does. A name alone is a
+function in the state machine's own Account and Region, and an ARN can name one in another. A
+qualified ARN invokes the version an alias points at.
+
+### The execution role
+
+The execution assumes the state machine's `RoleArn` and invokes the function as that role. The role
+needs two things. Its trust policy admits `states.amazonaws.com`, and one of its policies allows
+`lambda:InvokeFunction` on the function. A role missing either fails the task with
+`States.TaskFailed`, saying which of the two it was.
+
+The function's own resource policy is not consulted. A task arrives as an assumed role, and a role
+in the same Account needs only its own identity policy. An EventBridge rule works the other way
+round, arriving as a service principal that the function's resource policy admits.
+
+### When a task fails
+
+A handler that raises fails the task, and the Amazon States Language error name follows the
+`Resource` form that invoked it:
+
+- Through `arn:aws:states:::lambda:invoke` the failure is `States.TaskFailed`.
+- Through a function ARN it is the handler's own error type. An error named `NotEligible` fails the
+  task as `NotEligible`.
+
+`Retry` and `Catch` match on that name. Neither runs here yet. A task that fails ends the execution,
+and `DescribeExecution` carries the error name and the handler's message.
+
+Anything else that stops a task from running fails it with `States.TaskFailed`. A function that is
+not there, a role that cannot be assumed, and a role that may not invoke are the three of them, and
+the cause says which one it was.
 
 ## Branching on the input
 
@@ -375,7 +543,8 @@ raise. A path that would have selected the wrong node fails, and no state is ans
 data. A dotted field name is held to the JsonPath `member-name-shorthand` rule. `$.a-b` is refused,
 and `$['a-b']` is the way to write it.
 
-`$$`, the context object, arrives with the `Task` state.
+`$$`, the context object, is unsimulated. A path reading it fails the state with
+`States.QueryEvaluationError`, saying that only paths rooted at `$` are read.
 
 ## Intrinsic functions
 
@@ -404,6 +573,11 @@ A test asserting on the output of a state machine that used one could only asser
   `States.Format` alone, so `States.Format` is where `\{` is resolved. An escaped brace reaching
   another intrinsic arrives as it was written.
 - **`GetExecutionHistory` is unsimulated.** The inspection accessor answers the same question.
+- **A task's `Invoke` response carries three fields.** `ExecutedVersion`, `Payload` and
+  `StatusCode`. Real Step Functions adds `SdkHttpMetadata` and `SdkResponseMetadata`, which describe
+  a call over a network there was none of here.
+- **A failed task's `Cause` is the handler's message.** Real Step Functions writes the JSON error
+  document Lambda answered with, holding `errorMessage`, `errorType` and a stack trace.
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
 
@@ -427,8 +601,9 @@ two and is what this follows.
 
 ## Still to come
 
-- `Task`, `Parallel` and `Map` states.
-- `Retry` and `Catch`.
-- Service integrations, task tokens and activities.
+- `Parallel` and `Map` states.
+- `Retry` and `Catch`, and the `TimeoutSeconds` and `HeartbeatSeconds` a `Task` state takes. A
+  definition carrying one of them is refused, naming the field.
+- Service integrations beyond Lambda, task tokens and activities.
+- The context object, `$$`.
 - JSONata as a query language, and the `Assign` variables that go with it.
-- IAM authorization of what a state machine's role may do.

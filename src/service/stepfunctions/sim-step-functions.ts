@@ -16,11 +16,19 @@ import { SimStatesExecutionStore } from "./execution/sim-states-execution-store.
 import type { SimStateMachine } from "./machine/sim-state-machine.js";
 import { SimStateMachineStore } from "./machine/sim-state-machine-store.js";
 import { SimStepFunctionsSdkCommandRouter } from "./sdk/sim-step-functions-sdk-command-router.js";
+import { SimStatesNoTaskTargets } from "./task/sim-states-no-task-targets.js";
+import type { SimStatesTaskTargets } from "./task/sim-states-task-invocation.js";
 import { SimStepFunctionsInspection } from "./sim-step-functions-inspection.js";
 
 interface SimStepFunctionsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * Where a `Task` state does its work. A simulated Step Functions built on
+   * its own has nowhere to invoke, and says so at the first task.
+   */
+  readonly taskTargets?: SimStatesTaskTargets;
 }
 
 /**
@@ -29,7 +37,8 @@ interface SimStepFunctionsProperties {
  *
  * A state machine's definition is checked when it is created, so an execution
  * walks a definition it can rely on. The state types this runs are `Pass`,
- * `Succeed` and `Fail`, and a definition using any other is refused by name.
+ * `Task`, `Choice`, `Wait`, `Succeed` and `Fail`, and a definition using any
+ * other is refused by name.
  *
  * An execution runs on the simulation's background scheduler rather than in
  * the `StartExecution` call. An execution with nothing to wait for settles
@@ -53,6 +62,7 @@ export class SimStepFunctions {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
+      taskTargets = new SimStatesNoTaskTargets(),
     } = properties;
 
     this.#background = background;
@@ -72,6 +82,7 @@ export class SimStepFunctions {
       executions: this.#executions,
       accountRegionScope,
       background,
+      tasks: taskTargets,
     });
     this.#executionDescribe = new SimStatesExecutionDescribe(this.#executions);
   }

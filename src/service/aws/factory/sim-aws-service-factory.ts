@@ -245,7 +245,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated Step Functions for an Account Region scope. */
   createStepFunctions(scope: SimAwsAccountRegionContainer): SimStepFunctions {
-    return this.selfContainedServices.createStepFunctions(scope);
+    return this.accountRegionServices.createStepFunctions(scope);
   }
 
   /** Create simulated Lambda for an Account Region scope. */
