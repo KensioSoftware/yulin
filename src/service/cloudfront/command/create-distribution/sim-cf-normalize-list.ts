@@ -2,21 +2,20 @@ import { isRecord } from "../../../../util/type-guard/record.js";
 import { assertConsistentQuantity } from "../sim-cf-list-quantity.js";
 
 /**
- * A CloudFront list as the simulator holds it, whichever shape it arrived in.
+ * A CloudFront list, once normalized to the shape the simulator reads.
  */
 export interface SimCloudFrontConfigList<T> {
   readonly Items?: readonly T[] | undefined;
 }
 
 /**
- * Read one CloudFront list into the internal shape.
+ * Normalize one of the list-like shapes a CloudFront config arrives in.
  *
- * CloudFormation and CDK emit a plain array for a list-like property, while an
- * SDK-style input carries `{ Quantity, Items }`. Both arrive here, and both
- * come out as something with `Items` on it. A `Quantity` that disagrees with
- * the items it counts is refused first.
+ * The CloudFront API writes a list as `{ Quantity, Items }` and CloudFormation
+ * writes the same list as a plain array. Both arrive here and leave as the
+ * pair, so everything downstream reads one shape.
  */
-export function simCfNormalizedList<T>(
+export function normalizeSimCfList<T>(
   listName: string,
   value: unknown,
 ): SimCloudFrontConfigList<T> | undefined {
@@ -42,4 +41,19 @@ export function simCfNormalizedList<T>(
 
   /* v8 ignore next -- defensive fallback */
   return undefined;
+}
+
+/**
+ * Normalize a list and every item in it.
+ */
+export function normalizeSimCfListItems<T>(
+  listName: string,
+  value: unknown,
+  normalizeItem: (item: T) => T,
+): SimCloudFrontConfigList<T> | undefined {
+  const list = normalizeSimCfList<T>(listName, value);
+
+  return list === undefined
+    ? undefined
+    : { ...list, Items: list.Items?.map(normalizeItem) };
 }

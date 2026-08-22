@@ -48,9 +48,10 @@ export interface SimFirehoseDestinationInput {
 /**
  * The S3 destination a request declared, or a refusal saying why there is none.
  *
- * The extended configuration wins where a request carries both, as it does on
- * real Firehose. A CDK `DeliveryStream` with an `S3Bucket` destination
- * synthesizes the extended form.
+ * A request carrying both S3 configurations is refused. Firehose takes one
+ * destination, and the two are one destination declared twice. A CDK
+ * `DeliveryStream` with an `S3Bucket` destination synthesizes the extended
+ * form.
  *
  * A destination outside the simulation is refused rather than ignored. A
  * delivery stream created against one would take records and drop them, and a
@@ -70,9 +71,19 @@ export function simFirehoseDestinationOf(
     throw new SimFirehoseUnsimulatedDestination(unsimulated[0]);
   }
 
-  const s3 =
-    input.ExtendedS3DestinationConfiguration ??
-    input.S3DestinationConfiguration;
+  const extended = input.ExtendedS3DestinationConfiguration;
+  const plain = input.S3DestinationConfiguration;
+
+  if (extended !== undefined && plain !== undefined) {
+    throw new SimFirehoseInvalidArgumentException(
+      "The delivery stream declares both ExtendedS3DestinationConfiguration " +
+        "and S3DestinationConfiguration. Firehose takes one destination. " +
+        "Declare the extended one, which carries every field the plain one " +
+        "does.",
+    );
+  }
+
+  const s3 = extended ?? plain;
 
   if (s3 === undefined) {
     throw new SimFirehoseInvalidArgumentException(

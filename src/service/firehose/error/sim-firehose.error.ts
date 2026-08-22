@@ -85,21 +85,15 @@ export class SimFirehoseUnsimulatedDestination extends SimFirehoseError {
 /**
  * Simulated Firehose UnsimulatedSource error.
  *
- * This has no counterpart on real Firehose. `DirectPut` is the only source
- * simulated, and a delivery stream reading from a Kinesis stream would take
- * nothing and deliver nothing. Refusing at CreateDeliveryStream says so where
- * the request that asked for it is.
+ * This has no counterpart on real Firehose. A delivery stream takes records put
+ * on it, or reads them off a simulated Kinesis stream in its own Account and
+ * Region. A source outside that would take nothing and deliver nothing, so it
+ * is refused at CreateDeliveryStream, where the request that asked for it is.
  */
 export class SimFirehoseUnsimulatedSource extends SimFirehoseError {
   public override readonly name = "SimFirehoseUnsimulatedSource";
 
-  constructor() {
-    super(
-      "Simulated Kinesis Data Firehose takes records through PutRecord and " +
-        "PutRecordBatch only. A delivery stream reading from a Kinesis " +
-        "stream is not simulated, so leave DeliveryStreamType at DirectPut " +
-        "and put the records the delivery stream should see.",
-      { httpStatusCode: 400 },
-    );
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
   }
 }

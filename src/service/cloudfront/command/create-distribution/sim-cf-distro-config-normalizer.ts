@@ -1,11 +1,21 @@
 import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontCustomErrorResponseConfig,
+  SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontDistributionConfig,
+  SimCloudFrontFunctionAssociation,
+  SimCloudFrontLambdaFunctionAssociation,
   SimCloudFrontOriginConfig,
 } from "./create-distribution.command.js";
-import { simCfNormalizedCacheBehavior } from "./sim-cf-normalize-cache-behavior.js";
-import { simCfNormalizedList } from "./sim-cf-config-list.js";
+import {
+  normalizeSimCfList,
+  normalizeSimCfListItems,
+} from "./sim-cf-normalize-list.js";
+import { normalizeSimCfOrigin } from "./sim-cf-normalize-origin.js";
+
+type SimCloudFrontBehaviorConfig =
+  | SimCloudFrontDefaultCacheBehaviorConfig
+  | SimCloudFrontCacheBehaviorConfig;
 
 /**
  * Normalizes tolerated CloudFront DistributionConfig input shapes into the
@@ -24,46 +34,52 @@ export class SimCloudFrontDistributionConfigNormalizer {
    * Normalize known list-like DistributionConfig fields.
    */
   normalize(): SimCloudFrontDistributionConfig {
-    const distributionConfig = this.distributionConfig as Record<
-      string,
-      object
-    >;
-    const cacheBehaviors =
-      simCfNormalizedList<SimCloudFrontCacheBehaviorConfig>(
-        "CacheBehaviors",
-        distributionConfig["CacheBehaviors"],
-      );
+    const config = this.distributionConfig as Record<string, object>;
 
     return {
       ...this.distributionConfig,
-      Aliases: simCfNormalizedList<string>(
-        "Aliases",
-        distributionConfig["Aliases"],
-      ),
-      Origins: simCfNormalizedList<SimCloudFrontOriginConfig>(
+      Aliases: normalizeSimCfList<string>("Aliases", config["Aliases"]),
+      Origins: normalizeSimCfListItems<SimCloudFrontOriginConfig>(
         "Origins",
-        distributionConfig["Origins"],
+        config["Origins"],
+        normalizeSimCfOrigin,
       ),
       CustomErrorResponses:
-        simCfNormalizedList<SimCloudFrontCustomErrorResponseConfig>(
+        normalizeSimCfList<SimCloudFrontCustomErrorResponseConfig>(
           "CustomErrorResponses",
-          distributionConfig["CustomErrorResponses"],
+          config["CustomErrorResponses"],
         ),
       DefaultCacheBehavior:
         this.distributionConfig.DefaultCacheBehavior === undefined
           ? undefined
-          : simCfNormalizedCacheBehavior(
+          : this.normalizeCacheBehavior(
               this.distributionConfig.DefaultCacheBehavior,
             ),
-      CacheBehaviors:
-        cacheBehaviors === undefined
-          ? undefined
-          : {
-              ...cacheBehaviors,
-              Items: cacheBehaviors.Items?.map((cacheBehavior) =>
-                simCfNormalizedCacheBehavior(cacheBehavior),
-              ),
-            },
+      CacheBehaviors: normalizeSimCfListItems<SimCloudFrontCacheBehaviorConfig>(
+        "CacheBehaviors",
+        config["CacheBehaviors"],
+        (behavior) => this.normalizeCacheBehavior(behavior),
+      ),
+    };
+  }
+
+  private normalizeCacheBehavior<T extends SimCloudFrontBehaviorConfig>(
+    cacheBehavior: T,
+  ): T {
+    const cacheBehaviorRecord = cacheBehavior as Record<string, object>;
+
+    return {
+      ...cacheBehavior,
+      FunctionAssociations:
+        normalizeSimCfList<SimCloudFrontFunctionAssociation>(
+          "FunctionAssociations",
+          cacheBehaviorRecord["FunctionAssociations"],
+        ),
+      LambdaFunctionAssociations:
+        normalizeSimCfList<SimCloudFrontLambdaFunctionAssociation>(
+          "LambdaFunctionAssociations",
+          cacheBehaviorRecord["LambdaFunctionAssociations"],
+        ),
     };
   }
 }

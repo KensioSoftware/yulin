@@ -29,6 +29,10 @@ interface SimFirehosePutCommandsProperties {
  * `Encrypted` is always false. Server side encryption changes nothing a test
  * can see, so `DeliveryStreamEncryptionConfigurationInput` is left unsimulated
  * and no delivery stream reports itself encrypted.
+ *
+ * A delivery stream reading a Kinesis stream takes neither put. Its records
+ * come off the stream, and real Firehose refuses a producer trying to put one
+ * on it directly.
  */
 export class SimFirehosePutCommands {
   private readonly access: SimFirehoseDeliveryStreamAccess;
@@ -51,6 +55,8 @@ export class SimFirehosePutCommands {
       command.input.DeliveryStreamName,
       options,
     );
+
+    deliveryStream.source.requirePut("PutRecord", deliveryStream.name);
 
     this.delivery.accept(
       deliveryStream,
@@ -77,6 +83,8 @@ export class SimFirehosePutCommands {
       command.input.DeliveryStreamName,
       options,
     );
+
+    deliveryStream.source.requirePut("PutRecordBatch", deliveryStream.name);
     const data = simFirehoseBatchData(command.input.Records);
     const responses: SimFirehosePutRecordBatchResponseEntry[] = [];
 

@@ -4,6 +4,7 @@ import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorize
 import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
 import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimAwsSchedulerDeliveryTargets } from "../../scheduler/delivery/sim-aws-scheduler-delivery-targets.js";
+import { SimAwsStatesTaskTargets } from "../../stepfunctions/task/sim-aws-states-task-targets.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
@@ -72,6 +73,24 @@ export function simAwsSchedulerDeliveryTargets(
   simAws: SimAws,
 ): SimAwsSchedulerDeliveryTargets {
   return new SimAwsSchedulerDeliveryTargets({ simAws });
+}
+
+/**
+ * Everywhere a simulated state machine's `Task` state can invoke.
+ *
+ * An execution assumes its state machine's role in that role's own Account and
+ * reaches the function in the function's, which need not be the same one, so
+ * this reads the whole simulation rather than one scope. A `Task` state naming
+ * a function by name alone means one in the state machine's own scope.
+ */
+export function simAwsStatesTaskTargets(
+  simAws: SimAws,
+  scope: SimAwsAccountRegionContainer,
+): SimAwsStatesTaskTargets {
+  return new SimAwsStatesTaskTargets({
+    simAws,
+    accountRegionScope: scope.accountRegionScope,
+  });
 }
 
 /**

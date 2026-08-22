@@ -213,6 +213,12 @@ polls a stream and invokes a function with the records it reads. Every shard is 
 of its own, as real Lambda reads one, and the function's execution role is what the polling is done
 as.
 
+## Feeding a Firehose delivery stream
+
+A [Firehose delivery stream](../firehose/#reading-from-a-kinesis-stream "Simulated Firehose Kinesis source docs")
+can read a stream and buffer what it reads into an S3 Bucket. It reads every shard as its source
+`RoleARN`, starting at the end of the stream when the delivery stream is created.
+
 ## Deploying a stream
 
 `AWS::Kinesis::Stream` creates a simulated stream, which is what a CDK `Stream` synthesizes. The
@@ -441,6 +447,8 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   out, and no response carries an `EncryptionType`.
 - **Tags are kept and never listed.** A stream created with `Tags` holds them, readable through
   `findStream`. `AddTagsToStream`, `ListTagsForStream` and `RemoveTagsFromStream` are absent.
-- **Kinesis Data Firehose is a separate service and is absent.** So is Kinesis Video Streams.
+- **Kinesis Data Firehose is a separate service.** It has a simulation of its own under
+  `simAws.firehose()`, and a delivery stream there can read a stream here. Kinesis Video Streams is
+  absent.
 - **`AWS::DynamoDB::Table` `KinesisStreamSpecification` stays unsimulated.** A table does not publish
   its changes into a stream here.

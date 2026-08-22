@@ -10,6 +10,7 @@ import type {
   SimStatesSucceedState,
 } from "../definition/sim-states-state.js";
 import { runSimStatesChoice } from "./sim-states-run-choice.js";
+import { runSimStatesTask } from "./sim-states-run-task.js";
 import { runSimStatesWait } from "./sim-states-run-wait.js";
 import type {
   SimStatesStateContext,
@@ -26,12 +27,20 @@ const unnamedFailError = "States.Unknown";
  *
  * A data-flow field raising is left to the caller, which reads the Amazon
  * States Language error name off whatever came out.
+ *
+ * This waits on the work a `Task` state does. Every other state type answers
+ * without waiting for anything. A `Wait` state pauses the walk rather than
+ * blocking it, and answers by saying what it is waiting for.
  */
-export function runSimStatesState(
+export async function runSimStatesState(
   state: SimStatesState,
   input: JSONValue,
   context: SimStatesStateContext,
-): SimStatesStateOutcome {
+): Promise<SimStatesStateOutcome> {
+  if (state.Type === "Task") {
+    return await runSimStatesTask(state, input, context);
+  }
+
   if (state.Type === "Fail") {
     return runFail(state);
   }

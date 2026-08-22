@@ -25,6 +25,21 @@ export interface SimFirehoseDeliveryStreamInput {
    * `simIamRoleWithPolicyFactory`.
    */
   readonly roleArn: string | undefined;
+
+  /**
+   * The Kinesis stream the delivery stream reads, for the tests that want one.
+   *
+   * A delivery stream made without it is `DirectPut`, which is what most tests
+   * want. Naming a stream makes it `KinesisStreamAsSource`, and the stream has
+   * to be there already: it is one entity and the delivery stream is another.
+   */
+  readonly sourceStreamArn: string | undefined;
+
+  /**
+   * The Role the source stream is read as, which the Account root stands in
+   * for when a test is not about the source Role.
+   */
+  readonly sourceRoleArn: string | undefined;
 }
 
 /**
@@ -40,6 +55,9 @@ export interface SimFirehoseDeliveryStreamInput {
  *   simAws,
  * );
  * ```
+ *
+ * A delivery stream reading a Kinesis stream is the same call naming the
+ * stream, which has to be there already.
  */
 export const simFirehoseDeliveryStreamFactory = new AsyncMappedFactory<
   SimFirehoseDeliveryStreamInput,
@@ -53,17 +71,26 @@ export const simFirehoseDeliveryStreamFactory = new AsyncMappedFactory<
     intervalInSeconds: 60,
     sizeInMegabytes: 5,
     roleArn: undefined,
+    sourceStreamArn: undefined,
+    sourceRoleArn: undefined,
   }),
   async (input, simAws) => {
     const firehose = simAws.firehose();
+    const accountRoot = `arn:aws:iam::${simAws.defaultAccountId}:root`;
 
     await firehose.createDeliveryStream({
       input: {
         DeliveryStreamName: input.deliveryStreamName,
+        ...(input.sourceStreamArn !== undefined && {
+          DeliveryStreamType: "KinesisStreamAsSource",
+          KinesisStreamSourceConfiguration: {
+            KinesisStreamARN: input.sourceStreamArn,
+            RoleARN: input.sourceRoleArn ?? accountRoot,
+          },
+        }),
         ExtendedS3DestinationConfiguration: {
           BucketARN: `arn:aws:s3:::${input.bucketName}`,
-          RoleARN:
-            input.roleArn ?? `arn:aws:iam::${simAws.defaultAccountId}:root`,
+          RoleARN: input.roleArn ?? accountRoot,
           Prefix: input.prefix,
           BufferingHints: {
             IntervalInSeconds: input.intervalInSeconds,

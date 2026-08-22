@@ -12,7 +12,6 @@ import type { SimCreateDeliveryStreamCommandInput } from "../command/stream/stre
 import {
   SimFirehoseInvalidArgumentException,
   SimFirehoseUnsimulatedDestination,
-  SimFirehoseUnsimulatedSource,
 } from "../error/sim-firehose.error.js";
 
 const validS3Destination = {
@@ -79,21 +78,18 @@ describe("What a simulated Firehose delivery stream refuses to be", () => {
     assertStringIncludes(error.message, "no destination");
   });
 
-  it("refuses a Kinesis stream as the source", async () => {
-    // Given a delivery stream that would read from a Kinesis stream.
+  it("refuses a delivery stream declaring both S3 destinations", async () => {
+    // Given a delivery stream declaring the same destination twice, in the
+    // extended form and the plain one.
     const error = await refusalOf({
       DeliveryStreamName: "order-events",
-      DeliveryStreamType: "KinesisStreamAsSource",
-      KinesisStreamSourceConfiguration: {
-        KinesisStreamARN:
-          "arn:aws:kinesis:us-east-1:888888888888:stream/orders",
-        RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
-      },
       ExtendedS3DestinationConfiguration: validS3Destination,
+      S3DestinationConfiguration: validS3Destination,
     });
 
-    // Then it says so, rather than taking nothing and delivering nothing.
-    assertInstanceOf(error, SimFirehoseUnsimulatedSource);
-    assertStringIncludes(error.message, "DirectPut");
+    // Then it is refused, as real Firehose refuses a request naming more than
+    // one destination.
+    assertInstanceOf(error, SimFirehoseInvalidArgumentException);
+    assertStringIncludes(error.message, "one destination");
   });
 });

@@ -1,6 +1,7 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesChoiceRule } from "../choice/sim-states-choice-rule.js";
 import type { SimStatesDataFlowFields } from "../data/sim-states-data-flow.js";
+import type { SimStatesTaskTarget } from "../task/sim-states-task-target.js";
 
 /**
  * Every state type Amazon States Language defines.
@@ -28,6 +29,7 @@ export const simStatesRunnableTypes = [
   "Pass",
   "Succeed",
   "Fail",
+  "Task",
   "Choice",
   "Wait",
 ] as const;
@@ -49,6 +51,19 @@ interface SimStatesCommonState extends SimStatesDataFlowFields {
 export interface SimStatesPassState extends SimStatesCommonState {
   readonly Type: "Pass";
   readonly Result?: JSONValue;
+}
+
+/**
+ * A `Task` state, which does work outside the state machine.
+ *
+ * `Resource` is held as it was written, and `target` is what it named. The
+ * `Resource` is read when the definition is read, so one this simulator cannot
+ * reach is refused there rather than when an execution arrives at the state.
+ */
+export interface SimStatesTaskState extends SimStatesCommonState {
+  readonly Type: "Task";
+  readonly Resource: string;
+  readonly target: SimStatesTaskTarget;
 }
 
 /**
@@ -104,6 +119,7 @@ export interface SimStatesFailState {
 
 export type SimStatesState =
   | SimStatesPassState
+  | SimStatesTaskState
   | SimStatesSucceedState
   | SimStatesFailState
   | SimStatesChoiceState

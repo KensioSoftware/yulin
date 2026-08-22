@@ -12,11 +12,15 @@ import {
 import type * as simFirehoseCommands from "./command/sim-firehose-command.types.js";
 import { SimFirehoseCommands } from "./command/sim-firehose-commands.js";
 import type { SimFirehoseRequestOptions } from "./command/sim-firehose-request-options.js";
-import {
-  type SimFirehoseDeliveryFailure,
-  SimFirehoseDeliveryFailures,
-} from "./delivery/sim-firehose-delivery-failures.js";
+import { SimFirehoseCfnResourceFactory } from "./cfn/sim-firehose-cfn-resource-factory.js";
+import type { SimFirehoseDeliveryFailure } from "./delivery/sim-firehose-delivery-failures.js";
+import { SimFirehoseFailures } from "./failure/sim-firehose-failures.js";
 import type { SimFirehoseObjectDestination } from "./delivery/sim-firehose-object-writer.js";
+import {
+  SimFirehoseNoRecordSource,
+  type SimFirehoseRecordSource,
+} from "./source/sim-firehose-record-source.js";
+import type { SimFirehoseSourceFailure } from "./source/sim-firehose-source-failures.js";
 import { SimFirehoseSdkCommandRouter } from "./sdk/sim-firehose-sdk-command-router.js";
 import type { SimFirehoseDeliveryStream } from "./stream/sim-firehose-delivery-stream.js";
 import { SimFirehoseDeliveryStreamStore } from "./stream/sim-firehose-delivery-stream-store.js";
@@ -26,6 +30,14 @@ interface SimFirehoseProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly s3: SimFirehoseObjectDestination;
+
+  /**
+   * The simulated Kinesis a delivery stream reads a source stream from.
+   *
+   * A SimFirehose built without one delivers whatever is put on it, and refuses
+   * to read for a delivery stream created with a Kinesis source.
+   */
+  readonly kinesis?: SimFirehoseRecordSource;
 }
 
 /**
@@ -42,28 +54,42 @@ interface SimFirehoseProperties {
  * `RoleARN`. Advancing simulated time past the interval is what makes a test's
  * records land in the Bucket.
  *
- * S3 is the only destination simulated, and `DirectPut` the only source. The
- * rest are refused by name at CreateDeliveryStream.
+ * A delivery stream can read its records off a simulated Kinesis stream
+ * instead, as the source `RoleARN`. It starts at the end of the stream, so
+ * records put before it was created stay behind it, and it takes no puts of its
+ * own.
+ *
+ * S3 is the only destination simulated. The rest are refused by name at
+ * CreateDeliveryStream.
  */
 export class SimFirehose {
   private readonly deliveryStreams = new SimFirehoseDeliveryStreamStore();
-  private readonly failures = new SimFirehoseDeliveryFailures();
+  private readonly failures =
+    new SimFirehoseFailures<SimFirehoseDeliveryFailure>();
+  private readonly sourceFailures =
+    new SimFirehoseFailures<SimFirehoseSourceFailure>();
   private readonly commands: SimFirehoseCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimFirehoseSdkCommandRouter(this);
+  private readonly cfnFactory = new SimFirehoseCfnResourceFactory({
+    firehose: this,
+  });
 
   constructor(properties: SimFirehoseProperties) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      kinesis = new SimFirehoseNoRecordSource(),
     } = properties;
 
     this.background = background;
     this.commands = new SimFirehoseCommands({
       deliveryStreams: this.deliveryStreams,
       failures: this.failures,
+      sourceFailures: this.sourceFailures,
       s3: properties.s3,
+      kinesis,
       iam,
       background,
       accountRegionScope,
@@ -90,6 +116,18 @@ export class SimFirehose {
    */
   getDeliveryFailures(): readonly SimFirehoseDeliveryFailure[] {
     return this.failures.all;
+  }
+
+  /**
+   * Get the source streams this Firehose stopped reading, which is where a
+   * source Role that cannot read its Kinesis stream shows up.
+   *
+   * A delivery stream reads with no caller in front of it, so a read it was
+   * refused reaches a test here rather than through the request that put the
+   * record.
+   */
+  getSourceFailures(): readonly SimFirehoseSourceFailure[] {
+    return this.sourceFailures.all;
   }
 
   /** Handle a CreateDeliveryStream Command from the SDK. */
@@ -154,5 +192,12 @@ export class SimFirehose {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimFirehoseCfnResourceFactory {
+    return this.cfnFactory;
   }
 }

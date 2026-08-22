@@ -58,7 +58,7 @@ export function simCfnStepFunctionsSkippedResourceError(
  * Every Resource type here goes through the ordinary Step Functions commands,
  * so what a template may ask for is decided once, by simulated Step Functions,
  * rather than again in the CloudFormation layer. What that leaves out is where
- * the request came from. A deployment failing with `The state Check is a Task
+ * the request came from. A deployment failing with `The state Fan is a Parallel
  * state` says which state but not which Resource declared it, and a template
  * can hold several.
  *

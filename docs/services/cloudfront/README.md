@@ -575,6 +575,161 @@ Three things follow from the request never leaving the process:
   therefore refuses the request. [Origin access controls](#origin-access-controls) covers the
   Function URL that admits the Distribution and nothing else.
 
+## Custom headers on an Origin
+
+CloudFront adds an Origin's custom headers to every request it sends that Origin. An origin that
+answers only requests carrying a header nothing else knows is how AWS documents
+[restricting a custom origin to CloudFront](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html#forward-custom-headers-restrict-access),
+and a sim Distribution sends them the same way.
+
+The CloudFront API and CloudFormation name the field differently, and both spellings are accepted
+here. The API has `CustomHeaders` inside an `Origin`, and `AWS::CloudFront::Distribution` has
+`OriginCustomHeaders`, as the two differ over the viewer certificate ARN.
+
+```typescript sim-cloudfront-origin-custom-headers
+/**
+ * An HTTP API answering only the requests that came through the Distribution.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const originSecret = "5d6e2b0c6f564c1e9d5b2f1a5b8c9d70";
+
+// A function serving the API, which reads the secret off every request.
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "profile",
+    Role: "arn:aws:iam::111111111111:role/ProfileRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: { headers: Record<string, string> }) =>
+          event.headers["x-origin-secret"] === originSecret
+            ? { name: "Ada" }
+            : { message: "Forbidden" },
+      ),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "profile", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /user/profile",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "profile",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+// A Distribution that sends the secret with every request to that Origin.
+const distributionCreation = await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "user-site",
+      Comment: "User API CDN",
+      Enabled: true,
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "api-origin",
+            DomainName: new URL(ApiEndpoint).hostname,
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "https-only",
+            },
+            CustomHeaders: {
+              Quantity: 1,
+              Items: [
+                { HeaderName: "x-origin-secret", HeaderValue: originSecret },
+              ],
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "api-origin",
+        ViewerProtocolPolicy: "allow-all",
+      },
+    },
+  }),
+);
+
+const distroHostname = distributionCreation.Distribution!.DomainName!;
+const srv = await serveSimAws({ simAws });
+
+try {
+  const throughCdn = await fetch(
+    srv.localUrl(`http://${distroHostname}/user/profile`),
+  );
+  const direct = await fetch(srv.localUrl(`${ApiEndpoint}/user/profile`));
+
+  // {"name":"Ada"}
+  console.log(await throughCdn.text());
+  // {"message":"Forbidden"}
+  console.log(await direct.text());
+} finally {
+  await srv.close();
+}
+```
+
+Two rules follow CloudFront's own:
+
+- A header the viewer already sent is overwritten with the Origin's value, whatever case the viewer
+  wrote it in. A viewer cannot reach the origin with a guessed secret by sending the header through
+  the Distribution.
+- A header name CloudFront refuses to add fails the Distribution at create and fails the Stack at
+  deploy, naming the header. The
+  [denied names](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html#add-origin-custom-headers-denylist)
+  run from `Cache-Control` to `X-Real-Ip`, along with anything beginning `X-Amz-` or `X-Edge-`.
+
+An S3 Origin takes the headers and reaches nothing with them. Sim CloudFront reads a Bucket through
+`GetObject` and builds no HTTP request for a header to travel on, and real S3 ignores a header it
+has no use for.
+
 ## Viewer certificates
 
 A Distribution with alternate domain names needs an ACM certificate, and CloudFront accepts only
@@ -2121,6 +2276,7 @@ Sim CloudFront currently supports:
 - Key value stores, through both the CloudFront client and the key value store data client
 - S3 Origins backed by sim S3 Buckets, reading them as the Bucket policy allows
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
+- `CustomHeaders` and `OriginCustomHeaders` on an Origin, for an origin that admits only CloudFront
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps

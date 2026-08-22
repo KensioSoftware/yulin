@@ -21,6 +21,7 @@ export type {
   SimStatesChoiceState,
   SimStatesState,
   SimStatesStateType,
+  SimStatesTaskState,
   SimStatesWaitState,
 } from "./definition/sim-states-state.js";
 export { SimStatesChoiceRule } from "./choice/sim-states-choice-rule.js";
@@ -36,6 +37,8 @@ export {
   SimStatesResourceNotFound,
   SimStatesResultPathMatchFailure,
   SimStatesRuntimeFailure,
+  SimStatesTaskFailure,
+  SimStatesTaskHandlerFailure,
   SimStatesUnsimulatedInput,
   SimStepFunctionsError,
 } from "./error/sim-step-functions.error.js";

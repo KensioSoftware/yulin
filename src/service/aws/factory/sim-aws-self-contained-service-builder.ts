@@ -3,7 +3,6 @@ import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimFirehose } from "../../firehose/index.js";
 import { SimKinesis } from "../../kinesis/index.js";
-import { SimStepFunctions } from "../../stepfunctions/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -55,11 +54,16 @@ export class SimAwsSelfContainedServiceBuilder {
   /**
    * Create simulated Kinesis Data Firehose for an Account Region scope.
    *
-   * Delivery streams are Region-scoped on real AWS, and a delivery stream
-   * writes into a Bucket through that same scope's simulated S3.
+   * Delivery streams are Region-scoped on real AWS. A delivery stream writes
+   * into a Bucket through that same scope's simulated S3, and reads a source
+   * stream through that same scope's simulated Kinesis.
    */
   createFirehose(scope: SimAwsAccountRegionContainer): SimFirehose {
-    return new SimFirehose({ ...this.scoped(scope), s3: scope.s3() });
+    return new SimFirehose({
+      ...this.scoped(scope),
+      s3: scope.s3(),
+      kinesis: scope.kinesis(),
+    });
   }
 
   /**
@@ -70,16 +74,6 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createKinesis(scope: SimAwsAccountRegionContainer): SimKinesis {
     return new SimKinesis(this.scoped(scope));
-  }
-
-  /**
-   * Create simulated Step Functions for an Account Region scope.
-   *
-   * State machines are Region-scoped on real AWS: a state machine ARN names
-   * the Region, and one cannot be reached from another.
-   */
-  createStepFunctions(scope: SimAwsAccountRegionContainer): SimStepFunctions {
-    return new SimStepFunctions(this.scoped(scope));
   }
 
   /**

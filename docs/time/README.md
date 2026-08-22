@@ -146,6 +146,9 @@ failed delivery to nobody, and one rejected delivery would otherwise fail an unr
 `advanceBy(...)` elsewhere in the same test. Read the failures from `eventBridge().deliveryFailures`
 and `scheduler().deliveryFailures`.
 
+A Step Functions execution works the same way. A state that fails while the clock is being advanced
+is recorded on the execution, and `DescribeExecution` reports it once the advance has returned.
+
 Several parts of the simulator schedule work on the clock. Advancing time does more than change what
 timestamps and expiry checks see. A scheduled EventBridge rule fires, an EventBridge Scheduler
 schedule invokes its target, a DynamoDB item passes its time to live, a Secrets Manager deletion
