@@ -45,18 +45,38 @@ export function edgeFunctionArnParts(
 }
 
 /**
- * Refuse an ARN naming anything but a published version.
+ * Read the parts of an ARN CloudFront would associate, answering with nothing
+ * where it would refuse the ARN itself.
  *
- * A version qualifier is a number, and an alias is a name, which is the whole
- * of the difference between the two in an ARN.
+ * A caller that has something to do about such an ARN other than throw reads
+ * it here. A Distribution deployed from a template skips an association naming
+ * a function this simulation does not hold, and it can only tell whether the
+ * function is here once it knows the ARN names a function at all.
+ */
+export function readEdgeFunctionArnParts(
+  functionArn: string,
+): SimLambdaFunctionArnParts | undefined {
+  const arn = parseSimLambdaFunctionArn(functionArn);
+
+  if (arn?.regionName !== lambdaEdgeRegion) {
+    return undefined;
+  }
+
+  if (!isPublishedVersion(arn.qualifier)) {
+    return undefined;
+  }
+
+  return arn;
+}
+
+/**
+ * Refuse an ARN naming anything but a published version.
  */
 function assertVersionQualifier(
   arn: SimLambdaFunctionArnParts,
   functionArn: string,
 ): void {
-  const { qualifier } = arn;
-
-  if (qualifier !== undefined && /^\d+$/u.test(qualifier)) {
+  if (isPublishedVersion(arn.qualifier)) {
     return;
   }
 
@@ -66,4 +86,14 @@ function assertVersionQualifier(
       `qualifier such as :1, and takes neither $LATEST nor an alias. ` +
       `Publish a version with PublishVersion or AWS::Lambda::Version.`,
   );
+}
+
+/**
+ * Whether an ARN's qualifier names a published version.
+ *
+ * A version qualifier is a number, and an alias is a name, which is the whole
+ * of the difference between the two in an ARN.
+ */
+function isPublishedVersion(qualifier: string | undefined): boolean {
+  return qualifier !== undefined && /^\d+$/u.test(qualifier);
 }

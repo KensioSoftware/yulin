@@ -41,5 +41,7 @@
       "@kensio/yulin/watch": ["../src/watch/index.ts"]
     }
   },
-  "include": ["**/*.example.ts", "**/*.examples.ts"]
+  "include": ["**/*.example.ts", "**/*.examples.ts"],
+  // A CDK stack example is compiled by tsconfig.cdk.json instead.
+  "exclude": ["**/*-cdk.example.ts"]
 }
