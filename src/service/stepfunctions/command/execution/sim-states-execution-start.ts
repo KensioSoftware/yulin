@@ -1,8 +1,8 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import { simStatesContextObject } from "../../data/sim-states-context-object.js";
 import { SimStatesExecution } from "../../execution/sim-states-execution.js";
 import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
-import { SimStatesInterpreter } from "../../execution/sim-states-interpreter.js";
 import { simStatesWalks } from "../../execution/sim-states-walks.js";
 import { simStatesExecutionArn } from "../../machine/sim-state-machine-arn.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
@@ -94,17 +94,22 @@ export class SimStatesExecutionStart {
 
     this.#executions.add(execution);
 
-    const walks = {
+    await simStatesWalks({
       background: this.#background,
       tasks: this.#tasks,
       roleArn: stateMachine.roleArn,
-    };
-
-    await new SimStatesInterpreter({
-      ...walks,
+    })({
       definition: stateMachine.parsedDefinition,
       record: execution,
-      walkChild: simStatesWalks(walks),
+      contextObject: simStatesContextObject({
+        executionArn: execution.arn,
+        executionName: execution.name,
+        input: execution.input,
+        startDate,
+        stateMachineArn: stateMachine.arn,
+        stateMachineName: stateMachine.name,
+        roleArn: stateMachine.roleArn,
+      }),
     }).run();
 
     return { executionArn: execution.arn, startDate };

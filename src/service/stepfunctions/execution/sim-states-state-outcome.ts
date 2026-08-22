@@ -1,4 +1,4 @@
-import type { JSONValue } from "../../../util/type-guard/json.js";
+import type { JSONObject, JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesAttemptState } from "../retry/sim-states-attempt-state.js";
 import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
 import type { SimStatesChildWalks } from "./sim-states-child-walk.js";
@@ -100,6 +100,12 @@ export interface SimStatesWalkContext {
    * How a state that runs states of its own gets a walk over them.
    */
   readonly walkChild: SimStatesChildWalks;
+
+  /**
+   * What `$$` reads. The state running adds its own `State` to this, and a
+   * `Map` iteration is given one carrying the item it runs for.
+   */
+  readonly contextObject: JSONObject;
 }
 
 /**

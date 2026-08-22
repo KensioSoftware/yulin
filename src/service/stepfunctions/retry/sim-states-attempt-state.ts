@@ -44,6 +44,16 @@ export function simStatesRetriesTaken(
 }
 
 /**
+ * How many retries this entry to a state has taken, across its retriers.
+ *
+ * The context object reports this as `$$.State.RetryCount`, which counts the
+ * state rather than the retrier that asked for each one.
+ */
+export function simStatesRetriesSoFar(attempt: SimStatesAttemptState): number {
+  return attempt.taken.reduce((total, taken) => total + taken, 0);
+}
+
+/**
  * The same attempt state with one more retry counted against a retrier.
  */
 export function simStatesRetryTaken(

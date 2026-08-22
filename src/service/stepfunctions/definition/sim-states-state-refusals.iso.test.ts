@@ -36,21 +36,6 @@ describe("Step Functions state refusals", () => {
     );
   });
 
-  it("refuses a state type this simulator does not run yet, by name", () => {
-    // Given the state type still to come.
-    const refusal = refusalFor({
-      StartAt: "Only",
-      States: { Only: { Type: "Map", End: true } },
-    });
-
-    // When it is read, it names itself and what does run.
-    assertStringIncludes(refusal, "is a Map state");
-    assertStringIncludes(
-      refusal,
-      "Pass, Succeed, Fail, Task, Choice, Wait, Parallel",
-    );
-  });
-
   it("refuses the fields a Fail or a Succeed state does not have", () => {
     // Given data-flow fields on states that have no input or output
     // processing.

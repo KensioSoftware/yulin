@@ -48,6 +48,18 @@ export class SimStepFunctionsInspection {
   }
 
   /**
+   * Every iteration of every `Map` state one execution ran.
+   *
+   * An iteration runs states of its own, the way a `Parallel` state's branch
+   * does, and is reported here rather than among the states the execution
+   * around it visited. Each says which item it was for by its index, counting
+   * from zero.
+   */
+  iterations(executionArn: string): readonly SimStatesChild[] {
+    return this.#childrenOf(executionArn, "iteration");
+  }
+
+  /**
    * Every execution of one state machine, most recently started first.
    */
   executionsOf(stateMachineArn: string): readonly string[] {

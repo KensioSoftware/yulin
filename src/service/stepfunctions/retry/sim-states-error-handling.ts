@@ -8,8 +8,9 @@ import { parseSimStatesRetriers } from "./sim-states-retry-parse.js";
 /**
  * What a state says about failing.
  *
- * A `Task` state and a `Parallel` state both carry these two, and both read
- * them the same way: the retriers first and the catchers after them.
+ * A `Task` state, a `Parallel` state and a `Map` state all carry these two,
+ * and all read them the same way. The retriers come first and the catchers
+ * after them.
  */
 export interface SimStatesErrorHandling {
   readonly Retry?: readonly SimStatesRetrier[];
@@ -19,17 +20,26 @@ export interface SimStatesErrorHandling {
 /**
  * The `Retry` and `Catch` a state carries, where its type has them.
  *
- * A `Task` state and a `Parallel` state carry both. Every other state type
- * fails the walk it is in, since there is nothing on it to say otherwise.
+ * Every other state type fails the walk it is in, since there is nothing on
+ * it to say otherwise.
  */
 export function simStatesErrorHandling(
   state: SimStatesState,
 ): SimStatesErrorHandling | undefined {
-  if (state.Type === "Task" || state.Type === "Parallel") {
-    return state;
+  switch (state.Type) {
+    case "Task":
+    case "Parallel":
+    case "Map": {
+      return state;
+    }
+    case "Choice":
+    case "Fail":
+    case "Pass":
+    case "Succeed":
+    case "Wait": {
+      return undefined;
+    }
   }
-
-  return undefined;
 }
 
 /**

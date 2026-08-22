@@ -26,11 +26,16 @@ export async function runSimStatesTask(
   const result = await context.tasks.invoke({
     stateName: context.stateName,
     target: state.target,
-    payload: simStatesEffectiveInput(input, state),
+    payload: simStatesEffectiveInput(input, state, context.contextObject),
     roleArn: context.roleArn,
   });
 
-  const output = simStatesEffectiveOutput(input, result, state);
+  const output = simStatesEffectiveOutput(
+    input,
+    result,
+    state,
+    context.contextObject,
+  );
 
   return state.Next === undefined
     ? { kind: "succeed", output }

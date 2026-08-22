@@ -30,8 +30,10 @@ export function parseSimStatesReferencePath(
 
   if (path.startsWith("$$")) {
     throw new SimStatesPathError(
-      `${path} reads the context object, which is not simulated. Only paths ` +
-        "rooted at $ are read.",
+      `${path} reads the context object, which is read in InputPath, ` +
+        "OutputPath, ItemsPath, Parameters, ResultSelector, ItemSelector and " +
+        "an intrinsic function's arguments. A path in any other field is " +
+        "rooted at $.",
     );
   }
 

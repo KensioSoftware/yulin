@@ -1,7 +1,7 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesPathMatchFailure } from "../error/sim-step-functions.error.js";
+import { selectSimStatesReadPath } from "./sim-states-context-path.js";
 import { evaluateSimStatesPayloadTemplate } from "./sim-states-payload-template.js";
-import { selectSimStatesPath } from "./sim-states-path-segment.js";
 import { parseSimStatesReferencePath } from "./sim-states-reference-path.js";
 import { insertAtSimStatesPath } from "./sim-states-result-path.js";
 
@@ -25,16 +25,18 @@ export interface SimStatesDataFlowFields {
  *
  * `InputPath` narrows the raw input and `Parameters` then builds a value from
  * what is left, which is the order Amazon States Language applies them in.
+ * Both read the context object where the caller has one.
  */
 export function simStatesEffectiveInput(
   rawInput: JSONValue,
   fields: SimStatesDataFlowFields,
+  context: JSONValue = null,
 ): JSONValue {
-  const narrowed = applyPath(rawInput, fields.InputPath, "InputPath");
+  const narrowed = applyPath(rawInput, fields.InputPath, "InputPath", context);
 
   return fields.Parameters === undefined
     ? narrowed
-    : evaluateSimStatesPayloadTemplate(fields.Parameters, narrowed);
+    : evaluateSimStatesPayloadTemplate(fields.Parameters, narrowed, context);
 }
 
 /**
@@ -49,16 +51,22 @@ export function simStatesEffectiveOutput(
   rawInput: JSONValue,
   result: JSONValue,
   fields: SimStatesDataFlowFields,
+  context: JSONValue = null,
 ): JSONValue {
   const selected =
     fields.ResultSelector === undefined
       ? result
-      : evaluateSimStatesPayloadTemplate(fields.ResultSelector, result);
+      : evaluateSimStatesPayloadTemplate(
+          fields.ResultSelector,
+          result,
+          context,
+        );
 
   return applyPath(
     applyResultPath(rawInput, selected, fields.ResultPath),
     fields.OutputPath,
     "OutputPath",
+    context,
   );
 }
 
@@ -97,6 +105,7 @@ function applyPath(
   value: JSONValue,
   path: string | null | undefined,
   field: string,
+  context: JSONValue,
 ): JSONValue {
   if (path === null) {
     return {};
@@ -106,10 +115,7 @@ function applyPath(
     return value;
   }
 
-  const selected = selectSimStatesPath(
-    value,
-    parseSimStatesReferencePath(path),
-  );
+  const selected = selectSimStatesReadPath(path, value, context);
 
   if (selected === undefined) {
     throw new SimStatesPathMatchFailure(

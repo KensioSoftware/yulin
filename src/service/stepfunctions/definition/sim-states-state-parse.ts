@@ -4,14 +4,12 @@ import {
   checkSimStatesChoiceDefault,
   parseSimStatesChoices,
 } from "../choice/sim-states-choice-parse.js";
-import {
-  SimStatesInvalidDefinition,
-  SimStatesUnsimulatedInput,
-} from "../error/sim-step-functions.error.js";
+import { SimStatesInvalidDefinition } from "../error/sim-step-functions.error.js";
 import { parseSimStatesErrorHandling } from "../retry/sim-states-error-handling.js";
 import { checkSimStatesTaskFields } from "../task/sim-states-task-fields.js";
 import { parseSimStatesTaskResource } from "../task/sim-states-task-resource.js";
 import { checkSimStatesWaitFields } from "../wait/sim-states-wait-fields.js";
+import { readSimStatesMapState } from "./sim-states-map-parse.js";
 import { readSimStatesParallelState } from "./sim-states-parallel-parse.js";
 import {
   checkSimStatesRefusedFields,
@@ -21,7 +19,6 @@ import {
   type SimStatesChoiceState,
   type SimStatesState,
   type SimStatesTaskState,
-  simStatesRunnableTypes,
   simStatesStateTypes,
 } from "./sim-states-state.js";
 
@@ -49,13 +46,6 @@ export function parseSimStatesState(
     );
   }
 
-  if (!simStatesRunnableTypes.includes(type as never)) {
-    throw new SimStatesUnsimulatedInput(
-      `The state ${name} is a ${type} state, which this simulator does not ` +
-        `run yet. It runs ${simStatesRunnableTypes.join(", ")}.`,
-    );
-  }
-
   checkSimStatesRefusedFields(name, type, state);
   checkSimStatesTransitionFields(name, state);
 
@@ -69,6 +59,10 @@ export function parseSimStatesState(
 
   if (type === "Parallel") {
     return readSimStatesParallelState(name, state);
+  }
+
+  if (type === "Map") {
+    return readSimStatesMapState(name, state);
   }
 
   if (type === "Wait") {

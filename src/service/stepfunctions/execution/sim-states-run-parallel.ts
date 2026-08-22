@@ -24,18 +24,25 @@ export async function runSimStatesParallel(
   input: JSONValue,
   context: SimStatesStateContext,
 ): Promise<SimStatesStateOutcome> {
-  const effective = simStatesEffectiveInput(input, state);
+  const effective = simStatesEffectiveInput(
+    input,
+    state,
+    context.contextObject,
+  );
 
   return await new SimStatesFanOut({
     context,
     kind: "branch",
+    limit: Infinity,
     children: state.Branches.map((definition, index) => ({
       index,
       definition,
       input: effective,
+      contextObject: context.contextObject,
     })),
     names: (index) =>
       `Branch ${String(index + 1)} of the Parallel state ${context.stateName}`,
-    answers: (outputs) => simStatesFanOutOutcome(state, input, outputs),
+    answers: (outputs) =>
+      simStatesFanOutOutcome(state, input, outputs, context.contextObject),
   }).run();
 }

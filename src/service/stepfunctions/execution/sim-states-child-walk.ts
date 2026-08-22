@@ -1,3 +1,4 @@
+import type { JSONObject } from "../../../util/type-guard/json.js";
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
 import type { SimStatesRunRecord } from "./sim-states-run-record.js";
 
@@ -11,6 +12,11 @@ export interface SimStatesChildWalkProperties {
    * What the child records itself on, and where its input comes from.
    */
   readonly record: SimStatesRunRecord;
+
+  /**
+   * What the child's states read through `$$`.
+   */
+  readonly contextObject: JSONObject;
 
   /**
    * What to do once the child has ended, whenever that turns out to be. An

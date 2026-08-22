@@ -20,12 +20,11 @@ export { SimStatesExecution } from "./execution/sim-states-execution.js";
 export type { SimStatesExecutionStatus } from "./execution/sim-states-execution.js";
 export type { SimStatesAttempt } from "./execution/sim-states-attempt.js";
 export type { SimStatesDefinition } from "./definition/sim-states-definition.js";
-export {
-  simStatesRunnableTypes,
-  simStatesStateTypes,
-} from "./definition/sim-states-state.js";
+export { simStatesStateTypes } from "./definition/sim-states-state.js";
 export type {
   SimStatesChoiceState,
+  SimStatesMapState,
+  SimStatesParallelState,
   SimStatesState,
   SimStatesStateType,
   SimStatesTaskState,

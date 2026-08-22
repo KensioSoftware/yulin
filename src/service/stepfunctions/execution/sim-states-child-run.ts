@@ -21,11 +21,12 @@ interface SimStatesChildRunProperties {
 }
 
 /**
- * One branch of a `Parallel` state, as it runs.
+ * One branch of a `Parallel` state, or one iteration of a `Map` state, as it
+ * runs.
  *
- * The states a branch visits are its own rather than the execution's, so they
- * are held here. A branch of a branch is still reported on the execution,
- * which is why a child run passes one it is told about upwards.
+ * The states a child visits are its own rather than the execution's, so they
+ * are held here. A child of a child is still reported on the execution, which
+ * is why a child run passes one it is told about upwards.
  */
 export class SimStatesChildRun implements SimStatesRunRecord, SimStatesChild {
   readonly kind: SimStatesChildKind;

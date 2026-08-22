@@ -28,7 +28,7 @@ async function runDefinition(
     background,
     tasks: new SimStatesNoTaskTargets(),
     roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
-  })({ definition, record: execution }).run();
+  })({ definition, record: execution, contextObject: {} }).run();
 
   return execution;
 }

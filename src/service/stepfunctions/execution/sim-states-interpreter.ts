@@ -1,12 +1,9 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
-import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
-import type {
-  SimStatesChildWalk,
-  SimStatesChildWalks,
-} from "./sim-states-child-walk.js";
+import type { SimStatesChildWalk } from "./sim-states-child-walk.js";
 import type { SimStatesRunRecord } from "./sim-states-run-record.js";
+import type { SimStatesWalkContext } from "./sim-states-state-outcome.js";
 import { SimStatesSettlement } from "./sim-states-settlement.js";
 import { SimStatesStateAttempts } from "./sim-states-state-attempts.js";
 import { SimStatesStateRunner } from "./sim-states-state-runner.js";
@@ -14,29 +11,13 @@ import { SimStatesWalkSteps } from "./sim-states-walk-steps.js";
 
 interface SimStatesInterpreterProperties {
   readonly definition: SimStatesDefinition;
-
-  /**
-   * What the walk records itself on: an execution, or one branch of a
-   * `Parallel` state.
-   */
-  readonly record: SimStatesRunRecord;
-
   readonly background: BackgroundScheduler;
 
   /**
-   * Where a `Task` state does its work.
+   * What every state of this walk is given, the record it writes itself on
+   * included.
    */
-  readonly tasks: SimStatesTaskTargets;
-
-  /**
-   * The state machine's execution role, which a task assumes.
-   */
-  readonly roleArn: string;
-
-  /**
-   * How a state that runs states of its own gets a walk over them.
-   */
-  readonly walkChild: SimStatesChildWalks;
+  readonly walk: SimStatesWalkContext;
 
   /**
    * What to do once this walk has ended, which is how a branch tells the
@@ -77,12 +58,12 @@ export class SimStatesInterpreter implements SimStatesChildWalk {
 
   constructor(properties: SimStatesInterpreterProperties) {
     this.#definition = properties.definition;
-    this.#record = properties.record;
+    this.#record = properties.walk.record;
     this.#background = properties.background;
     this.#onSettled = properties.onSettled;
 
     const settlement = new SimStatesSettlement({
-      record: properties.record,
+      record: properties.walk.record,
       background: properties.background,
     });
 
@@ -90,12 +71,7 @@ export class SimStatesInterpreter implements SimStatesChildWalk {
     this.#attempts = new SimStatesStateAttempts({
       runner: new SimStatesStateRunner({
         background: properties.background,
-        walk: {
-          record: properties.record,
-          tasks: properties.tasks,
-          roleArn: properties.roleArn,
-          walkChild: properties.walkChild,
-        },
+        walk: properties.walk,
       }),
       settlement,
       background: properties.background,

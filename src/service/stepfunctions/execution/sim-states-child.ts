@@ -17,17 +17,18 @@ export type SimStatesChildStatus =
   | "ABANDONED";
 
 /**
- * One branch of a `Parallel` state, as an execution ran it.
+ * One branch of a `Parallel` state or one iteration of a `Map` state, as an
+ * execution ran it.
  *
- * A branch runs states of its own, so what it did is held apart from the
- * states the execution around it visited. A test asserting that four records
- * were processed counts these.
+ * Both run states of their own, so what they did is held apart from the states
+ * the execution around them visited. A test asserting that four records were
+ * processed counts these.
  */
 export interface SimStatesChild {
   readonly kind: SimStatesChildKind;
 
   /**
-   * The `Parallel` state the child belongs to.
+   * The `Parallel` or `Map` state the child belongs to.
    */
   readonly stateName: string;
 

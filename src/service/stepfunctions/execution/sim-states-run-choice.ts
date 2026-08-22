@@ -22,7 +22,11 @@ export function runSimStatesChoice(
   input: JSONValue,
   context: SimStatesStateContext,
 ): SimStatesStateOutcome {
-  const effective = simStatesEffectiveInput(input, state);
+  const effective = simStatesEffectiveInput(
+    input,
+    state,
+    context.contextObject,
+  );
   const matched = state.Choices.find((rule) => rule.matches(effective));
   const next = matched?.next ?? state.Default;
 
@@ -35,7 +39,12 @@ export function runSimStatesChoice(
 
   return {
     kind: "next",
-    output: simStatesEffectiveOutput(effective, effective, state),
+    output: simStatesEffectiveOutput(
+      effective,
+      effective,
+      state,
+      context.contextObject,
+    ),
     next,
   };
 }

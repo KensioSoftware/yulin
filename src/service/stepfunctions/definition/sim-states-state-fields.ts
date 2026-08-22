@@ -14,8 +14,10 @@ const stateFieldsRefused = new Map<string, readonly string[]>([
   ["Choice", ["Parameters", "ResultPath", "ResultSelector"]],
   ["Wait", ["Parameters", "ResultPath", "ResultSelector"]],
   // Only a Task state, and the state machine itself, take a timeout. A
-  // Parallel state runs for as long as its branches do.
+  // Parallel state runs for as long as its branches do, and a Map state for
+  // as long as its iterations do.
   ["Parallel", ["TimeoutSeconds", "HeartbeatSeconds"]],
+  ["Map", ["TimeoutSeconds", "HeartbeatSeconds"]],
 ]);
 
 /**

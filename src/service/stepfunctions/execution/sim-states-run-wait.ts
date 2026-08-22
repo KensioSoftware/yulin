@@ -22,8 +22,17 @@ export function runSimStatesWait(
   input: JSONValue,
   context: SimStatesStateContext,
 ): SimStatesStateOutcome {
-  const effective = simStatesEffectiveInput(input, state);
-  const output = simStatesEffectiveOutput(effective, effective, state);
+  const effective = simStatesEffectiveInput(
+    input,
+    state,
+    context.contextObject,
+  );
+  const output = simStatesEffectiveOutput(
+    effective,
+    effective,
+    state,
+    context.contextObject,
+  );
   const resume: SimStatesMoveOnOutcome =
     state.Next === undefined
       ? { kind: "succeed", output }
