@@ -22,6 +22,12 @@ import type {
   SimListDatasetsCommand,
 } from "../command/dataset/dataset.command.js";
 import type {
+  SimCreateEventTrackerCommand,
+  SimDeleteEventTrackerCommand,
+  SimDescribeEventTrackerCommand,
+  SimListEventTrackersCommand,
+} from "../command/event-tracker/event-tracker.command.js";
+import type {
   SimCreateSchemaCommand,
   SimDeleteSchemaCommand,
   SimDescribeSchemaCommand,
@@ -139,6 +145,38 @@ export class SimPersonalizeSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simPersonalize.deleteDataset(
             command as SimDeleteDatasetCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateEventTrackerCommand",
+        async (command, context): Promise<unknown> =>
+          await simPersonalize.createEventTracker(
+            command as SimCreateEventTrackerCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeEventTrackerCommand",
+        async (command, context): Promise<unknown> =>
+          await simPersonalize.describeEventTracker(
+            command as SimDescribeEventTrackerCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListEventTrackersCommand",
+        async (command, context): Promise<unknown> =>
+          await simPersonalize.listEventTrackers(
+            command as SimListEventTrackersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteEventTrackerCommand",
+        async (command, context): Promise<unknown> =>
+          await simPersonalize.deleteEventTracker(
+            command as SimDeleteEventTrackerCommand,
             simSdkCallerOptions(context),
           ),
       ],

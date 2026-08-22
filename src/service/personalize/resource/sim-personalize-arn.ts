@@ -15,6 +15,7 @@ export const simPersonalizeResourceTypes = {
   dataset: "dataset",
   solution: "solution",
   campaign: "campaign",
+  eventTracker: "event-tracker",
 } as const;
 
 export type SimPersonalizeResourceType =
@@ -102,6 +103,16 @@ export function simPersonalizeCampaignArn(
   scope: SimAwsAccountRegionScope,
 ): string {
   return personalizeArn(simPersonalizeResourceTypes.campaign, name, scope);
+}
+
+/**
+ * The ARN of one simulated event tracker.
+ */
+export function simPersonalizeEventTrackerArn(
+  name: string,
+  scope: SimAwsAccountRegionScope,
+): string {
+  return personalizeArn(simPersonalizeResourceTypes.eventTracker, name, scope);
 }
 
 /**

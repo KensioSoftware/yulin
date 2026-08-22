@@ -91,6 +91,11 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     (scoped): SimSdkCommandRouter => scoped.personalize().sdkCommandRouter(),
   ],
   [
+    "Personalize Events",
+    (scoped): SimSdkCommandRouter =>
+      scoped.personalizeEvents().sdkCommandRouter(),
+  ],
+  [
     "Personalize Runtime",
     (scoped): SimSdkCommandRouter =>
       scoped.personalizeRuntime().sdkCommandRouter(),

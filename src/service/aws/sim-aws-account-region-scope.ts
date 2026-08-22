@@ -19,6 +19,7 @@ import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type {
   SimPersonalize,
+  SimPersonalizeEvents,
   SimPersonalizeRuntime,
 } from "../personalize/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
@@ -214,6 +215,16 @@ export class SimAwsAccountRegionContainer {
    */
   personalizeRuntime(): SimPersonalizeRuntime {
     return this.personalize().runtime();
+  }
+
+  /**
+   * Get the simulated Personalize Events API for this account and region.
+   *
+   * Reached through this scope's Personalize, as the runtime API is. The event
+   * trackers it accepts interactions for belong to that service.
+   */
+  personalizeEvents(): SimPersonalizeEvents {
+    return this.personalize().events();
   }
 
   /** Get simulated Rekognition for this account and region. */
