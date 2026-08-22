@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 
 import { statesFlakyHandlerFactory } from "../../../test/stepfunctions/states-flaky-handler.factory.js";
-import { statesTaskExecutionFactory } from "../../../test/stepfunctions/states-task-execution.factory.js";
+import { statesExecutionFactory } from "../../../test/stepfunctions/states-execution.factory.js";
 import { statesTaskFunctionFactory } from "../../../test/stepfunctions/states-task-function.factory.js";
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
 import type { JSONObject } from "../../util/type-guard/json.js";
@@ -57,9 +57,9 @@ describe("Which retrier takes a failing task", () => {
   it("fails the execution once a retrier runs out of attempts", async () => {
     // Given a function that never comes good, retried twice.
     const simAws = await givenAFlakyFunction(10);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           {
             ErrorEquals: ["States.TaskFailed"],
             IntervalSeconds: 2,
@@ -91,9 +91,9 @@ describe("Which retrier takes a failing task", () => {
     // Given a retrier that names a throttled write, and a task that failed
     // for another reason.
     const simAws = await givenAFlakyFunction(10);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           { ErrorEquals: ["ThrottlingException"], IntervalSeconds: 2 },
         ]),
       },
@@ -115,9 +115,9 @@ describe("Which retrier takes a failing task", () => {
   it("takes the first retrier that names the error", async () => {
     // Given a retrier that does not match ahead of one that does.
     const simAws = await givenAFlakyFunction(1);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           { ErrorEquals: ["ThrottlingException"], IntervalSeconds: 300 },
           { ErrorEquals: ["States.ALL"], IntervalSeconds: 2 },
         ]),
@@ -160,9 +160,9 @@ describe("Which retrier takes a failing task", () => {
       },
       simAws,
     );
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: {
+        state: {
           Type: "Task",
           Resource: check.arn,
           Retry: [

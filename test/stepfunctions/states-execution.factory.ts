@@ -6,17 +6,18 @@ import { statesExecutionRoleFactory } from "./states-execution-role.factory.js";
 import { statesMachineFactory } from "./states-machine.factory.js";
 
 /**
- * What a `Task` state test asks for when it wants an execution of a workflow
- * built around one task.
+ * What a test asks for when it wants an execution of a workflow built around
+ * one state.
  */
-export interface StatesTaskExecutionInput {
+export interface StatesExecutionInput {
   /**
-   * The task, which the execution starts at under the name `Check`.
+   * The state under test, which the execution starts at under the name
+   * `Check`.
    */
-  readonly task: JSONObject;
+  readonly state: JSONObject;
 
   /**
-   * The states the task can move on to, written as Amazon States Language.
+   * The states that one can move on to, written as Amazon States Language.
    */
   readonly states: JSONObject;
 
@@ -27,26 +28,26 @@ export interface StatesTaskExecutionInput {
 }
 
 /**
- * Creates a state machine of one task, starts an execution of it, and answers
- * with the execution ARN.
+ * Creates a state machine built around one state, starts an execution of it,
+ * and answers with the execution ARN.
  *
  * ```typescript
- * const executionArn = await statesTaskExecutionFactory.make(
- *   { task: { Type: "Task", Resource: check.arn, End: true } },
+ * const executionArn = await statesExecutionFactory.make(
+ *   { state: { Type: "Task", Resource: check.arn, End: true } },
  *   simAws,
  * );
  * ```
  *
  * The execution role is one that may invoke anything, since a test about what
- * a task does when it fails is not a test about what its role is allowed.
+ * a state does when it fails is not a test about what its role is allowed.
  */
-export const statesTaskExecutionFactory = new AsyncMappedFactory<
-  StatesTaskExecutionInput,
+export const statesExecutionFactory = new AsyncMappedFactory<
+  StatesExecutionInput,
   string,
   SimAws
 >(
   () => ({
-    task: { Type: "Succeed" },
+    state: { Type: "Succeed" },
     states: {},
     input: '{"student":"Wei"}',
   }),
@@ -55,7 +56,7 @@ export const statesTaskExecutionFactory = new AsyncMappedFactory<
       {
         roleArn: await statesExecutionRoleFactory.make({}, simAws),
         startAt: "Check",
-        states: { Check: input.task, ...input.states },
+        states: { Check: input.state, ...input.states },
       },
       simAws,
     );

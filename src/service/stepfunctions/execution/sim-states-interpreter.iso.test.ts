@@ -5,7 +5,7 @@ import type { SimStatesDefinition } from "../definition/sim-states-definition.js
 import type { SimStatesState } from "../definition/sim-states-state.js";
 import { SimStatesNoTaskTargets } from "../task/sim-states-no-task-targets.js";
 import { SimStatesExecution } from "./sim-states-execution.js";
-import { SimStatesInterpreter } from "./sim-states-interpreter.js";
+import { simStatesWalks } from "./sim-states-walks.js";
 
 /**
  * Run a definition the parser would never have let through, to reach the
@@ -24,13 +24,11 @@ async function runDefinition(
     startDate: background.now(),
   });
 
-  await new SimStatesInterpreter({
-    definition,
-    execution,
+  await simStatesWalks({
     background,
     tasks: new SimStatesNoTaskTargets(),
     roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
-  }).run();
+  })({ definition, record: execution }).run();
 
   return execution;
 }

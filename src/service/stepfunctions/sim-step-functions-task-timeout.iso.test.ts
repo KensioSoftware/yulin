@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 
 import { statesFlakyHandlerFactory } from "../../../test/stepfunctions/states-flaky-handler.factory.js";
-import { statesTaskExecutionFactory } from "../../../test/stepfunctions/states-task-execution.factory.js";
+import { statesExecutionFactory } from "../../../test/stepfunctions/states-execution.factory.js";
 import { statesTaskFunctionFactory } from "../../../test/stepfunctions/states-task-function.factory.js";
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
 import type { JSONObject } from "../../util/type-guard/json.js";
@@ -39,13 +39,10 @@ describe("How long a Task state waits", () => {
    */
   async function runPastTheDeadline(
     failures: number,
-    task: JSONObject,
+    state: JSONObject,
   ): Promise<SimDescribeExecutionCommandOutput> {
     const simAws = await givenAFlakyFunction(failures);
-    const executionArn = await statesTaskExecutionFactory.make(
-      { task },
-      simAws,
-    );
+    const executionArn = await statesExecutionFactory.make({ state }, simAws);
 
     await simAws.clock().advanceBy({ minutes: 5 });
 
@@ -114,9 +111,9 @@ describe("How long a Task state waits", () => {
   it("sends a timed out task to its Catch", async () => {
     // Given a task that compensates for running long.
     const simAws = await givenAFlakyFunction(10);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: {
+        state: {
           ...invokeCheck({ TimeoutSeconds: 15 }),
           Catch: [
             {

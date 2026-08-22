@@ -1,6 +1,8 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesAttemptState } from "../retry/sim-states-attempt-state.js";
 import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
+import type { SimStatesChildWalks } from "./sim-states-child-walk.js";
+import type { SimStatesRunRecord } from "./sim-states-run-record.js";
 
 /**
  * What a state leaves the execution to do once it has run.
@@ -49,18 +51,35 @@ export interface SimStatesWaitOutcome {
   readonly resume: SimStatesMoveOnOutcome;
 }
 
+/**
+ * A state that has suspended, and will say what it did later.
+ *
+ * A `Parallel` state whose branches are waiting on the clock is neither done
+ * nor waiting for an instant of its own. The walk stops here, and the state
+ * carries on through the `resume` it was given once its branches have
+ * finished.
+ */
+export interface SimStatesPendingOutcome {
+  readonly kind: "pending";
+}
+
 export type SimStatesStateOutcome =
   | SimStatesSettledOutcome
   | SimStatesRetryOutcome
-  | SimStatesWaitOutcome;
+  | SimStatesWaitOutcome
+  | SimStatesPendingOutcome;
 
 /**
- * What a state knows about the execution it is running in.
+ * How a state that suspended says what it finally did.
  */
-export interface SimStatesStateContext {
-  readonly stateName: string;
-  readonly now: Date;
+export type SimStatesResume = (
+  outcome: SimStatesSettledOutcome,
+) => Promise<void>;
 
+/**
+ * What every state of one walk is given, whichever state it is.
+ */
+export interface SimStatesWalkContext {
   /**
    * Where a `Task` state does its work.
    */
@@ -70,4 +89,28 @@ export interface SimStatesStateContext {
    * The state machine's execution role, which a task assumes.
    */
   readonly roleArn: string;
+
+  /**
+   * What the walk is recording itself on, which a `Parallel` state's branch
+   * hangs off.
+   */
+  readonly record: SimStatesRunRecord;
+
+  /**
+   * How a state that runs states of its own gets a walk over them.
+   */
+  readonly walkChild: SimStatesChildWalks;
+}
+
+/**
+ * What a state knows about the execution it is running in.
+ */
+export interface SimStatesStateContext extends SimStatesWalkContext {
+  readonly stateName: string;
+  readonly now: Date;
+
+  /**
+   * How a state that suspends says what it finally did.
+   */
+  readonly resume: SimStatesResume;
 }

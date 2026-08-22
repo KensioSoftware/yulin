@@ -1,4 +1,5 @@
 import { SimStatesInvalidDefinition } from "../error/sim-step-functions.error.js";
+import { simStatesErrorHandling } from "../retry/sim-states-error-handling.js";
 import {
   type SimStatesChoiceState,
   type SimStatesState,
@@ -54,17 +55,13 @@ function checkCatchers(
   state: SimStatesState,
   states: ReadonlyMap<string, SimStatesState>,
 ): void {
-  if (state.Type !== "Task") {
-    return;
-  }
-
-  const catchers = state.Catch ?? [];
+  const catchers = simStatesErrorHandling(state)?.Catch ?? [];
 
   for (const catcher of catchers) {
     if (!states.has(catcher.Next)) {
       throw new SimStatesInvalidDefinition(
-        `A catcher in the Task state ${name} moves to ${catcher.Next}, ` +
-          "which is not one of this state machine's states.",
+        `A catcher in the ${state.Type} state ${name} moves to ` +
+          `${catcher.Next}, which is not one of this state machine's states.`,
       );
     }
   }

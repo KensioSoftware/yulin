@@ -8,18 +8,18 @@ import {
 } from "./sim-states-error-equals.js";
 
 /**
- * Read a `Task` state's `Catch`, refusing anything this cannot run.
+ * Read a state's `Catch`, refusing anything this cannot run.
  *
  * A catcher's `Next` is checked against the state machine's own states once
  * every state has been read, alongside the other transitions. Answers with
  * nothing where the state carries no `Catch`.
  */
 export function parseSimStatesCatchers(
-  stateName: string,
+  named: string,
   state: Record<string, JSONValue>,
 ): readonly SimStatesCatcher[] | undefined {
-  return readSimStatesHandlers(stateName, state, "Catch", "catcher")?.map(
-    (entry) => readCatcher(stateName, entry),
+  return readSimStatesHandlers(named, state, "Catch", "catcher")?.map((entry) =>
+    readCatcher(named, entry),
   );
 }
 
@@ -27,14 +27,14 @@ export function parseSimStatesCatchers(
  * Read one catcher, which names where a failure it matches goes.
  */
 function readCatcher(
-  stateName: string,
+  named: string,
   entry: SimStatesHandlerEntry,
 ): SimStatesCatcher {
   const next = entry.written["Next"];
 
   if (typeof next !== "string") {
     throw new SimStatesInvalidDefinition(
-      `A catcher in the Task state ${stateName} has no Next naming the ` +
+      `A catcher in the ${named} has no Next naming the ` +
         "state a caught failure goes to.",
     );
   }
@@ -42,7 +42,7 @@ function readCatcher(
   return {
     ErrorEquals: entry.ErrorEquals,
     Next: next,
-    ...resultPath(stateName, entry.written["ResultPath"]),
+    ...resultPath(named, entry.written["ResultPath"]),
   };
 }
 
@@ -53,7 +53,7 @@ function readCatcher(
  * written into can hold it is only known once a failure is caught.
  */
 function resultPath(
-  stateName: string,
+  named: string,
   written: JSONValue | undefined,
 ): { ResultPath?: string | null } {
   if (written === undefined) {
@@ -66,7 +66,7 @@ function resultPath(
 
   if (typeof written !== "string") {
     throw new SimStatesInvalidDefinition(
-      `A catcher in the Task state ${stateName} has a ResultPath that is ` +
+      `A catcher in the ${named} has a ResultPath that is ` +
         "neither a Reference Path nor null.",
     );
   }

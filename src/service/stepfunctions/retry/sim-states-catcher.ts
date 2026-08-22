@@ -3,7 +3,7 @@ import { parseSimStatesReferencePath } from "../data/sim-states-reference-path.j
 import { insertAtSimStatesPath } from "../data/sim-states-result-path.js";
 
 /**
- * One entry in a `Task` state's `Catch`.
+ * One entry in a state's `Catch`.
  *
  * `Next` is where a caught failure sends the execution, and `ResultPath` says
  * where in the state's input the error goes. A catcher left without one

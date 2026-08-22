@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import { SimStatesExecution } from "../../execution/sim-states-execution.js";
 import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
 import { SimStatesInterpreter } from "../../execution/sim-states-interpreter.js";
+import { simStatesWalks } from "../../execution/sim-states-walks.js";
 import { simStatesExecutionArn } from "../../machine/sim-state-machine-arn.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
 import type { SimStatesTaskTargets } from "../../task/sim-states-task-invocation.js";
@@ -93,12 +94,17 @@ export class SimStatesExecutionStart {
 
     this.#executions.add(execution);
 
-    await new SimStatesInterpreter({
-      definition: stateMachine.parsedDefinition,
-      execution,
+    const walks = {
       background: this.#background,
       tasks: this.#tasks,
       roleArn: stateMachine.roleArn,
+    };
+
+    await new SimStatesInterpreter({
+      ...walks,
+      definition: stateMachine.parsedDefinition,
+      record: execution,
+      walkChild: simStatesWalks(walks),
     }).run();
 
     return { executionArn: execution.arn, startDate };

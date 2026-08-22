@@ -1,5 +1,4 @@
-import type { SimStatesCatcher } from "./sim-states-catcher.js";
-import type { SimStatesRetrier } from "./sim-states-retrier.js";
+import type { SimStatesErrorHandling } from "./sim-states-error-handling.js";
 import type { SimStatesTaskTimeouts } from "./sim-states-task-deadline.js";
 
 /**
@@ -9,7 +8,5 @@ import type { SimStatesTaskTimeouts } from "./sim-states-task-deadline.js";
  * fails is retried, then caught, and a task still going at its deadline fails
  * whatever it was doing.
  */
-export interface SimStatesTaskHandling extends SimStatesTaskTimeouts {
-  readonly Retry?: readonly SimStatesRetrier[];
-  readonly Catch?: readonly SimStatesCatcher[];
-}
+export type SimStatesTaskHandling = SimStatesErrorHandling &
+  SimStatesTaskTimeouts;
