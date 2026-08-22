@@ -1,9 +1,9 @@
-import { isRecord } from "../../../../../util/type-guard/record.js";
-import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
+import { isRecord } from "../../../../util/type-guard/record.js";
+import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import {
   simCfnStepFunctionsResourceError,
   simCfnStepFunctionsSkippedResourceError,
-} from "./sim-cfn-step-functions-resource-error.js";
+} from "../sim-cfn-step-functions-resource-error.js";
 import {
   definitionPropertyName,
   definitionS3LocationPropertyName,
@@ -11,7 +11,7 @@ import {
   definitionSubstitutionsPropertyName,
 } from "./sim-cfn-state-machine-property-names.js";
 import { SimCfnStateMachineSubstitutions } from "./sim-cfn-state-machine-substitutions.js";
-import { stateMachineResourceType } from "./sim-cfn-step-functions-resource-types.js";
+import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-types.js";
 
 interface SimCfnStateMachineDefinitionProperties {
   readonly logicalId: string;

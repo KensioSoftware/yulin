@@ -1,7 +1,7 @@
 import {
   SimStatesUnsimulatedInput,
   SimStepFunctionsError,
-} from "../../../../stepfunctions/error/sim-step-functions.error.js";
+} from "../error/sim-step-functions.error.js";
 
 /**
  * Build the error a Resource of a simulated Step Functions type is refused

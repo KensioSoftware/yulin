@@ -5,8 +5,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
-import { SimCfnResource } from "../../sim-cfn-resource.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { simCfnStepFunctionsResourceCommand } from "./sim-cfn-step-functions-resource-error.js";
 import { SimStepFunctionsCfnResourceFactory } from "./sim-step-functions-cfn-resource-factory.js";
 

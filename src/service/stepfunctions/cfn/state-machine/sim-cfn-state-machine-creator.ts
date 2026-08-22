@@ -1,11 +1,11 @@
-import { assertDefined } from "../../../../../util/type-guard/defined.js";
-import type { SimStateMachine } from "../../../../stepfunctions/machine/sim-state-machine.js";
-import type { SimStepFunctions } from "../../../../stepfunctions/sim-step-functions.js";
-import type { SimCfnResource } from "../../sim-cfn-resource.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimStateMachine } from "../../machine/sim-state-machine.js";
+import type { SimStepFunctions } from "../../sim-step-functions.js";
+import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnStateMachineProperties } from "./sim-cfn-state-machine-properties.js";
-import { simCfnStepFunctionsResourceCommand } from "./sim-cfn-step-functions-resource-error.js";
-import { stateMachineResourceType } from "./sim-cfn-step-functions-resource-types.js";
+import { simCfnStepFunctionsResourceCommand } from "../sim-cfn-step-functions-resource-error.js";
+import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-types.js";
 
 interface SimCfnStateMachineCreatorProperties {
   readonly stepFunctions: SimStepFunctions;

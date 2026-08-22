@@ -9,14 +9,14 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimAws } from "../../aws/sim-aws.js";
 import {
   simStatesRunnableTypes,
   simStatesStateTypes,
-} from "../../../../stepfunctions/definition/sim-states-state.js";
-import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
-import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
+} from "../definition/sim-states-state.js";
+import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnDeployedStack } from "../../cloudformation/stack/sim-cfn-deployed-stack.type.js";
 
 describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
   const roleArn = "arn:aws:iam::123456789012:role/EnrolmentWorkflowRole";

@@ -7,10 +7,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
-import { SimStatesResourceNotFound } from "../../../../stepfunctions/error/sim-step-functions.error.js";
-import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { SimStatesResourceNotFound } from "../error/sim-step-functions.error.js";
+import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
   const roleArn = "arn:aws:iam::123456789012:role/EnrolmentWorkflowRole";

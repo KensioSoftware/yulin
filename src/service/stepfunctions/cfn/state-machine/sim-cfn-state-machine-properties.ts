@@ -1,8 +1,8 @@
-import type { SimCfnResource } from "../../sim-cfn-resource.js";
+import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
-} from "../../../template/value/sim-cfn-template-value.js";
+} from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnStateMachineDefinition } from "./sim-cfn-state-machine-definition.js";
 import { SimCfnStateMachineName } from "./sim-cfn-state-machine-name.js";
 import {
@@ -11,8 +11,8 @@ import {
   stateMachineTypePropertyName,
   unsimulatedPropertyReasons,
 } from "./sim-cfn-state-machine-property-names.js";
-import { simCfnStepFunctionsResourceError } from "./sim-cfn-step-functions-resource-error.js";
-import { stateMachineResourceType } from "./sim-cfn-step-functions-resource-types.js";
+import { simCfnStepFunctionsResourceError } from "../sim-cfn-step-functions-resource-error.js";
+import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-types.js";
 
 interface SimCfnStateMachinePropertiesProperties {
   readonly resource: SimCfnResource;

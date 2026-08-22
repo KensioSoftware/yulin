@@ -15,6 +15,7 @@ import type { SimStepFunctionsRequestOptions } from "./command/sim-step-function
 import { SimStatesExecutionStore } from "./execution/sim-states-execution-store.js";
 import type { SimStateMachine } from "./machine/sim-state-machine.js";
 import { SimStateMachineStore } from "./machine/sim-state-machine-store.js";
+import { SimStepFunctionsCfnResourceFactory } from "./cfn/sim-step-functions-cfn-resource-factory.js";
 import { SimStepFunctionsSdkCommandRouter } from "./sdk/sim-step-functions-sdk-command-router.js";
 import { SimStatesNoTaskTargets } from "./task/sim-states-no-task-targets.js";
 import type { SimStatesTaskTargets } from "./task/sim-states-task-invocation.js";
@@ -56,6 +57,9 @@ export class SimStepFunctions {
   readonly #executionDescribe: SimStatesExecutionDescribe;
   readonly #background: BackgroundScheduler;
   readonly #sdkRouter = new SimStepFunctionsSdkCommandRouter(this);
+  readonly #cfnFactory = new SimStepFunctionsCfnResourceFactory({
+    stepFunctions: this,
+  });
   readonly #inspection = new SimStepFunctionsInspection(this.#executions);
 
   constructor(properties: SimStepFunctionsProperties = {}) {
@@ -180,5 +184,12 @@ export class SimStepFunctions {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.#sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimStepFunctionsCfnResourceFactory {
+    return this.#cfnFactory;
   }
 }
