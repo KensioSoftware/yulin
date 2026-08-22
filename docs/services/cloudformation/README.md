@@ -930,8 +930,11 @@ exports published in that Region.
 ## Dynamic references
 
 A `{{resolve:...}}` dynamic reference reads a value from another service while a resource is being
-created. It is written into the template as ordinary text, so it can sit inside a longer string and
-inside `Fn::Sub`.
+created. It is written into the template as ordinary text, so it can sit inside a longer string.
+
+`Fn::Sub` and `Fn::Join` resolve first, and the reference is read from the string they built. CDK
+writes that shape whenever a secret sits in the same stack as the resource reading it (the secret's
+ARN arrives as a `Ref`).
 
 `{{resolve:ssm:name}}` and `{{resolve:ssm:name:3}}` read a simulated SSM parameter. See
 [reading a parameter with a dynamic reference](../ssm/README.md#reading-a-parameter-with-a-dynamic-reference)
