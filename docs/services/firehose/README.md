@@ -483,7 +483,9 @@ operations.
   at `CreateDeliveryStream`. A delivery stream created against one of them would take records and
   drop them, and a test asserting on an empty Bucket would blame the code under test.
   `S3DestinationConfiguration` and `ExtendedS3DestinationConfiguration` are both read, and the
-  extended one wins where a request carries both.
+  extended one wins where a request carries both. Either way the delivery stream describes back
+  through `ExtendedS3DestinationDescription`, which is the shape carrying every field read here.
+  `S3DestinationDescription` is always absent.
 - **`DirectPut` is the only source.** A `DeliveryStreamType` of `KinesisStreamAsSource` is refused,
   along with any `KinesisStreamSourceConfiguration`. Reading a simulated Kinesis stream is
   [issue 932](https://github.com/KensioSoftware/yulin/issues/932).
