@@ -15,6 +15,7 @@ export const simPersonalizeResourceTypes = {
   dataset: "dataset",
   solution: "solution",
   campaign: "campaign",
+  recommender: "recommender",
   eventTracker: "event-tracker",
 } as const;
 
@@ -103,6 +104,16 @@ export function simPersonalizeCampaignArn(
   scope: SimAwsAccountRegionScope,
 ): string {
   return personalizeArn(simPersonalizeResourceTypes.campaign, name, scope);
+}
+
+/**
+ * The ARN of one simulated recommender.
+ */
+export function simPersonalizeRecommenderArn(
+  name: string,
+  scope: SimAwsAccountRegionScope,
+): string {
+  return personalizeArn(simPersonalizeResourceTypes.recommender, name, scope);
 }
 
 /**

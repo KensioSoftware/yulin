@@ -3,7 +3,9 @@ import {
   CreateDatasetGroupCommand,
   CreateEventTrackerCommand,
   CreateSchemaCommand,
+  DeleteEventTrackerCommand,
   DescribeEventTrackerCommand,
+  ListEventTrackersCommand,
   PersonalizeClient,
 } from "@aws-sdk/client-personalize";
 import {
@@ -140,6 +142,20 @@ describe("Personalize Events SDK interception", () => {
       // Then the tracking ID the create handed out is the one it reports.
       assertNonNullable(described.eventTracker);
       assertIdentical(described.eventTracker.trackingId, created.trackingId);
+
+      // And listing and deleting it reach the simulation too.
+      const listed = await client.send(new ListEventTrackersCommand({}));
+
+      await client.send(
+        new DeleteEventTrackerCommand({
+          eventTrackerArn: created.eventTrackerArn,
+        }),
+      );
+
+      const remaining = await client.send(new ListEventTrackersCommand({}));
+
+      assertArrayLength(listed.eventTrackers ?? [], 1);
+      assertArrayLength(remaining.eventTrackers ?? [], 0);
     } finally {
       simSdk.restoreAll();
     }

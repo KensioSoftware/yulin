@@ -197,7 +197,9 @@ describe("Personalize SDK interception", () => {
       assertNonNullable(supported.route(commandName));
     }
 
-    assertUndefined(supported.route("CreateRecommenderCommand"));
-    assertArrayLength(supported.supportedCommandNames(), 27);
+    // And a Command that belongs to a Personalize API of its own is not one
+    // of them. PutEvents arrives on the events client.
+    assertUndefined(supported.route("PutEventsCommand"));
+    assertArrayLength(supported.supportedCommandNames(), 34);
   });
 });

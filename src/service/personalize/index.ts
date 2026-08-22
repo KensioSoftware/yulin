@@ -21,6 +21,15 @@ export {
   type SimPersonalizeDatasetGroupProperties,
 } from "./resource/sim-personalize-dataset-group.js";
 export {
+  SimPersonalizeRecommender,
+  type SimPersonalizeRecommenderConfig,
+  type SimPersonalizeRecommenderProperties,
+} from "./resource/sim-personalize-recommender.js";
+export {
+  simPersonalizeUseCases,
+  type SimPersonalizeUseCase,
+} from "./resource/sim-personalize-use-case.js";
+export {
   simPersonalizeDomains,
   type SimPersonalizeDomain,
 } from "./resource/sim-personalize-domain.js";

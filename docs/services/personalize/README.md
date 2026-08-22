@@ -437,9 +437,8 @@ one request.
 ## Domain dataset groups
 
 A dataset group created with a domain of `ECOMMERCE` or `VIDEO_ON_DEMAND` is a Domain dataset group.
-Simulated Personalize records the domain and otherwise treats it like any other group. The
-recommenders that make a domain group worth having arrive with the domain path. For now the domain
-is state a test can assert on.
+It serves recommendations through a recommender rather than through a solution and a campaign, and
+an application on that path never creates either.
 
 ```typescript sim-personalize-domain-dataset-group
 /**
@@ -462,6 +461,142 @@ const group = await simAws.personalize().createDatasetGroup(
 // ECOMMERCE
 console.log(group.domain);
 ```
+
+## Recommenders and their use cases
+
+A recommender goes straight onto a Domain dataset group, for one of the ten use cases AWS trained.
+There is no solution and no solution version in between. `GetRecommendations` then names a
+`recommenderArn` where the custom path names a `campaignArn`, and results are declared against it
+through the same `recommendations()` rules.
+
+```typescript sim-personalize-recommender
+/**
+ * Serving recommendations from a Domain dataset group recommender.
+ */
+
+import {
+  CreateDatasetGroupCommand,
+  CreateRecommenderCommand,
+} from "@aws-sdk/client-personalize";
+import { GetRecommendationsCommand } from "@aws-sdk/client-personalize-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const group = await simAws.personalize().createDatasetGroup(
+  new CreateDatasetGroupCommand({
+    name: "catalogue",
+    domain: "VIDEO_ON_DEMAND",
+  }),
+);
+
+const recommender = await simAws.personalize().createRecommender(
+  new CreateRecommenderCommand({
+    name: "more-like-x",
+    datasetGroupArn: group.datasetGroupArn,
+    recipeArn: "arn:aws:personalize:::recipe/aws-vod-more-like-x",
+  }),
+);
+
+const recommenderArn = recommender.recommenderArn!;
+
+// More like X is answered from the item the request names. It carries a user
+// as well, since AWS filters out what that user has already watched.
+simAws
+  .personalize()
+  .recommendations(recommenderArn)
+  .onItem("title-88", { itemIds: ["title-12", "title-40"] });
+
+const recommended = await simAws.personalizeRuntime().getRecommendations(
+  new GetRecommendationsCommand({
+    recommenderArn,
+    itemId: "title-88",
+    userId: "viewer-7",
+  }),
+);
+
+// title-12 title-40
+console.log(recommended.itemList?.map((item) => item.itemId).join(" "));
+```
+
+A recommender is `ACTIVE` on creation, for the reason `CreateSolutionVersion` gives one immediately.
+Real Personalize trains for hours and retrains every seven days.
+
+### The ten use cases
+
+The recipe ARN picks the use case, and the use case decides what a request has to carry. A request
+leaving out a parameter its use case requires is refused, which is what real Personalize does with
+it. That refusal is the part of the domain path worth simulating, and everything else here is state.
+
+| Use case                           | Recipe ARN suffix                              | `itemId` | `userId` |
+| ---------------------------------- | ---------------------------------------------- | -------- | -------- |
+| Most popular                       | `aws-vod-most-popular`                         | unused   | required |
+| Trending now                       | `aws-vod-trending-now`                         | unused   | optional |
+| Top picks for you                  | `aws-vod-top-picks`                            | unused   | required |
+| More like X                        | `aws-vod-more-like-x`                          | required | required |
+| Because you watched X              | `aws-vod-because-you-watched-x`                | required | required |
+| Most viewed                        | `aws-ecomm-popular-items-by-views`             | unused   | required |
+| Best sellers                       | `aws-ecomm-popular-items-by-purchases`         | unused   | required |
+| Recommended for you                | `aws-ecomm-recommended-for-you`                | unused   | required |
+| Frequently bought together         | `aws-ecomm-frequently-bought-together`         | required | optional |
+| Customers who viewed X also viewed | `aws-ecomm-customers-who-viewed-x-also-viewed` | required | required |
+
+Each ARN is that suffix under `arn:aws:personalize:::recipe/`. The first five belong to
+`VIDEO_ON_DEMAND` and the last five to `ECOMMERCE`, and a recipe from the other domain is refused on
+`CreateRecommender`. So is a custom recipe such as `aws-similar-items`, which belongs to a solution.
+
+Nearly every use case requires a `userId`, because real Personalize filters out what the user has
+already watched or bought and that filtering is keyed on the user. `Trending now` and
+`Frequently bought together` are the two exceptions. Each takes a `userId` only to apply a
+`CurrentUser` filter, and this simulation has no filters, so both accept a request without one.
+
+A parameter marked unused is ignored rather than matched on. A `Top picks for you` request carrying
+an `itemId` as well as its `userId` is answered from the user rule, since that is the tier real
+Personalize would have used. An optional one is matched where the request carries it.
+
+These are the requirements AWS documents against each use case. Both pages are worth reading before
+writing a request, since two of them differ from the e-commerce use case they otherwise mirror.
+
+### Starting and stopping
+
+`StopRecommender` leaves the recommender in place and stops it serving. `GetRecommendations` against
+a stopped one is refused by name until `StartRecommender` brings it back, and everything declared
+against it survives the round trip.
+
+```typescript sim-personalize-recommender-stop
+/**
+ * Stopping and starting a recommender.
+ */
+
+import {
+  StartRecommenderCommand,
+  StopRecommenderCommand,
+} from "@aws-sdk/client-personalize";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const recommenderArn: string;
+
+await simAws
+  .personalize()
+  .stopRecommender(new StopRecommenderCommand({ recommenderArn }));
+
+// INACTIVE
+console.log(simAws.personalize().findRecommender("more-like-x")?.status);
+
+await simAws
+  .personalize()
+  .startRecommender(new StartRecommenderCommand({ recommenderArn }));
+```
+
+`UpdateRecommender` replaces the configuration whole. `itemExplorationConfig` and
+`minRecommendationRequestsPerSecond` are recorded and read back through `DescribeRecommender`, and
+nothing here explores or provisions anything.
+
+Deleting a Domain dataset group needs its recommenders deleted first, the way it needs its datasets
+and solutions gone. A group still holding one is reported as `ResourceInUseException`.
 
 ## Deploying Personalize resources with CloudFormation
 
@@ -601,8 +736,8 @@ to be deleted.
 
 ## Reading state back
 
-`findDatasetGroup`, `findSolution` and `findCampaign` read resources by name without going through a
-Command or its authorization. `recordedEvents()`, `recordedItems()` and `recordedUsers()` read back
+`findDatasetGroup`, `findSolution`, `findCampaign` and `findRecommender` read resources by name
+without going through a Command or its authorization. `recordedEvents()`, `recordedItems()` and `recordedUsers()` read back
 what the events API was sent.
 
 ```typescript sim-personalize-accessors
@@ -642,14 +777,16 @@ either.
 
 Dataset groups, schemas, datasets, solutions, campaigns and event trackers each have `Create`,
 `Describe`, `List` and `Delete`. Solution versions have `Create`, `Describe` and `List`.
+Recommenders have those four plus `Update`, `Start` and `Stop`.
 
 Every command works through `simAws.personalize()` and through an intercepted `PersonalizeClient`.
 Each one authorizes through simulated IAM, against the resource ARN where the request names one and
 against `*` on a create.
 
 The runtime API has `GetRecommendations` and `GetPersonalizedRanking`. Both work through
-`simAws.personalizeRuntime()` and through an intercepted `PersonalizeRuntimeClient`, and both
-authorize against the campaign ARN the request names.
+`simAws.personalizeRuntime()` and through an intercepted `PersonalizeRuntimeClient`.
+`GetPersonalizedRanking` names a campaign, and `GetRecommendations` names a campaign or a
+recommender. Each authorizes against the ARN the request carries.
 
 The events API has `PutEvents`, `PutItems` and `PutUsers`. All three work through
 `simAws.personalizeEvents()` and through an intercepted `PersonalizeEventsClient`. `PutEvents`
@@ -680,8 +817,14 @@ dataset ARN they name.
   `CreateMetricAttribution` is absent. An event carrying one is refused by name.
 - **No `PutActions` or `PutActionInteractions`.** They belong with Next-Best-Action, alongside
   `GetActionRecommendations`.
-- **No recommenders.** `CreateRecommender` and the ten domain use cases arrive with the domain
-  path.
+- **A recommender is declared, never trained.** It is `ACTIVE` at once, where real Personalize
+  trains for hours and retrains every seven days. `Top picks for you` and `Recommended for you`
+  also update every two hours on AWS, and nothing here updates.
+- **No automatic filtering of what the user already has.** Several use cases drop items the user
+  purchased or watched, worked out from their event history. Simulated Personalize holds no such
+  history, so a declared list comes back whole.
+- **Exploration is recorded, never applied.** `explorationWeight` and the item age cutoff read back
+  from `DescribeRecommender` and change no recommendation.
 - **Five CloudFormation types are stepped over.** `AWS::Personalize::BatchInferenceJob`,
   `BatchSegmentJob`, `DataDeletionJob`, `MetricAttribution` and `Recipe` all work over data this
   simulation never reads. A template declaring one deploys with the Resource skipped.

@@ -16,8 +16,8 @@ function refuse(arn: string, count: number, holders: string): never {
 }
 
 /**
- * Refuse a dataset group that still holds datasets, solutions or an event
- * tracker.
+ * Refuse a dataset group that still holds datasets, solutions, recommenders or
+ * an event tracker.
  */
 export function requireDatasetGroupEmpty(
   resources: SimPersonalizeResources,
@@ -37,6 +37,14 @@ export function requireDatasetGroupEmpty(
 
   if (solutions.length > 0) {
     refuse(datasetGroupArn, solutions.length, "solution(s) in it");
+  }
+
+  const recommenders = resources.recommenders.all.filter(
+    (recommender) => recommender.datasetGroupArn === datasetGroupArn,
+  );
+
+  if (recommenders.length > 0) {
+    refuse(datasetGroupArn, recommenders.length, "recommender(s) on it");
   }
 
   const eventTrackers = resources.eventTrackers.all.filter(
