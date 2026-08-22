@@ -1,4 +1,4 @@
-import { SimCfnGeneratedResourceName } from "../../name/sim-cfn-generated-resource-name.js";
+import { SimCfnGeneratedResourceName } from "../../../cloudformation/resource/name/sim-cfn-generated-resource-name.js";
 
 const maximumNameLength = 80;
 

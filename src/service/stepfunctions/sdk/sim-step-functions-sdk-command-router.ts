@@ -55,6 +55,30 @@ export class SimStepFunctionsSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "TagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simStepFunctions.tagResource(
+            command as simStatesCommands.SimTagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simStepFunctions.untagResource(
+            command as simStatesCommands.SimUntagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTagsForResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simStepFunctions.listTagsForResource(
+            command as simStatesCommands.SimListTagsForResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "StartExecutionCommand",
         async (command, context): Promise<unknown> =>
           await simStepFunctions.startExecution(

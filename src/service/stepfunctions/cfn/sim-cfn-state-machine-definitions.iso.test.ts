@@ -1,9 +1,9 @@
 import { assertIdentical, assertTypeString } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
-import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
-import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
+import type { SimCfnTemplateValue } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 describe("AWS::StepFunctions::StateMachine definitions", () => {
   const roleArn = "arn:aws:iam::123456789012:role/EnrolmentWorkflowRole";

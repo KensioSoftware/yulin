@@ -1,16 +1,20 @@
-import type { SimStepFunctions } from "../../../../stepfunctions/sim-step-functions.js";
-import type { SimCfnServiceResourceFactory } from "../../factory/sim-cfn-resource-factory.type.js";
+import type { SimStatesDefinitionStore } from "../definition/store/sim-states-definition-store.js";
+import type { SimStepFunctions } from "../sim-step-functions.js";
+import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
   SimCloudFormationResourceDeleteContext,
-} from "../../sim-cfn-resource.js";
-import { SimCfnStateMachineCreator } from "./sim-cfn-state-machine-creator.js";
+} from "../../cloudformation/resource/sim-cfn-resource.js";
+import { SimCfnStateMachineCreator } from "./state-machine/sim-cfn-state-machine-creator.js";
 import { SimCfnStepFunctionsResourceDeleter } from "./sim-cfn-step-functions-resource-deleter.js";
 import { stateMachineResourceTypeName } from "./sim-cfn-step-functions-resource-types.js";
 
 interface SimStepFunctionsCfnResourceFactoryProperties {
   readonly stepFunctions: SimStepFunctions;
+
+  /** Where a `DefinitionS3Location` is read from. */
+  readonly definitions: SimStatesDefinitionStore;
 }
 
 /**
@@ -23,6 +27,7 @@ export class SimStepFunctionsCfnResourceFactory implements SimCfnServiceResource
   constructor(properties: SimStepFunctionsCfnResourceFactoryProperties) {
     this.#stateMachineCreator = new SimCfnStateMachineCreator({
       stepFunctions: properties.stepFunctions,
+      definitions: properties.definitions,
     });
     this.#deleter = new SimCfnStepFunctionsResourceDeleter({
       stepFunctions: properties.stepFunctions,

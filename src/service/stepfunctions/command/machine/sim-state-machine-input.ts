@@ -3,6 +3,7 @@ import type { SimStatesDefinition } from "../../definition/sim-states-definition
 import { SimStatesInvalidRequest } from "../../error/sim-step-functions.error.js";
 import type { SimStateMachineType } from "../../machine/sim-state-machine.js";
 import { checkSimStatesName } from "../../machine/sim-states-name.js";
+import { SimStateMachineTags } from "../../machine/sim-state-machine-tags.js";
 import type * as commands from "./machine.command.js";
 
 /**
@@ -14,6 +15,7 @@ export interface SimStateMachineCreateInput {
   readonly parsed: SimStatesDefinition;
   readonly roleArn: string;
   readonly type: SimStateMachineType;
+  readonly tags: SimStateMachineTags;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface SimStateMachineCreateInput {
 export function readSimStateMachineCreateInput(
   input: commands.SimCreateStateMachineCommandInput,
 ): SimStateMachineCreateInput {
-  const { name, definition, roleArn, type } = input;
+  const { name, definition, roleArn, type, tags } = input;
 
   if (name === undefined || name === "") {
     throw new SimStatesInvalidRequest("CreateStateMachine needs a name.");
@@ -42,6 +44,7 @@ export function readSimStateMachineCreateInput(
     parsed: parseSimStatesDefinition(definition),
     roleArn,
     type: readSimStateMachineType(type),
+    tags: SimStateMachineTags.fromInput(tags),
   };
 }
 

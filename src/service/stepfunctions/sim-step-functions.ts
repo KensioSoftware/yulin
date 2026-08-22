@@ -11,10 +11,16 @@ import { SimStatesExecutionStart } from "./command/execution/sim-states-executio
 import { SimStateMachineCreate } from "./command/machine/sim-state-machine-create.js";
 import { SimStateMachineReads } from "./command/machine/sim-state-machine-reads.js";
 import { SimStateMachineWrites } from "./command/machine/sim-state-machine-writes.js";
+import { SimStateMachineTagCommands } from "./command/tag/sim-state-machine-tag-commands.js";
 import type { SimStepFunctionsRequestOptions } from "./command/sim-step-functions-request-options.js";
+import {
+  type SimStatesDefinitionStore,
+  SimStatesNoDefinitionStore,
+} from "./definition/store/sim-states-definition-store.js";
 import { SimStatesExecutionStore } from "./execution/sim-states-execution-store.js";
 import type { SimStateMachine } from "./machine/sim-state-machine.js";
 import { SimStateMachineStore } from "./machine/sim-state-machine-store.js";
+import { SimStepFunctionsCfnResourceFactory } from "./cfn/sim-step-functions-cfn-resource-factory.js";
 import { SimStepFunctionsSdkCommandRouter } from "./sdk/sim-step-functions-sdk-command-router.js";
 import { SimStatesNoTaskTargets } from "./task/sim-states-no-task-targets.js";
 import type { SimStatesTaskTargets } from "./task/sim-states-task-invocation.js";
@@ -29,6 +35,12 @@ interface SimStepFunctionsProperties {
    * its own has nowhere to invoke, and says so at the first task.
    */
   readonly taskTargets?: SimStatesTaskTargets;
+
+  /**
+   * Where a `DefinitionS3Location` on a CloudFormation Resource is read from.
+   * A simulated Step Functions built on its own has no bucket to read.
+   */
+  readonly definitions?: SimStatesDefinitionStore;
 }
 
 /**
@@ -54,8 +66,10 @@ export class SimStepFunctions {
   readonly #machineCreate: SimStateMachineCreate;
   readonly #executionStart: SimStatesExecutionStart;
   readonly #executionDescribe: SimStatesExecutionDescribe;
+  readonly #tagCommands = new SimStateMachineTagCommands(this.#stateMachines);
   readonly #background: BackgroundScheduler;
   readonly #sdkRouter = new SimStepFunctionsSdkCommandRouter(this);
+  readonly #cfnFactory: SimStepFunctionsCfnResourceFactory;
   readonly #inspection = new SimStepFunctionsInspection(this.#executions);
 
   constructor(properties: SimStepFunctionsProperties = {}) {
@@ -63,9 +77,14 @@ export class SimStepFunctions {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
       taskTargets = new SimStatesNoTaskTargets(),
+      definitions = new SimStatesNoDefinitionStore(),
     } = properties;
 
     this.#background = background;
+    this.#cfnFactory = new SimStepFunctionsCfnResourceFactory({
+      stepFunctions: this,
+      definitions,
+    });
     this.#machineReads = new SimStateMachineReads(this.#stateMachines);
     this.#machineWrites = new SimStateMachineWrites({
       stateMachines: this.#stateMachines,
@@ -149,6 +168,33 @@ export class SimStepFunctions {
     return this.#machineReads.list(command);
   }
 
+  /** Handle a TagResource Command from the SDK. */
+  async tagResource(
+    command: simStatesCommands.SimTagResourceCommand,
+    _options?: SimStepFunctionsRequestOptions,
+  ): Promise<simStatesCommands.SimTagResourceCommandOutput> {
+    await this.#background.sequence();
+    return this.#tagCommands.tagResource(command);
+  }
+
+  /** Handle an UntagResource Command from the SDK. */
+  async untagResource(
+    command: simStatesCommands.SimUntagResourceCommand,
+    _options?: SimStepFunctionsRequestOptions,
+  ): Promise<simStatesCommands.SimUntagResourceCommandOutput> {
+    await this.#background.sequence();
+    return this.#tagCommands.untagResource(command);
+  }
+
+  /** Handle a ListTagsForResource Command from the SDK. */
+  async listTagsForResource(
+    command: simStatesCommands.SimListTagsForResourceCommand,
+    _options?: SimStepFunctionsRequestOptions,
+  ): Promise<simStatesCommands.SimListTagsForResourceCommandOutput> {
+    await this.#background.sequence();
+    return this.#tagCommands.listTagsForResource(command);
+  }
+
   /** Handle a StartExecution Command from the SDK. */
   async startExecution(
     command: simStatesCommands.SimStartExecutionCommand,
@@ -180,5 +226,12 @@ export class SimStepFunctions {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.#sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimStepFunctionsCfnResourceFactory {
+    return this.#cfnFactory;
   }
 }

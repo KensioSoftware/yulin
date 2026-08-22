@@ -1,14 +1,18 @@
-import { assertDefined } from "../../../../../util/type-guard/defined.js";
-import type { SimStateMachine } from "../../../../stepfunctions/machine/sim-state-machine.js";
-import type { SimStepFunctions } from "../../../../stepfunctions/sim-step-functions.js";
-import type { SimCfnResource } from "../../sim-cfn-resource.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimStateMachine } from "../../machine/sim-state-machine.js";
+import type { SimStatesDefinitionStore } from "../../definition/store/sim-states-definition-store.js";
+import type { SimStepFunctions } from "../../sim-step-functions.js";
+import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnStateMachineProperties } from "./sim-cfn-state-machine-properties.js";
-import { simCfnStepFunctionsResourceCommand } from "./sim-cfn-step-functions-resource-error.js";
-import { stateMachineResourceType } from "./sim-cfn-step-functions-resource-types.js";
+import { simCfnStepFunctionsResourceCommand } from "../sim-cfn-step-functions-resource-error.js";
+import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-types.js";
 
 interface SimCfnStateMachineCreatorProperties {
   readonly stepFunctions: SimStepFunctions;
+
+  /** Where a `DefinitionS3Location` is read from. */
+  readonly definitions: SimStatesDefinitionStore;
 }
 
 /**
@@ -23,9 +27,11 @@ interface SimCfnStateMachineCreatorProperties {
  */
 export class SimCfnStateMachineCreator {
   readonly #stepFunctions: SimStepFunctions;
+  readonly #definitions: SimStatesDefinitionStore;
 
   constructor(properties: SimCfnStateMachineCreatorProperties) {
     this.#stepFunctions = properties.stepFunctions;
+    this.#definitions = properties.definitions;
   }
 
   /**
@@ -38,11 +44,13 @@ export class SimCfnStateMachineCreator {
     const stateMachineProperties = new SimCfnStateMachineProperties({
       resource,
       properties,
+      definitions: this.#definitions,
     });
     const name = stateMachineProperties.name();
     const roleArn = stateMachineProperties.roleArn();
     const type = stateMachineProperties.type();
-    const definition = stateMachineProperties.definition();
+    const tags = stateMachineProperties.tags();
+    const definition = await stateMachineProperties.definition();
 
     return await simCfnStepFunctionsResourceCommand(
       stateMachineResourceType,
@@ -53,6 +61,7 @@ export class SimCfnStateMachineCreator {
             name,
             definition,
             roleArn,
+            tags,
             ...(type !== undefined && { type }),
           },
         });

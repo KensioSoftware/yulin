@@ -7,10 +7,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
-import { SimStatesResourceNotFound } from "../../../../stepfunctions/error/sim-step-functions.error.js";
-import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { SimStatesResourceNotFound } from "../error/sim-step-functions.error.js";
+import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
   const roleArn = "arn:aws:iam::123456789012:role/EnrolmentWorkflowRole";
@@ -167,8 +167,8 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
   });
 
   it("records the properties it deployed the state machine without", async () => {
-    // Given a template asking for tags, logging, tracing and encryption, none
-    // of which this simulation gives a state machine any behaviour for.
+    // Given a template asking for logging, tracing and encryption, none of
+    // which this simulation gives a state machine any behaviour for.
     const simAws = new SimAws();
 
     // When it is deployed.
@@ -178,7 +178,6 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
         StateMachineName: "Enrolment",
         RoleArn: roleArn,
         DefinitionString: JSON.stringify(passChain),
-        Tags: [{ Key: "team", Value: "enrolment" }],
         LoggingConfiguration: { Level: "ALL" },
         TracingConfiguration: { Enabled: true },
         EncryptionConfiguration: { Type: "AWS_OWNED_KEY" },
@@ -198,7 +197,7 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
     );
     assertIdentical(
       ignoredPaths.join(", "),
-      "Tags, LoggingConfiguration, TracingConfiguration, EncryptionConfiguration",
+      "LoggingConfiguration, TracingConfiguration, EncryptionConfiguration",
     );
   });
 

@@ -27,11 +27,6 @@ export const tagsPropertyName = "Tags";
  */
 export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   [
-    tagsPropertyName,
-    "simulated Step Functions holds no tags on a state machine, and " +
-      "ListTagsForResource is unsimulated",
-  ],
-  [
     "LoggingConfiguration",
     "an execution writes no log events, so there is nothing for a log level " +
       "or a destination to decide",

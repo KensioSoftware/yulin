@@ -4,7 +4,7 @@ import type {
   SimCfnServiceValueAdapter,
 } from "../sim-cfn-resource-value-adapter.js";
 import { SimStateMachineCfn } from "./sim-state-machine-cfn.js";
-import { stateMachineResourceType } from "./sim-cfn-step-functions-resource-types.js";
+import { stateMachineResourceType } from "../../../../stepfunctions/cfn/sim-cfn-step-functions-resource-types.js";
 
 /**
  * The CloudFormation-facing value adapter for a simulated Step Functions

@@ -27,3 +27,14 @@ export type {
   SimStartExecutionCommandInput,
   SimStartExecutionCommandOutput,
 } from "./execution/execution.command.js";
+export type {
+  SimListTagsForResourceCommand,
+  SimListTagsForResourceCommandInput,
+  SimListTagsForResourceCommandOutput,
+  SimTagResourceCommand,
+  SimTagResourceCommandInput,
+  SimTagResourceCommandOutput,
+  SimUntagResourceCommand,
+  SimUntagResourceCommandInput,
+  SimUntagResourceCommandOutput,
+} from "./tag/tag.command.js";

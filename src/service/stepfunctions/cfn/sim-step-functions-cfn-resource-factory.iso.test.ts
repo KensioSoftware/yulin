@@ -5,10 +5,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../aws/sim-aws.js";
-import { SimCfnResource } from "../../sim-cfn-resource.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { simCfnStepFunctionsResourceCommand } from "./sim-cfn-step-functions-resource-error.js";
-import { SimStepFunctionsCfnResourceFactory } from "./sim-step-functions-cfn-resource-factory.js";
+import type { SimStepFunctionsCfnResourceFactory } from "./sim-step-functions-cfn-resource-factory.js";
 
 describe("What the simulated Step Functions CloudFormation factory refuses", () => {
   /**
@@ -23,9 +23,7 @@ describe("What the simulated Step Functions CloudFormation factory refuses", () 
 
     return {
       simAws,
-      factory: new SimStepFunctionsCfnResourceFactory({
-        stepFunctions: simAws.stepFunctions(),
-      }),
+      factory: simAws.stepFunctions().cfnResourceFactory(),
       resource: new SimCfnResource({
         logicalId: "Live",
         stackName: "enrolment",

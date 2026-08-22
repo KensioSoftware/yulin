@@ -220,3 +220,40 @@ export class SimStatesInvalidRequest extends SimStepFunctionsError {
     super(message, "States.Runtime");
   }
 }
+
+/**
+ * A resource a tag request's ARN names nothing for.
+ *
+ * The tag commands reach a state machine, an activity or an execution, so real
+ * Step Functions answers them with `ResourceNotFound` rather than the
+ * `StateMachineDoesNotExist` that `DescribeStateMachine` gives.
+ */
+export class SimStatesTaggedResourceNotFound extends SimStepFunctionsError {
+  public override readonly name = "ResourceNotFound";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A tag key or value outside what Step Functions takes.
+ */
+export class SimStatesInvalidTag extends SimStepFunctionsError {
+  public override readonly name = "ValidationException";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A request that would leave a resource holding more tags than it may.
+ */
+export class SimStatesTooManyTags extends SimStepFunctionsError {
+  public override readonly name = "TooManyTags";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
