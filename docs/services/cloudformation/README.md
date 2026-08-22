@@ -3253,6 +3253,7 @@ The resource types it creates are:
 - `AWS::Events::EventBus` and `AWS::Events::Rule`, with the rule's inline `Targets`
 - `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::Kinesis::Stream`
+- `AWS::KinesisFirehose::DeliveryStream`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
 - `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`
 - `AWS::Logs::LogGroup`

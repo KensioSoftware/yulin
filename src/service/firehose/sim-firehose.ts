@@ -12,6 +12,7 @@ import {
 import type * as simFirehoseCommands from "./command/sim-firehose-command.types.js";
 import { SimFirehoseCommands } from "./command/sim-firehose-commands.js";
 import type { SimFirehoseRequestOptions } from "./command/sim-firehose-request-options.js";
+import { SimFirehoseCfnResourceFactory } from "./cfn/sim-firehose-cfn-resource-factory.js";
 import type { SimFirehoseDeliveryFailure } from "./delivery/sim-firehose-delivery-failures.js";
 import { SimFirehoseFailures } from "./failure/sim-firehose-failures.js";
 import type { SimFirehoseObjectDestination } from "./delivery/sim-firehose-object-writer.js";
@@ -70,6 +71,9 @@ export class SimFirehose {
   private readonly commands: SimFirehoseCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimFirehoseSdkCommandRouter(this);
+  private readonly cfnFactory = new SimFirehoseCfnResourceFactory({
+    firehose: this,
+  });
 
   constructor(properties: SimFirehoseProperties) {
     const {
@@ -188,5 +192,12 @@ export class SimFirehose {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimFirehoseCfnResourceFactory {
+    return this.cfnFactory;
   }
 }

@@ -96,6 +96,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.kinesis().cfnResourceFactory(),
   ],
   [
+    "KinesisFirehose",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.firehose().cfnResourceFactory(),
+  ],
+  [
     "KMS",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.kms().cfnResourceFactory(),
