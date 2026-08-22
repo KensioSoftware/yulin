@@ -23,6 +23,8 @@ import {
   type SimLambdaEventSourceStreams,
   SimLambdaNoEventSourceStreams,
 } from "./event-source/stream/sim-lambda-event-source-streams.js";
+import type { SimLambdaKinesisStreams } from "./event-source/stream/kinesis/sim-lambda-kinesis-streams.js";
+import { SimLambdaNoKinesisStreams } from "./event-source/stream/kinesis/sim-lambda-no-kinesis-streams.js";
 import {
   type SimLambdaContainerImages,
   SimLambdaNoContainerImages,
@@ -66,6 +68,7 @@ export interface SimLambdaProperties {
   readonly urlRegistry?: SimLambdaUrlRegistry;
   readonly eventSourceQueues?: SimSqsPollQueues;
   readonly eventSourceStreams?: SimLambdaEventSourceStreams;
+  readonly kinesisStreams?: SimLambdaKinesisStreams;
   /**
    * Where a function's asynchronous invocation results are sent. A standalone
    * SimLambda has no simulated SQS, SNS or EventBridge beside it, so a
@@ -128,6 +131,7 @@ export class SimLambdaCommands {
       // delivering.
       eventSourceQueues = new SimLambdaNoEventSourceQueues(),
       eventSourceStreams = new SimLambdaNoEventSourceStreams(),
+      kinesisStreams = new SimLambdaNoKinesisStreams(),
       // A standalone SimLambda has no simulated ECR beside it, so a container
       // image function created on one has nothing to resolve its image in.
       containerImages = new SimLambdaNoContainerImages(),
@@ -179,10 +183,12 @@ export class SimLambdaCommands {
         functions: this.functionLookup,
         queues: eventSourceQueues,
         streams: eventSourceStreams,
+        kinesisStreams,
         background,
       }),
       queues: eventSourceQueues,
       streams: eventSourceStreams,
+      kinesisStreams,
       functions: this.functionLookup,
       iam,
       background,

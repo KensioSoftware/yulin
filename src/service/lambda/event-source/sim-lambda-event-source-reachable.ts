@@ -1,10 +1,12 @@
 import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
+import type { SimLambdaKinesisStreams } from "./stream/kinesis/sim-lambda-kinesis-streams.js";
 import type { SimLambdaEventSourceStreams } from "./stream/sim-lambda-event-source-streams.js";
 
 interface SimLambdaEventSourceReachableProperties {
   readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
+  readonly kinesisStreams: SimLambdaKinesisStreams;
 }
 
 /**
@@ -19,10 +21,12 @@ interface SimLambdaEventSourceReachableProperties {
 export class SimLambdaEventSourceReachable {
   private readonly queues: SimSqsPollQueues;
   private readonly streams: SimLambdaEventSourceStreams;
+  private readonly kinesisStreams: SimLambdaKinesisStreams;
 
   constructor(properties: SimLambdaEventSourceReachableProperties) {
     this.queues = properties.queues;
     this.streams = properties.streams;
+    this.kinesisStreams = properties.kinesisStreams;
   }
 
   /**
@@ -46,6 +50,15 @@ export class SimLambdaEventSourceReachable {
 
       case "dynamodb-stream": {
         await this.streams.tableName({
+          streamArn: eventSourceArn.value,
+          caller,
+        });
+
+        return;
+      }
+
+      case "kinesis-stream": {
+        await this.kinesisStreams.shardIds({
           streamArn: eventSourceArn.value,
           caller,
         });

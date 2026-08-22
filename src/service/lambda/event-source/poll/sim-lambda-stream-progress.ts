@@ -5,8 +5,8 @@ import type {
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
 import type {
-  SimLambdaEventSourceStreamBatch,
   SimLambdaEventSourceStreamPosition,
+  SimLambdaEventSourceStreamProgressBatch,
 } from "../stream/sim-lambda-event-source-streams.js";
 import { PollSchedule } from "../../../../util/background/poll-schedule.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
@@ -39,10 +39,10 @@ export class SimLambdaStreamProgress {
     // A stream mapping is refused at creation unless it names a starting
     // position, so one that has got this far without one is the simulator
     // having gone wrong rather than a request having been wrong.
-    const { startingPosition } = properties.mapping;
-    assertDefined(startingPosition, "DynamoDB stream mapping start position");
+    const { start } = properties.mapping;
+    assertDefined(start, "stream mapping start position");
 
-    this.checkpoint = new SimLambdaStreamCheckpoint(startingPosition);
+    this.checkpoint = new SimLambdaStreamCheckpoint(start);
     this.schedule = new PollSchedule(properties);
   }
 
@@ -67,7 +67,7 @@ export class SimLambdaStreamProgress {
    * resolves to, so the mapping settles on one place to read on from rather
    * than working out a new one each time.
    */
-  caughtUp(batch: SimLambdaEventSourceStreamBatch): void {
+  caughtUp(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.checkpoint.advanceTo(batch.next);
   }
 
@@ -76,7 +76,7 @@ export class SimLambdaStreamProgress {
    */
   after(
     outcome: SimLambdaStreamBatchOutcome,
-    batch: SimLambdaEventSourceStreamBatch,
+    batch: SimLambdaEventSourceStreamProgressBatch,
   ): void {
     if (outcome.isHandled) {
       this.handled(batch);
@@ -90,7 +90,7 @@ export class SimLambdaStreamProgress {
   /**
    * Move past a batch the function took, and read on.
    */
-  handled(batch: SimLambdaEventSourceStreamBatch): void {
+  handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.backoff.reset();
     this.checkpoint.advanceTo(batch.next);
 
@@ -113,7 +113,7 @@ export class SimLambdaStreamProgress {
    */
   failed(
     outcome: SimLambdaStreamBatchOutcome,
-    batch: SimLambdaEventSourceStreamBatch,
+    batch: SimLambdaEventSourceStreamProgressBatch,
   ): void {
     if (this.backoff.isExhausted) {
       this.handled(batch);

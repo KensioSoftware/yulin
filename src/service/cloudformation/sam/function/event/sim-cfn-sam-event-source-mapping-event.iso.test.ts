@@ -217,7 +217,7 @@ describe("SAM SQS and DynamoDB event expansion", () => {
 
     // Then the mapping started where the event said, and the write reached the
     // bound handler as a stream record
-    assertIdentical(deployedMapping(stack).startingPosition, "TRIM_HORIZON");
+    assertIdentical(deployedMapping(stack).start?.position, "TRIM_HORIZON");
     assertArrayLength(events, 1);
 
     const record = events[0].Records[0];

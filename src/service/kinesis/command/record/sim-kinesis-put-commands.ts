@@ -1,4 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
+import type { SimKinesisStreamActivity } from "../../stream/sim-kinesis-stream-activity.js";
 import type { SimKinesisRequestOptions } from "../sim-kinesis-request-options.js";
 import type { SimKinesisStreamAccess } from "../sim-kinesis-stream-access.js";
 import { simKinesisReadPutBatch } from "./sim-kinesis-put-batch.js";
@@ -12,6 +13,7 @@ import type {
 
 interface SimKinesisPutCommandsProperties {
   readonly access: SimKinesisStreamAccess;
+  readonly activity: SimKinesisStreamActivity;
   readonly background: BackgroundScheduler;
 }
 
@@ -20,10 +22,12 @@ interface SimKinesisPutCommandsProperties {
  */
 export class SimKinesisPutCommands {
   private readonly access: SimKinesisStreamAccess;
+  private readonly activity: SimKinesisStreamActivity;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: SimKinesisPutCommandsProperties) {
     this.access = properties.access;
+    this.activity = properties.activity;
     this.background = properties.background;
   }
 
@@ -43,6 +47,8 @@ export class SimKinesisPutCommands {
     const stream = this.access.require("kinesis:PutRecord", input, options);
     const entry = simKinesisReadPutEntry(input);
     const placement = stream.put({ ...entry, at: this.background.now() });
+
+    this.activity.recordsAvailable(stream.arn);
 
     return {
       $metadata: {},
@@ -68,18 +74,19 @@ export class SimKinesisPutCommands {
     const stream = this.access.require("kinesis:PutRecords", input, options);
     const entries = simKinesisReadPutBatch(input.Records);
     const at = this.background.now();
+    const placements = entries.map((entry) => stream.put({ ...entry, at }));
+
+    // Once, for the batch, rather than once per record. A poller woken by the
+    // first record would read the rest of the batch in the same turn anyway.
+    this.activity.recordsAvailable(stream.arn);
 
     return {
       $metadata: {},
       FailedRecordCount: 0,
-      Records: entries.map((entry) => {
-        const placement = stream.put({ ...entry, at });
-
-        return {
-          ShardId: placement.shardId,
-          SequenceNumber: placement.sequenceNumber,
-        };
-      }),
+      Records: placements.map((placement) => ({
+        ShardId: placement.shardId,
+        SequenceNumber: placement.sequenceNumber,
+      })),
     };
   }
 }

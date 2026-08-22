@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
-import type { SimLambdaEventSourceStartingPosition } from "./sim-lambda-event-source-starting-position.js";
+import type {
+  SimLambdaEventSourceStart,
+  SimLambdaEventSourceStartingPosition,
+} from "./sim-lambda-event-source-starting-position.js";
 
 /**
  * Event source mapping ARNs address the mapping by its UUID.
@@ -36,7 +39,7 @@ interface SimLambdaEventSourceMappingProperties {
   readonly qualifier?: string | undefined;
   readonly functionArn: SimLambdaFunctionArn;
   readonly batchSize: number;
-  readonly startingPosition?: SimLambdaEventSourceStartingPosition | undefined;
+  readonly start?: SimLambdaEventSourceStart | undefined;
   readonly enabled?: boolean | undefined;
   readonly functionResponseTypes?:
     | readonly SimLambdaFunctionResponseType[]
@@ -56,6 +59,7 @@ export interface SimLambdaEventSourceMappingConfiguration {
   readonly FunctionArn: SimLambdaFunctionArn;
   readonly BatchSize: number;
   readonly StartingPosition?: SimLambdaEventSourceStartingPosition | undefined;
+  readonly StartingPositionTimestamp?: Date | undefined;
   readonly MaximumBatchingWindowInSeconds: number;
   readonly FunctionResponseTypes: readonly SimLambdaFunctionResponseType[];
   readonly State: SimLambdaEventSourceMappingState;
@@ -93,9 +97,7 @@ export class SimLambdaEventSourceMapping {
    *
    * A queue mapping has none, because a queue only has a front.
    */
-  public readonly startingPosition:
-    | SimLambdaEventSourceStartingPosition
-    | undefined;
+  public readonly start: SimLambdaEventSourceStart | undefined;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -110,7 +112,7 @@ export class SimLambdaEventSourceMapping {
     this.qualifier = properties.qualifier;
     this.functionArn = properties.functionArn;
     this.batchSize = properties.batchSize;
-    this.startingPosition = properties.startingPosition;
+    this.start = properties.start;
     // Copied rather than held, so a caller keeping the list it passed in
     // cannot change what this mapping does with a batch afterwards.
     this.functionResponseTypes = [...(properties.functionResponseTypes ?? [])];
@@ -170,7 +172,8 @@ export class SimLambdaEventSourceMapping {
       EventSourceArn: this.eventSourceArn,
       FunctionArn: this.functionArn,
       BatchSize: this.batchSize,
-      StartingPosition: this.startingPosition,
+      StartingPosition: this.start?.position,
+      StartingPositionTimestamp: this.start?.timestamp,
       // Partial batches are delivered as soon as anything is available, so the
       // batching window is always zero. Anything else is refused at creation.
       MaximumBatchingWindowInSeconds: 0,

@@ -1,4 +1,3 @@
-import type { SimLambdaEventSourceStreamRecord } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaBatchItemFailures } from "./sim-lambda-batch-item-failures.js";
 import { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 
@@ -26,9 +25,14 @@ export class SimLambdaStreamBatchResponse {
 
   /**
    * What became of a batch the function returned from.
+   *
+   * The sequence numbers are the batch's own, in stream order, and each source
+   * cuts them out of its own record shape. A record carrying none is left out
+   * rather than given an empty name, so a report entry with no identifier names
+   * nothing and the whole batch goes back.
    */
   handled(
-    records: readonly SimLambdaEventSourceStreamRecord[],
+    sequenceNumbers: readonly string[],
     result: unknown,
   ): SimLambdaStreamBatchOutcome {
     const failedIds = this.batchItemFailures.idsIn(result);
@@ -37,7 +41,7 @@ export class SimLambdaStreamBatchResponse {
       return SimLambdaStreamBatchOutcome.handled();
     }
 
-    const rewindTo = rewindPoint(failedIds, sequenceNumbersOf(records));
+    const rewindTo = rewindPoint(failedIds, sequenceNumbers);
 
     if (rewindTo === undefined) {
       return this.failed();
@@ -53,26 +57,6 @@ export class SimLambdaStreamBatchResponse {
   failed(): SimLambdaStreamBatchOutcome {
     return SimLambdaStreamBatchOutcome.failed();
   }
-}
-
-/**
- * The sequence numbers a batch's records can be named by, in stream order.
- *
- * A record carrying none is left out rather than given an empty name, so a
- * report entry with no identifier names nothing and the whole batch goes back.
- */
-function sequenceNumbersOf(
-  records: readonly SimLambdaEventSourceStreamRecord[],
-): readonly string[] {
-  return records.flatMap((record) => {
-    const sequenceNumber = record.dynamodb?.SequenceNumber;
-
-    if (sequenceNumber === undefined || sequenceNumber === "") {
-      return [];
-    }
-
-    return [sequenceNumber];
-  });
 }
 
 /**

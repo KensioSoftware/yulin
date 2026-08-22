@@ -3,8 +3,10 @@ import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-func
 import type { SimSqsPollQueues } from "../../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceArn } from "../sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
+import type { SimLambdaKinesisStreams } from "../stream/kinesis/sim-lambda-kinesis-streams.js";
 import type { SimLambdaEventSourceStreams } from "../stream/sim-lambda-event-source-streams.js";
 import { SimSqsQueuePoller } from "../../../sqs/poll/sim-sqs-queue-poller.js";
+import { SimLambdaKinesisStreamEventSourcePoller } from "./kinesis/sim-lambda-kinesis-stream-event-source-poller.js";
 import { SimLambdaDynamoDbStreamEventSourcePoller } from "./sim-lambda-dynamodb-stream-event-source-poller.js";
 import type { SimLambdaEventSourcePoller } from "./sim-lambda-event-source-poller.js";
 import { SimLambdaSqsEventSourceConsumer } from "./sim-lambda-sqs-event-source-consumer.js";
@@ -15,6 +17,7 @@ export interface SimLambdaEventSourcePollerProperties {
   readonly functions: SimLambdaFunctionLookup;
   readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
+  readonly kinesisStreams: SimLambdaKinesisStreams;
   readonly background: BackgroundScheduler;
 }
 
@@ -50,6 +53,13 @@ export function makeSimLambdaEventSourcePoller(
 
     case "dynamodb-stream": {
       return new SimLambdaDynamoDbStreamEventSourcePoller({
+        ...properties,
+        eventSourceArn,
+      });
+    }
+
+    case "kinesis-stream": {
+      return new SimLambdaKinesisStreamEventSourcePoller({
         ...properties,
         eventSourceArn,
       });

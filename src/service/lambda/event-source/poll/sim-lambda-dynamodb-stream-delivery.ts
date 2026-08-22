@@ -39,7 +39,15 @@ export class SimLambdaDynamoDbStreamDelivery {
     this.batchResponse = new SimLambdaStreamBatchResponse(
       properties.mapping.reportsBatchItemFailures,
     );
-    this.cascade = new SimLambdaStreamCascadeGuard(properties);
+    this.cascade = new SimLambdaStreamCascadeGuard({
+      mapping: properties.mapping,
+      source: {
+        streamArn: properties.eventSourceArn.value,
+        wroteTo: `wrote to the table ${properties.eventSourceArn.tableName}`,
+        sourceRelation: "that table's own stream",
+        advice: "Write the result to a different table.",
+      },
+    });
   }
 
   /**
@@ -68,7 +76,7 @@ export class SimLambdaDynamoDbStreamDelivery {
   ): Promise<SimLambdaStreamBatchOutcome> {
     try {
       return this.batchResponse.handled(
-        records,
+        sequenceNumbersOf(records),
         await simFunction.invoke(this.eventBuilder.of(records)),
       );
     } catch {
@@ -77,4 +85,21 @@ export class SimLambdaDynamoDbStreamDelivery {
       return this.batchResponse.failed();
     }
   }
+}
+
+/**
+ * The sequence numbers a batch's records can be named by, in stream order.
+ */
+function sequenceNumbersOf(
+  records: readonly SimLambdaEventSourceStreamRecord[],
+): readonly string[] {
+  return records.flatMap((record) => {
+    const sequenceNumber = record.dynamodb?.SequenceNumber;
+
+    if (sequenceNumber === undefined || sequenceNumber === "") {
+      return [];
+    }
+
+    return [sequenceNumber];
+  });
 }

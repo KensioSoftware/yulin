@@ -14,6 +14,7 @@ import { SimKinesisCommands } from "./command/sim-kinesis-commands.js";
 import type { SimKinesisRequestOptions } from "./command/sim-kinesis-request-options.js";
 import { SimKinesisSdkCommandRouter } from "./sdk/sim-kinesis-sdk-command-router.js";
 import type { SimKinesisStream } from "./stream/sim-kinesis-stream.js";
+import { SimKinesisStreamActivity } from "./stream/sim-kinesis-stream-activity.js";
 import { SimKinesisStreamStore } from "./stream/sim-kinesis-stream-store.js";
 
 interface SimKinesisProperties {
@@ -40,6 +41,7 @@ interface SimKinesisProperties {
  */
 export class SimKinesis {
   private readonly streams = new SimKinesisStreamStore();
+  private readonly activity = new SimKinesisStreamActivity();
   private readonly commands: SimKinesisCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimKinesisSdkCommandRouter(this);
@@ -54,6 +56,7 @@ export class SimKinesis {
     this.background = background;
     this.commands = new SimKinesisCommands({
       streams: this.streams,
+      activity: this.activity,
       iam,
       background,
       accountRegionScope,
@@ -68,6 +71,17 @@ export class SimKinesis {
    */
   findStream(name: string): SimKinesisStream | undefined {
     return this.streams.find(name);
+  }
+
+  /**
+   * Get the streams of this service, for a consumer that cannot poll them
+   * continuously.
+   *
+   * A Lambda event source mapping is what this exists for. It says when a
+   * record has been put, so a poller has something to wake on.
+   */
+  streamActivity(): SimKinesisStreamActivity {
+    return this.activity;
   }
 
   /** Handle a CreateStream Command from the SDK. */

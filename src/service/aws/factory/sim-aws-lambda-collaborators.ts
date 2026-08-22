@@ -1,4 +1,5 @@
 import { SimAwsLambdaDestinations } from "../../lambda/destination/sim-aws-lambda-destinations.js";
+import { SimKinesisEventSourceStreams } from "../../lambda/event-source/stream/kinesis/sim-kinesis-event-source-streams.js";
 import { SimDynamoDbEventSourceStreams } from "../../lambda/event-source/stream/sim-dynamodb-event-source-streams.js";
 import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs-event-source-queues.js";
 import { SimEcrLambdaContainerImages } from "../../lambda/function/code/image/sim-ecr-lambda-container-images.js";
@@ -29,6 +30,7 @@ interface SimAwsLambdaCollaborators {
   readonly containerImages: SimEcrLambdaContainerImages;
   readonly eventSourceQueues: SimSqsEventSourceQueues;
   readonly eventSourceStreams: SimDynamoDbEventSourceStreams;
+  readonly kinesisStreams: SimKinesisEventSourceStreams;
   readonly vmSdkModuleProvider: SimSdkLambdaVmModuleProvider;
   readonly outboundHttp: SimLambdaOutboundHttp;
   readonly logs: SimLogsServiceWriter;
@@ -44,9 +46,9 @@ interface SimAwsLambdaCollaborators {
  * code running in the vm runtime is provided host-installed AWS SDK packages
  * intercepted into this SimAws, as the real Lambda runtime provides the SDK.
  *
- * Event source mappings poll the same scope's simulated SQS and DynamoDB, as a
- * queue or a table's stream can only be an event source for a function in its
- * own Account and Region.
+ * Event source mappings poll the same scope's simulated SQS, DynamoDB and
+ * Kinesis, as a queue or a stream can only be an event source for a function in
+ * its own Account and Region.
  *
  * A container image function's image is resolved in the whole simulation's ECR
  * rather than this scope's, because an image URI names the Account and Region
@@ -88,6 +90,9 @@ export function simAwsLambdaCollaborators(
     eventSourceQueues: new SimSqsEventSourceQueues({ sqs: scope.sqs() }),
     eventSourceStreams: new SimDynamoDbEventSourceStreams({
       dynamoDb: scope.dynamoDb(),
+    }),
+    kinesisStreams: new SimKinesisEventSourceStreams({
+      kinesis: scope.kinesis(),
     }),
     vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
       simAws,

@@ -1,6 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimLambdaError } from "../../error/sim-lambda.error.js";
-import type { SimLambdaEventSourceStartingPosition } from "../sim-lambda-event-source-starting-position.js";
+import type { SimLambdaEventSourceStart } from "../sim-lambda-event-source-starting-position.js";
 import type { SimLambdaDynamoDbImage } from "./sim-lambda-dynamodb-attribute-value.js";
 
 /**
@@ -54,10 +54,7 @@ export interface SimLambdaEventSourceStreamRecord {
  * than after it.
  */
 export type SimLambdaEventSourceStreamPosition =
-  | {
-      readonly kind: "starting";
-      readonly startingPosition: SimLambdaEventSourceStartingPosition;
-    }
+  | { readonly kind: "starting"; readonly start: SimLambdaEventSourceStart }
   | { readonly kind: "iterator"; readonly shardIterator: string }
   | { readonly kind: "sequence"; readonly sequenceNumber: string };
 
@@ -76,16 +73,26 @@ export interface SimLambdaEventSourceStreamReadRequest extends SimLambdaEventSou
 }
 
 /**
- * What one read of a stream came back with.
+ * Where a read left the reader, apart from what it read.
+ *
+ * This is all the progress of a mapping depends on, and it is the same for
+ * every stream service. The records a batch carried are the service's own
+ * shape, so they stay with the batch types below.
  *
  * `drained` is only true of a shard the reader has reached the end of, which
  * happens when the table's stream has been switched off. An empty batch from an
  * open shard is the ordinary answer for a mapping that has caught up.
  */
-export interface SimLambdaEventSourceStreamBatch {
-  readonly records: readonly SimLambdaEventSourceStreamRecord[];
+export interface SimLambdaEventSourceStreamProgressBatch {
   readonly next: SimLambdaEventSourceStreamPosition;
   readonly drained: boolean;
+}
+
+/**
+ * What one read of a DynamoDB stream came back with.
+ */
+export interface SimLambdaEventSourceStreamBatch extends SimLambdaEventSourceStreamProgressBatch {
+  readonly records: readonly SimLambdaEventSourceStreamRecord[];
 }
 
 /**

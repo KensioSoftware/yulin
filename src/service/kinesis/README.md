@@ -75,5 +75,10 @@ cannot reach a stream it lacks permission for by holding an iterator someone els
 an intercepted client sends is refused with `SimSdkUnsupportedCommandError`, which covers enhanced
 fan-out, resharding, encryption and the tag operations.
 
+A Lambda event source mapping reads a stream through those same commands, as the function's
+execution role. The adapter is `SimKinesisEventSourceStreams` under
+`src/service/lambda/event-source/stream/kinesis/`, and `streamActivity()` is what tells a poller
+there is something to read.
+
 `docs/services/kinesis/README.md` is the user-facing page, and its **Divergences and limitations**
 section is the full list.

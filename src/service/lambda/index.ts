@@ -41,6 +41,11 @@ export type {
   SimLambdaDynamoDbStreamEventUserIdentity,
 } from "./event-source/poll/sim-lambda-dynamodb-stream-event.types.js";
 export type {
+  SimLambdaKinesisStreamEvent,
+  SimLambdaKinesisStreamEventRecord,
+  SimLambdaKinesisStreamEventRecordBody,
+} from "./event-source/poll/kinesis/sim-lambda-kinesis-stream-event.types.js";
+export type {
   SimLambdaDynamoDbAttributeValue,
   SimLambdaDynamoDbImage,
 } from "./event-source/stream/sim-lambda-dynamodb-attribute-value.js";

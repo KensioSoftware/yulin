@@ -4,7 +4,7 @@ import {
   simLambdaEventSourceArnOf,
 } from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
-import type { SimLambdaEventSourceStartingPosition } from "../../event-source/sim-lambda-event-source-starting-position.js";
+import type { SimLambdaEventSourceStart } from "../../event-source/sim-lambda-event-source-starting-position.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
 import {
@@ -22,7 +22,7 @@ interface SimLambdaEventSourceMappingInputProperties {
   readonly functionName: string;
   readonly qualifier: string | undefined;
   readonly batchSize: number;
-  readonly startingPosition: SimLambdaEventSourceStartingPosition | undefined;
+  readonly start: SimLambdaEventSourceStart | undefined;
   readonly enabled: boolean;
   readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 }
@@ -50,9 +50,7 @@ export class SimLambdaEventSourceMappingInput {
    */
   public readonly qualifier: string | undefined;
   public readonly batchSize: number;
-  public readonly startingPosition:
-    | SimLambdaEventSourceStartingPosition
-    | undefined;
+  public readonly start: SimLambdaEventSourceStart | undefined;
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
@@ -61,7 +59,7 @@ export class SimLambdaEventSourceMappingInput {
     this.functionName = properties.functionName;
     this.qualifier = properties.qualifier;
     this.batchSize = properties.batchSize;
-    this.startingPosition = properties.startingPosition;
+    this.start = properties.start;
     this.enabled = properties.enabled;
     this.functionResponseTypes = properties.functionResponseTypes;
   }
@@ -85,7 +83,7 @@ export class SimLambdaEventSourceMappingInput {
         requiredString(input.FunctionName, "functionName"),
       ),
       batchSize: eventSourceArn.batchRules.sizeIn(input.BatchSize),
-      startingPosition: eventSourceArn.startingPositionRules.positionIn({
+      start: eventSourceArn.startingPositionRules.startIn({
         startingPosition: input.StartingPosition,
         startingPositionTimestamp: input.StartingPositionTimestamp,
       }),

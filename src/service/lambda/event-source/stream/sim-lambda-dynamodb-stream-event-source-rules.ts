@@ -32,6 +32,13 @@ export const dynamoDbStreamBatchRules = new SimLambdaEventSourceBatchRules({
 
 /**
  * A stream mapping has to say where it starts reading from.
+ *
+ * A DynamoDB stream takes two of the three positions. `AT_TIMESTAMP` is for a
+ * Kinesis stream, and real Lambda refuses it here.
  */
 export const dynamoDbStreamStartingPositionRules =
-  new SimLambdaStreamStartingPosition();
+  new SimLambdaStreamStartingPosition({
+    positions: ["TRIM_HORIZON", "LATEST"],
+    sourceDescription: "a DynamoDB stream",
+    positionElsewhere: "AT_TIMESTAMP is for a Kinesis stream",
+  });

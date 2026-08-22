@@ -200,6 +200,13 @@ const { Records } = await kinesis.getRecords(
 console.log(Records.length);
 ```
 
+## Triggering a Lambda function
+
+A [Lambda event source mapping](../lambda/#triggering-a-function-from-a-kinesis-stream "Simulated Lambda Kinesis event source docs")
+polls a stream and invokes a function with the records it reads. Every shard is read by a processor
+of its own, as real Lambda reads one, and the function's execution role is what the polling is done
+as.
+
 ## Permissions
 
 Every operation goes through simulated IAM. The action is the `kinesis:` name of the operation, and
@@ -356,8 +363,6 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   out, and no response carries an `EncryptionType`.
 - **Tags are kept and never listed.** A stream created with `Tags` holds them, readable through
   `findStream`. `AddTagsToStream`, `ListTagsForStream` and `RemoveTagsFromStream` are absent.
-- **Nothing triggers a Lambda function.** An event source mapping naming a Kinesis stream is refused
-  at creation.
 - **`AWS::Kinesis::Stream` does not deploy.** A CloudFormation template holding one records the
   resource as skipped.
 - **Kinesis Data Firehose is a separate service and is absent.** So is Kinesis Video Streams.
