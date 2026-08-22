@@ -37,6 +37,7 @@ use case a recipe names decides which parameters a recommendation request has to
   through `events()` on the service. A third API over one service's state, alongside the runtime.
   What it is sent is recorded rather than trained on, and read back through the accessors on
   `sim-personalize.ts`.
+- `cfn/` builds the `AWS::Personalize::*` CloudFormation Resources a stack deploys.
 - `index.ts` exports the public Personalize simulator API for `@kensio/yulin/personalize`.
 
 ## Resource model
@@ -123,7 +124,35 @@ uses, and a solution a campaign still deploys are all reported as `ResourceInUse
 Deleting a solution takes its versions with it. Real Personalize has no `DeleteSolutionVersion`
 either.
 
+## CloudFormation Resources
+
+`cfn/` holds the CloudFormation Resource factory, reached through `cfnResourceFactory()` and
+registered under `Personalize` in `sim-cfn-service-factories.ts`. Five `AWS::Personalize::*` types
+deploy through it. The dataset group, the schema, the dataset, the solution and the event tracker.
+The other five CloudFormation has are batch inference, batch segments, data deletion, metric
+attribution and recipes, all of which work over data nothing here reads. A template declaring one is
+refused as unsupported, and sim CloudFormation records that as a skip and steps over it.
+
+Every creator goes through the ordinary command on `SimPersonalize`, in the way
+`SimCfnSesIdentityCreator` deploys an identity through `CreateEmailIdentity`. A template and an SDK
+caller are then validated in one place. What the creators read the stores for is the ARN the command
+answered with, turned back into the resource the Resource holds.
+
+`SimCfnPersonalizeProperties` reads the template properties for all five types. Every Personalize
+Resource property is a string or a boolean handed straight to a create command. The five types
+differ in which names they read and not in how any of them is read. A property with no behaviour
+behind it is recorded through `ignoreProperty` with the reason. That covers `Tags`,
+`DatasetImportJob` and `SolutionConfig`.
+
+The `Ref` and `Fn::GetAtt` values live with the other services' adapters, under
+`cloudformation/resource/cfn/personalize/`. `Ref` is the resource name and `Fn::GetAtt` the ARN. That
+is the way round real Personalize publishes them. One adapter class covers all five types on the
+strength of that shared shape, carrying the attribute names it answers.
+
+CloudFormation has no `AWS::Personalize::Campaign` or `AWS::Personalize::Recommender` type. A stack
+reaches a solution and stops there. Nothing in `cfn/` deploys the far end of the chain, and a test
+that wants recommendations builds the solution version and the campaign itself.
+
 ## What comes next
 
-CloudFormation resource types and domain recommenders are separate issues. Both build on what is
-here.
+Domain recommenders are a separate issue, building on what is here.

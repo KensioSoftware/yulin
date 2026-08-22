@@ -13,6 +13,7 @@ import { eventBridgeValueAdapter } from "./events/sim-event-bridge-cfn-value-ada
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
 import { lambdaValueAdapter } from "./lambda/sim-lambda-cfn-value-adapter.js";
+import { personalizeValueAdapter } from "./personalize/sim-personalize-cfn-value-adapter.js";
 import { route53ValueAdapter } from "./route53/sim-route53-cfn-value-adapter.js";
 import { s3ValueAdapter } from "./s3/sim-s3-cfn-value-adapter.js";
 import { schedulerValueAdapter } from "./scheduler/sim-scheduler-cfn-value-adapter.js";
@@ -54,6 +55,7 @@ export const simCfnServiceValueAdapters: readonly ((
   iamValueAdapter,
   kmsValueAdapter,
   lambdaValueAdapter,
+  personalizeValueAdapter,
   route53ValueAdapter,
   s3ValueAdapter,
   schedulerValueAdapter,

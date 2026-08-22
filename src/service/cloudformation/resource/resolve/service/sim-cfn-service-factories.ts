@@ -105,6 +105,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.logs().cfnResourceFactory(),
   ],
   [
+    "Personalize",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.personalize().cfnResourceFactory(),
+  ],
+  [
     "Route53",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.route53().cfnResourceFactory(),
