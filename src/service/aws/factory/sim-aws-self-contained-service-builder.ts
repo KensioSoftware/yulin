@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
+import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
@@ -30,6 +31,17 @@ export class SimAwsSelfContainedServiceBuilder {
 
   constructor(properties: SimAwsSelfContainedServiceBuilderProperties) {
     this.accountServices = properties.accountServices;
+  }
+
+  /**
+   * Create simulated Bedrock for an Account Region scope.
+   *
+   * Bedrock is Region-scoped because the responses declared against it are: an
+   * invocation made in one Region is answered by that Region's rules, as a
+   * real Bedrock endpoint answers for the Region it belongs to.
+   */
+  createBedrock(scope: SimAwsAccountRegionContainer): SimBedrock {
+    return new SimBedrock(this.scoped(scope));
   }
 
   /** Create simulated DynamoDB for an Account Region scope. */

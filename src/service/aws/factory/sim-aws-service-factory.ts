@@ -15,6 +15,7 @@ import type { SimCloudWatch } from "../../cloudwatch/index.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimEcr } from "../../ecr/index.js";
 import type { SimEcs } from "../../ecs/index.js";
+import type { SimBedrock } from "../../bedrock/index.js";
 import type { SimPersonalize } from "../../personalize/index.js";
 import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
@@ -232,6 +233,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Lambda for an Account Region scope. */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return this.accountRegionServices.createLambda(scope);
+  }
+
+  /** Create simulated Bedrock for an Account Region scope. */
+  createBedrock(scope: SimAwsAccountRegionContainer): SimBedrock {
+    return this.selfContainedServices.createBedrock(scope);
   }
 
   /** Create simulated Personalize for an Account Region scope. */
