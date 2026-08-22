@@ -7,6 +7,7 @@ import { SimKinesisAuthorizer } from "./authorize/sim-kinesis-authorizer.js";
 import { SimKinesisPutCommands } from "./record/sim-kinesis-put-commands.js";
 import { SimKinesisReadCommands } from "./read/sim-kinesis-read-commands.js";
 import { SimKinesisCreateStream } from "./stream/sim-kinesis-create-stream.js";
+import { SimKinesisRetentionCommands } from "./stream/sim-kinesis-retention-commands.js";
 import { SimKinesisStreamCommands } from "./stream/sim-kinesis-stream-commands.js";
 import { SimKinesisStreamAccess } from "./sim-kinesis-stream-access.js";
 
@@ -29,6 +30,7 @@ interface SimKinesisCommandsProperties {
 export class SimKinesisCommands {
   public readonly streamCreation: SimKinesisCreateStream;
   public readonly streams: SimKinesisStreamCommands;
+  public readonly retention: SimKinesisRetentionCommands;
   public readonly puts: SimKinesisPutCommands;
   public readonly reads: SimKinesisReadCommands;
 
@@ -47,6 +49,7 @@ export class SimKinesisCommands {
       background,
     });
     this.streams = new SimKinesisStreamCommands({ streams, access });
+    this.retention = new SimKinesisRetentionCommands({ access });
     this.puts = new SimKinesisPutCommands({
       access,
       activity: properties.activity,

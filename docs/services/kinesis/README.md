@@ -153,6 +153,12 @@ A stream keeps a record for 24 hours. Records older than that are gone from a re
 applied at the instant of the read rather than on a timer, so moving simulated time forward is all a
 test needs.
 
+`IncreaseStreamRetentionPeriod` and `DecreaseStreamRetentionPeriod` move it, up to the 8760 hours
+Kinesis keeps at most. Each refuses a request that goes the other way, including one asking for what
+the stream already keeps, which is what real Kinesis does with a caller that has the wrong idea of
+what the stream is set to. Shortening the window drops whatever it has already outlived from the
+next read.
+
 ```typescript sim-kinesis-retention
 /**
  * Ageing a record out of a stream's retention window.
@@ -206,6 +212,78 @@ A [Lambda event source mapping](../lambda/#triggering-a-function-from-a-kinesis-
 polls a stream and invokes a function with the records it reads. Every shard is read by a processor
 of its own, as real Lambda reads one, and the function's execution role is what the polling is done
 as.
+
+## Deploying a stream
+
+`AWS::Kinesis::Stream` creates a simulated stream, which is what a CDK `Stream` synthesizes. The
+stream goes through the ordinary `CreateStream` command, so a stream a template deployed is the same
+thing an SDK caller would have got, and a template asking for something Kinesis will not take is
+refused in the words `CreateStream` refuses it in.
+
+`Ref` gives the stream name and `Fn::GetAtt` on `Arn` gives the stream ARN, which is the way round
+real CloudFormation publishes them. Every Kinesis API and every grant names the ARN, so a template
+wiring a stream into a Lambda event source mapping or an IAM policy reads the attribute.
+
+```typescript sim-kinesis-cloudformation
+/**
+ * Deploying a Kinesis stream and putting a record onto it.
+ */
+
+import { PutRecordCommand } from "@aws-sdk/client-kinesis";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersStream: {
+        Type: "AWS::Kinesis::Stream",
+        Properties: {
+          Name: "orders",
+          ShardCount: 2,
+          RetentionPeriodHours: 168,
+        },
+      },
+    },
+    Outputs: {
+      StreamArn: { Value: { "Fn::GetAtt": ["OrdersStream", "Arn"] } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// arn:aws:kinesis:us-east-1:<account>:stream/orders
+console.log(stack.outputs.get("StreamArn")?.value);
+
+await simAws.kinesis().putRecord(
+  new PutRecordCommand({
+    StreamName: "orders",
+    PartitionKey: "customer-1",
+    Data: new TextEncoder().encode("order-1"),
+  }),
+);
+```
+
+`Name`, `ShardCount`, `RetentionPeriodHours`, `StreamModeDetails` and `Tags` are read. A stream the
+template does not name is named after the stack and the logical ID, as real CloudFormation names
+one.
+
+`RetentionPeriodHours` is applied after the stream is created, because `CreateStream` takes no
+retention on real Kinesis either. It only ever goes up: a new stream keeps records for 24 hours,
+which is also the least Kinesis accepts, so a template can ask for more or for the same and never
+for less.
+
+`StreamEncryption` and `DesiredShardLevelMetrics` are recorded against the resource as unsimulated
+and the stream is created anyway, so a template that encrypts its streams still deploys and the
+omission is somewhere a test can find it. Deleting the stack deletes the stream.
+
+`AWS::Kinesis::StreamConsumer` and `AWS::Kinesis::ResourcePolicy` are reported as unsupported and
+skipped. One registers an enhanced fan-out consumer and the other admits a caller from another
+account, and neither has anything to act on here.
 
 ## Permissions
 
@@ -317,17 +395,19 @@ console.log(put.ShardId);
 
 ## Supported commands
 
-| Command                 | Notes                                                                  |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `CreateStream`          | A name already in use raises `ResourceInUseException`.                 |
-| `DeleteStream`          | The name is free again at once. `EnforceConsumerDeletion` is accepted. |
-| `ListStreams`           | Sorted by name, paged with `Limit` and `NextToken`.                    |
-| `DescribeStream`        | Shards paged with `Limit` and `ExclusiveStartShardId`.                 |
-| `DescribeStreamSummary` | Reports the open shard count instead of the shards.                    |
-| `PutRecord`             | `SequenceNumberForOrdering` is accepted and already guaranteed.        |
-| `PutRecords`            | Up to 500 records and 5 MB. `FailedRecordCount` is always zero.        |
-| `GetShardIterator`      | Every iterator type resolves.                                          |
-| `GetRecords`            | `Limit` up to 10,000. Reports `MillisBehindLatest`.                    |
+| Command                         | Notes                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| `CreateStream`                  | A name already in use raises `ResourceInUseException`.                 |
+| `DeleteStream`                  | The name is free again at once. `EnforceConsumerDeletion` is accepted. |
+| `ListStreams`                   | Sorted by name, paged with `Limit` and `NextToken`.                    |
+| `DescribeStream`                | Shards paged with `Limit` and `ExclusiveStartShardId`.                 |
+| `DescribeStreamSummary`         | Reports the open shard count instead of the shards.                    |
+| `IncreaseStreamRetentionPeriod` | Refused unless it asks for more than the stream keeps now.             |
+| `DecreaseStreamRetentionPeriod` | Refused unless it asks for less than the stream keeps now.             |
+| `PutRecord`                     | `SequenceNumberForOrdering` is accepted and already guaranteed.        |
+| `PutRecords`                    | Up to 500 records and 5 MB. `FailedRecordCount` is always zero.        |
+| `GetShardIterator`              | Every iterator type resolves.                                          |
+| `GetRecords`                    | `Limit` up to 10,000. Reports `MillisBehindLatest`.                    |
 
 Every operation takes `StreamName` or `StreamARN`, and reads the ARN when a request carries both.
 
@@ -347,8 +427,6 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   that nothing here delivers. Every consumer reads through `GetRecords`.
 - **A shard iterator never expires.** Real Kinesis expires one after five minutes. An iterator this
   simulation never issued is still refused, with the `ExpiredIteratorException` real Kinesis uses.
-- **Retention is fixed at 24 hours.** `IncreaseStreamRetentionPeriod` and
-  `DecreaseStreamRetentionPeriod` are absent.
 - **Throughput is unlimited.** Real Kinesis takes 1 MB or 1,000 records a second per shard for
   writes and 2 MB a second for reads, and refuses past that with
   `ProvisionedThroughputExceededException`. Nothing here counts. That is why `FailedRecordCount` on
@@ -363,8 +441,6 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   out, and no response carries an `EncryptionType`.
 - **Tags are kept and never listed.** A stream created with `Tags` holds them, readable through
   `findStream`. `AddTagsToStream`, `ListTagsForStream` and `RemoveTagsFromStream` are absent.
-- **`AWS::Kinesis::Stream` does not deploy.** A CloudFormation template holding one records the
-  resource as skipped.
 - **Kinesis Data Firehose is a separate service and is absent.** So is Kinesis Video Streams.
 - **`AWS::DynamoDB::Table` `KinesisStreamSpecification` stays unsimulated.** A table does not publish
   its changes into a stream here.

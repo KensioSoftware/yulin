@@ -12,6 +12,7 @@ import {
 import type * as simKinesisCommands from "./command/sim-kinesis-command.types.js";
 import { SimKinesisCommands } from "./command/sim-kinesis-commands.js";
 import type { SimKinesisRequestOptions } from "./command/sim-kinesis-request-options.js";
+import { SimKinesisCfnResourceFactory } from "./cfn/sim-kinesis-cfn-resource-factory.js";
 import { SimKinesisSdkCommandRouter } from "./sdk/sim-kinesis-sdk-command-router.js";
 import type { SimKinesisStream } from "./stream/sim-kinesis-stream.js";
 import { SimKinesisStreamActivity } from "./stream/sim-kinesis-stream-activity.js";
@@ -45,6 +46,9 @@ export class SimKinesis {
   private readonly commands: SimKinesisCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimKinesisSdkCommandRouter(this);
+  private readonly cfnFactory = new SimKinesisCfnResourceFactory({
+    kinesis: this,
+  });
 
   constructor(properties: SimKinesisProperties = {}) {
     const {
@@ -129,6 +133,24 @@ export class SimKinesis {
     return this.commands.streams.describeStreamSummary(command, options);
   }
 
+  /** Handle an IncreaseStreamRetentionPeriod Command from the SDK. */
+  async increaseStreamRetentionPeriod(
+    command: simKinesisCommands.SimIncreaseStreamRetentionPeriodCommand,
+    options?: SimKinesisRequestOptions,
+  ): Promise<simKinesisCommands.SimStreamRetentionPeriodCommandOutput> {
+    await this.background.sequence();
+    return this.commands.retention.increase(command, options);
+  }
+
+  /** Handle a DecreaseStreamRetentionPeriod Command from the SDK. */
+  async decreaseStreamRetentionPeriod(
+    command: simKinesisCommands.SimDecreaseStreamRetentionPeriodCommand,
+    options?: SimKinesisRequestOptions,
+  ): Promise<simKinesisCommands.SimStreamRetentionPeriodCommandOutput> {
+    await this.background.sequence();
+    return this.commands.retention.decrease(command, options);
+  }
+
   /** Handle a PutRecord Command from the SDK. */
   async putRecord(
     command: simKinesisCommands.SimPutRecordCommand,
@@ -170,5 +192,12 @@ export class SimKinesis {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimKinesisCfnResourceFactory {
+    return this.cfnFactory;
   }
 }

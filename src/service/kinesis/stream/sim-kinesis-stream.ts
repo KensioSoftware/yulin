@@ -69,7 +69,7 @@ export class SimKinesisStream {
 
   private readonly sequenceNumbers = new SimKinesisSequenceNumbers();
   private readonly shardMap: SimKinesisShardMap;
-  private readonly retention: number;
+  private retention: number;
 
   constructor(properties: SimKinesisStreamProperties) {
     this.name = properties.name.value;
@@ -99,6 +99,17 @@ export class SimKinesisStream {
    */
   get retentionHours(): number {
     return this.retention;
+  }
+
+  /**
+   * Change how long this stream keeps a record.
+   *
+   * Real Kinesis moves it with IncreaseStreamRetentionPeriod and
+   * DecreaseStreamRetentionPeriod, and a record already older than the new
+   * window is gone from the next read.
+   */
+  setRetentionHours(hours: number): void {
+    this.retention = hours;
   }
 
   /**

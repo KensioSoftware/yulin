@@ -5,6 +5,7 @@ export type {
   SimCreateStreamCommand,
   SimCreateStreamCommandInput,
   SimCreateStreamCommandOutput,
+  SimDecreaseStreamRetentionPeriodCommand,
   SimDeleteStreamCommand,
   SimDeleteStreamCommandInput,
   SimDeleteStreamCommandOutput,
@@ -14,6 +15,7 @@ export type {
   SimDescribeStreamSummaryCommand,
   SimDescribeStreamSummaryCommandInput,
   SimDescribeStreamSummaryCommandOutput,
+  SimIncreaseStreamRetentionPeriodCommand,
   SimKinesisHashKeyRangeOutput,
   SimKinesisSequenceNumberRange,
   SimKinesisShardOutput,
@@ -25,6 +27,8 @@ export type {
   SimListStreamsCommand,
   SimListStreamsCommandInput,
   SimListStreamsCommandOutput,
+  SimStreamRetentionPeriodCommandInput,
+  SimStreamRetentionPeriodCommandOutput,
 } from "./stream/stream.command.js";
 export type {
   SimKinesisPutRecordsRequestEntry,

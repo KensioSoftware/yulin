@@ -75,6 +75,12 @@ cannot reach a stream it lacks permission for by holding an iterator someone els
 an intercepted client sends is refused with `SimSdkUnsupportedCommandError`, which covers enhanced
 fan-out, resharding, encryption and the tag operations.
 
+`cfn/` deploys `AWS::Kinesis::Stream`. It goes through `CreateStream` like everything else, so a
+template and an SDK caller reach the same stream, and `RetentionPeriodHours` is a second call
+afterwards because `CreateStream` takes no retention on real Kinesis either. That call is always an
+increase: 24 hours is both the default a stream is created with and the least Kinesis accepts, so a
+template can never ask for less.
+
 A Lambda event source mapping reads a stream through those same commands, as the function's
 execution role. The adapter is `SimKinesisEventSourceStreams` under
 `src/service/lambda/event-source/stream/kinesis/`, and `streamActivity()` is what tells a poller

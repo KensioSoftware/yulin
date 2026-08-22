@@ -180,3 +180,31 @@ export interface SimDescribeStreamSummaryCommandOutput {
   readonly StreamDescriptionSummary: SimKinesisStreamDescriptionSummary;
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim Kinesis IncreaseStreamRetentionPeriod command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kinesis/command/IncreaseStreamRetentionPeriodCommand/
+ */
+export interface SimIncreaseStreamRetentionPeriodCommand {
+  readonly input: SimStreamRetentionPeriodCommandInput;
+}
+
+/**
+ * Minimal structural sim Kinesis DecreaseStreamRetentionPeriod command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kinesis/command/DecreaseStreamRetentionPeriodCommand/
+ */
+export interface SimDecreaseStreamRetentionPeriodCommand {
+  readonly input: SimStreamRetentionPeriodCommandInput;
+}
+
+export interface SimStreamRetentionPeriodCommandInput {
+  readonly StreamName?: string | undefined;
+  readonly StreamARN?: string | undefined;
+  readonly RetentionPeriodHours?: number | undefined;
+}
+
+export interface SimStreamRetentionPeriodCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
