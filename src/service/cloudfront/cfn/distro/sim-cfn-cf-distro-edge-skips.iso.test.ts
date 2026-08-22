@@ -176,6 +176,28 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
     );
   });
 
+  it("fails the stack over a role Lambda@Edge cannot assume", async () => {
+    // Given a template whose edge function runs as an ordinary Lambda
+    // execution role, trusting lambda.amazonaws.com alone.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {});
+
+    // When it deploys.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "edge-site",
+        template: edgeDistributionTemplateFactory.make({
+          trustedServices: ["lambda.amazonaws.com"],
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the deployment failed on the trust policy. The function version is
+    // here, so the association is left where CreateDistribution refuses it.
+    assertStringIncludes(error.message, "edgelambda.amazonaws.com");
+  });
+
   it("fails the stack over a function outside us-east-1", async () => {
     // Given a template whose association names a function in the Region the
     // rest of the stack is in.

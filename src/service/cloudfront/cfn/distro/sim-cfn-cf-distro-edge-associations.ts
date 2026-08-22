@@ -75,7 +75,7 @@ function distroCacheBehaviors(
 ): SimCloudFrontDistributionConfig["CacheBehaviors"] {
   const behaviors = normalizeSimCfList<SimCloudFrontCacheBehaviorConfig>(
     "CacheBehaviors",
-    (distributionConfig as Record<string, unknown>)["CacheBehaviors"],
+    distributionConfig.CacheBehaviors,
   );
   const items = behaviors?.Items;
 

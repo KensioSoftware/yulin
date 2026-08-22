@@ -48,7 +48,7 @@ export class SimCfnCfEdgeAssociationSkips {
   ): readonly SimCloudFrontLambdaFunctionAssociation[] | undefined {
     const items = normalizeSimCfList<SimCloudFrontLambdaFunctionAssociation>(
       "LambdaFunctionAssociations",
-      (behavior as Record<string, unknown>)["LambdaFunctionAssociations"],
+      behavior.LambdaFunctionAssociations,
     )?.Items;
 
     if (items === undefined) {

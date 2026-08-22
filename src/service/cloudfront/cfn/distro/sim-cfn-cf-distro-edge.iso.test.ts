@@ -7,6 +7,7 @@ import {
 import { describe, it } from "vitest";
 
 import {
+  edgeCacheBehavior,
   edgeDistributionLogicalId,
   edgeDistributionTemplateFactory,
   edgeVersionLogicalId,
@@ -45,6 +46,48 @@ describe("CloudFormation Distribution Lambda@Edge associations", () => {
       simAws,
       distribution.distributionId,
       "/index.html",
+    );
+
+    assertResponseStatus(response, 200);
+    assertIdentical(await response.text(), "<h1>Edge</h1>");
+  });
+
+  it("runs the function a path-based Behavior associates", async () => {
+    // Given a Bucket holding the page the edge function rewrites requests to.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {
+      "edge.html": "<h1>Edge</h1>",
+      "images/logo.svg": "<svg />",
+    });
+
+    // When the Behavior for one path associates the published version and the
+    // default Behavior associates nothing.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "edge-site",
+      template: edgeDistributionTemplateFactory.make({
+        associations: [],
+        cacheBehaviors: [
+          edgeCacheBehavior("/images/*", [
+            {
+              EventType: "viewer-request",
+              LambdaFunctionARN: { Ref: edgeVersionLogicalId },
+            },
+          ]),
+        ],
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then a request that Behavior matches runs the function.
+    const distribution = stack.getResource(
+      edgeDistributionLogicalId,
+    )?.simResource;
+    assertInstanceOf(distribution, SimCloudFrontDistribution);
+
+    const response = await simCfSiteRequest(
+      simAws,
+      distribution.distributionId,
+      "/images/logo.svg",
     );
 
     assertResponseStatus(response, 200);
