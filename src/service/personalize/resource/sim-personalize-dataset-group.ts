@@ -1,3 +1,4 @@
+import type { SimPersonalizeDomain } from "./sim-personalize-domain.js";
 import type { SimPersonalizeResource } from "./sim-personalize-resource.js";
 
 export interface SimPersonalizeDatasetGroupProperties {
@@ -5,7 +6,7 @@ export interface SimPersonalizeDatasetGroupProperties {
   readonly name: string;
   readonly status: string;
   readonly creationDateTime: Date;
-  readonly domain?: string | undefined;
+  readonly domain?: SimPersonalizeDomain | undefined;
   readonly kmsKeyArn?: string | undefined;
   readonly roleArn?: string | undefined;
 }
@@ -25,7 +26,7 @@ export class SimPersonalizeDatasetGroup implements SimPersonalizeResource {
   public readonly status: string;
   public readonly creationDateTime: Date;
   public readonly lastUpdatedDateTime: Date;
-  public readonly domain: string | undefined;
+  public readonly domain: SimPersonalizeDomain | undefined;
   public readonly kmsKeyArn: string | undefined;
   public readonly roleArn: string | undefined;
 

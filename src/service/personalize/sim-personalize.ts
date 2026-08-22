@@ -7,6 +7,7 @@ import type { SimPersonalizeRankings } from "./recommendation/sim-personalize-ra
 import type { SimPersonalizeRecommendations } from "./recommendation/sim-personalize-recommendations.js";
 import type { SimPersonalizeCampaign } from "./resource/sim-personalize-campaign.js";
 import type { SimPersonalizeDatasetGroup } from "./resource/sim-personalize-dataset-group.js";
+import type { SimPersonalizeRecommender } from "./resource/sim-personalize-recommender.js";
 import type { SimPersonalizeSolution } from "./resource/sim-personalize-solution.js";
 import { SimPersonalizeSdkCommandRouter } from "./sdk/sim-personalize-sdk-command-router.js";
 import { SimPersonalizeControlPlane } from "./sim-personalize-control-plane.js";
@@ -31,6 +32,9 @@ import { SimPersonalizeRuntime } from "./sim-personalize-runtime.js";
  * The events API is on `events()`, on a client of its own again. What it is
  * sent is read back through `recordedEvents()`, `recordedItems()` and
  * `recordedUsers()`.
+ *
+ * The domain path reaches the same runtime through a recommender rather than a
+ * campaign, and results are declared against it the same way.
  */
 export class SimPersonalize extends SimPersonalizeControlPlane {
   private readonly sdkRouter = new SimPersonalizeSdkCommandRouter(this);
@@ -97,10 +101,11 @@ export class SimPersonalize extends SimPersonalizeControlPlane {
   }
 
   /**
-   * The recommendations one campaign answers GetRecommendations with.
+   * The recommendations one campaign or recommender answers
+   * GetRecommendations with.
    *
-   * Declaring against a campaign ARN this scope does not hold raises, rather
-   * than leaving the declaration somewhere no request will reach it.
+   * Declaring against an ARN this scope holds nothing at raises, rather than
+   * leaving the declaration somewhere no request will reach it.
    */
   recommendations(campaignArn: string): SimPersonalizeRecommendations {
     return this.commands.rules.recommendations(campaignArn);
@@ -131,6 +136,11 @@ export class SimPersonalize extends SimPersonalizeControlPlane {
   /** Find a campaign by name. */
   findCampaign(name: string): SimPersonalizeCampaign | undefined {
     return this.resources.campaigns.findByName(name);
+  }
+
+  /** Find a recommender by name. */
+  findRecommender(name: string): SimPersonalizeRecommender | undefined {
+    return this.resources.recommenders.findByName(name);
   }
 
   /**

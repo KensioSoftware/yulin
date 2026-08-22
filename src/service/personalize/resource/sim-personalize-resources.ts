@@ -2,6 +2,7 @@ import type { SimPersonalizeCampaign } from "./sim-personalize-campaign.js";
 import type { SimPersonalizeDatasetGroup } from "./sim-personalize-dataset-group.js";
 import type { SimPersonalizeDataset } from "./sim-personalize-dataset.js";
 import type { SimPersonalizeEventTracker } from "./sim-personalize-event-tracker.js";
+import type { SimPersonalizeRecommender } from "./sim-personalize-recommender.js";
 import { SimPersonalizeResourceStore } from "./sim-personalize-resource-store.js";
 import type { SimPersonalizeSchema } from "./sim-personalize-schema.js";
 import type { SimPersonalizeSolutionVersion } from "./sim-personalize-solution-version.js";
@@ -44,6 +45,11 @@ export class SimPersonalizeResources {
   public readonly campaigns =
     new SimPersonalizeResourceStore<SimPersonalizeCampaign>({
       description: "campaign",
+    });
+
+  public readonly recommenders =
+    new SimPersonalizeResourceStore<SimPersonalizeRecommender>({
+      description: "recommender",
     });
 
   public readonly eventTrackers =

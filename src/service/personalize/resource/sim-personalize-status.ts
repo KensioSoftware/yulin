@@ -7,3 +7,12 @@
  * is active from the moment it is created and a test never polls.
  */
 export const simPersonalizeActiveStatus = "ACTIVE";
+
+/**
+ * The status a stopped recommender reports.
+ *
+ * Real Personalize walks a recommender through `STOP PENDING` and
+ * `STOP IN_PROGRESS` before it settles here, and back through `START PENDING`
+ * on the way out. Neither takes any time here.
+ */
+export const simPersonalizeInactiveStatus = "INACTIVE";

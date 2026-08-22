@@ -23,6 +23,7 @@ export interface SimGetRecommendationsCommand {
 
 export interface SimGetRecommendationsCommandInput {
   readonly campaignArn?: string | undefined;
+  readonly recommenderArn?: string | undefined;
   readonly itemId?: string | undefined;
   readonly userId?: string | undefined;
   readonly numResults?: number | undefined;

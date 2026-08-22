@@ -9,13 +9,15 @@ CloudFormation templates actually touch.
 ## Resources without models
 
 A dataset group holds schemas and datasets. A solution names a recipe on that group. A solution
-version stands for the trained model, and a campaign is the endpoint a runtime call names. An event
-tracker is where interactions arrive. All seven exist here as state, reach `ACTIVE` on creation, and
-report back what the request gave them.
+version stands for the trained model, and a campaign is the endpoint a runtime call names. A
+recommender is the domain path's answer to those three at once. An event tracker is where
+interactions arrive. All eight exist here as state, reach `ACTIVE` on creation, and report back what
+the request gave them.
 
-The recipe ARN is recorded and never looked up. There is no catalogue of recipes, because no model
-is fitted and one recipe would behave like another. That changes with domain recommenders, where the
-use case a recipe names decides which parameters a recommendation request has to carry.
+A solution's recipe ARN is recorded and never looked up. There is no catalogue of custom recipes,
+because no model is fitted and one recipe would behave like another. A recommender's recipe ARN is
+different. It names one of the ten domain use cases, and the use case decides which parameters a
+recommendation request has to carry.
 
 ## Entry points
 
@@ -44,10 +46,10 @@ use case a recipe names decides which parameters a recommendation request has to
 
 Resource state lives under `resource/`. Every resource carries an ARN, a name, a status and a pair
 of timestamps, gathered as `SimPersonalizeResource`. One generic `SimPersonalizeResourceStore`
-serves all seven types on the strength of that shared shape, keyed by ARN with a secondary lookup
+serves all eight types on the strength of that shared shape, keyed by ARN with a secondary lookup
 by name.
 
-`SimPersonalizeResources` gathers the seven stores. The stores sit together, away from the service
+`SimPersonalizeResources` gathers the eight stores. The stores sit together, away from the service
 facade, because most commands read more than one of them. Creating a dataset reaches its dataset
 group and its schema, and creating a campaign reaches a solution version and through it a solution.
 
@@ -61,29 +63,58 @@ A solution version ARN is the solution's with a version on the end. That is why
 `simPersonalizeSolutionVersionArn` takes a solution ARN where the other builders take a name and a
 scope.
 
-An event tracker is the seventh resource type and the one a request reaches by something other than
-its ARN. `PutEvents` names the tracking ID, so the events handlers look a tracker up by that and
+An event tracker is the one resource a request reaches by something other than its ARN. `PutEvents` names the tracking ID, so the events handlers look a tracker up by that and
 authorize against the ARN they find. One dataset group takes one tracker, as on real Personalize.
 
 ## Commands
 
 Command handlers live under `command/`, grouped by the resource they are about.
-`SimPersonalizeCommands` builds all seven groups over one set of resources and one authorizer. The
+`SimPersonalizeCommands` builds all eight groups over one set of resources and one authorizer. The
 service facade stays a list of operations because of it.
 
 Every group follows the same order. Read the ARN from the input, authorize against it, resolve the
 resource, then act. Authorizing before resolving is deliberate. A caller with no permission learns
 only that it has no permission, and the existence of the resource stays hidden.
 
-`command/list/sim-personalize-page.ts` is shared by all seven list operations. The pagination token
+`command/list/sim-personalize-page.ts` is shared by all eight list operations. The pagination token
 is
 the index the next page starts at, where real Personalize hands out an opaque string.
 
+## Domain recommenders
+
+`resource/sim-personalize-use-case.ts` holds the ten use cases, five per domain, each with the
+recipe ARN it is named by and the parameters `GetRecommendations` has to carry for it.
+`sim-personalize-use-case-recipe.ts` beside it resolves a recipe ARN to one of them. The
+requirements are the ones AWS documents. Most of them need a `userId` because real Personalize
+filters out what the user already has, and that filtering is keyed on the user. `More like X` and
+`Frequently bought together` take one only for a `CurrentUser` filter. This simulation has no
+filters, and both are answered from their item alone.
+
+Requiring those parameters is the whole of what the use case does. Everything else about a
+recommender is state. `CreateRecommender` refuses a custom dataset group, a recipe from the other
+domain and a custom recipe, and each of those is a mistake worth catching before it reaches AWS.
+
+A recommender carries a mutable status, which no other resource here does. `StopRecommender` leaves
+it `INACTIVE` and `StartRecommender` brings it back, and a runtime request against a stopped one is
+refused as invalid input. Reporting it as missing would send a reader looking for a resource that is
+still there.
+
+`command/runtime/sim-personalize-recommendation-target.ts` is where a request is matched against its
+use case. It also drops the parameters outside the use case, so a `Top picks for you` request carrying an item
+is answered from its user. Passing the item through would match an item rule real
+Personalize would never have reached.
+
 ## Declared results
 
-The runtime API answers from rules held per campaign under `recommendation/`. That is the resource
-real Personalize answers a runtime call from. A campaign serves one solution version trained on one
-recipe, and two campaigns answer the same item differently.
+The runtime API answers from rules held per campaign or recommender under `recommendation/`. Those
+are the resources real Personalize answers a runtime call from. A campaign serves one solution
+version trained on one recipe and a recommender serves one use case, and two of them answer the same
+item differently.
+
+`SimPersonalizeResultRules` keys the rules by ARN and holds the resource each set was declared
+against. A resource deleted and created again under the same name therefore starts with an empty
+rule set. Rankings are campaigns only. `GetPersonalizedRanking` has no recommender form, and a recommender ARN
+handed to `rankings()` is told so where it was written.
 
 `SimDeclaredResultRules` in `util/rule/` does the matching, and simulated Rekognition matches images
 with it too. It holds a leading key, a trailing key and a default, matched exactly and in that
@@ -96,9 +127,9 @@ list to rank, and an item rule would be one nothing could match. A ranking no ru
 answered from the request's own `inputList`. The default there starts as `undefined` to leave room
 for that case.
 
-A campaign is required to exist before anything is declared against it. An ARN no campaign is
-deployed at raises `SimPersonalizeDeclarationError`, which follows simulated Rekognition's
-`SimRekognitionDeclarationError`. The ARN would otherwise be a typo nothing reported.
+The resource is required to exist before anything is declared against it. An ARN holding no campaign
+and no recommender raises `SimPersonalizeDeclarationError`, which follows simulated
+Rekognition's `SimRekognitionDeclarationError`. The ARN would otherwise be a typo nothing reported.
 
 ## Recorded events
 
@@ -118,8 +149,9 @@ turns both into the string the wire would have carried.
 ## Deletion rules
 
 Real Personalize refuses to delete a resource other resources still depend on, and these do the
-same. A dataset group holding datasets, solutions or an event tracker, a schema a dataset still
-uses, and a solution a campaign still deploys are all reported as `ResourceInUseException`.
+same. A dataset group holding datasets, solutions, recommenders or an event tracker, a schema a
+dataset still uses, and a solution a campaign still deploys are all reported as
+`ResourceInUseException`.
 
 Deleting a solution takes its versions with it. Real Personalize has no `DeleteSolutionVersion`
 either.
@@ -153,6 +185,8 @@ CloudFormation has no `AWS::Personalize::Campaign` or `AWS::Personalize::Recomme
 reaches a solution and stops there. Nothing in `cfn/` deploys the far end of the chain, and a test
 that wants recommendations builds the solution version and the campaign itself.
 
-## What comes next
+## SDK routing
 
-Domain recommenders are a separate issue, building on what is here.
+`sdk/route/` splits the thirty-four control plane routes in two, along the same seam the service
+facade splits its operations. One file over all of them is past the line limit, and the data and
+model halves are the division already there.

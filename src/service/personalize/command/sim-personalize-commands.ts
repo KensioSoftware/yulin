@@ -2,7 +2,7 @@ import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimPersonalizeEventRecords } from "../event/sim-personalize-event-records.js";
-import { SimPersonalizeCampaignRules } from "../recommendation/sim-personalize-campaign-rules.js";
+import { SimPersonalizeResultRules } from "../recommendation/sim-personalize-result-rules.js";
 import type { SimPersonalizeResources } from "../resource/sim-personalize-resources.js";
 import { SimPersonalizeAuthorizer } from "./authorize/sim-personalize-authorizer.js";
 import { SimPersonalizeCampaignReadCommands } from "./campaign/sim-personalize-campaign-read-commands.js";
@@ -16,6 +16,8 @@ import { SimPersonalizeEventTrackerWriteCommands } from "./event-tracker/sim-per
 import { SimPersonalizePutEventsHandler } from "./events/sim-personalize-put-events.js";
 import { SimPersonalizePutItemsHandler } from "./events/sim-personalize-put-items.js";
 import { SimPersonalizePutUsersHandler } from "./events/sim-personalize-put-users.js";
+import { SimPersonalizeRecommenderReadCommands } from "./recommender/sim-personalize-recommender-read-commands.js";
+import { SimPersonalizeRecommenderWriteCommands } from "./recommender/sim-personalize-recommender-write-commands.js";
 import { SimPersonalizeGetPersonalizedRankingHandler } from "./runtime/sim-personalize-get-personalized-ranking.js";
 import { SimPersonalizeGetRecommendationsHandler } from "./runtime/sim-personalize-get-recommendations.js";
 import { SimPersonalizeSchemaReadCommands } from "./schema/sim-personalize-schema-read-commands.js";
@@ -42,8 +44,8 @@ interface SimPersonalizeCommandsProperties {
  *
  * The two runtime handlers are built here as well, over the same resources
  * and the same authorizer. What they answer with is declared against a
- * campaign through the rules, so those are held here too. The declaration and
- * the request that reads it have to reach the same rules.
+ * campaign or a recommender through the rules, so those are held here too. The
+ * declaration and the request that reads it have to reach the same rules.
  *
  * The three events handlers are here for the same reason. They record what
  * they are sent, and `SimPersonalize` reads that record back through its own
@@ -62,13 +64,15 @@ export class SimPersonalizeCommands {
   public readonly solutionVersionReads: SimPersonalizeSolutionVersionReadCommands;
   public readonly campaignWrites: SimPersonalizeCampaignWriteCommands;
   public readonly campaignReads: SimPersonalizeCampaignReadCommands;
+  public readonly recommenderWrites: SimPersonalizeRecommenderWriteCommands;
+  public readonly recommenderReads: SimPersonalizeRecommenderReadCommands;
   public readonly eventTrackerWrites: SimPersonalizeEventTrackerWriteCommands;
   public readonly eventTrackerReads: SimPersonalizeEventTrackerReadCommands;
   public readonly records = new SimPersonalizeEventRecords();
   public readonly putEvents: SimPersonalizePutEventsHandler;
   public readonly putItems: SimPersonalizePutItemsHandler;
   public readonly putUsers: SimPersonalizePutUsersHandler;
-  public readonly rules: SimPersonalizeCampaignRules;
+  public readonly rules: SimPersonalizeResultRules;
   public readonly recommendations: SimPersonalizeGetRecommendationsHandler;
   public readonly rankings: SimPersonalizeGetPersonalizedRankingHandler;
 
@@ -95,6 +99,8 @@ export class SimPersonalizeCommands {
     );
     this.campaignWrites = new SimPersonalizeCampaignWriteCommands(shared);
     this.campaignReads = new SimPersonalizeCampaignReadCommands(shared);
+    this.recommenderWrites = new SimPersonalizeRecommenderWriteCommands(shared);
+    this.recommenderReads = new SimPersonalizeRecommenderReadCommands(shared);
     this.eventTrackerWrites = new SimPersonalizeEventTrackerWriteCommands(
       shared,
     );
@@ -106,8 +112,9 @@ export class SimPersonalizeCommands {
     this.putItems = new SimPersonalizePutItemsHandler(events);
     this.putUsers = new SimPersonalizePutUsersHandler(events);
 
-    this.rules = new SimPersonalizeCampaignRules({
+    this.rules = new SimPersonalizeResultRules({
       campaigns: resources.campaigns,
+      recommenders: resources.recommenders,
     });
 
     const runtime = { ...shared, rules: this.rules };
