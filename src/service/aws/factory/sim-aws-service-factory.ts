@@ -24,6 +24,7 @@ import type { SimScheduler } from "../../scheduler/index.js";
 import type { SimElbV2 } from "../../elbv2/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import type { SimFirehose } from "../../firehose/index.js";
 import type { SimKinesis } from "../../kinesis/index.js";
 import type { SimStepFunctions } from "../../stepfunctions/index.js";
 import type { SimKms } from "../../kms/index.js";
@@ -230,6 +231,11 @@ export class SimAwsServiceFactory {
   /** Create simulated KMS for an Account Region scope. */
   createKms(scope: SimAwsAccountRegionContainer): SimKms {
     return this.registeredServices.createKms(scope);
+  }
+
+  /** Create simulated Kinesis Data Firehose for an Account Region scope. */
+  createFirehose(scope: SimAwsAccountRegionContainer): SimFirehose {
+    return this.selfContainedServices.createFirehose(scope);
   }
 
   /** Create simulated Kinesis Data Streams for an Account Region scope. */

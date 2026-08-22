@@ -18,6 +18,7 @@
       "@kensio/yulin/dynamodb": ["../src/service/dynamodb/index.ts"],
       "@kensio/yulin/elbv2": ["../src/service/elbv2/index.ts"],
       "@kensio/yulin/eslint": ["../src/config/eslint/index.ts"],
+      "@kensio/yulin/firehose": ["../src/service/firehose/index.ts"],
       "@kensio/yulin/iam": ["../src/service/iam/index.ts"],
       "@kensio/yulin/kinesis": ["../src/service/kinesis/index.ts"],
       "@kensio/yulin/kms": ["../src/service/kms/index.ts"],
