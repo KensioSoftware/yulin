@@ -499,9 +499,9 @@ what a test checking the denial does. Anything else is also warned about on the 
 ## Deploying from CloudFormation
 
 `AWS::KinesisFirehose::DeliveryStream` deploys a delivery stream. `DeliveryStreamName`,
-`DeliveryStreamType`, `ExtendedS3DestinationConfiguration`, `S3DestinationConfiguration` and `Tags`
-are read. A `Ref` gives the delivery stream name and `Fn::GetAtt` on `Arn` gives the ARN, the way
-real CloudFormation publishes them.
+`DeliveryStreamType`, `ExtendedS3DestinationConfiguration`, `S3DestinationConfiguration`,
+`KinesisStreamSourceConfiguration` and `Tags` are read. A `Ref` gives the delivery stream name and
+`Fn::GetAtt` on `Arn` gives the ARN, the way real CloudFormation publishes them.
 
 A CDK `DeliveryStream` with an `S3Bucket` destination synthesizes that resource, along with the
 delivery Role and its policy. A CDK project reaches a simulated delivery stream by deploying its
@@ -617,12 +617,15 @@ simulation has no behaviour for go the same way, including `ProcessingConfigurat
 `CloudWatchLoggingOptions` CDK writes into every destination. They are all in
 `stack.ignoredProperties`.
 
+A `DeliveryStreamType` of `KinesisStreamAsSource` deploys as well. The
+`KinesisStreamSourceConfiguration` names the stream by ARN and the Role to read it as, and a stack
+declaring the stream beside the delivery stream archives what a producer puts on it.
+
 A delivery stream this simulation cannot deliver for is skipped and recorded in
 `stack.skippedResources`, and the rest of the stack deploys. That covers a destination other than
-S3, a `DeliveryStreamType` of `KinesisStreamAsSource`, and a source property naming somewhere the
-records cannot come from, such as `MSKSourceConfiguration` or `DatabaseSourceConfiguration`. The
-source property is what the skip is decided on, because a template that leaves `DeliveryStreamType`
-out gets `DirectPut` by default.
+S3, and a source property naming somewhere the records cannot come from, such as
+`MSKSourceConfiguration` or `DatabaseSourceConfiguration`. The source property is what the skip is
+decided on, because a template that leaves `DeliveryStreamType` out gets `DirectPut` by default.
 
 ## SDK interception
 

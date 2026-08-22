@@ -14,6 +14,11 @@ import {
   SimFirehoseUnsimulatedDestination,
 } from "../error/sim-firehose.error.js";
 
+const validS3Destination = {
+  BucketARN: "arn:aws:s3:::order-archive",
+  RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
+};
+
 /**
  * Try to create a delivery stream, and hand back what refused it.
  */

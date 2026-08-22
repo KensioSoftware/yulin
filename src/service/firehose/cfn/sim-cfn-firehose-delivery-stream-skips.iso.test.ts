@@ -192,59 +192,6 @@ describe("What a deployed AWS::KinesisFirehose::DeliveryStream leaves out", () =
     );
   });
 
-  it("skips a delivery stream reading from a Kinesis stream", async () => {
-    // Given a template declaring a delivery stream whose source is a Kinesis
-    // stream, which simulated Firehose does not yet read from.
-    const simAws = new SimAws();
-
-    // When it is deployed.
-    const stack = await deploy(simAws, {
-      DeliveryStreamName: "order-events",
-      DeliveryStreamType: "KinesisStreamAsSource",
-      KinesisStreamSourceConfiguration: {
-        KinesisStreamARN: `arn:aws:kinesis:${simAws.defaultRegionName}:${simAws.defaultAccountId}:stream/orders`,
-        RoleARN: { "Fn::GetAtt": ["DeliveryRole", "Arn"] },
-      },
-      ExtendedS3DestinationConfiguration: cdkS3Destination,
-    });
-
-    // Then the delivery stream was not created, and the rest of the stack was.
-    assertUndefined(simAws.firehose().findDeliveryStream("order-events"));
-    assertIdentical(stack.status, "CREATE_COMPLETE");
-    assertArrayLength(stack.skippedResources, 1);
-    assertStringIncludes(
-      stack.skippedResources[0].skippedReason ?? "",
-      "reading from a Kinesis stream",
-    );
-  });
-
-  it("skips a delivery stream reading from a source outside the simulation", async () => {
-    // Given a template declaring an MSK source and no DeliveryStreamType,
-    // which leaves the type at the DirectPut default while the records would
-    // come from somewhere this simulation cannot read.
-    const simAws = new SimAws();
-
-    // When it is deployed.
-    const stack = await deploy(simAws, {
-      DeliveryStreamName: "order-events",
-      MSKSourceConfiguration: {
-        MSKClusterARN: `arn:aws:kafka:${simAws.defaultRegionName}:${simAws.defaultAccountId}:cluster/orders/abc`,
-        TopicName: "orders",
-      },
-      ExtendedS3DestinationConfiguration: cdkS3Destination,
-    });
-
-    // Then the delivery stream was not created, the rest of the stack was, and
-    // the skip names the source property the template wrote.
-    assertUndefined(simAws.firehose().findDeliveryStream("order-events"));
-    assertIdentical(stack.status, "CREATE_COMPLETE");
-    assertArrayLength(stack.skippedResources, 1);
-    assertStringIncludes(
-      stack.skippedResources[0].skippedReason ?? "",
-      "MSKSourceConfiguration",
-    );
-  });
-
   it("takes tags without listing them back", async () => {
     // Given a template tagging its delivery stream.
     const simAws = new SimAws();

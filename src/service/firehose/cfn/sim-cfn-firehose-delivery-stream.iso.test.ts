@@ -16,6 +16,7 @@ import {
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimFirehoseResourceNotFoundException } from "../error/sim-firehose.error.js";
 import {
+  cdkKinesisSource,
   cdkS3Destination,
   orderArchiveBucketName,
   simCfnFirehoseDeliveryStreamTemplateFactory,
@@ -51,6 +52,45 @@ describe("deployed AWS::KinesisFirehose::DeliveryStream Resources", () => {
 
     // Then it is in the deployed Bucket, which means the Bucket ARN the
     // template read off the Bucket beside it resolved to that Bucket.
+    const keys = await deliveredObjectKeys(simAws, orderArchiveBucketName);
+    assertArrayLength(keys, 1);
+    assertIdentical(
+      await deliveredObjectBody(simAws, orderArchiveBucketName, keys[0]),
+      '{"id":"order-1"}\n',
+    );
+  });
+
+  it("delivers from the Kinesis stream the template named as its source", async () => {
+    // Given a stack holding a Kinesis stream, a source Role, a Bucket, a
+    // delivery Role and a delivery stream reading the one into the other.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: simCfnFirehoseDeliveryStreamTemplateFactory.make({
+        sourceStreamName: "orders",
+        deliveryStreamProperties: {
+          DeliveryStreamName: "order-events",
+          DeliveryStreamType: "KinesisStreamAsSource",
+          KinesisStreamSourceConfiguration: cdkKinesisSource,
+          ExtendedS3DestinationConfiguration: cdkS3Destination,
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // When a record is put onto the deployed stream and the buffering interval
+    // passes.
+    await simAws.kinesis().putRecord({
+      input: {
+        StreamName: "orders",
+        PartitionKey: "order-1",
+        Data: new TextEncoder().encode('{"id":"order-1"}\n'),
+      },
+    });
+    await simAws.clock().advanceBy({ minutes: 2 });
+
+    // Then it reached the deployed Bucket, which means the delivery stream
+    // opened the stream the template named and read it as the Role beside it.
     const keys = await deliveredObjectKeys(simAws, orderArchiveBucketName);
     assertArrayLength(keys, 1);
     assertIdentical(

@@ -3,35 +3,19 @@ import { MappedFactory } from "@kensio/part-factory";
 import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import {
+  cdkDeliveryStreamProperties,
   firehoseDeliveryActions,
   orderArchiveBucket,
   orderArchiveDeliveryRole,
+  orderSourceRole,
+  orderSourceStream,
 } from "./sim-cfn-firehose-archive.resources.js";
 
-export { orderArchiveBucketName } from "./sim-cfn-firehose-archive.resources.js";
-
-/**
- * The destination CDK synthesizes for a `DeliveryStream` with an `S3Bucket`,
- * reading the Bucket and the Role off the Resources beside it.
- *
- * A test states this as its destination and changes what it is about, which is
- * how a template a CDK project would have produced stays the starting point.
- */
-export const cdkS3Destination: SimCfnTemplateValueRecord = {
-  BucketARN: { "Fn::GetAtt": ["OrderArchive", "Arn"] },
-  RoleARN: { "Fn::GetAtt": ["DeliveryRole", "Arn"] },
-  Prefix: "orders/",
-  BufferingHints: { IntervalInSeconds: 60, SizeInMBs: 1 },
-};
-
-/**
- * The delivery stream a test that states no properties of its own gets.
- */
-const cdkDeliveryStreamProperties: SimCfnTemplateValueRecord = {
-  DeliveryStreamName: "order-events",
-  DeliveryStreamType: "DirectPut",
-  ExtendedS3DestinationConfiguration: cdkS3Destination,
-};
+export {
+  cdkKinesisSource,
+  cdkS3Destination,
+  orderArchiveBucketName,
+} from "./sim-cfn-firehose-archive.resources.js";
 
 /**
  * What a test asks for when it wants a stack holding a delivery stream.
@@ -54,6 +38,15 @@ export interface SimCfnFirehoseDeliveryStreamTemplateInput {
    * Narrowing them is how a test checks what a Role that cannot write does.
    */
   readonly allowedActions: readonly string[];
+
+  /**
+   * The stream a Kinesis-sourced delivery stream reads.
+   *
+   * Left empty, the stack holds no stream and no source Role, which is what a
+   * `DirectPut` delivery stream wants. Naming one adds both, and
+   * `cdkKinesisSource` is the configuration that reads them.
+   */
+  readonly sourceStreamName: string;
 }
 
 /**
@@ -76,11 +69,16 @@ export const simCfnFirehoseDeliveryStreamTemplateFactory = new MappedFactory<
   SimCfnFirehoseDeliveryStreamTemplateInput,
   CfnTemplateBodyRecord
 >(
-  () => ({ deliveryStreamProperties: {}, allowedActions: [] }),
+  () => ({
+    deliveryStreamProperties: {},
+    allowedActions: [],
+    sourceStreamName: "",
+  }),
   (input) => ({
     Resources: {
       OrderArchive: orderArchiveBucket,
       DeliveryRole: orderArchiveDeliveryRole(allowedActions(input)),
+      ...sourceResources(input),
       OrderEvents: {
         Type: "AWS::KinesisFirehose::DeliveryStream",
         Properties: deliveryStreamProperties(input),
@@ -93,6 +91,23 @@ export const simCfnFirehoseDeliveryStreamTemplateFactory = new MappedFactory<
     },
   }),
 );
+
+/**
+ * The stream and the Role a Kinesis-sourced delivery stream reads, for a stack
+ * that names one.
+ */
+function sourceResources(
+  input: SimCfnFirehoseDeliveryStreamTemplateInput,
+): SimCfnTemplateValueRecord {
+  if (input.sourceStreamName === "") {
+    return {};
+  }
+
+  return {
+    OrderStream: orderSourceStream(input.sourceStreamName),
+    SourceRole: orderSourceRole(),
+  };
+}
 
 function allowedActions(
   input: SimCfnFirehoseDeliveryStreamTemplateInput,
