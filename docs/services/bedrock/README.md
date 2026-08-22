@@ -267,6 +267,8 @@ simSdk.restoreAll();
 - Token counts are fixed unless the declaration carries them. Counting them needs the tokenizer of
   the model the request names. Declare a `usage` where the code under test meters spend.
 - `metrics.latencyMs` is always zero. No time passes during an invocation.
+- A `Converse` with no messages is refused. Real Bedrock accepts one where the `modelId` names a
+  prompt version from Prompt management, which is unsimulated.
 - The model id goes unchecked. AWS publishes no enumerable table of model ids, so refusing one would
   be failing closed against Yulin's own gaps.
 - `InvokeModel` has no built-in default response body, and an invocation matching a rule that
