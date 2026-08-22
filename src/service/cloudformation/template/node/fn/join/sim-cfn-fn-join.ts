@@ -27,6 +27,13 @@ export class SimCfnFnJoin extends SimCfnNode {
    * during the up-front pass before Resources exist), this node re-emits
    * itself in template form. A later resolution pass can finish it once the
    * referenced Resources are available.
+   *
+   * A dynamic reference can be assembled out of the joined values, as CDK
+   * writes one whenever the secret it reads sits in the same Stack: the
+   * opening `{{resolve:secretsmanager:`, a `Ref` to the secret, and the
+   * trailing segments. No single value holds a whole reference, so the
+   * reference is read from the finished string, as `Fn::Sub` reads one built
+   * out of its variables.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
     const resolved = this.values.map((value) =>
@@ -34,7 +41,9 @@ export class SimCfnFnJoin extends SimCfnNode {
     );
 
     if (resolved.every((value): value is string => typeof value === "string")) {
-      return resolved.join(this.delimiter);
+      const joined = resolved.join(this.delimiter);
+
+      return context.dynamicReferences?.substitute(joined) ?? joined;
     }
 
     return { "Fn::Join": [this.delimiter, resolved] };
