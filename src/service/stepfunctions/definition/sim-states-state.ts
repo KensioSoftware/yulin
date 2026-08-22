@@ -1,8 +1,10 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesChoiceRule } from "../choice/sim-states-choice-rule.js";
 import type { SimStatesDataFlowFields } from "../data/sim-states-data-flow.js";
+import type { SimStatesErrorHandling } from "../retry/sim-states-error-handling.js";
 import type { SimStatesTaskHandling } from "../retry/sim-states-task-handling.js";
 import type { SimStatesTaskTarget } from "../task/sim-states-task-target.js";
+import type { SimStatesDefinition } from "./sim-states-definition.js";
 
 /**
  * Every state type Amazon States Language defines.
@@ -33,6 +35,7 @@ export const simStatesRunnableTypes = [
   "Task",
   "Choice",
   "Wait",
+  "Parallel",
 ] as const;
 
 export type SimStatesRunnableType = (typeof simStatesRunnableTypes)[number];
@@ -68,6 +71,19 @@ export interface SimStatesTaskState
   readonly Type: "Task";
   readonly Resource: string;
   readonly target: SimStatesTaskTarget;
+}
+
+/**
+ * A `Parallel` state, which runs each of its branches on the same input.
+ *
+ * A branch is a state machine of its own, with its own `StartAt` and its own
+ * states. The branches are read when the definition is read, so a `Parallel`
+ * state that runs is one whose branches are already known to be good.
+ */
+export interface SimStatesParallelState
+  extends SimStatesCommonState, SimStatesErrorHandling {
+  readonly Type: "Parallel";
+  readonly Branches: readonly SimStatesDefinition[];
 }
 
 /**
@@ -124,6 +140,7 @@ export interface SimStatesFailState {
 export type SimStatesState =
   | SimStatesPassState
   | SimStatesTaskState
+  | SimStatesParallelState
   | SimStatesSucceedState
   | SimStatesFailState
   | SimStatesChoiceState

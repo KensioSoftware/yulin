@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 
 import { statesFlakyHandlerFactory } from "../../../test/stepfunctions/states-flaky-handler.factory.js";
-import { statesTaskExecutionFactory } from "../../../test/stepfunctions/states-task-execution.factory.js";
+import { statesExecutionFactory } from "../../../test/stepfunctions/states-execution.factory.js";
 import { statesTaskFunctionFactory } from "../../../test/stepfunctions/states-task-function.factory.js";
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
 import type { JSONObject } from "../../util/type-guard/json.js";
@@ -46,9 +46,9 @@ describe("Simulated Step Functions Retry on the clock", () => {
   it("runs a task again until it answers, and records every attempt", async () => {
     // Given a function that raises twice and then answers.
     const simAws = await givenAFlakyFunction(2);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           { ErrorEquals: ["States.TaskFailed"], IntervalSeconds: 2 },
         ]),
       },
@@ -83,8 +83,8 @@ describe("Simulated Step Functions Retry on the clock", () => {
     // Given a retrier written as Amazon States Language allows the shortest
     // one to be, which waits a second and doubles from there.
     const simAws = await givenAFlakyFunction(2);
-    const executionArn = await statesTaskExecutionFactory.make(
-      { task: invokeCheck([{ ErrorEquals: ["States.TaskFailed"] }]) },
+    const executionArn = await statesExecutionFactory.make(
+      { state: invokeCheck([{ ErrorEquals: ["States.TaskFailed"] }]) },
       simAws,
     );
 
@@ -107,9 +107,9 @@ describe("Simulated Step Functions Retry on the clock", () => {
   it("leaves the execution RUNNING between one attempt and the next", async () => {
     // Given a workflow whose second retry falls six seconds in.
     const simAws = await givenAFlakyFunction(2);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           { ErrorEquals: ["States.TaskFailed"], IntervalSeconds: 2 },
         ]),
       },
@@ -148,9 +148,9 @@ describe("Simulated Step Functions Retry on the clock", () => {
   it("caps the wait between attempts at MaxDelaySeconds", async () => {
     // Given a retrier whose backoff would reach a hundred seconds untouched.
     const simAws = await givenAFlakyFunction(2);
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: invokeCheck([
+        state: invokeCheck([
           {
             ErrorEquals: ["States.ALL"],
             IntervalSeconds: 10,

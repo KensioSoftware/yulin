@@ -1,21 +1,26 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
-import type { SimStatesState } from "../definition/sim-states-state.js";
 import type { SimStatesTaskTargets } from "../task/sim-states-task-invocation.js";
-import type { SimStatesExecution } from "./sim-states-execution.js";
-import {
-  simStatesCycleFailure,
-  simStatesMaximumTransitions,
-  simStatesUnknownStateFailure,
-} from "./sim-states-failure.js";
+import type {
+  SimStatesChildWalk,
+  SimStatesChildWalks,
+} from "./sim-states-child-walk.js";
+import type { SimStatesRunRecord } from "./sim-states-run-record.js";
 import { SimStatesSettlement } from "./sim-states-settlement.js";
 import { SimStatesStateAttempts } from "./sim-states-state-attempts.js";
 import { SimStatesStateRunner } from "./sim-states-state-runner.js";
+import { SimStatesWalkSteps } from "./sim-states-walk-steps.js";
 
 interface SimStatesInterpreterProperties {
   readonly definition: SimStatesDefinition;
-  readonly execution: SimStatesExecution;
+
+  /**
+   * What the walk records itself on: an execution, or one branch of a
+   * `Parallel` state.
+   */
+  readonly record: SimStatesRunRecord;
+
   readonly background: BackgroundScheduler;
 
   /**
@@ -27,10 +32,21 @@ interface SimStatesInterpreterProperties {
    * The state machine's execution role, which a task assumes.
    */
   readonly roleArn: string;
+
+  /**
+   * How a state that runs states of its own gets a walk over them.
+   */
+  readonly walkChild: SimStatesChildWalks;
+
+  /**
+   * What to do once this walk has ended, which is how a branch tells the
+   * `Parallel` state holding it.
+   */
+  readonly onSettled?: () => Promise<void>;
 }
 
 /**
- * Walks one execution through its state machine.
+ * Walks one execution, or one branch of one, through its states.
  *
  * The walk is a loop over a map of states, which is all Amazon States Language
  * asks for. Everything interesting happens either side of a state, in the
@@ -41,68 +57,85 @@ interface SimStatesInterpreterProperties {
  * something moves simulated time to the instant it is waiting for. A `Retry`
  * pauses it the same way, with the next attempt at the state standing in for
  * the state after it.
+ *
+ * A `Parallel` state runs a walk of its own per branch, on the same clock and
+ * through the same states, so a branch waits the way anything else does and
+ * its siblings carry on while it does.
  */
-export class SimStatesInterpreter {
+export class SimStatesInterpreter implements SimStatesChildWalk {
   readonly #definition: SimStatesDefinition;
-  readonly #execution: SimStatesExecution;
+  readonly #record: SimStatesRunRecord;
   readonly #background: BackgroundScheduler;
-  readonly #settlement: SimStatesSettlement;
+  readonly #steps: SimStatesWalkSteps;
   readonly #attempts: SimStatesStateAttempts;
+  readonly #onSettled: (() => Promise<void>) | undefined;
 
   /**
-   * Transitions made so far, counted across every pause the clock makes.
+   * Whether whatever is holding this walk has been told it ended.
    */
-  #taken = 0;
+  #told = false;
 
   constructor(properties: SimStatesInterpreterProperties) {
     this.#definition = properties.definition;
-    this.#execution = properties.execution;
+    this.#record = properties.record;
     this.#background = properties.background;
-    this.#settlement = new SimStatesSettlement({
-      execution: properties.execution,
+    this.#onSettled = properties.onSettled;
+
+    const settlement = new SimStatesSettlement({
+      record: properties.record,
       background: properties.background,
     });
+
+    this.#steps = new SimStatesWalkSteps(properties.definition, settlement);
     this.#attempts = new SimStatesStateAttempts({
       runner: new SimStatesStateRunner({
-        execution: properties.execution,
         background: properties.background,
-        tasks: properties.tasks,
-        roleArn: properties.roleArn,
+        walk: {
+          record: properties.record,
+          tasks: properties.tasks,
+          roleArn: properties.roleArn,
+          walkChild: properties.walkChild,
+        },
       }),
-      settlement: this.#settlement,
+      settlement,
       background: properties.background,
       walkOn: async (outcome): Promise<void> => {
-        await this.#walk(outcome.next, outcome.output);
+        if (outcome !== undefined) {
+          await this.#walk(outcome.next, outcome.output);
+        }
+
+        await this.#ended();
       },
     });
   }
 
   /**
-   * Run the execution as far as it goes without waiting on the clock.
+   * Run the walk as far as it goes without waiting on the clock.
    *
    * A failure ends the execution and is recorded on it. Nothing raises out of
    * here, since this runs where a caller advancing the clock would otherwise
    * see the raise.
    */
   async run(): Promise<void> {
-    await this.#walk(this.#definition.StartAt, this.#execution.input);
+    await this.#walk(this.#definition.StartAt, this.#record.input);
+    await this.#ended();
   }
 
   /**
-   * Walk from one state until the execution ends or the clock pauses it.
+   * Walk from one state until the walk ends or the clock pauses it.
    */
   async #walk(from: string, value: JSONValue): Promise<void> {
     let current = from;
     let carried = value;
 
-    for (;;) {
-      const state = this.#nextState(current);
+    while (!this.#record.stopped) {
+      const state = this.#steps.next(current);
 
       if (state === undefined) {
         return;
       }
 
-      this.#execution.enter(current);
+      this.#record.enter(current);
       // One sequencing point per state. The states are a chain, so there is
       // nothing here to run in parallel.
       // oxlint-disable-next-line eslint/no-await-in-loop
@@ -127,20 +160,18 @@ export class SimStatesInterpreter {
   }
 
   /**
-   * The state a name stands for, failing the execution where there is none.
+   * Tell whatever is holding this walk that it is over, once it is.
+   *
+   * A walk that answered with states still on the clock is not over, and this
+   * runs again when they release it.
    */
-  #nextState(current: string): SimStatesState | undefined {
-    if (this.#taken++ >= simStatesMaximumTransitions) {
-      this.#settlement.settle(simStatesCycleFailure());
-      return undefined;
+  async #ended(): Promise<void> {
+    if (this.#told || !this.#record.stopped) {
+      return;
     }
 
-    const state = this.#definition.States.get(current);
+    this.#told = true;
 
-    if (state === undefined) {
-      this.#settlement.settle(simStatesUnknownStateFailure(current));
-    }
-
-    return state;
+    await this.#onSettled?.();
   }
 }

@@ -17,6 +17,11 @@ export const simStatesTimeoutError = "States.Timeout";
 export const simStatesRuntimeError = "States.Runtime";
 
 /**
+ * The failure a `Parallel` state one of whose branches failed ends with.
+ */
+export const simStatesBranchFailedError = "States.BranchFailed";
+
+/**
  * Whether one retrier's or catcher's `ErrorEquals` names an error.
  *
  * Amazon States Language matches on the error name alone, so a catcher naming

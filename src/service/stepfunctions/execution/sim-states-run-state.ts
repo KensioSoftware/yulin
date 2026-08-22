@@ -10,6 +10,7 @@ import type {
   SimStatesSucceedState,
 } from "../definition/sim-states-state.js";
 import { runSimStatesChoice } from "./sim-states-run-choice.js";
+import { runSimStatesParallel } from "./sim-states-run-parallel.js";
 import { runSimStatesTask } from "./sim-states-run-task.js";
 import { runSimStatesWait } from "./sim-states-run-wait.js";
 import type {
@@ -28,9 +29,10 @@ const unnamedFailError = "States.Unknown";
  * A data-flow field raising is left to the caller, which reads the Amazon
  * States Language error name off whatever came out.
  *
- * This waits on the work a `Task` state does. Every other state type answers
- * without waiting for anything. A `Wait` state pauses the walk rather than
- * blocking it, and answers by saying what it is waiting for.
+ * This waits on the work a `Task` state does, and on the branches a `Parallel`
+ * state runs as far as they get. Every other state type answers without
+ * waiting for anything. A `Wait` state pauses the walk rather than blocking
+ * it, and answers by saying what it is waiting for.
  */
 export async function runSimStatesState(
   state: SimStatesState,
@@ -55,6 +57,10 @@ export async function runSimStatesState(
 
   if (state.Type === "Wait") {
     return runSimStatesWait(state, input, context);
+  }
+
+  if (state.Type === "Parallel") {
+    return await runSimStatesParallel(state, input, context);
   }
 
   return runPass(state, input);

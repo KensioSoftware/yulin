@@ -7,13 +7,13 @@ import type { SimStatesAttemptState } from "./sim-states-attempt-state.js";
 import { simStatesCatchOutcome } from "./sim-states-catch-outcome.js";
 import { simStatesTimeoutError } from "./sim-states-error-name.js";
 import { simStatesRetryOutcome } from "./sim-states-retry-outcome.js";
-import type { SimStatesTaskHandling } from "./sim-states-task-handling.js";
+import type { SimStatesErrorHandling } from "./sim-states-error-handling.js";
 
 interface SimStatesRecoverProperties {
   /**
    * The `Retry` and `Catch` of the state that failed.
    */
-  readonly handling: SimStatesTaskHandling;
+  readonly handling: SimStatesErrorHandling;
 
   /**
    * The raw input the state was given, which is what a catcher's `ResultPath`

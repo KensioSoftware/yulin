@@ -8,8 +8,8 @@ Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunc
 
 ## What runs today
 
-Six state types run. `Pass`, `Task`, `Succeed`, `Fail`, `Choice` and `Wait`. A definition using
-`Parallel` or `Map` is refused when the state machine is created, naming the state and its type.
+Seven state types run. `Pass`, `Task`, `Succeed`, `Fail`, `Choice`, `Wait` and `Parallel`. A
+definition using `Map` is refused when the state machine is created, naming the state and its type.
 
 The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
 `OutputPath` apply in that order, reading Reference Paths and the intrinsic functions.
@@ -19,7 +19,8 @@ service, or starts another state machine. A `Resource` this simulator has no ans
 when the state machine is created, naming what the definition asked for.
 
 A `Task` state's `Retry` and `Catch` both run, on the simulation's clock, along with the
-`TimeoutSeconds` and `HeartbeatSeconds` it takes.
+`TimeoutSeconds` and `HeartbeatSeconds` it takes. A `Parallel` state takes the same `Retry` and
+`Catch`.
 
 ## Running a state machine
 
@@ -801,6 +802,133 @@ The execution stops at the instant it was waiting for, and `DescribeExecution` r
 for one that succeeded. [Simulated time](../../time/ "Simulated time docs") covers what else
 advancing the clock runs.
 
+## Running branches at once
+
+A `Parallel` state runs each of its `Branches`, and answers with an array of what they produced. The
+array is in the order the branches were written, whatever order they finished in.
+
+```typescript sim-step-functions-parallel
+/**
+ * Running two branches at once with a Parallel state.
+ */
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+    definition: JSON.stringify({
+      StartAt: "Enrol",
+      States: {
+        Enrol: {
+          Type: "Parallel",
+          Branches: [
+            {
+              StartAt: "Settle",
+              States: {
+                Settle: { Type: "Wait", Seconds: 300, Next: "Register" },
+                Register: {
+                  Type: "Pass",
+                  Result: { registered: true },
+                  End: true,
+                },
+              },
+            },
+            {
+              StartAt: "Bill",
+              States: {
+                Bill: { Type: "Pass", Result: { billed: true }, End: true },
+              },
+            },
+          ],
+          Next: "Confirm",
+        },
+        Confirm: { Type: "Pass", End: true },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei" }),
+  },
+});
+
+const waiting = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(waiting.status); // RUNNING
+
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const settled = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(settled.output); // [{"registered":true},{"billed":true}]
+
+console.log(
+  simAws
+    .stepFunctions()
+    .inspection()
+    .branches(started.executionArn)
+    .map((branch) => branch.visitedStates),
+); // [ [ 'Settle', 'Register' ], [ 'Bill' ] ]
+```
+
+Every branch is given the state's effective input. `InputPath` and `Parameters` apply once for the
+state, and not once per branch. `ResultSelector`, `ResultPath` and `OutputPath` then apply to the
+array of branch outputs.
+
+A branch is a state machine of its own, with its own `StartAt` and its own `States`. A `Next` inside
+a branch reaches only the states in that branch, and two branches are free to use the same state
+name. The states inside a branch are read when the state machine is created. A definition using something
+this simulator has no implementation for inside a branch is refused there, naming the branch it was
+written in.
+
+A branch that reaches a `Wait` state waits on the same clock as everything else, and its siblings
+carry on while it waits. The execution reads as `RUNNING` until the last branch has finished.
+
+### When a branch fails
+
+A branch that fails takes the `Parallel` state with it. The state fails with `States.BranchFailed`,
+and the `Cause` names the branch and what it failed with:
+
+```text
+Branch 2 of the Parallel state Enrol failed with NotEligible: no place left on the course
+```
+
+The branches still going are given up on, along with the branches those were running themselves.
+Whatever they had scheduled on the clock finds a branch that has stopped, so a later `advanceBy`
+runs none of it.
+
+`Retry` and `Catch` on the `Parallel` state itself work the way they do on a `Task` state, and are
+written the same way. A retry runs every branch again from its own `StartAt`, on the interval and
+backoff the retrier gives. A catcher matching `States.BranchFailed` (or `States.ALL`) sends the
+execution to the state it names.
+
+### Reading the branches back
+
+The inspection accessor reports branches separately from the states around them:
+
+```typescript
+const branches = simAws.stepFunctions().inspection().branches(executionArn);
+```
+
+Each branch says which `Parallel` state it belongs to, where among its siblings it sits (counting
+from zero), the states it entered and how it ended. A branch given up on because a sibling failed
+reads as `ABANDONED`. A `Parallel` state inside a branch reports its own branches here too, however
+deep they go. `visitedStates` on the execution holds the states outside the branches, while
+`attempts` covers every run of every state, branches included.
+
 ## Through an intercepted SDK client
 
 An `SFNClient` handed to `SimSdk` reaches the same simulated service:
@@ -1034,6 +1162,12 @@ A test asserting on the output of a state machine that used one could only asser
   machine is created.
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
+- **A branch that failed on the data it was given keeps `States.Runtime`.** Every other branch
+  failure becomes `States.BranchFailed` on the `Parallel` state. `States.Runtime` is the one error
+  nothing catches, and a state around a branch is no more able to carry on than the branch was.
+- **A branch's own states are reported apart from the execution's.** Real Step Functions writes
+  them into one execution history, under events naming the branch. The inspection accessor answers
+  `branches` instead, since a test asserting on a branch is asking about that branch.
 
 - **A state machine is the only resource that holds tags.** An activity and an execution both take
   tags on real Step Functions, and both are unsimulated here. A tag request naming one is refused
@@ -1056,7 +1190,7 @@ two and is what this follows.
 
 ## Still to come
 
-- `Parallel` and `Map` states, and the `Retry` and `Catch` those two take.
+- `Map` states, with `ItemsPath`, `ItemSelector` and `MaxConcurrency`.
 - The `.sync` pattern, task tokens and activities.
 - The context object, `$$`.
 - JSONata as a query language, and the `Assign` variables that go with it.

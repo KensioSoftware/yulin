@@ -1,4 +1,5 @@
 import type { SimStatesAttempt } from "./execution/sim-states-attempt.js";
+import type { SimStatesChild } from "./execution/sim-states-child.js";
 import type { SimStatesExecutionStore } from "./execution/sim-states-execution-store.js";
 
 /**
@@ -35,11 +36,35 @@ export class SimStepFunctionsInspection {
   }
 
   /**
+   * Every branch of every `Parallel` state one execution ran.
+   *
+   * A branch runs states of its own, so what it did is reported here rather
+   * than among the states the execution around it visited. The branches are in
+   * the order they were started, and each says where among its siblings it
+   * was.
+   */
+  branches(executionArn: string): readonly SimStatesChild[] {
+    return this.#childrenOf(executionArn, "branch");
+  }
+
+  /**
    * Every execution of one state machine, most recently started first.
    */
   executionsOf(stateMachineArn: string): readonly string[] {
     return this.#executions
       .forStateMachine(stateMachineArn)
       .map((execution) => execution.arn);
+  }
+
+  /**
+   * The child runs of one kind that one execution made.
+   */
+  #childrenOf(
+    executionArn: string,
+    kind: SimStatesChild["kind"],
+  ): readonly SimStatesChild[] {
+    return (this.#executions.find(executionArn)?.children ?? []).filter(
+      (child) => child.kind === kind,
+    );
   }
 }

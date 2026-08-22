@@ -16,7 +16,18 @@ import { checkSimStatesTransitions } from "./sim-states-transitions.js";
 export function parseSimStatesDefinition(
   definition: string,
 ): SimStatesDefinition {
-  const document = readDocument(definition);
+  return parseSimStatesDefinitionDocument(readDocument(definition));
+}
+
+/**
+ * Read a definition from the JSON object it was written as.
+ *
+ * A `Parallel` state's branch is a definition of its own, written inside the
+ * one holding it, so a branch is read through here as well.
+ */
+export function parseSimStatesDefinitionDocument(
+  document: Record<string, JSONValue>,
+): SimStatesDefinition {
   const states = readStates(document);
   const startAt = document["StartAt"];
 

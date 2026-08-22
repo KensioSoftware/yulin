@@ -12,6 +12,11 @@ export interface SimStatesStateEntry {
 }
 
 /**
- * How the rest of the walk carries on from a state the clock held up.
+ * How the rest of the walk carries on from a state that held it up.
+ *
+ * A state that ended the walk rather than moving it on carries nothing, and
+ * the walk is over when this answers.
  */
-export type SimStatesWalkOn = (outcome: SimStatesNextOutcome) => Promise<void>;
+export type SimStatesWalkOn = (
+  outcome: SimStatesNextOutcome | undefined,
+) => Promise<void>;

@@ -20,18 +20,18 @@ import type { SimStatesRetrier } from "./sim-states-retrier.js";
 const jitterField = "JitterStrategy";
 
 /**
- * Read a `Task` state's `Retry`, refusing anything this cannot run.
+ * Read a state's `Retry`, refusing anything this cannot run.
  *
- * The retriers are read when the state machine is created, so a `Task` state
- * that runs is one whose intervals and attempt counts are already known to be
- * good. Answers with nothing where the state carries no `Retry`.
+ * The retriers are read when the state machine is created, so a state that
+ * runs is one whose intervals and attempt counts are already known to be good.
+ * Answers with nothing where the state carries no `Retry`.
  */
 export function parseSimStatesRetriers(
-  stateName: string,
+  named: string,
   state: Record<string, JSONValue>,
 ): readonly SimStatesRetrier[] | undefined {
-  return readSimStatesHandlers(stateName, state, "Retry", "retrier")?.map(
-    (entry) => readRetrier(stateName, entry),
+  return readSimStatesHandlers(named, state, "Retry", "retrier")?.map((entry) =>
+    readRetrier(named, entry),
   );
 }
 
@@ -39,14 +39,14 @@ export function parseSimStatesRetriers(
  * Read one retrier's `ErrorEquals` and the four fields that shape its wait.
  */
 function readRetrier(
-  stateName: string,
+  named: string,
   entry: SimStatesHandlerEntry,
 ): SimStatesRetrier {
   const { written } = entry;
 
   if (Object.hasOwn(written, jitterField)) {
     throw new SimStatesUnsimulatedInput(
-      `A retrier in the Task state ${stateName} carries ${jitterField}, ` +
+      `A retrier in the ${named} carries ${jitterField}, ` +
         "which this simulator does not run. Jitter makes the wait between " +
         "attempts vary, and a test advancing a clock over that wait needs it " +
         "not to.",
@@ -55,10 +55,10 @@ function readRetrier(
 
   return {
     ErrorEquals: entry.ErrorEquals,
-    ...wholeNumber(stateName, written, "IntervalSeconds", 1),
-    ...wholeNumber(stateName, written, "MaxDelaySeconds", 1),
-    ...wholeNumber(stateName, written, "MaxAttempts", 0),
-    ...backoffRate(stateName, written),
+    ...wholeNumber(named, written, "IntervalSeconds", 1),
+    ...wholeNumber(named, written, "MaxDelaySeconds", 1),
+    ...wholeNumber(named, written, "MaxAttempts", 0),
+    ...backoffRate(named, written),
   };
 }
 
@@ -66,7 +66,7 @@ function readRetrier(
  * Read one of the three whole-number fields, where the retrier carries it.
  */
 function wholeNumber(
-  stateName: string,
+  named: string,
   written: Record<string, JSONValue>,
   field: "IntervalSeconds" | "MaxDelaySeconds" | "MaxAttempts",
   least: number,
@@ -86,7 +86,7 @@ function wholeNumber(
     value > simStatesMaximumWaitSeconds
   ) {
     throw new SimStatesInvalidDefinition(
-      `A retrier in the Task state ${stateName} has a ${field} of ` +
+      `A retrier in the ${named} has a ${field} of ` +
         `${JSON.stringify(value)}. It is a whole number from ` +
         `${String(least)} to ${String(simStatesMaximumWaitSeconds)}.`,
     );
@@ -99,7 +99,7 @@ function wholeNumber(
  * Read `BackoffRate`, which multiplies the wait for each retry already taken.
  */
 function backoffRate(
-  stateName: string,
+  named: string,
   written: Record<string, JSONValue>,
 ): Record<string, number> {
   const value = written["BackoffRate"];
@@ -110,7 +110,7 @@ function backoffRate(
 
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
     throw new SimStatesInvalidDefinition(
-      `A retrier in the Task state ${stateName} has a BackoffRate of ` +
+      `A retrier in the ${named} has a BackoffRate of ` +
         `${JSON.stringify(value)}. It is at least 1, since a wait that ` +
         "shrank would retry faster the longer a failure went on.",
     );

@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 
 import { statesFlakyHandlerFactory } from "../../../test/stepfunctions/states-flaky-handler.factory.js";
-import { statesTaskExecutionFactory } from "../../../test/stepfunctions/states-task-execution.factory.js";
+import { statesExecutionFactory } from "../../../test/stepfunctions/states-execution.factory.js";
 import { statesTaskFunctionFactory } from "../../../test/stepfunctions/states-task-function.factory.js";
 import type { JSONObject } from "../../util/type-guard/json.js";
 import { SimAws } from "../aws/sim-aws.js";
@@ -35,14 +35,14 @@ describe("Simulated Step Functions Catch", () => {
    */
   async function runWorkflow(
     simAws: SimAws,
-    task: JSONObject,
+    state: JSONObject,
     input = '{"student":"Wei"}',
   ): Promise<{
     readonly described: SimDescribeExecutionCommandOutput;
     readonly executionArn: string;
   }> {
-    const executionArn = await statesTaskExecutionFactory.make(
-      { task, states: compensating, input },
+    const executionArn = await statesExecutionFactory.make(
+      { state, states: compensating, input },
       simAws,
     );
 
@@ -118,9 +118,9 @@ describe("Simulated Step Functions Catch", () => {
   it("catches a task whose retrier has run out of attempts", async () => {
     // Given a task that is retried once and caught after that.
     const simAws = await givenAFailingFunction();
-    const executionArn = await statesTaskExecutionFactory.make(
+    const executionArn = await statesExecutionFactory.make(
       {
-        task: {
+        state: {
           ...invokeCheck([{ ErrorEquals: ["States.ALL"], Next: "Compensate" }]),
           Retry: [
             {

@@ -8,11 +8,11 @@ import {
   SimStatesInvalidDefinition,
   SimStatesUnsimulatedInput,
 } from "../error/sim-step-functions.error.js";
-import { parseSimStatesCatchers } from "../retry/sim-states-catch-parse.js";
-import { parseSimStatesRetriers } from "../retry/sim-states-retry-parse.js";
+import { parseSimStatesErrorHandling } from "../retry/sim-states-error-handling.js";
 import { checkSimStatesTaskFields } from "../task/sim-states-task-fields.js";
 import { parseSimStatesTaskResource } from "../task/sim-states-task-resource.js";
 import { checkSimStatesWaitFields } from "../wait/sim-states-wait-fields.js";
+import { readSimStatesParallelState } from "./sim-states-parallel-parse.js";
 import {
   checkSimStatesRefusedFields,
   checkSimStatesTransitionFields,
@@ -67,6 +67,10 @@ export function parseSimStatesState(
     return readTaskState(name, state);
   }
 
+  if (type === "Parallel") {
+    return readSimStatesParallelState(name, state);
+  }
+
   if (type === "Wait") {
     checkSimStatesWaitFields(name, state);
   }
@@ -106,13 +110,9 @@ function readTaskState(
 ): SimStatesTaskState {
   checkSimStatesTaskFields(name, state);
 
-  const retriers = parseSimStatesRetriers(name, state);
-  const catchers = parseSimStatesCatchers(name, state);
-
   return {
     ...(state as unknown as SimStatesTaskState),
     target: parseSimStatesTaskResource(name, state),
-    ...(retriers !== undefined && { Retry: retriers }),
-    ...(catchers !== undefined && { Catch: catchers }),
+    ...parseSimStatesErrorHandling(`Task state ${name}`, state),
   };
 }

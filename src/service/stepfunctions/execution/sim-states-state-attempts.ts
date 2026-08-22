@@ -7,6 +7,8 @@ import type { SimStatesSettlement } from "./sim-states-settlement.js";
 import type { SimStatesStateRunner } from "./sim-states-state-runner.js";
 import type {
   SimStatesNextOutcome,
+  SimStatesSettledOutcome,
+  SimStatesStateOutcome,
   SimStatesWaitOutcome,
 } from "./sim-states-state-outcome.js";
 import type {
@@ -34,10 +36,11 @@ interface SimStatesStateAttemptsProperties {
  * Runs the attempts one state takes, and puts the ones it waits for on the
  * clock.
  *
- * A `Wait` state and a `Retry` both hold the execution `RUNNING` until an
- * instant, and both carry on from where they left off once the clock gets
- * there. That is one job, and it is this one. The interpreter is left walking
- * states.
+ * A `Wait` state and a `Retry` both hold the walk `RUNNING` until an instant,
+ * and both carry on from where they left off once the clock gets there. A
+ * `Parallel` state waits for its branches instead of for an instant, and
+ * carries on the same way. That is one job, and it is this one. The
+ * interpreter is left walking states.
  */
 export class SimStatesStateAttempts {
   readonly #settlement: SimStatesSettlement;
@@ -53,11 +56,10 @@ export class SimStatesStateAttempts {
   }
 
   /**
-   * Run one state until it moves the walk on, ends the execution, or leaves it
-   * waiting on the clock.
+   * Run one state until it moves the walk on, ends it, or leaves it waiting.
    *
    * Answers with the outcome the walk carries on from, and with nothing where
-   * the execution has ended or is waiting.
+   * the walk has ended or is waiting.
    */
   async run(
     entry: SimStatesStateEntry,
@@ -69,51 +71,72 @@ export class SimStatesStateAttempts {
   }
 
   /**
-   * Run the attempts a state has left, from the one it is up to.
-   *
-   * An attempt due at an instant the clock has already reached holds nothing
-   * up, so those run round this loop instead of through the scheduler.
+   * Make one attempt at a state, and see what the walk does about it.
    */
   async #from(
     entry: SimStatesStateEntry,
-    from: SimStatesAttemptState,
+    attempt: SimStatesAttemptState,
   ): Promise<SimStatesNextOutcome | undefined> {
-    let attempt = from;
+    const outcome = await this.#runner.run(entry, attempt, async (settled) => {
+      await this.#resumed(entry, attempt, settled);
+    });
 
-    for (;;) {
-      // One attempt at a time, since each one is only made because the one
-      // before it failed.
-      // oxlint-disable-next-line eslint/no-await-in-loop
-      const outcome = await this.#runner.run(
-        entry.state,
-        entry.input,
-        entry.name,
-        attempt,
-      );
-
-      if (outcome.kind === "wait") {
-        return this.#waited(outcome);
-      }
-
-      if (outcome.kind !== "retry") {
-        return this.#settlement.settle(outcome);
-      }
-
-      if (this.#reached(outcome.until)) {
-        attempt = outcome.attempt;
-        continue;
-      }
-
-      this.#pause(outcome.until, async () =>
-        this.#from(entry, outcome.attempt),
-      );
-
-      return undefined;
-    }
+    return await this.#took(entry, outcome);
   }
 
   /**
-   * Hold the execution until the clock reaches what a `Wait` state waits for.
+   * What the walk does about one attempt's outcome.
+   *
+   * An attempt due at an instant the clock has already reached holds nothing
+   * up, so it is made from here rather than through the scheduler.
+   */
+  async #took(
+    entry: SimStatesStateEntry,
+    outcome: SimStatesStateOutcome,
+  ): Promise<SimStatesNextOutcome | undefined> {
+    if (outcome.kind === "pending") {
+      return undefined;
+    }
+
+    if (outcome.kind === "wait") {
+      return this.#waited(outcome);
+    }
+
+    if (outcome.kind !== "retry") {
+      return this.#settlement.settle(outcome);
+    }
+
+    if (this.#reached(outcome.until)) {
+      return await this.#from(entry, outcome.attempt);
+    }
+
+    this.#pause(outcome.until, async () => this.#from(entry, outcome.attempt));
+
+    return undefined;
+  }
+
+  /**
+   * Carry the walk on from a state that suspended, once it has finished.
+   *
+   * The walk stopped where the state was, so this takes it from there rather
+   * than answering something that is no longer waiting for one.
+   */
+  async #resumed(
+    entry: SimStatesStateEntry,
+    attempt: SimStatesAttemptState,
+    settled: SimStatesSettledOutcome,
+  ): Promise<void> {
+    if (this.#settlement.stopped) {
+      return;
+    }
+
+    const outcome = this.#runner.answered(entry, attempt, settled);
+
+    await this.#walkOn(await this.#took(entry, outcome));
+  }
+
+  /**
+   * Hold the walk until the clock reaches what a `Wait` state waits for.
    *
    * An instant already reached holds nothing up, and the walk carries straight
    * on. Under a frozen clock anything later waits for as long as the test
@@ -135,15 +158,16 @@ export class SimStatesStateAttempts {
    * Put the rest of one state's work on the clock, and the walk after it.
    *
    * One advance covering a whole backoff runs every attempt in it, because
-   * work this schedules is itself due by the time the advance reaches it.
+   * work this schedules is itself due by the time the advance reaches it. A
+   * walk that was abandoned while it waited runs none of it.
    */
   #pause(until: Date, rest: SimStatesPausedWork): void {
     this.#background.scheduleAt(until, async () => {
-      const carrying = await rest();
-
-      if (carrying !== undefined) {
-        await this.#walkOn(carrying);
+      if (this.#settlement.stopped) {
+        return;
       }
+
+      await this.#walkOn(await rest());
     });
   }
 

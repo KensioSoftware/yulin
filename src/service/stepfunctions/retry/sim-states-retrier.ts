@@ -1,5 +1,5 @@
 /**
- * One entry in a `Task` state's `Retry`.
+ * One entry in a state's `Retry`.
  *
  * The four fields that shape the wait are optional, and the defaults below are
  * the ones Amazon States Language gives them.
