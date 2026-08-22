@@ -167,8 +167,8 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
   });
 
   it("records the properties it deployed the state machine without", async () => {
-    // Given a template asking for logging, tracing and tags, none of which
-    // this simulation gives a state machine any behaviour for.
+    // Given a template asking for tags, logging, tracing and encryption, none
+    // of which this simulation gives a state machine any behaviour for.
     const simAws = new SimAws();
 
     // When it is deployed.
@@ -178,8 +178,10 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
         StateMachineName: "Enrolment",
         RoleArn: roleArn,
         DefinitionString: JSON.stringify(passChain),
-        TracingConfiguration: { Enabled: true },
         Tags: [{ Key: "team", Value: "enrolment" }],
+        LoggingConfiguration: { Level: "ALL" },
+        TracingConfiguration: { Enabled: true },
+        EncryptionConfiguration: { Type: "AWS_OWNED_KEY" },
       }),
     });
     await stack.waitForDeployComplete();
@@ -194,7 +196,10 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
     const ignoredPaths = stack.ignoredProperties.map(
       (property) => property.path,
     );
-    assertIdentical(ignoredPaths.join(", "), "Tags, TracingConfiguration");
+    assertIdentical(
+      ignoredPaths.join(", "),
+      "Tags, LoggingConfiguration, TracingConfiguration, EncryptionConfiguration",
+    );
   });
 
   it("deletes the state machine when the stack is deleted", async () => {

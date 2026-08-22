@@ -305,8 +305,10 @@ console.log(started.executionArn);
 ## Deploying one from CloudFormation
 
 A template declaring `AWS::StepFunctions::StateMachine` creates a state machine. It goes through the
-ordinary `CreateStateMachine` command. A template and an SDK caller reach the same state machine, and
-a definition this simulator will not run is refused in the same words either way.
+ordinary `CreateStateMachine` command, and a template and an SDK caller reach the same state machine.
+A definition Amazon States Language itself refuses fails the Resource, in the words
+`CreateStateMachine` refuses it in. A definition this simulator has no implementation for takes the
+skip described at the end of this section.
 
 CDK synthesizes the Resource from `stepfunctions.StateMachine`. Deploy the synthesized assembly and
 the workflow is there to start an execution against.
