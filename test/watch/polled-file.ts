@@ -1,7 +1,9 @@
+import { rename } from "node:fs/promises";
 import { SimWatchFilePoll } from "../../src/watch/sim-watch-file-poll.js";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
 
 const fileName = "Site.template.json";
+const pendingName = "Site.template.json.pending";
 
 /**
  * A real file with a real read on it.
@@ -49,15 +51,24 @@ export class PolledFile {
   }
 
   /**
-   * Save the file.
+   * Save the file, in one move.
    *
    * Every save is a different length. A read comparing what the file looks like
    * has that to go on wherever the timestamps behind it are coarser than the
    * gap between two saves.
+   *
+   * The bytes go to a file beside it and are renamed over it, the way an editor
+   * saves. Writing in place empties the file and fills it a moment later, and a
+   * read landing between the two finds two changes in the one save.
    */
   async write(): Promise<void> {
     this.saves++;
-    await this.directory.writeFile(fileName, "save".repeat(this.saves));
+    await this.directory.writeFile(pendingName, "save".repeat(this.saves));
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
+    await rename(
+      this.directory.join(pendingName),
+      this.directory.join(fileName),
+    );
   }
 
   /**
@@ -127,6 +138,26 @@ export class PolledFile {
       await this.pause(20);
     }
 
+    await this.quiet();
     this.changed = 0;
+  }
+
+  /**
+   * Wait for the read to catch up with the saves that started it.
+   *
+   * The loop above saves faster than the read looks. The look that reports a
+   * save can be one taken before the last of them, leaving a save for the look
+   * after it to find. That one arrives in the middle of the test, as a change
+   * the test did nothing to cause. Waiting for the count to hold still leaves
+   * the read level with the file.
+   */
+  private async quiet(): Promise<void> {
+    let seen = -1;
+
+    while (seen !== this.changed) {
+      seen = this.changed;
+      // oxlint-disable-next-line no-await-in-loop -- waiting on a real read
+      await this.pause(300);
+    }
   }
 }
