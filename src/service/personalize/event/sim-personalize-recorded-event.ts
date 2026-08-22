@@ -62,7 +62,11 @@ export class SimPersonalizeRecordedEvent {
 
   public readonly recommendationId: string | undefined;
 
-  /** The items shown to the user, where the request recorded impressions. */
+  /**
+   * The items shown to the user, where the request recorded impressions.
+   *
+   * Copied on the way in, as `sentAt` is. The SDK takes a mutable array here.
+   */
   public readonly impression: readonly string[] | undefined;
 
   constructor(properties: SimPersonalizeRecordedEventProperties) {
@@ -75,8 +79,11 @@ export class SimPersonalizeRecordedEvent {
     this.eventValue = properties.eventValue;
     this.itemId = properties.itemId;
     this.properties = properties.properties;
-    this.sentAt = properties.sentAt;
+    this.sentAt = new Date(properties.sentAt);
     this.recommendationId = properties.recommendationId;
-    this.impression = properties.impression;
+    this.impression =
+      properties.impression === undefined
+        ? undefined
+        : [...properties.impression];
   }
 }

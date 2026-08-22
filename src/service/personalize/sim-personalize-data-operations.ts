@@ -28,7 +28,7 @@ export interface SimPersonalizeProperties {
  * control plane.
  *
  * The rest of the control plane is on `SimPersonalizeControlPlane`, which
- * extends this. The two are split because one class carrying all twenty-six
+ * extends this. The two are split because one class carrying all twenty-seven
  * operations is a list and nothing else, and because a file has a line limit.
  */
 export abstract class SimPersonalizeDataOperations {

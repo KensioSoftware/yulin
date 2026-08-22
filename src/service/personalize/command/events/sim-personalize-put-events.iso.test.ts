@@ -182,6 +182,35 @@ describe("Personalize PutEvents", () => {
     assertIdentical(event.sessionId, "session-1");
   });
 
+  it("keeps what it recorded when the caller reuses the values it sent", async () => {
+    // Given a request built from a Date and an impression list the caller
+    // holds on to.
+    const simAws = new SimAws();
+    const trackingId = await givenAnEventTracker(simAws);
+    const sentAt = new Date("2026-03-04T10:00:00.000Z");
+    const impression = ["entry-1042", "entry-2071"];
+
+    await simAws.personalizeEvents().putEvents(
+      new PutEventsCommand({
+        trackingId,
+        sessionId: "session-1",
+        eventList: [
+          { eventType: "view", itemId: "entry-1042", sentAt, impression },
+        ],
+      }),
+    );
+
+    // When the caller reuses both of them for the next interaction.
+    sentAt.setFullYear(2030);
+    impression.push("entry-3388");
+
+    // Then the recorded interaction still reads as it was sent.
+    const [event] = simAws.personalize().recordedEvents();
+    assertNonNullable(event);
+    assertIdentical(event.sentAt.toISOString(), "2026-03-04T10:00:00.000Z");
+    assertArrayEquals(event.impression ?? [], ["entry-1042", "entry-2071"]);
+  });
+
   it("refuses a tracking ID no tracker holds", async () => {
     // Given an event tracker, and a tracking ID that is not its own.
     const simAws = new SimAws();

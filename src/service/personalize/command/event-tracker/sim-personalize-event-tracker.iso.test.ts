@@ -9,10 +9,12 @@ import {
 import {
   assertArrayEquals,
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -186,6 +188,46 @@ describe("Personalize ListEventTrackers", () => {
 
     // Then both come back.
     assertArrayLength(listed.eventTrackers ?? [], 2);
+  });
+
+  it("pages through the trackers and leaves the tracking ID out", async () => {
+    // Given three dataset groups with a tracker each.
+    const simAws = new SimAws();
+    await Promise.all(
+      ["catalogue", "storefront", "lessons"].map(async (name) => {
+        const datasetGroupArn = await givenADatasetGroup(simAws, name);
+
+        await simAws.personalize().createEventTracker(
+          new CreateEventTrackerCommand({
+            name: `${name}-events`,
+            datasetGroupArn,
+          }),
+        );
+      }),
+    );
+
+    // When they are listed two at a time.
+    const first = await simAws
+      .personalize()
+      .listEventTrackers(new ListEventTrackersCommand({ maxResults: 2 }));
+    const second = await simAws.personalize().listEventTrackers(
+      new ListEventTrackersCommand({
+        maxResults: 2,
+        nextToken: first.nextToken,
+      }),
+    );
+
+    // Then the two pages carry the three between them, and the second one ends
+    // the listing.
+    assertArrayLength(first.eventTrackers ?? [], 2);
+    assertArrayLength(second.eventTrackers ?? [], 1);
+    assertUndefined(second.nextToken);
+
+    // And a summary reports no tracking ID. Real Personalize reports one from
+    // Describe alone.
+    const [summary] = first.eventTrackers ?? [];
+    assertNonNullable(summary);
+    assertFalse("trackingId" in summary);
   });
 });
 

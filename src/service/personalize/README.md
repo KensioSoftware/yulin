@@ -23,7 +23,7 @@ use case a recipe names decides which parameters a recommendation request has to
   the runtime API, the rules declared against campaigns, and the accessors a test reads state back
   through.
 - `sim-personalize-control-plane.ts` and `sim-personalize-data-operations.ts` are the abstract
-  bases it extends, carrying the twenty-six control plane operations between them. The data
+  bases it extends, carrying the twenty-seven control plane operations between them. The data
   operations file holds dataset groups, schemas, datasets and event trackers along with the
   constructor, and the control plane file extends it with solutions, solution versions and
   campaigns. The split keeps `sim-personalize.ts` from being that list and nothing else, and it

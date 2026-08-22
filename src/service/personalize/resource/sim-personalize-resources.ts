@@ -49,5 +49,6 @@ export class SimPersonalizeResources {
   public readonly eventTrackers =
     new SimPersonalizeResourceStore<SimPersonalizeEventTracker>({
       description: "event tracker",
+      article: "An",
     });
 }

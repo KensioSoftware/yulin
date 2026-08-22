@@ -6,7 +6,7 @@ import { SimPersonalizeDataOperations } from "./sim-personalize-data-operations.
  * The operations of the Personalize control plane API that are about models.
  *
  * A solution names a recipe on a dataset group, a solution version stands for
- * the trained model, and a campaign deploys that version. These ten calls
+ * the trained model, and a campaign deploys that version. These eleven calls
  * build the chain a recommendation is served from, on top of the data
  * operations this extends.
  *

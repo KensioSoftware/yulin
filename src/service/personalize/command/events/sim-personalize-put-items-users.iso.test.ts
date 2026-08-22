@@ -195,6 +195,42 @@ describe("Personalize PutUsers", () => {
     assertStringIncludes(error.message, "PutUsers needs a USERS one");
   });
 
+  it("refuses more records than one request may carry", async () => {
+    // Given an Items dataset and a Users dataset.
+    const simAws = new SimAws();
+    const datasets = await givenTheThreeDatasets(simAws);
+
+    // When each operation batches eleven records.
+    const tooManyItems = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.personalizeEvents().putItems(
+          new PutItemsCommand({
+            datasetArn: datasets.items,
+            items: Array.from({ length: 11 }, (_, index) => ({
+              itemId: `entry-${String(index)}`,
+            })),
+          }),
+        ),
+    );
+    const tooManyUsers = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.personalizeEvents().putUsers(
+          new PutUsersCommand({
+            datasetArn: datasets.users,
+            users: Array.from({ length: 11 }, (_, index) => ({
+              userId: `visitor-${String(index)}`,
+            })),
+          }),
+        ),
+    );
+
+    // Then both are refused, as real Personalize refuses them at ten.
+    assertIdentical(tooManyItems.name, "InvalidInputException");
+    assertStringIncludes(tooManyItems.message, "items carries 11 records");
+    assertIdentical(tooManyUsers.name, "InvalidInputException");
+    assertStringIncludes(tooManyUsers.message, "users carries 11 records");
+  });
+
   it("refuses an empty batch", async () => {
     // Given a Users dataset.
     const simAws = new SimAws();
