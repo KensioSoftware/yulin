@@ -185,13 +185,15 @@ HTTP request behaviour is split across a few directories:
   `controller/root-object/` substitutes the default root object for a request to the Distribution
   root, before Behavior resolution so that everything downstream sees the object being served.
   `controller/error/` replaces an Origin error with the Distribution's response page, after the
-  Origin fetch and before the viewer-response CloudFront Function. The response page is fetched
-  through the same Behavior resolution and Origin fetching as any other request, so it can come from
-  an Origin of its own.
+  Origin fetch. The response page is fetched through the same Behavior resolution and Origin
+  fetching as any other request, so it can come from an Origin of its own.
   `controller/response-headers/` applies the Behavior's response headers policy, after the custom
-  error response and before the viewer-response CloudFront Function. That ordering is CloudFront's
-  own: an error page carries the policy's headers, and a function sees them in its event and can
-  change them.
+  error response and before the viewer-response event. That ordering is CloudFront's own. An error
+  page carries the policy's headers, and a viewer-response function that runs sees them in its event
+  and can change them.
+  The pipeline runs neither viewer-response applicator once the Origin has answered 400 or higher.
+  CloudFront restricts both kinds of edge function that way. The status the pipeline reads is the
+  Origin's, taken before the custom error response can replace it.
   `controller/web-acl/` puts the request through the Distribution's web ACL, first of all the stages
   and before Behavior resolution. CloudFront asks WAF ahead of every content-handling stage. A
   blocked request is answered with the web ACL's 403, and no Behavior, viewer-request function or

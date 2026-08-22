@@ -6,7 +6,7 @@ import {
   CreateDistributionCommand,
   CreateFunctionCommand,
 } from "@aws-sdk/client-cloudfront";
-import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { makeCffFunctionCodeInput } from "./function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
@@ -192,6 +192,14 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
     );
     await grantPublicObjectRead(simS3, "foobar-bucket");
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "foobar-bucket",
+        Key: "foobar/something.html",
+        ContentType: "text/html",
+        Body: "<h1>Something</h1>",
+      }),
+    );
 
     function viewerResponseHandlerFunction(
       event: CloudFrontFunction.ViewerResponseEvent,
@@ -246,12 +254,15 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     const distroId = distributionCreation.Distribution?.Id;
     assertNonNullable(distroId);
 
-    const redirectedResponse = await fetch(
+    // The Object has to be there for the Origin to answer below 400. A
+    // viewer-response CFF runs for an Origin error in neither CloudFront nor
+    // this simulation.
+    const servedResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/foobar/something.html`,
     );
-    assertIdentical(redirectedResponse.status, 404);
+    assertIdentical(servedResponse.status, 200);
     assertIdentical(
-      redirectedResponse.headers.get("x-changed-by"),
+      servedResponse.headers.get("x-changed-by"),
       "foobar handler",
     );
   });
