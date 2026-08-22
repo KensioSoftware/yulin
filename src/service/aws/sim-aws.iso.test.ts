@@ -113,6 +113,15 @@ describe("SimAws", () => {
     assertIdentical(simAws.account().region().personalizeEvents(), events);
   });
 
+  it("returns the same Firehose from every scope", () => {
+    const simAws = new SimAws();
+    const firehose = simAws.firehose();
+
+    assertIdentical(simAws.account().firehose(), firehose);
+    assertIdentical(simAws.region().firehose(), firehose);
+    assertIdentical(simAws.account().region().firehose(), firehose);
+  });
+
   it("returns the same Kinesis from every scope", () => {
     const simAws = new SimAws();
     const kinesis = simAws.kinesis();

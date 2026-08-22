@@ -99,6 +99,10 @@
       "import": "./dist/config/eslint/index.js",
       "types": "./dist/config/eslint/index.d.ts"
     },
+    "./firehose": {
+      "import": "./dist/service/firehose/index.js",
+      "types": "./dist/service/firehose/index.d.ts"
+    },
     "./eventbridge": {
       "import": "./dist/service/eventbridge/index.js",
       "types": "./dist/service/eventbridge/index.d.ts"
@@ -217,6 +221,7 @@
     "@aws-sdk/client-ecs": "^3.1101.0",
     "@aws-sdk/client-elastic-load-balancing-v2": "^3.1109.0",
     "@aws-sdk/client-eventbridge": "^3.1109.0",
+    "@aws-sdk/client-firehose": "^3.1115.0",
     "@aws-sdk/client-iam": "^3.1101.0",
     "@aws-sdk/client-kinesis": "^3.1115.0",
     "@aws-sdk/client-kms": "^3.1101.0",

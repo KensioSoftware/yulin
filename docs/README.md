@@ -19,6 +19,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [Elastic Load Balancing](./services/elbv2/ "Simulated Application Load Balancer usage docs")
 - [EventBridge](./services/eventbridge/ "Simulated EventBridge usage docs")
 - [IAM](./services/iam/ "Simulated IAM usage docs")
+- [Kinesis Data Firehose](./services/firehose/ "Simulated Kinesis Data Firehose usage docs")
 - [Kinesis Data Streams](./services/kinesis/ "Simulated Kinesis Data Streams usage docs")
 - [KMS](./services/kms/ "Simulated KMS usage docs")
 - [Lambda](./services/lambda/ "Simulated Lambda usage docs")

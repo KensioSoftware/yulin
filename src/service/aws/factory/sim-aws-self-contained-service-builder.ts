@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import { SimFirehose } from "../../firehose/index.js";
 import { SimKinesis } from "../../kinesis/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
@@ -48,6 +49,16 @@ export class SimAwsSelfContainedServiceBuilder {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return new SimDynamoDatabase(this.scoped(scope));
+  }
+
+  /**
+   * Create simulated Kinesis Data Firehose for an Account Region scope.
+   *
+   * Delivery streams are Region-scoped on real AWS, and a delivery stream
+   * writes into a Bucket through that same scope's simulated S3.
+   */
+  createFirehose(scope: SimAwsAccountRegionContainer): SimFirehose {
+    return new SimFirehose({ ...this.scoped(scope), s3: scope.s3() });
   }
 
   /**

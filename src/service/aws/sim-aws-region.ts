@@ -11,6 +11,7 @@ import type {
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimFirehose } from "../firehose/index.js";
 import type { SimKinesis } from "../kinesis/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
@@ -168,6 +169,13 @@ export class SimAwsRegion {
    */
   dynamoDbStreams(): SimDynamoDbStreams {
     return this.account().dynamoDbStreams();
+  }
+
+  /**
+   * Get simulated Kinesis Data Firehose for this Region's default Account.
+   */
+  firehose(): SimFirehose {
+    return this.account().firehose();
   }
 
   /**
