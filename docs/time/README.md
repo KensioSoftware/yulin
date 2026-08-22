@@ -149,8 +149,9 @@ and `scheduler().deliveryFailures`.
 Several parts of the simulator schedule work on the clock. Advancing time does more than change what
 timestamps and expiry checks see. A scheduled EventBridge rule fires, an EventBridge Scheduler
 schedule invokes its target, a DynamoDB item passes its time to live, a Secrets Manager deletion
-falls due, and a Lambda event source mapping polls again. Each of those runs at its own due instant
-inside the interval, in the order they fall due.
+falls due, a Step Functions execution moves on from a `Wait` state, and a Lambda event source
+mapping polls again. Each of those runs at its own due instant inside the interval, in the order
+they fall due.
 
 ## Time inside a simulated Lambda handler
 

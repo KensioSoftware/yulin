@@ -66,6 +66,32 @@ export class SimStatesIntrinsicFailure extends SimStepFunctionsError {
 }
 
 /**
+ * A `Choice` state none of whose rules matched, where it carries no `Default`.
+ */
+export class SimStatesNoChoiceMatched extends SimStepFunctionsError {
+  public override readonly name = "SimStatesNoChoiceMatched";
+
+  constructor(message: string) {
+    super(message, "States.NoChoiceMatched");
+  }
+}
+
+/**
+ * A state that could not run on the data it was given.
+ *
+ * A `Choice` rule comparing a field that is not there, or a `Wait` reading a
+ * duration from a path holding something else. Real Step Functions fails the
+ * execution with `States.Runtime` for both.
+ */
+export class SimStatesRuntimeFailure extends SimStepFunctionsError {
+  public override readonly name = "SimStatesRuntimeFailure";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
  * A state machine definition that Amazon States Language itself refuses.
  *
  * A malformed definition, a state type that does not exist, a transition to a

@@ -8,8 +8,8 @@ Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunc
 
 ## What runs today
 
-Three state types run. `Pass`, `Succeed` and `Fail`. A definition using any other is refused when the
-state machine is created, naming the state and its type. `Task`, `Choice`, `Wait`, `Parallel` and
+Five state types run. `Pass`, `Succeed`, `Fail`, `Choice` and `Wait`. A definition using any other
+is refused when the state machine is created, naming the state and its type. `Task`, `Parallel` and
 `Map` are on the way.
 
 The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
@@ -109,6 +109,154 @@ succeeded. Simulated EventBridge treats an undeliverable event the same way. An 
 as often the thing under test as it is a fault, and raising it would fail an unrelated `advanceBy`
 elsewhere in the same test.
 
+## Branching on the input
+
+A `Choice` state takes the first rule its input matches, and its `Default` where none of them do.
+
+```typescript sim-step-functions-choice
+/**
+ * Branching on an execution's data with a Choice state.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+    definition: JSON.stringify({
+      StartAt: "Eligible",
+      States: {
+        Eligible: {
+          Type: "Choice",
+          Choices: [
+            {
+              And: [
+                { Variable: "$.term", IsPresent: true },
+                { Variable: "$.term", NumericGreaterThanEquals: 2 },
+              ],
+              Next: "Enrol",
+            },
+          ],
+          Default: "Decline",
+        },
+        Enrol: { Type: "Pass", Result: { enrolled: true }, End: true },
+        Decline: { Type: "Fail", Error: "NotEligible" },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei", term: 3 }),
+  },
+});
+
+console.log(
+  simAws.stepFunctions().inspection().visitedStates(started.executionArn),
+); // [ 'Eligible', 'Enrol' ]
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.output); // {"enrolled":true}
+```
+
+The comparators are the ones Amazon States Language defines. Strings compare with `StringEquals`,
+`StringLessThan`, `StringGreaterThan`, `StringLessThanEquals`, `StringGreaterThanEquals` and
+`StringMatches`. The same five orderings appear under `Numeric` and under `Timestamp`, and a boolean
+compares with `BooleanEquals`. Every one of them has a `Path` twin, such as
+`NumericGreaterThanPath`, which takes a Reference Path and reads its operand from the state's own
+input. The data tests are `IsPresent`, `IsNull`, `IsBoolean`, `IsNumeric`, `IsString` and
+`IsTimestamp`. Rules combine with `And`, `Or` and `Not`.
+
+`StringMatches` takes `*` as a wildcard spanning any run of characters. A backslash escapes the
+character after it, so `Star\*` matches the literal name `Star*`.
+
+Two things fail an execution at a `Choice` state, both the way real Step Functions fails one:
+
+- A state matching no rule with no `Default` to fall back on fails with `States.NoChoiceMatched`.
+- A comparator whose `Variable` selects nothing fails with `States.Runtime`. Guard a field that may
+  be absent with `IsPresent` at the front of an `And`, as the example above does. The rules under an
+  `And` are tested in the order they were written and stop at the first one that fails. The data
+  tests answer for an absent field on their own.
+
+A comparison of two different types answers false. A `StringEquals` rule tested against a number
+falls through to the next rule. Timestamps are read as RFC3339 (`2026-07-26T09:00:00Z`), so a date
+on its own counts as a string.
+
+## Waiting on the clock
+
+A `Wait` state holds the execution until an instant on the simulation's clock. `StartExecution`
+answers with the execution `RUNNING`, and moving simulated time past the instant runs the rest of
+it.
+
+```typescript sim-step-functions-wait
+/**
+ * Holding an execution at a Wait state, then moving time past it.
+ */
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+    definition: JSON.stringify({
+      StartAt: "Settle",
+      States: {
+        Settle: { Type: "Wait", Seconds: 300, Next: "Confirm" },
+        Confirm: { Type: "Pass", Result: { confirmed: true }, End: true },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei" }),
+  },
+});
+
+const waiting = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(waiting.status); // RUNNING
+
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const settled = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(settled.status); // SUCCEEDED
+console.log(settled.stopDate); // 2026-07-26T09:05:00.000Z
+```
+
+Under a frozen clock the execution stays `RUNNING` for as long as the test leaves it there.
+Simulated time moves only when the test moves it, and a slow test holds the state it set up.
+
+A `Wait` state carries exactly one of `Seconds`, `SecondsPath`, `Timestamp` and `TimestampPath`. The
+two paths are read out of the state's input as it runs. A path holding something other than a whole
+number of seconds, or something other than an RFC3339 instant, fails the execution with
+`States.Runtime`. An instant already behind the clock lets the execution carry straight on.
+
+The execution stops at the instant it was waiting for, and `DescribeExecution` reports that as its
+`stopDate`. A failure after a wait is recorded on the execution, and `advanceBy` returns as it would
+for one that succeeded. [Simulated time](../../time/ "Simulated time docs") covers what else
+advancing the clock runs.
+
 ## Through an intercepted SDK client
 
 An `SFNClient` handed to `SimSdk` reaches the same simulated service:
@@ -173,18 +321,19 @@ A test asserting on the output of a state machine that used one could only asser
 
 ## Where this differs from real Step Functions
 
-- **`StartExecution` settles before it answers.** Real Step Functions answers before the execution
-  has run, and a caller there sees `RUNNING` first. An execution here has finished by the time the
-  caller reads it back. That spares every test a wait for work that is already done.
+- **`StartExecution` runs the execution as far as it goes before it answers.** Real Step Functions
+  answers before the execution has run, and a caller there sees `RUNNING` first. An execution here
+  with nothing to wait for has finished by the time the caller reads it back, and one held at a
+  `Wait` state reads as `RUNNING`. That spares every test a wait for work that is already done.
 - **An `EXPRESS` state machine runs the standard way.** The type is carried and read back, and
   `StartSyncExecution` is unsimulated.
 - **An unnamed execution is named by a counter.** Real Step Functions uses a UUID. A counter means a
   simulation answers the same way twice. The counter steps over any name a caller has already used.
-- **A running execution is not yet idempotent by name.** Real `StartExecution` answers a repeat of a
-  running Standard execution carrying the same name and input with that execution's own response.
-  Every execution here finishes before `StartExecution` answers, so there is never a running one to
-  match, and a repeated name raises `ExecutionAlreadyExists`. This arrives with the `Wait` state.
-  Reusing a name 90 days after an execution closes is unsimulated as well.
+- **A name is taken for good.** Real Step Functions frees an execution name 90 days after the
+  execution closes. A name here stays taken for the life of the simulation, which no test runs long
+  enough to notice. `StartExecution` is idempotent while an execution is still running, as it is on
+  AWS. A repeat carrying the same name and input answers with the execution already there, and one
+  carrying different input raises `ExecutionAlreadyExists`.
 - **A brace escape outside `States.Format` keeps its backslash.** A brace is a placeholder to
   `States.Format` alone, so `States.Format` is where `\{` is resolved. An escaped brace reaching
   another intrinsic arrives as it was written.
@@ -201,7 +350,7 @@ two and is what this follows.
 
 ## Still to come
 
-- `Task`, `Choice`, `Wait`, `Parallel` and `Map` states.
+- `Task`, `Parallel` and `Map` states.
 - `Retry` and `Catch`.
 - Service integrations, task tokens and activities.
 - `AWS::StepFunctions::StateMachine` CloudFormation resources.

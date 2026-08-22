@@ -1,10 +1,16 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { isRecord } from "../../../util/type-guard/record.js";
 import {
+  checkSimStatesChoiceDefault,
+  parseSimStatesChoices,
+} from "../choice/sim-states-choice-parse.js";
+import {
   SimStatesInvalidDefinition,
   SimStatesUnsimulatedInput,
 } from "../error/sim-step-functions.error.js";
+import { checkSimStatesWaitFields } from "../wait/sim-states-wait-fields.js";
 import {
+  type SimStatesChoiceState,
   type SimStatesState,
   simStatesRunnableTypes,
   simStatesStateTypes,
@@ -18,6 +24,10 @@ const stateFieldsRefused = new Map<string, readonly string[]>([
     ["InputPath", "OutputPath", "Parameters", "ResultPath", "ResultSelector"],
   ],
   ["Succeed", ["Parameters", "ResultPath", "ResultSelector"]],
+  // A Choice state and a Wait state produce no result of their own, so they
+  // carry the two paths and nothing that reshapes a result.
+  ["Choice", ["Parameters", "ResultPath", "ResultSelector"]],
+  ["Wait", ["Parameters", "ResultPath", "ResultSelector"]],
 ]);
 
 /**
@@ -54,7 +64,33 @@ export function parseSimStatesState(
   checkRefusedFields(name, type, state);
   checkTransitionFields(name, state);
 
+  if (type === "Choice") {
+    return readChoiceState(name, state);
+  }
+
+  if (type === "Wait") {
+    checkSimStatesWaitFields(name, state);
+  }
+
   return state as unknown as SimStatesState;
+}
+
+/**
+ * Read a `Choice` state, whose rules are checked and built as it is read.
+ *
+ * The rules become the objects the state tests its input with, so a `Choice`
+ * state that runs has already had its comparators, paths and operands read.
+ */
+function readChoiceState(
+  name: string,
+  state: Record<string, JSONValue>,
+): SimStatesChoiceState {
+  checkSimStatesChoiceDefault(name, state);
+
+  return {
+    ...(state as unknown as SimStatesChoiceState),
+    Choices: parseSimStatesChoices(name, state),
+  };
 }
 
 /**

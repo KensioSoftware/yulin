@@ -30,19 +30,29 @@ export class SimStatesExecutionStore {
   }
 
   /**
-   * Whether one state machine already has an execution of this name.
+   * One state machine's execution of a name, where it has one.
    *
-   * Real Step Functions refuses a second execution of the same name within 90
-   * days, which is what makes a name usable for idempotency.
+   * Real Step Functions keeps a name taken for 90 days after the execution
+   * closes, which is what makes a name usable for idempotency.
    */
-  hasName(stateMachineArn: string, name: string): boolean {
+  findByName(
+    stateMachineArn: string,
+    name: string,
+  ): SimStatesExecution | undefined {
     return this.#byArn
       .values()
-      .some(
+      .find(
         (execution) =>
           execution.stateMachineArn === stateMachineArn &&
           execution.name === name,
       );
+  }
+
+  /**
+   * Whether one state machine already has an execution of this name.
+   */
+  hasName(stateMachineArn: string, name: string): boolean {
+    return this.findByName(stateMachineArn, name) !== undefined;
   }
 
   /**

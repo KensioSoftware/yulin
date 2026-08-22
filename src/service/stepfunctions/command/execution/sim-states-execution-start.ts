@@ -1,6 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { SimStatesExecutionAlreadyExists } from "../../error/sim-step-functions.error.js";
 import { SimStatesExecution } from "../../execution/sim-states-execution.js";
 import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
 import { SimStatesInterpreter } from "../../execution/sim-states-interpreter.js";
@@ -12,6 +11,7 @@ import type {
   SimStartExecutionCommandOutput,
 } from "./execution.command.js";
 import { chooseSimStatesExecutionName } from "./sim-states-execution-name.js";
+import { answerSimStatesRepeatedStart } from "./sim-states-execution-repeat.js";
 import { readSimStatesExecutionInput } from "./sim-states-execution-view.js";
 
 interface SimStatesExecutionStartProperties {
@@ -65,10 +65,13 @@ export class SimStatesExecutionStart {
       name,
     );
 
-    if (this.#executions.hasName(stateMachine.arn, executionName)) {
-      throw new SimStatesExecutionAlreadyExists(
-        `${stateMachine.name} already has an execution called ${executionName}.`,
-      );
+    const already = this.#executions.findByName(
+      stateMachine.arn,
+      executionName,
+    );
+
+    if (already !== undefined) {
+      return answerSimStatesRepeatedStart(already, stateMachine.name, input);
     }
 
     const startDate = this.#background.now();

@@ -1,4 +1,5 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
+import type { SimStatesChoiceRule } from "../choice/sim-states-choice-rule.js";
 import type { SimStatesDataFlowFields } from "../data/sim-states-data-flow.js";
 
 /**
@@ -23,7 +24,13 @@ export type SimStatesStateType = (typeof simStatesStateTypes)[number];
 /**
  * The state types this simulator runs.
  */
-export const simStatesRunnableTypes = ["Pass", "Succeed", "Fail"] as const;
+export const simStatesRunnableTypes = [
+  "Pass",
+  "Succeed",
+  "Fail",
+  "Choice",
+  "Wait",
+] as const;
 
 export type SimStatesRunnableType = (typeof simStatesRunnableTypes)[number];
 
@@ -52,6 +59,37 @@ export interface SimStatesSucceedState extends SimStatesCommonState {
 }
 
 /**
+ * A `Choice` state, which picks where the execution goes by testing its input.
+ *
+ * A `Choice` state has no result of its own, so it carries the two paths and
+ * none of the other data-flow fields.
+ */
+export interface SimStatesChoiceState {
+  readonly Type: "Choice";
+  readonly Comment?: string;
+  readonly InputPath?: string | null;
+  readonly OutputPath?: string | null;
+  readonly Choices: readonly SimStatesChoiceRule[];
+  readonly Default?: string;
+}
+
+/**
+ * A `Wait` state, which holds the execution until an instant on the clock.
+ */
+export interface SimStatesWaitState {
+  readonly Type: "Wait";
+  readonly Comment?: string;
+  readonly InputPath?: string | null;
+  readonly OutputPath?: string | null;
+  readonly Next?: string;
+  readonly End?: boolean;
+  readonly Seconds?: number;
+  readonly SecondsPath?: string;
+  readonly Timestamp?: string;
+  readonly TimestampPath?: string;
+}
+
+/**
  * A `Fail` state, which ends an execution with an error.
  *
  * Real Step Functions gives `Fail` no input or output processing, so the
@@ -67,7 +105,9 @@ export interface SimStatesFailState {
 export type SimStatesState =
   | SimStatesPassState
   | SimStatesSucceedState
-  | SimStatesFailState;
+  | SimStatesFailState
+  | SimStatesChoiceState
+  | SimStatesWaitState;
 
 /**
  * Whether a state ends the execution when it is reached.
