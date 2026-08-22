@@ -55,6 +55,22 @@ export class SimKinesisSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "IncreaseStreamRetentionPeriodCommand",
+        async (command, context): Promise<unknown> =>
+          await simKinesis.increaseStreamRetentionPeriod(
+            command as simKinesisCommands.SimIncreaseStreamRetentionPeriodCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DecreaseStreamRetentionPeriodCommand",
+        async (command, context): Promise<unknown> =>
+          await simKinesis.decreaseStreamRetentionPeriod(
+            command as simKinesisCommands.SimDecreaseStreamRetentionPeriodCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "PutRecordCommand",
         async (command, context): Promise<unknown> =>
           await simKinesis.putRecord(

@@ -4,7 +4,6 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { CfnTemplateBodyRecord } from "../../../cloudformation/template/sim-cfn-template.js";
-import { simKinesisStreamFactory } from "../../../kinesis/stream/sim-kinesis-stream.factory.js";
 import type { SimLambdaKinesisStreamEvent } from "../../event-source/poll/kinesis/sim-lambda-kinesis-stream-event.types.js";
 
 const assumeRolePolicyDocument = {
@@ -19,20 +18,23 @@ const assumeRolePolicyDocument = {
 };
 
 /**
- * A template with a projector function whose role may read a stream, and a
+ * A template with a stream, a projector function whose role may read it, and a
  * mapping between them.
  *
- * The stream itself is made through the SDK rather than declared, because
- * `AWS::Kinesis::Stream` is a separate piece of work. The mapping names it by
- * the ARN it already has, which is what a template referring to a stream in
- * another stack does anyway.
+ * This is the shape a CDK `KinesisEventSource` synthesizes: the mapping and the
+ * grant both reach the stream by `Fn::GetAtt`, and that reference is also what
+ * makes them wait for it.
  *
  * The role's grant is split the way CDK's own `grantRead` splits it: the three
  * stream operations on the stream ARN, and `ListStreams` on every stream.
  */
-function projectorTemplate(streamArn: string): CfnTemplateBodyRecord {
+function projectorTemplate(): CfnTemplateBodyRecord {
   return {
     Resources: {
+      OrdersStream: {
+        Type: "AWS::Kinesis::Stream",
+        Properties: { Name: "orders", ShardCount: 2 },
+      },
       ProjectorRole: {
         Type: "AWS::IAM::Role",
         Properties: {
@@ -51,7 +53,7 @@ function projectorTemplate(streamArn: string): CfnTemplateBodyRecord {
                       "kinesis:GetRecords",
                       "kinesis:GetShardIterator",
                     ],
-                    Resource: streamArn,
+                    Resource: { "Fn::GetAtt": ["OrdersStream", "Arn"] },
                   },
                   {
                     Effect: "Allow",
@@ -74,7 +76,7 @@ function projectorTemplate(streamArn: string): CfnTemplateBodyRecord {
       OrderProjectorMapping: {
         Type: "AWS::Lambda::EventSourceMapping",
         Properties: {
-          EventSourceArn: streamArn,
+          EventSourceArn: { "Fn::GetAtt": ["OrdersStream", "Arn"] },
           FunctionName: { Ref: "ProjectorFunction" },
           BatchSize: 100,
           StartingPosition: "TRIM_HORIZON",
@@ -86,14 +88,13 @@ function projectorTemplate(streamArn: string): CfnTemplateBodyRecord {
 
 describe("deployed Kinesis stream event source mappings", () => {
   it("polls the stream a deployed mapping names", async () => {
-    // Given a stream, and a stack mapping it to a projector function.
+    // Given a stack declaring a stream and mapping it to a projector function.
     const simAws = new SimAws();
-    const stream = await simKinesisStreamFactory.make({}, simAws);
     const events: SimLambdaKinesisStreamEvent[] = [];
 
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
-      template: projectorTemplate(stream.arn),
+      template: projectorTemplate(),
       bindings: [
         {
           logicalId: "ProjectorFunction",
@@ -122,7 +123,10 @@ describe("deployed Kinesis stream event source mappings", () => {
     assertArrayLength(events, 1);
     assertArrayLength(events[0].Records, 1);
     const record = events[0].Records[0];
-    assertIdentical(record.eventSourceARN, stream.arn);
+    assertIdentical(
+      record.eventSourceARN,
+      `arn:aws:kinesis:${simAws.defaultRegionName}:${simAws.defaultAccountId}:stream/orders`,
+    );
     assertIdentical(
       Buffer.from(record.kinesis.data, "base64").toString(),
       "order-1",

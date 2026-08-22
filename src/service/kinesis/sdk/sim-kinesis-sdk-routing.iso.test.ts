@@ -1,10 +1,12 @@
 import {
   CreateStreamCommand,
+  DecreaseStreamRetentionPeriodCommand,
   DeleteStreamCommand,
   DescribeStreamCommand,
   DescribeStreamSummaryCommand,
   GetRecordsCommand,
   GetShardIteratorCommand,
+  IncreaseStreamRetentionPeriodCommand,
   KinesisClient,
   ListStreamsCommand,
   PutRecordCommand,
@@ -140,7 +142,37 @@ describe("Kinesis SDK interception", () => {
 
     // Then every command this service simulates is named, and one it does not
     // is absent.
-    assertArrayLength(supported.supportedCommandNames(), 9);
+    assertArrayLength(supported.supportedCommandNames(), 11);
     assertUndefined(supported.route("RegisterStreamConsumerCommand"));
+  });
+
+  it("routes a retention change an intercepted client sends", async () => {
+    // Given an intercepted Kinesis SDK client holding one stream.
+    using simSdk = new SimSdk();
+    simSdk.intercept(KinesisClient);
+
+    const kinesis = new KinesisClient({ region: "eu-west-2" });
+    await kinesis.send(new CreateStreamCommand({ StreamName: "orders" }));
+
+    // When ordinary SDK code lengthens and then shortens how long the stream
+    // keeps a record.
+    await kinesis.send(
+      new IncreaseStreamRetentionPeriodCommand({
+        StreamName: "orders",
+        RetentionPeriodHours: 168,
+      }),
+    );
+    await kinesis.send(
+      new DecreaseStreamRetentionPeriodCommand({
+        StreamName: "orders",
+        RetentionPeriodHours: 48,
+      }),
+    );
+
+    // Then the stream reports what it was left set to.
+    const summary = await kinesis.send(
+      new DescribeStreamSummaryCommand({ StreamName: "orders" }),
+    );
+    assertIdentical(summary.StreamDescriptionSummary?.RetentionPeriodHours, 48);
   });
 });
