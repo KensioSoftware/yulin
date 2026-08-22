@@ -82,6 +82,67 @@ describe("sim Lambda in-process handler environment", () => {
     });
   });
 
+  it("gives a function declaring nothing the AWS runtime variables", async () => {
+    // Given a function with no Environment of its own.
+    const simAws = new SimAws();
+    const simLambda = simAws.lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => ({
+            region: process.env["AWS_REGION"],
+            functionName: process.env["AWS_LAMBDA_FUNCTION_NAME"],
+            accessKeyId: process.env["AWS_ACCESS_KEY_ID"],
+          })),
+        },
+      }),
+    );
+
+    // When it is invoked.
+    const result = await invoke(simLambda, "greeter");
+
+    // Then it runs with the AWS-provided runtime variables, as a real Lambda
+    // function does whether or not it declares any of its own. An SDK client
+    // built in the handler resolves its Region from them.
+    assertObjectEquals(result, {
+      region: simAws.defaultRegionName,
+      functionName: "greeter",
+      accessKeyId: "ASIAYULINSIMULATED00",
+    });
+  });
+
+  it("reads a host variable set between two invocations", async () => {
+    // Given a function declaring nothing, invoked once already.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => ({
+            late: process.env["YULIN_TEST_LATE"] ?? null,
+          })),
+        },
+      }),
+    );
+    assertObjectEquals(await invoke(simLambda, "greeter"), { late: null });
+
+    // When the test process sets a variable and invokes it again.
+    process.env["YULIN_TEST_LATE"] = "late value";
+
+    try {
+      const result = await invoke(simLambda, "greeter");
+
+      // Then the handler reads what the test process set now, rather than
+      // the host environment as it stood at the first invocation.
+      assertObjectEquals(result, { late: "late value" });
+    } finally {
+      delete process.env["YULIN_TEST_LATE"];
+    }
+  });
+
   it("hides host process variables the function does not declare", async () => {
     // Given a variable set on the host process running the tests.
     process.env["YULIN_TEST_HOST_ONLY"] = "host value";

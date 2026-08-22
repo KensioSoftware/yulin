@@ -2594,10 +2594,16 @@ if (invokeOutput.Payload === undefined) throw new Error("No invoke Payload");
 console.log(Buffer.from(invokeOutput.Payload).toString());
 ```
 
-Each function gets only the variables it declares. Variables that happen to be set in the process
-running your tests stay invisible to it, and a function cannot accidentally pass because your
-shell or CI environment had the right variable set. Two functions declaring the same variable name
-with different values each see their own, including when their invocations overlap.
+A function that declares variables gets only those and the AWS-provided ones. Variables that happen
+to be set in the process running your tests stay invisible to it, and a function cannot accidentally
+pass because your shell or CI environment had the right variable set. Two functions declaring the
+same variable name with different values each see their own, including when their invocations
+overlap.
+
+A function that declares none is the exception, and keeps reading the test process's environment
+with the AWS-provided variables laid over it. That is where the configuration of an in-process
+handler comes from when nothing declares it. Declaring the variables on the function keeps the test
+explicit about where they came from.
 
 The same applies to zip-packaged code in the vm runtime and to functions deployed from an
 `AWS::Lambda::Function` template with an `Environment` property, including ones backed by an

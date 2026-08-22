@@ -248,9 +248,17 @@ current invocation's variables while one is set, and to the untouched host envir
 otherwise. The store follows the invocation across `await` points and keeps concurrent invocations
 apart, which swapping and restoring `process.env` around the handler call could not.
 
+Every invocation of an in-process handler runs with the AWS-provided runtime variables, whatever the
+function declared, because a real Lambda invocation always has them and an AWS SDK client built in
+the handler reads its Region and its credentials from them. A function declaring nothing of its own
+keeps the host process environment underneath them, read per invocation
+(`SimLambdaEnvironment.runVariables`). Taking that away would take away everything the test process
+set, which is where an in-process handler's configuration comes from when the function declares
+none. A function declaring variables runs with only its own, as a deployed one does.
+
 This is the only place the simulator patches a process global, so it is deliberately narrow. The
-patch is only installed when a function, or a simulated ECS container, actually declares variables,
-it is inert whenever no invocation is running, and it is never removed, since removing it would be unsafe while another
+patch is installed on the first invocation that needs it, it is inert whenever no invocation is
+running, and it is never removed, since removing it would be unsafe while another
 invocation is in flight and buys nothing. It lives under `util/` rather than here because simulated
 ECS applies a container's environment variables through the same object: two patches would each
 install a getter, and the second would capture whatever the first was reporting as its host

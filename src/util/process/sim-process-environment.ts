@@ -51,6 +51,26 @@ class SimProcessEnvironment {
   }
 
   /**
+   * The host process environment in the shape a run's variables are held in.
+   *
+   * A run's store holds string values only, which is what process.env holds
+   * once Node.js has read it. The declared type allows undefined, so the
+   * names holding one are dropped rather than carried into a run as the
+   * string "undefined".
+   */
+  definedHostVariables(): Record<string, string> {
+    const defined: [string, string][] = [];
+
+    for (const [name, value] of Object.entries(this.hostEnvironment)) {
+      if (value !== undefined) {
+        defined.push([name, value]);
+      }
+    }
+
+    return Object.fromEntries(defined);
+  }
+
+  /**
    * Redefine process.env as an accessor backed by the run store.
    *
    * process.env is a plain configurable data property on process, so it can
