@@ -35,12 +35,19 @@ export const firehoseDeliveryActions: readonly string[] = [
 ];
 
 /**
- * What a delivery fixture leaves a test holding.
+ * A Bucket and a Role allowed to write into it, which is what a delivery
+ * stream needs before it can deliver anything.
  */
-export interface FirehoseDelivery {
-  readonly deliveryStream: SimFirehoseDeliveryStream;
+export interface FirehoseDeliveryDestination {
   readonly bucketName: string;
   readonly roleArn: string;
+}
+
+/**
+ * What a delivery fixture leaves a test holding.
+ */
+export interface FirehoseDelivery extends FirehoseDeliveryDestination {
+  readonly deliveryStream: SimFirehoseDeliveryStream;
 }
 
 interface FirehoseDeliveryOptions {
@@ -52,16 +59,18 @@ interface FirehoseDeliveryOptions {
 }
 
 /**
- * Make a Bucket, a delivery Role and a delivery stream writing into the one as
- * the other.
+ * Make a Bucket and a delivery Role allowed to write into it.
  *
  * The Role is allowed the actions real Firehose asks a delivery Role for.
  * Narrowing them is how a test checks what a Role that cannot write does.
+ *
+ * This is the half a delivery stream reading a Kinesis stream needs as well,
+ * which is why it is on its own.
  */
-export async function makeFirehoseDelivery(
+export async function makeFirehoseDeliveryDestination(
   simAws: SimAws,
   options: FirehoseDeliveryOptions = {},
-): Promise<FirehoseDelivery> {
+): Promise<FirehoseDeliveryDestination> {
   const bucketName = options.bucketName ?? "order-archive";
 
   await simAws
@@ -80,10 +89,26 @@ export async function makeFirehoseDelivery(
 
   assertDefined(role.Arn, "Simulated IAM created a Role with no ARN");
 
+  return { bucketName, roleArn: role.Arn };
+}
+
+/**
+ * Make a Bucket, a delivery Role and a delivery stream writing into the one as
+ * the other.
+ */
+export async function makeFirehoseDelivery(
+  simAws: SimAws,
+  options: FirehoseDeliveryOptions = {},
+): Promise<FirehoseDelivery> {
+  const { bucketName, roleArn } = await makeFirehoseDeliveryDestination(
+    simAws,
+    options,
+  );
+
   const deliveryStream = await simFirehoseDeliveryStreamFactory.make(
     {
       bucketName,
-      roleArn: role.Arn,
+      roleArn,
       prefix: options.prefix ?? "",
       intervalInSeconds: options.intervalInSeconds ?? 60,
       sizeInMegabytes: options.sizeInMegabytes ?? 5,
@@ -91,7 +116,7 @@ export async function makeFirehoseDelivery(
     simAws,
   );
 
-  return { deliveryStream, bucketName, roleArn: role.Arn };
+  return { deliveryStream, bucketName, roleArn };
 }
 
 /**

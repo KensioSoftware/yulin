@@ -1,4 +1,5 @@
 import type { SimFirehoseDelivery } from "../../delivery/sim-firehose-delivery.js";
+import type { SimFirehoseSourceReading } from "../../source/read/sim-firehose-source-reading.js";
 import type { SimFirehoseDeliveryStreamStore } from "../../stream/sim-firehose-delivery-stream-store.js";
 import type { SimFirehoseDeliveryStreamAccess } from "../sim-firehose-delivery-stream-access.js";
 import type { SimFirehoseRequestOptions } from "../sim-firehose-request-options.js";
@@ -23,6 +24,7 @@ interface SimFirehoseStreamCommandsProperties {
   readonly deliveryStreams: SimFirehoseDeliveryStreamStore;
   readonly access: SimFirehoseDeliveryStreamAccess;
   readonly delivery: SimFirehoseDelivery;
+  readonly sourceReading: SimFirehoseSourceReading;
 }
 
 /**
@@ -32,11 +34,13 @@ export class SimFirehoseStreamCommands {
   private readonly deliveryStreams: SimFirehoseDeliveryStreamStore;
   private readonly access: SimFirehoseDeliveryStreamAccess;
   private readonly delivery: SimFirehoseDelivery;
+  private readonly sourceReading: SimFirehoseSourceReading;
 
   constructor(properties: SimFirehoseStreamCommandsProperties) {
     this.deliveryStreams = properties.deliveryStreams;
     this.access = properties.access;
     this.delivery = properties.delivery;
+    this.sourceReading = properties.sourceReading;
   }
 
   /**
@@ -46,9 +50,8 @@ export class SimFirehoseStreamCommands {
    * authorizes against every delivery stream in the Account and Region and does
    * not filter the list by what the caller can reach.
    *
-   * `DeliveryStreamType` filters the list on real Firehose. `DirectPut` is the
-   * only type a simulated delivery stream has, so asking for
-   * `KinesisStreamAsSource` lists nothing.
+   * `DeliveryStreamType` filters the list on real Firehose, and it filters
+   * here on the type each delivery stream was created with.
    */
   listDeliveryStreams(
     command: SimListDeliveryStreamsCommand,
@@ -100,6 +103,9 @@ export class SimFirehoseStreamCommands {
    * Whatever it was holding goes with it. Real Firehose delivers the buffer
    * first, and an Object landing after the delivery stream naming it has gone
    * is nothing a test could expect.
+   *
+   * A delivery stream reading a Kinesis stream stops reading it here. Its place
+   * on the stream goes with it, and records put afterwards stay on the stream.
    */
   deleteDeliveryStream(
     command: SimDeleteDeliveryStreamCommand,
@@ -111,6 +117,7 @@ export class SimFirehoseStreamCommands {
       options,
     );
 
+    this.sourceReading.forget(deliveryStream);
     this.delivery.forget(deliveryStream);
     this.deliveryStreams.remove(deliveryStream);
 

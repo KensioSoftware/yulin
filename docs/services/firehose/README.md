@@ -2,8 +2,9 @@
 
 Yulin includes a simulated Kinesis Data Firehose for tests and local development. A delivery stream
 takes records, buffers them, and writes them into a simulated S3 Bucket under the key format real
-Firehose uses. A test can put an event and assert on the Object it landed in, without an AWS account
-and without waiting five minutes for a buffer to flush.
+Firehose uses. The records come from `PutRecord` or off a simulated Kinesis stream. A test can put an
+event and assert on the Object it landed in, without an AWS account and without waiting five minutes
+for a buffer to flush.
 
 Firehose specific types are imported from the `@kensio/yulin/firehose` subpath.
 
@@ -236,6 +237,142 @@ since a delivery stream's configuration is fixed once it is created.
 Simulated time is what the date path and the timestamp come from. A test that sets the clock to a
 known instant knows the prefix its Objects are under, and can list them.
 
+## Reading from a Kinesis stream
+
+A delivery stream can take its records off a simulated Kinesis stream instead. Create it with a
+`DeliveryStreamType` of `KinesisStreamAsSource` and a `KinesisStreamSourceConfiguration` naming the
+stream and the Role to read it as. Records put on the stream from then on are buffered and delivered
+the way put records are.
+
+```typescript sim-firehose-kinesis-source
+/**
+ * An order event put on a Kinesis stream, and the Object the delivery stream
+ * reading that stream wrote it into.
+ */
+
+import { CreateDeliveryStreamCommand } from "@aws-sdk/client-firehose";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateStreamCommand,
+  DescribeStreamSummaryCommand,
+  PutRecordCommand,
+} from "@aws-sdk/client-kinesis";
+import { CreateBucketCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws
+  .s3()
+  .createBucket(new CreateBucketCommand({ Bucket: "order-archive" }));
+
+await simAws
+  .kinesis()
+  .createStream(
+    new CreateStreamCommand({ StreamName: "orders", ShardCount: 2 }),
+  );
+
+const { StreamDescriptionSummary } = await simAws
+  .kinesis()
+  .describeStreamSummary(
+    new DescribeStreamSummaryCommand({ StreamName: "orders" }),
+  );
+
+const { Role } = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderArchiveRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "firehose.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderArchiveRole",
+    PolicyName: "ArchiveOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "s3:PutObject",
+          Resource: "arn:aws:s3:::order-archive/*",
+        },
+        {
+          Effect: "Allow",
+          Action: [
+            "kinesis:DescribeStream",
+            "kinesis:GetShardIterator",
+            "kinesis:GetRecords",
+          ],
+          Resource: StreamDescriptionSummary.StreamARN,
+        },
+      ],
+    }),
+  }),
+);
+
+await simAws.firehose().createDeliveryStream(
+  new CreateDeliveryStreamCommand({
+    DeliveryStreamName: "order-events",
+    DeliveryStreamType: "KinesisStreamAsSource",
+    KinesisStreamSourceConfiguration: {
+      KinesisStreamARN: StreamDescriptionSummary.StreamARN,
+      RoleARN: Role.Arn,
+    },
+    ExtendedS3DestinationConfiguration: {
+      BucketARN: "arn:aws:s3:::order-archive",
+      RoleARN: Role.Arn,
+      BufferingHints: { IntervalInSeconds: 60 },
+    },
+  }),
+);
+
+const orderEvent = `${JSON.stringify({ id: "order-1" })}\n`;
+
+await simAws.kinesis().putRecord(
+  new PutRecordCommand({
+    StreamName: "orders",
+    PartitionKey: "order-1",
+    Data: new TextEncoder().encode(orderEvent),
+  }),
+);
+
+await simAws.clock().advanceBy({ seconds: 60 });
+
+const { Contents } = await simAws
+  .s3()
+  .listObjectsV2(new ListObjectsV2Command({ Bucket: "order-archive" }));
+
+// 1
+console.log(Contents?.length);
+```
+
+Every shard of the stream is read, so records spread across partition keys all arrive. The Object
+holds the record data as it was put on the stream. Firehose delivers those bytes and nothing else
+about the Kinesis record.
+
+Reading starts at the end of the stream when the delivery stream is created. Real Firehose starts
+there too. A record put before that stays on the stream for whatever else is reading it.
+
+The read happens on the clock. A record put on the stream is read when simulated time next moves, so
+one `advanceBy` past the buffering interval covers both halves. `simAws.backgroundTasksComplete()`
+does not move simulated time and leaves the record on the stream.
+
+`DescribeDeliveryStream` reports the stream, the Role and the instant reading started under
+`Source.KinesisStreamSourceDescription`. `PutRecord` and `PutRecordBatch` on a delivery stream with a
+Kinesis source raise `InvalidArgumentException`, as they do on real Firehose. Put the record onto the
+stream instead.
+
+Deleting the delivery stream stops it reading. Records put afterwards stay on the stream.
+
 ## Permissions
 
 Every Firehose operation authorizes against the `firehose:` action of the same name, on the ARN of
@@ -348,8 +485,14 @@ console.log(
 console.log(failure?.wasRefused);
 ```
 
+The source `RoleARN` is a second Role, and reading is authorized against it in the same way. A Role
+that cannot read the stream stops the delivery stream reading, and the failure goes to
+`getSourceFailures()`. There is one of those per delivery stream at most. The Role is refused every
+time it asks, and going round again would record the same refusal for as long as the simulation ran.
+
 A failure carries the delivery stream, the Bucket, the key it tried, how many records were in the
-buffer, the Role it wrote as and the error itself. `wasRefused` separates an IAM denial from a
+buffer, the Role it wrote as and the error itself. A source failure carries the delivery stream, the
+stream ARN, the Role it read as and the error. `wasRefused` separates an IAM denial from a
 delivery that broke some other way. A denial is recorded quietly, since removing `s3:PutObject` is
 what a test checking the denial does. Anything else is also warned about on the console.
 
@@ -466,8 +609,8 @@ console.log(Contents?.length);
 | `CreateDeliveryStream`   | A name already in use raises `ResourceInUseException`.                     |
 | `DeleteDeliveryStream`   | The name is free again at once. Whatever was buffered goes with it.        |
 | `ListDeliveryStreams`    | Sorted by name, paged with `Limit` and `ExclusiveStartDeliveryStreamName`. |
-| `DescribeDeliveryStream` | Reports the one destination as an `ExtendedS3DestinationDescription`.      |
-| `PutRecord`              | Records up to 1,000 KiB.                                                   |
+| `DescribeDeliveryStream` | Reports the one destination, and a Kinesis source under `Source`.          |
+| `PutRecord`              | Records up to 1,000 KiB. Refused on a Kinesis-sourced delivery stream.     |
 | `PutRecordBatch`         | Up to 500 records and 4 MiB. `FailedPutCount` is always zero.              |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`, which covers
@@ -486,9 +629,16 @@ operations.
   extended one wins where a request carries both. Either way the delivery stream describes back
   through `ExtendedS3DestinationDescription`, which is the shape carrying every field read here.
   `S3DestinationDescription` is always absent.
-- **`DirectPut` is the only source.** A `DeliveryStreamType` of `KinesisStreamAsSource` is refused,
-  along with any `KinesisStreamSourceConfiguration`. Reading a simulated Kinesis stream is
-  [issue 932](https://github.com/KensioSoftware/yulin/issues/932).
+- **`DirectPut` and `KinesisStreamAsSource` are the two sources.** Every other
+  `DeliveryStreamType`, such as `MSKAsSource` and `DatabaseAsSource`, is refused by name. A source
+  stream in another account or region is refused as well, since a simulated Firehose reads the
+  simulated Kinesis of its own scope.
+- **A source stream is read through `GetRecords`.** Enhanced fan-out is absent from simulated
+  Kinesis as well. `RetryOptions` on the destination is read and stored, and nothing here fails a
+  read in a way that would use it. A read that fails stops the delivery stream instead, and the
+  failure goes to `getSourceFailures()`.
+- **A source stream keeps the shards it was created with.** Simulated Kinesis does not reshard, so
+  the shards a delivery stream opens when it is created are the ones it reads for its life.
 - **`AWS::KinesisFirehose::DeliveryStream` is skipped on deploy.** It is a Resource type outside
   the simulation, so it is skipped and the rest of the stack deploys. Deploying one is
   [issue 933](https://github.com/KensioSoftware/yulin/issues/933).

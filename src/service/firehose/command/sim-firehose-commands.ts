@@ -7,6 +7,9 @@ import {
   type SimFirehoseObjectDestination,
   SimFirehoseObjectWriter,
 } from "../delivery/sim-firehose-object-writer.js";
+import type { SimFirehoseRecordSource } from "../source/sim-firehose-record-source.js";
+import type { SimFirehoseSourceFailures } from "../source/sim-firehose-source-failures.js";
+import { SimFirehoseSourceReading } from "../source/read/sim-firehose-source-reading.js";
 import type { SimFirehoseDeliveryStreamStore } from "../stream/sim-firehose-delivery-stream-store.js";
 import { SimFirehoseAuthorizer } from "./authorize/sim-firehose-authorizer.js";
 import { SimFirehosePutCommands } from "./record/sim-firehose-put-commands.js";
@@ -17,7 +20,9 @@ import { SimFirehoseStreamCommands } from "./stream/sim-firehose-stream-commands
 interface SimFirehoseCommandsProperties {
   readonly deliveryStreams: SimFirehoseDeliveryStreamStore;
   readonly failures: SimFirehoseDeliveryFailures;
+  readonly sourceFailures: SimFirehoseSourceFailures;
   readonly s3: SimFirehoseObjectDestination;
+  readonly kinesis: SimFirehoseRecordSource;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -51,16 +56,25 @@ export class SimFirehoseCommands {
       }),
     });
 
+    const sourceReading = new SimFirehoseSourceReading({
+      records: properties.kinesis,
+      failures: properties.sourceFailures,
+      delivery,
+      background,
+    });
+
     this.creation = new SimFirehoseCreateDeliveryStream({
       deliveryStreams,
       access,
       accountRegionScope,
       background,
+      sourceReading,
     });
     this.deliveryStreams = new SimFirehoseStreamCommands({
       deliveryStreams,
       access,
       delivery,
+      sourceReading,
     });
     this.puts = new SimFirehosePutCommands({ access, delivery });
   }
