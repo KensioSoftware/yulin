@@ -102,3 +102,36 @@ export class SimPersonalizeInvalidNextTokenException extends SimPersonalizeError
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated Personalize error for a request input this simulation does not
+ * model.
+ *
+ * This is not an error real Personalize has, and it is reported under the name
+ * real Personalize refuses bad input with. The input is refused rather than
+ * ignored, because an ignored input looks applied to the request that sent it
+ * and unapplied to everything else. A `filterArn` naming a filter that keeps
+ * out-of-stock items out is the case worth refusing: the recommendations would
+ * come back whole here and come back filtered on AWS.
+ */
+export class SimPersonalizeUnsimulatedInputException extends SimPersonalizeError {
+  public override readonly name = "InvalidInputException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Personalize error for a result declared against this simulation
+ * that it cannot answer with.
+ *
+ * This is a simulator configuration error rather than an AWS one, so it is
+ * raised where the declaration is made rather than where the recommendation is
+ * served. Recommendations declared against a campaign ARN nothing holds would
+ * otherwise sit there unanswered, and the test would read the empty item list
+ * as the system under test asking for the wrong item.
+ */
+export class SimPersonalizeDeclarationError extends SimPersonalizeError {
+  public override readonly name = "SimPersonalizeDeclarationError";
+}

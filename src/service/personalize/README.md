@@ -18,8 +18,16 @@ use case a recipe names decides which parameters a recommendation request has to
 
 ## Entry points
 
-- `sim-personalize.ts` is the main in-memory service object for one account/region scope. It is a
-  list of the operations Personalize answers, with the work delegated to the command groups.
+- `sim-personalize.ts` is the main in-memory service object for one account/region scope. It holds
+  the runtime API, the rules declared against campaigns, and the accessors a test reads state back
+  through.
+- `sim-personalize-control-plane.ts` is the abstract base it extends, carrying the twenty-two
+  control plane operations. The split keeps `sim-personalize.ts` from being that list and nothing
+  else, and it is the split AWS makes between the `personalize` endpoint and `personalize-runtime`.
+- `sim-personalize-runtime.ts` is the runtime API, reached through `simAws.personalizeRuntime()` or
+  through `runtime()` on the service. It is a second API over one service's state, in the way
+  simulated DynamoDB Streams is over simulated DynamoDB. The Account/Region scope builds no service
+  for it, and reaches it through the Personalize it already holds.
 - `index.ts` exports the public Personalize simulator API for `@kensio/yulin/personalize`.
 
 ## Resource model
@@ -55,6 +63,27 @@ only that it has no permission, and the existence of the resource stays hidden.
 `command/list/sim-personalize-page.ts` is shared by all six list operations. The pagination token is
 the index the next page starts at, where real Personalize hands out an opaque string.
 
+## Declared results
+
+The runtime API answers from rules held per campaign under `recommendation/`. That is the resource
+real Personalize answers a runtime call from. A campaign serves one solution version trained on one
+recipe, and two campaigns answer the same item differently.
+
+`SimDeclaredResultRules` in `util/rule/` does the matching, and simulated Rekognition matches images
+with it too. It holds a leading key, a trailing key and a default, matched exactly and in that
+order. Personalize puts the item id in the leading tier and the user id in the trailing one. That
+order follows the recipes. `aws-similar-items` requires an `itemId` and looks at no user, and the
+user personalization recipes require a `userId`.
+
+Rankings carry a user rule and a default, and no item rule. A ranking request names a user and the
+list to rank, and an item rule would be one nothing could match. A ranking no rule matches is
+answered from the request's own `inputList`. The default there starts as `undefined` to leave room
+for that case.
+
+A campaign is required to exist before anything is declared against it. An ARN no campaign is
+deployed at raises `SimPersonalizeDeclarationError`, which follows simulated Rekognition's
+`SimRekognitionDeclarationError`. The ARN would otherwise be a typo nothing reported.
+
 ## Deletion rules
 
 Real Personalize refuses to delete a resource other resources still depend on, and these do the
@@ -66,5 +95,5 @@ either.
 
 ## What comes next
 
-The runtime API, the events API, CloudFormation resource types and domain recommenders are all
-separate issues. Each of them builds on what is here.
+The events API, CloudFormation resource types and domain recommenders are all separate issues. Each
+of them builds on what is here.

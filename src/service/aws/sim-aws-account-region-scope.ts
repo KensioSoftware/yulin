@@ -17,7 +17,10 @@ import type { SimEcr } from "../ecr/index.js";
 import type { SimEcs } from "../ecs/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
-import type { SimPersonalize } from "../personalize/index.js";
+import type {
+  SimPersonalize,
+  SimPersonalizeRuntime,
+} from "../personalize/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
@@ -200,6 +203,17 @@ export class SimAwsAccountRegionContainer {
     return this.memo.getOrCreate("personalize", () =>
       this.factory.createPersonalize(this),
     );
+  }
+
+  /**
+   * Get the simulated Personalize Runtime API for this account and region.
+   *
+   * It is not made here, unlike the services around it. The campaigns it
+   * answers for are the ones this scope's Personalize holds, so it belongs to
+   * that service and is reached through it.
+   */
+  personalizeRuntime(): SimPersonalizeRuntime {
+    return this.personalize().runtime();
   }
 
   /** Get simulated Rekognition for this account and region. */

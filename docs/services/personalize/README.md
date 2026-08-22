@@ -71,6 +71,161 @@ A solution version ARN is the solution's with a version number on the end, count
 Personalize generates an opaque id there. This one counts so a test can write down the ARN it
 expects.
 
+## Recommendations from a campaign
+
+A campaign answers the runtime API from results declared against it. No model is fitted and no
+interaction history is held. A test says what one campaign recommends for one item, and the code
+under test makes the calls it would make against AWS.
+
+The two runtime operations live on `simAws.personalizeRuntime()`, and an intercepted
+`PersonalizeRuntimeClient` reaches the same place. They arrive from a separate SDK package
+(`@aws-sdk/client-personalize-runtime`), as they do on AWS.
+
+```typescript sim-personalize-recommendations
+/**
+ * Answering a related items request from declared recommendations.
+ */
+
+import {
+  CreateCampaignCommand,
+  CreateDatasetGroupCommand,
+  CreateSolutionCommand,
+  CreateSolutionVersionCommand,
+} from "@aws-sdk/client-personalize";
+import { GetRecommendationsCommand } from "@aws-sdk/client-personalize-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const group = await simAws
+  .personalize()
+  .createDatasetGroup(new CreateDatasetGroupCommand({ name: "catalogue" }));
+const solution = await simAws.personalize().createSolution(
+  new CreateSolutionCommand({
+    name: "related-entries",
+    datasetGroupArn: group.datasetGroupArn,
+    recipeArn: "arn:aws:personalize:::recipe/aws-similar-items",
+  }),
+);
+const version = await simAws
+  .personalize()
+  .createSolutionVersion(
+    new CreateSolutionVersionCommand({ solutionArn: solution.solutionArn }),
+  );
+const campaign = await simAws.personalize().createCampaign(
+  new CreateCampaignCommand({
+    name: "related-entries",
+    solutionVersionArn: version.solutionVersionArn,
+  }),
+);
+
+const campaignArn = campaign.campaignArn!;
+
+// What this campaign recommends for one entry.
+simAws
+  .personalize()
+  .recommendations(campaignArn)
+  .onItem("entry-1042", { itemIds: ["entry-2071", "entry-3388"] });
+
+const recommended = await simAws.personalizeRuntime().getRecommendations(
+  new GetRecommendationsCommand({
+    campaignArn,
+    itemId: "entry-1042",
+    numResults: 2,
+  }),
+);
+
+// entry-2071 entry-3388
+console.log(recommended.itemList?.map((item) => item.itemId).join(" "));
+```
+
+Results are declared per campaign, through `recommendations()` and `rankings()`. A campaign serves
+one solution version trained on one recipe, and two campaigns in a dataset group answer the same
+entry differently.
+
+An item rule is read first where the request carries an item, then a user rule, then the default.
+That order follows the recipes. `aws-similar-items` requires an `itemId` and looks at no user, and
+the user personalization recipes require a `userId`. Each request reaches the tier its own recipe
+would have used. Matching is exact, with no pattern syntax.
+
+`numResults` cuts a declared list to length. A request no rule matches gets the campaign's default,
+and an empty `itemList` where no default is declared.
+
+An item is declared as an id on its own, or as an id with a score for a test to assert on. The
+number comes from the declaration, and a rule that leaves it out answers with an item carrying no
+score.
+
+```typescript sim-personalize-recommendation-scores
+/**
+ * Declaring the scores a campaign reports with its recommendations.
+ */
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const campaignArn: string;
+
+simAws
+  .personalize()
+  .recommendations(campaignArn)
+  .onItem("entry-1042", {
+    itemIds: [
+      { itemId: "entry-2071", score: 0.62 },
+      { itemId: "entry-3388", score: 0.38 },
+    ],
+    recommendationId: "RID-related-entries",
+  });
+```
+
+### Rankings
+
+`GetPersonalizedRanking` carries the items in the request and asks for an order to put them in.
+Rules are declared against the user, because that is what a ranking request names.
+
+```typescript sim-personalize-rankings
+/**
+ * Ranking a list of entries for one user.
+ */
+
+import { GetPersonalizedRankingCommand } from "@aws-sdk/client-personalize-runtime";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const campaignArn: string;
+
+simAws
+  .personalize()
+  .rankings(campaignArn)
+  .onUser("user-77", { itemIds: ["entry-3", "entry-1", "entry-2"] });
+
+const ranked = await simAws.personalizeRuntime().getPersonalizedRanking(
+  new GetPersonalizedRankingCommand({
+    campaignArn,
+    userId: "user-77",
+    inputList: ["entry-1", "entry-2", "entry-3"],
+  }),
+);
+
+// entry-3 entry-1 entry-2
+console.log(ranked.personalizedRanking?.map((item) => item.itemId).join(" "));
+```
+
+A ranking no rule matches comes back as the `inputList` in the order it arrived, with scores that
+descend and sum to one across the list. A test that cares about the order declares a rule for it,
+and every other test gets a stable answer.
+
+A rule says exactly what comes back. Declaring two of the three items a request carries answers with
+those two, where real Personalize ranks everything it was given.
+
+### Declaring against a campaign
+
+The campaign has to exist first. `recommendations()` and `rankings()` raise
+`SimPersonalizeDeclarationError` for an ARN no campaign is deployed at. A typo is reported where it
+was typed. A runtime call naming one raises `ResourceNotFoundException`, as real Personalize
+Runtime does.
+
 ## Datasets and schemas
 
 A dataset belongs to a dataset group and has one of five types. The dataset ARN carries the group
@@ -205,12 +360,25 @@ Every command works through `simAws.personalize()` and through an intercepted `P
 Each one authorizes through simulated IAM, against the resource ARN where the request names one and
 against `*` on a create.
 
+The runtime API has `GetRecommendations` and `GetPersonalizedRanking`. Both work through
+`simAws.personalizeRuntime()` and through an intercepted `PersonalizeRuntimeClient`, and both
+authorize against the campaign ARN the request names.
+
 ## Divergences and limitations
 
 - **Training is skipped.** `CreateSolutionVersion` gives an `ACTIVE` version immediately. Real
   Personalize spends tens of minutes fitting a model and reports `CREATE PENDING` first.
-- **Recommendations come later.** `GetRecommendations` and `GetPersonalizedRanking` belong to the
-  Personalize Runtime API, which has its own issue.
+- **A recommendation is declared, never computed.** A campaign answers with the items a rule gives
+  it. A score comes from the declaration as well, and an item declared without one comes back
+  without one.
+- **A request no rule matches gets the default.** Real Personalize answers an `itemId` it does not
+  recognise with popular items, worked out from the interaction history. Simulated Personalize
+  holds no interactions. A request carrying an unknown item falls to the user rule where it names a
+  user and one is declared, then to the campaign's default, and then to an empty `itemList`.
+- **No filters.** `CreateFilter` takes an expression over item and interaction metadata that this
+  simulation leaves out by design. A runtime request naming a `filterArn` is refused by name.
+- **No `GetActionRecommendations`.** Actions are a dataset type with interactions of their own, and
+  the Next-Best-Action operations arrive with them.
 - **No events.** `PutEvents`, `PutItems`, `PutUsers` and event trackers arrive with the events API.
 - **No recommenders.** `CreateRecommender` and the ten domain use cases arrive with the domain
   path.
