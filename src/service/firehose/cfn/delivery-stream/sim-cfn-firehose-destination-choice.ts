@@ -11,16 +11,18 @@ import {
 } from "./sim-cfn-firehose-delivery-stream-property-names.js";
 
 /**
- * The destination a delivery stream Resource writes to.
+ * The destinations a delivery stream Resource declared.
  *
  * A destination outside the simulation is refused first, in the words
  * CreateDeliveryStream refuses it in, which is what skips the Resource. That is
  * the order the destination model works in too, so a template carrying both an
  * S3 destination and a Redshift one is refused rather than half deployed.
  *
- * The extended destination wins over the plain one, as it does on real
- * Firehose. A template declaring neither is left alone here, and
- * CreateDeliveryStream refuses it, as real CloudFormation refuses it.
+ * Both S3 destinations go through where a template declares both, and
+ * CreateDeliveryStream refuses the pair. Which destinations a delivery stream
+ * may have is decided in one place, by simulated Firehose, so the template door
+ * and the SDK door answer the same request the same way. A template declaring
+ * no destination goes through in the same way.
  */
 export function simCfnFirehoseDestination(
   resource: SimCfnResource,
@@ -39,29 +41,23 @@ export function simCfnFirehoseDestination(
   }
 
   const extended = properties.get(extendedS3DestinationPropertyName);
+  const plain = properties.get(s3DestinationPropertyName);
 
-  if (extended !== undefined) {
-    return {
+  return {
+    ...(extended !== undefined && {
       ExtendedS3DestinationConfiguration: read(
         resource,
         extendedS3DestinationPropertyName,
         extended,
       ),
-    };
-  }
-
-  const plain = properties.get(s3DestinationPropertyName);
-
-  if (plain === undefined) {
-    return {};
-  }
-
-  return {
-    S3DestinationConfiguration: read(
-      resource,
-      s3DestinationPropertyName,
-      plain,
-    ),
+    }),
+    ...(plain !== undefined && {
+      S3DestinationConfiguration: read(
+        resource,
+        s3DestinationPropertyName,
+        plain,
+      ),
+    }),
   };
 }
 

@@ -115,6 +115,21 @@ describe("What a deployed AWS::KinesisFirehose::DeliveryStream refuses", () => {
     assertStringIncludes(error.message, "declares no destination");
   });
 
+  it("refuses a template declaring both S3 destinations", async () => {
+    // When a template declares the same destination twice, in the extended
+    // form and the plain one.
+    const error = await refusalFrom({
+      DeliveryStreamName: "order-events",
+      ExtendedS3DestinationConfiguration: cdkS3Destination,
+      S3DestinationConfiguration: cdkS3Destination,
+    });
+
+    // Then the deployment is refused, as real CloudFormation refuses a
+    // Resource naming more than one destination.
+    assertStringIncludes(error.message, "OrderEvents");
+    assertStringIncludes(error.message, "one destination");
+  });
+
   it("refuses a property whose shape the template got wrong", async () => {
     // Given templates that put the wrong kind of value in each place.
     const wrongShapes: readonly (readonly [

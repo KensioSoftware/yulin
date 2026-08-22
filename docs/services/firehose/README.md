@@ -599,6 +599,9 @@ const { Contents } = await simAws
 console.log(Contents?.[0]?.Key);
 ```
 
+Both S3 destination properties are read, and a template declaring both is refused, the same as a
+`CreateDeliveryStream` request carrying both.
+
 The Bucket and the Role are named by ARN. A stack declaring all three deploys a delivery stream that
 writes into the Bucket beside it, as the Role beside it, and a Role without `s3:PutObject` fails the
 delivery the same way one created through `CreateDeliveryStream` does. Deleting the stack deletes the
@@ -750,9 +753,10 @@ operations.
   `IcebergDestinationConfiguration` and `SnowflakeDestinationConfiguration` are each refused by name
   at `CreateDeliveryStream`. A delivery stream created against one of them would take records and
   drop them, and a test asserting on an empty Bucket would blame the code under test.
-  `S3DestinationConfiguration` and `ExtendedS3DestinationConfiguration` are both read, and the
-  extended one wins where a request carries both. Either way the delivery stream describes back
-  through `ExtendedS3DestinationDescription`, which is the shape carrying every field read here.
+  `S3DestinationConfiguration` and `ExtendedS3DestinationConfiguration` are both read, and a
+  request carrying both is refused with `InvalidArgumentException`, the way real Firehose refuses a
+  request naming more than one destination. Either way the delivery stream describes back through
+  `ExtendedS3DestinationDescription`, which is the shape carrying every field read here.
   `S3DestinationDescription` is always absent.
 - **`DirectPut` and `KinesisStreamAsSource` are the two sources.** Every other
   `DeliveryStreamType`, such as `MSKAsSource` and `DatabaseAsSource`, is refused by name. A source

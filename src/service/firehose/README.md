@@ -47,7 +47,9 @@ which are bytes and milliseconds. The bounds Firehose allows are checked when a 
 created. A request asking for a buffer Firehose would refuse is refused here, at the same call.
 
 `simFirehoseDestinationOf` picks the destination a request declared. A destination outside the
-simulation is refused by name, with `SimFirehoseUnsimulatedDestination`. A delivery stream created
+simulation is refused by name, with `SimFirehoseUnsimulatedDestination`. A request carrying both
+S3 destinations is refused too, since Firehose takes one destination and the two are one
+destination declared twice. A delivery stream created
 against Redshift or OpenSearch would take records and drop them, and a test asserting on an empty
 Bucket would blame the code under test.
 
@@ -147,6 +149,11 @@ delivery stream a template deployed is therefore the same thing an SDK caller wo
 `SimCfnFirehoseDeliveryStreamProperties` reads the shape of the template and nothing else. Whether
 a name, a Bucket ARN or a set of buffering hints is allowed is decided by simulated Firehose, at the
 command that reads it.
+
+The CloudFormation layer reads the destinations a template declared and hands them all over
+without choosing between them. Which destinations a delivery stream may have is decided by
+`simFirehoseDestinationOf`, so the template door and the SDK door answer the same request the same
+way.
 
 `simCfnFirehoseSource` classifies the source before the command sees it. A `*SourceConfiguration`
 property other than the Kinesis one and the DirectPut throughput hint skips the Resource.
