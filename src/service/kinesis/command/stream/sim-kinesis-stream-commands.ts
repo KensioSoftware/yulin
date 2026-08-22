@@ -1,4 +1,3 @@
-import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimKinesisStreamStore } from "../../stream/sim-kinesis-stream-store.js";
 import { SimKinesisPage } from "../sim-kinesis-page.js";
 import type { SimKinesisRequestOptions } from "../sim-kinesis-request-options.js";
@@ -27,7 +26,6 @@ const defaultStreamLimit = 100;
 interface SimKinesisStreamCommandsProperties {
   readonly streams: SimKinesisStreamStore;
   readonly access: SimKinesisStreamAccess;
-  readonly background: BackgroundScheduler;
 }
 
 /**
@@ -36,12 +34,10 @@ interface SimKinesisStreamCommandsProperties {
 export class SimKinesisStreamCommands {
   private readonly streams: SimKinesisStreamStore;
   private readonly access: SimKinesisStreamAccess;
-  private readonly background: BackgroundScheduler;
 
   constructor(properties: SimKinesisStreamCommandsProperties) {
     this.streams = properties.streams;
     this.access = properties.access;
-    this.background = properties.background;
   }
 
   /**
@@ -76,10 +72,6 @@ export class SimKinesisStreamCommands {
 
   /**
    * Describe a stream and a page of its shards.
-   *
-   * Retention is applied first, so the shards a description reports are the
-   * shards as they are at the instant of the request rather than as they were
-   * when something last read them.
    */
   describeStream(
     command: SimDescribeStreamCommand,
@@ -91,8 +83,6 @@ export class SimKinesisStreamCommands {
       input,
       options,
     );
-
-    this.streams.applyRetention(this.background.now());
 
     return {
       $metadata: {},

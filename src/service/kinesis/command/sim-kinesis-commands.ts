@@ -44,11 +44,7 @@ export class SimKinesisCommands {
       accountRegionScope,
       background,
     });
-    this.streams = new SimKinesisStreamCommands({
-      streams,
-      access,
-      background,
-    });
+    this.streams = new SimKinesisStreamCommands({ streams, access });
     this.puts = new SimKinesisPutCommands({ access, background });
     this.reads = new SimKinesisReadCommands({ streams, access, background });
   }

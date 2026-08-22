@@ -45,6 +45,10 @@ export class SimKinesisReadCommands {
 
   /**
    * Hand out an iterator standing for a place on one shard of a stream.
+   *
+   * Retention is left to the read. An iterator is a place rather than a record,
+   * and every place it can stand at survives the records around it being
+   * trimmed.
    */
   getShardIterator(
     command: SimGetShardIteratorCommand,
@@ -56,9 +60,6 @@ export class SimKinesisReadCommands {
       input,
       options,
     );
-
-    this.streams.applyRetention(this.background.now());
-
     const shard = stream.requireShard(simKinesisRequiredShardId(input.ShardId));
 
     return {
