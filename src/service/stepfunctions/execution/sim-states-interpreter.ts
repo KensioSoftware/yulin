@@ -10,12 +10,8 @@ import {
   simStatesUnknownStateFailure,
 } from "./sim-states-failure.js";
 import { SimStatesSettlement } from "./sim-states-settlement.js";
+import { SimStatesStateAttempts } from "./sim-states-state-attempts.js";
 import { SimStatesStateRunner } from "./sim-states-state-runner.js";
-import type {
-  SimStatesMoveOnOutcome,
-  SimStatesNextOutcome,
-  SimStatesStateOutcome,
-} from "./sim-states-state-outcome.js";
 
 interface SimStatesInterpreterProperties {
   readonly definition: SimStatesDefinition;
@@ -42,17 +38,19 @@ interface SimStatesInterpreterProperties {
  *
  * A `Wait` state pauses the walk rather than blocking it. The rest of it is
  * scheduled on the simulation's clock, so the execution stays `RUNNING` until
- * something moves simulated time to the instant it is waiting for.
+ * something moves simulated time to the instant it is waiting for. A `Retry`
+ * pauses it the same way, with the next attempt at the state standing in for
+ * the state after it.
  */
 export class SimStatesInterpreter {
   readonly #definition: SimStatesDefinition;
   readonly #execution: SimStatesExecution;
   readonly #background: BackgroundScheduler;
-  readonly #runner: SimStatesStateRunner;
   readonly #settlement: SimStatesSettlement;
+  readonly #attempts: SimStatesStateAttempts;
 
   /**
-   * Transitions made so far, counted across the pauses a `Wait` state makes.
+   * Transitions made so far, counted across every pause the clock makes.
    */
   #taken = 0;
 
@@ -60,14 +58,22 @@ export class SimStatesInterpreter {
     this.#definition = properties.definition;
     this.#execution = properties.execution;
     this.#background = properties.background;
-    this.#runner = new SimStatesStateRunner({
-      background: properties.background,
-      tasks: properties.tasks,
-      roleArn: properties.roleArn,
-    });
     this.#settlement = new SimStatesSettlement({
       execution: properties.execution,
       background: properties.background,
+    });
+    this.#attempts = new SimStatesStateAttempts({
+      runner: new SimStatesStateRunner({
+        execution: properties.execution,
+        background: properties.background,
+        tasks: properties.tasks,
+        roleArn: properties.roleArn,
+      }),
+      settlement: this.#settlement,
+      background: properties.background,
+      walkOn: async (outcome): Promise<void> => {
+        await this.#walk(outcome.next, outcome.output);
+      },
     });
   }
 
@@ -83,7 +89,7 @@ export class SimStatesInterpreter {
   }
 
   /**
-   * Walk from one state until the execution ends or a `Wait` pauses it.
+   * Walk from one state until the execution ends or the clock pauses it.
    */
   async #walk(from: string, value: JSONValue): Promise<void> {
     let current = from;
@@ -102,12 +108,14 @@ export class SimStatesInterpreter {
       // oxlint-disable-next-line eslint/no-await-in-loop
       await this.#background.sequence();
 
-      const carrying = this.#resolve(
-        // One state at a time, since each one's input is what the state
-        // before it produced.
-        // oxlint-disable-next-line eslint/no-await-in-loop
-        await this.#runner.run(state, carried, current),
-      );
+      // One state at a time, since each one's input is what the state before
+      // it produced.
+      // oxlint-disable-next-line eslint/no-await-in-loop
+      const carrying = await this.#attempts.run({
+        name: current,
+        state,
+        input: carried,
+      });
 
       if (carrying === undefined) {
         return;
@@ -134,46 +142,5 @@ export class SimStatesInterpreter {
     }
 
     return state;
-  }
-
-  /**
-   * Settle what a state left to do, or schedule the rest of the walk.
-   *
-   * Answers with the outcome the walk carries on from, and with nothing where
-   * the execution has ended or is waiting on the clock.
-   */
-  #resolve(outcome: SimStatesStateOutcome): SimStatesNextOutcome | undefined {
-    if (outcome.kind === "wait") {
-      return this.#wait(outcome.until, outcome.resume);
-    }
-
-    return this.#settlement.settle(outcome);
-  }
-
-  /**
-   * Hold the execution until the clock reaches an instant.
-   *
-   * An instant already reached holds nothing up, and the walk carries straight
-   * on. Anything later is scheduled, and the execution is left `RUNNING` until
-   * simulated time gets there. Under a frozen clock that is for as long as the
-   * test leaves it.
-   */
-  #wait(
-    until: Date,
-    resume: SimStatesMoveOnOutcome,
-  ): SimStatesNextOutcome | undefined {
-    if (until.getTime() <= this.#background.now().getTime()) {
-      return this.#settlement.settle(resume);
-    }
-
-    this.#background.scheduleAt(until, async () => {
-      const carrying = this.#settlement.settle(resume);
-
-      if (carrying !== undefined) {
-        await this.#walk(carrying.next, carrying.output);
-      }
-    });
-
-    return undefined;
   }
 }

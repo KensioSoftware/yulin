@@ -1,6 +1,7 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import type { SimStatesChoiceRule } from "../choice/sim-states-choice-rule.js";
 import type { SimStatesDataFlowFields } from "../data/sim-states-data-flow.js";
+import type { SimStatesTaskHandling } from "../retry/sim-states-task-handling.js";
 import type { SimStatesTaskTarget } from "../task/sim-states-task-target.js";
 
 /**
@@ -59,8 +60,11 @@ export interface SimStatesPassState extends SimStatesCommonState {
  * `Resource` is held as it was written, and `target` is what it named. The
  * `Resource` is read when the definition is read, so one this simulator cannot
  * reach is refused there rather than when an execution arrives at the state.
+ * `Retry` and `Catch` are read there too, and arrive here as the retriers and
+ * catchers a failing task is handled by.
  */
-export interface SimStatesTaskState extends SimStatesCommonState {
+export interface SimStatesTaskState
+  extends SimStatesCommonState, SimStatesTaskHandling {
   readonly Type: "Task";
   readonly Resource: string;
   readonly target: SimStatesTaskTarget;

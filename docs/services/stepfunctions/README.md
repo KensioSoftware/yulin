@@ -17,6 +17,9 @@ The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `
 A `Task` state invokes a simulated Lambda function. Every other `Resource` is refused when the state
 machine is created, naming what the definition asked for.
 
+A `Task` state's `Retry` and `Catch` both run, on the simulation's clock, along with the
+`TimeoutSeconds` and `HeartbeatSeconds` it takes.
+
 ## Running a state machine
 
 ```typescript sim-step-functions-run
@@ -270,12 +273,197 @@ A handler that raises fails the task, and the Amazon States Language error name 
 - Through a function ARN it is the handler's own error type. An error named `NotEligible` fails the
   task as `NotEligible`.
 
-`Retry` and `Catch` match on that name. Neither runs here yet. A task that fails ends the execution,
-and `DescribeExecution` carries the error name and the handler's message.
+`Retry` and `Catch` match on that name, and the next section covers both. A task that carries
+neither ends the execution, and `DescribeExecution` carries the error name and the handler's
+message.
 
 Anything else that stops a task from running fails it with `States.TaskFailed`. A function that is
 not there, a role that cannot be assumed, and a role that may not invoke are the three of them, and
 the cause says which one it was.
+
+## Retrying and catching a failure
+
+A `Task` state's `Retry` runs a failing task again on the simulation's clock. Its `Catch` sends a
+failure that survived the retries to another state. Both match on the Amazon States Language error
+name, and both are read when the state machine is created.
+
+Each attempt is scheduled at its own instant, and the execution reads as `RUNNING` in between. One
+`advanceBy` covering the whole backoff runs every attempt in it, because an attempt the advance
+schedules is itself due by the time the advance gets there. A test advances once and then asserts.
+
+```typescript sim-step-functions-retry
+/**
+ * Retrying a failing task on the clock, and catching what the retries leave.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+// The enrolment service is down for the whole of this run.
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "check-enrolment",
+    Role: "arn:aws:iam::123456789012:role/FunctionRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        throw new Error("the enrolment service is down");
+      }),
+    },
+  }),
+);
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "WorkflowRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "states.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "WorkflowRole",
+    PolicyName: "InvokeEnrolmentFunctions",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "lambda:InvokeFunction",
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: role.Role.Arn,
+    definition: JSON.stringify({
+      StartAt: "Check",
+      States: {
+        Check: {
+          Type: "Task",
+          Resource: "arn:aws:states:::lambda:invoke",
+          Parameters: { FunctionName: "check-enrolment", "Payload.$": "$" },
+          Retry: [
+            {
+              ErrorEquals: ["States.TaskFailed"],
+              IntervalSeconds: 2,
+              MaxAttempts: 2,
+            },
+          ],
+          Catch: [
+            {
+              ErrorEquals: ["States.ALL"],
+              Next: "Compensate",
+              ResultPath: "$.error",
+            },
+          ],
+          Next: "Enrol",
+        },
+        Enrol: { Type: "Pass", Result: { enrolled: true }, End: true },
+        Compensate: { Type: "Pass", End: true },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei" }),
+  },
+});
+
+const waiting = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(waiting.status); // RUNNING
+
+// The attempts fall at 0, 2 and 6 seconds. One advance covers all three.
+await simAws.clock().advanceBy({ seconds: 10 });
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.status); // SUCCEEDED
+console.log(described.stopDate); // 2026-07-26T09:00:06.000Z
+
+// {"student":"Wei","error":{"Error":"States.TaskFailed","Cause":"The function
+//  the Task state Check invoked raised Error: the enrolment service is down"}}
+console.log(described.output);
+
+// [ { stateName: 'Check', error: 'States.TaskFailed' },
+//   { stateName: 'Check', error: 'States.TaskFailed' },
+//   { stateName: 'Check', error: 'States.TaskFailed' },
+//   { stateName: 'Compensate' } ]
+console.log(simAws.stepFunctions().inspection().attempts(started.executionArn));
+```
+
+### Matching an error
+
+`ErrorEquals` names the errors an entry handles. The retriers are tried first and the catchers after
+them, each in the order it was written, and the first entry naming the error takes it. `States.ALL`
+matches anything. Amazon States Language holds that one to an entry of its own written last, and a
+definition breaking either rule is refused when the state machine is created.
+
+Which name a task fails under follows the `Resource` that invoked it, as the section above
+describes. A handler raising through `arn:aws:states:::lambda:invoke` is `States.TaskFailed`, and
+through a function ARN it is the handler's own error type.
+
+`States.Runtime` is left alone by both. Real Step Functions ends an execution on that one whatever a
+`Retry` or a `Catch` names, and a catcher on `States.ALL` passes over it.
+
+### How long a retry waits
+
+The wait starts at `IntervalSeconds` (1 second by default) and is multiplied by `BackoffRate` (2.0)
+for every retry already taken. `MaxDelaySeconds` caps it. `MaxAttempts` (3) counts retries. A
+retrier left on all four defaults runs a task four times, at 0, 1, 3 and 7 seconds.
+
+Each retrier keeps its own count, the way Amazon States Language keeps it. A task failing one way
+and then another spends one attempt from each of the two retriers that name them. A retrier with no
+attempts left hands the failure to the catchers, and a failure no catcher names ends the execution.
+
+`JitterStrategy` is refused when the state machine is created. Jitter varies the wait between
+attempts, and a test advancing a clock over that wait needs it fixed.
+
+### Where the error lands
+
+A catcher's `Next` names the state a caught failure goes to. Its `ResultPath` says where the error
+output sits in that state's input, and the error output holds `Error` and `Cause` (the two the
+example above prints). `ResultPath` reads the raw input of the state that failed. Writing it to
+`$.error` keeps the data the task was given and puts the error beside it. A catcher carrying no
+`ResultPath` passes the error output on by itself, and one carrying `null` passes the input on
+untouched.
+
+### How long a task waits
+
+`TimeoutSeconds` and `HeartbeatSeconds` say how long a `Task` state waits for its work. A task still
+going when simulated time reaches either one fails with `States.Timeout`, and the shorter of the two
+fires. The failure goes to the state's `Catch` like any other. The deadline covers the state with
+its retries in it, and a task that reaches the deadline gives up where it stands.
+
+### Counting the attempts
+
+`visitedStates` says which states an execution reached. `attempts` says how many runs each of those
+states took, and what each run failed with. A test asserting that a task ran three times counts the
+rows.
 
 ## Branching on the input
 
@@ -645,6 +833,15 @@ A test asserting on the output of a state machine that used one could only asser
   a call over a network there was none of here.
 - **A failed task's `Cause` is the handler's message.** Real Step Functions writes the JSON error
   document Lambda answered with, holding `errorMessage`, `errorType` and a stack trace.
+- **A task's timeout covers the whole state.** Real Step Functions gives every attempt its own
+  `TimeoutSeconds`. An attempt here takes no simulated time by itself, and a per-attempt deadline
+  would never be reached. The deadline runs from the instant the execution entered the state, and a
+  task that reaches it goes to its `Catch` without another attempt.
+- **Nothing sends a heartbeat.** `HeartbeatSeconds` behaves as a second, shorter `TimeoutSeconds`.
+  Activities and task tokens are unsimulated, and there is no worker to send one from.
+- **`TimeoutSecondsPath` and `HeartbeatSecondsPath` are unsimulated.** The two literal fields say
+  the same thing in the definition. A `Task` state carrying either path is refused when the state
+  machine is created.
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
 
@@ -669,9 +866,7 @@ two and is what this follows.
 
 ## Still to come
 
-- `Parallel` and `Map` states.
-- `Retry` and `Catch`, and the `TimeoutSeconds` and `HeartbeatSeconds` a `Task` state takes. A
-  definition carrying one of them is refused, naming the field.
+- `Parallel` and `Map` states, and the `Retry` and `Catch` those two take.
 - Service integrations beyond Lambda, task tokens and activities.
 - The context object, `$$`.
 - JSONata as a query language, and the `Assign` variables that go with it.

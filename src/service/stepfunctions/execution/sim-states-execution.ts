@@ -1,4 +1,5 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
+import type { SimStatesAttempt } from "./sim-states-attempt.js";
 
 export type SimStatesExecutionStatus =
   | "RUNNING"
@@ -19,8 +20,9 @@ interface SimStatesExecutionProperties {
  * One run of a state machine.
  *
  * An execution holds what it has done as well as where it got to, because the
- * states it visited are what a test asserts on. Real Step Functions keeps the
- * same record and answers it through `GetExecutionHistory`.
+ * states it visited and the attempts it made at them are what a test asserts
+ * on. Real Step Functions keeps the same record and answers it through
+ * `GetExecutionHistory`.
  */
 export class SimStatesExecution {
   readonly arn: string;
@@ -35,6 +37,7 @@ export class SimStatesExecution {
   #cause: string | undefined;
   #stopDate: Date | undefined;
   readonly #visited: string[] = [];
+  readonly #attempts: SimStatesAttempt[] = [];
 
   constructor(properties: SimStatesExecutionProperties) {
     this.arn = properties.arn;
@@ -72,10 +75,29 @@ export class SimStatesExecution {
   }
 
   /**
+   * Every run of a state this execution made, in the order it made them.
+   *
+   * A state entered once and retried twice is three attempts and one visit.
+   */
+  get attempts(): readonly SimStatesAttempt[] {
+    return [...this.#attempts];
+  }
+
+  /**
    * Record that the execution has entered a state.
    */
   enter(stateName: string): void {
     this.#visited.push(stateName);
+  }
+
+  /**
+   * Record that the execution ran a state, and what that run failed with.
+   */
+  attempt(stateName: string, error: string | undefined): void {
+    this.#attempts.push({
+      stateName,
+      ...(error !== undefined && { error }),
+    });
   }
 
   /**
