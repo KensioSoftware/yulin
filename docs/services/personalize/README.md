@@ -501,17 +501,20 @@ const recommender = await simAws.personalize().createRecommender(
 
 const recommenderArn = recommender.recommenderArn!;
 
-// More like X is answered from the item the request names.
+// More like X is answered from the item the request names. It carries a user
+// as well, since AWS filters out what that user has already watched.
 simAws
   .personalize()
   .recommendations(recommenderArn)
   .onItem("title-88", { itemIds: ["title-12", "title-40"] });
 
-const recommended = await simAws
-  .personalizeRuntime()
-  .getRecommendations(
-    new GetRecommendationsCommand({ recommenderArn, itemId: "title-88" }),
-  );
+const recommended = await simAws.personalizeRuntime().getRecommendations(
+  new GetRecommendationsCommand({
+    recommenderArn,
+    itemId: "title-88",
+    userId: "viewer-7",
+  }),
+);
 
 // title-12 title-40
 console.log(recommended.itemList?.map((item) => item.itemId).join(" "));
@@ -526,31 +529,34 @@ The recipe ARN picks the use case, and the use case decides what a request has t
 leaving out a parameter its use case requires is refused, which is what real Personalize does with
 it. That refusal is the part of the domain path worth simulating, and everything else here is state.
 
-| Use case                           | Recipe ARN suffix                              | Requires           |
-| ---------------------------------- | ---------------------------------------------- | ------------------ |
-| Most popular                       | `aws-vod-most-popular`                         | `userId`           |
-| Trending now                       | `aws-vod-trending-now`                         | `userId`           |
-| Top picks for you                  | `aws-vod-top-picks`                            | `userId`           |
-| More like X                        | `aws-vod-more-like-x`                          | `itemId`           |
-| Because you watched X              | `aws-vod-because-you-watched-x`                | `itemId`, `userId` |
-| Most viewed                        | `aws-ecomm-popular-items-by-views`             | `userId`           |
-| Best sellers                       | `aws-ecomm-popular-items-by-purchases`         | `userId`           |
-| Recommended for you                | `aws-ecomm-recommended-for-you`                | `userId`           |
-| Frequently bought together         | `aws-ecomm-frequently-bought-together`         | `itemId`           |
-| Customers who viewed X also viewed | `aws-ecomm-customers-who-viewed-x-also-viewed` | `itemId`, `userId` |
+| Use case                           | Recipe ARN suffix                              | `itemId` | `userId` |
+| ---------------------------------- | ---------------------------------------------- | -------- | -------- |
+| Most popular                       | `aws-vod-most-popular`                         | unused   | required |
+| Trending now                       | `aws-vod-trending-now`                         | unused   | optional |
+| Top picks for you                  | `aws-vod-top-picks`                            | unused   | required |
+| More like X                        | `aws-vod-more-like-x`                          | required | required |
+| Because you watched X              | `aws-vod-because-you-watched-x`                | required | required |
+| Most viewed                        | `aws-ecomm-popular-items-by-views`             | unused   | required |
+| Best sellers                       | `aws-ecomm-popular-items-by-purchases`         | unused   | required |
+| Recommended for you                | `aws-ecomm-recommended-for-you`                | unused   | required |
+| Frequently bought together         | `aws-ecomm-frequently-bought-together`         | required | optional |
+| Customers who viewed X also viewed | `aws-ecomm-customers-who-viewed-x-also-viewed` | required | required |
 
 Each ARN is that suffix under `arn:aws:personalize:::recipe/`. The first five belong to
 `VIDEO_ON_DEMAND` and the last five to `ECOMMERCE`, and a recipe from the other domain is refused on
 `CreateRecommender`. So is a custom recipe such as `aws-similar-items`, which belongs to a solution.
 
-Most of the use cases require a `userId` because real Personalize filters out what the user has
-already watched or bought, and that filtering is keyed on the user. `More like X` and
-`Frequently bought together` take one only to apply a `CurrentUser` filter, and filters are not
-simulated here.
+Nearly every use case requires a `userId`, because real Personalize filters out what the user has
+already watched or bought and that filtering is keyed on the user. `Trending now` and
+`Frequently bought together` are the two exceptions. Each takes a `userId` only to apply a
+`CurrentUser` filter, and this simulation has no filters, so both accept a request without one.
 
-A parameter a use case does not read is ignored rather than matched on. A `Top picks for you`
-request carrying an `itemId` as well as its `userId` is answered from the user rule, since that is
-the tier real Personalize would have used.
+A parameter marked unused is ignored rather than matched on. A `Top picks for you` request carrying
+an `itemId` as well as its `userId` is answered from the user rule, since that is the tier real
+Personalize would have used. An optional one is matched where the request carries it.
+
+These are the requirements AWS documents against each use case. Both pages are worth reading before
+writing a request, since two of them differ from the e-commerce use case they otherwise mirror.
 
 ### Starting and stopping
 

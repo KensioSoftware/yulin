@@ -18,6 +18,7 @@ const useCases = {
   becauseYouWatched:
     "arn:aws:personalize:::recipe/aws-vod-because-you-watched-x",
   mostPopular: "arn:aws:personalize:::recipe/aws-vod-most-popular",
+  trendingNow: "arn:aws:personalize:::recipe/aws-vod-trending-now",
 };
 
 /** A recommender on a video dataset group, for one use case. */
@@ -71,7 +72,8 @@ describe("GetRecommendations from a recommender", () => {
   });
 
   it("answers a More like X recommender from the item", async () => {
-    // Given a More like X recommender, whose requests name an item.
+    // Given a More like X recommender. Its requests name an item, and a user
+    // as well, since AWS filters out what that user has already watched.
     const { simAws, recommenderArn } = await recommenderFor(useCases.moreLikeX);
 
     simAws
@@ -79,13 +81,48 @@ describe("GetRecommendations from a recommender", () => {
       .recommendations(recommenderArn)
       .onItem("title-88", { itemIds: ["title-12"] });
 
-    const recommended = await simAws
+    const recommended = await simAws.personalizeRuntime().getRecommendations(
+      new GetRecommendationsCommand({
+        recommenderArn,
+        itemId: "title-88",
+        userId: "viewer-7",
+      }),
+    );
+
+    // Then the item rule answers it, since that is the tier a related items
+    // request is keyed on.
+    assertArrayEquals(itemIds(recommended.itemList), ["title-12"]);
+  });
+
+  it("takes an optional userId where the use case only filters by it", async () => {
+    // Given a Trending now recommender. AWS needs a userId from one of these
+    // only to filter by CurrentUser, and filters are not simulated here.
+    const { simAws, recommenderArn } = await recommenderFor(
+      useCases.trendingNow,
+    );
+
+    simAws
+      .personalize()
+      .recommendations(recommenderArn)
+      .byDefault({ itemIds: ["title-1"] });
+    simAws
+      .personalize()
+      .recommendations(recommenderArn)
+      .onUser("viewer-7", { itemIds: ["title-9"] });
+
+    // When one request names a user and another names nobody.
+    const forUser = await simAws
       .personalizeRuntime()
       .getRecommendations(
-        new GetRecommendationsCommand({ recommenderArn, itemId: "title-88" }),
+        new GetRecommendationsCommand({ recommenderArn, userId: "viewer-7" }),
       );
+    const forNobody = await simAws
+      .personalizeRuntime()
+      .getRecommendations(new GetRecommendationsCommand({ recommenderArn }));
 
-    assertArrayEquals(itemIds(recommended.itemList), ["title-12"]);
+    // Then both are answered, the user's from the rule declared for them.
+    assertArrayEquals(itemIds(forUser.itemList), ["title-9"]);
+    assertArrayEquals(itemIds(forNobody.itemList), ["title-1"]);
   });
 
   it.each([
@@ -94,6 +131,11 @@ describe("GetRecommendations from a recommender", () => {
       recipe: useCases.moreLikeX,
       omitted: "itemId",
       carried: { userId: "viewer-7" },
+    },
+    {
+      recipe: useCases.moreLikeX,
+      omitted: "userId",
+      carried: { itemId: "title-88" },
     },
     {
       recipe: useCases.becauseYouWatched,

@@ -83,12 +83,17 @@ the index the next page starts at, where real Personalize hands out an opaque st
 ## Domain recommenders
 
 `resource/sim-personalize-use-case.ts` holds the ten use cases, five per domain, each with the
-recipe ARN it is named by and the parameters `GetRecommendations` has to carry for it.
-`sim-personalize-use-case-recipe.ts` beside it resolves a recipe ARN to one of them. The
-requirements are the ones AWS documents. Most of them need a `userId` because real Personalize
-filters out what the user already has, and that filtering is keyed on the user. `More like X` and
-`Frequently bought together` take one only for a `CurrentUser` filter. This simulation has no
-filters, and both are answered from their item alone.
+recipe ARN it is named by and what it does with the `itemId` and the `userId` of a request.
+`sim-personalize-use-case-recipe.ts` beside it resolves a recipe ARN to one of them.
+
+A parameter is `required`, `optional` or `unused`, which are the three states the AWS tables draw.
+Nearly every use case requires a `userId`, because real Personalize filters out what the user
+already has and that filtering is keyed on the user. `Trending now` and
+`Frequently bought together` are the two exceptions, and each takes a `userId` only for a
+`CurrentUser` filter. This simulation has no filters, so both are `optional`.
+
+Read the requirements off the AWS pages rather than reasoning from the other domain. Four of the
+five video use cases pair with an e-commerce one, and two of those pairs differ.
 
 Requiring those parameters is the whole of what the use case does. Everything else about a
 recommender is state. `CreateRecommender` refuses a custom dataset group, a recipe from the other
@@ -100,8 +105,8 @@ refused as invalid input. Reporting it as missing would send a reader looking fo
 still there.
 
 `command/runtime/sim-personalize-recommendation-target.ts` is where a request is matched against its
-use case. It also drops the parameters outside the use case, so a `Top picks for you` request carrying an item
-is answered from its user. Passing the item through would match an item rule real
+use case. It also drops the parameters the use case marks unused, so a `Top picks for you` request carrying an
+item is answered from its user. Passing the item through would match an item rule real
 Personalize would never have reached.
 
 ## Declared results

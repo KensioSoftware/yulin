@@ -25,30 +25,42 @@ describe("Personalize domain use cases", () => {
   });
 
   it.each([
-    { recipe: "aws-vod-most-popular", itemId: false, userId: true },
-    { recipe: "aws-vod-trending-now", itemId: false, userId: true },
-    { recipe: "aws-vod-top-picks", itemId: false, userId: true },
-    { recipe: "aws-vod-more-like-x", itemId: true, userId: false },
-    { recipe: "aws-vod-because-you-watched-x", itemId: true, userId: true },
-    { recipe: "aws-ecomm-popular-items-by-views", itemId: false, userId: true },
+    { recipe: "aws-vod-most-popular", itemId: "unused", userId: "required" },
+    { recipe: "aws-vod-trending-now", itemId: "unused", userId: "optional" },
+    { recipe: "aws-vod-top-picks", itemId: "unused", userId: "required" },
+    { recipe: "aws-vod-more-like-x", itemId: "required", userId: "required" },
+    {
+      recipe: "aws-vod-because-you-watched-x",
+      itemId: "required",
+      userId: "required",
+    },
+    {
+      recipe: "aws-ecomm-popular-items-by-views",
+      itemId: "unused",
+      userId: "required",
+    },
     {
       recipe: "aws-ecomm-popular-items-by-purchases",
-      itemId: false,
-      userId: true,
+      itemId: "unused",
+      userId: "required",
     },
-    { recipe: "aws-ecomm-recommended-for-you", itemId: false, userId: true },
+    {
+      recipe: "aws-ecomm-recommended-for-you",
+      itemId: "unused",
+      userId: "required",
+    },
     {
       recipe: "aws-ecomm-frequently-bought-together",
-      itemId: true,
-      userId: false,
+      itemId: "required",
+      userId: "optional",
     },
     {
       recipe: "aws-ecomm-customers-who-viewed-x-also-viewed",
-      itemId: true,
-      userId: true,
+      itemId: "required",
+      userId: "required",
     },
   ])(
-    "requires itemId $itemId and userId $userId for $recipe",
+    "reads itemId $itemId and userId $userId for $recipe",
     ({ recipe, itemId, userId }) => {
       // Given one of the ten recipe ARNs.
       const arn = `arn:aws:personalize:::recipe/${recipe}`;
@@ -56,12 +68,12 @@ describe("Personalize domain use cases", () => {
         (useCase) => useCase.recipeArn === arn,
       );
 
-      // Then it records what GetRecommendations has to carry, as AWS
-      // documents it against the use case.
+      // Then it records what GetRecommendations does with each parameter, as
+      // AWS documents it against the use case.
       assertNonNullable(found);
       assertIdentical(found.recipeArn, arn);
-      assertIdentical(found.requiresItemId, itemId);
-      assertIdentical(found.requiresUserId, userId);
+      assertIdentical(found.itemId, itemId);
+      assertIdentical(found.userId, userId);
     },
   );
 
