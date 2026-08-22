@@ -1,4 +1,5 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import { SimPersonalizeCfnResourceFactory } from "./cfn/sim-personalize-cfn-resource-factory.js";
 import type { SimPersonalizeRecordedEvent } from "./event/sim-personalize-recorded-event.js";
 import type { SimPersonalizeRecordedItem } from "./event/sim-personalize-recorded-item.js";
 import type { SimPersonalizeRecordedUser } from "./event/sim-personalize-recorded-user.js";
@@ -33,6 +34,11 @@ import { SimPersonalizeRuntime } from "./sim-personalize-runtime.js";
  */
 export class SimPersonalize extends SimPersonalizeControlPlane {
   private readonly sdkRouter = new SimPersonalizeSdkCommandRouter(this);
+  private readonly cfnFactory = new SimPersonalizeCfnResourceFactory({
+    personalize: this,
+    resources: this.resources,
+  });
+
   private readonly runtimeApi = new SimPersonalizeRuntime({
     recommendations: this.commands.recommendations,
     rankings: this.commands.rankings,
@@ -125,6 +131,16 @@ export class SimPersonalize extends SimPersonalizeControlPlane {
   /** Find a campaign by name. */
   findCampaign(name: string): SimPersonalizeCampaign | undefined {
     return this.resources.campaigns.findByName(name);
+  }
+
+  /**
+   * The CloudFormation Resource factory for this simulated Personalize.
+   *
+   * It deploys through the commands above, so a Resource and an SDK caller
+   * asking for the same thing are answered the same way.
+   */
+  cfnResourceFactory(): SimPersonalizeCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /** The SDK Command router for this simulated Personalize. */

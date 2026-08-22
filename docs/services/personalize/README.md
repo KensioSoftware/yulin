@@ -463,6 +463,142 @@ const group = await simAws.personalize().createDatasetGroup(
 console.log(group.domain);
 ```
 
+## Deploying Personalize resources with CloudFormation
+
+`AWS::Personalize::DatasetGroup`, `AWS::Personalize::Schema`, `AWS::Personalize::Dataset`,
+`AWS::Personalize::Solution` and `AWS::Personalize::EventTracker` deploy into simulated Personalize.
+A project that declares them in CDK or CloudFormation can deploy the same template its application
+deploys, with no hand-written test setup.
+
+Each one goes through the ordinary create command. A template and an SDK caller get the same
+validation, the same refusals and the same ARN.
+
+```typescript sim-personalize-cloudformation
+/**
+ * Deploying a Personalize dataset group, schema, dataset and solution.
+ */
+
+import {
+  CreateCampaignCommand,
+  CreateSolutionVersionCommand,
+} from "@aws-sdk/client-personalize";
+import { GetRecommendationsCommand } from "@aws-sdk/client-personalize-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "catalogue",
+  template: {
+    Resources: {
+      Catalogue: {
+        Type: "AWS::Personalize::DatasetGroup",
+        Properties: { Name: "catalogue" },
+      },
+      InteractionsSchema: {
+        Type: "AWS::Personalize::Schema",
+        Properties: {
+          Name: "interactions",
+          Schema: JSON.stringify({
+            type: "record",
+            name: "Interactions",
+            fields: [
+              { name: "USER_ID", type: "string" },
+              { name: "ITEM_ID", type: "string" },
+              { name: "TIMESTAMP", type: "long" },
+            ],
+          }),
+        },
+      },
+      Views: {
+        Type: "AWS::Personalize::Dataset",
+        Properties: {
+          Name: "views",
+          DatasetType: "Interactions",
+          DatasetGroupArn: { "Fn::GetAtt": ["Catalogue", "DatasetGroupArn"] },
+          SchemaArn: { "Fn::GetAtt": ["InteractionsSchema", "SchemaArn"] },
+        },
+      },
+      RelatedItems: {
+        Type: "AWS::Personalize::Solution",
+        Properties: {
+          Name: "related-items",
+          DatasetGroupArn: { "Fn::GetAtt": ["Catalogue", "DatasetGroupArn"] },
+          RecipeArn: "arn:aws:personalize:::recipe/aws-similar-items",
+        },
+      },
+    },
+    Outputs: {
+      SolutionArn: { Value: { "Fn::GetAtt": ["RelatedItems", "SolutionArn"] } },
+    },
+  },
+});
+
+// The stack stops at the solution. The version and the campaign are created
+// here, the way they are created outside a template on AWS.
+const version = await simAws.personalize().createSolutionVersion(
+  new CreateSolutionVersionCommand({
+    solutionArn: stack.outputs.get("SolutionArn")!.value as string,
+  }),
+);
+
+const campaign = await simAws.personalize().createCampaign(
+  new CreateCampaignCommand({
+    name: "related-items",
+    solutionVersionArn: version.solutionVersionArn,
+  }),
+);
+
+const campaignArn = campaign.campaignArn!;
+
+simAws
+  .personalize()
+  .recommendations(campaignArn)
+  .onItem("entry-1042", { itemIds: ["entry-2071"] });
+
+const recommended = await simAws
+  .personalizeRuntime()
+  .getRecommendations(
+    new GetRecommendationsCommand({ campaignArn, itemId: "entry-1042" }),
+  );
+
+// entry-2071
+console.log(recommended.itemList?.[0]?.itemId);
+```
+
+`Ref` answers with the resource name, and `Fn::GetAtt` with the ARN. The attribute is
+`DatasetGroupArn`, `SchemaArn`, `DatasetArn`, `SolutionArn` or `EventTrackerArn`, one per type. That
+is the way round real Personalize publishes them. Every Personalize API takes an ARN, and a template
+wiring one resource into another reads `Fn::GetAtt`. An event tracker publishes `TrackingId` too.
+`PutEvents` names that value, and a stack Output is where a test picks it up. An attribute a type
+does not publish fails the deploy, since answering one would let a template deploy here and fail on
+AWS.
+
+### A stack stops at the solution
+
+CloudFormation has no `AWS::Personalize::Campaign` type and no `AWS::Personalize::Recommender` type.
+A campaign is what every runtime call names, and it is always created out of band through the SDK,
+the CLI or the console. A deployed stack gets as far as a solution and stops there. A test creates
+the solution version and the campaign itself, as the example above does. This is real Personalize
+behaviour and worth knowing before reading it as a gap in the simulation.
+
+The domain path stops in the same place. `Domain` is a property of `AWS::Personalize::DatasetGroup`,
+and a template can declare a Domain dataset group. No `AWS::Personalize::Recommender` type exists to
+put a recommender on it.
+
+### Types a stack steps over
+
+`AWS::Personalize::BatchInferenceJob`, `AWS::Personalize::BatchSegmentJob`,
+`AWS::Personalize::DataDeletionJob`, `AWS::Personalize::MetricAttribution` and
+`AWS::Personalize::Recipe` all work over data simulated Personalize never reads. A template
+declaring one deploys, with that Resource in `stack.skippedResources` under a reason naming the
+type, and the rest of the stack around it.
+
+Deleting the stack removes the resources it made, in reverse dependency order. That order is what
+Personalize needs, since a dataset group holding a dataset, a solution or an event tracker refuses
+to be deleted.
+
 ## Reading state back
 
 `findDatasetGroup`, `findSolution` and `findCampaign` read resources by name without going through a
@@ -546,9 +682,9 @@ dataset ARN they name.
   `GetActionRecommendations`.
 - **No recommenders.** `CreateRecommender` and the ten domain use cases arrive with the domain
   path.
-- **No CloudFormation.** `AWS::Personalize::*` resource types arrive with their own issue. Real
-  CloudFormation has no `AWS::Personalize::Campaign` type at all. A campaign is always created
-  outside a template.
+- **Five CloudFormation types are stepped over.** `AWS::Personalize::BatchInferenceJob`,
+  `BatchSegmentJob`, `DataDeletionJob`, `MetricAttribution` and `Recipe` all work over data this
+  simulation never reads. A template declaring one deploys with the Resource skipped.
 - **No data import or metrics.** `CreateDatasetImportJob`, `GetSolutionMetrics` and the batch job
   operations describe work on data that simulated Personalize never reads.
 - **A solution version id is a count**, where real Personalize generates an opaque string.
