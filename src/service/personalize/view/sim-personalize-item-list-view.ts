@@ -6,12 +6,21 @@ import {
 
 /**
  * The items a runtime call answers with, as they were declared.
+ *
+ * An item declared without a score comes back without the field at all. Real
+ * Personalize leaves `score` out where the recipe behind the campaign reports
+ * none, and a `score` of `undefined` reads as a score to a test comparing the
+ * whole item.
  */
 export function simPersonalizeItemList(
   declarations: readonly SimPersonalizeItemDeclaration[],
 ): readonly SimPersonalizePredictedItem[] {
   return declarations.map((declaration) => {
     const item = simPersonalizeDeclaredItem(declaration);
+
+    if (item.score === undefined) {
+      return { itemId: item.itemId };
+    }
 
     return { itemId: item.itemId, score: item.score };
   });

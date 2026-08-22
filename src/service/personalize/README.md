@@ -80,7 +80,8 @@ list to rank, and an item rule would be one nothing could match. A ranking no ru
 answered from the request's own `inputList`. The default there starts as `undefined` to leave room
 for that case.
 
-A campaign is required to exist before anything is declared against it, following
+A campaign is required to exist before anything is declared against it. An ARN no campaign is
+deployed at raises `SimPersonalizeDeclarationError`, which follows simulated Rekognition's
 `SimRekognitionDeclarationError`. The ARN would otherwise be a typo nothing reported.
 
 ## Deletion rules

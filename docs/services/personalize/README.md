@@ -371,10 +371,10 @@ authorize against the campaign ARN the request names.
 - **A recommendation is declared, never computed.** A campaign answers with the items a rule gives
   it. A score comes from the declaration as well, and an item declared without one comes back
   without one.
-- **An unknown item gets the default.** Real Personalize answers an `itemId` it does not recognise
-  with popular items, worked out from the interaction history. Simulated Personalize holds no
-  interactions. It answers with the campaign's declared default, and with an empty `itemList` where
-  nothing is declared.
+- **A request no rule matches gets the default.** Real Personalize answers an `itemId` it does not
+  recognise with popular items, worked out from the interaction history. Simulated Personalize
+  holds no interactions. A request carrying an unknown item falls to the user rule where it names a
+  user and one is declared, then to the campaign's default, and then to an empty `itemList`.
 - **No filters.** `CreateFilter` takes an expression over item and interaction metadata that this
   simulation leaves out by design. A runtime request naming a `filterArn` is refused by name.
 - **No `GetActionRecommendations`.** Actions are a dataset type with interactions of their own, and
