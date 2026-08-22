@@ -10,6 +10,10 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
+import {
+  simStatesRunnableTypes,
+  simStatesStateTypes,
+} from "../../../../stepfunctions/definition/sim-states-state.js";
 import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.type.js";
@@ -72,16 +76,34 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     return { simAws, stack };
   }
 
+  /**
+   * A state type Amazon States Language defines and this simulator has no
+   * implementation for.
+   *
+   * Read from Step Functions' own two lists rather than named here. The
+   * interpreter keeps taking state types on, and a test naming one starts
+   * failing the day that one lands.
+   */
+  function unrunStateType(): string {
+    const type = simStatesStateTypes.find(
+      (candidate) => !simStatesRunnableTypes.includes(candidate as never),
+    );
+    assertNonNullable(type);
+
+    return type;
+  }
+
   it("drops a state machine using a state the interpreter does not run", async () => {
-    // Given a workflow holding a Wait state, which this simulator has no
+    // Given a workflow holding a state type this simulator has no
     // implementation for yet.
+    const stateType = unrunStateType();
     const body = workflowTemplate({
       StateMachineName: "Enrolment",
       RoleArn: roleArn,
       DefinitionString: JSON.stringify({
-        StartAt: "Pause",
+        StartAt: "Step",
         States: {
-          Pause: { Type: "Wait", Seconds: 5, Next: "Done" },
+          Step: { Type: stateType, Next: "Done" },
           Done: { Type: "Succeed" },
         },
       }),
@@ -99,7 +121,10 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     assertNonNullable(skipped);
     assertTrue(skipped.skipped);
     assertIdentical(skipped.logicalId, "Workflow");
-    assertStringIncludes(skipped.skippedReason ?? "", "is a Wait state");
+    assertStringIncludes(
+      skipped.skippedReason ?? "",
+      `is a ${stateType} state`,
+    );
     assertIdentical(
       stack.getResource("OrdersQueue")?.status,
       "CREATE_COMPLETE",
