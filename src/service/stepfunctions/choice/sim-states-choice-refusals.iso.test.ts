@@ -69,11 +69,20 @@ describe("Step Functions Choice refusals", () => {
   });
 
   it("refuses a comparator Amazon States Language does not define", () => {
-    // Given a rule testing with something invented.
-    // When it is read, it is refused by name.
+    // Given a rule testing with something invented, and one asking for the
+    // Path twin StringMatches has not got.
+    // When each is read, each is refused by name.
     assertStringIncludes(
       refusalForRule({ Variable: "$.term", NumericAbout: 3, Next: "Enrol" }),
       "NumericAbout",
+    );
+    assertStringIncludes(
+      refusalForRule({
+        Variable: "$.key",
+        StringMatchesPath: "$.pattern",
+        Next: "Enrol",
+      }),
+      "StringMatchesPath",
     );
   });
 

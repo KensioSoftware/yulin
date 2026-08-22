@@ -170,13 +170,15 @@ console.log(described.output); // {"enrolled":true}
 The comparators are the ones Amazon States Language defines. Strings compare with `StringEquals`,
 `StringLessThan`, `StringGreaterThan`, `StringLessThanEquals`, `StringGreaterThanEquals` and
 `StringMatches`. The same five orderings appear under `Numeric` and under `Timestamp`, and a boolean
-compares with `BooleanEquals`. Every one of them has a `Path` twin, such as
-`NumericGreaterThanPath`, which takes a Reference Path and reads its operand from the state's own
-input. The data tests are `IsPresent`, `IsNull`, `IsBoolean`, `IsNumeric`, `IsString` and
-`IsTimestamp`. Rules combine with `And`, `Or` and `Not`.
+compares with `BooleanEquals`. Each of those has a `Path` twin, such as `NumericGreaterThanPath`,
+which takes a Reference Path and reads its operand from the state's own input. The data tests are
+`IsPresent`, `IsNull`, `IsBoolean`, `IsNumeric`, `IsString` and `IsTimestamp`. Rules combine with
+`And`, `Or` and `Not`.
 
 `StringMatches` takes `*` as a wildcard spanning any run of characters. A backslash escapes the
-character after it, so `Star\*` matches the literal name `Star*`.
+character after it, so `Star\*` matches the literal name `Star*`. Amazon States Language gives
+`StringMatches` no `Path` twin, and `StringMatchesPath` is refused here as a comparator it does not
+define.
 
 Two things fail an execution at a `Choice` state, both the way real Step Functions fails one:
 
