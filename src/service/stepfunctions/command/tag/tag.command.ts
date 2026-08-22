@@ -41,9 +41,8 @@ export type SimUntagResourceCommandOutput = Record<string, never>;
 /**
  * Minimal structural sim Step Functions ListTagsForResource input.
  *
- * Real Step Functions answers with every tag in one go. The API has a
- * `nextToken`, and no resource can hold more than the 50 tags one answer
- * carries, so it is never sent back.
+ * There is no page to ask for. Real Step Functions answers with every tag a
+ * resource holds, and its API has no paging on this operation.
  */
 export interface SimListTagsForResourceCommandInput {
   readonly resourceArn?: string;

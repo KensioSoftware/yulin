@@ -74,6 +74,19 @@ describe("What tagging a simulated state machine refuses", () => {
     assertStringIncludes(error.message, "257 characters, where 256");
   });
 
+  it("refuses a value under the prefix AWS assigns its own tags", async () => {
+    // When a caller writes a value beginning aws:. The AWS tagging
+    // restrictions reserve the prefix in a value as well as in a key.
+    const error = await refusalFrom([
+      { key: "owner", value: "aws:cloudformation" },
+    ]);
+
+    assertStringIncludes(
+      error.message,
+      "The value of the tag 'owner' begins with the reserved aws: prefix",
+    );
+  });
+
   it("refuses a key under the prefix AWS assigns its own tags", async () => {
     // When a caller writes a key beginning aws:.
     const error = await refusalFrom([
@@ -161,14 +174,63 @@ describe("What tagging a simulated state machine refuses", () => {
   });
 
   it("refuses a request with no resourceArn", async () => {
-    // When a request names nothing to tag.
+    // When a well-formed request names nothing to tag.
     const simAws = new SimAws();
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simAws.stepFunctions().tagResource({ input: {} });
+      await simAws.stepFunctions().tagResource({ input: { tags: [] } });
     });
 
     assertStringIncludes(error.message, "TagResource needs a resourceArn");
+  });
+
+  it("refuses a TagResource request carrying no tags", async () => {
+    // When a request names a resource with nothing to put on it. The API takes
+    // tags as a required member, and an empty list is how a caller asks for
+    // nothing.
+    const simAws = new SimAws();
+    const resourceArn = await createWorkflow(simAws);
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.stepFunctions().tagResource({ input: { resourceArn } });
+    });
+
+    assertStringIncludes(error.message, "TagResource needs tags");
+  });
+
+  it("refuses an UntagResource request carrying no tagKeys", async () => {
+    // When a request names a resource with no keys to take off it.
+    const simAws = new SimAws();
+    const resourceArn = await createWorkflow(simAws);
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.stepFunctions().untagResource({ input: { resourceArn } });
+    });
+
+    assertStringIncludes(error.message, "UntagResource needs tagKeys");
+  });
+
+  it("takes an empty tagKeys list as the resource it already is", async () => {
+    // Given a state machine carrying one tag.
+    const simAws = new SimAws();
+    const resourceArn = await createWorkflow(simAws);
+    await simAws.stepFunctions().tagResource({
+      input: { resourceArn, tags: [{ key: "team", value: "enrolment" }] },
+    });
+
+    // When a request names no keys at all, which the API takes.
+    await simAws
+      .stepFunctions()
+      .untagResource({ input: { resourceArn, tagKeys: [] } });
+
+    // Then the tag is left where it was.
+    const listed = await simAws
+      .stepFunctions()
+      .listTagsForResource({ input: { resourceArn } });
+    assertArrayEquals(
+      listed.tags.map((tag) => tag.key),
+      ["team"],
+    );
   });
 
   it("leaves the tags a resource had when it refuses a request", async () => {
@@ -179,7 +241,8 @@ describe("What tagging a simulated state machine refuses", () => {
       input: { resourceArn, tags: [{ key: "team", value: "enrolment" }] },
     });
 
-    // When a request carrying a good tag and a bad one is refused.
+    // When a request carrying a good tag and a bad one is refused, against a
+    // resource that is there.
     await assertThrowsErrorAsync(async () => {
       await simAws.stepFunctions().tagResource({
         input: {

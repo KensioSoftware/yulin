@@ -520,8 +520,12 @@ A key is held once. `TagResource` adds a new key, and replaces the value of a ke
 
 A key runs to 128 characters and a value to 256, and one resource holds 50 tags. A value may be
 empty, where a key may not. Letters, digits, whitespace and `+ - = . _ : / @` are what a tag is
-written with. A key beginning `aws:` is refused, since AWS assigns tags of its own under that
-prefix. A request outside any of those limits leaves the tags exactly as they were.
+written with. A key or a value beginning `aws:` is refused, since AWS assigns tags of its own under
+that prefix. A request outside any of those limits leaves the tags exactly as they were.
+
+`TagResource` requires `tags` and `UntagResource` requires `tagKeys`, as the API does. Either list
+may be empty. A request that omits one is refused before the state machine is looked up, along with
+a request carrying a tag Step Functions will not take.
 
 ## Deploying one from CloudFormation
 
@@ -644,9 +648,6 @@ A test asserting on the output of a state machine that used one could only asser
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
 
-- **`ListTagsForResource` answers with every tag at once.** Real Step Functions pages its answer
-  with a `nextToken`. One page here carries all 50 tags a resource may hold, and the token is never
-  sent back.
 - **A state machine is the only resource that holds tags.** An activity and an execution both take
   tags on real Step Functions, and both are unsimulated here. A tag request naming one is refused
   as an ARN this holds nothing under.

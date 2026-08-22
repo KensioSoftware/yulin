@@ -18,6 +18,9 @@ const allowedCharacters = /^[\p{L}\p{N}\s+\-=._:/@]*$/u;
 
 /**
  * The prefix AWS assigns tags under, which a caller may not.
+ *
+ * Reserved in a value as well as in a key. The AWS tagging restrictions put
+ * both out of a caller's reach, and Step Functions holds its own tags to them.
  */
 const reservedPrefix = "aws:";
 
@@ -101,6 +104,18 @@ function readKey(key: string | undefined): string {
 }
 
 /**
+ * Read every tag a request carries.
+ *
+ * The whole list is read before a caller acts on any of it, so a request with
+ * one bad tag in it changes nothing.
+ */
+export function readSimStatesTags(
+  input: readonly SimStatesTagInput[],
+): readonly SimStateMachineTag[] {
+  return input.map((entry) => SimStateMachineTag.fromInput(entry));
+}
+
+/**
  * Read the value a tag holds.
  *
  * A tag value may be empty, where a key may not. Step Functions takes a key on
@@ -118,6 +133,13 @@ function readValue(value: string | undefined, key: string): string {
       `The value of the tag '${key}' is ${value.length.toString()} ` +
         `characters, where ${greatestValueLength.toString()} is the most a ` +
         "tag value holds.",
+    );
+  }
+
+  if (value.startsWith(reservedPrefix)) {
+    throw new SimStatesInvalidTag(
+      `The value of the tag '${key}' begins with the reserved ` +
+        `${reservedPrefix} prefix, which AWS assigns tags of its own under.`,
     );
   }
 

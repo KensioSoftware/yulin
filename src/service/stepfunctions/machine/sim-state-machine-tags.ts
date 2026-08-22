@@ -1,7 +1,8 @@
 import { SimStatesTooManyTags } from "../error/sim-step-functions.error.js";
 import {
-  SimStateMachineTag,
+  type SimStateMachineTag,
   type SimStatesTagInput,
+  readSimStatesTags,
 } from "./sim-state-machine-tag.js";
 
 /**
@@ -34,24 +35,21 @@ export class SimStateMachineTags {
   ): SimStateMachineTags {
     const tags = new this(new Map());
 
-    tags.apply(input ?? []);
+    tags.apply(readSimStatesTags(input ?? []));
 
     return tags;
   }
 
   /**
-   * Add the tags a request carries, replacing the value of any key already
-   * held.
+   * Add tags a request carried, replacing the value of any key already held.
    *
-   * The whole request is read and counted before anything is kept. A request
-   * Step Functions would refuse leaves the tags exactly as they were.
+   * The whole request is counted before anything is kept. A request Step
+   * Functions would refuse leaves the tags exactly as they were.
    */
-  apply(input: readonly SimStatesTagInput[]): void {
+  apply(tags: readonly SimStateMachineTag[]): void {
     const applied = new Map(this.#tags);
 
-    for (const entry of input) {
-      const tag = SimStateMachineTag.fromInput(entry);
-
+    for (const tag of tags) {
       applied.set(tag.key, tag);
     }
 

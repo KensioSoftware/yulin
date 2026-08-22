@@ -4,6 +4,7 @@ import {
 } from "../../error/sim-step-functions.error.js";
 import type { SimStateMachine } from "../../machine/sim-state-machine.js";
 import { parseSimStateMachineArn } from "../../machine/sim-state-machine-arn.js";
+import { readSimStatesTags } from "../../machine/sim-state-machine-tag.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
 import type {
   SimListTagsForResourceCommand,
@@ -34,10 +35,18 @@ export class SimStateMachineTagCommands {
    * Add tags to a resource, replacing the value of any key already there.
    */
   tagResource(command: SimTagResourceCommand): SimTagResourceCommandOutput {
-    const tags = command.input.tags ?? [];
-    const stateMachine = this.reach(command.input.resourceArn, "TagResource");
+    const { resourceArn, tags } = command.input;
 
-    stateMachine.tags.apply(tags);
+    if (tags === undefined) {
+      throw new SimStatesInvalidRequest("TagResource needs tags.");
+    }
+
+    // The request is read before the resource is reached, so a tag Step
+    // Functions would refuse is refused whether or not the state machine is
+    // there.
+    const read = readSimStatesTags(tags);
+
+    this.reach(resourceArn, "TagResource").tags.apply(read);
 
     return {};
   }
@@ -48,10 +57,16 @@ export class SimStateMachineTagCommands {
   untagResource(
     command: SimUntagResourceCommand,
   ): SimUntagResourceCommandOutput {
-    const keys = command.input.tagKeys ?? [];
-    const stateMachine = this.reach(command.input.resourceArn, "UntagResource");
+    const { resourceArn, tagKeys } = command.input;
 
-    stateMachine.tags.remove(keys);
+    if (tagKeys === undefined) {
+      throw new SimStatesInvalidRequest("UntagResource needs tagKeys.");
+    }
+
+    // An empty list is a request Step Functions takes. UntagResource asks for
+    // a resource without the keys it names, and naming none of them asks for
+    // the resource as it already is.
+    this.reach(resourceArn, "UntagResource").tags.remove(tagKeys);
 
     return {};
   }
