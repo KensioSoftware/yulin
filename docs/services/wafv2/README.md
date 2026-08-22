@@ -171,6 +171,10 @@ The tests are `ByteMatchStatement` (with `EXACTLY`, `STARTS_WITH`, `ENDS_WITH`, 
 `SizeConstraintStatement`. `AndStatement`, `OrStatement` and `NotStatement` join and negate them,
 and they nest.
 
+An `AndStatement` or an `OrStatement` needs at least two statements to join. Real WAF answers a web
+ACL holding one that joins fewer with `OR_STATEMENT` and a minimum threshold, refusing the whole
+resource, and `CreateWebACL` here refuses it too.
+
 Matching is case sensitive, as it is on AWS. A rule that means to ignore case says so with a
 `LOWERCASE` transformation and a lower case search string.
 

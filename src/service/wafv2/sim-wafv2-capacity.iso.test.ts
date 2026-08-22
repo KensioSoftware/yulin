@@ -182,14 +182,19 @@ describe("What a simulated web ACL costs in capacity units", () => {
   });
 
   it("adds up the statements inside a logical statement", async () => {
-    // Given a rule joining three statements, one of them negated.
+    // Given a rule joining three statements, one of them negated and one of
+    // them joining two more.
     const capacity = await capacityOf([
       ruleWith({
         AndStatement: {
           Statements: [
             byteMatch("EXACTLY"),
             { NotStatement: { Statement: byteMatch("EXACTLY") } },
-            { OrStatement: { Statements: [byteMatch("CONTAINS")] } },
+            {
+              OrStatement: {
+                Statements: [byteMatch("CONTAINS"), byteMatch("EXACTLY")],
+              },
+            },
           ],
         },
       }),
@@ -197,7 +202,7 @@ describe("What a simulated web ACL costs in capacity units", () => {
 
     // Then it costs what its parts cost. A logical statement has no base cost
     // of its own.
-    assertIdentical(capacity, 14);
+    assertIdentical(capacity, 16);
   });
 
   it("charges a managed rule group at the capacity AWS fixed it at", async () => {
