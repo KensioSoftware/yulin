@@ -2,14 +2,15 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateStageCommandInput } from "../../command/stage/stage.command.js";
 import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-property-parser.js";
+import { SimCfnHttpApiRouteSettingsProperties } from "./sim-cfn-http-api-route-settings-properties.js";
 
 /**
  * The AWS::ApiGatewayV2::Stage properties this simulation deploys.
  *
- * `DeploymentId`, `AccessLogSettings`, `RouteSettings`, `DefaultRouteSettings`
- * and `Tags` are left out, so a template carrying one is refused by name. None
- * of them is modelled, and a stage that looked throttled or logged to the
- * template and did neither when serving is the failure worth avoiding.
+ * `DeploymentId`, `AccessLogSettings` and `Tags` are left out, so a template
+ * carrying one is recorded and the stage is created without it. None of them
+ * is modelled, and a stage that looked logged to the template and logged
+ * nothing when serving is the failure worth recording.
  */
 const simulatedProperties = [
   "ApiId",
@@ -17,6 +18,8 @@ const simulatedProperties = [
   "AutoDeploy",
   "StageVariables",
   "Description",
+  "DefaultRouteSettings",
+  "RouteSettings",
 ];
 
 interface SimCfnHttpApiStagePropertiesProperties {
@@ -36,9 +39,15 @@ export class SimCfnHttpApiStageProperties {
     simulated: simulatedProperties,
   });
 
+  private readonly routeSettingsParser: SimCfnHttpApiRouteSettingsProperties;
+
   constructor(properties: SimCfnHttpApiStagePropertiesProperties) {
     this.resource = properties.resource;
     this.properties = properties.properties;
+    this.routeSettingsParser = new SimCfnHttpApiRouteSettingsProperties({
+      resource: this.resource,
+      propertyParser: this.propertyParser,
+    });
 
     this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
@@ -71,7 +80,8 @@ export class SimCfnHttpApiStageProperties {
    *
    * `AutoDeploy` is passed through as the template wrote it, so a stage that
    * does not deploy itself is refused by CreateStage with the reason it is
-   * refused.
+   * refused. The route settings arrive holding only their throttling members.
+   * The ones CreateStage would refuse never reach it from a template.
    */
   createStageInput(): SimCreateStageCommandInput {
     return {
@@ -91,6 +101,14 @@ export class SimCfnHttpApiStageProperties {
         this.resource,
         this.properties["Description"],
         "Description",
+      ),
+      DefaultRouteSettings: this.routeSettingsParser.settings(
+        this.properties["DefaultRouteSettings"],
+        "DefaultRouteSettings",
+      ),
+      RouteSettings: this.routeSettingsParser.settingsMap(
+        this.properties["RouteSettings"],
+        "RouteSettings",
       ),
     };
   }

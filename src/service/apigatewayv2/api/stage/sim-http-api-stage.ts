@@ -1,3 +1,6 @@
+import type { SimHttpApiRouteSettingsView } from "./settings/sim-http-api-route-settings.type.js";
+import type { SimHttpApiStageRouteSettings } from "./settings/sim-http-api-stage-route-settings.js";
+
 /**
  * The default stage, which is served at the root of the API endpoint rather
  * than under a stage-name path segment. It is the only stage simulated so far.
@@ -10,12 +13,13 @@ interface SimHttpApiStageProperties {
   readonly stageVariables?: Readonly<Record<string, string>> | undefined;
   readonly description?: string | undefined;
   readonly createdDate: Date;
+  readonly routeSettings?: SimHttpApiStageRouteSettings | undefined;
 }
 
 /**
  * Minimal structural stage view, as the Create and Get commands return.
  */
-export interface SimHttpApiStageView {
+export interface SimHttpApiStageView extends SimHttpApiRouteSettingsView {
   StageName: string;
   AutoDeploy: boolean;
   CreatedDate: Date;
@@ -37,12 +41,29 @@ export class SimHttpApiStage {
   public readonly description?: string | undefined;
   public readonly createdDate: Date;
 
+  /**
+   * The throttle this stage serves its routes at, or undefined for a stage
+   * that was given no route settings and so throttles nothing.
+   */
+  public readonly routeSettings?: SimHttpApiStageRouteSettings | undefined;
+
   constructor(properties: SimHttpApiStageProperties) {
     this.stageName = properties.stageName;
     this.autoDeploy = properties.autoDeploy;
     this.stageVariables = properties.stageVariables ?? {};
     this.description = properties.description;
     this.createdDate = properties.createdDate;
+    this.routeSettings = properties.routeSettings;
+  }
+
+  /**
+   * Whether this stage's throttle serves one more request to a route key now.
+   *
+   * Asking takes a token. A request that is admitted has already paid for
+   * itself, and a refused one has taken nothing.
+   */
+  admits(routeKey: string): boolean {
+    return this.routeSettings?.admits(routeKey) ?? true;
   }
 
   /**
@@ -56,6 +77,7 @@ export class SimHttpApiStage {
       StageName: this.stageName,
       AutoDeploy: this.autoDeploy,
       CreatedDate: new Date(this.createdDate),
+      ...this.routeSettings?.view(),
     };
 
     if (Object.keys(this.stageVariables).length > 0) {

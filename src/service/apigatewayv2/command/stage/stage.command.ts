@@ -1,4 +1,8 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type {
+  SimHttpApiRouteSettings,
+  SimHttpApiRouteSettingsMap,
+} from "../../api/stage/settings/sim-http-api-route-settings.type.js";
 import type { SimHttpApiStageView } from "../../api/stage/sim-http-api-stage.js";
 
 /**
@@ -16,6 +20,8 @@ export interface SimCreateStageCommandInput {
   readonly AutoDeploy?: boolean | undefined;
   readonly StageVariables?: Readonly<Record<string, string>> | undefined;
   readonly Description?: string | undefined;
+  readonly DefaultRouteSettings?: SimHttpApiRouteSettings | undefined;
+  readonly RouteSettings?: SimHttpApiRouteSettingsMap | undefined;
 }
 
 export interface SimCreateStageCommandOutput extends SimHttpApiStageView {

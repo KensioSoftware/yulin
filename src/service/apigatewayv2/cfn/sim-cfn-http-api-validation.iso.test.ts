@@ -1,5 +1,6 @@
 import {
   assertFalse,
+  assertIdentical,
   assertNonNullable,
   assertStringIncludes,
   assertTrue,
@@ -161,7 +162,7 @@ describe("API Gateway v2 CloudFormation validation", () => {
   });
 
   it("creates a stage without a property outside the simulated set", async () => {
-    // Given a stage asking for throttling settings
+    // Given a stage asking for access logging
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -169,12 +170,12 @@ describe("API Gateway v2 CloudFormation validation", () => {
       simAws,
       simCfnHttpApiTemplateFactory.make({
         stageProperties: {
-          DefaultRouteSettings: { ThrottlingBurstLimit: 10 },
+          AccessLogSettings: { Format: "$context.requestId" },
         },
       }),
     );
 
-    // Then the stage is created throttling nothing, and the record names the
+    // Then the stage is created logging nothing, and the record names the
     // Resource type, the logical ID, the property and what is simulated
     assertTrue(stack.getResource("Stage")?.deployed);
 
@@ -183,13 +184,45 @@ describe("API Gateway v2 CloudFormation validation", () => {
     assertStringIncludes(reason, "Stage");
     assertStringIncludes(
       reason,
-      "AWS::ApiGatewayV2::Stage property DefaultRouteSettings is not " +
-        "simulated",
+      "AWS::ApiGatewayV2::Stage property AccessLogSettings is not simulated",
     );
     assertStringIncludes(
       reason,
       "The simulated properties are ApiId, StageName, AutoDeploy, " +
-        "StageVariables, Description.",
+        "StageVariables, Description, DefaultRouteSettings, RouteSettings.",
+    );
+  });
+
+  it("creates a stage without a route setting outside throttling", async () => {
+    // Given a stage throttling a route and asking to log it as well
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const stack = await deployHttpApi(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        stageProperties: {
+          RouteSettings: {
+            "GET /orders": {
+              ThrottlingRateLimit: 10,
+              ThrottlingBurstLimit: 5,
+              LoggingLevel: "INFO",
+            },
+          },
+        },
+      }),
+    );
+
+    // Then the throttle is deployed and only the logging is recorded, named by
+    // the entry of the template it was written on
+    assertTrue(stack.getResource("Stage")?.deployed);
+
+    const [ignored] = stack.ignoredProperties;
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "RouteSettings.GET /orders.LoggingLevel");
+    assertStringIncludes(
+      ignored.reason,
+      "AWS::ApiGatewayV2::Stage route setting LoggingLevel is not simulated",
     );
   });
 

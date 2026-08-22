@@ -6,6 +6,10 @@ import { simApiGatewayServicePrincipal } from "../../apigateway/sim-api-gateway-
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import type {
+  SimHttpApiRouteSettings,
+  SimHttpApiRouteSettingsMap,
+} from "./stage/settings/sim-http-api-route-settings.type.js";
 import type { SimHttpApi } from "./sim-http-api.js";
 import {
   simHttpApiProxyAuthorization,
@@ -51,6 +55,10 @@ export interface SimHttpApiLambdaProxyInput {
   readonly stageNames: readonly string[];
   /** The variables every one of those stages carries. */
   readonly stageVariables: Readonly<Record<string, string>>;
+  /** The throttle every one of those stages applies to any route. */
+  readonly defaultRouteSettings: SimHttpApiRouteSettings | undefined;
+  /** The throttles those stages apply to the route keys they name. */
+  readonly routeSettings: SimHttpApiRouteSettingsMap | undefined;
   /**
    * Whether the function grants the API permission to invoke it, which it
    * needs before any route serves anything.
@@ -103,6 +111,8 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     authorizationScopes: [],
     stageNames: ["$default"],
     stageVariables: {},
+    defaultRouteSettings: undefined,
+    routeSettings: undefined,
     invokePermission: true,
   }),
   async (input, simAws) => {
@@ -181,6 +191,8 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
             StageName: stageName,
             AutoDeploy: true,
             StageVariables: input.stageVariables,
+            DefaultRouteSettings: input.defaultRouteSettings,
+            RouteSettings: input.routeSettings,
           },
         }),
       ),

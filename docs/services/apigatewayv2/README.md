@@ -527,6 +527,158 @@ A request reaching an API with no stage for it, and no `$default` stage, is a 40
 on a `$default` match. `StageVariables` set on the stage arrive as `event.stageVariables`, and are
 left out the same way when the stage has none.
 
+## Throttling a stage and a route
+
+A stage holds a token bucket for every route it serves. `DefaultRouteSettings` sets the rate and the
+burst those buckets start with, and a `RouteSettings` entry keyed by route key overrides them for the
+route it names. `ThrottlingRateLimit` is requests per second, and `ThrottlingBurstLimit` is how many
+requests a route will take at once.
+
+A request that finds an empty bucket is answered 429 with `{"message":"Too Many Requests"}`. The
+route's authorizer and its integration are both skipped.
+
+The buckets refill against the simulated clock. Freeze it, spend a route's burst, assert on the 429,
+then move a second on and watch the route serve again.
+
+```typescript sim-apigatewayv2-throttling
+/**
+ * Throttling a simulated HTTP API stage and one of its routes.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "users",
+    Role: "arn:aws:iam::111111111111:role/UsersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: "ok",
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "users", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+for (const RouteKey of ["POST /user/password-reset", "GET /user/profile"]) {
+  await apiGateway.createRoute(
+    new CreateRouteCommand({
+      ApiId,
+      RouteKey,
+      Target: `integrations/${IntegrationId}`,
+    }),
+  );
+}
+
+await apiGateway.createStage(
+  new CreateStageCommand({
+    ApiId,
+    StageName: "$default",
+    AutoDeploy: true,
+    DefaultRouteSettings: { ThrottlingRateLimit: 10, ThrottlingBurstLimit: 5 },
+    RouteSettings: {
+      "POST /user/password-reset": {
+        ThrottlingRateLimit: 1,
+        ThrottlingBurstLimit: 2,
+      },
+    },
+  }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "users",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+// Stop simulated time. A bucket now refills only when this example moves it.
+simAws.clock().freeze();
+
+const passwordReset = async (): Promise<Response> =>
+  await fetch(srv.localUrl(`${ApiEndpoint}/user/password-reset`), {
+    method: "POST",
+  });
+
+const first = await passwordReset();
+const second = await passwordReset();
+const third = await passwordReset();
+
+console.log(first.status, second.status, third.status);
+console.log(await third.text());
+
+// Another route, drawing on the stage default and a bucket of its own.
+const profile = await fetch(srv.localUrl(`${ApiEndpoint}/user/profile`));
+console.log(profile.status);
+
+// One second at a rate limit of one is one token back.
+await simAws.clock().advanceBy({ seconds: 1 });
+const afterASecond = await passwordReset();
+console.log(afterASecond.status);
+
+await srv.close();
+```
+
+The burst of two is served, the third password reset is refused, and the profile route is untouched
+by any of it:
+
+```text
+200 200 429
+{"message":"Too Many Requests"}
+200
+200
+```
+
+Every client of a route draws on the same bucket. Two callers sending one request each spend two
+tokens between them. A WAFv2 `RateBasedStatement` counts each client on its own (see
+[Rate limiting](../wafv2/#rate-limiting)), and a stack often carries both.
+
+A route is throttled here only where the settings reaching it name both limits. Naming one alone
+leaves the other at the account limit on real AWS. Account limits are outside this simulation, and a
+route configured that way is served unthrottled.
+
+`GetStages` answers with the settings a stage was created with. `AWS::ApiGatewayV2::Stage` deploys
+both properties as well (see [CloudFormation](#cloudformation)). The three members of `RouteSettings`
+that say nothing about throttling, `DetailedMetricsEnabled`, `LoggingLevel` and `DataTraceEnabled`,
+are refused by `CreateStage`. A template carrying one deploys, and the member it named is recorded on
+`stack.ignoredProperties`.
+
 ## Protecting a route with a Cognito user pool
 
 A JWT authorizer verifies a signed token before the integration is invoked. `CreateAuthorizerCommand`
@@ -1976,7 +2128,8 @@ parts behaves differently to the template. The simulated properties are:
   `AuthorizerResultTtlInSeconds`
 - `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
 - `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
-- `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`
+- `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`,
+  `DefaultRouteSettings`, `RouteSettings`
 
 CDK's `HttpIamAuthorizer` deploys too. It emits no `AWS::ApiGatewayV2::Authorizer` and no
 `AuthorizerId`, only `AuthorizationType: "AWS_IAM"` on the `Route`, and the deployed route then
@@ -2106,6 +2259,8 @@ the simulation without being given one. See the
   to hold one per route
 - `CreateStage`, `GetStages` and `DeleteStage` for the `$default` stage and for named stages served
   under their own path segment, including stage variables
+- `DefaultRouteSettings` and `RouteSettings` throttling, with a token bucket per route refilling
+  against the simulated clock and a 429 for the requests past it
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
   payload format 2.0 event and turning its result back into an HTTP response
 - The invoke permission of an integration's function and of an authorizer's, each evaluated against
@@ -2136,8 +2291,9 @@ Current documented limitations:
 - Deployments are outside the simulation, so `CreateStage` requires `AutoDeploy: true`. A stage
   without it serves whichever Deployment it was given, which on real AWS is nothing until one is
   created.
-- `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any
-  other option `CreateStage` takes and this one lacks.
+- `AccessLogSettings` on a stage is refused, as is any other option `CreateStage` takes and this one
+  lacks. `RouteSettings` and `DefaultRouteSettings` are taken, and only their throttling members are
+  read. `DetailedMetricsEnabled`, `LoggingLevel` and `DataTraceEnabled` are refused by name.
 - `AWS_PROXY` is the only integration type, and its URI must name a Lambda function ARN, written
   either as that ARN or as the
   `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.
@@ -2288,7 +2444,10 @@ Current documented limitations:
   for a REST API, not against a gap here.
 - A stack update replaces a changed resource of these types rather than updating it in place, as it
   does for any other type. See the [CloudFormation limitations](../cloudformation/#limitations).
-- Access logging, throttling, usage plans and API keys are outside the simulation.
+- Access logging, usage plans and API keys are outside the simulation. Stage and route
+  throttling is simulated (see [Throttling a stage and a route](#throttling-a-stage-and-a-route)).
+  The account-level rate and burst limits are not. A stage that names no limit throttles nothing,
+  and a settings entry naming one limit alone leaves that route unthrottled.
 - The response an API Gateway endpoint returns itself uses a lower-case `message` field, as a real
   HTTP API does. A Lambda Function URL uses `Message` for the same thing, so the two cannot be
   swapped.

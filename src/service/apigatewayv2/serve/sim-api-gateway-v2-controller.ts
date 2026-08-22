@@ -24,7 +24,10 @@ interface SimApiGatewayV2ServiceControllerProperties {
  * format 2.0 event. The function runs as its execution Role, as it does for
  * any other invocation.
  *
- * A route that authorizes anybody is checked before any of that: a JWT route's
+ * The stage's throttle comes before any of that. A route whose bucket is empty
+ * is answered 429, and neither its authorizer nor its integration runs.
+ *
+ * A route that authorizes anybody is checked next: a JWT route's
  * token has to verify and meet the route's scopes, an `AWS_IAM` route's caller
  * has to be allowed `execute-api:Invoke` on the route, and a `CUSTOM` route's
  * Lambda authorizer has to allow the request, or the request is refused and the
@@ -91,7 +94,14 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       return this.errorResponse.notFound();
     }
 
-    // The client's own authorization comes first: a request with no
+    // The stage's throttle is asked before the route's authorizer. A flood of
+    // requests to a throttled route invokes neither. AWS publishes no order
+    // between the two.
+    if (!match.stage.admits(match.route.routeKey)) {
+      return this.errorResponse.tooManyRequests();
+    }
+
+    // The client's own authorization comes next: a request with no
     // credentials is refused whether or not the integration behind the route
     // would work.
     const authorization = await this.routeAuthorizer.authorize({

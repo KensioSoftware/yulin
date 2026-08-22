@@ -213,4 +213,48 @@ describe("API Gateway v2 CloudFormation deployment", () => {
     assertIdentical(response.status, 200);
     assertIdentical(await response.text(), "GET /orders {}");
   });
+
+  it("throttles a deployed stage's route at the limits it declares", async () => {
+    // Given a template whose stage throttles one route harder than the rest
+    const simAws = simAwsInEuWest2();
+    const stack = await deployHttpApi(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        handlerSource: routeReportingHandler,
+        routeKeys: ["GET /orders", "POST /orders"],
+        stageProperties: {
+          DefaultRouteSettings: {
+            ThrottlingRateLimit: 10,
+            ThrottlingBurstLimit: 5,
+          },
+          RouteSettings: {
+            "POST /orders": {
+              ThrottlingRateLimit: 1,
+              ThrottlingBurstLimit: 1,
+            },
+          },
+        },
+      }),
+    );
+
+    // When the throttled route is used twice over
+    const apiEndpoint = stack.outputs.get("ApiEndpoint")?.value;
+    assertTypeString(apiEndpoint);
+    simAws.clock().freeze();
+    const http = new SimAwsHttp({ simAws });
+    const served = await http.fetch(localUrl(apiEndpoint, "/orders"), {
+      method: "POST",
+    });
+    const refused = await http.fetch(localUrl(apiEndpoint, "/orders"), {
+      method: "POST",
+    });
+
+    // Then the deployed limits are the ones the stage serves at, and the route
+    // on the stage default is untouched by the other route's burst
+    assertIdentical(served.status, 200);
+    assertIdentical(refused.status, 429);
+
+    const other = await http.fetch(localUrl(apiEndpoint, "/orders"));
+    assertIdentical(other.status, 200);
+  });
 });
