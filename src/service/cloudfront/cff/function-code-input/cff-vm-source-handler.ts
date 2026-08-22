@@ -15,6 +15,15 @@ import { cffSourceWithoutCloudFrontImport } from "./cff-cloudfront-import.js";
  * Function's own `cf`, so two Functions running in one process each read the
  * key value store they are associated with and nothing else. A Function with no
  * association still gets a `cf`, one that refuses when asked to open a store.
+ *
+ * This evaluation runs on no timer. The 50ms real CloudFront allows a Function
+ * is compute for one invocation, and this runs at CreateFunction, once, over
+ * the top level of the source. A `vm` timeout counts wall clock, and on a
+ * loaded machine a top level of a few string literals can be preempted past
+ * 50ms after a fraction of a millisecond of its own work. Through
+ * CloudFormation that surfaces as a resource creation failure and takes the
+ * whole stack down. A Function whose top level loops forever hangs instead,
+ * and that is the better of the two failures.
  */
 export function cffHandlerFromSource(
   source: string,
@@ -27,7 +36,6 @@ export function cffHandlerFromSource(
     `);
 
   const handler = script.runInContext(context, {
-    timeout: 50, // Real CloudFront Functions have a short timeout.
     breakOnSigint: true,
   }) as CloudFrontFunction.Handler;
 
