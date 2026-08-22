@@ -50,6 +50,16 @@ function readPartitionKey(partitionKey: string | undefined): string {
 }
 
 /**
+ * The decimal Kinesis takes an explicit hash key as.
+ *
+ * Reading it with `BigInt` alone would take a good deal more than Kinesis does,
+ * including hexadecimal, a sign, surrounding whitespace and the empty string,
+ * each of which would silently place a record somewhere the producer never
+ * named.
+ */
+const explicitHashKeyPattern = /^(?:0|[1-9]\d{0,38})$/u;
+
+/**
  * Read the explicit hash key a record carries, when it carries one.
  *
  * Kinesis takes it as a decimal string because the hash key space runs to
@@ -62,17 +72,15 @@ function readExplicitHashKey(
     return undefined;
   }
 
-  let value: bigint;
-
-  try {
-    value = BigInt(explicitHashKey);
-  } catch {
+  if (!explicitHashKeyPattern.test(explicitHashKey)) {
     throw new SimKinesisInvalidArgumentException(
       `ExplicitHashKey '${explicitHashKey}' is not a whole number`,
     );
   }
 
-  if (value < 0n || value >= simKinesisHashKeySpace) {
+  const value = BigInt(explicitHashKey);
+
+  if (value >= simKinesisHashKeySpace) {
     throw new SimKinesisInvalidArgumentException(
       `ExplicitHashKey '${explicitHashKey}' is outside the 128 bit hash key ` +
         `space`,

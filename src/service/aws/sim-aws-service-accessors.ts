@@ -133,7 +133,6 @@ export abstract class SimAwsServiceAccessors {
     return this.defaultAccountRegionScope().iam();
   }
 
-  /** Get simulated KMS in the default Account Region scope. */
   /** Get simulated Kinesis Data Streams in the default Account Region scope. */
   kinesis(): SimKinesis {
     return this.defaultAccountRegionScope().kinesis();

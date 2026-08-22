@@ -134,4 +134,25 @@ describe("Where a record lands on a simulated Kinesis stream", () => {
     const records = await readShard(simAws, placement.ShardId);
     assertIdentical(records[0]?.PartitionKey, "customer-1");
   });
+
+  it("keeps the bytes a producer put, even after it reuses the buffer", async () => {
+    // Given a stream, and one buffer a producer fills for each record.
+    const simAws = new SimAws();
+    await simKinesisStreamFactory.make({}, simAws);
+    const buffer = new TextEncoder().encode("order-1");
+
+    // When a record is put and the producer refills that same buffer.
+    await simAws.kinesis().putRecord(
+      new PutRecordCommand({
+        StreamName: "orders",
+        PartitionKey: "customer-1",
+        Data: buffer,
+      }),
+    );
+    buffer.set(new TextEncoder().encode("order-2"));
+
+    // Then the record on the stream is the one that was put.
+    const records = await readShard(simAws, "shardId-000000000000");
+    assertIdentical(new TextDecoder().decode(records[0]?.Data), "order-1");
+  });
 });

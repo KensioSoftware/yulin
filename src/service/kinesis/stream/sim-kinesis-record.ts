@@ -9,9 +9,13 @@ interface SimKinesisRecordProperties {
 /**
  * One record on one shard of one stream.
  *
- * The data is held as the bytes the caller put, untouched. Real Kinesis carries
- * whatever it was given and hands the same bytes back, so a consumer decoding
- * JSON, Avro or anything else gets what the producer encoded.
+ * The data is a copy of the bytes the caller put. Real Kinesis serializes a
+ * record on the way in, so a producer reusing one buffer for record after
+ * record puts a different record each time. Holding the caller's array would
+ * make every record on the stream change together as that buffer was refilled.
+ *
+ * The bytes themselves are carried unchanged. A consumer decoding JSON, Avro or
+ * anything else gets what the producer encoded.
  */
 export class SimKinesisRecord {
   public readonly partitionKey: string;
@@ -23,8 +27,8 @@ export class SimKinesisRecord {
   constructor(properties: SimKinesisRecordProperties) {
     this.partitionKey = properties.partitionKey;
     this.explicitHashKey = properties.explicitHashKey;
-    this.data = properties.data;
+    this.data = Uint8Array.from(properties.data);
     this.sequenceNumber = properties.sequenceNumber;
-    this.arrivedAt = properties.arrivedAt;
+    this.arrivedAt = new Date(properties.arrivedAt);
   }
 }

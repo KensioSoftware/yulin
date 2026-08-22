@@ -35,3 +35,27 @@ export function simKinesisReadLimit(limit: number | undefined): number {
 
   return limit;
 }
+
+/**
+ * Refuse a request whose StreamARN disagrees with the iterator it carries.
+ *
+ * GetRecords takes both, and the iterator is the one that decides which stream
+ * is read. A request naming a different stream is refused rather than answered
+ * from the iterator's, since a caller that believed the ARN would be reading
+ * somewhere other than where it thinks.
+ */
+export function assertSimKinesisStreamArnMatches(
+  streamArn: string | undefined,
+  iteratorStreamArn: string,
+): void {
+  if (
+    streamArn !== undefined &&
+    streamArn !== "" &&
+    streamArn !== iteratorStreamArn
+  ) {
+    throw new SimKinesisInvalidArgumentException(
+      `StreamARN ${streamArn} is not the stream the ShardIterator was made ` +
+        `on, which is ${iteratorStreamArn}`,
+    );
+  }
+}

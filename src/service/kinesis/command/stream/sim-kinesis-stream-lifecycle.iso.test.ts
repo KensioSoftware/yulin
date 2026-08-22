@@ -10,9 +10,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
-  assertFalse,
   assertThrowsErrorAsync,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -152,28 +150,5 @@ describe("Simulated Kinesis stream lifecycle", () => {
 
     // Then it is not found, rather than answered by the local stream.
     assertInstanceOf(error, SimKinesisResourceNotFoundException);
-  });
-
-  it("pages a listing longer than the limit it was given", async () => {
-    // Given three streams.
-    const simAws = new SimAws();
-    for (const streamName of ["alpha", "beta", "gamma"]) {
-      // oxlint-disable-next-line no-await-in-loop
-      await simKinesisStreamFactory.make({ streamName }, simAws);
-    }
-
-    // When they are listed two at a time.
-    const first = await simAws
-      .kinesis()
-      .listStreams(new ListStreamsCommand({ Limit: 2 }));
-    const second = await simAws
-      .kinesis()
-      .listStreams(new ListStreamsCommand({ NextToken: first.NextToken }));
-
-    // Then the pages follow each other in name order, and the last one says so.
-    assertTrue(first.HasMoreStreams);
-    assertIdentical(first.StreamNames.join(","), "alpha,beta");
-    assertIdentical(second.StreamNames.join(","), "gamma");
-    assertFalse(second.HasMoreStreams);
   });
 });

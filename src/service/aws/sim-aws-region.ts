@@ -171,9 +171,8 @@ export class SimAwsRegion {
   }
 
   /**
-   * Get simulated KMS for this Region's default Account.
+   * Get simulated Kinesis Data Streams for this Region's default Account.
    */
-  /** Get simulated Kinesis Data Streams for this region. */
   kinesis(): SimKinesis {
     return this.account().kinesis();
   }

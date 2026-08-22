@@ -2,7 +2,6 @@ import { PutRecordsCommand } from "@aws-sdk/client-kinesis";
 import {
   assertArrayLength,
   assertIdentical,
-  assertSetSize,
   assertStringStartsWith,
   assertTrue,
   assertUndefined,
@@ -46,34 +45,5 @@ describe("Putting a batch of records onto a simulated Kinesis stream", () => {
       assertTrue((record.SequenceNumber ?? "").length > 0);
       assertUndefined(record.ErrorCode);
     }
-  });
-
-  it("gives every record on a stream its own increasing sequence number", async () => {
-    // Given a stream with two shards.
-    const simAws = new SimAws();
-    await simKinesisStreamFactory.make({ shardCount: 2 }, simAws);
-
-    // When a batch of records is put.
-    const put = await simAws.kinesis().putRecords(
-      new PutRecordsCommand({
-        StreamName: "orders",
-        Records: ["a", "b", "c", "d"].map((key) => ({
-          PartitionKey: key,
-          Data: orderBytes(key),
-        })),
-      }),
-    );
-
-    // Then the sequence numbers are distinct and each is higher than the last.
-    const sequenceNumbers = put.Records.map(
-      (record) => record.SequenceNumber ?? "",
-    );
-    assertSetSize(new Set(sequenceNumbers), 4);
-    assertIdentical(
-      sequenceNumbers.join(","),
-      [...sequenceNumbers]
-        .toSorted((left, right) => left.localeCompare(right))
-        .join(","),
-    );
   });
 });

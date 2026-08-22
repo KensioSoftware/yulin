@@ -40,7 +40,16 @@ export function simKinesisReadPutBatch(
   }
 
   const read = records.map((record) => simKinesisReadPutEntry(record));
-  const bytes = read.reduce((total, entry) => total + entry.data.byteLength, 0);
+
+  // AWS counts the partition keys towards the request limit, unlike the
+  // per-record one, which is on the data blob alone.
+  const bytes = read.reduce(
+    (total, entry) =>
+      total +
+      entry.data.byteLength +
+      Buffer.byteLength(entry.partitionKey, "utf8"),
+    0,
+  );
 
   if (bytes > maxBatchBytes) {
     throw new SimKinesisInvalidArgumentException(

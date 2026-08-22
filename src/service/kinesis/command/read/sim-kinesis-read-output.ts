@@ -15,7 +15,10 @@ export function simKinesisMillisBehindLatest(
 ): number {
   const last = returned.at(-1);
 
-  if (last === undefined || last === available.at(-1)) {
+  if (
+    last === undefined ||
+    last.sequenceNumber === available.at(-1)?.sequenceNumber
+  ) {
     return 0;
   }
 
@@ -24,14 +27,18 @@ export function simKinesisMillisBehindLatest(
 
 /**
  * One record as GetRecords hands it back.
+ *
+ * The bytes and the instant are copies, as they would be coming off the wire.
+ * A consumer that decodes in place, or that shifts a timestamp to its own zone,
+ * would otherwise be editing what is still on the stream.
  */
 export function simKinesisRecordOutput(
   record: SimKinesisRecord,
 ): SimKinesisRecordOutput {
   return {
     SequenceNumber: record.sequenceNumber,
-    ApproximateArrivalTimestamp: record.arrivedAt,
-    Data: record.data,
+    ApproximateArrivalTimestamp: new Date(record.arrivedAt),
+    Data: Uint8Array.from(record.data),
     PartitionKey: record.partitionKey,
   };
 }

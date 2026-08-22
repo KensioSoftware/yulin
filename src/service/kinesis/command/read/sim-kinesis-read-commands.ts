@@ -9,6 +9,7 @@ import type { SimKinesisRequestOptions } from "../sim-kinesis-request-options.js
 import type { SimKinesisStreamAccess } from "../sim-kinesis-stream-access.js";
 import { simKinesisIteratorPosition } from "./sim-kinesis-iterator-type.js";
 import {
+  assertSimKinesisStreamArnMatches,
   simKinesisReadLimit,
   simKinesisRequiredShardId,
 } from "./sim-kinesis-read-inputs.js";
@@ -87,6 +88,12 @@ export class SimKinesisReadCommands {
     const iterator = readSimKinesisShardIteratorToken(
       command.input.ShardIterator,
     );
+
+    assertSimKinesisStreamArnMatches(
+      command.input.StreamARN,
+      iterator.streamArn,
+    );
+
     const stream = this.access.require(
       "kinesis:GetRecords",
       { StreamARN: iterator.streamArn },
