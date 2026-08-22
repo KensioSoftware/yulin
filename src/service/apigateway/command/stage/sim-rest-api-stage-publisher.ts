@@ -1,5 +1,7 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimRestApiDeploymentId } from "../../api/deployment/sim-rest-api-deployment.js";
+import type { SimRestApiMethodSettingsMap } from "../../api/stage/settings/sim-rest-api-method-settings.type.js";
+import { SimRestApiStageMethodSettings } from "../../api/stage/settings/sim-rest-api-stage-method-settings.js";
 import { SimRestApiStage } from "../../api/stage/sim-rest-api-stage.js";
 import type { SimRestApi } from "../../api/sim-rest-api.js";
 import { SimRestApiStageRules } from "./sim-rest-api-stage-rules.js";
@@ -16,6 +18,7 @@ export interface SimRestApiStageInput {
   readonly deploymentId: SimRestApiDeploymentId;
   readonly description?: string | undefined;
   readonly variables?: Readonly<Record<string, string>> | undefined;
+  readonly methodSettings?: SimRestApiMethodSettingsMap | undefined;
 }
 
 /**
@@ -61,6 +64,25 @@ export class SimRestApiStagePublisher {
     return existing;
   }
 
+  /**
+   * The throttle a new stage serves at, or undefined for a stage that named no
+   * method settings.
+   *
+   * The buckets are a function of the same clock the stage is stamped with.
+   */
+  private throttle(
+    input: SimRestApiStageInput,
+  ): SimRestApiStageMethodSettings | undefined {
+    if (input.methodSettings === undefined) {
+      return undefined;
+    }
+
+    return new SimRestApiStageMethodSettings({
+      clock: this.clock,
+      methodSettings: input.methodSettings,
+    });
+  }
+
   private added(
     restApi: SimRestApi,
     input: SimRestApiStageInput,
@@ -68,6 +90,7 @@ export class SimRestApiStagePublisher {
     const stage = new SimRestApiStage({
       ...input,
       createdDate: this.clock.now(),
+      methodSettings: this.throttle(input),
     });
     restApi.stages.add(stage);
 

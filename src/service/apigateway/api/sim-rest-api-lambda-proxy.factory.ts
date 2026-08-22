@@ -14,11 +14,16 @@ import {
   simRestApiProxyFunction,
 } from "./sim-rest-api-proxy-function.js";
 import type { SimRestApi } from "./sim-rest-api.js";
+import {
+  simRestApiProxyStage,
+  type SimRestApiProxyStageInput,
+} from "./sim-rest-api-proxy-stage.js";
 
 /**
  * What a test asks for when it wants a REST API that serves something.
  */
-export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInput {
+export interface SimRestApiLambdaProxyInput
+  extends SimRestApiProxyAuthorizerInput, SimRestApiProxyStageInput {
   readonly apiName: string;
   readonly functionName: string;
   /** The function code every method of the API hands its requests to. */
@@ -31,10 +36,6 @@ export interface SimRestApiLambdaProxyInput extends SimRestApiProxyAuthorizerInp
   readonly resourcePaths: readonly string[];
   /** The HTTP method declared on each of those resources. */
   readonly httpMethod: string;
-  /** The stage the API is deployed to, which every request goes through. */
-  readonly stageName: string;
-  /** The variables that stage carries. */
-  readonly stageVariables: Readonly<Record<string, string>>;
   /**
    * Whether the function grants the API permission to invoke it, which it
    * needs before any method serves anything.
@@ -99,6 +100,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
     httpMethod: "ANY",
     stageName: "prod",
     stageVariables: {},
+    methodSettings: undefined,
     invokePermission: true,
   }),
   async (input, simAws) => {
@@ -128,13 +130,7 @@ export const simRestApiLambdaProxyFactory = new AsyncMappedFactory<
       await simRestApiInvokePermission(simAws, input, restApiId);
     }
 
-    await apiGateway.createDeployment({
-      input: {
-        restApiId,
-        stageName: input.stageName,
-        variables: input.stageVariables,
-      },
-    });
+    await simRestApiProxyStage(apiGateway, input, restApiId);
 
     // An id CreateRestApi allocated is an API the store holds, so this is only
     // missing if something is wrong with the simulator itself.

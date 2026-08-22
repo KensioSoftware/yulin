@@ -352,6 +352,125 @@ supplied as `AWS:SourceArn`, in the form
 granted for one method therefore leaves the others closed. CDK wildcards the stage, method and path segments,
 which admits every method of the API.
 
+## Throttling a stage and a method
+
+A stage holds a token bucket for every method it serves. A method setting is addressed by
+`{resourcePath}/{httpMethod}`, which is how API Gateway addresses one, and the entry keyed with a
+resource path of `/*` and a method of `*` is the stage default. `throttlingRateLimit` is requests per
+second, and `throttlingBurstLimit` is how many requests a method will take at once.
+
+A request that finds an empty bucket is answered 429 with `{"message":"Too Many Requests"}`. The
+method's authorizer and its integration are both skipped.
+
+The buckets refill against the simulated clock. Freeze it, spend a method's burst, assert on the 429,
+then move a second on and watch the method serve again.
+
+```typescript sim-apigateway-throttling
+/**
+ * Throttling a REST API stage and one of its methods.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/password-reset", "/profile"],
+    httpMethod: "POST",
+    methodSettings: {
+      "/*/*": { throttlingRateLimit: 10, throttlingBurstLimit: 5 },
+      "/password-reset/POST": {
+        throttlingRateLimit: 1,
+        throttlingBurstLimit: 2,
+      },
+    },
+    handler: () => ({ statusCode: 200, body: "ok" }),
+  },
+  simAws,
+);
+
+const srv = await serveSimAws({ simAws });
+
+// Stop simulated time. A bucket now refills only when this example moves it.
+simAws.clock().freeze();
+
+const passwordReset = async (): Promise<Response> =>
+  await fetch(srv.localUrl(`${restApi.invokeUrl("prod")}/password-reset`), {
+    method: "POST",
+  });
+
+const first = await passwordReset();
+const second = await passwordReset();
+const third = await passwordReset();
+
+console.log(first.status, second.status, third.status);
+console.log(await third.text());
+
+// Another method, drawing on the stage default and a bucket of its own.
+const profile = await fetch(
+  srv.localUrl(`${restApi.invokeUrl("prod")}/profile`),
+  { method: "POST" },
+);
+console.log(profile.status);
+
+// One second at a rate limit of one is one token back.
+await simAws.clock().advanceBy({ seconds: 1 });
+const afterASecond = await passwordReset();
+console.log(afterASecond.status);
+
+await srv.close();
+```
+
+The burst of two is served, the third password reset is refused, and the profile method is untouched
+by any of it:
+
+```text
+200 200 429
+{"message":"Too Many Requests"}
+200
+200
+```
+
+A template writes the same thing as a list, with each entry naming the method it applies to:
+
+```yaml
+ProdStage:
+  Type: AWS::ApiGateway::Stage
+  Properties:
+    RestApiId: !Ref Api
+    DeploymentId: !Ref Deployment
+    StageName: prod
+    MethodSettings:
+      - ResourcePath: "/*"
+        HttpMethod: "*"
+        ThrottlingRateLimit: 10
+        ThrottlingBurstLimit: 5
+      - ResourcePath: "/password-reset"
+        HttpMethod: POST
+        ThrottlingRateLimit: 1
+        ThrottlingBurstLimit: 2
+```
+
+Every client of a method draws on the same bucket. Two callers sending one request each spend two
+tokens between them. A WAFv2 `RateBasedStatement` counts each client on its own (see
+[Rate limiting](../wafv2/#rate-limiting)), and a stack often carries both.
+
+A method is throttled here only where the settings reaching it name both limits. Naming one alone
+leaves the other at the account limit on real AWS. Account limits are outside this simulation, and a
+method configured that way is served unthrottled.
+
+The `httpMethod` half of a key is the one the method was declared with. A resource declaring `ANY`
+is named `ANY`, whatever method the client sent.
+
+Real `CreateStage` carries no method settings. AWS sets them with `UpdateStage` patch operations,
+which are outside this simulation, or from an `AWS::ApiGateway::Stage`. The `methodSettings` input
+above is this simulator's own, so that a test can throttle a stage without a template, and the SDK's
+`CreateStageCommand` declares no such member. `GetStage` reports the settings the way AWS reports
+them.
+
 ## Authorizing a method
 
 A method is open unless it names an authorizer. `CreateAuthorizerCommand` creates one, and
@@ -1625,7 +1744,10 @@ behaves differently to the template. The simulated properties are:
 - A method's `Integration` block: `Type`, `IntegrationHttpMethod`, `Uri`
 - `Authorizer`: `RestApiId`, `Name`, `Type`, `AuthorizerUri`, `ProviderARNs`, `IdentitySource`
 - `Deployment`: `RestApiId`, `Description`, `StageName`
-- `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`
+- `Stage`: `RestApiId`, `DeploymentId`, `StageName`, `Description`, `Variables`,
+  `MethodSettings`
+- A stage's `MethodSettings` entries: `ResourcePath`, `HttpMethod`, `ThrottlingRateLimit`,
+  `ThrottlingBurstLimit`
 
 A `Body` on the `RestApi` is an inline OpenAPI document declaring the API's resources, methods and
 integrations. It goes through `ImportRestApi`, the same translator an SDK caller importing a
@@ -1735,7 +1857,12 @@ and behave differently deployed. The refusals worth knowing about:
 - **Integration types.** Only `AWS_PROXY` with a Lambda function URI is simulated. `MOCK`, `HTTP`,
   `HTTP_PROXY` and the non-proxy `AWS` type each answer a request from somewhere this cannot reach.
 - **API keys and usage plans.** `apiKeyRequired: true` is refused, because a method requiring a key
-  here would answer requests real AWS rejects.
+  here would answer requests real AWS rejects. A usage plan holds a per-key quota and is its own
+  feature. Stage throttling is simulated, and is a bucket shared by every client. See
+  [Throttling a stage and a method](#throttling-a-stage-and-a-method).
+- **Method settings outside throttling.** `cachingEnabled`, `metricsEnabled`, `loggingLevel` and
+  `dataTraceEnabled` are refused by `CreateStage`. A template carrying one deploys, and the member it
+  named is recorded on `stack.ignoredProperties`.
 - **Paging.** Every list command answers in full, and `limit` or `position` is refused.
 - **Endpoint types, request validators, models, mapping templates and WAF.** All refused.
 - **Updates.** `UpdateRestApi` replaces `/name` and `/description`. Any other patch path is refused.
@@ -1778,6 +1905,8 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
   API Gateway matches a token against before verifying it, is outside this.
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
   A response body is still base64 decoded when the handler says `isBase64Encoded`.
+- The account-level rate and burst limits are outside this. A stage that names no limit throttles
+  nothing, and a method setting naming one limit alone leaves that method unthrottled.
 - WebSocket APIs are outside this and outside the v2 service.
 - Only OpenAPI 3.0.x is imported. `ImportRestApi` and `PutRestApi` refuse a `swagger: "2.0"`
   document and an `openapi: "3.1.0"` one by version. A `Body` carrying a Swagger 2.0 document is

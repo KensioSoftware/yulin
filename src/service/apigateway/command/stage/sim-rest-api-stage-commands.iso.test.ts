@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
+  SimApiGatewayBadRequest,
   SimApiGatewayConflict,
   SimApiGatewayNotFound,
 } from "../../error/sim-api-gateway.error.js";
@@ -255,5 +256,118 @@ describe("Sim API Gateway REST API deployment and stage commands", () => {
     // Then it is refused
     await expect(deleted).rejects.toThrow(SimApiGatewayNotFound);
     await expect(deleted).rejects.toThrow("Invalid stage identifier");
+  });
+
+  it("keeps the method settings a stage was created with", async () => {
+    // Given a REST API with a deployment nothing serves yet
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+    const deployment = await simAws
+      .apiGateway()
+      .createDeployment(new CreateDeploymentCommand({ restApiId }));
+
+    // When a stage is created with a stage default and a method of its own.
+    // The settings are sent as a plain input, since real CreateStage carries
+    // no method settings and the SDK command declares no such member.
+    const created = await simAws.apiGateway().createStage({
+      input: {
+        restApiId,
+        stageName: "prod",
+        deploymentId: deployment.id,
+        methodSettings: {
+          "/*/*": { throttlingRateLimit: 10, throttlingBurstLimit: 5 },
+          "/password-reset/POST": {
+            throttlingRateLimit: 1,
+            throttlingBurstLimit: 2,
+          },
+        },
+      },
+    });
+
+    // Then both are reported back, by the create and by the get
+    expect(created.methodSettings?.["/*/*"]).toStrictEqual({
+      throttlingRateLimit: 10,
+      throttlingBurstLimit: 5,
+    });
+
+    const stage = await simAws
+      .apiGateway()
+      .getStage(new GetStageCommand({ restApiId, stageName: "prod" }));
+    expect(stage.methodSettings?.["/password-reset/POST"]).toStrictEqual({
+      throttlingRateLimit: 1,
+      throttlingBurstLimit: 2,
+    });
+  });
+
+  it("reports no method settings for a stage created without any", async () => {
+    // Given a REST API published to a stage that names no limits
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+    await simAws
+      .apiGateway()
+      .createDeployment(
+        new CreateDeploymentCommand({ restApiId, stageName: "prod" }),
+      );
+
+    // When the stage is read back
+    const stage = await simAws
+      .apiGateway()
+      .getStage(new GetStageCommand({ restApiId, stageName: "prod" }));
+
+    // Then nothing is reported, as AWS reports none for a stage that throttles
+    // at the account limits
+    assertUndefined(stage.methodSettings);
+  });
+
+  it("refuses a method setting that is not about throttling", async () => {
+    // Given a REST API with a deployment
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+    const deployment = await simAws
+      .apiGateway()
+      .createDeployment(new CreateDeploymentCommand({ restApiId }));
+
+    // When a stage asks for request logging alongside its throttle
+    const stage = {
+      input: {
+        restApiId,
+        stageName: "prod",
+        deploymentId: deployment.id,
+        methodSettings: {
+          "/orders/GET": { throttlingRateLimit: 1, loggingLevel: "INFO" },
+        },
+      },
+    };
+
+    // Then the member that is not simulated is refused by the path it was
+    // written at, rather than logging nothing while the throttle works
+    await expect(simAws.apiGateway().createStage(stage)).rejects.toThrow(
+      /methodSettings '\/orders\/GET' loggingLevel is not simulated/,
+    );
+  });
+
+  it("refuses a method settings key that names no method", async () => {
+    // Given a REST API with a deployment
+    const simAws = new SimAws();
+    const restApiId = await givenRestApi(simAws.apiGateway());
+    const deployment = await simAws
+      .apiGateway()
+      .createDeployment(new CreateDeploymentCommand({ restApiId }));
+
+    // When a key is written as something other than a resource path and an
+    // HTTP method
+    const stage = {
+      input: {
+        restApiId,
+        stageName: "prod",
+        deploymentId: deployment.id,
+        methodSettings: { orders: { throttlingRateLimit: 1 } },
+      },
+    };
+
+    // Then it is refused, because API Gateway would find no method under it
+    await expect(simAws.apiGateway().createStage(stage)).rejects.toThrow(
+      SimApiGatewayBadRequest,
+    );
   });
 });

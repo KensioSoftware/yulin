@@ -4,7 +4,7 @@ import type {
   SimHttpApiRouteSettingsMap,
   SimHttpApiRouteSettingsView,
 } from "./sim-http-api-route-settings.type.js";
-import { SimHttpApiTokenBucket } from "./sim-http-api-token-bucket.js";
+import { SimTokenBucket } from "../../../../../util/throttle/sim-token-bucket.js";
 
 interface SimHttpApiStageRouteSettingsProperties {
   readonly clock: SimClock;
@@ -31,7 +31,7 @@ export class SimHttpApiStageRouteSettings {
   readonly #clock: SimClock;
   readonly #defaultRouteSettings?: SimHttpApiRouteSettings | undefined;
   readonly #routeSettings: ReadonlyMap<string, SimHttpApiRouteSettings>;
-  readonly #buckets = new Map<string, SimHttpApiTokenBucket | undefined>();
+  readonly #buckets = new Map<string, SimTokenBucket | undefined>();
 
   constructor(properties: SimHttpApiStageRouteSettingsProperties) {
     this.#clock = properties.clock;
@@ -74,7 +74,7 @@ export class SimHttpApiStageRouteSettings {
    * The bucket a route key draws on, made the first time the route is asked
    * about so that it starts full at the request that found it.
    */
-  #bucketFor(routeKey: string): SimHttpApiTokenBucket | undefined {
+  #bucketFor(routeKey: string): SimTokenBucket | undefined {
     if (!this.#buckets.has(routeKey)) {
       this.#buckets.set(routeKey, this.#newBucket(routeKey));
     }
@@ -82,7 +82,7 @@ export class SimHttpApiStageRouteSettings {
     return this.#buckets.get(routeKey);
   }
 
-  #newBucket(routeKey: string): SimHttpApiTokenBucket | undefined {
+  #newBucket(routeKey: string): SimTokenBucket | undefined {
     const settings =
       this.#routeSettings.get(routeKey) ?? this.#defaultRouteSettings;
     const rateLimit = settings?.ThrottlingRateLimit;
@@ -92,7 +92,7 @@ export class SimHttpApiStageRouteSettings {
       return undefined;
     }
 
-    return new SimHttpApiTokenBucket({
+    return new SimTokenBucket({
       clock: this.#clock,
       rateLimit,
       burstLimit,

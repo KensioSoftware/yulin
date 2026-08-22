@@ -2,16 +2,17 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateStageCommandInput } from "../../command/stage/stage.command.js";
 import { SimCfnApiGatewayPropertyParser } from "../sim-cfn-api-gateway-property-parser.js";
+import { SimCfnRestApiMethodSettingsProperties } from "./sim-cfn-rest-api-method-settings-properties.js";
 
 /**
  * The AWS::ApiGateway::Stage properties this simulation deploys.
  *
- * `MethodSettings`, `AccessLogSetting`, `CanarySetting`, `CacheClusterEnabled`,
+ * `AccessLogSetting`, `CanarySetting`, `CacheClusterEnabled`,
  * `CacheClusterSize`, `ClientCertificateId`, `DocumentationVersion`,
  * `TracingEnabled` and `Tags` are left out, so a template carrying one has it
  * recorded against the Resource. None of them is modelled, and a stage that
- * looked throttled or logged to the template and did neither when serving is
- * the failure worth avoiding.
+ * looked logged to the template and logged nothing when serving is the failure
+ * worth recording.
  */
 const simulatedProperties = [
   "RestApiId",
@@ -19,6 +20,7 @@ const simulatedProperties = [
   "StageName",
   "Description",
   "Variables",
+  "MethodSettings",
 ];
 
 interface SimCfnRestApiStagePropertiesProperties {
@@ -38,9 +40,14 @@ export class SimCfnRestApiStageProperties {
     simulated: simulatedProperties,
   });
 
+  private readonly methodSettingsParser: SimCfnRestApiMethodSettingsProperties;
+
   constructor(properties: SimCfnRestApiStagePropertiesProperties) {
     this.resource = properties.resource;
     this.properties = properties.properties;
+    this.methodSettingsParser = new SimCfnRestApiMethodSettingsProperties({
+      resource: this.resource,
+    });
 
     this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
@@ -75,7 +82,9 @@ export class SimCfnRestApiStageProperties {
    * `DeploymentId` is the `Ref` to the AWS::ApiGateway::Deployment this stage
    * serves. A deployment id naming nothing on the API is refused by
    * CreateStage, which is what stops a `Ref` to a Resource this simulation
-   * skipped from publishing a stage that serves nothing.
+   * skipped from publishing a stage that serves nothing. `MethodSettings`
+   * arrives holding only its throttling members, so the ones CreateStage would
+   * refuse never reach it from a template.
    */
   createStageInput(): SimCreateStageCommandInput {
     return {
@@ -95,6 +104,10 @@ export class SimCfnRestApiStageProperties {
         this.resource,
         this.properties["Variables"],
         "Variables",
+      ),
+      methodSettings: this.methodSettingsParser.methodSettings(
+        this.properties["MethodSettings"],
+        "MethodSettings",
       ),
     };
   }

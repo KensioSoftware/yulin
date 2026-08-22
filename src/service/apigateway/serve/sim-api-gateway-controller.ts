@@ -29,7 +29,10 @@ interface SimApiGatewayServiceControllerProperties {
  * simulated Lambda function with a payload format 1.0 event. The function runs
  * as its execution Role, as it does for any other invocation.
  *
- * A method that authorizes anybody is checked before any of that. An `AWS_IAM`
+ * The stage's throttle comes before any of that. A method whose bucket is
+ * empty is answered 429, and neither its authorizer nor its integration runs.
+ *
+ * A method that authorizes anybody is checked next. An `AWS_IAM`
  * method's caller has to be allowed `execute-api:Invoke` on the method, and a
  * `CUSTOM` method's Lambda authorizer has to allow the request, or the request
  * is refused and the integration is never invoked. Whether the API may invoke a
@@ -108,6 +111,13 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
 
     if (!isSimRestApiMatch(match)) {
       return this.missResponse(match);
+    }
+
+    // The stage's throttle is asked before the method's authorizer. A flood of
+    // requests to a throttled method invokes neither. AWS publishes no order
+    // between the two.
+    if (!match.stage.admits(match.resource.path, match.method.httpMethod)) {
+      return this.errorResponse.tooManyRequests();
     }
 
     // The client's own authorization comes next: a request with no
