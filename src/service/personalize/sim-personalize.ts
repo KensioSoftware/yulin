@@ -1,4 +1,7 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimPersonalizeRecordedEvent } from "./event/sim-personalize-recorded-event.js";
+import type { SimPersonalizeRecordedItem } from "./event/sim-personalize-recorded-item.js";
+import type { SimPersonalizeRecordedUser } from "./event/sim-personalize-recorded-user.js";
 import type { SimPersonalizeRankings } from "./recommendation/sim-personalize-rankings.js";
 import type { SimPersonalizeRecommendations } from "./recommendation/sim-personalize-recommendations.js";
 import type { SimPersonalizeCampaign } from "./resource/sim-personalize-campaign.js";
@@ -6,6 +9,7 @@ import type { SimPersonalizeDatasetGroup } from "./resource/sim-personalize-data
 import type { SimPersonalizeSolution } from "./resource/sim-personalize-solution.js";
 import { SimPersonalizeSdkCommandRouter } from "./sdk/sim-personalize-sdk-command-router.js";
 import { SimPersonalizeControlPlane } from "./sim-personalize-control-plane.js";
+import { SimPersonalizeEvents } from "./sim-personalize-events.js";
 import { SimPersonalizeRuntime } from "./sim-personalize-runtime.js";
 
 /**
@@ -22,12 +26,23 @@ import { SimPersonalizeRuntime } from "./sim-personalize-runtime.js";
  * to a campaign. The runtime operations a campaign answers are on `runtime()`,
  * as they are on a client of their own in the SDK, and what they answer with
  * is declared through `recommendations()` and `rankings()`.
+ *
+ * The events API is on `events()`, on a client of its own again. What it is
+ * sent is read back through `recordedEvents()`, `recordedItems()` and
+ * `recordedUsers()`.
  */
 export class SimPersonalize extends SimPersonalizeControlPlane {
   private readonly sdkRouter = new SimPersonalizeSdkCommandRouter(this);
   private readonly runtimeApi = new SimPersonalizeRuntime({
     recommendations: this.commands.recommendations,
     rankings: this.commands.rankings,
+    background: this.background,
+  });
+
+  private readonly eventsApi = new SimPersonalizeEvents({
+    putEvents: this.commands.putEvents,
+    putItems: this.commands.putItems,
+    putUsers: this.commands.putUsers,
     background: this.background,
   });
 
@@ -41,6 +56,38 @@ export class SimPersonalize extends SimPersonalizeControlPlane {
    */
   runtime(): SimPersonalizeRuntime {
     return this.runtimeApi;
+  }
+
+  /**
+   * The Personalize Events API over this simulated Personalize.
+   *
+   * A third API over one service's state. `PutEvents` names a tracking
+   * ID this Account and Region holds an event tracker for, and what it records
+   * is read back here.
+   */
+  events(): SimPersonalizeEvents {
+    return this.eventsApi;
+  }
+
+  /**
+   * Every item interaction the events API has accepted, oldest first.
+   *
+   * This is the simulator's own accessor rather than a Personalize operation.
+   * Real Personalize puts the interactions into a dataset a later training run
+   * reads, and offers no way to read them back.
+   */
+  recordedEvents(): readonly SimPersonalizeRecordedEvent[] {
+    return this.commands.records.events;
+  }
+
+  /** Every item PutItems has added, oldest first. */
+  recordedItems(): readonly SimPersonalizeRecordedItem[] {
+    return this.commands.records.items;
+  }
+
+  /** Every user PutUsers has added, oldest first. */
+  recordedUsers(): readonly SimPersonalizeRecordedUser[] {
+    return this.commands.records.users;
   }
 
   /**

@@ -287,6 +287,153 @@ names one case insensitively and Personalize upper-cases it. `ACTIONS` and `ACTI
 belong to Next-Best-Action, and real Personalize allows them only in a custom dataset group. A
 domain dataset group refuses them here too.
 
+## Recording events
+
+An event tracker is where `PutEvents` sends item interactions. It is created against a dataset
+group and reports a tracking ID back, and every `PutEvents` names that ID.
+
+```typescript sim-personalize-event-tracker
+/**
+ * Recording an item interaction through an event tracker.
+ */
+
+import {
+  CreateDatasetGroupCommand,
+  CreateEventTrackerCommand,
+} from "@aws-sdk/client-personalize";
+import { PutEventsCommand } from "@aws-sdk/client-personalize-events";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const group = await simAws
+  .personalize()
+  .createDatasetGroup(new CreateDatasetGroupCommand({ name: "catalogue" }));
+
+const tracker = await simAws.personalize().createEventTracker(
+  new CreateEventTrackerCommand({
+    name: "catalogue-events",
+    datasetGroupArn: group.datasetGroupArn,
+  }),
+);
+
+await simAws.personalizeEvents().putEvents(
+  new PutEventsCommand({
+    trackingId: tracker.trackingId,
+    userId: "visitor-7",
+    sessionId: "session-1",
+    eventList: [
+      { eventType: "view", itemId: "entry-1042", sentAt: new Date() },
+    ],
+  }),
+);
+
+const [event] = simAws.personalize().recordedEvents();
+
+// view entry-1042 visitor-7
+console.log(event?.eventType, event?.itemId, event?.userId);
+```
+
+The three events operations live on `simAws.personalizeEvents()`, and an intercepted
+`PersonalizeEventsClient` reaches the same place. They arrive from a third SDK package
+(`@aws-sdk/client-personalize-events`), as they do on AWS.
+
+`recordedEvents()` reads the interactions back, oldest first. A batch is recorded in the order the
+request listed it. Each record carries the `eventType`, `sentAt`, `itemId`, `properties`, `userId`
+and `sessionId` the request gave, along with the tracking ID it named and the ARN of the tracker
+behind it. `eventValue`, `eventId`, `recommendationId` and `impression` are recorded too.
+
+The `properties` of an event are held as the JSON string the wire would carry. The SDK turns an
+object into one on its way out. An object handed to the client is serialised here before it is
+recorded, and a test asserting on one field parses it back.
+
+An event that leaves `sentAt` out is stamped from the simulated clock. Moving the clock therefore
+decides what a later event records:
+
+```typescript sim-personalize-event-clock
+/**
+ * Timestamping an event from the simulated clock.
+ */
+
+import { PutEventsCommand } from "@aws-sdk/client-personalize-events";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const trackingId: string;
+
+simAws.clock().freeze();
+await simAws.clock().setTo(new Date("2026-03-04T10:00:00.000Z"));
+
+await simAws.personalizeEvents().putEvents(
+  new PutEventsCommand({
+    trackingId,
+    sessionId: "session-1",
+    // The SDK types make sentAt a required property, so it is passed as
+    // undefined rather than left off.
+    eventList: [{ eventType: "view", itemId: "entry-1042", sentAt: undefined }],
+  }),
+);
+
+// 2026-03-04T10:00:00.000Z
+console.log(simAws.personalize().recordedEvents()[0]?.sentAt.toISOString());
+```
+
+A `PutEvents` naming a tracking ID no tracker holds raises `ResourceNotFoundException`, and nothing
+is recorded. One request carries up to ten events. Real Personalize applies the same limit.
+
+### Items and users
+
+`PutItems` and `PutUsers` are how a catalogue update reaches Personalize between import jobs. Each
+one names the dataset it adds to, an Items dataset or a Users dataset.
+
+```typescript sim-personalize-put-items
+/**
+ * Adding an item and a user through the events API.
+ */
+
+import {
+  PutItemsCommand,
+  PutUsersCommand,
+} from "@aws-sdk/client-personalize-events";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const itemsDatasetArn: string;
+declare const usersDatasetArn: string;
+
+await simAws.personalizeEvents().putItems(
+  new PutItemsCommand({
+    datasetArn: itemsDatasetArn,
+    items: [
+      { itemId: "entry-1042", properties: { category: "Horror|Action" } },
+    ],
+  }),
+);
+
+await simAws.personalizeEvents().putUsers(
+  new PutUsersCommand({
+    datasetArn: usersDatasetArn,
+    users: [{ userId: "visitor-7", properties: { membership: "Frequent" } }],
+  }),
+);
+
+// entry-1042 visitor-7
+console.log(
+  simAws.personalize().recordedItems()[0]?.itemId,
+  simAws.personalize().recordedUsers()[0]?.userId,
+);
+```
+
+`recordedItems()` and `recordedUsers()` read them back the way `recordedEvents()` does. The
+datasets themselves stay empty, as every simulated dataset does.
+
+A dataset ARN of the wrong type is refused as invalid input. Sending items to the Interactions
+dataset of the same group is the mistake this catches. Both operations take up to ten records in
+one request.
+
 ## Domain dataset groups
 
 A dataset group created with a domain of `ECOMMERCE` or `VIDEO_ON_DEMAND` is a Domain dataset group.
@@ -319,7 +466,8 @@ console.log(group.domain);
 ## Reading state back
 
 `findDatasetGroup`, `findSolution` and `findCampaign` read resources by name without going through a
-Command or its authorization.
+Command or its authorization. `recordedEvents()`, `recordedItems()` and `recordedUsers()` read back
+what the events API was sent.
 
 ```typescript sim-personalize-accessors
 /**
@@ -344,17 +492,20 @@ console.log(group?.name, group?.status);
 
 ## Deleting resources
 
-Deletion follows real Personalize. A dataset group holding datasets or solutions is reported as
-`ResourceInUseException`, and so is a solution a campaign still deploys. Tear a chain down from the
-campaign end.
+Deletion follows real Personalize. A dataset group holding datasets, solutions or an event tracker
+is reported as `ResourceInUseException`, and so is a solution a campaign still deploys. Tear a chain
+down from the campaign end.
+
+Deleting an event tracker leaves the events it accepted recorded, as real Personalize leaves the
+interactions it wrote in the dataset behind it.
 
 Deleting a solution takes its versions with it. Real Personalize has no `DeleteSolutionVersion`
 either.
 
 ## Supported commands
 
-Dataset groups, schemas, datasets, solutions and campaigns each have `Create`, `Describe`, `List`
-and `Delete`. Solution versions have `Create`, `Describe` and `List`.
+Dataset groups, schemas, datasets, solutions, campaigns and event trackers each have `Create`,
+`Describe`, `List` and `Delete`. Solution versions have `Create`, `Describe` and `List`.
 
 Every command works through `simAws.personalize()` and through an intercepted `PersonalizeClient`.
 Each one authorizes through simulated IAM, against the resource ARN where the request names one and
@@ -363,6 +514,11 @@ against `*` on a create.
 The runtime API has `GetRecommendations` and `GetPersonalizedRanking`. Both work through
 `simAws.personalizeRuntime()` and through an intercepted `PersonalizeRuntimeClient`, and both
 authorize against the campaign ARN the request names.
+
+The events API has `PutEvents`, `PutItems` and `PutUsers`. All three work through
+`simAws.personalizeEvents()` and through an intercepted `PersonalizeEventsClient`. `PutEvents`
+authorizes against the ARN of the tracker its tracking ID belongs to, and the other two against the
+dataset ARN they name.
 
 ## Divergences and limitations
 
@@ -379,7 +535,15 @@ authorize against the campaign ARN the request names.
   simulation leaves out by design. A runtime request naming a `filterArn` is refused by name.
 - **No `GetActionRecommendations`.** Actions are a dataset type with interactions of their own, and
   the Next-Best-Action operations arrive with them.
-- **No events.** `PutEvents`, `PutItems`, `PutUsers` and event trackers arrive with the events API.
+- **A recorded event trains nothing.** Real Personalize puts the interaction into the Interactions
+  dataset behind the tracker, and a later training run reads it. A campaign here answers with what
+  was declared against it however many events it has been sent.
+- **A tracking ID is a UUID that changes every run.** Real Personalize generates one too. Read it
+  from the `CreateEventTracker` response rather than writing it down.
+- **No `metricAttribution` on an event.** It ties an event to a metric attribution report, and
+  `CreateMetricAttribution` is absent. An event carrying one is refused by name.
+- **No `PutActions` or `PutActionInteractions`.** They belong with Next-Best-Action, alongside
+  `GetActionRecommendations`.
 - **No recommenders.** `CreateRecommender` and the ten domain use cases arrive with the domain
   path.
 - **No CloudFormation.** `AWS::Personalize::*` resource types arrive with their own issue. Real

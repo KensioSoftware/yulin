@@ -212,6 +212,7 @@
     "@aws-sdk/client-kms": "^3.1101.0",
     "@aws-sdk/client-lambda": "^3.1101.0",
     "@aws-sdk/client-personalize": "^3.1115.0",
+    "@aws-sdk/client-personalize-events": "^3.1115.0",
     "@aws-sdk/client-personalize-runtime": "^3.1115.0",
     "@aws-sdk/client-rekognition": "^3.1101.0",
     "@aws-sdk/client-route-53": "^3.1101.0",

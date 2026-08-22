@@ -198,6 +198,6 @@ describe("Personalize SDK interception", () => {
     }
 
     assertUndefined(supported.route("CreateRecommenderCommand"));
-    assertArrayLength(supported.supportedCommandNames(), 23);
+    assertArrayLength(supported.supportedCommandNames(), 27);
   });
 });

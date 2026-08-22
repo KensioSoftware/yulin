@@ -51,6 +51,37 @@ export type {
   SimPersonalizeDatasetSummary,
 } from "./dataset/dataset.command.js";
 export type {
+  SimCreateEventTrackerCommand,
+  SimCreateEventTrackerCommandInput,
+  SimCreateEventTrackerCommandOutput,
+  SimDeleteEventTrackerCommand,
+  SimDeleteEventTrackerCommandInput,
+  SimDeleteEventTrackerCommandOutput,
+  SimDescribeEventTrackerCommand,
+  SimDescribeEventTrackerCommandInput,
+  SimDescribeEventTrackerCommandOutput,
+  SimListEventTrackersCommand,
+  SimListEventTrackersCommandInput,
+  SimListEventTrackersCommandOutput,
+  SimPersonalizeEventTrackerDetail,
+  SimPersonalizeEventTrackerSummary,
+} from "./event-tracker/event-tracker.command.js";
+export type {
+  SimPersonalizeEventInput,
+  SimPersonalizeItemInput,
+  SimPersonalizeProperties,
+  SimPersonalizeUserInput,
+  SimPutEventsCommand,
+  SimPutEventsCommandInput,
+  SimPutEventsCommandOutput,
+  SimPutItemsCommand,
+  SimPutItemsCommandInput,
+  SimPutItemsCommandOutput,
+  SimPutUsersCommand,
+  SimPutUsersCommandInput,
+  SimPutUsersCommandOutput,
+} from "./events/events.command.js";
+export type {
   SimCreateSchemaCommand,
   SimCreateSchemaCommandInput,
   SimCreateSchemaCommandOutput,

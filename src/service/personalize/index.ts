@@ -1,5 +1,6 @@
 export { SimPersonalize } from "./sim-personalize.js";
 export { SimPersonalizeRuntime } from "./sim-personalize-runtime.js";
+export { SimPersonalizeEvents } from "./sim-personalize-events.js";
 export { SimPersonalizeRecommendations } from "./recommendation/sim-personalize-recommendations.js";
 export { SimPersonalizeRankings } from "./recommendation/sim-personalize-rankings.js";
 export type {
@@ -8,6 +9,13 @@ export type {
   SimPersonalizeItemDeclaration,
 } from "./recommendation/sim-personalize-item-declaration.js";
 export type { SimPersonalizeRequestOptions } from "./command/sim-personalize-request-options.js";
+export { SimPersonalizeRecordedEvent } from "./event/sim-personalize-recorded-event.js";
+export { SimPersonalizeRecordedItem } from "./event/sim-personalize-recorded-item.js";
+export { SimPersonalizeRecordedUser } from "./event/sim-personalize-recorded-user.js";
+export {
+  SimPersonalizeEventTracker,
+  type SimPersonalizeEventTrackerProperties,
+} from "./resource/sim-personalize-event-tracker.js";
 export {
   SimPersonalizeDatasetGroup,
   type SimPersonalizeDatasetGroupProperties,

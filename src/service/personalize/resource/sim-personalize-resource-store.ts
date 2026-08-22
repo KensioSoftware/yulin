@@ -12,6 +12,12 @@ interface SimPersonalizeResourceStoreProperties {
    * "solution", "campaign".
    */
   readonly description: string;
+
+  /**
+   * The indefinite article the description takes, where "A" is wrong. "event
+   * tracker" is the only one so far.
+   */
+  readonly article?: string;
 }
 
 /**
@@ -24,9 +30,11 @@ interface SimPersonalizeResourceStoreProperties {
 export class SimPersonalizeResourceStore<T extends SimPersonalizeResource> {
   private readonly resources = new Map<string, T>();
   private readonly description: string;
+  private readonly article: string;
 
   constructor(properties: SimPersonalizeResourceStoreProperties) {
     this.description = properties.description;
+    this.article = properties.article ?? "A";
   }
 
   /**
@@ -103,7 +111,7 @@ export class SimPersonalizeResourceStore<T extends SimPersonalizeResource> {
     }
 
     throw new SimPersonalizeResourceAlreadyExistsException(
-      `A ${this.description} named '${name}' already exists`,
+      `${this.article} ${this.description} named '${name}' already exists`,
     );
   }
 

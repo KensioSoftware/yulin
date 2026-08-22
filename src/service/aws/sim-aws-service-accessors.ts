@@ -20,6 +20,7 @@ import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
 import type {
   SimPersonalize,
+  SimPersonalizeEvents,
   SimPersonalizeRuntime,
 } from "../personalize/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
@@ -157,6 +158,14 @@ export abstract class SimAwsServiceAccessors {
    */
   personalizeRuntime(): SimPersonalizeRuntime {
     return this.defaultAccountRegionScope().personalizeRuntime();
+  }
+
+  /**
+   * Get the simulated Personalize Events API in the default Account Region
+   * scope.
+   */
+  personalizeEvents(): SimPersonalizeEvents {
+    return this.defaultAccountRegionScope().personalizeEvents();
   }
 
   /** Get simulated Rekognition in the default Account Region scope. */
