@@ -1,7 +1,9 @@
+import type { SimFirehoseSource } from "../../source/sim-firehose-source.js";
 import type { SimFirehoseDeliveryStream } from "../../stream/sim-firehose-delivery-stream.js";
 import type {
   SimFirehoseDeliveryStreamDescription,
   SimFirehoseDestinationDescription,
+  SimFirehoseSourceDescription,
 } from "./stream.command.js";
 
 /**
@@ -33,8 +35,34 @@ export function deliveryStreamDescription(
     DeliveryStreamType: deliveryStream.deliveryStreamType,
     VersionId: deliveryStream.versionId,
     CreateTimestamp: deliveryStream.createdAt,
+    ...sourceDescription(deliveryStream.source),
     Destinations: [destinationDescription(deliveryStream)],
     HasMoreDestinations: false,
+  };
+}
+
+/**
+ * Where a delivery stream reads from, for the ones that read.
+ *
+ * A `DirectPut` delivery stream carries no `Source` at all, which is what real
+ * Firehose reports for one, so this answers with nothing to spread rather than
+ * with an absent field.
+ */
+function sourceDescription(source: SimFirehoseSource): {
+  Source?: SimFirehoseSourceDescription;
+} {
+  if (source.kind !== "kinesis-stream") {
+    return {};
+  }
+
+  return {
+    Source: {
+      KinesisStreamSourceDescription: {
+        KinesisStreamARN: source.streamArn.value,
+        RoleARN: source.roleArn,
+        DeliveryStartTimestamp: source.startedAt,
+      },
+    },
   };
 }
 

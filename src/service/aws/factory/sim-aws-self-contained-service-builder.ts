@@ -54,11 +54,16 @@ export class SimAwsSelfContainedServiceBuilder {
   /**
    * Create simulated Kinesis Data Firehose for an Account Region scope.
    *
-   * Delivery streams are Region-scoped on real AWS, and a delivery stream
-   * writes into a Bucket through that same scope's simulated S3.
+   * Delivery streams are Region-scoped on real AWS. A delivery stream writes
+   * into a Bucket through that same scope's simulated S3, and reads a source
+   * stream through that same scope's simulated Kinesis.
    */
   createFirehose(scope: SimAwsAccountRegionContainer): SimFirehose {
-    return new SimFirehose({ ...this.scoped(scope), s3: scope.s3() });
+    return new SimFirehose({
+      ...this.scoped(scope),
+      s3: scope.s3(),
+      kinesis: scope.kinesis(),
+    });
   }
 
   /**

@@ -12,13 +12,7 @@ import type { SimCreateDeliveryStreamCommandInput } from "../command/stream/stre
 import {
   SimFirehoseInvalidArgumentException,
   SimFirehoseUnsimulatedDestination,
-  SimFirehoseUnsimulatedSource,
 } from "../error/sim-firehose.error.js";
-
-const validS3Destination = {
-  BucketARN: "arn:aws:s3:::order-archive",
-  RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
-};
 
 /**
  * Try to create a delivery stream, and hand back what refused it.
@@ -77,23 +71,5 @@ describe("What a simulated Firehose delivery stream refuses to be", () => {
 
     assertInstanceOf(error, SimFirehoseInvalidArgumentException);
     assertStringIncludes(error.message, "no destination");
-  });
-
-  it("refuses a Kinesis stream as the source", async () => {
-    // Given a delivery stream that would read from a Kinesis stream.
-    const error = await refusalOf({
-      DeliveryStreamName: "order-events",
-      DeliveryStreamType: "KinesisStreamAsSource",
-      KinesisStreamSourceConfiguration: {
-        KinesisStreamARN:
-          "arn:aws:kinesis:us-east-1:888888888888:stream/orders",
-        RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
-      },
-      ExtendedS3DestinationConfiguration: validS3Destination,
-    });
-
-    // Then it says so, rather than taking nothing and delivering nothing.
-    assertInstanceOf(error, SimFirehoseUnsimulatedSource);
-    assertStringIncludes(error.message, "DirectPut");
   });
 });

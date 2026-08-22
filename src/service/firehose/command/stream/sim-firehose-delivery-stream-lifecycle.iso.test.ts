@@ -240,7 +240,7 @@ describe("Simulated Firehose delivery stream lifecycle", () => {
   });
 
   it("lists nothing for a delivery stream type nothing has", async () => {
-    // Given a DirectPut delivery stream, which is the only type simulated.
+    // Given a DirectPut delivery stream, and nothing reading a stream.
     const simAws = await simAwsWithBucket();
     await simFirehoseDeliveryStreamFactory.make({}, simAws);
 

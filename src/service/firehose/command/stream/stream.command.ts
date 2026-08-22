@@ -1,5 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimFirehoseDestinationInput } from "../../destination/sim-firehose-destination-choice.js";
+import type { SimFirehoseSourceInput } from "../../source/sim-firehose-source-choice.js";
 
 /**
  * One tag as a CreateDeliveryStream request carries it.
@@ -18,10 +19,9 @@ export interface SimCreateDeliveryStreamCommand {
   readonly input: SimCreateDeliveryStreamCommandInput;
 }
 
-export interface SimCreateDeliveryStreamCommandInput extends SimFirehoseDestinationInput {
+export interface SimCreateDeliveryStreamCommandInput
+  extends SimFirehoseDestinationInput, SimFirehoseSourceInput {
   readonly DeliveryStreamName?: string | undefined;
-  readonly DeliveryStreamType?: string | undefined;
-  readonly KinesisStreamSourceConfiguration?: unknown;
   readonly DeliveryStreamEncryptionConfigurationInput?: unknown;
   readonly Tags?: readonly SimFirehoseTag[] | undefined;
 }
@@ -100,6 +100,27 @@ export interface SimFirehoseDestinationDescription {
 }
 
 /**
+ * The Kinesis stream a delivery stream reads, as DescribeDeliveryStream reports
+ * it.
+ */
+export interface SimFirehoseKinesisStreamSourceDescription {
+  readonly KinesisStreamARN: string;
+  readonly RoleARN: string;
+  readonly DeliveryStartTimestamp: Date;
+}
+
+/**
+ * Where a delivery stream's records come from, as DescribeDeliveryStream
+ * reports it.
+ *
+ * A `DirectPut` delivery stream reports no source at all, as it does on real
+ * Firehose. Nothing put the records there but the producer.
+ */
+export interface SimFirehoseSourceDescription {
+  readonly KinesisStreamSourceDescription: SimFirehoseKinesisStreamSourceDescription;
+}
+
+/**
  * One delivery stream, as DescribeDeliveryStream reports it.
  */
 export interface SimFirehoseDeliveryStreamDescription {
@@ -109,6 +130,7 @@ export interface SimFirehoseDeliveryStreamDescription {
   readonly DeliveryStreamType: string;
   readonly VersionId: string;
   readonly CreateTimestamp: Date;
+  readonly Source?: SimFirehoseSourceDescription | undefined;
   readonly Destinations: readonly SimFirehoseDestinationDescription[];
   readonly HasMoreDestinations: boolean;
 }
