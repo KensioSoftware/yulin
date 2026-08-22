@@ -8,7 +8,10 @@ import type {
   SimCreateStateMachineCommand,
   SimCreateStateMachineCommandOutput,
 } from "./machine.command.js";
-import { readSimStateMachineCreateInput } from "./sim-state-machine-input.js";
+import {
+  type SimStateMachineCreateInput,
+  readSimStateMachineCreateInput,
+} from "./sim-state-machine-input.js";
 
 interface SimStateMachineCreateProperties {
   readonly stateMachines: SimStateMachineStore;
@@ -36,16 +39,19 @@ export class SimStateMachineCreate {
    * A definition using something this simulator does not run is refused here
    * rather than when an execution reaches the state, which is where real Step
    * Functions refuses a malformed one too.
+   *
+   * `CreateStateMachine` is idempotent. A second request carrying the same
+   * name, definition and type answers with the state machine that is already
+   * there.
    */
   handle(
     command: SimCreateStateMachineCommand,
   ): SimCreateStateMachineCommandOutput {
     const read = readSimStateMachineCreateInput(command.input);
+    const existing = this.#stateMachines.findByName(read.name);
 
-    if (this.#stateMachines.findByName(read.name) !== undefined) {
-      throw new SimStateMachineAlreadyExists(
-        `A state machine called ${read.name} is already there.`,
-      );
+    if (existing !== undefined) {
+      return answerForExisting(existing, read);
     }
 
     const creationDate = this.#background.now();
@@ -59,4 +65,31 @@ export class SimStateMachineCreate {
 
     return { stateMachineArn: stateMachine.arn, creationDate };
   }
+}
+
+/**
+ * Answer a repeat request for a state machine that is already there.
+ *
+ * The idempotency check reads the name, the definition and the type. A request
+ * differing only in its `roleArn` is idempotent too, and real Step Functions
+ * leaves the role as it was. Its API reference contradicts itself on that
+ * point, listing a differing role ARN under `StateMachineAlreadyExists` while
+ * the operation's own note says the difference is ignored. The note is the
+ * more specific of the two and is followed here.
+ */
+function answerForExisting(
+  existing: SimStateMachine,
+  read: SimStateMachineCreateInput,
+): SimCreateStateMachineCommandOutput {
+  if (existing.definition !== read.definition || existing.type !== read.type) {
+    throw new SimStateMachineAlreadyExists(
+      `A state machine called ${read.name} is already there, with a ` +
+        "different definition or type.",
+    );
+  }
+
+  return {
+    stateMachineArn: existing.arn,
+    creationDate: existing.creationDate,
+  };
 }

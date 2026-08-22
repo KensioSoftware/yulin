@@ -73,7 +73,7 @@ describe("Step Functions interpreter guards", () => {
       Type: "Pass",
       End: true,
       get Result(): never {
-        // eslint-disable-next-line no-throw-literal
+        // oxlint-disable-next-line typescript/only-throw-error
         throw "a bare string" as unknown as Error;
       },
     } as unknown as SimStatesState;
@@ -86,5 +86,22 @@ describe("Step Functions interpreter guards", () => {
 
     // Then the value is read as the cause.
     assertIdentical(execution.cause, "a bare string");
+  });
+
+  it("stops an execution whose states form a cycle", async () => {
+    // Given two states pointing at each other, which Amazon States Language
+    // allows and the parser cannot refuse.
+    const states = new Map<string, SimStatesState>([
+      ["A", { Type: "Pass", Next: "B" }],
+      ["B", { Type: "Pass", Next: "A" }],
+    ]);
+
+    // When it runs.
+    const execution = await runDefinition({ StartAt: "A", States: states });
+
+    // Then the walk stopped instead of never answering.
+    assertIdentical(execution.status, "FAILED");
+    assertIdentical(execution.error, "States.Runtime");
+    assertStringIncludes(execution.cause ?? "", "form a cycle");
   });
 });

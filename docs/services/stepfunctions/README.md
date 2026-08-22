@@ -4,7 +4,7 @@ Simulated Step Functions interprets Amazon States Language and runs a state mach
 process as the code under test. A workflow held in a template as data becomes something a test can
 run and assert on.
 
-Step Functions specific types are imported from the `@kensio/yulin/stepfunctions` subpath.
+Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunctions` subpath.
 
 ## What runs today
 
@@ -179,11 +179,25 @@ A test asserting on the output of a state machine that used one could only asser
 - **An `EXPRESS` state machine runs the standard way.** The type is carried and read back, and
   `StartSyncExecution` is unsimulated.
 - **An unnamed execution is named by a counter.** Real Step Functions uses a UUID. A counter means a
-  simulation answers the same way twice.
+  simulation answers the same way twice. The counter steps over any name a caller has already used.
+- **A running execution is not yet idempotent by name.** Real `StartExecution` answers a repeat of a
+  running Standard execution carrying the same name and input with that execution's own response.
+  Every execution here finishes before `StartExecution` answers, so there is never a running one to
+  match, and a repeated name raises `ExecutionAlreadyExists`. This arrives with the `Wait` state.
+  Reusing a name 90 days after an execution closes is unsimulated as well.
 - **A brace escape outside `States.Format` keeps its backslash.** A brace is a placeholder to
   `States.Format` alone, so `States.Format` is where `\{` is resolved. An escaped brace reaching
   another intrinsic arrives as it was written.
 - **`GetExecutionHistory` is unsimulated.** The inspection accessor answers the same question.
+- **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
+  Step Functions stops one when it runs out of execution history events.
+
+`CreateStateMachine` is idempotent, as it is on AWS. A second request carrying the same name,
+definition and type answers with the state machine already there, and one carrying a different
+definition raises `StateMachineAlreadyExists`. A differing `roleArn` is ignored. The AWS API
+reference contradicts itself here, listing a differing role ARN under `StateMachineAlreadyExists`
+while the operation's own note says the difference is ignored. The note is the more specific of the
+two and is what this follows.
 
 ## Still to come
 

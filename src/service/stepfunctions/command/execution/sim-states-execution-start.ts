@@ -11,6 +11,7 @@ import type {
   SimStartExecutionCommand,
   SimStartExecutionCommandOutput,
 } from "./execution.command.js";
+import { chooseSimStatesExecutionName } from "./sim-states-execution-name.js";
 import { readSimStatesExecutionInput } from "./sim-states-execution-view.js";
 
 interface SimStatesExecutionStartProperties {
@@ -28,7 +29,6 @@ export class SimStatesExecutionStart {
   readonly #executions: SimStatesExecutionStore;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
   readonly #background: BackgroundScheduler;
-  #started = 0;
 
   constructor(properties: SimStatesExecutionStartProperties) {
     this.#stateMachines = properties.stateMachines;
@@ -59,7 +59,11 @@ export class SimStatesExecutionStart {
       stateMachineArn,
       "StartExecution",
     );
-    const executionName = name ?? this.#nextName();
+    const executionName = chooseSimStatesExecutionName(
+      this.#executions,
+      stateMachine.arn,
+      name,
+    );
 
     if (this.#executions.hasName(stateMachine.arn, executionName)) {
       throw new SimStatesExecutionAlreadyExists(
@@ -89,18 +93,5 @@ export class SimStatesExecutionStart {
     }).run();
 
     return { executionArn: execution.arn, startDate };
-  }
-
-  /**
-   * A name for an execution the caller did not name.
-   *
-   * Real Step Functions uses a UUID. A counter is used here because a
-   * simulation answering the same way twice is worth more than a name that
-   * looks right, and nothing reads meaning out of it.
-   */
-  #nextName(): string {
-    this.#started += 1;
-
-    return `execution-${String(this.#started)}`;
   }
 }

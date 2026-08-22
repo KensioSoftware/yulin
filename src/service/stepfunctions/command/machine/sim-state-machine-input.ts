@@ -2,6 +2,7 @@ import { parseSimStatesDefinition } from "../../definition/sim-states-definition
 import type { SimStatesDefinition } from "../../definition/sim-states-definition.js";
 import { SimStatesInvalidRequest } from "../../error/sim-step-functions.error.js";
 import type { SimStateMachineType } from "../../machine/sim-state-machine.js";
+import { checkSimStatesName } from "../../machine/sim-states-name.js";
 import type * as commands from "./machine.command.js";
 
 /**
@@ -36,7 +37,7 @@ export function readSimStateMachineCreateInput(
   }
 
   return {
-    name,
+    name: checkSimStatesName(name, "The state machine name"),
     definition,
     parsed: parseSimStatesDefinition(definition),
     roleArn,

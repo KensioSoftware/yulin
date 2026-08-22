@@ -52,6 +52,7 @@ export function parseSimStatesState(
   }
 
   checkRefusedFields(name, type, state);
+  checkTransitionFields(name, state);
 
   return state as unknown as SimStatesState;
 }
@@ -74,6 +75,35 @@ function checkRefusedFields(
     throw new SimStatesInvalidDefinition(
       `The ${type} state ${name} carries ${present.join(", ")}, which a ` +
         `${type} state does not have.`,
+    );
+  }
+}
+
+/**
+ * Check the two fields that say what happens after a state.
+ *
+ * This runs on the state as it was written, before it is read as one of the
+ * state types. Once it has been, `End` is a boolean as far as the compiler is
+ * concerned, and a definition carrying `"true"` would be taken at its word.
+ */
+function checkTransitionFields(
+  name: string,
+  state: Record<string, JSONValue>,
+): void {
+  const end = state["End"];
+
+  if (end !== undefined && typeof end !== "boolean") {
+    throw new SimStatesInvalidDefinition(
+      `The state ${name} has an End that is not a boolean. Only true ends an ` +
+        "execution there.",
+    );
+  }
+
+  const next = state["Next"];
+
+  if (next !== undefined && typeof next !== "string") {
+    throw new SimStatesInvalidDefinition(
+      `The state ${name} has a Next that is not a state name.`,
     );
   }
 }

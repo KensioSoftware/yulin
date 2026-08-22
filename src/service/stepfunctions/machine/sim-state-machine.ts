@@ -28,7 +28,8 @@ interface SimStateMachineProperties {
 export class SimStateMachine {
   readonly arn: string;
   readonly name: string;
-  readonly creationDate: Date;
+
+  readonly #creationDate: Date;
 
   #roleArn: string;
   #definition: string;
@@ -38,11 +39,21 @@ export class SimStateMachine {
   constructor(properties: SimStateMachineProperties) {
     this.arn = properties.arn;
     this.name = properties.name;
-    this.creationDate = properties.creationDate;
+    this.#creationDate = new Date(properties.creationDate);
     this.#roleArn = properties.roleArn;
     this.#definition = properties.definition;
     this.#parsed = properties.parsed;
     this.#type = properties.type;
+  }
+
+  /**
+   * When this state machine was created.
+   *
+   * A copy, because a `Date` is mutable and this one is read back by every
+   * `DescribeStateMachine`.
+   */
+  get creationDate(): Date {
+    return new Date(this.#creationDate);
   }
 
   get roleArn(): string {

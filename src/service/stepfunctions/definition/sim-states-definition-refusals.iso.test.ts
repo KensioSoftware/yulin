@@ -83,4 +83,29 @@ describe("Step Functions definition refusals", () => {
       "ends the execution",
     );
   });
+
+  it("refuses a terminal state carrying an End", () => {
+    // Given a Succeed state that also says it ends.
+    // When it is read, the field it does not have is refused.
+    assertStringIncludes(
+      refusalFor({
+        StartAt: "Only",
+        States: { Only: { Type: "Succeed", End: true } },
+      }),
+      "carries End",
+    );
+  });
+
+  it("refuses an End that is not a boolean", () => {
+    // Given a Pass state whose End is a string.
+    // When it is read, it is refused for what it is rather than for being
+    // absent.
+    assertStringIncludes(
+      refusalFor({
+        StartAt: "Only",
+        States: { Only: { Type: "Pass", End: "true" } },
+      }),
+      "End that is not a boolean",
+    );
+  });
 });

@@ -5,6 +5,7 @@ import type {
   SimListStateMachinesCommand,
   SimListStateMachinesCommandOutput,
 } from "./machine.command.js";
+import { SimStatesInvalidRequest } from "../../error/sim-step-functions.error.js";
 import { requireSimStateMachine } from "./sim-state-machine-lookup.js";
 
 /**
@@ -47,6 +48,16 @@ export class SimStateMachineReads {
     command: SimListStateMachinesCommand,
   ): SimListStateMachinesCommandOutput {
     const { maxResults } = command.input;
+
+    if (
+      maxResults !== undefined &&
+      (!Number.isSafeInteger(maxResults) || maxResults < 0 || maxResults > 1000)
+    ) {
+      throw new SimStatesInvalidRequest(
+        `maxResults is ${String(maxResults)}. It is a whole number from 0 to 1000.`,
+      );
+    }
+
     const all = this.#stateMachines.all();
     const wanted =
       maxResults === undefined || maxResults === 0

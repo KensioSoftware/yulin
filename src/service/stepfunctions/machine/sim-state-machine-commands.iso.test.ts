@@ -48,18 +48,65 @@ describe("Simulated Step Functions state machines", () => {
     assertIdentical(described.type, "STANDARD");
   });
 
-  it("refuses a second state machine of the same name", async () => {
+  it("answers a repeat CreateStateMachine with the one already there", async () => {
+    // Given a state machine that is already there.
+    const simAws = new SimAws();
+    const first = await givenAStateMachine(simAws.stepFunctions(), "Enrolment");
+
+    // When the same request is made again.
+    const second = await givenAStateMachine(
+      simAws.stepFunctions(),
+      "Enrolment",
+    );
+
+    // Then it answers with the same ARN, as real Step Functions does.
+    assertIdentical(second, first);
+  });
+
+  it("ignores a differing roleArn on a repeat CreateStateMachine", async () => {
+    // Given a state machine that is already there.
+    const simAws = new SimAws();
+    const first = await givenAStateMachine(simAws.stepFunctions(), "Enrolment");
+
+    // When the same name and definition arrive with another role.
+    const second = await simAws.stepFunctions().createStateMachine({
+      input: {
+        name: "Enrolment",
+        roleArn: "arn:aws:iam::123456789012:role/Another",
+        definition: passThrough,
+      },
+    });
+    const described = await simAws
+      .stepFunctions()
+      .describeStateMachine({ input: { stateMachineArn: first } });
+
+    // Then it is the same state machine and the role stayed as it was.
+    assertIdentical(second.stateMachineArn, first);
+    assertStringIncludes(described.roleArn, "role/WorkflowRole");
+  });
+
+  it("refuses a second state machine of the same name and another definition", async () => {
     // Given a state machine that is already there.
     const simAws = new SimAws();
     await givenAStateMachine(simAws.stepFunctions(), "Enrolment");
 
-    // When another of that name is created.
+    // When that name is used for a different definition.
     const error = await assertThrowsErrorAsync(
-      async () => await givenAStateMachine(simAws.stepFunctions(), "Enrolment"),
+      async () =>
+        await simAws.stepFunctions().createStateMachine({
+          input: {
+            name: "Enrolment",
+            roleArn,
+            definition: JSON.stringify({
+              StartAt: "Only",
+              States: { Only: { Type: "Succeed" } },
+            }),
+          },
+        }),
     );
 
-    // Then it is refused rather than answering with the one that is there.
-    assertStringIncludes(error.message, "already there");
+    // Then the idempotency check refuses it.
+    assertStringIncludes(error.message, "different definition or type");
   });
 
   it("lists state machines by name", async () => {

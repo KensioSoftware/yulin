@@ -25,14 +25,16 @@ export function checkSimStatesTransitions(
 }
 
 /**
- * A terminal state ends the execution, so it names nothing to go to.
+ * A terminal state ends the execution, so it carries neither field.
  */
 function checkTerminal(name: string, state: SimStatesState): void {
-  if ("Next" in state) {
-    throw new SimStatesInvalidDefinition(
-      `The ${state.Type} state ${name} carries a Next. A ${state.Type} state ` +
-        "ends the execution.",
-    );
+  for (const field of ["Next", "End"]) {
+    if (Object.hasOwn(state, field)) {
+      throw new SimStatesInvalidDefinition(
+        `The ${state.Type} state ${name} carries ${field}. A ${state.Type} ` +
+          "state ends the execution and carries neither.",
+      );
+    }
   }
 }
 
@@ -45,6 +47,8 @@ function checkTransition(
   states: ReadonlyMap<string, SimStatesState>,
 ): void {
   const next = "Next" in state ? state.Next : undefined;
+  // `End` is already known to be a boolean: the state was checked as it was
+  // read, before it was taken as one of the state types.
   const ends = "End" in state && state.End;
 
   if (next === undefined && !ends) {

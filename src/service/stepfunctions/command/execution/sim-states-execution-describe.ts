@@ -1,6 +1,6 @@
 import {
+  SimStatesExecutionNotFound,
   SimStatesInvalidRequest,
-  SimStatesResourceNotFound,
 } from "../../error/sim-step-functions.error.js";
 import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
 import type {
@@ -33,7 +33,7 @@ export class SimStatesExecutionDescribe {
     const execution = this.#executions.find(executionArn);
 
     if (execution === undefined) {
-      throw new SimStatesResourceNotFound(
+      throw new SimStatesExecutionNotFound(
         `${executionArn} is not a simulated execution in this Account and Region.`,
       );
     }

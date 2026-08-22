@@ -5,6 +5,17 @@ import { SimStepFunctionsError } from "../error/sim-step-functions.error.js";
 import type { SimStatesExecution } from "./sim-states-execution.js";
 import { runSimStatesState } from "./sim-states-run-state.js";
 
+/**
+ * How many state transitions one execution may make.
+ *
+ * Amazon States Language allows a cycle, so a definition can be valid and
+ * still never reach a terminal state. Real Step Functions stops such an
+ * execution when it runs out of execution history events, and this stands in
+ * for that limit. Without it the walk never returns and `StartExecution` never
+ * answers, which is the one failure a test tool must not have.
+ */
+const maximumTransitions = 25_000;
+
 interface SimStatesInterpreterProperties {
   readonly definition: SimStatesDefinition;
   readonly execution: SimStatesExecution;
@@ -40,7 +51,16 @@ export class SimStatesInterpreter {
     let current = this.#definition.StartAt;
     let value: JSONValue = this.#execution.input;
 
-    for (;;) {
+    for (let taken = 0; ; taken++) {
+      if (taken >= maximumTransitions) {
+        this.#fail(
+          "States.Runtime",
+          `The execution made ${String(maximumTransitions)} transitions ` +
+            "without reaching a terminal state. Its states form a cycle.",
+        );
+        return;
+      }
+
       const state = this.#definition.States.get(current);
 
       if (state === undefined) {

@@ -97,10 +97,35 @@ export class SimStatesUnsimulatedInput extends SimStepFunctionsError {
 }
 
 /**
- * A state machine or an execution an ARN names nothing for.
+ * A state machine an ARN names nothing for.
  */
 export class SimStatesResourceNotFound extends SimStepFunctionsError {
   public override readonly name = "StateMachineDoesNotExist";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * An execution an ARN names nothing for.
+ *
+ * Real Step Functions tells this apart from a missing state machine, and a
+ * caller branching on the error name needs the same two names.
+ */
+export class SimStatesExecutionNotFound extends SimStepFunctionsError {
+  public override readonly name = "ExecutionDoesNotExist";
+
+  constructor(message: string) {
+    super(message, "States.Runtime");
+  }
+}
+
+/**
+ * A name outside what Step Functions allows.
+ */
+export class SimStatesInvalidName extends SimStepFunctionsError {
+  public override readonly name = "InvalidName";
 
   constructor(message: string) {
     super(message, "States.Runtime");

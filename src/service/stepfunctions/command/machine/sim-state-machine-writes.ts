@@ -1,5 +1,6 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { parseSimStatesDefinition } from "../../definition/sim-states-definition-parse.js";
+import { SimStatesInvalidRequest } from "../../error/sim-step-functions.error.js";
 import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
 import type {
@@ -37,6 +38,13 @@ export class SimStateMachineWrites {
     command: SimUpdateStateMachineCommand,
   ): SimUpdateStateMachineCommandOutput {
     const { stateMachineArn, definition, roleArn } = command.input;
+
+    if (definition === undefined && roleArn === undefined) {
+      throw new SimStatesInvalidRequest(
+        "UpdateStateMachine needs a definition or a roleArn to change.",
+      );
+    }
+
     const found = requireSimStateMachine(
       this.#stateMachines,
       stateMachineArn,
