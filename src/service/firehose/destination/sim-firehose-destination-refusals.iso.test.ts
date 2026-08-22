@@ -14,6 +14,11 @@ import {
   SimFirehoseUnsimulatedDestination,
 } from "../error/sim-firehose.error.js";
 
+const validS3Destination = {
+  BucketARN: "arn:aws:s3:::order-archive",
+  RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
+};
+
 /**
  * Try to create a delivery stream, and hand back what refused it.
  */
@@ -71,5 +76,20 @@ describe("What a simulated Firehose delivery stream refuses to be", () => {
 
     assertInstanceOf(error, SimFirehoseInvalidArgumentException);
     assertStringIncludes(error.message, "no destination");
+  });
+
+  it("refuses a delivery stream declaring both S3 destinations", async () => {
+    // Given a delivery stream declaring the same destination twice, in the
+    // extended form and the plain one.
+    const error = await refusalOf({
+      DeliveryStreamName: "order-events",
+      ExtendedS3DestinationConfiguration: validS3Destination,
+      S3DestinationConfiguration: validS3Destination,
+    });
+
+    // Then it is refused, as real Firehose refuses a request naming more than
+    // one destination.
+    assertInstanceOf(error, SimFirehoseInvalidArgumentException);
+    assertStringIncludes(error.message, "one destination");
   });
 });
