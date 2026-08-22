@@ -40,6 +40,23 @@ export class SimLambdaKinesisShardPollers {
   }
 
   /**
+   * Stop every shard poller, and make no more.
+   *
+   * Stopping settles this collection on having none, which is what the empty
+   * list means here. Finding the shards is a DescribeStream call, so a mapping
+   * stopped while that call is in flight would otherwise come back to shard
+   * pollers made after it stopped, which nothing would ever stop and which
+   * would go on delivering. Settling it now is what the read below finds.
+   */
+  stop(): void {
+    for (const shardPoller of this.made) {
+      shardPoller.stop();
+    }
+
+    this.held = [];
+  }
+
+  /**
    * The shard pollers of this stream, making them if this is the first poll.
    *
    * A mapping that is not polling yet, or whose function has gone, has none:
@@ -66,6 +83,10 @@ export class SimLambdaKinesisShardPollers {
     }
 
     const made = await this.forRole(simFunction.roleArn);
+
+    // Stopping may have happened while the shards were being asked for, and it
+    // settles this collection on the empty list. Keeping whatever is already
+    // settled is what drops the pollers that arrived too late.
     this.held ??= made;
 
     return this.held;

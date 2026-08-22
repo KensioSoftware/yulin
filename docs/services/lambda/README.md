@@ -3460,9 +3460,9 @@ Sim Lambda currently supports:
 - A CDK app built on `fn.currentVersion` or a `lambda.Alias`, which deploys with the alias its
   integrations point at, and where an `AWS::Lambda::Permission` naming that alias grants on the
   alias
-- `AWS::Lambda::EventSourceMapping` on a queue or on a table's stream, including the
-  `StartingPosition` a stream mapping needs, so a CDK `SqsEventSource` or `DynamoEventSource`
-  deploys as it is synthesised
+- `AWS::Lambda::EventSourceMapping` on a queue, on a table's stream or on a Kinesis stream,
+  including the `StartingPosition` a stream mapping needs, so a CDK `SqsEventSource`,
+  `DynamoEventSource` or `KinesisEventSource` deploys as it is synthesised
 - A CDK function given `onFailure`, `onSuccess`, `retryAttempts`, `maxEventAge` or
   `deadLetterQueue`, which deploys the `AWS::Lambda::EventInvokeConfig` and the `DeadLetterConfig`
   those synthesise
@@ -3597,10 +3597,11 @@ Current documented limitations:
   Write the grant inline to deploy either.
 - `UpdateEventSourceMapping` is absent, and a mapping's batch size or enabled state is fixed once it
   is created. `Enabled: false` at creation is simulated.
-- One poll delivers one batch. Real Lambda runs several pollers at once and scales them with the
-  event source, and what that concurrency does to ordering or to a downstream service is invisible
-  here. A simulated stream has one shard and never splits, so a stream mapping has one thing to read
-  either way.
+- One poll of one shard delivers one batch. Real Lambda runs several pollers at once and scales them
+  with the event source, and what that concurrency does to ordering or to a downstream service is
+  invisible here. A simulated DynamoDB stream has one shard and never splits, so a mapping on one has
+  a single thing to read either way. A Kinesis stream has the shards it was created with, each read
+  by a processor of its own, and none of them ever splits or merges.
 - CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url`,
   `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias`,
   `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig` (`LayerVersion`,

@@ -38,10 +38,20 @@ export class SimKinesisStreamActivity {
    * Stop watching a stream.
    */
   unwatch(streamArn: string, watcher: SimKinesisStreamWatcher): void {
-    this.watchers.set(
-      streamArn,
-      this.watchersOf(streamArn).filter((held) => held !== watcher),
+    const remaining = this.watchersOf(streamArn).filter(
+      (held) => held !== watcher,
     );
+
+    if (remaining.length === 0) {
+      // A stream nothing watches any more is forgotten. Keeping the empty list
+      // would grow one entry per stream ever watched, for the life of the
+      // simulation.
+      this.watchers.delete(streamArn);
+
+      return;
+    }
+
+    this.watchers.set(streamArn, [...remaining]);
   }
 
   /**

@@ -71,10 +71,7 @@ export class SimLambdaKinesisStreamEventSourcePoller implements SimLambdaEventSo
   stop(): void {
     this.schedule.stop();
     this.kinesisStreams.unwatch(this.streamArn, this);
-
-    for (const shardPoller of this.shardPollers.made) {
-      shardPoller.stop();
-    }
+    this.shardPollers.stop();
   }
 
   /**

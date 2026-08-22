@@ -65,4 +65,21 @@ describe("the life of a sim Lambda Kinesis stream event source mapping", () => {
     await putOrder(simAws, "order-2");
     assertArrayLength(events, 7);
   });
+
+  it("delivers nothing from a mapping deleted before it ever polled", async () => {
+    // Given a mapping that has delivered nothing yet.
+    const { simAws, uuid, events } = await simAwsWithKinesisEventSource();
+
+    // When it is deleted before the simulation has settled, and a record is
+    // put afterwards.
+    await simAws
+      .lambda()
+      .deleteEventSourceMapping(
+        new DeleteEventSourceMappingCommand({ UUID: uuid }),
+      );
+    await putOrder(simAws, "order-1");
+
+    // Then nothing reached the function.
+    assertArrayLength(events, 0);
+  });
 });
