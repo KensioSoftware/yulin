@@ -1,4 +1,6 @@
 import type { SimRestApiDeploymentId } from "../deployment/sim-rest-api-deployment.js";
+import type { SimRestApiMethodSettingsMap } from "./settings/sim-rest-api-method-settings.type.js";
+import type { SimRestApiStageMethodSettings } from "./settings/sim-rest-api-stage-method-settings.js";
 
 interface SimRestApiStageProperties {
   readonly stageName: string;
@@ -6,6 +8,7 @@ interface SimRestApiStageProperties {
   readonly createdDate: Date;
   readonly variables?: Readonly<Record<string, string>> | undefined;
   readonly description?: string | undefined;
+  readonly methodSettings?: SimRestApiStageMethodSettings | undefined;
 }
 
 /**
@@ -18,6 +21,7 @@ export interface SimRestApiStageView {
   lastUpdatedDate: Date;
   variables?: Record<string, string>;
   description?: string;
+  methodSettings?: SimRestApiMethodSettingsMap;
 }
 
 /**
@@ -43,6 +47,15 @@ export class SimRestApiStage {
   public deploymentId: SimRestApiDeploymentId;
   public lastUpdatedDate: Date;
 
+  /**
+   * The throttle this stage serves its methods at, or undefined for a stage
+   * that was given no method settings and so throttles nothing.
+   *
+   * A redeployment leaves it alone, the way it leaves the stage name and
+   * everything else addressed through the stage alone.
+   */
+  public readonly methodSettings?: SimRestApiStageMethodSettings | undefined;
+
   constructor(properties: SimRestApiStageProperties) {
     this.stageName = properties.stageName;
     this.deploymentId = properties.deploymentId;
@@ -50,6 +63,17 @@ export class SimRestApiStage {
     this.lastUpdatedDate = properties.createdDate;
     this.variables = properties.variables ?? {};
     this.description = properties.description;
+    this.methodSettings = properties.methodSettings;
+  }
+
+  /**
+   * Whether this stage's throttle serves one more request to a method now.
+   *
+   * Asking takes a token. A request that is admitted has already paid for
+   * itself, and a refused one has taken nothing.
+   */
+  admits(resourcePath: string, httpMethod: string): boolean {
+    return this.methodSettings?.admits(resourcePath, httpMethod) ?? true;
   }
 
   /**
@@ -80,6 +104,12 @@ export class SimRestApiStage {
 
     if (this.description !== undefined) {
       view.description = this.description;
+    }
+
+    const methodSettings = this.methodSettings?.view();
+
+    if (methodSettings !== undefined) {
+      view.methodSettings = methodSettings;
     }
 
     return view;

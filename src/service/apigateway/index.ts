@@ -110,6 +110,11 @@ export {
   type SimRestApiStageView,
 } from "./api/stage/sim-rest-api-stage.js";
 export { SimRestApiStageStore } from "./api/stage/sim-rest-api-stage-store.js";
+export type {
+  SimRestApiMethodSettings,
+  SimRestApiMethodSettingsMap,
+} from "./api/stage/settings/sim-rest-api-method-settings.type.js";
+export { SimRestApiStageMethodSettings } from "./api/stage/settings/sim-rest-api-stage-method-settings.js";
 export {
   SimApiGatewayBadRequest,
   SimApiGatewayConflict,

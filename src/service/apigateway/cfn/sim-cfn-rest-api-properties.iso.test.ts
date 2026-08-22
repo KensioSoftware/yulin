@@ -208,7 +208,8 @@ describe("API Gateway REST API CloudFormation properties left out", () => {
   });
 
   it("records the settings a stage was created without", async () => {
-    // Given a stage asking for throttling and access logs
+    // Given a stage asking for tracing and for a method setting outside
+    // throttling
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -216,23 +217,34 @@ describe("API Gateway REST API CloudFormation properties left out", () => {
       simAws,
       simCfnRestApiTemplateFactory.make({
         stageProperties: {
-          MethodSettings: [{ HttpMethod: "*", ThrottlingBurstLimit: 10 }],
           TracingEnabled: true,
+          MethodSettings: [
+            {
+              ResourcePath: "/*",
+              HttpMethod: "*",
+              ThrottlingBurstLimit: 10,
+              MetricsEnabled: true,
+            },
+          ],
         },
       }),
     );
 
     // Then the stage serves the API and both are reported, since a stage that
-    // looked throttled to the template and was not is the failure to avoid
+    // looked traced to the template and was not is the failure to avoid
     const apiId = stack.getResource("Api")?.refValue;
     assertTypeString(apiId);
     assertNonNullable(
       simAws.apiGateway().findRestApi(apiId)?.stages.find("prod"),
     );
     expect(stack.ignoredProperties.map((entry) => entry.path)).toStrictEqual([
-      "MethodSettings",
       "TracingEnabled",
+      "MethodSettings[0].MetricsEnabled",
     ]);
+    assertStringIncludes(
+      stack.ignoredProperties[1]?.reason ?? "",
+      "AWS::ApiGateway::Stage MethodSettings property MetricsEnabled is not simulated",
+    );
   });
 });
 

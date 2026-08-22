@@ -59,6 +59,17 @@ export class SimApiGatewayErrorResponse {
   }
 
   /**
+   * The method's throttle had no token left for the request.
+   *
+   * The stage's `MethodSettings` set the rate and the burst each method is
+   * served at, and every client of a method draws on the one bucket. A client
+   * can be refused over traffic it did not send.
+   */
+  tooManyRequests(): Response {
+    return this.jsonResponse(429, "Too Many Requests");
+  }
+
+  /**
    * The method's authorizer could not answer at all.
    */
   internalServerError(): Response {

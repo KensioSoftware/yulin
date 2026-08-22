@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimApiGatewayRequestOptions } from "../sim-api-gateway-request-options.js";
 import { SimApiGatewayUnsimulatedInput } from "../sim-api-gateway-unsimulated-input.js";
 import type { SimRestApiAccess } from "../sim-rest-api-access.js";
+import { simRestApiStageMethodSettings } from "./sim-rest-api-stage-method-settings-input.js";
 import { SimRestApiStagePublisher } from "./sim-rest-api-stage-publisher.js";
 import { SimRestApiStageRules } from "./sim-rest-api-stage-rules.js";
 import type {
@@ -23,6 +24,7 @@ const acceptedCreateOptions = [
   "deploymentId",
   "description",
   "variables",
+  "methodSettings",
 ];
 
 interface SimRestApiStageCommandsProperties {
@@ -59,6 +61,7 @@ export class SimRestApiStageCommands {
     const restApiId = unsimulated.require("restApiId", input.restApiId);
     const stageName = unsimulated.require("stageName", input.stageName);
     const named = unsimulated.require("deploymentId", input.deploymentId);
+    const methodSettings = simRestApiStageMethodSettings(input, unsimulated);
 
     const restApi = this.access.api({
       method: "POST",
@@ -72,6 +75,7 @@ export class SimRestApiStageCommands {
       deploymentId,
       description: input.description,
       variables: input.variables,
+      methodSettings,
     });
 
     return { ...stage.view(), $metadata: {} };

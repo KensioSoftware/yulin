@@ -1,5 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimRestApiDeploymentView } from "../../api/deployment/sim-rest-api-deployment.js";
+import type { SimRestApiMethodSettingsMap } from "../../api/stage/settings/sim-rest-api-method-settings.type.js";
 import type { SimRestApiStageView } from "../../api/stage/sim-rest-api-stage.js";
 
 /**
@@ -38,6 +39,16 @@ export interface SimCreateStageCommandInput {
   readonly deploymentId?: string | undefined;
   readonly description?: string | undefined;
   readonly variables?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The throttle of each method, keyed `{resourcePath}/{httpMethod}`, with the
+   * key of two stars as the stage default.
+   *
+   * Real CreateStage takes no such member. API Gateway sets these through
+   * UpdateStage patch operations, which are outside this simulation, and
+   * through the `MethodSettings` of an AWS::ApiGateway::Stage. This is here so
+   * that a test can throttle a stage without a template.
+   */
+  readonly methodSettings?: SimRestApiMethodSettingsMap | undefined;
 }
 
 export interface SimCreateStageCommandOutput extends SimRestApiStageView {
