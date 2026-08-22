@@ -34,6 +34,11 @@ export function selectSimStatesPath(
 
 /**
  * Step one segment into a value.
+ *
+ * A field is read only where the object owns it. A Reference Path identifies a
+ * node in JSON data, and `$.toString` names a field a JSON document either has
+ * or has not got. Reading the prototype chain would answer that path with a
+ * JavaScript function.
  */
 function selectSegment(
   current: JSONValue | undefined,
@@ -43,5 +48,9 @@ function selectSegment(
     return Array.isArray(current) ? current[segment.index] : undefined;
   }
 
-  return isRecord(current) ? current[segment.name] : undefined;
+  if (!isRecord(current) || !Object.hasOwn(current, segment.name)) {
+    return undefined;
+  }
+
+  return current[segment.name];
 }

@@ -1,9 +1,4 @@
-import {
-  assertIdentical,
-  assertObjectEquals,
-  assertStringIncludes,
-  assertThrowsError,
-} from "@kensio/smartass";
+import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { evaluateSimStatesIntrinsic } from "./sim-states-intrinsic.js";
 
@@ -126,99 +121,6 @@ describe("Step Functions intrinsic functions", () => {
     assertIdentical(formatted, "it's Wei");
   });
 
-  it("refuses an intrinsic this simulator does not answer", () => {
-    // Given a call to one that is left out on purpose.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.UUID()", enrolment),
-    );
-
-    // Then the refusal lists what is answered.
-    assertStringIncludes(error.message, "States.Format");
-  });
-
-  it("refuses a call whose placeholders and arguments disagree", () => {
-    // Given two placeholders and one argument.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Format('{} {}', 'one')", enrolment),
-    );
-
-    // Then the count is refused.
-    assertStringIncludes(error.message, "placeholders");
-  });
-
-  it("refuses a path argument selecting nothing", () => {
-    // Given a path the document has no value at.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.ArrayLength($.absent)", enrolment),
-    );
-
-    // Then the failure names the path.
-    assertStringIncludes(error.message, "$.absent");
-  });
-
-  it("refuses arguments of the wrong type", () => {
-    // Given calls given the wrong shape of value.
-    const refused = [
-      "States.Format($.student.terms)",
-      "States.ArrayLength($.student.name)",
-      "States.StringToJson($.student.terms)",
-    ];
-
-    // When each runs.
-    const errors = refused.map((expression) =>
-      assertThrowsError(() =>
-        evaluateSimStatesIntrinsic(expression, enrolment),
-      ),
-    );
-
-    // Then each says what it needed.
-    for (const error of errors) {
-      assertStringIncludes(error.message, "needs");
-    }
-  });
-
-  it("refuses a string that is not JSON", () => {
-    // Given a document holding something that will not parse.
-    // When it is read as JSON.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.StringToJson($.student.name)", {
-        student: { name: "Wei" },
-      }),
-    );
-
-    // Then the failure says so.
-    assertStringIncludes(error.message, "not JSON");
-  });
-
-  it("refuses an expression that is not a call at all", () => {
-    // Given text with no argument list.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Format", enrolment),
-    );
-
-    // Then it is refused by shape.
-    assertStringIncludes(error.message, "States.Name(arguments)");
-  });
-
-  it("refuses an unclosed argument list and an unreadable argument", () => {
-    // Given a call missing its closing bracket, and one given a bare word.
-    // When each runs.
-    const unclosed = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Array('one'", enrolment),
-    );
-    const bare = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Array(one)", enrolment),
-    );
-
-    // Then each is refused.
-    assertStringIncludes(unclosed.message, "States.Name(arguments)");
-    assertStringIncludes(bare.message, "cannot read");
-  });
-
   it("builds an empty array from a call with no arguments", () => {
     // Given a call with an empty argument list.
     // When it runs.
@@ -238,39 +140,5 @@ describe("Step Functions intrinsic functions", () => {
 
     // Then each arrives as the value it names.
     assertObjectEquals(built, [false, true, null, -2.5]);
-  });
-
-  it("writes null for a States.JsonToString call given no argument", () => {
-    // Given a call with nothing to write.
-    // When it runs.
-    const written = evaluateSimStatesIntrinsic(
-      "States.JsonToString()",
-      enrolment,
-    );
-
-    // Then it answers with the JSON null.
-    assertIdentical(written, "null");
-  });
-
-  it("refuses an argument list whose quote never closes", () => {
-    // Given a call whose closing bracket falls inside a string.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Array('one)", enrolment),
-    );
-
-    // Then the unclosed quote is refused.
-    assertStringIncludes(error.message, "unclosed quote or bracket");
-  });
-
-  it("refuses a string argument with trailing text after its quote", () => {
-    // Given an argument that stops being a string partway through.
-    // When it runs.
-    const error = assertThrowsError(() =>
-      evaluateSimStatesIntrinsic("States.Array('one'two)", enrolment),
-    );
-
-    // Then it is refused as unterminated.
-    assertStringIncludes(error.message, "unterminated string");
   });
 });

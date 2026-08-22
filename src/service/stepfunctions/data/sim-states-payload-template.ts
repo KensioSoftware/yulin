@@ -39,16 +39,19 @@ export function evaluateSimStatesPayloadTemplate(
   const built: JSONObject = {};
 
   for (const [key, value] of Object.entries(template)) {
-    if (key.endsWith(resolvedKeySuffix)) {
-      built[key.slice(0, -resolvedKeySuffix.length)] = resolveField(
-        key,
-        value,
-        document,
+    const resolved = key.endsWith(resolvedKeySuffix);
+    const field = resolved ? key.slice(0, -resolvedKeySuffix.length) : key;
+
+    if (Object.hasOwn(built, field)) {
+      throw new SimStatesUnsimulatedInput(
+        `${key} and another field of this Payload Template both build ` +
+          `${field}, so one of them would be lost.`,
       );
-      continue;
     }
 
-    built[key] = evaluateSimStatesPayloadTemplate(value, document);
+    built[field] = resolved
+      ? resolveField(key, value, document)
+      : evaluateSimStatesPayloadTemplate(value, document);
   }
 
   return built;

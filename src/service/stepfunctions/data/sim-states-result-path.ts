@@ -33,6 +33,11 @@ export function insertAtSimStatesPath(
 
 /**
  * Write one field, building the object where the document holds nothing yet.
+ *
+ * The field is defined rather than assigned, and the value underneath it is
+ * read only where the object owns it. A JSON document is free to hold a field
+ * called `__proto__`, and assigning that one would move the copy's prototype
+ * instead of writing the field the path named.
  */
 function insertIntoObject(
   document: JSONValue,
@@ -51,19 +56,24 @@ function insertIntoObject(
   }
 
   const copy: JSONObject = { ...target };
+  const existing = Object.hasOwn(copy, name) ? copy[name] : null;
 
-  copy[name] = insertAtSimStatesPath(
-    copy[name] ?? null,
-    rest,
-    result,
-    resultPath,
-  );
+  Object.defineProperty(copy, name, {
+    configurable: true,
+    enumerable: true,
+    value: insertAtSimStatesPath(existing ?? null, rest, result, resultPath),
+    writable: true,
+  });
 
   return copy;
 }
 
 /**
  * Write one array element.
+ *
+ * The index has to be one the array already reaches. Writing past the end
+ * would leave a hole, and a hole is not a JSON value: it serializes as null
+ * and the next state receives something the write never described.
  */
 function insertIntoArray(
   document: JSONValue,
@@ -76,6 +86,13 @@ function insertIntoArray(
     throw new SimStatesResultPathMatchFailure(
       `${resultPath} writes element ${String(index)} into a value that is ` +
         "not an array, so the result has nowhere to go.",
+    );
+  }
+
+  if (index >= document.length) {
+    throw new SimStatesResultPathMatchFailure(
+      `${resultPath} writes element ${String(index)} of an array holding ` +
+        `${String(document.length)}, so the result has nowhere to go.`,
     );
   }
 

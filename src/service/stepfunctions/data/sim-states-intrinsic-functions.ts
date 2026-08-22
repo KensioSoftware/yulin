@@ -64,13 +64,30 @@ function formatIntrinsic(
 }
 
 /**
+ * Take the one value a single-argument intrinsic was called with.
+ */
+function onlyArgument(
+  values: readonly JSONValue[],
+  expression: string,
+): JSONValue {
+  if (values.length !== 1) {
+    throw new SimStatesIntrinsicFailure(
+      `${expression} takes one argument and was given ` +
+        `${String(values.length)}.`,
+    );
+  }
+
+  return values[0] as JSONValue;
+}
+
+/**
  * `States.ArrayLength`.
  */
 function arrayLengthIntrinsic(
   values: readonly JSONValue[],
   expression: string,
 ): JSONValue {
-  const [array] = values;
+  const array = onlyArgument(values, expression);
 
   if (!Array.isArray(array)) {
     throw new SimStatesIntrinsicFailure(
@@ -88,7 +105,7 @@ function stringToJsonIntrinsic(
   values: readonly JSONValue[],
   expression: string,
 ): JSONValue {
-  const [text] = values;
+  const text = onlyArgument(values, expression);
 
   if (typeof text !== "string") {
     throw new SimStatesIntrinsicFailure(
@@ -108,8 +125,9 @@ function stringToJsonIntrinsic(
 /**
  * `States.JsonToString`.
  */
-function jsonToStringIntrinsic(values: readonly JSONValue[]): JSONValue {
-  const [value] = values;
-
-  return JSON.stringify(value ?? null);
+function jsonToStringIntrinsic(
+  values: readonly JSONValue[],
+  expression: string,
+): JSONValue {
+  return JSON.stringify(onlyArgument(values, expression));
 }

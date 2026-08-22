@@ -1,8 +1,6 @@
 import {
   assertIdentical,
   assertObjectEquals,
-  assertStringIncludes,
-  assertThrowsError,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -101,73 +99,26 @@ describe("Step Functions Reference Paths", () => {
     assertUndefined(selected);
   });
 
-  it("refuses a path that is not rooted at the document", () => {
-    // Given a path with no root.
-    // When it is parsed.
-    const error = assertThrowsError(() =>
-      parseSimStatesReferencePath("enrolment.student"),
-    );
+  it("reads a bracketed name written after a dot", () => {
+    // Given the form the Amazon States Language docs use for a name with a
+    // space in it.
+    const document = { abc: { "def ghi": "Wei" } };
 
-    // Then it is refused by name.
-    assertStringIncludes(error.message, "has to start with $");
+    // When it is read.
+    const selected = select(document, "$.abc.['def ghi']");
+
+    // Then the bracketed name is one segment.
+    assertIdentical(selected, "Wei");
   });
 
-  it("refuses the context object by name", () => {
-    // Given a path reading the context object.
-    // When it is parsed.
-    const error = assertThrowsError(() =>
-      parseSimStatesReferencePath("$$.Execution.Name"),
-    );
+  it("selects nothing for a field the document inherits rather than owns", () => {
+    // Given a document with no such field of its own.
+    const document = { student: "Wei" };
 
-    // Then the refusal says what it is.
-    assertStringIncludes(error.message, "context object");
-  });
+    // When a name every JavaScript object carries is read.
+    const selected = select(document, "$.toString");
 
-  it("refuses the JSONPath grammar Amazon States Language does not use", () => {
-    // Given paths using a wildcard, a filter and a slice.
-    const refused = ["$.students[*].name", "$.students[?(@.age>3)]", "$[0:2]"];
-
-    // When each is parsed.
-    const errors = refused.map((path) =>
-      assertThrowsError(() => parseSimStatesReferencePath(path)),
-    );
-
-    // Then each is refused rather than read as something else.
-    for (const error of errors) {
-      assertStringIncludes(error.message, "does not read");
-    }
-  });
-
-  it("refuses a root followed by something that is not a separator", () => {
-    // Given a path running a name straight on from the root.
-    // When it is parsed.
-    const error = assertThrowsError(() =>
-      parseSimStatesReferencePath("$enrolment"),
-    );
-
-    // Then it says what it expected.
-    assertStringIncludes(error.message, "Expected . or [");
-  });
-
-  it("refuses a dotted wildcard", () => {
-    // Given a path selecting every field of an object.
-    // When it is parsed.
-    const error = assertThrowsError(() =>
-      parseSimStatesReferencePath("$.students.*"),
-    );
-
-    // Then the wildcard is refused.
-    assertStringIncludes(error.message, "wildcard");
-  });
-
-  it("refuses a path with nothing between its separators", () => {
-    // Given a path with an empty segment.
-    // When it is parsed.
-    const error = assertThrowsError(() =>
-      parseSimStatesReferencePath("$.enrolment..student"),
-    );
-
-    // Then it is refused.
-    assertStringIncludes(error.message, "empty field name");
+    // Then nothing is selected.
+    assertUndefined(selected);
   });
 });

@@ -2,7 +2,10 @@ import { SimStatesPathError } from "../error/sim-step-functions.error.js";
 import type { SimStatesPathSegment } from "./sim-states-path-segment.js";
 
 const bracketPattern = /^\[(?:'((?:[^'\\]|\\.)*)'|(\d+))]/;
-const fieldPattern = /^[^.[]+/;
+// The JsonPath member-name-shorthand rule. Anything outside it, punctuation
+// apart from _ included, has to be written in brackets.
+// oxlint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
+const fieldPattern = /^[A-Za-z_\u{80}-\u{FFFF}][\w\u{80}-\u{FFFF}]*/u;
 
 interface SimStatesReadSegment {
   readonly segment: SimStatesPathSegment;
@@ -60,12 +63,19 @@ function readSegment(path: string, rest: string): SimStatesReadSegment {
   }
 
   if (rest.startsWith(".")) {
-    return readFieldSegment(path, rest.slice(1));
+    const afterDot = rest.slice(1);
+
+    // `$.abc.['def ghi']` is how the Amazon States Language docs write a field
+    // name holding a space, so a bracket is allowed to follow a dot.
+    return afterDot.startsWith("[")
+      ? readBracketSegment(path, afterDot)
+      : readFieldSegment(path, afterDot);
   }
 
   throw new SimStatesPathError(
     `${path} is not a Reference Path this simulator reads. Expected . or [ ` +
-      `where it has ${rest.slice(0, 1)}.`,
+      `where it has ${rest.slice(0, 1)}. A name holding punctuation or a ` +
+      "space has to be written in brackets, as in $.abc.['def ghi'].",
   );
 }
 
@@ -99,18 +109,13 @@ function readFieldSegment(path: string, rest: string): SimStatesReadSegment {
 
   if (matched === null) {
     throw new SimStatesPathError(
-      `${path} has an empty field name in it. A dot has to be followed by a ` +
-        "field name.",
+      `${path} has a dotted field name outside the JsonPath ` +
+        "member-name-shorthand rule. A name holding punctuation, a space or a " +
+        "wildcard has to be written in brackets, as in $.abc.['def ghi'].",
     );
   }
 
   const [name] = matched;
-
-  if (name === "*") {
-    throw new SimStatesPathError(
-      `${path} uses a wildcard, which this simulator does not read.`,
-    );
-  }
 
   return { segment: { kind: "field", name }, rest: rest.slice(name.length) };
 }

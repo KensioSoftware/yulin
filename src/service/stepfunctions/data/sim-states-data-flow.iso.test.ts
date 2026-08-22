@@ -1,7 +1,9 @@
 import {
+  assertIdentical,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsError,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import {
@@ -147,21 +149,40 @@ describe("Step Functions state data flow", () => {
     assertObjectEquals(output, { students: [{ name: "Wei", term: 3 }] });
   });
 
-  it("writes into an array position the input has not reached yet", () => {
+  it("refuses a ResultPath writing past the end of an array", () => {
     // Given an input holding a one element array.
-    // When a result is written past its end.
-    const output = simStatesEffectiveOutput(
-      { students: [{ name: "Wei" }] },
-      3,
-      {
+    // When a result is written to an index the array does not reach.
+    const error = assertThrowsError(() =>
+      simStatesEffectiveOutput({ students: [{ name: "Wei" }] }, 3, {
         ResultPath: "$.students[2].term",
-      },
+      }),
     );
 
-    // Then the gap is filled the way JavaScript fills a sparse array.
-    assertObjectEquals(output, {
-      students: [{ name: "Wei" }, undefined, { term: 3 }],
+    // Then it is refused rather than leaving a hole in the array.
+    assertStringIncludes(error.message, "array holding 1");
+  });
+
+  it("writes a field named __proto__ as an ordinary field", () => {
+    // Given a ResultPath naming a field JavaScript treats specially.
+    // When a result is written to it.
+    const output = simStatesEffectiveOutput({ term: 3 }, "written", {
+      ResultPath: "$['__proto__']",
     });
+
+    // Then it is an own field that serializes, and not a moved prototype.
+    assertTrue(Object.hasOwn(output as object, "__proto__"));
+    assertIdentical(JSON.stringify(output), '{"term":3,"__proto__":"written"}');
+  });
+
+  it("writes a field named toString without reading the one on the prototype", () => {
+    // Given a ResultPath through a field every object inherits.
+    // When a result is written underneath it.
+    const output = simStatesEffectiveOutput({ term: 3 }, "written", {
+      ResultPath: "$.toString.value",
+    });
+
+    // Then the inherited function was never treated as the value there.
+    assertObjectEquals(output, { term: 3, toString: { value: "written" } });
   });
 
   it("reshapes the result with ResultSelector before ResultPath", () => {
