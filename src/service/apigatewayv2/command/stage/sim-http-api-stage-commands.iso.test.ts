@@ -3,7 +3,7 @@ import {
   CreateStageCommand,
   GetStagesCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical, assertTrue } from "@kensio/smartass";
+import { assertIdentical, assertTrue, assertUndefined } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -204,5 +204,99 @@ describe("Sim API Gateway v2 stage commands", () => {
           new CreateStageCommand({ ApiId: apiId, StageName: "$default" }),
         ),
     ).rejects.toThrow(SimApiGatewayV2BadRequest);
+  });
+  it("keeps the route settings a stage was created with", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const { ApiId: apiId } = await simAws
+      .apiGatewayV2()
+      .createApi(
+        new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+      );
+
+    // When a stage is created with a stage default and a route of its own
+    const created = await simAws.apiGatewayV2().createStage(
+      new CreateStageCommand({
+        ApiId: apiId,
+        StageName: "$default",
+        AutoDeploy: true,
+        DefaultRouteSettings: {
+          ThrottlingRateLimit: 10,
+          ThrottlingBurstLimit: 5,
+        },
+        RouteSettings: {
+          "POST /user/password-reset": {
+            ThrottlingRateLimit: 1,
+            ThrottlingBurstLimit: 2,
+          },
+        },
+      }),
+    );
+
+    // Then both are reported back, by the create and by the list
+    expect(created.DefaultRouteSettings).toStrictEqual({
+      ThrottlingRateLimit: 10,
+      ThrottlingBurstLimit: 5,
+    });
+
+    const { Items: items } = await simAws
+      .apiGatewayV2()
+      .getStages(new GetStagesCommand({ ApiId: apiId }));
+    expect(items[0]?.RouteSettings).toStrictEqual({
+      "POST /user/password-reset": {
+        ThrottlingRateLimit: 1,
+        ThrottlingBurstLimit: 2,
+      },
+    });
+  });
+
+  it("reports no route settings for a stage created without any", async () => {
+    // Given an API with a stage that names no limits
+    const simAws = new SimAws();
+    const { ApiId: apiId } = await simAws
+      .apiGatewayV2()
+      .createApi(
+        new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+      );
+
+    // When the stage is created
+    const created = await simAws.apiGatewayV2().createStage(
+      new CreateStageCommand({
+        ApiId: apiId,
+        StageName: "$default",
+        AutoDeploy: true,
+      }),
+    );
+
+    // Then neither settings property is reported, as AWS reports none for a
+    // stage that throttles at the account limits
+    assertUndefined(created.DefaultRouteSettings);
+    assertUndefined(created.RouteSettings);
+  });
+
+  it("refuses a route setting that is not about throttling", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const { ApiId: apiId } = await simAws
+      .apiGatewayV2()
+      .createApi(
+        new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+      );
+
+    // When a stage asks for request logging alongside its throttle
+    const stage = new CreateStageCommand({
+      ApiId: apiId,
+      StageName: "$default",
+      AutoDeploy: true,
+      RouteSettings: {
+        "POST /orders": { ThrottlingRateLimit: 1, LoggingLevel: "INFO" },
+      },
+    });
+
+    // Then the member that is not simulated is refused by the path it was
+    // written at, rather than logging nothing while the throttle works
+    await expect(simAws.apiGatewayV2().createStage(stage)).rejects.toThrow(
+      /RouteSettings 'POST \/orders' LoggingLevel is not simulated/,
+    );
   });
 });

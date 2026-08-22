@@ -46,6 +46,17 @@ export class SimApiGatewayV2ErrorResponse {
   }
 
   /**
+   * The route's throttle had no token left for the request.
+   *
+   * The stage's `DefaultRouteSettings` and `RouteSettings` set the rate and
+   * the burst each route is served at, and every client of a route draws on
+   * the one bucket. A client can be refused over traffic it did not send.
+   */
+  tooManyRequests(): Response {
+    return this.jsonResponse(429, "Too Many Requests");
+  }
+
+  /**
    * The integration failed to handle the request.
    */
   internalServerError(): Response {

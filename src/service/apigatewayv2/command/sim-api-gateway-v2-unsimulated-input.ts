@@ -19,16 +19,25 @@ export class SimApiGatewayV2UnsimulatedInput {
 
   /**
    * Refuse every supplied input that is not one of the accepted options.
+   *
+   * An option nested inside another, such as one member of a stage's
+   * `DefaultRouteSettings`, is refused by the same accepted set. `within` names
+   * the path it was written at, and the message then points at the member the
+   * caller wrote.
    */
-  refuseUnaccepted(input: object, accepted: readonly string[]): void {
+  refuseUnaccepted(
+    input: object,
+    accepted: readonly string[],
+    within = "",
+  ): void {
     for (const [option, value] of Object.entries(input)) {
       if (value === undefined || accepted.includes(option)) {
         continue;
       }
 
       throw new SimApiGatewayV2BadRequest(
-        `${this.operation} ${option} is not simulated: it would be ignored ` +
-          `here and applied on real AWS`,
+        `${this.operation} ${within}${option} is not simulated: it would be ` +
+          `ignored here and applied on real AWS`,
       );
     }
   }

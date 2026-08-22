@@ -80,6 +80,13 @@ export {
   SimHttpApiStage,
   type SimHttpApiStageView,
 } from "./api/stage/sim-http-api-stage.js";
+export type {
+  SimHttpApiRouteSettings,
+  SimHttpApiRouteSettingsMap,
+  SimHttpApiRouteSettingsView,
+} from "./api/stage/settings/sim-http-api-route-settings.type.js";
+export { SimHttpApiStageRouteSettings } from "./api/stage/settings/sim-http-api-stage-route-settings.js";
+export { SimHttpApiTokenBucket } from "./api/stage/settings/sim-http-api-token-bucket.js";
 export {
   SimApiGatewayV2BadRequest,
   SimApiGatewayV2Conflict,
