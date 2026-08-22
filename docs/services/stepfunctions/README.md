@@ -14,8 +14,9 @@ Six state types run. `Pass`, `Task`, `Succeed`, `Fail`, `Choice` and `Wait`. A d
 The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
 `OutputPath` apply in that order, reading Reference Paths and the intrinsic functions.
 
-A `Task` state invokes a simulated Lambda function. Every other `Resource` is refused when the state
-machine is created, naming what the definition asked for.
+A `Task` state invokes a simulated Lambda function, calls an operation on any other simulated
+service, or starts another state machine. A `Resource` this simulator has no answer for is refused
+when the state machine is created, naming what the definition asked for.
 
 A `Task` state's `Retry` and `Catch` both run, on the simulation's clock, along with the
 `TimeoutSeconds` and `HeartbeatSeconds` it takes.
@@ -465,6 +466,189 @@ its retries in it, and a task that reaches the deadline gives up where it stands
 states took, and what each run failed with. A test asserting that a task ran three times counts the
 rows.
 
+## Calling a simulated service
+
+A `Task` state can call an operation on any service this simulation holds, through both of the forms
+Amazon States Language gives a service integration.
+
+`arn:aws:states:::aws-sdk:<service>:<operation>` is the SDK integration. The state's `Parameters` are
+the request and the operation's response is its result. The service is named the way the AWS SDK
+names it, in lower case with nothing between the words (`dynamodb`, `sqs`, `eventbridge`, `sfn`,
+`secretsmanager`, `cloudwatchlogs`). Every simulated service answers one, and a service this
+simulation has no simulation of is refused when the state machine is created.
+
+Seven integrations are the ones Step Functions optimises, and each carries the request shape that
+integration defines.
+
+| `Resource`                               | Calls                           |
+| ---------------------------------------- | ------------------------------- |
+| `arn:aws:states:::dynamodb:putItem`      | DynamoDB `PutItem`              |
+| `arn:aws:states:::dynamodb:getItem`      | DynamoDB `GetItem`              |
+| `arn:aws:states:::dynamodb:updateItem`   | DynamoDB `UpdateItem`           |
+| `arn:aws:states:::dynamodb:deleteItem`   | DynamoDB `DeleteItem`           |
+| `arn:aws:states:::sns:publish`           | SNS `Publish`                   |
+| `arn:aws:states:::sqs:sendMessage`       | SQS `SendMessage`               |
+| `arn:aws:states:::events:putEvents`      | EventBridge `PutEvents`         |
+| `arn:aws:states:::states:startExecution` | Step Functions `StartExecution` |
+
+Four of them carry a message, and an optimized integration lets that message be written as JSON.
+`Message` on `sns:publish`, `MessageBody` on `sqs:sendMessage`, the `Detail` of each
+`events:putEvents` entry and `Input` on `states:startExecution` are all serialised on the way out.
+`Parameters` build a message the way they build anything else.
+
+```typescript sim-step-functions-service-task
+/**
+ * A workflow that records an enrolment in DynamoDB and announces it on SNS.
+ */
+
+import { CreateTableCommand, GetItemCommand } from "@aws-sdk/client-dynamodb";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateTopicCommand } from "@aws-sdk/client-sns";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "enrolments",
+    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+const topic = await simAws
+  .sns()
+  .createTopic(new CreateTopicCommand({ Name: "enrolments" }));
+
+// The execution assumes this role, and every call it makes is authorized as it.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "WorkflowRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "states.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "WorkflowRole",
+    PolicyName: "RecordEnrolments",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: ["dynamodb:PutItem", "sns:Publish"],
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: role.Role.Arn,
+    definition: JSON.stringify({
+      StartAt: "Record",
+      States: {
+        Record: {
+          Type: "Task",
+          Resource: "arn:aws:states:::dynamodb:putItem",
+          Parameters: {
+            TableName: "enrolments",
+            Item: { id: { "S.$": "$.student" }, term: { S: "2026-autumn" } },
+          },
+          // PutItem answers with nothing, and the announcement needs the input.
+          ResultPath: null,
+          Next: "Announce",
+        },
+        Announce: {
+          Type: "Task",
+          Resource: "arn:aws:states:::sns:publish",
+          Parameters: {
+            TopicArn: topic.TopicArn,
+            Message: { "student.$": "$.student", enrolled: true },
+          },
+          End: true,
+        },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({ student: "Wei" }),
+  },
+});
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.status); // SUCCEEDED
+
+const recorded = await simAws.dynamoDb().getItem(
+  new GetItemCommand({
+    TableName: "enrolments",
+    Key: { id: { S: "Wei" } },
+  }),
+);
+
+console.log(recorded.Item?.["term"]); // { S: '2026-autumn' }
+```
+
+The five data-flow fields apply around one of these calls the way they apply around any other state.
+`Parameters` build the request, and `ResultSelector`, `ResultPath` and `OutputPath` shape the
+response. A `Parameters` field written with `.$` reads a Reference Path or an intrinsic. The `Item`
+above takes its key out of the execution's input that way.
+
+The call is made in the state machine's own Account and Region. A resource in another one is reached
+by naming it in the request, where the operation takes an ARN.
+
+### What the execution role has to allow
+
+Each call carries the role the execution assumed, and simulated IAM answers it against that role's
+policies and the resource the request names. The action is the one AWS documents for the operation,
+so `dynamodb:PutItem` for a `putItem` and `sns:Publish` for a `publish`. A role that has not been
+granted it fails the task with an access denied error, naming the action and the resource.
+
+`states:startExecution` is the exception. Simulated Step Functions authorizes none of its own
+operations yet. A task starting another state machine runs whatever the role allows.
+
+### When a service refuses a call
+
+The task fails under the name Amazon States Language gives a service error. That name is the service
+and the error joined by a dot. A conditional write that did not hold is
+`DynamoDb.ConditionalCheckFailedException`, and a request the service would not accept is
+`DynamoDb.ValidationException`. `Retry` and `Catch` match on that name.
+
+The error is the service's own name for what it refused, and simulated IAM calls a refusal
+`AccessDenied`. A task an execution role may not make is `DynamoDb.AccessDenied` here, where real
+Step Functions writes `DynamoDb.AccessDeniedException`.
+
+Anything that stopped the call from reaching the service fails the task with `States.TaskFailed`. An
+operation this simulator has no implementation for is one of these, and the cause names the operation
+and lists what that simulated service does run. That refusal comes when the task runs, because the
+operations a service runs belong to the simulated service and there is none to ask while a state
+machine is being created.
+
+### What a Resource is refused for
+
+`.sync` and `.waitForTaskToken` are refused when the state machine is created, naming the pattern. A
+task here calls and answers, and both of those hold a state open until something else happens. An
+integration for a service this simulation has no simulation of is refused the same way, naming the
+service and the operation the definition asked for.
+
 ## Branching on the input
 
 A `Choice` state takes the first rule its input matches, and its `Default` where none of them do.
@@ -831,6 +1015,12 @@ A test asserting on the output of a state machine that used one could only asser
 - **A task's `Invoke` response carries three fields.** `ExecutedVersion`, `Payload` and
   `StatusCode`. Real Step Functions adds `SdkHttpMetadata` and `SdkResponseMetadata`, which describe
   a call over a network there was none of here.
+- **A service call an execution role may not make fails as `AccessDenied`.** Simulated IAM names a
+  refusal that way, and the task error is the service and that name joined by a dot. Real Step
+  Functions writes the service's own `AccessDeniedException`.
+- **An operation a simulated service has no implementation for is refused when the task runs.** The
+  operations a service runs belong to the simulated service, and there is none to ask while the
+  state machine is being created. The service itself is refused there.
 - **A failed task's `Cause` is the handler's message.** Real Step Functions writes the JSON error
   document Lambda answered with, holding `errorMessage`, `errorType` and a stack trace.
 - **A task's timeout covers the whole state.** Real Step Functions gives every attempt its own
@@ -867,6 +1057,6 @@ two and is what this follows.
 ## Still to come
 
 - `Parallel` and `Map` states, and the `Retry` and `Catch` those two take.
-- Service integrations beyond Lambda, task tokens and activities.
+- The `.sync` pattern, task tokens and activities.
 - The context object, `$$`.
 - JSONata as a query language, and the `Assign` variables that go with it.

@@ -142,6 +142,17 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
 ]);
 
 /**
+ * Every AWS service SDK interception can reach a simulation of.
+ *
+ * Read by anything that resolves a service from something other than an SDK
+ * client, such as a Step Functions `Task` state whose `Resource` names a
+ * service and an operation.
+ */
+export function simSdkInterceptedServiceIds(): readonly string[] {
+  return scopedRouters.keys().toArray();
+}
+
+/**
  * Resolve the scoped simulated service SDK Command router for an intercepted
  * client's AWS service.
  *

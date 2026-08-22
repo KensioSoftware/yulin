@@ -4,7 +4,7 @@ import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-functio
 import type { SimLambdaFunctionReference } from "../../lambda/function/sim-lambda-function-reference.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesTaskFailure } from "../error/sim-step-functions.error.js";
-import type { SimStatesTaskTarget } from "./sim-states-task-target.js";
+import type { SimStatesLambdaTarget } from "./sim-states-lambda-target.js";
 
 /**
  * The action an execution needs to invoke a function.
@@ -20,7 +20,7 @@ interface SimStatesTaskFunctionProperties {
  */
 export interface SimStatesTaskFunctionRequest {
   readonly stateName: string;
-  readonly target: SimStatesTaskTarget;
+  readonly target: SimStatesLambdaTarget;
   readonly reference: SimLambdaFunctionReference;
 
   /**

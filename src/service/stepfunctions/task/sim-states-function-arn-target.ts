@@ -2,9 +2,9 @@ import { functionErrorDocument } from "../../lambda/command/invoke/invoke-payloa
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesTaskHandlerFailure } from "../error/sim-step-functions.error.js";
 import {
+  SimStatesLambdaTarget,
   type SimStatesTaskCall,
-  SimStatesTaskTarget,
-} from "./sim-states-task-target.js";
+} from "./sim-states-lambda-target.js";
 
 interface SimStatesFunctionArnTargetProperties {
   readonly functionArn: string;
@@ -17,7 +17,7 @@ interface SimStatesFunctionArnTargetProperties {
  * it sends is its own input and what it gets back is what the handler
  * answered. CDK's `LambdaInvoke` emits this form for `payloadResponseOnly`.
  */
-export class SimStatesFunctionArnTarget extends SimStatesTaskTarget {
+export class SimStatesFunctionArnTarget extends SimStatesLambdaTarget {
   readonly #functionArn: string;
 
   constructor(properties: SimStatesFunctionArnTargetProperties) {
