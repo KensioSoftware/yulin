@@ -25,8 +25,9 @@
     "test:local": "rm -rf './.tmp/' && vitest run --project localTests",
     "examples:extract": "pnpm tsx scripts/mts/extract-documentation-examples.mts",
     "examples:tsc": "tsc -p docs/tsconfig.json",
+    "examples:tsc:cdk": "tsc -p docs/tsconfig.cdk.json",
     "examples:lint": "oxlint --type-aware --max-warnings=0 docs",
-    "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",
+    "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:tsc:cdk && pnpm examples:lint",
     "fta": "./scripts/sh/fta.sh",
     "check": "pnpm fmt && pnpm fta && pnpm build:check && pnpm examples:check && pnpm test:coverage",
     "tf:init": "./scripts/sh/tf-init.sh"

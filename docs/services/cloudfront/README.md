@@ -1363,6 +1363,114 @@ Both kinds of function see the `host` header as the hostname the viewer reached 
 rather than the Yulin-local host a request served on localhost arrives with. As on AWS, `host` is
 read-only at the viewer request, and a host a handler writes is discarded before the Origin sees it.
 
+### From CloudFormation
+
+`AWS::CloudFront::Distribution` takes `LambdaFunctionAssociations` on `DefaultCacheBehavior` and on
+any entry of `CacheBehaviors`. CloudFormation writes the list as a plain array where the SDK writes
+the `Quantity` and `Items` pair. `Ref` on an `AWS::Lambda::Version` answers the qualified function
+ARN. That is the value an association names, and the two fit together directly:
+
+```yaml
+EdgeVersion:
+  Type: AWS::Lambda::Version
+  Properties:
+    FunctionName: !Ref RewriteFunction
+
+SiteDistribution:
+  Type: AWS::CloudFront::Distribution
+  Properties:
+    DistributionConfig:
+      DefaultCacheBehavior:
+        TargetOriginId: SiteOrigin
+        ViewerProtocolPolicy: allow-all
+        LambdaFunctionAssociations:
+          - EventType: viewer-request
+            LambdaFunctionARN: !Ref EdgeVersion
+```
+
+The function still has to live in us-east-1. A stack holding one is a us-east-1 stack.
+
+Two kinds of association are left out of the deployed Distribution and recorded on
+`stack.ignoredProperties`, under the event type each was on. One names a function version this
+simulation does not hold, as a template pointing at a function in a real account does. The other is
+on `origin-request` or `origin-response`. The rest of the Behavior deploys either way, and the
+event the skipped association was on is left empty. A test that cares reads the record.
+
+Everything real CloudFront refuses still fails the deployment. A function outside us-east-1, an ARN
+without a version qualifier, an execution role missing the `edgelambda.amazonaws.com` trust, two
+functions on one event type and a viewer event running both kinds of edge function each fail a real
+deploy of the same template.
+
+CDK reaches a Behavior through `edgeLambdas`, given a `lambda.Version` from the same stack:
+
+```typescript sim-cloudfront-lambda-edge-cdk
+/**
+ * A CDK Distribution running a Lambda@Edge function at the viewer request.
+ */
+
+import { Stack } from "aws-cdk-lib";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import type { Construct } from "constructs";
+
+/**
+ * Example CDK stack whose Distribution rewrites every request at the edge.
+ *
+ * The stack is in us-east-1, the one Region CloudFront runs a Lambda@Edge
+ * function from.
+ */
+export class SiteStack extends Stack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id, { env: { region: "us-east-1" } });
+
+    const siteBucket = new s3.Bucket(this, "SiteBucket");
+
+    // A Lambda@Edge execution role trusts both service principals.
+    const edgeRole = new iam.Role(this, "EdgeRole", {
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal("lambda.amazonaws.com"),
+        new iam.ServicePrincipal("edgelambda.amazonaws.com"),
+      ),
+    });
+
+    const rewriteFunction = new lambda.Function(this, "RewriteFunction", {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      role: edgeRole,
+      code: lambda.Code.fromInline(`
+exports.handler = async (event) => {
+  const { request } = event.Records[0].cf;
+  request.uri = "/index.html";
+  return request;
+};
+`),
+    });
+
+    new cloudfront.Distribution(this, "SiteDistribution", {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+        edgeLambdas: [
+          {
+            // edgeLambdas takes a published version, and currentVersion
+            // is one.
+            functionVersion: rewriteFunction.currentVersion,
+            eventType: cloudfront.LambdaEdgeEventType.VIEWER_REQUEST,
+          },
+        ],
+      },
+    });
+  }
+}
+```
+
+`cloudfront.experimental.EdgeFunction` deploys from a us-east-1 stack, where the construct creates
+the function alongside everything else. From a stack in any other Region it writes the function into
+a second stack and reads the ARN back through a custom resource, and that route is unsupported (see
+[Limitations](#limitations)).
+
 ## Web ACLs
 
 A Distribution can put a WAFv2 web ACL in front of everything it serves. Name the web ACL's ARN in
@@ -2293,6 +2401,7 @@ Sim CloudFront currently supports:
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions, including async ones
 - `viewer-request` and `viewer-response` Lambda@Edge functions, through `LambdaFunctionAssociations`
+- `LambdaFunctionAssociations` on a template's Distribution, and CDK's `edgeLambdas`
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
@@ -2310,8 +2419,16 @@ whether the simulator needs them to model the requested behaviour safely.
 Where sim CloudFront knowingly behaves differently from AWS:
 
 - **Lambda@Edge runs at the two viewer events only.** CloudFront runs an edge function at
-  `origin-request` and `origin-response` as well, and both are refused by name rather than being
-  accepted and never run. The request pipeline has no hook either side of the Origin fetch yet.
+  `origin-request` and `origin-response` as well, and `CreateDistribution` refuses both by name
+  rather than accepting one that would never run. A Distribution deployed from a template records
+  the association and deploys without it. A site naming one origin function still serves. The
+  request pipeline has no hook either side of the Origin fetch yet.
+- **A CDK `EdgeFunction` outside us-east-1 fails the deployment.**
+  `cloudfront.experimental.EdgeFunction` writes the function into a us-east-1 support stack and
+  reads its ARN back through a custom resource in the stack that uses it. That custom resource
+  goes unresolved here, and the association is left holding the attribute reference. An
+  `EdgeFunction` in a us-east-1 stack deploys, as the construct creates the function there
+  directly. A `lambda.Version` handed to `edgeLambdas` is the route that works from a template.
 - **Nothing is replicated.** Real Lambda@Edge copies the function out to every Region and creates the
   `AWSServiceRoleForLambdaReplicator` service-linked role to do it. Here the function is invoked
   where it was created. The trust policy and the `lambda:GetFunction` and `lambda:EnableReplication`

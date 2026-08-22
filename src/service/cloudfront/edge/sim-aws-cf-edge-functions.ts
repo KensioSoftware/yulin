@@ -8,6 +8,7 @@ import {
 import { SimCloudFrontInvalidLambdaFunctionAssociation } from "../error/sim-cloudfront.error.js";
 import { edgeFunctionArnParts } from "./sim-cf-edge-function-arn.js";
 import type { SimCfEdgeFunctions } from "./sim-cf-edge-functions.js";
+import { findSimCfEdgeFunctionVersion } from "./sim-cf-edge-function-version.js";
 
 /**
  * The service principal Lambda@Edge runs a function's execution role as.
@@ -54,10 +55,7 @@ export class SimAwsCfEdgeFunctions implements SimCfEdgeFunctions {
    */
   private target(functionArn: string): SimLambdaFunctionTarget {
     const arn = edgeFunctionArnParts(functionArn);
-    const found = this.simAws
-      .accountRegionScope(arn.accountId, arn.regionName)
-      .lambda()
-      .getSimFunctionTarget(arn.functionName, arn.qualifier);
+    const found = findSimCfEdgeFunctionVersion(this.simAws, arn);
 
     if (found === undefined) {
       throw new SimCloudFrontInvalidLambdaFunctionAssociation(

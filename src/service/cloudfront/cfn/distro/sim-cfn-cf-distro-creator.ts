@@ -9,8 +9,11 @@ import type {
 import type { SimCloudFront } from "../../sim-cloudfront.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.command.js";
 import { SimCfnCfDistroConfigValidator } from "./sim-cfn-cf-distro-config-validator.js";
+import { simCfnCfDistroWithRunnableEdgeAssociations } from "./sim-cfn-cf-distro-edge-associations.js";
 import { simCfnCfDistroWithoutAbsentWebAcl } from "./sim-cfn-cf-distro-web-acl.js";
+import type { SimAws } from "../../../aws/sim-aws.js";
 
 interface SimCfnCfDistroCreatorProperties {
   readonly cloudFront: SimCloudFront;
@@ -20,10 +23,11 @@ interface SimCfnCfDistroCreatorProperties {
  * Creates simulated CloudFront Distributions from CloudFormation Resources.
  *
  * A `WebACLId` naming a web ACL this simulation does not hold is left out and
- * recorded. CloudFront has no association Resource, so the reference lives on
- * the Distribution itself, and refusing it would take the Distribution down
- * over a web ACL that was never the point of the template. The site a local
- * dev server and a suite of tests make requests to has to survive that.
+ * recorded, and so is a Lambda@Edge association it cannot run. CloudFront has
+ * no association Resource for either, so both live on the Distribution itself,
+ * and refusing one would take the Distribution down over something that was
+ * never the point of the template. The site a local dev server and a suite of
+ * tests make requests to has to survive that.
  */
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;
@@ -58,7 +62,7 @@ export class SimCfnCfDistroCreator {
     });
     const output = await this.cloudFront.createDistribution({
       input: {
-        DistributionConfig: simCfnCfDistroWithoutAbsentWebAcl(
+        DistributionConfig: deployableConfig(
           resource,
           validator.validate(),
           context.simAws,
@@ -81,4 +85,24 @@ export class SimCfnCfDistroCreator {
 
     return distribution;
   }
+}
+
+/**
+ * The DistributionConfig to deploy, without the parts this simulation cannot
+ * act on, each recorded on the Resource.
+ */
+function deployableConfig(
+  resource: SimCfnResource,
+  distributionConfig: SimCloudFrontDistributionConfig,
+  simAws: SimAws,
+): SimCloudFrontDistributionConfig {
+  return simCfnCfDistroWithoutAbsentWebAcl(
+    resource,
+    simCfnCfDistroWithRunnableEdgeAssociations(
+      resource,
+      distributionConfig,
+      simAws,
+    ),
+    simAws,
+  );
 }

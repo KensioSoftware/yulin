@@ -29,7 +29,7 @@ type BehaviorConfig =
 export function assertSimulatedEventType(
   eventType: string | undefined,
 ): asserts eventType is SimulatedEdgeEventType {
-  if (eventType === "viewer-request" || eventType === "viewer-response") {
+  if (isSimulatedEdgeEventType(eventType)) {
     return;
   }
 
@@ -38,6 +38,15 @@ export function assertSimulatedEventType(
       `simulated. Simulated CloudFront runs a Lambda@Edge function at ` +
       `viewer-request and viewer-response.`,
   );
+}
+
+/**
+ * Whether this simulation runs a Lambda@Edge function at this event type.
+ */
+export function isSimulatedEdgeEventType(
+  eventType: string | undefined,
+): eventType is SimulatedEdgeEventType {
+  return eventType === "viewer-request" || eventType === "viewer-response";
 }
 
 /**

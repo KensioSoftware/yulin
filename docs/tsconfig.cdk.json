@@ -1,0 +1,14 @@
+{
+  // CDK examples compile on their own, because an L2 construct is not
+  // assignable to the interface CDK itself declares for it under
+  // exactOptionalPropertyTypes. A project made by `cdk init` leaves that
+  // setting off, and a stack here is checked the way a reader's project checks
+  // one.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "exactOptionalPropertyTypes": false,
+    "tsBuildInfoFile": "../tsconfig.docs-cdk.tsbuildinfo"
+  },
+  "include": ["**/*-cdk.example.ts"]
+}
