@@ -11,6 +11,11 @@ interface SimCloudFrontCustomOriginProperties {
   readonly originPath?: string | undefined;
   readonly dispatcher: SimCfCustomOriginDispatcher;
   readonly originAccessControl?: SimCloudFrontOriginAccessControl | undefined;
+  /**
+   * The headers CloudFront adds to every request it sends to this Origin,
+   * keyed by lower-case header name.
+   */
+  readonly customHeaders?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -40,6 +45,7 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
   private readonly originPath: string;
   private readonly dispatcher: SimCfCustomOriginDispatcher;
   private readonly signer: SimCfCustomOriginSigner;
+  private readonly customHeaders: Readonly<Record<string, string>>;
 
   constructor(properties: SimCloudFrontCustomOriginProperties) {
     this.originId = properties.originId;
@@ -48,6 +54,7 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
     this.dispatcher = properties.dispatcher;
     this.originAccessControl = properties.originAccessControl;
     this.signer = new SimCfCustomOriginSigner(properties.originAccessControl);
+    this.customHeaders = properties.customHeaders ?? {};
   }
 
   /**
@@ -62,6 +69,7 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
       domainName: this.domainName,
       originPath: this.originPath,
       request: request.req,
+      customHeaders: this.customHeaders,
       signingHeaders: this.signer.forRequest(request),
     });
 

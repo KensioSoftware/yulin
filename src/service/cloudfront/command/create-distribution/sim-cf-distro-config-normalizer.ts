@@ -6,12 +6,11 @@ import type {
   SimCloudFrontFunctionAssociation,
   SimCloudFrontOriginConfig,
 } from "./create-distribution.command.js";
-import { isRecord } from "../../../../util/type-guard/record.js";
-import { assertConsistentQuantity } from "../sim-cf-list-quantity.js";
-
-interface SimCloudFrontConfigList<T> {
-  readonly Items?: readonly T[] | undefined;
-}
+import {
+  normalizeSimCfList,
+  normalizeSimCfListItems,
+} from "./sim-cf-normalize-list.js";
+import { normalizeSimCfOrigin } from "./sim-cf-normalize-origin.js";
 
 type SimCloudFrontBehaviorConfig =
   | SimCloudFrontDefaultCacheBehaviorConfig
@@ -34,29 +33,20 @@ export class SimCloudFrontDistributionConfigNormalizer {
    * Normalize known list-like DistributionConfig fields.
    */
   normalize(): SimCloudFrontDistributionConfig {
-    const distributionConfig = this.distributionConfig as Record<
-      string,
-      object
-    >;
-    const cacheBehaviors = this.normalizeList<SimCloudFrontCacheBehaviorConfig>(
-      "CacheBehaviors",
-      distributionConfig["CacheBehaviors"],
-    );
+    const config = this.distributionConfig as Record<string, object>;
 
     return {
       ...this.distributionConfig,
-      Aliases: this.normalizeList<string>(
-        "Aliases",
-        distributionConfig["Aliases"],
-      ),
-      Origins: this.normalizeList<SimCloudFrontOriginConfig>(
+      Aliases: normalizeSimCfList<string>("Aliases", config["Aliases"]),
+      Origins: normalizeSimCfListItems<SimCloudFrontOriginConfig>(
         "Origins",
-        distributionConfig["Origins"],
+        config["Origins"],
+        normalizeSimCfOrigin,
       ),
       CustomErrorResponses:
-        this.normalizeList<SimCloudFrontCustomErrorResponseConfig>(
+        normalizeSimCfList<SimCloudFrontCustomErrorResponseConfig>(
           "CustomErrorResponses",
-          distributionConfig["CustomErrorResponses"],
+          config["CustomErrorResponses"],
         ),
       DefaultCacheBehavior:
         this.distributionConfig.DefaultCacheBehavior === undefined
@@ -64,15 +54,11 @@ export class SimCloudFrontDistributionConfigNormalizer {
           : this.normalizeCacheBehavior(
               this.distributionConfig.DefaultCacheBehavior,
             ),
-      CacheBehaviors:
-        cacheBehaviors === undefined
-          ? undefined
-          : {
-              ...cacheBehaviors,
-              Items: cacheBehaviors.Items?.map((cacheBehavior) =>
-                this.normalizeCacheBehavior(cacheBehavior),
-              ),
-            },
+      CacheBehaviors: normalizeSimCfListItems<SimCloudFrontCacheBehaviorConfig>(
+        "CacheBehaviors",
+        config["CacheBehaviors"],
+        (behavior) => this.normalizeCacheBehavior(behavior),
+      ),
     };
   }
 
@@ -84,40 +70,10 @@ export class SimCloudFrontDistributionConfigNormalizer {
     return {
       ...cacheBehavior,
       FunctionAssociations:
-        this.normalizeList<SimCloudFrontFunctionAssociation>(
+        normalizeSimCfList<SimCloudFrontFunctionAssociation>(
           "FunctionAssociations",
           cacheBehaviorRecord["FunctionAssociations"],
         ),
     };
-  }
-
-  private normalizeList<T>(
-    listName: string,
-    value: unknown,
-  ): SimCloudFrontConfigList<T> | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    assertConsistentQuantity(listName, value);
-
-    if (Array.isArray(value)) {
-      return {
-        Items: value as readonly T[],
-      };
-    }
-
-    if (isRecord(value)) {
-      return {
-        ...value,
-        // Keep downstream for..of iteration safe when Items is malformed.
-        Items: Array.isArray(value["Items"])
-          ? (value["Items"] as readonly T[])
-          : undefined,
-      };
-    }
-
-    /* v8 ignore next -- defensive fallback */
-    return undefined;
   }
 }

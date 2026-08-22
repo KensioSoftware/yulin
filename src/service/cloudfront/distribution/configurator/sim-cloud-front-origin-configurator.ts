@@ -12,6 +12,7 @@ import type { SimCloudFrontOriginAccessControl } from "../../origin-access-contr
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
 import { assertSimCfOacOriginType } from "../../origin-access-control/sim-cf-oac-origin-type.js";
 import { SimCloudFrontInvalidOriginAccessControl } from "../../error/sim-cloudfront.error.js";
+import { simCfOriginCustomHeaders } from "../../origin/sim-cf-origin-custom-headers.js";
 
 /**
  * Applies Origin configuration to a sim CloudFront Distribution.
@@ -44,6 +45,12 @@ export class SimCloudFrontOriginConfigurator {
       origin.Id,
       origin.OriginAccessControlId,
     );
+    // Read for both Origin kinds, since CloudFront refuses a header name it
+    // cannot add whichever kind the Origin turns out to be. Only a custom
+    // Origin goes on to carry them. An S3 Origin here reads its Bucket through
+    // GetObject and builds no request for a header to travel on, and real S3
+    // ignores a header it has no use for either way.
+    const customHeaders = simCfOriginCustomHeaders(origin.Id, origin);
 
     if (origin.S3OriginConfig !== undefined) {
       assertNoSimCfS3OriginAccessIdentity(origin.Id, origin.S3OriginConfig);
@@ -84,6 +91,7 @@ export class SimCloudFrontOriginConfigurator {
           domainName: origin.DomainName,
           originPath: origin.OriginPath,
           dispatcher: this.customOriginDispatcher,
+          customHeaders,
           ...(originAccessControl !== undefined && { originAccessControl }),
         }),
       );

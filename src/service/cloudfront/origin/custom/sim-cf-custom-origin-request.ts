@@ -6,6 +6,10 @@ interface SimCfCustomOriginRequestProperties {
   readonly originPath: string;
   readonly request: Request;
   /**
+   * The Origin's own custom headers, keyed by lower-case header name.
+   */
+  readonly customHeaders?: Readonly<Record<string, string>> | undefined;
+  /**
    * Headers stating who the Origin request is from and what its signature
    * covers, which an Origin whose origin access control signs carries and an
    * anonymous one does not.
@@ -46,6 +50,15 @@ export function simCfCustomOriginRequest(
   // had them stripped already; one reaching a controller in process has not,
   // and either way an unsigned Origin should state nothing.
   stripSimAwsControlHeaders(headers);
+
+  // A viewer sending a header the Origin also configures has its value
+  // replaced, as CloudFront replaces it. That is what stops a viewer spoofing
+  // a header the origin trusts by sending it through the Distribution.
+  const customHeaders = Object.entries(properties.customHeaders ?? {});
+
+  for (const [name, value] of customHeaders) {
+    headers.set(name, value);
+  }
 
   const signingHeaders = Object.entries(properties.signingHeaders ?? {});
 
