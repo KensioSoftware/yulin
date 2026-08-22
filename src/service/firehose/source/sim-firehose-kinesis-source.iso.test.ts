@@ -20,14 +20,14 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { simKinesisStreamFactory } from "../../kinesis/stream/sim-kinesis-stream.factory.js";
 import { simFirehoseDeliveryStreamFactory } from "../stream/sim-firehose-delivery-stream.factory.js";
 
-/**
- * The bytes of one JSON line, the way a producer writes one onto a stream.
- */
-function orderLine(id: string): Uint8Array {
-  return new TextEncoder().encode(`${JSON.stringify({ id })}\n`);
-}
-
 describe("A simulated Firehose delivery stream reading a Kinesis stream", () => {
+  /**
+   * The bytes of one JSON line, the way a producer writes one onto a stream.
+   */
+  function orderLine(id: string): Uint8Array {
+    return new TextEncoder().encode(`${JSON.stringify({ id })}\n`);
+  }
+
   /**
    * One batch of orders to put on a stream, each under its own partition key.
    */

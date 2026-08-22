@@ -604,14 +604,14 @@ console.log(Contents?.length);
 
 ## Supported commands
 
-| Command                  | Notes                                                                      |
-| ------------------------ | -------------------------------------------------------------------------- |
-| `CreateDeliveryStream`   | A name already in use raises `ResourceInUseException`.                     |
-| `DeleteDeliveryStream`   | The name is free again at once. Whatever was buffered goes with it.        |
-| `ListDeliveryStreams`    | Sorted by name, paged with `Limit` and `ExclusiveStartDeliveryStreamName`. |
-| `DescribeDeliveryStream` | Reports the one destination, and a Kinesis source under `Source`.          |
-| `PutRecord`              | Records up to 1,000 KiB. Refused on a Kinesis-sourced delivery stream.     |
-| `PutRecordBatch`         | Up to 500 records and 4 MiB. `FailedPutCount` is always zero.              |
+| Command                  | Notes                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `CreateDeliveryStream`   | A name already in use raises `ResourceInUseException`.                                                  |
+| `DeleteDeliveryStream`   | The name is free again at once. Whatever was buffered goes with it.                                     |
+| `ListDeliveryStreams`    | Sorted by name, paged with `Limit` and `ExclusiveStartDeliveryStreamName`.                              |
+| `DescribeDeliveryStream` | Reports the one destination, and a Kinesis source under `Source`.                                       |
+| `PutRecord`              | Records up to 1,000 KiB. Refused on a Kinesis-sourced delivery stream.                                  |
+| `PutRecordBatch`         | Up to 500 records and 4 MiB, and refused on a Kinesis-sourced one too. `FailedPutCount` is always zero. |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`, which covers
 `UpdateDestination`, `StartDeliveryStreamEncryption`, `StopDeliveryStreamEncryption` and the tag

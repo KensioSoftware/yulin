@@ -54,6 +54,9 @@ describe("A simulated Firehose with no simulated Kinesis to read", () => {
     const streamArn = "arn:aws:kinesis:us-east-1:888888888888:stream/orders";
 
     // When each of the three reads is made.
+    const shards = await assertThrowsErrorAsync(async () => {
+      await records.describeStream({ input: { StreamARN: streamArn } });
+    });
     const iterator = await assertThrowsErrorAsync(async () => {
       await records.getShardIterator({ input: { StreamARN: streamArn } });
     });
@@ -62,7 +65,9 @@ describe("A simulated Firehose with no simulated Kinesis to read", () => {
     });
 
     // Then each refuses on its own, rather than one refusing and the next
-    // handing back nothing.
+    // handing back nothing. Finding the shards is the one a delivery stream
+    // hits, since it is the read it starts with.
+    assertStringIncludes(shards.message, streamArn);
     assertStringIncludes(iterator.message, streamArn);
     assertStringIncludes(read.message, "no simulated Kinesis");
   });
