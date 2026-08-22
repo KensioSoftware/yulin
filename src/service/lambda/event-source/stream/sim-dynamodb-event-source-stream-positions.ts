@@ -15,6 +15,7 @@ export type SimLambdaEventSourceStreamNamedPosition = Exclude<
 export interface SimDynamoDbEventSourceIteratorType {
   readonly ShardIteratorType: string;
   readonly SequenceNumber?: string;
+  readonly Timestamp?: Date;
 }
 
 /**
@@ -28,7 +29,12 @@ export function simDynamoDbEventSourceIteratorTypeOf(
   position: SimLambdaEventSourceStreamNamedPosition,
 ): SimDynamoDbEventSourceIteratorType {
   if (position.kind === "starting") {
-    return { ShardIteratorType: position.startingPosition };
+    const { start } = position;
+
+    return {
+      ShardIteratorType: start.position,
+      ...(start.timestamp !== undefined && { Timestamp: start.timestamp }),
+    };
   }
 
   return {

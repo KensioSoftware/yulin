@@ -5,12 +5,14 @@ import type { SimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-
 import type { SimSqsPollQueues } from "../../sqs/poll/sim-sqs-poll-queues.js";
 import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "./sim-lambda-event-source-mapping.js";
+import type { SimLambdaKinesisStreams } from "./stream/kinesis/sim-lambda-kinesis-streams.js";
 import type { SimLambdaEventSourceStreams } from "./stream/sim-lambda-event-source-streams.js";
 
 interface SimLambdaEventSourcePollersProperties {
   readonly functions: SimLambdaFunctionLookup;
   readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
+  readonly kinesisStreams: SimLambdaKinesisStreams;
   readonly background: BackgroundScheduler;
 }
 

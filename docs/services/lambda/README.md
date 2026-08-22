@@ -1477,7 +1477,7 @@ the `Records` shape real Lambda uses.
 `StartingPosition` is required for a stream and is `TRIM_HORIZON` or `LATEST`. `TRIM_HORIZON` reads
 what the stream still holds, so changes made before the mapping existed are delivered too. `LATEST`
 reads only what the table changes from the moment the mapping starts reading. `AT_TIMESTAMP` is for
-a Kinesis stream and is refused by name.
+[a Kinesis stream](#triggering-a-function-from-a-kinesis-stream) and is refused by name here.
 
 `BatchSize` says how many records one invocation may be given, and defaults to 100, the number
 CDK's `DynamoEventSource` also asks for. The table and the function have to be in the same account
@@ -1930,6 +1930,162 @@ A hand-written template or a SAM application usually gives the function the AWS 
 that role reaches the mapping with no stream permissions and the mapping is refused when it is
 created.
 Write the grant as an inline policy, as the example above and CDK both do.
+
+## Triggering a function from a Kinesis stream
+
+An event source mapping also connects a [simulated Kinesis stream](../kinesis/ "Simulated Kinesis Data Streams docs")
+to a function. Records put onto the stream are delivered to the handler as a Kinesis event, with the
+`Records` shape real Lambda uses.
+
+A Kinesis stream has as many shards as it was created with, and every one of them is read. Real
+Lambda runs a processor per shard, and so does this: each shard keeps its own place on the stream,
+delivers its own batches and backs off on its own when a batch fails. One invocation is given
+records from one shard, so a handler that has to see records in order should put them under one
+partition key, which is what puts them on one shard.
+
+`StartingPosition` is required for a stream. A Kinesis stream takes all three positions.
+`TRIM_HORIZON` reads what the stream still holds, `LATEST` reads only what arrives from the moment
+the mapping starts reading, and `AT_TIMESTAMP` reads from the instant `StartingPositionTimestamp`
+names.
+
+`BatchSize` says how many records one invocation may be given, and defaults to 100, the number CDK's
+`KinesisEventSource` also asks for. The stream and the function have to be in the same account and
+region, as they do on real AWS.
+
+```typescript sim-lambda-kinesis-event-source
+/**
+ * Delivering a simulated Kinesis stream's records to a simulated function.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateStreamCommand, PutRecordCommand } from "@aws-sdk/client-kinesis";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaKinesisStreamEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws
+  .kinesis()
+  .createStream(new CreateStreamCommand({ StreamName: "orders" }));
+
+const streamArn = `arn:aws:kinesis:${simAws.defaultRegionName}:${simAws.defaultAccountId}:stream/orders`;
+
+const { Role } = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderProjectorRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderProjectorRole",
+    PolicyName: "ReadOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: [
+            "kinesis:DescribeStream",
+            "kinesis:GetRecords",
+            "kinesis:GetShardIterator",
+          ],
+          Resource: streamArn,
+        },
+        { Effect: "Allow", Action: "kinesis:ListStreams", Resource: "*" },
+      ],
+    }),
+  }),
+);
+
+const projected: string[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-projector",
+    Role: Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: SimLambdaKinesisStreamEvent): void => {
+          for (const record of event.Records) {
+            // The payload arrives base64 encoded, as it does on AWS.
+            projected.push(
+              Buffer.from(record.kinesis.data, "base64").toString("utf8"),
+            );
+          }
+        },
+      ),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: streamArn,
+    FunctionName: "order-projector",
+    StartingPosition: "TRIM_HORIZON",
+  }),
+);
+
+await simAws.kinesis().putRecord(
+  new PutRecordCommand({
+    StreamName: "orders",
+    PartitionKey: "customer-1",
+    Data: new TextEncoder().encode('{"id":"order-1"}'),
+  }),
+);
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+
+console.log(projected[0]); // {"id":"order-1"}
+```
+
+Each record carries `eventID`, `eventName`, `eventVersion`, `eventSource`, `awsRegion`,
+`eventSourceARN`, `invokeIdentityArn` and a `kinesis` body holding `kinesisSchemaVersion`,
+`partitionKey`, `sequenceNumber`, `data` and `approximateArrivalTimestamp`. `eventID` is the shard
+identifier and the sequence number joined by a colon, so it is unique across the whole stream rather
+than within one shard. `invokeIdentityArn` is the execution role the records were read with.
+
+The two translations worth knowing are the payload and the instant. `data` is base64 of the bytes
+that were put, because the event is JSON and JSON has no bytes, and `approximateArrivalTimestamp` is
+seconds since the epoch where
+[the Kinesis API](../kinesis/#putting-a-record-and-reading-it-back "Simulated Kinesis docs") hands
+out a `Date`. Both are what a deployed function receives.
+
+`SimLambdaKinesisStreamEvent` and `SimLambdaKinesisStreamEventRecord` are exported from
+`@kensio/yulin/lambda` for typing a handler, and are minimal structural equivalents of the
+`KinesisStreamEvent` and `KinesisStreamRecord` types from the `aws-lambda` typings package.
+
+Creating the mapping checks what real Lambda checks. The stream has to exist, and the function's
+execution role has to be allowed `kinesis:DescribeStream`, `kinesis:GetRecords` and
+`kinesis:GetShardIterator` on it, plus `kinesis:ListStreams` on `*`. Those four are what both the
+AWS managed policy and CDK's own grant give a stream consumer. A role missing one of them fails with
+`InvalidParameterValueException` naming the operation.
+
+`FunctionResponseTypes: ["ReportBatchItemFailures"]` works as it does for a DynamoDB stream. A
+handler names a record by its `sequenceNumber`, and the mapping goes back to the lowest one the
+report names, so that record and everything after it on that shard is delivered again. A failing
+batch blocks its own shard and no other.
+
+A mapping naming an enhanced fan-out consumer ARN is refused, since consumers are unsimulated.
+`AWS::Lambda::EventSourceMapping` deploys a Kinesis mapping the same way it deploys a DynamoDB one.
 
 ## Function URLs
 
@@ -3265,12 +3421,13 @@ Sim Lambda currently supports:
   handler directly
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
-- SQS and DynamoDB stream event source mappings, created with `CreateEventSourceMappingCommand` and
-  read with `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
-  `DeleteEventSourceMappingCommand`, delivering real-shaped SQS and DynamoDB stream events and
-  honouring `BatchSize`
-- `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, with a failing batch
-  blocking its shard until it is through or discarded
+- SQS, DynamoDB stream and Kinesis stream event source mappings, created with
+  `CreateEventSourceMappingCommand` and read with `GetEventSourceMappingCommand`,
+  `ListEventSourceMappingsCommand` and `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
+  DynamoDB stream and Kinesis events and honouring `BatchSize`
+- `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, and `"AT_TIMESTAMP"` on a
+  Kinesis one, with a failing batch blocking its shard until it is through or discarded
+- Every shard of a Kinesis stream read by a processor of its own, as real Lambda reads one
 - `FunctionResponseTypes: ["ReportBatchItemFailures"]` on a queue mapping, returning only the
   message ids the handler reported, and on a stream mapping, rewinding to the lowest sequence number
   the handler reported
@@ -3412,8 +3569,8 @@ Current documented limitations:
   versioning yet. That covers `Code.S3ObjectVersion` on `CreateFunction` and on a template
   function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as
   it stands.
-- SQS queues and DynamoDB streams are the only event sources. Kinesis, Kafka and DocumentDB sources
-  are refused outright, and so are `FilterCriteria`,
+- SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
+  Kinesis enhanced fan-out consumers are refused outright, and so are `FilterCriteria`,
   `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
   `ParallelizationFactor`, `TumblingWindowInSeconds` and the other mapping inputs this simulation
   has no behaviour for.

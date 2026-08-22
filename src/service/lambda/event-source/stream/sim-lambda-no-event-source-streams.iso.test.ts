@@ -23,7 +23,7 @@ describe("sim Lambda event source streams with no simulated DynamoDB", () => {
       assertThrowsErrorAsync(async () => {
         await streams.read({
           ...request,
-          position: { kind: "starting", startingPosition: "TRIM_HORIZON" },
+          position: { kind: "starting", start: { position: "TRIM_HORIZON" } },
           batchSize: 100,
         });
       }),

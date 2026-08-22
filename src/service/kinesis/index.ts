@@ -4,6 +4,8 @@ export type * from "./command/sim-kinesis-command.types.js";
 export { SimKinesisStream } from "./stream/sim-kinesis-stream.js";
 export type { SimKinesisStreamStatus } from "./stream/sim-kinesis-stream.js";
 export { SimKinesisShard } from "./stream/sim-kinesis-shard.js";
+export { SimKinesisStreamActivity } from "./stream/sim-kinesis-stream-activity.js";
+export type { SimKinesisStreamWatcher } from "./stream/sim-kinesis-stream-activity.js";
 export type { SimKinesisStreamMode } from "./stream/sim-kinesis-stream-mode.js";
 export {
   parseSimKinesisStreamArn,

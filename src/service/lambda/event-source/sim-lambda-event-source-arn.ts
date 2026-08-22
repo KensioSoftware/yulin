@@ -1,5 +1,6 @@
 import { SimLambdaInvalidParameterValueException } from "../error/sim-lambda.error.js";
 import { SimLambdaSqsEventSourceArn } from "./queue/sim-lambda-sqs-event-source-arn.js";
+import { SimLambdaKinesisEventSourceArn } from "./stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import { SimLambdaDynamoDbStreamEventSourceArn } from "./stream/sim-lambda-dynamodb-stream-event-source-arn.js";
 
 /**
@@ -12,14 +13,16 @@ import { SimLambdaDynamoDbStreamEventSourceArn } from "./stream/sim-lambda-dynam
  */
 export type SimLambdaEventSourceArn =
   | SimLambdaSqsEventSourceArn
-  | SimLambdaDynamoDbStreamEventSourceArn;
+  | SimLambdaDynamoDbStreamEventSourceArn
+  | SimLambdaKinesisEventSourceArn;
 
 /**
  * What this simulation polls, said in one place so every refusal that mentions
  * it says the same thing.
  */
 export const simulatedEventSourcesDescription =
-  "SQS queues and DynamoDB streams are the simulated event sources";
+  "SQS queues, DynamoDB streams and Kinesis streams are the simulated event " +
+  "sources";
 
 /**
  * The ARN shapes those event sources are named by.
@@ -27,6 +30,7 @@ export const simulatedEventSourcesDescription =
 const simulatedEventSourceArnShapes: readonly string[] = [
   SimLambdaSqsEventSourceArn.arnShape,
   SimLambdaDynamoDbStreamEventSourceArn.arnShape,
+  SimLambdaKinesisEventSourceArn.arnShape,
 ];
 
 /**
@@ -41,7 +45,8 @@ export function simLambdaEventSourceArnOf(
 ): SimLambdaEventSourceArn {
   const parsed =
     SimLambdaSqsEventSourceArn.parse(eventSourceArn) ??
-    SimLambdaDynamoDbStreamEventSourceArn.parse(eventSourceArn);
+    SimLambdaDynamoDbStreamEventSourceArn.parse(eventSourceArn) ??
+    SimLambdaKinesisEventSourceArn.parse(eventSourceArn);
 
   if (parsed === undefined) {
     const arnShapes = simulatedEventSourceArnShapes.join(". ");

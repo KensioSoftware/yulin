@@ -31,8 +31,8 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
   ],
   [
     "ParallelizationFactor",
-    "polling concurrency is not simulated, and a simulated stream has one " +
-      "shard",
+    "polling concurrency is not simulated, so each shard of a stream is read " +
+      "by one reader",
   ],
   ["TumblingWindowInSeconds", "tumbling windows are not simulated"],
   [

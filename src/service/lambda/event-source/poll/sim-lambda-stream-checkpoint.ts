@@ -1,4 +1,4 @@
-import type { SimLambdaEventSourceStartingPosition } from "../sim-lambda-event-source-starting-position.js";
+import type { SimLambdaEventSourceStart } from "../sim-lambda-event-source-starting-position.js";
 import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 
@@ -15,8 +15,8 @@ import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outc
 export class SimLambdaStreamCheckpoint {
   #position: SimLambdaEventSourceStreamPosition;
 
-  constructor(startingPosition: SimLambdaEventSourceStartingPosition) {
-    this.#position = { kind: "starting", startingPosition };
+  constructor(start: SimLambdaEventSourceStart) {
+    this.#position = { kind: "starting", start };
   }
 
   /**

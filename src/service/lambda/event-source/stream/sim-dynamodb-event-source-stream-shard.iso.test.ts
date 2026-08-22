@@ -86,7 +86,7 @@ describe("sim DynamoDB event source stream shard", () => {
     const error = await assertThrowsErrorAsync(async () => {
       await shard.iteratorFor(request, {
         kind: "starting",
-        startingPosition: "TRIM_HORIZON",
+        start: { position: "TRIM_HORIZON" },
       });
     });
 

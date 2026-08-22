@@ -1,6 +1,7 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimKinesisStreamActivity } from "../stream/sim-kinesis-stream-activity.js";
 import type { SimKinesisStreamStore } from "../stream/sim-kinesis-stream-store.js";
 import { SimKinesisAuthorizer } from "./authorize/sim-kinesis-authorizer.js";
 import { SimKinesisPutCommands } from "./record/sim-kinesis-put-commands.js";
@@ -11,6 +12,7 @@ import { SimKinesisStreamAccess } from "./sim-kinesis-stream-access.js";
 
 interface SimKinesisCommandsProperties {
   readonly streams: SimKinesisStreamStore;
+  readonly activity: SimKinesisStreamActivity;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -45,7 +47,11 @@ export class SimKinesisCommands {
       background,
     });
     this.streams = new SimKinesisStreamCommands({ streams, access });
-    this.puts = new SimKinesisPutCommands({ access, background });
+    this.puts = new SimKinesisPutCommands({
+      access,
+      activity: properties.activity,
+      background,
+    });
     this.reads = new SimKinesisReadCommands({ streams, access, background });
   }
 }

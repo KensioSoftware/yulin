@@ -1,10 +1,7 @@
 import { assertIdentical, assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import type {
-  SimLambdaEventSourceStreamPosition,
-  SimLambdaEventSourceStreamRecord,
-} from "../stream/sim-lambda-event-source-streams.js";
+import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaStreamBatchResponse } from "./sim-lambda-stream-batch-response.js";
 
 /**
@@ -16,11 +13,10 @@ const readFrom: SimLambdaEventSourceStreamPosition = {
   shardIterator: "iterator-1",
 };
 
-const records: readonly SimLambdaEventSourceStreamRecord[] = [
-  { eventID: "event-1", dynamodb: { SequenceNumber: "100" } },
-  { eventID: "event-2", dynamodb: { SequenceNumber: "200" } },
-  { eventID: "event-3", dynamodb: { SequenceNumber: "300" } },
-];
+/**
+ * The sequence numbers one batch carried, in stream order.
+ */
+const records: readonly string[] = ["100", "200", "300"];
 
 /**
  * The sequence number the next read starts at, or the iterator it starts from
@@ -111,12 +107,12 @@ describe("sim Lambda stream batch responses", () => {
   });
 
   it("names no record for a batch whose records carry no sequence number", () => {
-    // Given a mapping expecting a failure report, and a batch of records the
-    // stream handed over without sequence numbers.
+    // Given a mapping expecting a failure report, and a batch whose records the
+    // stream handed over without sequence numbers, so none can be named.
     const response = new SimLambdaStreamBatchResponse(true);
 
     // When the function reports an entry naming nothing.
-    const outcome = response.handled([{ eventID: "event-1" }], {
+    const outcome = response.handled([], {
       batchItemFailures: [{ itemIdentifier: "" }],
     });
 

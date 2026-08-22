@@ -10,6 +10,7 @@ import type { SimLambdaEventSourceMappingStore } from "../../event-source/sim-la
 import type { SimLambdaEventSourcePollers } from "../../event-source/sim-lambda-event-source-pollers.js";
 import { SimLambdaEventSourceReachable } from "../../event-source/sim-lambda-event-source-reachable.js";
 import { SimLambdaEventSourceRolePermissions } from "../../event-source/sim-lambda-event-source-role-permissions.js";
+import type { SimLambdaKinesisStreams } from "../../event-source/stream/kinesis/sim-lambda-kinesis-streams.js";
 import type { SimLambdaEventSourceStreams } from "../../event-source/stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
@@ -27,6 +28,7 @@ interface CreateEventSourceMappingCommandHandlerProperties {
   readonly pollers: SimLambdaEventSourcePollers;
   readonly queues: SimSqsPollQueues;
   readonly streams: SimLambdaEventSourceStreams;
+  readonly kinesisStreams: SimLambdaKinesisStreams;
   readonly functions: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
@@ -67,6 +69,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
     this.reachable = new SimLambdaEventSourceReachable({
       queues: properties.queues,
       streams: properties.streams,
+      kinesisStreams: properties.kinesisStreams,
     });
   }
 
@@ -138,7 +141,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
       // it, as real Lambda does.
       functionArn: target.resource.arn,
       batchSize: input.batchSize,
-      startingPosition: input.startingPosition,
+      start: input.start,
       enabled: input.enabled,
       functionResponseTypes: input.functionResponseTypes,
       createdAt: this.properties.background.now(),

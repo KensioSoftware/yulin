@@ -85,9 +85,11 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping names a Kinesis stream.
+    // When a mapping names an MSK cluster, which is a real Lambda event source
+    // this simulation has no broker for.
     const error = await refusedMapping(ready, {
-      EventSourceArn: "arn:aws:kinesis:eu-west-2:111111111111:stream/orders",
+      EventSourceArn:
+        "arn:aws:kafka:eu-west-2:111111111111:cluster/orders/a1b2c3d4-1",
     });
 
     // Then it is refused rather than accepted and never delivered from, and
@@ -99,7 +101,7 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     );
     assertStringIncludes(
       error.message,
-      "SQS queues and DynamoDB streams are the simulated event sources",
+      "SQS queues, DynamoDB streams and Kinesis streams are the simulated",
     );
     assertStringIncludes(
       error.message,
@@ -119,7 +121,7 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "Topics");
     assertStringIncludes(
       error.message,
-      "SQS queues and DynamoDB streams are the simulated event sources",
+      "SQS queues, DynamoDB streams and Kinesis streams are the simulated",
     );
   });
 
