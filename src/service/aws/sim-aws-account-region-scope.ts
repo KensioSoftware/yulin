@@ -29,6 +29,7 @@ import type { SimApiGateway } from "../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimKinesis } from "../kinesis/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
@@ -185,6 +186,13 @@ export class SimAwsAccountRegionContainer {
   /** Get simulated IAM for this account. */
   iam(): SimIam {
     return this.memo.getOrCreate("iam", () => this.factory.createIam(this));
+  }
+
+  /** Get simulated Kinesis Data Streams for this account and region. */
+  kinesis(): SimKinesis {
+    return this.memo.getOrCreate("kinesis", () =>
+      this.factory.createKinesis(this),
+    );
   }
 
   /** Get simulated KMS for this account and region. */

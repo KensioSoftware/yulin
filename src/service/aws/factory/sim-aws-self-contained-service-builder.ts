@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import { SimKinesis } from "../../kinesis/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -35,6 +36,16 @@ export class SimAwsSelfContainedServiceBuilder {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return new SimDynamoDatabase(this.scoped(scope));
+  }
+
+  /**
+   * Create simulated Kinesis Data Streams for an Account Region scope.
+   *
+   * Streams are Region-scoped on real AWS: a stream ARN names the Region, and a
+   * stream cannot be reached from another one.
+   */
+  createKinesis(scope: SimAwsAccountRegionContainer): SimKinesis {
+    return new SimKinesis(this.scoped(scope));
   }
 
   /**
