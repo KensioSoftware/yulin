@@ -77,6 +77,36 @@ export class SimStatesNoChoiceMatched extends SimStepFunctionsError {
 }
 
 /**
+ * A `Task` state that could not do its work.
+ *
+ * The task itself failed rather than the handler it reached: the function was
+ * not there, the execution role could not be assumed, or the role is not
+ * allowed to invoke it. Real Step Functions names each of these after the
+ * failure a task had, and this is the name a `Retry` or a `Catch` matches.
+ */
+export class SimStatesTaskFailure extends SimStepFunctionsError {
+  public override readonly name = "SimStatesTaskFailure";
+
+  constructor(message: string) {
+    super(message, "States.TaskFailed");
+  }
+}
+
+/**
+ * A handler that raised, reported under its own error type.
+ *
+ * A `Task` state whose `Resource` is a function ARN is talking to the function
+ * rather than to the Lambda API, and the error name it fails with is the one
+ * the handler raised. `NotEligible` thrown in a handler is `NotEligible` here.
+ *
+ * The error type the handler raised under is the states error name, so it is
+ * given where this is raised rather than fixed by the class.
+ */
+export class SimStatesTaskHandlerFailure extends SimStepFunctionsError {
+  public override readonly name = "SimStatesTaskHandlerFailure";
+}
+
+/**
  * A state that could not run on the data it was given.
  *
  * A `Choice` rule comparing a field that is not there, or a `Wait` reading a
