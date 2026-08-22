@@ -616,7 +616,10 @@ simulation has no behaviour for go the same way, including `ProcessingConfigurat
 
 A delivery stream this simulation cannot deliver for is skipped and recorded in
 `stack.skippedResources`, and the rest of the stack deploys. That covers a destination other than
-S3, and a `DeliveryStreamType` of `KinesisStreamAsSource`.
+S3, a `DeliveryStreamType` of `KinesisStreamAsSource`, and a source property naming somewhere the
+records cannot come from, such as `MSKSourceConfiguration` or `DatabaseSourceConfiguration`. The
+source property is what the skip is decided on, because a template that leaves `DeliveryStreamType`
+out gets `DirectPut` by default.
 
 ## SDK interception
 
@@ -761,8 +764,9 @@ operations.
   failure goes to `getSourceFailures()`.
 - **A source stream keeps the shards it was created with.** Simulated Kinesis does not reshard, so
   the shards a delivery stream opens when it is created are the ones it reads for its life.
-- **A delivery stream a template cannot deploy is skipped.** A destination other than S3, and a
-  source outside the two simulated, leave the Resource in `stack.skippedResources` while the rest
+- **A delivery stream a template cannot deploy is skipped.** A destination other than S3, a source
+  outside the two simulated, and a source property such as `MSKSourceConfiguration` or
+  `DatabaseSourceConfiguration`, each leave the Resource in `stack.skippedResources` while the rest
   of the stack deploys. See [deploying from CloudFormation](#deploying-from-cloudformation).
 - **A delivery stream is `ACTIVE` as soon as it exists.** Real Firehose reports `CREATING` for a
   minute or so, and a status a test has to poll through earns its keep only where something is

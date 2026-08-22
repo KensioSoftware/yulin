@@ -8,6 +8,8 @@ export const deliveryStreamTypePropertyName = "DeliveryStreamType";
 export const kinesisStreamSourcePropertyName =
   "KinesisStreamSourceConfiguration";
 
+export const directPutSourcePropertyName = "DirectPutSourceConfiguration";
+
 export const extendedS3DestinationPropertyName =
   "ExtendedS3DestinationConfiguration";
 
@@ -19,6 +21,25 @@ export const tagsPropertyName = "Tags";
  * The suffix every Firehose destination configuration property ends in.
  */
 export const destinationPropertySuffix = "DestinationConfiguration";
+
+/**
+ * The suffix every Firehose source configuration property ends in.
+ */
+export const sourcePropertySuffix = "SourceConfiguration";
+
+/**
+ * The two source properties this simulation has an answer for.
+ *
+ * `KinesisStreamSourceConfiguration` goes through to CreateDeliveryStream, and
+ * `DirectPutSourceConfiguration` is a throughput hint on a delivery stream that
+ * is already taking direct puts. Everything else ending in
+ * {@link sourcePropertySuffix} reads from somewhere outside the simulation,
+ * found by the suffix so a source AWS adds later needs no change here.
+ */
+export const readSourcePropertyNames: ReadonlySet<string> = new Set([
+  kinesisStreamSourcePropertyName,
+  directPutSourcePropertyName,
+]);
 
 /**
  * The two destination properties this simulation delivers to. Everything else
@@ -45,7 +66,7 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
       "holds the bytes that were put",
   ],
   [
-    "DirectPutSourceConfiguration",
+    directPutSourcePropertyName,
     "throughput is unlimited in the simulation, so a throughput hint has " +
       "nothing to act on",
   ],

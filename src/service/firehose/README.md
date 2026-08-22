@@ -148,6 +148,11 @@ delivery stream a template deployed is therefore the same thing an SDK caller wo
 a name, a Bucket ARN or a set of buffering hints is allowed is decided by simulated Firehose, at the
 command that reads it.
 
+`simCfnFirehoseSource` classifies the source before the command sees it. A `*SourceConfiguration`
+property other than the Kinesis one and the DirectPut throughput hint skips the Resource.
+`DeliveryStreamType` is no help there, since a template that leaves it out gets `DirectPut` by
+default and the source property is what says where the records come from.
+
 `simCfnFirehoseResourceCreation` decides what a refusal does to the Stack.
 `SimFirehoseUnsimulatedDestination` and `SimFirehoseUnsimulatedSource` become an
 `Unsupported sim Firehose CloudFormation Resource` error, which sim CloudFormation records as a skip

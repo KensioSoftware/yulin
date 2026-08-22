@@ -9,11 +9,11 @@ import { SimCfnFirehoseDeliveryStreamName } from "./sim-cfn-firehose-delivery-st
 import {
   deliveryStreamNamePropertyName,
   deliveryStreamTypePropertyName,
-  kinesisStreamSourcePropertyName,
   tagsPropertyName,
   unsimulatedPropertyReasons,
 } from "./sim-cfn-firehose-delivery-stream-property-names.js";
 import { simCfnFirehoseDestination } from "./sim-cfn-firehose-destination-choice.js";
+import { simCfnFirehoseSource } from "./sim-cfn-firehose-source-choice.js";
 import { simCfnFirehoseTags } from "./sim-cfn-firehose-tags.js";
 
 interface SimCfnFirehoseDeliveryStreamPropertiesProperties {
@@ -74,7 +74,7 @@ export class SimCfnFirehoseDeliveryStreamProperties {
    */
   createInput(): SimCreateDeliveryStreamCommandInput {
     const type = this.deliveryStreamType();
-    const source = this.properties.get(kinesisStreamSourcePropertyName);
+    const source = simCfnFirehoseSource(this.resource, this.properties);
     const tags = simCfnFirehoseTags(
       this.resource,
       this.properties.get(tagsPropertyName),
