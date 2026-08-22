@@ -117,6 +117,62 @@ console.log(answered.output.message.content.at(0)?.toolUse?.name);
 // "lookUpEntry"
 ```
 
+## Streaming a conversation
+
+`ConverseStream` answers from the same rules, and sends the response as the events real Bedrock
+sends. Declaring `chunks` says where the deltas fall.
+
+```typescript sim-bedrock-converse-stream
+/**
+ * Declaring a response in chunks and accumulating the stream.
+ */
+
+import { ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+simAws
+  .bedrock()
+  .responses()
+  .onPrompt("Summarise entry 1042", {
+    chunks: ["Entry 1042 covers ", "the tone sandhi rules."],
+  });
+
+const answered = await simAws.bedrock().converseStream(
+  new ConverseStreamCommand({
+    modelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    messages: [{ role: "user", content: [{ text: "Summarise entry 1042" }] }],
+  }),
+);
+
+let accumulated = "";
+
+for await (const event of answered.stream) {
+  accumulated += event.contentBlockDelta?.delta.text ?? "";
+}
+
+console.log(accumulated); // "Entry 1042 covers the tone sandhi rules."
+```
+
+The events arrive in the order real Bedrock sends them. `messageStart`, then one
+`contentBlockDelta` per chunk, then `contentBlockStop`, `messageStop` carrying the stop reason, and
+`metadata` carrying the token counts. A tool call adds a `contentBlockStart` before its delta,
+carrying the tool use id and name.
+
+The same declaration serves both APIs. `Converse` answers with the chunks joined, and a response
+declared as `text` streams as a single delta. A stream is readable once, and reading it again
+raises.
+
+`InvokeModelWithResponseStream` streams the declared body as a single `chunk`:
+
+```typescript
+for await (const event of answered.body) {
+  accumulated += new TextDecoder().decode(event.chunk?.bytes);
+}
+```
+
 ## Invoking a model directly
 
 `InvokeModel` answers with the body declared for the request, serialized as JSON. The body is the
@@ -238,12 +294,14 @@ simSdk.restoreAll();
 
 ## Available functionality
 
-- `Converse` and `InvokeModel`, through `simAws.bedrock()` and through an intercepted
-  `BedrockRuntimeClient`.
+- `Converse`, `ConverseStream`, `InvokeModel` and `InvokeModelWithResponseStream`, through
+  `simAws.bedrock()` and through an intercepted `BedrockRuntimeClient`.
 - Responses declared with `onPrompt`, `onModel` and `byDefault`. A prompt rule wins, then a model
   rule, then the default.
-- A declared response carries `text` or `content` blocks for `Converse`, a `body` for `InvokeModel`,
-  and optionally a `stopReason` and a `usage`.
+- A declared response carries `text`, `chunks` or `content` blocks for `Converse`, a `body` for
+  `InvokeModel`, and optionally a `stopReason` and a `usage`.
+- Streamed responses, with `chunks` deciding where the deltas fall and one declaration serving the
+  streaming and non-streaming APIs alike.
 - Tool calls, as a declared `toolUse` content block.
 - IAM authorization of `bedrock:InvokeModel` against the foundation model, inference profile or
   provisioned model ARN the request names.
@@ -253,7 +311,17 @@ simSdk.restoreAll();
 
 - No model runs. A response is whatever the matching rule declared, and the prompt is read only as
   a key to match on.
-- `ConverseStream` and `InvokeModelWithResponseStream` are unsimulated.
+- Every event of a stream is ready as soon as the call returns. Real Bedrock sends them as the model
+  generates them. No simulated clock advance separates them here.
+- A response is split into deltas only where the declaration says so. Text declared any other way
+  arrives in one delta. The split a real model streams comes from its own tokenizer.
+- A streamed tool call sends its arguments in one delta. Real `ConverseStream` sends them as
+  fragments of JSON to be concatenated. A tool call with no declared arguments sends `{}`.
+- `InvokeModelWithResponseStream` sends the declared body as a single chunk. Real Bedrock sends a
+  chunk per generated fragment, in the shape the model behind the id uses.
+- A serialized Bedrock request is refused. Bedrock speaks REST-JSON, and the wire path answers only
+  the AWS JSON protocol services. A function bundling its own SDK reaches Bedrock through module
+  interception. S3 and every other non-JSON-protocol service are reached the same way.
 - The Bedrock control plane is unsimulated. `ListFoundationModels`, guardrail management, inference
   profile management and provisioned throughput all belong to `BedrockClient`.
 - Bedrock Agents and knowledge bases are unsimulated. `InvokeAgent`, `Retrieve` and
@@ -277,6 +345,6 @@ simSdk.restoreAll();
 - An `InvokeModel` body that arrives as a stream or a Blob matches no prompt rule. Reading it would
   consume the caller's own request body, so such a request falls through to a model rule or to the
   default.
-- A `Converse` call matching a response declared only as a body is refused for the same reason,
-  rather than falling back to the default.
+- A `Converse` call matching a response declared only as a body is refused for the same reason. It
+  does not fall back to the default.
 - There are no CloudFormation resource types for Bedrock, and Bedrock is absent from `serveSimAws`.

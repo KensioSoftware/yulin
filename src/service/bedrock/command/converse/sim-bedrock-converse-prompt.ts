@@ -4,6 +4,27 @@ import type { SimBedrockRequestMessage } from "./converse.command.js";
 const userRole = "user";
 
 /**
+ * The inputs a simulated conversation reads or can honestly ignore.
+ *
+ * `system`, `inferenceConfig` and `additionalModelRequestFields` are accepted
+ * and have no effect, because they change what a model generates and no model
+ * generates anything here. `toolConfig` is accepted for the same reason: which
+ * tools the model may call is decided by the declared response, which either
+ * carries a tool use block or leaves one out.
+ *
+ * `Converse` and `ConverseStream` take the same request, so they accept the
+ * same inputs.
+ */
+export const simBedrockConverseAccepted = [
+  "modelId",
+  "messages",
+  "system",
+  "inferenceConfig",
+  "toolConfig",
+  "additionalModelRequestFields",
+];
+
+/**
  * The prompt a `Converse` request is matched on.
  *
  * It is the text of the last user message, which is the turn the model is
@@ -18,10 +39,11 @@ const userRole = "user";
  */
 export function simBedrockConversePrompt(
   messages: readonly SimBedrockRequestMessage[] | undefined,
+  operation: string,
 ): string | undefined {
   if (messages === undefined || messages.length === 0) {
     throw new SimBedrockValidationException(
-      "Converse needs at least one message to send to the model",
+      `${operation} needs at least one message to send to the model`,
     );
   }
 

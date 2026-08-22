@@ -27,22 +27,61 @@ function checkedBlock(
   return block;
 }
 
+/**
+ * The members a response used to say what the message holds.
+ *
+ * One response says it one way. `text` is a single block, `chunks` is that
+ * block written as the deltas a stream sends, and `content` is the blocks
+ * themselves.
+ */
+function namedMessageMembers(
+  declared: SimBedrockDeclaredResponse,
+): readonly string[] {
+  const named: string[] = [];
+
+  if (declared.text !== undefined) {
+    named.push("text");
+  }
+
+  if (declared.chunks !== undefined) {
+    named.push("chunks");
+  }
+
+  if (declared.content !== undefined) {
+    named.push("content");
+  }
+
+  return named;
+}
+
+function requireOneMessageMember(
+  subject: string,
+  declared: SimBedrockDeclaredResponse,
+): void {
+  const named = namedMessageMembers(declared);
+
+  if (named.length > 1) {
+    throw new SimBedrockDeclarationError(
+      `The response declared for ${subject} carries ${named.join(" and ")}. ` +
+        `Each of those says what the message holds, so declare one of them.`,
+    );
+  }
+}
+
 function blocksOf(
   subject: string,
   declared: SimBedrockDeclaredResponse,
 ): readonly SimBedrockDeclaredContentBlock[] | undefined {
-  const { text, content } = declared;
+  const { text, chunks, content } = declared;
 
-  if (text !== undefined && content !== undefined) {
-    throw new SimBedrockDeclarationError(
-      `The response declared for ${subject} carries both text and content ` +
-        `blocks. Text is the short form of one text block, so declare one or ` +
-        `the other.`,
-    );
-  }
+  requireOneMessageMember(subject, declared);
 
   if (text !== undefined) {
     return [{ text }];
+  }
+
+  if (chunks !== undefined) {
+    return [{ text: chunks.join("") }];
   }
 
   return content?.map((block) => checkedBlock(subject, block));
@@ -51,10 +90,14 @@ function blocksOf(
 /**
  * The content blocks a declared response answers `Converse` with.
  *
- * A response declared as a body alone has none, which is the ordinary case
- * rather than an error: it answers `InvokeModel`. A response with no content
- * and no body has nothing to answer anything with, and is refused where it was
- * written.
+ * A response declared as chunks holds them joined, so the same declaration
+ * answers `Converse` with the whole text and `ConverseStream` with the deltas
+ * it was written in.
+ *
+ * A response declared as a body alone has no content, which is the ordinary
+ * case rather than an error: it answers `InvokeModel`. A response with no
+ * content and no body has nothing to answer anything with, and is refused
+ * where it was written.
  */
 export function simBedrockDeclaredContent(
   subject: string,
@@ -65,8 +108,8 @@ export function simBedrockDeclaredContent(
   if (blocks === undefined && declared.body === undefined) {
     throw new SimBedrockDeclarationError(
       `The response declared for ${subject} carries no text, no content and ` +
-        `no body. Declare text or content for Converse, or a body for ` +
-        `InvokeModel.`,
+        `no body. Declare text, chunks or content for Converse, or a body ` +
+        `for InvokeModel.`,
     );
   }
 

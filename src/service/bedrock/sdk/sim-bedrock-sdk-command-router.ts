@@ -3,8 +3,12 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type { SimConverseStreamCommand } from "../command/converse/converse-stream.command.js";
 import type { SimConverseCommand } from "../command/converse/converse.command.js";
-import type { SimInvokeModelCommand } from "../command/invoke-model/invoke-model.command.js";
+import type {
+  SimInvokeModelCommand,
+  SimInvokeModelWithResponseStreamCommand,
+} from "../command/invoke-model/invoke-model.command.js";
 import type { SimBedrock } from "../sim-bedrock.js";
 
 /**
@@ -27,10 +31,26 @@ export class SimBedrockSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "ConverseStreamCommand",
+        async (command, context): Promise<unknown> =>
+          await simBedrock.converseStream(
+            command as SimConverseStreamCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "InvokeModelCommand",
         async (command, context): Promise<unknown> =>
           await simBedrock.invokeModel(
             command as SimInvokeModelCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "InvokeModelWithResponseStreamCommand",
+        async (command, context): Promise<unknown> =>
+          await simBedrock.invokeModelWithResponseStream(
+            command as SimInvokeModelWithResponseStreamCommand,
             simSdkCallerOptions(context),
           ),
       ],

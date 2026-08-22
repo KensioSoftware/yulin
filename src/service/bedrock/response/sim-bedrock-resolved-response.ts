@@ -9,6 +9,10 @@ import type {
   SimBedrockDeclaredResponse,
 } from "./sim-bedrock-response-declaration.js";
 import { simBedrockDefaultStopReason } from "./sim-bedrock-response-defaults.js";
+import {
+  simBedrockStreamedContent,
+  type SimBedrockStreamedBlock,
+} from "./sim-bedrock-streamed-content.js";
 
 /**
  * The message one `Converse` call answers with.
@@ -50,15 +54,14 @@ export class SimBedrockResolvedResponse {
    * it from `Converse` is a declaration this simulation cannot answer with.
    */
   message(): SimBedrockResponseMessage {
-    if (this.content === undefined) {
-      throw new SimBedrockDeclarationError(
-        `A Converse call matched the response declared for ${this.subject}, ` +
-          `which carries a body and nothing else. A body answers InvokeModel. ` +
-          `Declare text or content for Converse.`,
-      );
-    }
+    return { role: "assistant", content: this.requireContent() };
+  }
 
-    return { role: "assistant", content: this.content };
+  /**
+   * How the message arrives over `ConverseStream`, block by block.
+   */
+  streamedContent(): readonly SimBedrockStreamedBlock[] {
+    return simBedrockStreamedContent(this.declared, this.requireContent());
   }
 
   /**
@@ -92,6 +95,18 @@ export class SimBedrockResolvedResponse {
    */
   usage(): SimBedrockResponseUsage {
     return this.declaredUsage;
+  }
+
+  private requireContent(): readonly SimBedrockDeclaredContentBlock[] {
+    if (this.content === undefined) {
+      throw new SimBedrockDeclarationError(
+        `A Converse call matched the response declared for ${this.subject}, ` +
+          `which carries a body and nothing else. A body answers InvokeModel. ` +
+          `Declare text, chunks or content for Converse.`,
+      );
+    }
+
+    return this.content;
   }
 
   private reachedStopReason(): string {

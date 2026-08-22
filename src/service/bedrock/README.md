@@ -1,7 +1,8 @@
 # Simulated Bedrock implementation
 
-This directory contains the simulated Bedrock implementation. Two invocations are simulated,
-`Converse` and `InvokeModel`, each answered from a response a test declared.
+This directory contains the simulated Bedrock implementation. Four invocations are simulated,
+`Converse` and `InvokeModel` with their streaming forms, each answered from a response a test
+declared.
 
 The guiding decision here is that no model runs. What matters about a Bedrock call is the answer,
 and the simulation reads the prompt only as a key to match on. Simulated Rekognition
@@ -14,10 +15,11 @@ and the response the SDK hands back are all real.
 - `sim-bedrock.ts` is the service facade for one account/region scope.
 - `index.ts` exports the public Bedrock simulator API for `@kensio/yulin/bedrock`.
 
-`SimBedrock` owns one `SimBedrockResponses`, which both invocation handlers answer from. Rekognition
+`SimBedrock` owns one `SimBedrockResponses`, which all four invocation handlers answer from. Rekognition
 groups its rules per operation, because a moderation result and a face are different shapes.
-Bedrock's two operations reach the same exchange through two request shapes. One rule set covers
-both, and a test declaring a response gets it whichever API the code under test calls.
+Bedrock's operations reach the same exchange through four request shapes. One rule set covers them
+all, and a test declaring a response gets it whichever API the code under test calls. Code moving
+from `Converse` to `ConverseStream` keeps its declarations.
 
 The service is scoped to an account and region because its rules are. An invocation made in one
 Region is answered by the rules registered in that Region, as a real Bedrock endpoint answers for
@@ -44,6 +46,37 @@ by one exchange, which is the case a multi-turn test is about.
 The prompt of an `InvokeModel` request is its body decoded as UTF-8. The body is the whole request in
 the shape the model behind the id expects, and real Bedrock treats it as opaque. So does this. A test matching one usually wants a model rule instead, and the tier exists
 because the body is the only thing an `InvokeModel` request carries that identifies the exchange.
+
+## The streaming model
+
+`src/sdk/stream/sim-sdk-event-stream.ts` is the machinery, and it is in the SDK layer because an
+event stream belongs to the SDK rather than to Bedrock. It holds the events, yields them in order
+and refuses a second reading, matching `simSdkStreamBody`. Every event is ready as soon as the
+stream is made, since a simulation with no model has nothing to wait for.
+
+`response/sim-bedrock-streamed-content.ts` turns a declaration into blocks, and
+`command/converse/sim-bedrock-converse-stream-events.ts` turns those into the event sequence. The
+sequence is real Bedrock's, and a test accumulating deltas reads here what it reads in production.
+
+`chunks` is where the deltas fall. A response declared any other way streams its text in one delta,
+because the split a real model streams comes from its own tokenizer and inventing one would give a
+test something to depend on that means nothing. The chunks are joined for `Converse`, so one
+declaration serves both APIs.
+
+A text block opens with no event of its own, as it does on real Bedrock. Only a tool call announces
+itself, with `contentBlockStart` carrying the id and name the caller needs before the arguments
+arrive. Those arguments come in one delta. Real Bedrock sends them as JSON fragments, and this
+is the one place the sequence is shorter than the real one.
+
+## The wire path
+
+A serialized Bedrock request never reaches `SimSdkWireDispatcher`. That path reads the operation
+from `x-amz-target`, which only the AWS JSON protocol services send, and Bedrock speaks REST-JSON.
+Such a request is already refused by `simSdkUnbridgedWireRequest`, which names the service and says
+to intercept the client instead.
+
+That leaves nothing here to frame as `application/vnd.amazon.eventstream`. Interception answers with
+the output object itself, so a stream reaches calling code intact without any framing.
 
 ## The response model
 
@@ -117,4 +150,4 @@ reasoning that leaves simulated Rekognition without a label ontology.
 
 Tests are colocated with the code they exercise. `command/sim-bedrock-iam.iso.test.ts` and
 `command/sim-bedrock-validation.iso.test.ts` sit above the two command directories, because each
-covers both operations.
+covers more than one operation.

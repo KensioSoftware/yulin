@@ -190,7 +190,7 @@ describe("Bedrock Converse", () => {
     // Then it says which declaration it reached and what it needs.
     assertIdentical(error.name, "SimBedrockDeclarationError");
     assertStringIncludes(error.message, `the model '${sonnet}'`);
-    assertStringIncludes(error.message, "Declare text or content for Converse");
+    assertStringIncludes(error.message, "Declare text, chunks or content");
   });
 
   it("answers each Region from its own rules", async () => {

@@ -1,35 +1,36 @@
+import { simSdkEventStream } from "../../../../sdk/index.js";
 import { SimBedrockCommandGroup } from "../sim-bedrock-command-group.js";
 import type { SimBedrockRequestOptions } from "../sim-bedrock-request-options.js";
 import { SimBedrockUnsimulatedInput } from "../sim-bedrock-unsimulated-input.js";
-import type {
-  SimConverseCommand,
-  SimConverseCommandOutput,
-} from "./converse.command.js";
 import {
   simBedrockConverseAccepted,
   simBedrockConversePrompt,
 } from "./sim-bedrock-converse-prompt.js";
+import type {
+  SimConverseStreamCommand,
+  SimConverseStreamCommandOutput,
+} from "./converse-stream.command.js";
+import { simBedrockConverseStreamEvents } from "./sim-bedrock-converse-stream-events.js";
 
-const operation = "Converse";
+const operation = "ConverseStream";
 
 const unsimulated = new SimBedrockUnsimulatedInput(operation);
 
 /**
- * Handles a Converse command.
+ * Handles a ConverseStream command.
  *
- * The response comes from the rule the request matches, and nothing in the
- * conversation is read for meaning. A prompt rule answers the exchange it was
- * declared for, a model rule answers every other call to that model, and a
- * request matching neither is answered with the default.
+ * It answers from the rules `Converse` answers from, so a test declaring a
+ * response covers both APIs and code moving from one to the other keeps its
+ * declarations. What differs is the shape it arrives in.
  */
-export class SimBedrockConverseHandler extends SimBedrockCommandGroup {
+export class SimBedrockConverseStreamHandler extends SimBedrockCommandGroup {
   /**
-   * Answer a conversation with the response declared for it.
+   * Stream the response declared for a conversation.
    */
   handle(
-    command: SimConverseCommand,
+    command: SimConverseStreamCommand,
     options?: SimBedrockRequestOptions,
-  ): SimConverseCommandOutput {
+  ): SimConverseStreamCommandOutput {
     const { input } = command;
 
     unsimulated.refuseUnaccepted(input, simBedrockConverseAccepted);
@@ -42,10 +43,7 @@ export class SimBedrockConverseHandler extends SimBedrockCommandGroup {
     const declared = this.responses.responseFor({ prompt, modelId });
 
     return {
-      output: { message: declared.message() },
-      stopReason: declared.stopReason(),
-      usage: declared.usage(),
-      metrics: { latencyMs: 0 },
+      stream: simSdkEventStream(simBedrockConverseStreamEvents(declared)),
       $metadata: {},
     };
   }

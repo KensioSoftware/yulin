@@ -129,10 +129,15 @@ describe("Bedrock SDK interception", () => {
       .sdkCommandRouter()
       .supportedCommandNames();
 
-    // Then it names the two invocation commands.
+    // Then it names the four invocation commands.
     assertArrayEquals(
       supported.toSorted((a, b) => a.localeCompare(b)),
-      ["ConverseCommand", "InvokeModelCommand"],
+      [
+        "ConverseCommand",
+        "ConverseStreamCommand",
+        "InvokeModelCommand",
+        "InvokeModelWithResponseStreamCommand",
+      ],
     );
   });
 });
