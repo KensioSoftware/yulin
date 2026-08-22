@@ -302,6 +302,68 @@ const started = await client.send(
 console.log(started.executionArn);
 ```
 
+## Deploying one from CloudFormation
+
+A template declaring `AWS::StepFunctions::StateMachine` creates a state machine. It goes through the
+ordinary `CreateStateMachine` command, and a template and an SDK caller reach the same state machine.
+A definition Amazon States Language itself refuses fails the Resource, in the words
+`CreateStateMachine` refuses it in. A definition this simulator has no implementation for takes the
+skip described at the end of this section.
+
+CDK synthesizes the Resource from `stepfunctions.StateMachine`. Deploy the synthesized assembly and
+the workflow is there to start an execution against.
+
+```typescript sim-step-functions-cloudformation
+/**
+ * Running an execution against a state machine a CDK app deployed.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+// The CDK app holds `new sfn.StateMachine(stack, "Workflow", {
+//   stateMachineName: "Enrolment",
+//   definitionBody: sfn.DefinitionBody.fromChainable(record.next(done)),
+// })`.
+await simAws.cloudFormation().deployCdkOut(path.join(process.cwd(), "cdk.out"));
+
+const workflow = simAws.stepFunctions().findStateMachine("Enrolment");
+
+if (workflow === undefined) throw new Error("No Enrolment state machine");
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: workflow.arn,
+    input: JSON.stringify({ student: "Wei" }),
+  },
+});
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.status); // SUCCEEDED
+```
+
+The definition is read once the template intrinsics have resolved. CDK writes `DefinitionString` as
+an `Fn::Join` over the ARNs of the resources the workflow reaches, and the joined string is the
+Amazon States Language the interpreter reads. A template can write the same document as template
+data under `Definition`. `DefinitionSubstitutions` replaces every `${Key}` in the definition before
+it is read.
+
+`StateMachineName`, `RoleArn` and `StateMachineType` are carried across. A state machine the
+template does not name is named after the stack and the logical ID (`enrolment-Workflow`), the way
+CloudFormation names one. `Ref` answers with the ARN and `Fn::GetAtt` answers `Arn` and `Name`. Real
+CloudFormation publishes this one that way round too. Deleting the stack deletes the state machine.
+
+A definition holding a state type this simulator does not run drops that one state machine. The
+reason lands on `stack.skippedResources` and the rest of the stack deploys. The whole state machine
+goes. A state machine missing one state runs wrong, and a test watching it run wrong is worse off
+than a test watching it be absent.
+
 ## Reference Paths
 
 The path subset read here is the one Amazon States Language itself uses. A document root, a child by
@@ -345,6 +407,17 @@ A test asserting on the output of a state machine that used one could only asser
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
 
+- **A state machine carries no tags.** `Tags` on the CloudFormation Resource is recorded on
+  `stack.ignoredProperties` and the state machine is created without them. `ListTagsForResource`,
+  `TagResource` and `UntagResource` are unsimulated. `LoggingConfiguration`,
+  `TracingConfiguration` and `EncryptionConfiguration` are recorded the same way.
+- **`DefinitionS3Location` is unsimulated.** CDK reaches for it once a definition passes the
+  template size limit, and for `DefinitionBody.fromFile`. The state machine is dropped and the
+  reason recorded, and the rest of the stack deploys.
+- **`AWS::StepFunctions::StateMachineVersion` and `AWS::StepFunctions::StateMachineAlias` are
+  unsupported.** Every execution runs the definition the state machine currently holds, so there is
+  nothing for a published version or an alias to point at.
+
 `CreateStateMachine` is idempotent, as it is on AWS. A second request carrying the same name,
 definition and type answers with the state machine already there, and one carrying a different
 definition raises `StateMachineAlreadyExists`. A differing `roleArn` is ignored. The AWS API
@@ -357,6 +430,5 @@ two and is what this follows.
 - `Task`, `Parallel` and `Map` states.
 - `Retry` and `Catch`.
 - Service integrations, task tokens and activities.
-- `AWS::StepFunctions::StateMachine` CloudFormation resources.
 - JSONata as a query language, and the `Assign` variables that go with it.
 - IAM authorization of what a state machine's role may do.

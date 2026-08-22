@@ -23,6 +23,7 @@ import { sesValueAdapter } from "./ses/sim-ses-cfn-value-adapter.js";
 import { snsValueAdapter } from "./sns/sim-sns-cfn-value-adapter.js";
 import { sqsValueAdapter } from "./sqs/sim-sqs-cfn-value-adapter.js";
 import { ssmValueAdapter } from "./ssm/sim-ssm-cfn-value-adapter.js";
+import { stepFunctionsValueAdapter } from "./stepfunctions/sim-step-functions-cfn-value-adapter.js";
 import { wafV2ValueAdapter } from "./wafv2/sim-wafv2-cfn-value-adapter.js";
 import type {
   SimCfnResourceValueAdapterProperties,
@@ -66,5 +67,6 @@ export const simCfnServiceValueAdapters: readonly ((
   snsValueAdapter,
   sqsValueAdapter,
   ssmValueAdapter,
+  stepFunctionsValueAdapter,
   wafV2ValueAdapter,
 ];

@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionContainer } from "../../../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnServiceResourceFactory } from "../../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
+import { SimStepFunctionsCfnResourceFactory } from "../../cfn/stepfunctions/sim-step-functions-cfn-resource-factory.js";
 
 /**
  * How one simulated service hands over its CloudFormation Resource factory,
@@ -158,6 +159,13 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
     "SSM",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.ssm().cfnResourceFactory(),
+  ],
+  [
+    "StepFunctions",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      new SimStepFunctionsCfnResourceFactory({
+        stepFunctions: scopedAws.stepFunctions(),
+      }),
   ],
   [
     "WAFv2",

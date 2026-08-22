@@ -3263,6 +3263,7 @@ The resource types it creates are:
 - `AWS::SecretsManager::Secret`
 - `AWS::SQS::Queue`
 - `AWS::SSM::Parameter`
+- `AWS::StepFunctions::StateMachine`
 - selected CDK custom resources: `Custom::CDKBucketDeployment` and `Custom::S3BucketNotifications`
 
 Each service's own docs describe what its resource types support.
