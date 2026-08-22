@@ -143,6 +143,34 @@ describe("sim Lambda in-process handler environment", () => {
     }
   });
 
+  it("keeps a write by a function declaring nothing for its next invocation", async () => {
+    // Given a function declaring nothing, whose handler writes a variable
+    // the first time it runs, as function code caching something would.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => {
+            const before = process.env["YULIN_TEST_WARM"] ?? null;
+            process.env["YULIN_TEST_WARM"] = "written";
+            return { before };
+          }),
+        },
+      }),
+    );
+    assertObjectEquals(await invoke(simLambda, "greeter"), { before: null });
+
+    // When it is invoked again.
+    const result = await invoke(simLambda, "greeter");
+
+    // Then the second invocation reads the first one's write, as a warm
+    // execution environment does, and the host process never saw it.
+    assertObjectEquals(result, { before: "written" });
+    assertUndefined(process.env["YULIN_TEST_WARM"]);
+  });
+
   it("hides host process variables the function does not declare", async () => {
     // Given a variable set on the host process running the tests.
     process.env["YULIN_TEST_HOST_ONLY"] = "host value";

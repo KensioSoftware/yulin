@@ -2600,14 +2600,15 @@ pass because your shell or CI environment had the right variable set. Two functi
 same variable name with different values each see their own, including when their invocations
 overlap.
 
-A function that declares none is the exception, and keeps reading the test process's environment
-with the AWS-provided variables laid over it. That is where the configuration of an in-process
-handler comes from when nothing declares it. Declaring the variables on the function keeps the test
-explicit about where they came from.
-
 The same applies to zip-packaged code in the vm runtime and to functions deployed from an
 `AWS::Lambda::Function` template with an `Environment` property, including ones backed by an
 [executable binding](#executable-bindings).
+
+A function backed by a real in-process handler and declaring no variables at all is the exception.
+It keeps reading the test process's environment, with the AWS-provided variables laid over it, since
+that is where such a handler's configuration comes from when nothing declares it. Declaring the
+variables on the function keeps the test explicit about where they came from. Zip-packaged code in
+the vm runtime gets the function's own variables either way, and never the test process's.
 
 This is also how a function reaches something outside the simulation, such as a Redis or a
 Postgres. See [non-AWS dependencies](../../non-aws-dependencies/README.md).

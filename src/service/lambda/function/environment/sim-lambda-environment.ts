@@ -1,4 +1,5 @@
 import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
+import { SimLambdaHostBackedVariables } from "./sim-lambda-host-backed-variables.js";
 import {
   type SimLambdaEnvironmentDetails,
   simLambdaRuntimeVariables,
@@ -19,6 +20,12 @@ interface SimLambdaEnvironmentProperties extends SimLambdaEnvironmentDetails {
 export class SimLambdaEnvironment {
   private readonly details: SimLambdaEnvironmentDetails;
   private readonly declared: ReadonlyMap<string, string>;
+
+  /**
+   * The environment a function declaring nothing of its own runs with, which
+   * keeps the host process environment underneath the AWS-provided variables.
+   */
+  private readonly hostBacked = new SimLambdaHostBackedVariables();
 
   /**
    * The merged variables, built once and then reused.
@@ -93,7 +100,11 @@ export class SimLambdaEnvironment {
    * instead, and is unaffected either way.
    */
   async runWith<T>(run: () => Promise<T>): Promise<T> {
-    return await simProcessEnvironment.run(this.runVariables(), run);
+    if (this.hasDeclaredVariables) {
+      return await simProcessEnvironment.run(this.variables(), run);
+    }
+
+    return await this.hostBacked.runWith(this.variables(), run);
   }
 
   /**
@@ -105,23 +116,5 @@ export class SimLambdaEnvironment {
       ...Object.fromEntries(this.declared),
     };
     return this.#variables;
-  }
-
-  /**
-   * The variables one invocation runs with.
-   *
-   * The host variables are read for each invocation rather than merged once,
-   * so a variable the test process sets between two invocations reaches the
-   * second of them.
-   */
-  private runVariables(): Record<string, string> {
-    if (this.hasDeclaredVariables) {
-      return this.variables();
-    }
-
-    return {
-      ...simProcessEnvironment.definedHostVariables(),
-      ...this.variables(),
-    };
   }
 }
