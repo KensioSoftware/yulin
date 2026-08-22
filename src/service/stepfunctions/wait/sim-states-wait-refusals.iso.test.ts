@@ -53,12 +53,31 @@ describe("Step Functions Wait refusals", () => {
     );
   });
 
+  it("refuses a wait longer than Step Functions takes", () => {
+    // Given a Seconds a little past the hundred million Step Functions takes.
+    // When it is read, it is refused with the limit in the message.
+    assertStringIncludes(
+      refusalFor({ Seconds: 100_000_000 }),
+      "Step Functions waits 99999999 at most",
+    );
+  });
+
   it("refuses a Timestamp that is not an instant", () => {
     // Given a Timestamp written as a date, with no time or zone on it.
     // When it is read, it is refused with an example of one that works.
     assertStringIncludes(
       refusalFor({ Timestamp: "2026-07-26" }),
       "2026-07-26T09:00:00Z",
+    );
+  });
+
+  it("refuses a Timestamp naming a day its month has not got", () => {
+    // Given the thirtieth of February, which JavaScript's own parser reads as
+    // the second of March.
+    // When it is read, it is refused rather than rolled over.
+    assertStringIncludes(
+      refusalFor({ Timestamp: "2026-02-30T00:00:00Z" }),
+      "RFC3339",
     );
   });
 

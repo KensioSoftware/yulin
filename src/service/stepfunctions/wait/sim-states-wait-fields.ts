@@ -6,6 +6,11 @@ import { SimStatesInvalidDefinition } from "../error/sim-step-functions.error.js
 /**
  * The four ways a `Wait` state says how long to wait.
  */
+/**
+ * The longest wait Step Functions takes, which is a little over three years.
+ */
+export const simStatesMaximumWaitSeconds = 99_999_999;
+
 export const simStatesWaitFields = [
   "Seconds",
   "SecondsPath",
@@ -80,7 +85,7 @@ function checkField(
 }
 
 /**
- * `Seconds` is a whole number of seconds, and never a negative one.
+ * `Seconds` is a whole number of seconds within the range a wait takes.
  */
 function checkSeconds(stateName: string, written: JSONValue | undefined): void {
   if (typeof written !== "number" || !Number.isSafeInteger(written)) {
@@ -93,6 +98,13 @@ function checkSeconds(stateName: string, written: JSONValue | undefined): void {
     throw new SimStatesInvalidDefinition(
       `The Wait state ${stateName} waits for ${String(written)} seconds. A ` +
         "wait does not run backwards.",
+    );
+  }
+
+  if (written > simStatesMaximumWaitSeconds) {
+    throw new SimStatesInvalidDefinition(
+      `The Wait state ${stateName} waits for ${String(written)} seconds. ` +
+        `Step Functions waits ${String(simStatesMaximumWaitSeconds)} at most.`,
     );
   }
 }

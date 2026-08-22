@@ -4,7 +4,10 @@ import { parseSimStatesReferencePath } from "../data/sim-states-reference-path.j
 import { readSimStatesTimestamp } from "../data/sim-states-timestamp.js";
 import type { SimStatesWaitState } from "../definition/sim-states-state.js";
 import { SimStatesRuntimeFailure } from "../error/sim-step-functions.error.js";
-import { simStatesWaitFields } from "./sim-states-wait-fields.js";
+import {
+  simStatesMaximumWaitSeconds,
+  simStatesWaitFields,
+} from "./sim-states-wait-fields.js";
 
 const millisecondsInASecond = 1000;
 
@@ -57,18 +60,27 @@ function afterSeconds(
   seconds: JSONValue | undefined,
   source: string,
 ): Date {
-  if (
-    typeof seconds !== "number" ||
-    !Number.isSafeInteger(seconds) ||
-    seconds < 0
-  ) {
+  if (!isAWaitInSeconds(seconds)) {
     throw new SimStatesRuntimeFailure(
       `A Wait state reads ${source}, which holds ${JSON.stringify(seconds)} ` +
-        "rather than a whole number of seconds to wait.",
+        "rather than a whole number of seconds between 0 and " +
+        `${String(simStatesMaximumWaitSeconds)}.`,
     );
   }
 
   return new Date(now.getTime() + seconds * millisecondsInASecond);
+}
+
+/**
+ * Whether a value is a length of time a `Wait` state can wait for.
+ */
+function isAWaitInSeconds(seconds: JSONValue | undefined): seconds is number {
+  return (
+    typeof seconds === "number" &&
+    Number.isSafeInteger(seconds) &&
+    seconds >= 0 &&
+    seconds <= simStatesMaximumWaitSeconds
+  );
 }
 
 /**

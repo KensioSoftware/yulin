@@ -75,6 +75,17 @@ describe("Step Functions Wait due instants", () => {
     assertStringIncludes(failure.message, '"30"');
   });
 
+  it("fails where the input holds a wait longer than one Step Functions takes", () => {
+    // Given an input holding more seconds than a Wait state can wait for.
+    // When the due instant is worked out.
+    const failure = assertThrowsError(() =>
+      dueFor({ SecondsPath: "$.after" }, { after: 100_000_000 }),
+    );
+
+    // Then the state fails, naming the range a wait falls in.
+    assertStringIncludes(failure.message, "between 0 and 99999999");
+  });
+
   it("fails where the input holds no instant to wait for", () => {
     // Given an input holding a date rather than a timestamp.
     // When the due instant is worked out.

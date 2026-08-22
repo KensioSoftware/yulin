@@ -1,4 +1,5 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
+import { simStatesTimestampFieldsHold } from "./sim-states-timestamp-fields.js";
 
 // RFC3339, which is the timestamp format Amazon States Language names. The
 // looser formats Date.parse accepts are left out, so a plain "2026-07-26" is
@@ -6,7 +7,7 @@ import type { JSONValue } from "../../../util/type-guard/json.js";
 // guessing at midnight in some zone.
 const rfc3339 =
   // oxlint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
-  /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|[+-](\d{2}):(\d{2}))$/;
 
 /**
  * Read a JSON value as an RFC3339 timestamp, in milliseconds since the epoch.
@@ -18,15 +19,15 @@ const rfc3339 =
 export function readSimStatesTimestamp(
   value: JSONValue | undefined,
 ): number | undefined {
-  if (typeof value !== "string" || !rfc3339.test(value)) {
+  if (typeof value !== "string") {
     return undefined;
   }
 
-  const milliseconds = Date.parse(value);
+  const written = rfc3339.exec(value);
 
-  if (Number.isNaN(milliseconds)) {
+  if (written === null || !simStatesTimestampFieldsHold(written.slice(1))) {
     return undefined;
   }
 
-  return milliseconds;
+  return Date.parse(value);
 }

@@ -194,9 +194,9 @@ on its own counts as a string.
 
 ## Waiting on the clock
 
-A `Wait` state holds the execution until an instant on the simulation's clock. `StartExecution`
-answers with the execution `RUNNING`, and moving simulated time past the instant runs the rest of
-it.
+A `Wait` state holds the execution until an instant on the simulation's clock. Where that instant is
+still ahead, `StartExecution` answers with the execution `RUNNING`, and moving simulated time past it
+runs the rest of the execution.
 
 ```typescript sim-step-functions-wait
 /**
@@ -249,10 +249,12 @@ console.log(settled.stopDate); // 2026-07-26T09:05:00.000Z
 Under a frozen clock the execution stays `RUNNING` for as long as the test leaves it there.
 Simulated time moves only when the test moves it, and a slow test holds the state it set up.
 
-A `Wait` state carries exactly one of `Seconds`, `SecondsPath`, `Timestamp` and `TimestampPath`. The
-two paths are read out of the state's input as it runs. A path holding something other than a whole
-number of seconds, or something other than an RFC3339 instant, fails the execution with
-`States.Runtime`. An instant already behind the clock lets the execution carry straight on.
+A `Wait` state carries exactly one of `Seconds`, `SecondsPath`, `Timestamp` and `TimestampPath`. A
+wait runs from 0 to 99,999,999 seconds, which is the range Step Functions takes, and a `Timestamp` is
+held to RFC3339 (so `2026-02-30T00:00:00Z` is refused rather than read as the second of March). The
+two paths are read out of the state's input as it runs, and a path holding a value outside either
+range fails the execution with `States.Runtime`. An instant already behind the clock lets the
+execution carry straight on.
 
 The execution stops at the instant it was waiting for, and `DescribeExecution` reports that as its
 `stopDate`. A failure after a wait is recorded on the execution, and `advanceBy` returns as it would

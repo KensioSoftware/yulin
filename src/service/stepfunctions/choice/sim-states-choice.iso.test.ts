@@ -170,9 +170,21 @@ describe("Step Functions Choice comparators", () => {
     assertFalse(
       matches(
         { Variable: "$.closesAt", IsTimestamp: true },
-        {
-          closesAt: "2026-13-45T09:00:00Z",
-        },
+        { closesAt: "2026-13-45T09:00:00Z" },
+      ),
+    );
+    assertFalse(
+      matches(
+        { Variable: "$.closesAt", IsTimestamp: true },
+        // The thirtieth of February, which JavaScript's own parser reads as
+        // the second of March.
+        { closesAt: "2026-02-30T00:00:00Z" },
+      ),
+    );
+    assertTrue(
+      matches(
+        { Variable: "$.closesAt", IsTimestamp: true },
+        { closesAt: "2024-02-29T00:00:00Z" },
       ),
     );
   });
