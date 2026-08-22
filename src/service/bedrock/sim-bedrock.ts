@@ -14,12 +14,20 @@ import type {
   SimConverseCommand,
   SimConverseCommandOutput,
 } from "./command/converse/converse.command.js";
+import type {
+  SimConverseStreamCommand,
+  SimConverseStreamCommandOutput,
+} from "./command/converse/converse-stream.command.js";
 import { SimBedrockConverseHandler } from "./command/converse/sim-bedrock-converse.js";
+import { SimBedrockConverseStreamHandler } from "./command/converse/sim-bedrock-converse-stream.js";
 import type {
   SimInvokeModelCommand,
   SimInvokeModelCommandOutput,
+  SimInvokeModelWithResponseStreamCommand,
+  SimInvokeModelWithResponseStreamCommandOutput,
 } from "./command/invoke-model/invoke-model.command.js";
 import { SimBedrockInvokeModelHandler } from "./command/invoke-model/sim-bedrock-invoke-model.js";
+import { SimBedrockInvokeModelStreamHandler } from "./command/invoke-model/sim-bedrock-invoke-model-stream.js";
 import type { SimBedrockRequestOptions } from "./command/sim-bedrock-request-options.js";
 import { SimBedrockResponses } from "./response/sim-bedrock-responses.js";
 import { SimBedrockSdkCommandRouter } from "./sdk/sim-bedrock-sdk-command-router.js";
@@ -47,7 +55,9 @@ interface SimBedrockProperties {
 export class SimBedrock {
   private readonly responseRules = new SimBedrockResponses();
   private readonly converseCommand: SimBedrockConverseHandler;
+  private readonly converseStreamCommand: SimBedrockConverseStreamHandler;
   private readonly invokeModelCommand: SimBedrockInvokeModelHandler;
+  private readonly invokeModelStreamCommand: SimBedrockInvokeModelStreamHandler;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimBedrockSdkCommandRouter(this);
 
@@ -65,7 +75,13 @@ export class SimBedrock {
 
     this.background = background;
     this.converseCommand = new SimBedrockConverseHandler(commandProperties);
+    this.converseStreamCommand = new SimBedrockConverseStreamHandler(
+      commandProperties,
+    );
     this.invokeModelCommand = new SimBedrockInvokeModelHandler(
+      commandProperties,
+    );
+    this.invokeModelStreamCommand = new SimBedrockInvokeModelStreamHandler(
       commandProperties,
     );
   }
@@ -98,6 +114,18 @@ export class SimBedrock {
   }
 
   /**
+   * Handle a ConverseStream Command from the SDK.
+   */
+  async converseStream(
+    command: SimConverseStreamCommand,
+    options?: SimBedrockRequestOptions,
+  ): Promise<SimConverseStreamCommandOutput> {
+    await this.background.sequence();
+
+    return this.converseStreamCommand.handle(command, options);
+  }
+
+  /**
    * Handle an InvokeModel Command from the SDK.
    */
   async invokeModel(
@@ -107,6 +135,18 @@ export class SimBedrock {
     await this.background.sequence();
 
     return this.invokeModelCommand.handle(command, options);
+  }
+
+  /**
+   * Handle an InvokeModelWithResponseStream Command from the SDK.
+   */
+  async invokeModelWithResponseStream(
+    command: SimInvokeModelWithResponseStreamCommand,
+    options?: SimBedrockRequestOptions,
+  ): Promise<SimInvokeModelWithResponseStreamCommandOutput> {
+    await this.background.sequence();
+
+    return this.invokeModelStreamCommand.handle(command, options);
   }
 
   /**

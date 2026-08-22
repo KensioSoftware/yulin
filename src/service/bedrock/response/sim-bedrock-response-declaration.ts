@@ -38,15 +38,18 @@ export interface SimBedrockDeclaredUsage {
  * What simulated Bedrock answers one request with.
  *
  * The members an operation reads are the ones it can use. `Converse` answers
- * from `text` or `content`, and `InvokeModel` answers from `body`. A
+ * from `text`, `chunks` or `content`, and `InvokeModel` answers from `body`. A
  * declaration carrying nothing the operation asking for it can use is refused
  * where the call is made rather than answered with the built-in default.
  *
- * `text` is the short form of a single text content block, and declaring both
- * it and `content` is refused where the rule is written.
+ * `text` is the short form of a single text content block, and `chunks` is
+ * that same text written as the deltas `ConverseStream` sends it in. All three
+ * of `text`, `chunks` and `content` say what the message holds, so declaring
+ * more than one of them is refused where the rule is written.
  */
 export interface SimBedrockDeclaredResponse {
   readonly text?: string | undefined;
+  readonly chunks?: readonly string[] | undefined;
   readonly content?: readonly SimBedrockDeclaredContentBlock[] | undefined;
   readonly body?: unknown;
   readonly stopReason?: string | undefined;

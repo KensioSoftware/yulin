@@ -24,7 +24,24 @@ describe("Bedrock response declarations", () => {
 
     // Then it is refused where it was written.
     assertIdentical(error.name, "SimBedrockDeclarationError");
-    assertStringIncludes(error.message, "declare one or the other");
+    assertStringIncludes(error.message, "carries text and content");
+  });
+
+  it("refuses a response carrying both chunks and text", () => {
+    // Given a simulated Bedrock.
+    const simAws = new SimAws();
+
+    // When a response says what the message holds two ways.
+    const error = assertThrowsError(() => {
+      simAws
+        .bedrock()
+        .responses()
+        .byDefault({ text: "Tone sandhi.", chunks: ["Tone ", "sandhi."] });
+    });
+
+    // Then it is refused where it was written.
+    assertIdentical(error.name, "SimBedrockDeclarationError");
+    assertStringIncludes(error.message, "declare one of them");
   });
 
   it("refuses a content block carrying text and a tool use at once", () => {
@@ -58,6 +75,7 @@ describe("Bedrock response declarations", () => {
     // Then it says what to declare instead.
     assertIdentical(error.name, "SimBedrockDeclarationError");
     assertStringIncludes(error.message, "no text, no content and no body");
+    assertStringIncludes(error.message, "Declare text, chunks or content");
   });
 
   it("refuses a negative token count", () => {

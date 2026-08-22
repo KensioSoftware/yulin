@@ -1,5 +1,21 @@
 export { SimBedrock } from "./sim-bedrock.js";
 export type { SimBedrockRequestOptions } from "./command/sim-bedrock-request-options.js";
+export type {
+  SimBedrockContentBlockDelta,
+  SimBedrockContentBlockDeltaEvent,
+  SimBedrockContentBlockStartEvent,
+  SimBedrockContentBlockStopEvent,
+  SimBedrockMessageStartEvent,
+  SimBedrockMessageStopEvent,
+  SimBedrockStreamMetadataEvent,
+  SimConverseStreamOutput,
+} from "./command/converse/converse-stream.command.js";
+export type { SimInvokeModelResponseStreamOutput } from "./command/invoke-model/invoke-model.command.js";
+export type {
+  SimBedrockStreamedBlock,
+  SimBedrockStreamedTextBlock,
+  SimBedrockStreamedToolUseBlock,
+} from "./response/sim-bedrock-streamed-content.js";
 export {
   SimBedrockResponses,
   type SimBedrockResponseRequest,

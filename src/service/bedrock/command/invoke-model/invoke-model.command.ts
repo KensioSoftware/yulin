@@ -1,3 +1,4 @@
+import type { SimSdkEventStream } from "../../../../sdk/index.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
@@ -18,6 +19,29 @@ export interface SimInvokeModelCommandInput {
 
 export interface SimInvokeModelCommandOutput {
   readonly body: Uint8Array;
+  readonly contentType: string;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim Bedrock Runtime InvokeModelWithResponseStream
+ * command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/bedrock-runtime/command/InvokeModelWithResponseStreamCommand/
+ */
+export interface SimInvokeModelWithResponseStreamCommand {
+  readonly input: SimInvokeModelCommandInput;
+}
+
+/**
+ * One event of an `InvokeModelWithResponseStream` response.
+ */
+export interface SimInvokeModelResponseStreamOutput {
+  readonly chunk?: { readonly bytes: Uint8Array } | undefined;
+}
+
+export interface SimInvokeModelWithResponseStreamCommandOutput {
+  readonly body: SimSdkEventStream<SimInvokeModelResponseStreamOutput>;
   readonly contentType: string;
   readonly $metadata: SimResponseMetadata;
 }

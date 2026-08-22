@@ -13,6 +13,10 @@ export type {
 } from "./router/sim-sdk-command-router.type.js";
 export { simSdkCallerOptions } from "./router/sim-sdk-caller-options.js";
 export type { SimSdkCallerOptions } from "./router/sim-sdk-caller-options.js";
+export {
+  simSdkEventStream,
+  type SimSdkEventStream,
+} from "./stream/sim-sdk-event-stream.js";
 export { simSdkStreamBody } from "./stream/sim-sdk-stream-body.js";
 export type {
   SimSdkStreamBody,
