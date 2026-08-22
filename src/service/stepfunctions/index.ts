@@ -3,6 +3,12 @@ export { SimStepFunctionsInspection } from "./sim-step-functions-inspection.js";
 export type { SimStepFunctionsRequestOptions } from "./command/sim-step-functions-request-options.js";
 export type * from "./command/sim-step-functions-command.types.js";
 export { SimStateMachine } from "./machine/sim-state-machine.js";
+export { SimStateMachineTag } from "./machine/sim-state-machine-tag.js";
+export type {
+  SimStatesTag,
+  SimStatesTagInput,
+} from "./machine/sim-state-machine-tag.js";
+export { SimStateMachineTags } from "./machine/sim-state-machine-tags.js";
 export type { SimStateMachineType } from "./machine/sim-state-machine.js";
 export {
   parseSimStateMachineArn,
@@ -31,14 +37,17 @@ export {
   SimStatesIntrinsicFailure,
   SimStatesInvalidDefinition,
   SimStatesInvalidRequest,
+  SimStatesInvalidTag,
   SimStatesNoChoiceMatched,
   SimStatesPathError,
   SimStatesPathMatchFailure,
   SimStatesResourceNotFound,
   SimStatesResultPathMatchFailure,
   SimStatesRuntimeFailure,
+  SimStatesTaggedResourceNotFound,
   SimStatesTaskFailure,
   SimStatesTaskHandlerFailure,
+  SimStatesTooManyTags,
   SimStatesUnsimulatedInput,
   SimStepFunctionsError,
 } from "./error/sim-step-functions.error.js";

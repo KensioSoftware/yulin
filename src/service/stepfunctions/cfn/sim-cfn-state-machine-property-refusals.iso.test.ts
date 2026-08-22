@@ -7,6 +7,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimStateMachine } from "../machine/sim-state-machine.js";
+import { SimStateMachineTags } from "../machine/sim-state-machine-tags.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimStateMachineCfn } from "../../cloudformation/resource/cfn/stepfunctions/sim-state-machine-cfn.js";
 
@@ -128,6 +129,7 @@ describe("What an AWS::StepFunctions::StateMachine Resource shape refuses", () =
         parsed: { StartAt: "Done", States: new Map() },
         type: "STANDARD",
         creationDate: new Date(0),
+        tags: SimStateMachineTags.fromInput([]),
       }),
     );
 

@@ -3,12 +3,16 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimStatesDefinitionStore } from "../../definition/store/sim-states-definition-store.js";
+import type { SimStatesTagInput } from "../../machine/sim-state-machine-tag.js";
 import { SimCfnStateMachineDefinition } from "./sim-cfn-state-machine-definition.js";
 import { SimCfnStateMachineName } from "./sim-cfn-state-machine-name.js";
+import { SimCfnStateMachineTags } from "./sim-cfn-state-machine-tags.js";
 import {
   roleArnPropertyName,
   stateMachineNamePropertyName,
   stateMachineTypePropertyName,
+  tagsPropertyName,
   unsimulatedPropertyReasons,
 } from "./sim-cfn-state-machine-property-names.js";
 import { simCfnStepFunctionsResourceError } from "../sim-cfn-step-functions-resource-error.js";
@@ -17,6 +21,9 @@ import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-typ
 interface SimCfnStateMachinePropertiesProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
+
+  /** Where a `DefinitionS3Location` is read from. */
+  readonly definitions: SimStatesDefinitionStore;
 }
 
 /**
@@ -32,10 +39,12 @@ interface SimCfnStateMachinePropertiesProperties {
 export class SimCfnStateMachineProperties {
   readonly #resource: SimCfnResource;
   readonly #properties: ReadonlyMap<string, SimCfnTemplateValue>;
+  readonly #definitions: SimStatesDefinitionStore;
 
   constructor(properties: SimCfnStateMachinePropertiesProperties) {
     this.#resource = properties.resource;
     this.#properties = new Map(Object.entries(properties.properties));
+    this.#definitions = properties.definitions;
 
     this.recordUnsimulated();
   }
@@ -95,12 +104,23 @@ export class SimCfnStateMachineProperties {
   }
 
   /**
+   * The tags the template puts on the state machine.
+   */
+  tags(): readonly SimStatesTagInput[] {
+    return new SimCfnStateMachineTags({
+      logicalId: this.#resource.logicalId,
+      declared: this.#properties.get(tagsPropertyName),
+    }).value();
+  }
+
+  /**
    * The Amazon States Language the state machine runs.
    */
-  definition(): string {
-    return new SimCfnStateMachineDefinition({
+  async definition(): Promise<string> {
+    return await new SimCfnStateMachineDefinition({
       logicalId: this.#resource.logicalId,
       properties: this.#properties,
+      definitions: this.#definitions,
     }).value();
   }
 

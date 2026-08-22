@@ -29,6 +29,7 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { SimScheduler } from "../../scheduler/index.js";
 import { SimSesV2 } from "../../ses/index.js";
 import { SimStepFunctions } from "../../stepfunctions/index.js";
+import { SimS3StatesDefinitionStore } from "../../stepfunctions/definition/store/sim-s3-states-definition-store.js";
 import { simAwsEcsCollaborators } from "./sim-aws-ecs-collaborators.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
@@ -270,11 +271,16 @@ export class SimAwsAccountRegionServiceBuilder {
    * invokes a function in any Account and Region of the simulation, as a real
    * execution does, so the functions it can reach come from the whole
    * simulation rather than from this scope.
+   *
+   * A `DefinitionS3Location` on a CloudFormation Resource is read from this
+   * scope's own simulated S3, which is where the CDK assets publisher put a
+   * definition file staged in a cloud assembly.
    */
   createStepFunctions(scope: SimAwsAccountRegionContainer): SimStepFunctions {
     return new SimStepFunctions({
       ...this.scoped(scope),
       taskTargets: simAwsStatesTaskTargets(this.simAws, scope),
+      definitions: new SimS3StatesDefinitionStore({ s3: scope.s3() }),
     });
   }
 

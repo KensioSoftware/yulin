@@ -1,4 +1,5 @@
 import type { SimStatesDefinition } from "../definition/sim-states-definition.js";
+import type { SimStateMachineTags } from "./sim-state-machine-tags.js";
 
 /**
  * The two kinds of state machine real Step Functions runs.
@@ -16,6 +17,7 @@ interface SimStateMachineProperties {
   readonly parsed: SimStatesDefinition;
   readonly type: SimStateMachineType;
   readonly creationDate: Date;
+  readonly tags: SimStateMachineTags;
 }
 
 /**
@@ -28,6 +30,11 @@ interface SimStateMachineProperties {
 export class SimStateMachine {
   readonly arn: string;
   readonly name: string;
+
+  /**
+   * The tags this state machine holds, which the tag commands read and write.
+   */
+  readonly tags: SimStateMachineTags;
 
   readonly #creationDate: Date;
 
@@ -44,6 +51,7 @@ export class SimStateMachine {
     this.#definition = properties.definition;
     this.#parsed = properties.parsed;
     this.#type = properties.type;
+    this.tags = properties.tags;
   }
 
   /**

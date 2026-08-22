@@ -470,6 +470,59 @@ const started = await client.send(
 console.log(started.executionArn);
 ```
 
+## Tagging a state machine
+
+`CreateStateMachine` takes tags, and `TagResource`, `UntagResource` and `ListTagsForResource` read
+and write them afterwards. A tag is a `key` and a `value`, both lower case, as the Step Functions
+API writes them.
+
+```typescript sim-step-functions-tags
+/**
+ * Tagging a state machine and reading its tags back.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+    definition: JSON.stringify({
+      StartAt: "Done",
+      States: { Done: { Type: "Succeed" } },
+    }),
+    tags: [{ key: "team", value: "enrolment" }],
+  },
+});
+
+await simAws.stepFunctions().tagResource({
+  input: {
+    resourceArn: created.stateMachineArn,
+    tags: [{ key: "term", value: "autumn" }],
+  },
+});
+
+await simAws.stepFunctions().untagResource({
+  input: { resourceArn: created.stateMachineArn, tagKeys: ["team"] },
+});
+
+const listed = await simAws
+  .stepFunctions()
+  .listTagsForResource({ input: { resourceArn: created.stateMachineArn } });
+
+console.log(listed.tags); // [ { key: 'term', value: 'autumn' } ]
+```
+
+A key is held once. `TagResource` adds a new key, and replaces the value of a key already held.
+`UntagResource` takes off the keys it names, and passes over a key that was never there.
+
+A key runs to 128 characters and a value to 256, and one resource holds 50 tags. A value may be
+empty, where a key may not. Letters, digits, whitespace and `+ - = . _ : / @` are what a tag is
+written with. A key beginning `aws:` is refused, since AWS assigns tags of its own under that
+prefix. A request outside any of those limits leaves the tags exactly as they were.
+
 ## Deploying one from CloudFormation
 
 A template declaring `AWS::StepFunctions::StateMachine` creates a state machine. It goes through the
@@ -522,7 +575,13 @@ Amazon States Language the interpreter reads. A template can write the same docu
 data under `Definition`. `DefinitionSubstitutions` replaces every `${Key}` in the definition before
 it is read.
 
-`StateMachineName`, `RoleArn` and `StateMachineType` are carried across. A state machine the
+`DefinitionS3Location` names an object holding the definition. CDK writes that form for
+`DefinitionBody.fromFile`, and for a definition past the template size limit. The object is fetched
+from simulated S3, where the CDK assets publisher put the staged file before any Resource was
+created. A location this simulation holds no object for drops that one state machine and records
+where it looked.
+
+`StateMachineName`, `RoleArn`, `StateMachineType` and `Tags` are carried across. A state machine the
 template does not name is named after the stack and the logical ID (`enrolment-Workflow`), the way
 CloudFormation names one. `Ref` answers with the ARN and `Fn::GetAtt` answers `Arn` and `Name`. Real
 CloudFormation publishes this one that way round too. Deleting the stack deletes the state machine.
@@ -531,6 +590,10 @@ A definition holding a state type this simulator does not run drops that one sta
 reason lands on `stack.skippedResources` and the rest of the stack deploys. The whole state machine
 goes. A state machine missing one state runs wrong, and a test watching it run wrong is worse off
 than a test watching it be absent.
+
+CDK's `LambdaInvoke` gives its task a `Retry` over the Lambda service errors. `Retry` is
+unsimulated, and a state machine carrying one takes that same skip. Pass
+`retryOnServiceExceptions: false` to the task for a workflow that deploys here.
 
 ## Reference Paths
 
@@ -581,13 +644,17 @@ A test asserting on the output of a state machine that used one could only asser
 - **A cycle in the states fails the execution** after 25,000 transitions, with `States.Runtime`. Real
   Step Functions stops one when it runs out of execution history events.
 
-- **A state machine carries no tags.** `Tags` on the CloudFormation Resource is recorded on
-  `stack.ignoredProperties` and the state machine is created without them. `ListTagsForResource`,
-  `TagResource` and `UntagResource` are unsimulated. `LoggingConfiguration`,
-  `TracingConfiguration` and `EncryptionConfiguration` are recorded the same way.
-- **`DefinitionS3Location` is unsimulated.** CDK reaches for it once a definition passes the
-  template size limit, and for `DefinitionBody.fromFile`. The state machine is dropped and the
-  reason recorded, and the rest of the stack deploys.
+- **`ListTagsForResource` answers with every tag at once.** Real Step Functions pages its answer
+  with a `nextToken`. One page here carries all 50 tags a resource may hold, and the token is never
+  sent back.
+- **A state machine is the only resource that holds tags.** An activity and an execution both take
+  tags on real Step Functions, and both are unsimulated here. A tag request naming one is refused
+  as an ARN this holds nothing under.
+- **A `Version` on `DefinitionS3Location` is read past.** Simulated S3 holds one body per key, and a
+  template naming a version gets that body.
+- **`LoggingConfiguration`, `TracingConfiguration` and `EncryptionConfiguration` are recorded on
+  `stack.ignoredProperties`.** An execution writes no log events, X-Ray is unsimulated, and a
+  definition is held as it was written, with a key asked for nowhere.
 - **`AWS::StepFunctions::StateMachineVersion` and `AWS::StepFunctions::StateMachineAlias` are
   unsupported.** Every execution runs the definition the state machine currently holds, so there is
   nothing for a published version or an alias to point at.

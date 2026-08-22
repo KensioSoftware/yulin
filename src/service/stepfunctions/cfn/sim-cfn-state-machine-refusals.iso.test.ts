@@ -131,9 +131,9 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     );
   });
 
-  it("drops a state machine whose definition is an object in a bucket", async () => {
-    // Given a definition CDK published as an asset, which this simulation does
-    // not fetch.
+  it("drops a state machine whose definition object is not there", async () => {
+    // Given a Resource pointing at an object no bucket in this simulation
+    // holds, such as a template deployed without the assets alongside it.
     const body = workflowTemplate({
       StateMachineName: "Enrolment",
       RoleArn: roleArn,
@@ -143,12 +143,12 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     // When the stack is deployed.
     const { simAws, stack } = await deploy(body);
 
-    // Then the state machine is dropped and recorded, rather than deployed
-    // without the definition it was meant to run.
+    // Then the state machine is dropped and the location recorded, rather
+    // than deployed without the definition it was meant to run.
     assertUndefined(simAws.stepFunctions().findStateMachine("Enrolment"));
     assertStringIncludes(
       stack.skippedResources[0]?.skippedReason ?? "",
-      "DefinitionS3Location",
+      "s3://assets/workflow.asl.json",
     );
   });
 
@@ -227,11 +227,12 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     // Then the deployment is refused, as real CloudFormation refuses it.
     assertStringIncludes(
       error.message,
-      "a state machine needs a DefinitionString or a Definition",
+      "a state machine needs a DefinitionString, a Definition or a " +
+        "DefinitionS3Location",
     );
   });
 
-  it("refuses a state machine carrying both forms of definition", async () => {
+  it("refuses a state machine carrying two forms of definition", async () => {
     // When a template writes the definition twice, once each way.
     const done = { StartAt: "Done", States: { Done: { Type: "Succeed" } } };
     const error = await refusalFrom(
@@ -244,7 +245,7 @@ describe("What a deployed AWS::StepFunctions::StateMachine refuses", () => {
     );
 
     // Then the deployment is refused rather than one of them being picked.
-    assertStringIncludes(error.message, "two ways of writing the same thing");
+    assertStringIncludes(error.message, "three ways of writing the same thing");
   });
 
   it("refuses a state machine with no Role to run as", async () => {

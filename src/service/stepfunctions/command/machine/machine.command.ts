@@ -1,10 +1,12 @@
 import type { SimStateMachineType } from "../../machine/sim-state-machine.js";
+import type { SimStatesTagInput } from "../../machine/sim-state-machine-tag.js";
 
 export interface SimCreateStateMachineCommandInput {
   readonly name?: string;
   readonly definition?: string;
   readonly roleArn?: string;
   readonly type?: string;
+  readonly tags?: readonly SimStatesTagInput[];
 }
 
 export interface SimCreateStateMachineCommand {
