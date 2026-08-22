@@ -1,28 +1,19 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontDistributionConfig,
 } from "../command/create-distribution/create-distribution.command.js";
+import { authorizeEdgeAssociation } from "./sim-cf-edge-association-auth-z.js";
 import {
+  assertAssociatedFunctionArn,
   assertNoViewerFunctionMix,
+  assertOneFunctionPerEvent,
   assertSimulatedEventType,
 } from "./sim-cf-edge-association-checks.js";
 import { edgeFunctionArnParts } from "./sim-cf-edge-function-arn.js";
 import type { SimCfEdgeFunctions } from "./sim-cf-edge-functions.js";
-
-/**
- * What a caller needs on the function version to put it in front of a
- * Distribution.
- *
- * `GetFunction` is how CloudFront reads the code and configuration, and
- * `EnableReplication` is what lets the replication service copy it out to the
- * edge. A policy written the way the AWS docs write it grants
- * `lambda:EnableReplication*`, which matches this.
- */
-const associationActions = ["lambda:GetFunction", "lambda:EnableReplication"];
 
 interface SimCfEdgeAssociationValidatorProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -98,46 +89,23 @@ export class SimCfEdgeAssociationValidator {
     assertNoViewerFunctionMix(behavior);
 
     const functionArns: string[] = [];
+    const eventTypes = new Set<string>();
 
     for (const association of associations) {
-      assertSimulatedEventType(association.EventType);
+      const { EventType, LambdaFunctionARN } = association;
 
-      const functionArn = association.LambdaFunctionARN;
-
-      if (functionArn === undefined) {
-        continue;
-      }
+      assertSimulatedEventType(EventType);
+      assertOneFunctionPerEvent(eventTypes, EventType);
+      assertAssociatedFunctionArn(LambdaFunctionARN, EventType);
 
       // Read for the refusals reading it produces. The parts themselves
       // matter only where the function behind the ARN is looked up.
-      edgeFunctionArnParts(functionArn);
-      this.authorize(functionArn, caller);
-      functionArns.push(functionArn);
+      edgeFunctionArnParts(LambdaFunctionARN);
+      authorizeEdgeAssociation(this.iam, LambdaFunctionARN, caller);
+      functionArns.push(LambdaFunctionARN);
     }
 
     return functionArns;
-  }
-
-  /**
-   * Check the caller may put this function version in front of a
-   * Distribution.
-   */
-  private authorize(functionArn: string, caller?: SimAwsCaller): void {
-    for (const action of associationActions) {
-      const decision = this.iam.authorize({
-        action,
-        resource: functionArn,
-        caller,
-      });
-
-      if (decision.isDenied) {
-        throw new SimIamAccessDenied({
-          principal: decision.caller.principal,
-          action,
-          resource: functionArn,
-        });
-      }
-    }
   }
 }
 

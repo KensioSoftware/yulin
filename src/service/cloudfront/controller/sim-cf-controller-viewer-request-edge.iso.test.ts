@@ -226,4 +226,90 @@ describe("Simulated CloudFront viewer-request Lambda@Edge", () => {
 
     assertIdentical(await response.text(), "order=1042");
   });
+
+  it("answers the viewer with a 502 when the request body cannot be read into the event", async () => {
+    // Given an association that reads the body, and a body that fails on read.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-unreadable-site", {});
+
+    const versionArn = await makeEdgeFunctionVersionArn({
+      simAws,
+      functionName: "unreadable-body-edge",
+      handler: (): LambdaAtEdge.Response => ({ status: "200" }),
+    });
+
+    const distributionId = await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig("edge-unreadable-site", {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          AllowedMethods: { Quantity: 3, Items: ["GET", "HEAD", "POST"] },
+          LambdaFunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              {
+                EventType: "viewer-request",
+                LambdaFunctionARN: versionArn,
+                IncludeBody: true,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    // When the request arrives with a body that errors partway through.
+    const response = await simCfSiteRequest(simAws, distributionId, "/orders", {
+      method: "POST",
+      body: new ReadableStream({
+        pull(controller) {
+          controller.error(new Error("the viewer went away"));
+        },
+      }),
+      duplex: "half",
+    });
+
+    // Then the failure at the edge is a 502, the same as a handler that threw.
+    assertResponseStatus(response, 502);
+  });
+
+  it("runs a function a CloudFormation-shaped association array names", async () => {
+    // Given the array shape a template carries, rather than the Quantity and
+    // Items pair the CloudFront API takes.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-template-site", {
+      "index.html": "<h1>Home</h1>",
+    });
+
+    const versionArn = await makeEdgeFunctionVersionArn({
+      simAws,
+      functionName: "template-shaped-edge",
+      handler: (event: LambdaAtEdge.RequestEvent) => {
+        const { request } = event.Records[0].cf;
+        request.uri = "/index.html";
+
+        return request;
+      },
+    });
+
+    const distributionId = await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig("edge-template-site", {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          LambdaFunctionAssociations: [
+            { EventType: "viewer-request", LambdaFunctionARN: versionArn },
+          ],
+        } as never,
+      }),
+    );
+
+    // When a request arrives, the function runs rather than being dropped.
+    const response = await simCfSiteRequest(simAws, distributionId, "/");
+
+    assertResponseStatus(response, 200);
+    assertIdentical(await response.text(), "<h1>Home</h1>");
+  });
 });

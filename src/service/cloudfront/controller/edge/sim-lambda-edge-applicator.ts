@@ -50,21 +50,21 @@ export class SimLambdaEdgeApplicator {
       return request;
     }
 
-    const event = await this.eventAdapter.toRequestEvent(
-      request,
-      association.includeBody,
-      simCfEdgeDistributionConfig(distribution),
-    );
+    return await this.running(association, async () => {
+      const event = await this.eventAdapter.toRequestEvent(
+        request,
+        association.includeBody,
+        simCfEdgeDistributionConfig(distribution),
+      );
 
-    return await this.running(association, async () =>
-      this.eventAdapter.fromRequestResult(
+      return this.eventAdapter.fromRequestResult(
         (await edgeFunctions.invoke(
           association.functionArn,
           event,
         )) as LambdaAtEdge.RequestResult,
         request,
-      ),
-    );
+      );
+    });
   }
 
   /**
@@ -83,29 +83,31 @@ export class SimLambdaEdgeApplicator {
       return response;
     }
 
-    const event = await this.eventAdapter.toResponseEvent(
-      request,
-      response,
-      simCfEdgeDistributionConfig(distribution),
-    );
+    return await this.running(association, async () => {
+      const event = await this.eventAdapter.toResponseEvent(
+        request,
+        response,
+        simCfEdgeDistributionConfig(distribution),
+      );
 
-    return await this.running(association, async () =>
-      this.eventAdapter.fromResponseResult(
+      return this.eventAdapter.fromResponseResult(
         (await edgeFunctions.invoke(
           association.functionArn,
           event,
         )) as LambdaAtEdge.Response,
         response,
-      ),
-    );
+      );
+    });
   }
 
   /**
    * Run one edge function, answering with the 502 a failed one gets.
    *
-   * A handler that threw, and a handler that answered with something the
-   * adapter cannot read as a request or a response, are the same thing to
-   * CloudFront. Both are a validation failure the viewer sees as a 502.
+   * A handler that threw, a handler that answered with something the adapter
+   * cannot read as a request or a response, and a request whose body could not
+   * be read into the event, are all the same thing to CloudFront. Each is a
+   * failure at the edge the viewer sees as a 502, which is why building the
+   * event happens in here rather than before it.
    */
   private async running<TResult extends Request | Response>(
     association: SimCfEdgeAssociation,

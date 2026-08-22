@@ -1,5 +1,12 @@
-import { assertStringIncludes, assertThrowsErrorAsync } from "@kensio/smartass";
-import { UpdateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  assertMapSize,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
+import {
+  CreateDistributionCommand,
+  UpdateDistributionCommand,
+} from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -161,5 +168,70 @@ describe("Simulated CloudFront Lambda@Edge association refusals", () => {
     // Then the update is refused for the same reason a create would be.
     assertStringIncludes(error.name, "InvalidLambdaFunctionAssociation");
     assertStringIncludes(error.message, "published Lambda function version");
+  });
+
+  it("refuses an association with no LambdaFunctionARN before a Distribution exists", async () => {
+    const simAws = new SimAws();
+
+    const error = await refusalFor(simAws, {
+      edge: [{ EventType: "viewer-request" } as never],
+    });
+
+    assertStringIncludes(error.name, "InvalidLambdaFunctionAssociation");
+    assertStringIncludes(error.message, "no LambdaFunctionARN");
+    assertMapSize(simAws.cloudFront().getDistributions(), 0);
+  });
+
+  it("refuses two Lambda@Edge functions on one event type", async () => {
+    const simAws = new SimAws();
+    const functionArn = await makeEdgeFunctionVersionArn({
+      simAws,
+      functionName: "first-edge",
+      handler: (event: unknown) => event,
+    });
+
+    const error = await refusalFor(simAws, {
+      edge: [
+        { EventType: "viewer-request", LambdaFunctionARN: functionArn },
+        { EventType: "viewer-request", LambdaFunctionARN: functionArn },
+      ],
+    });
+
+    assertStringIncludes(error.name, "InvalidLambdaFunctionAssociation");
+    assertStringIncludes(error.message, "more than one Lambda@Edge function");
+  });
+
+  it("refuses a LambdaFunctionAssociations Quantity that disagrees with its Items", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.cloudFront().createDistribution(
+          new CreateDistributionCommand({
+            DistributionConfig: {
+              CallerReference: "miscounted",
+              Comment: "Miscounted associations",
+              Enabled: true,
+              Origins: { Quantity: 0, Items: [] },
+              DefaultCacheBehavior: {
+                TargetOriginId: "site-origin",
+                ViewerProtocolPolicy: "allow-all",
+                LambdaFunctionAssociations: {
+                  Quantity: 2,
+                  Items: [
+                    {
+                      EventType: "viewer-request",
+                      LambdaFunctionARN:
+                        "arn:aws:lambda:us-east-1:000000000000:function:one:1",
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+        ),
+    );
+
+    assertStringIncludes(error.name, "InconsistentQuantities");
   });
 });

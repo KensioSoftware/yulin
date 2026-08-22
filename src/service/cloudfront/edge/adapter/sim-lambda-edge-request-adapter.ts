@@ -54,6 +54,15 @@ export class SimLambdaEdgeRequestAdapter {
     const headers = fromEdgeHeaders(edgeRequest.headers);
     restoreViewerHost(headers, originalRequest);
 
+    // A replaced body is a different length from the one the viewer sent, and
+    // `Content-Length` is read-only to the handler, so the header it hands
+    // back still describes the old body. Real CloudFront works the new length
+    // out for itself, and dropping the header leaves the transport to do the
+    // same.
+    if (edgeRequest.body?.action === "replace") {
+      headers.delete("content-length");
+    }
+
     return new Request(url, {
       method: edgeRequest.method,
       headers,
