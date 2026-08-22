@@ -123,6 +123,33 @@ export interface SimCloudFrontOriginConfig {
   readonly OriginAccessControlId?: string | undefined;
   readonly S3OriginConfig?: SimCloudFrontS3OriginConfig | undefined;
   readonly CustomOriginConfig?: object | undefined;
+  /**
+   * The headers CloudFront adds to a request it sends to this Origin.
+   *
+   * The CloudFront API and CloudFormation name this field differently. The API
+   * has `CustomHeaders` and `AWS::CloudFront::Distribution` has
+   * `OriginCustomHeaders`, as they differ over `ACMCertificateArn` and
+   * `AcmCertificateArn`. Both spellings are accepted so a template and an SDK
+   * call reach the simulator the same way.
+   */
+  readonly CustomHeaders?: SimCloudFrontOriginCustomHeaders | undefined;
+  readonly OriginCustomHeaders?: SimCloudFrontOriginCustomHeaders | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront Origin custom header list.
+ */
+export interface SimCloudFrontOriginCustomHeaders {
+  readonly Quantity?: number | undefined;
+  readonly Items?: readonly SimCloudFrontOriginCustomHeader[] | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront Origin custom header.
+ */
+export interface SimCloudFrontOriginCustomHeader {
+  readonly HeaderName?: string | undefined;
+  readonly HeaderValue?: string | undefined;
 }
 
 /**
