@@ -137,7 +137,10 @@ The pieces underneath it each answer one question about a statement:
 - `sim-waf-match-pattern.ts` reads which headers or cookies a rule selects.
 - `sim-waf-byte-match.ts`, `sim-waf-regex-match.ts` and `sim-waf-size-constraint.ts` are the three
   tests a field is put through.
-- `sim-waf-logical-statement.ts` joins and negates the others.
+- `sim-waf-logical-statement.ts` joins and negates the others. Fewer than two statements to
+  join is refused, and so is a `NotStatement` with nothing to negate. Real WAF refuses the
+  whole web ACL for a one-statement `OrStatement`, and a simulation that evaluated it would
+  pass a shape no deployment takes (#907).
 
 `sim-waf-field-content.ts` is where the inspection limit lives. WAF stops reading a body, a header
 set or a cookie set at 8 KB, and the rule says what content past that point counts as. `MATCH` and

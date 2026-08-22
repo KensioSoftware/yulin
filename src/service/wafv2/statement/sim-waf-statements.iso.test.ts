@@ -238,15 +238,59 @@ describe("SimWafV2 statement kinds", () => {
     // Given a simulated WAFv2.
     const waf = new SimAws().wafV2();
 
-    // When a rule joins an empty list of statements.
-    const error = await assertThrowsErrorAsync(async () => {
+    // When one rule joins an empty list of statements and another leaves the
+    // list out altogether.
+    const empty = await assertThrowsErrorAsync(async () => {
       await simWafStatementMatches(waf, { AndStatement: { Statements: [] } });
     });
+    const absent = await assertThrowsErrorAsync(async () => {
+      await simWafStatementMatches(waf, { AndStatement: {} });
+    });
 
-    // Then it is refused rather than claiming every request, which is what an
-    // empty `every` would do.
+    // Then both are refused rather than claiming every request, which is what
+    // an empty `every` would do.
+    assertInstanceOf(empty, SimWafInvalidParameterException);
+    assertInstanceOf(absent, SimWafInvalidParameterException);
+    assertStringIncludes(empty.message, "statements to join");
+    assertStringIncludes(absent.message, "has 0");
+  });
+
+  it.each([
+    ["AndStatement", { AndStatement: { Statements: [pathIs("/admin")] } }],
+    ["OrStatement", { OrStatement: { Statements: [pathIs("/admin")] } }],
+  ] as const)(
+    "refuses a %s joining only one statement",
+    async (kind, statement) => {
+      // Given a simulated WAFv2.
+      const waf = new SimAws().wafV2();
+
+      // When a rule joins a single statement.
+      const error = await assertThrowsErrorAsync(async () => {
+        await simWafStatementMatches(waf, statement);
+      });
+
+      // Then it is refused, as real WAF refuses the whole web ACL for it. A
+      // rule evaluating the one statement would pass a shape no deployment
+      // takes.
+      assertInstanceOf(error, SimWafInvalidParameterException);
+      assertStringIncludes(error.message, `An ${kind} needs at least two`);
+      assertStringIncludes(error.message, "has 1");
+    },
+  );
+
+  it("refuses a NotStatement with nothing to negate", async () => {
+    // Given a simulated WAFv2.
+    const waf = new SimAws().wafV2();
+
+    // When a rule negates a statement it left out.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simWafStatementMatches(waf, { NotStatement: {} });
+    });
+
+    // Then the refusal names the NotStatement, which is where the reader has
+    // to go and look.
     assertInstanceOf(error, SimWafInvalidParameterException);
-    assertStringIncludes(error.message, "statements to join");
+    assertStringIncludes(error.message, "NotStatement needs the one statement");
   });
 
   it("refuses a rule whose statement names no kind", async () => {

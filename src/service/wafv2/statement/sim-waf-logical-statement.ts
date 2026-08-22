@@ -17,22 +17,39 @@ export function compileSimWafLogicalStatement(
   scope: SimWafStatementScope,
 ): SimWafMatcher {
   if (statement.AndStatement !== undefined) {
-    const matchers = compileAll(statement.AndStatement.Statements, scope);
+    const matchers = compileAll(
+      "AndStatement",
+      statement.AndStatement.Statements,
+      scope,
+    );
 
     return (request): boolean => matchers.every((matches) => matches(request));
   }
 
   if (statement.OrStatement !== undefined) {
-    const matchers = compileAll(statement.OrStatement.Statements, scope);
+    const matchers = compileAll(
+      "OrStatement",
+      statement.OrStatement.Statements,
+      scope,
+    );
 
     return (request): boolean => matchers.some((matches) => matches(request));
   }
 
   if (statement.NotStatement !== undefined) {
-    const matches = compileSimWafStatement(
-      statement.NotStatement.Statement,
-      scope,
-    );
+    const negated = statement.NotStatement.Statement;
+
+    // Named here rather than left to `compileSimWafStatement`, which would
+    // report the rule as having no statement at all and send the reader to the
+    // wrong place in a rule holding several.
+    if (negated === undefined) {
+      invalidSimWafRule(
+        scope.ruleName,
+        "A NotStatement needs the one statement it negates",
+      );
+    }
+
+    const matches = compileSimWafStatement(negated, scope);
 
     return (request): boolean => !matches(request);
   }
@@ -41,23 +58,27 @@ export function compileSimWafLogicalStatement(
 }
 
 /**
- * Compile the statements a logical statement joins, refusing an empty list.
+ * Compile the statements a logical statement joins, refusing fewer than two.
  *
- * Real WAF requires at least two, and an `AndStatement` with none would
- * otherwise match every request while looking like it narrowed one.
+ * Real WAF holds this minimum hard enough to refuse the whole web ACL over it,
+ * answering `OR_STATEMENT` and a threshold setting. A rule joining one
+ * statement evaluates as that statement on its own, and an `AndStatement` with
+ * an empty list would match every request while looking like it narrowed one.
  */
 function compileAll(
+  kind: "AndStatement" | "OrStatement",
   statements: readonly SimWafStatementInput[] | undefined,
   scope: SimWafStatementScope,
 ): readonly SimWafMatcher[] {
-  if (statements === undefined || statements.length === 0) {
+  const joined = statements ?? [];
+
+  if (joined.length < 2) {
     invalidSimWafRule(
       scope.ruleName,
-      "An AndStatement or OrStatement needs statements to join",
+      `An ${kind} needs at least two statements to join, and this one has ` +
+        `${joined.length}`,
     );
   }
 
-  return statements.map((statement) =>
-    compileSimWafStatement(statement, scope),
-  );
+  return joined.map((statement) => compileSimWafStatement(statement, scope));
 }
