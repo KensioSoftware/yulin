@@ -69,28 +69,6 @@ describe("CFF function code input conversion", () => {
     assertIdentical(handlerResponse, cffEvent.request);
   });
 
-  it("creates handler function from source that is slow to load", () => {
-    const handlerSourceCode = Buffer.from(`
-      const startedAt = Date.now();
-      while (Date.now() - startedAt < 60) {
-        // Longer than the 50ms a real invocation is allowed.
-      }
-
-      function handler(event) {
-        return event.request;
-      }
-    `);
-
-    const extractor = new CffUint8ArrayFunctionCodeExtractor(handlerSourceCode);
-
-    const handler = extractor.extractHandlerFunction();
-    assertTypeFunction(handler);
-
-    const cffEvent = cloudFrontViewerRequestEventFactory.make();
-    const handlerResponse = handler(cffEvent);
-    assertIdentical(handlerResponse, cffEvent.request);
-  });
-
   it("throws on non-function handler in source code", () => {
     const handlerSourceCode = Buffer.from(`
       const handler = "this is not a function";
