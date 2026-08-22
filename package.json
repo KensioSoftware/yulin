@@ -107,6 +107,10 @@
       "import": "./dist/service/iam/index.js",
       "types": "./dist/service/iam/index.d.ts"
     },
+    "./kinesis": {
+      "import": "./dist/service/kinesis/index.js",
+      "types": "./dist/service/kinesis/index.d.ts"
+    },
     "./kms": {
       "import": "./dist/service/kms/index.js",
       "types": "./dist/service/kms/index.d.ts"
@@ -214,6 +218,7 @@
     "@aws-sdk/client-elastic-load-balancing-v2": "^3.1109.0",
     "@aws-sdk/client-eventbridge": "^3.1109.0",
     "@aws-sdk/client-iam": "^3.1101.0",
+    "@aws-sdk/client-kinesis": "^3.1115.0",
     "@aws-sdk/client-kms": "^3.1101.0",
     "@aws-sdk/client-lambda": "^3.1101.0",
     "@aws-sdk/client-personalize": "^3.1115.0",

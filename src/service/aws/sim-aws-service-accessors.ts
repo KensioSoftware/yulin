@@ -16,6 +16,7 @@ import type { SimEcr } from "../ecr/index.js";
 import type { SimEcs } from "../ecs/index.js";
 import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimKinesis } from "../kinesis/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimLogs } from "../logs/index.js";
@@ -136,6 +137,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated IAM in the default Account scope. */
   iam(): SimIam {
     return this.defaultAccountRegionScope().iam();
+  }
+
+  /** Get simulated Kinesis Data Streams in the default Account Region scope. */
+  kinesis(): SimKinesis {
+    return this.defaultAccountRegionScope().kinesis();
   }
 
   /** Get simulated KMS in the default Account Region scope. */

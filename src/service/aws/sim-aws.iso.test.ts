@@ -113,6 +113,15 @@ describe("SimAws", () => {
     assertIdentical(simAws.account().region().personalizeEvents(), events);
   });
 
+  it("returns the same Kinesis from every scope", () => {
+    const simAws = new SimAws();
+    const kinesis = simAws.kinesis();
+
+    assertIdentical(simAws.account().kinesis(), kinesis);
+    assertIdentical(simAws.region().kinesis(), kinesis);
+    assertIdentical(simAws.account().region().kinesis(), kinesis);
+  });
+
   it("returns the Streams API of the DynamoDB in the same scope", () => {
     const simAws = new SimAws();
     const streams = simAws.dynamoDb().streams();

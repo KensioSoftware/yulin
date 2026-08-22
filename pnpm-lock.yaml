@@ -78,6 +78,9 @@ importers:
       '@aws-sdk/client-iam':
         specifier: ^3.1101.0
         version: 3.1110.0
+      '@aws-sdk/client-kinesis':
+        specifier: ^3.1115.0
+        version: 3.1115.0
       '@aws-sdk/client-kms':
         specifier: ^3.1101.0
         version: 3.1110.0
@@ -354,6 +357,10 @@ packages:
 
   '@aws-sdk/client-iam@3.1110.0':
     resolution: {integrity: sha512-LVl/0wBusyjYXj7xu1aroj9wMO7c4r5KmpeLGrkXRa/3pv+K/j1ys3vT03kv3fKwCSVpMGzz6H1j4tg7fHn2tw==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-kinesis@3.1115.0':
+    resolution: {integrity: sha512-6Xw4VdApquUgTyM3p2kGod0g9Fx7MulwoC6TwC+NU2FwPNzRu420cCdH7FfWX4pgIsZdtkW538sGJ2sm9wXKAQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-kms@3.1110.0':
@@ -3815,6 +3822,17 @@ snapshots:
       tslib: 2.8.1
 
   '@aws-sdk/client-iam@3.1110.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.8
+      '@aws-sdk/credential-provider-node': 3.972.80
+      '@aws-sdk/types': 3.974.4
+      '@smithy/core': 3.33.2
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.2
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/client-kinesis@3.1115.0':
     dependencies:
       '@aws-sdk/core': 3.977.8
       '@aws-sdk/credential-provider-node': 3.972.80

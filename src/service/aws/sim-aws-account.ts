@@ -13,6 +13,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimKinesis } from "../kinesis/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
@@ -123,8 +124,13 @@ export class SimAwsAccount {
   }
 
   /**
-   * Get simulated KMS for this Account's default Region.
+   * Get simulated Kinesis Data Streams for this Account's default Region.
    */
+  kinesis(): SimKinesis {
+    return this.region().kinesis();
+  }
+
+  /** Get simulated KMS for this account. */
   kms(): SimKms {
     return this.region().kms();
   }
