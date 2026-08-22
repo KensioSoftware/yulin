@@ -107,6 +107,18 @@ export class SimStatesTaskHandlerFailure extends SimStepFunctionsError {
 }
 
 /**
+ * A service that refused the call a `Task` state made.
+ *
+ * Amazon States Language names a service error after the service and the error
+ * together, so `DynamoDb.ConditionalCheckFailedException` is a conditional
+ * write that did not hold. The name is given where this is raised, because it
+ * is read off what the service said rather than fixed by the class.
+ */
+export class SimStatesServiceFailure extends SimStepFunctionsError {
+  public override readonly name = "SimStatesServiceFailure";
+}
+
+/**
  * A state that could not run on the data it was given.
  *
  * A `Choice` rule comparing a field that is not there, or a `Wait` reading a

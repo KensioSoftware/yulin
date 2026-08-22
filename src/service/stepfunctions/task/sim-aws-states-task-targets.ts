@@ -5,8 +5,6 @@ import {
   assumeSimStatesExecutionRole,
   simStatesExecutionRoleTarget,
 } from "./sim-states-execution-role.js";
-import { simStatesFunctionLocation } from "./sim-states-function-location.js";
-import { SimStatesTaskFunction } from "./sim-states-task-function.js";
 import type {
   SimStatesTaskInvocation,
   SimStatesTaskTargets,
@@ -18,15 +16,16 @@ interface SimAwsStatesTaskTargetsProperties {
 }
 
 /**
- * Everywhere the state machines of one simulated AWS instance can invoke.
+ * Everywhere the state machines of one simulated AWS instance can reach.
  *
- * The function is looked up when a task runs, never when this is built:
+ * What a task calls is looked up when it runs, never when this is built:
  * reaching another service while this one is being constructed is a cycle with
  * no bottom to it.
  *
- * A function in another Account or Region is allowed, since a real execution
- * invokes across both, and it is the function's own Account that decides
- * whether the execution role may.
+ * This owns the execution role and nothing else. Which function, table, topic,
+ * queue or bus a task talks to is the target's own business, and a target in
+ * another Account or Region is allowed, since a real execution reaches across
+ * both.
  */
 export class SimAwsStatesTaskTargets implements SimStatesTaskTargets {
   readonly #simAws: SimAws;
@@ -38,38 +37,28 @@ export class SimAwsStatesTaskTargets implements SimStatesTaskTargets {
   }
 
   /**
-   * Assume the state machine's execution role, then invoke the function as
-   * that role.
+   * Assume the state machine's execution role, then do the task's work as that
+   * role.
    *
-   * The role is assumed in its own Account, and the function is reached in the
-   * function's, which are not necessarily the same one.
+   * The role is assumed in its own Account, and that is not always the state
+   * machine's. Every call the task goes on to make carries the session that
+   * makes. Simulated IAM answers each of them against the role's policies.
    */
   async invoke(invocation: SimStatesTaskInvocation): Promise<JSONValue> {
     const { stateName, target } = invocation;
-    const call = target.call(invocation.payload, stateName);
-    const where = simStatesFunctionLocation(
-      call.functionNameOrArn,
-      this.#accountRegionScope,
-      stateName,
-    );
     const role = simStatesExecutionRoleTarget(invocation.roleArn, stateName);
     const iam = this.#simAws
-      .accountRegionScope(role.accountId, where.regionName)
+      .accountRegionScope(role.accountId, this.#accountRegionScope.regionName)
       .iam();
 
     const caller = await assumeSimStatesExecutionRole(role, iam);
-    const scope = this.#simAws.accountRegionScope(
-      where.accountId,
-      where.regionName,
-    );
 
-    return await new SimStatesTaskFunction({ scope }).invoke({
+    return await target.run({
       stateName,
-      target,
-      reference: where.reference,
-      named: call.functionNameOrArn,
-      payload: call.payload,
+      payload: invocation.payload,
       caller,
+      simAws: this.#simAws,
+      scope: this.#accountRegionScope,
     });
   }
 }

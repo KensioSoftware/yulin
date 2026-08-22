@@ -15,14 +15,12 @@ describe("Step Functions Task state refusals", () => {
     ).message;
   }
 
-  it("refuses a Resource that is not a Lambda invoke, naming it", () => {
-    // Given the service integrations this simulator has no implementation for.
+  it("refuses a Resource that names no work, naming it", () => {
+    // Given a Resource that is neither a function nor a service integration.
     // When each is read, each names what the definition asked for.
     for (const resource of [
-      "arn:aws:states:::sns:publish",
-      "arn:aws:states:::dynamodb:putItem",
-      "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "arn:aws:sqs:eu-west-2:123456789012:enrolments",
+      "check-enrolment",
     ]) {
       const refusal = refusalForTask({
         Type: "Task",

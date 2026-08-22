@@ -1,39 +1,58 @@
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimAws } from "../../aws/sim-aws.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 
 /**
- * The function one `Task` state invocation names, and what it sends.
+ * One `Task` state's work, as the target receives it.
  */
-export interface SimStatesTaskCall {
-  readonly functionNameOrArn: string;
+export interface SimStatesTaskRequest {
+  readonly stateName: string;
+
+  /**
+   * What the state's `InputPath` and `Parameters` produced. That is the
+   * request the target sends.
+   */
   readonly payload: JSONValue;
+
+  /**
+   * The state machine's execution role, already assumed. Everything the task
+   * reaches, it reaches as this.
+   */
+  readonly caller: SimAwsCaller;
+
+  /**
+   * The whole simulation, because a task can reach another Account or Region.
+   */
+  readonly simAws: SimAws;
+
+  /**
+   * The state machine's own Account and Region. A target naming no other one
+   * does its work there.
+   */
+  readonly scope: SimAwsAccountRegionScope;
 }
 
 /**
  * What a `Task` state's `Resource` named.
  *
- * The two forms a `Task` state invokes a function through differ in three
- * places, and this is each of them: which function the state is talking to,
- * what the state gets back, and what a handler raising is called. Everything
- * between those, from assuming the execution role to running the handler, is
- * the same for both.
+ * The `Resource` forms differ in what they call, what the state gets back and
+ * what a failure is called, and this is each of them. What is the same for all
+ * of them is around this: the execution role is assumed once per invocation,
+ * and the data-flow fields build the request and shape the result.
  */
 export abstract class SimStatesTaskTarget {
   /**
-   * The function to invoke and the payload to send it, read from what the
-   * state's data-flow fields produced.
+   * Do the task's work, as the execution role, and answer with the result the
+   * state carries on with.
    */
-  abstract call(payload: JSONValue, stateName: string): SimStatesTaskCall;
+  abstract run(request: SimStatesTaskRequest): Promise<JSONValue>;
 
   /**
-   * The result the state produces from what the handler answered.
-   */
-  abstract answer(result: JSONValue, executedVersion: string): JSONValue;
-
-  /**
-   * What a handler raising fails the task with.
+   * What a failure the work raised is called.
    *
    * The Amazon States Language error name is read here rather than where the
-   * failure is recorded, because the two forms report a handler error
+   * failure is recorded, because each `Resource` form reports the same failure
    * differently and `Retry` and `Catch` match on exactly that name.
    */
   abstract handlerFailure(error: unknown, stateName: string): Error;

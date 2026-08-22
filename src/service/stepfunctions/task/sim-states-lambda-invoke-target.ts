@@ -6,9 +6,9 @@ import {
   SimStatesTaskFailure,
 } from "../error/sim-step-functions.error.js";
 import {
+  SimStatesLambdaTarget,
   type SimStatesTaskCall,
-  SimStatesTaskTarget,
-} from "./sim-states-task-target.js";
+} from "./sim-states-lambda-target.js";
 
 /**
  * The `Resource` of the Lambda integration Step Functions optimises.
@@ -30,7 +30,7 @@ export const simStatesLambdaInvokeParameters = [
  * `Parameters` are an `Invoke` request and its result is an `Invoke` response.
  * That is the form CDK's `LambdaInvoke` emits by default.
  */
-export class SimStatesLambdaInvokeTarget extends SimStatesTaskTarget {
+export class SimStatesLambdaInvokeTarget extends SimStatesLambdaTarget {
   /**
    * Read the `Invoke` request the state's `Parameters` built.
    */
