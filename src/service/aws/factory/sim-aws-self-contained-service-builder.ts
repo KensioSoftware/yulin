@@ -2,6 +2,7 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimKinesis } from "../../kinesis/index.js";
+import { SimStepFunctions } from "../../stepfunctions/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -58,6 +59,16 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createKinesis(scope: SimAwsAccountRegionContainer): SimKinesis {
     return new SimKinesis(this.scoped(scope));
+  }
+
+  /**
+   * Create simulated Step Functions for an Account Region scope.
+   *
+   * State machines are Region-scoped on real AWS: a state machine ARN names
+   * the Region, and one cannot be reached from another.
+   */
+  createStepFunctions(scope: SimAwsAccountRegionContainer): SimStepFunctions {
+    return new SimStepFunctions(this.scoped(scope));
   }
 
   /**

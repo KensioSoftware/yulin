@@ -321,3 +321,18 @@ describe("Step Functions state data flow", () => {
     assertStringIncludes(error.message, "not an array");
   });
 });
+
+describe("Step Functions Payload Template collisions", () => {
+  it("refuses a template building the same field twice", () => {
+    // Given a template naming one field plainly and again with .$.
+    // When the effective input is worked out.
+    const error = assertThrowsError(() =>
+      simStatesEffectiveInput(rawInput, {
+        Parameters: { studentId: "fixed", "studentId.$": "$.student.id" },
+      }),
+    );
+
+    // Then it is refused rather than one value silently winning.
+    assertStringIncludes(error.message, "both build studentId");
+  });
+});

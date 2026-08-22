@@ -87,6 +87,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
   ],
   ["KMS", (scoped): SimSdkCommandRouter => scoped.kms().sdkCommandRouter()],
   [
+    "SFN",
+    (scoped): SimSdkCommandRouter => scoped.stepFunctions().sdkCommandRouter(),
+  ],
+  [
     "Lambda",
     (scoped): SimSdkCommandRouter => scoped.lambda().sdkCommandRouter(),
   ],

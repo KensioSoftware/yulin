@@ -44,6 +44,7 @@ npm i -D @kensio/yulin
 - [SNS](./docs/services/sns "Simulated SNS docs")
 - [SQS](./docs/services/sqs "Simulated SQS docs")
 - [SSM Parameter Store](./docs/services/ssm "Simulated SSM Parameter Store docs")
+- [Step Functions](./docs/services/stepfunctions "Simulated Step Functions docs")
 - [STS](./docs/services/sts "Simulated STS docs")
 - [WAFv2](./docs/services/wafv2 "Simulated WAFv2 docs")
 

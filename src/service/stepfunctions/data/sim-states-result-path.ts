@@ -99,7 +99,7 @@ function insertIntoArray(
   const copy = [...document];
 
   copy[index] = insertAtSimStatesPath(
-    copy[index] ?? null,
+    copy[index] as JSONValue,
     rest,
     result,
     resultPath,
