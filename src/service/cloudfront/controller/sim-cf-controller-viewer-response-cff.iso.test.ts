@@ -7,6 +7,7 @@ import {
 import {
   CreateDistributionCommand,
   CreateFunctionCommand,
+  type DistributionConfig,
 } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -24,6 +25,60 @@ import {
 } from "../../../../test/cloudfront/site-fixture.js";
 
 describe("Simulated CloudFront local HTTP controller CFF", () => {
+  /**
+   * A viewer-response CFF marking the response with the status it saw, so a
+   * test can tell whether the function ran at all.
+   */
+  async function markerCffArn(simAws: SimAws, name: string): Promise<string> {
+    const creation = await simAws.cloudFront().createFunction(
+      new CreateFunctionCommand({
+        Name: name,
+        FunctionConfig: {
+          Comment: "Viewer-response marker CFF",
+          Runtime: "cloudfront-js-2.0",
+        },
+        FunctionCode: makeCffFunctionCodeInput(
+          (event: CloudFrontFunction.ViewerResponseEvent) => {
+            event.response.headers["x-served-status"] = {
+              value: String(event.response.statusCode),
+            };
+            return event.response;
+          },
+        ),
+      }),
+    );
+
+    assertNonNullable(creation.FunctionMetadata.FunctionARN);
+
+    return creation.FunctionMetadata.FunctionARN;
+  }
+
+  /**
+   * A Distribution serving one Bucket through a viewer-response CFF, with the
+   * given config merged on top.
+   */
+  async function markerCffSite(
+    simAws: SimAws,
+    bucketName: string,
+    functionArn: string,
+    distributionConfig: Partial<DistributionConfig> = {},
+  ): Promise<string> {
+    return await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig(bucketName, {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          FunctionAssociations: {
+            Quantity: 1,
+            Items: [{ EventType: "viewer-response", FunctionARN: functionArn }],
+          },
+        },
+        ...distributionConfig,
+      }),
+    );
+  }
+
   it("preserves the Origin response body when a viewer-response CFF only changes headers", async () => {
     const simAws = new SimAws();
     const body = "<h1>Hello from S3</h1>";
@@ -129,68 +184,63 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
     assertFalse(response.headers.has("transfer-encoding"));
   });
 
-  it("runs the viewer-response CFF on a custom error response", async () => {
-    // Given a site whose 404s are answered with its own error page.
+  it("skips the viewer-response CFF when the Origin answered with an error", async () => {
+    // Given a site with a viewer-response CFF and no custom error pages.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "cff-origin-error-site", {
+      "index.html": "<h1>Home</h1>",
+    });
+
+    const distributionId = await markerCffSite(
+      simAws,
+      "cff-origin-error-site",
+      await markerCffArn(simAws, "origin-error-marker-cff"),
+    );
+
+    // When a key the Bucket does not hold is requested, so the Origin
+    // answers 404.
+    const response = await simCfSiteRequest(simAws, distributionId, "/missing");
+
+    // Then the function did not run, as CloudFront runs no viewer-response
+    // function for an Origin status of 400 or higher.
+    assertResponseStatus(response, 404);
+    assertFalse(response.headers.has("x-served-status"));
+  });
+
+  it("skips the viewer-response CFF when a custom error page answers 200", async () => {
+    // Given a site serving its shell with a 200 for any path the Bucket has
+    // no Object for, which is how a single-page app is configured.
     const simAws = new SimAws();
     await simCfSiteBucket(simAws, "cff-error-page-site", {
       "404.html": "<h1>Not found</h1>",
     });
 
-    // And a viewer-response CFF marking whatever the viewer is about to get.
-    const cffOutput = await simAws.cloudFront().createFunction(
-      new CreateFunctionCommand({
-        Name: "error-page-marker-cff",
-        FunctionConfig: {
-          Comment: "Error page marker CFF",
-          Runtime: "cloudfront-js-2.0",
-        },
-        FunctionCode: makeCffFunctionCodeInput(
-          (event: CloudFrontFunction.ViewerResponseEvent) => {
-            event.response.headers["x-served-status"] = {
-              value: String(event.response.statusCode),
-            };
-            return event.response;
-          },
-        ),
-      }),
-    );
-
-    const distributionId = await simCfSiteDistributionId(
+    const distributionId = await markerCffSite(
       simAws,
-      simCfSiteDistributionConfig("cff-error-page-site", {
-        DefaultCacheBehavior: {
-          TargetOriginId: "site-origin",
-          ViewerProtocolPolicy: "allow-all",
-          FunctionAssociations: {
-            Quantity: 1,
-            Items: [
-              {
-                EventType: "viewer-response",
-                FunctionARN: cffOutput.FunctionMetadata.FunctionARN,
-              },
-            ],
-          },
-        },
+      "cff-error-page-site",
+      await markerCffArn(simAws, "error-page-marker-cff"),
+      {
         CustomErrorResponses: {
           Quantity: 1,
           Items: [
             {
               ErrorCode: 404,
               ResponsePagePath: "/404.html",
-              ResponseCode: "404",
+              ResponseCode: "200",
             },
           ],
         },
-      }),
+      },
     );
 
     // When a page that does not exist is requested.
     const response = await simCfSiteRequest(simAws, distributionId, "/missing");
 
-    // Then the function saw the custom error response rather than the Origin's
-    // own, so the error page is what the CFF gets to act on.
-    assertResponseStatus(response, 404);
+    // Then the viewer gets the error page as a 200, and the function still
+    // did not run. The status the Origin returned is what decides the skip,
+    // not the one the custom error response put in its place.
+    assertResponseStatus(response, 200);
     assertIdentical(await response.text(), "<h1>Not found</h1>");
-    assertIdentical(response.headers.get("x-served-status"), "404");
+    assertFalse(response.headers.has("x-served-status"));
   });
 });

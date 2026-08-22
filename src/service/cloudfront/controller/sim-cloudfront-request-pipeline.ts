@@ -7,7 +7,8 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
  * apply the default root object, resolve the matching Behavior, run
  * viewer-request hooks, fetch from the Origin, replace an error response with
  * the Distribution's custom error page, apply the Behavior's response headers
- * policy, then run viewer-response hooks.
+ * policy, then run viewer-response hooks where the Origin did not answer with
+ * an error.
  *
  * A viewer hook is a CloudFront Function or a Lambda@Edge function. A Behavior
  * carries at most one of the two kinds at the viewer events, which
@@ -91,8 +92,7 @@ export class SimCloudFrontRequestPipeline {
     );
 
     // Replace an Origin error with the Distribution's custom error page, if it
-    // configures one for that status. This happens before the viewer-response
-    // CFF so that a function sees the response the viewer is about to get.
+    // configures one for that status.
     const errorResponse = await this.stages.customErrorResponder.apply(
       requestReference,
       distro,
@@ -102,13 +102,21 @@ export class SimCloudFrontRequestPipeline {
     // Apply the Behavior's response headers policy, if it names one. CloudFront
     // does this after the response leaves the cache and before the
     // viewer-response event, so the custom error page above carries the
-    // policy's headers and a viewer-response function sees them.
+    // policy's headers and a viewer-response function that runs sees them.
     const response = this.stages.responseHeadersApplicator.apply(
       cloudFront,
       requestReference,
       errorResponse,
       behaviour,
     );
+
+    // CloudFront runs no viewer-response function when the Origin answered
+    // 400 or higher, for either kind of function. The status that decides it
+    // is the one the Origin returned, so a custom error response carrying
+    // `ResponseCode: 200` above does not bring the function back.
+    if (originResponse.status >= 400) {
+      return response;
+    }
 
     // Handle viewer-response CFF, if any.
     // A viewer-response CFF can inspect the original request and replace or

@@ -259,8 +259,10 @@ with a 200 for a URL the Bucket has no object for. It is one of the same error c
 CloudFront allows. Where the response page is itself missing, the viewer gets the status from
 fetching it, as in CloudFront.
 
-Custom error responses are applied before a `viewer-response` CloudFront Function runs. The function
-sees the response the viewer is about to get. `ErrorCachingMinTTL` is accepted and ignored, along
+A viewer-response function never sees a custom error page. CloudFront runs no viewer-response
+function once the Origin has answered 400 or higher, and simulated CloudFront does the same, for a
+CloudFront Function and a Lambda@Edge function alike. The status the Origin returned is what decides
+that, whatever `ResponseCode` puts in its place. `ErrorCachingMinTTL` is accepted and ignored, along
 with a rule that sets nothing else, since sim CloudFront has no cache to apply it to.
 
 ## Serve simulated CloudFront on localhost
@@ -906,6 +908,10 @@ Function code.
 
 The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Functions.
 
+A `viewer-response` Function runs for an Origin status below 400. CloudFront skips the
+viewer-response event once the Origin has answered 400 or higher (see
+[Limitations](#limitations)), and so does this simulation.
+
 Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
 
 The `host` header a function sees is the hostname the request was made to CloudFront with, being the
@@ -1349,6 +1355,10 @@ Lambda@Edge at the viewer events. A Behavior with a viewer-request CloudFront Fu
 viewer-response Lambda@Edge function is refused, and so is a Behavior naming both at one event type.
 Simulated CloudFront refuses the same combinations.
 
+Neither kind runs at the viewer response once the Origin has answered 400 or higher. CloudFront
+skips that event for an Origin error, and the status the Origin returned is what decides it (see
+[Limitations](#limitations)).
+
 Both kinds of function see the `host` header as the hostname the viewer reached CloudFront with,
 rather than the Yulin-local host a request served on localhost arrives with. As on AWS, `host` is
 read-only at the viewer request, and a host a handler writes is discarded before the Origin sees it.
@@ -1627,9 +1637,10 @@ header the Origin left out is added either way.
 `RemoveHeadersConfig` takes headers away, and is applied before the added ones. A header named in
 both sections ends up present with the policy's value.
 
-The policy is applied after a custom error response is fetched and before a `viewer-response`
-CloudFront Function runs, as CloudFront does. An error page carries the policy's headers, and a
-function sees them in `event.response.headers` and can change them.
+The policy is applied after a custom error response is fetched and before the viewer-response event,
+as CloudFront does. An error page carries the policy's headers. A viewer-response Function sees them
+in `event.response.headers` and can change them, where the Origin answered below 400 and the
+Function ran at all.
 
 `SecurityHeadersConfig` is what CDK's `ResponseHeadersPolicy` construct synthesizes from
 `securityHeadersBehavior`, and every one of its sections is modelled. `ContentSecurityPolicy`,
@@ -2310,6 +2321,13 @@ Where sim CloudFront knowingly behaves differently from AWS:
   function and reports `inputTruncated` when it had to cut one. Every simulated body arrives whole
   and `inputTruncated` is always false, so a test finds out nothing about whether its request would
   be too large for a real edge function.
+- **The Origin's status decides whether a viewer-response function runs.** CloudFront skips the
+  viewer-response event once the Origin answers 400 or higher, and both kinds of function are
+  skipped here on that rule. Where a custom error response turns that status into another one, such
+  as the 200 a single-page app serves its shell with, the Origin's own status still decides. AWS
+  documents the restriction against the Origin's status and says nothing about the status a custom
+  error response puts in its place. A Distribution combining the two is where this simulation is
+  guessing.
 - **CloudFront's disallowed and read-only header lists go unchecked.** Real CloudFront answers 502
   when an edge function adds `Connection` or edits `Content-Length`. Both kinds of function here
   write what they like, apart from the viewer-request `host`, which is restored.
