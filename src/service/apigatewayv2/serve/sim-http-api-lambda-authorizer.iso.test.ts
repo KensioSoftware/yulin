@@ -115,6 +115,32 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     });
   });
 
+  it("runs its authorizer with the Lambda runtime environment", async () => {
+    // Given an authorizer reading the variables an AWS SDK client in it
+    // would, and passing them on for the handler to report
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const api = await protectedApi(simAws, {
+      handler: () => ({
+        isAuthorized: true,
+        context: {
+          region: process.env["AWS_REGION"],
+          functionName: process.env["AWS_LAMBDA_FUNCTION_NAME"],
+        },
+      }),
+    });
+
+    // When the route is called
+    const response = await get(simAws, api, { cookie: goodCookie });
+
+    // Then the authorizer ran with its own function's environment, the way
+    // the integration behind it does
+    assertIdentical(response.status, 200);
+    assertObjectMatches(await response.json(), {
+      region: "eu-west-2",
+      functionName: "session-authorizer",
+    });
+  });
+
   it("refuses a request its authorizer says no to, without invoking the integration", async () => {
     // Given a route behind that authorizer, and a handler counting its runs
     const simAws = new SimAws();

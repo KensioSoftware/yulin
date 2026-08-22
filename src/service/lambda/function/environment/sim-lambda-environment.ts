@@ -1,15 +1,9 @@
 import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
-import { simLambdaExecutionCredentials } from "./sim-lambda-execution-credentials.js";
-
-/**
- * The function details the AWS-provided runtime environment variables are
- * built from.
- */
-export interface SimLambdaEnvironmentDetails {
-  readonly functionName: string;
-  readonly regionName: string;
-  readonly memorySizeMb: number;
-}
+import { SimLambdaHostBackedVariables } from "./sim-lambda-host-backed-variables.js";
+import {
+  type SimLambdaEnvironmentDetails,
+  simLambdaRuntimeVariables,
+} from "./sim-lambda-runtime-variables.js";
 
 interface SimLambdaEnvironmentProperties extends SimLambdaEnvironmentDetails {
   readonly declaredVariables?: ReadonlyMap<string, string> | undefined;
@@ -26,6 +20,12 @@ interface SimLambdaEnvironmentProperties extends SimLambdaEnvironmentDetails {
 export class SimLambdaEnvironment {
   private readonly details: SimLambdaEnvironmentDetails;
   private readonly declared: ReadonlyMap<string, string>;
+
+  /**
+   * The environment a function declaring nothing of its own runs with, which
+   * keeps the host process environment underneath the AWS-provided variables.
+   */
+  private readonly hostBacked = new SimLambdaHostBackedVariables();
 
   /**
    * The merged variables, built once and then reused.
@@ -46,8 +46,9 @@ export class SimLambdaEnvironment {
   /**
    * Whether any variables were declared for this function.
    *
-   * A function with no declared variables needs no environment of its own, so
-   * callers can leave the host process environment alone entirely.
+   * A function with no declared variables runs with the host process
+   * environment under the AWS-provided runtime variables, and reports no
+   * Environment in its configuration.
    */
   get hasDeclaredVariables(): boolean {
     return this.declared.size > 0;
@@ -84,18 +85,26 @@ export class SimLambdaEnvironment {
   /**
    * Run function code with this environment applied to process.env.
    *
-   * A function that declares nothing is left reading the host process
-   * environment, exactly as before: there is nothing of its own to give it,
-   * so there is no reason to touch process.env at all. Zip code running in a
-   * vm context takes its variables from the sandbox instead, and is
-   * unaffected either way.
+   * Every invocation runs with the AWS-provided runtime variables, as every
+   * real Lambda invocation does, whatever the function declared. An AWS SDK
+   * client built inside the handler reads its Region from AWS_REGION there,
+   * and reads credentials the invocation is already attributed to.
+   *
+   * A function that declares nothing of its own keeps the host process
+   * environment underneath them. Taking that away would take away everything
+   * the test process set, which is where an in-process handler's
+   * configuration comes from when the function declares none. A function
+   * declaring variables gets only its own, as before.
+   *
+   * Zip code running in a vm context takes its variables from the sandbox
+   * instead, and is unaffected either way.
    */
   async runWith<T>(run: () => Promise<T>): Promise<T> {
-    if (!this.hasDeclaredVariables) {
-      return await run();
+    if (this.hasDeclaredVariables) {
+      return await simProcessEnvironment.run(this.variables(), run);
     }
 
-    return await simProcessEnvironment.run(this.variables(), run);
+    return await this.hostBacked.runWith(this.variables(), run);
   }
 
   /**
@@ -103,27 +112,9 @@ export class SimLambdaEnvironment {
    */
   variables(): Record<string, string> {
     this.#variables ??= {
-      ...this.runtimeVariables(),
+      ...simLambdaRuntimeVariables(this.details),
       ...Object.fromEntries(this.declared),
     };
     return this.#variables;
-  }
-
-  /**
-   * The AWS-like standard runtime environment variables.
-   */
-  private runtimeVariables(): Record<string, string> {
-    const { functionName, regionName, memorySizeMb } = this.details;
-    // Built from entries rather than an object literal because AWS
-    // environment variable names are not code identifier names, and the
-    // project's naming rules treat object literal keys as if they were.
-    return Object.fromEntries([
-      ["AWS_REGION", regionName],
-      ["AWS_DEFAULT_REGION", regionName],
-      ["AWS_LAMBDA_FUNCTION_NAME", functionName],
-      ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE", String(memorySizeMb)],
-      ["AWS_LAMBDA_FUNCTION_VERSION", "$LATEST"],
-      ...simLambdaExecutionCredentials,
-    ]);
   }
 }
