@@ -1,7 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimArn } from "../aws/arn.js";
-import { assertDefined } from "../../util/type-guard/defined.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type {
@@ -50,6 +49,7 @@ import type {
 import { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 import type { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
+import { simCffNameInArn } from "./cff/sim-cff-arn.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import {
   SimCloudFrontCommands,
@@ -198,18 +198,12 @@ export class SimCloudFront {
   getCloudFrontFunctionByArn(
     cloudFrontFunctionArn: SimArn,
   ): SimCloudFrontFunction | undefined {
-    const arnAccountId = cloudFrontFunctionArn.split(":", 5)[4];
-    if (arnAccountId !== this.accountRegionScope.accountId) {
-      return undefined;
-    }
-    const cloudFrontFunctionName = cloudFrontFunctionArn.split("/").pop();
-    assertDefined(
-      cloudFrontFunctionName,
-      `CloudFront Function name in ARN ${cloudFrontFunctionArn}`,
+    const name = simCffNameInArn(
+      cloudFrontFunctionArn,
+      this.accountRegionScope.accountId,
     );
-    return this.cloudFrontFunctions.get(
-      cloudFrontFunctionName as SimCloudFrontFunctionName,
-    );
+
+    return name === undefined ? undefined : this.cloudFrontFunctions.get(name);
   }
 
   /**

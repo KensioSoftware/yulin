@@ -167,6 +167,9 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
   readonly AllowedMethods?: SimCloudFrontAllowedMethods | undefined;
   readonly ViewerProtocolPolicy?: SimCloudFrontViewerProtocolPolicy | undefined;
   readonly FunctionAssociations?: SimCloudFrontFunctionAssociations | undefined;
+  readonly LambdaFunctionAssociations?:
+    | SimCloudFrontLambdaFunctionAssociations
+    | undefined;
   readonly ResponseHeadersPolicyId?: string | undefined;
 }
 
@@ -197,6 +200,30 @@ export interface SimCloudFrontFunctionAssociation {
     | "origin-response"
     | undefined;
   readonly FunctionARN?: string | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront Lambda@Edge associations list.
+ */
+export interface SimCloudFrontLambdaFunctionAssociations {
+  readonly Quantity?: number | undefined;
+  readonly Items?:
+    | readonly SimCloudFrontLambdaFunctionAssociation[]
+    | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront Lambda@Edge association.
+ */
+export interface SimCloudFrontLambdaFunctionAssociation {
+  readonly EventType?:
+    | "viewer-request"
+    | "viewer-response"
+    | "origin-request"
+    | "origin-response"
+    | undefined;
+  readonly LambdaFunctionARN?: string | undefined;
+  readonly IncludeBody?: boolean | undefined;
 }
 
 /**

@@ -18,6 +18,8 @@ import type {
   SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontViewerCertificateValidator } from "../../distribution/viewer-certificate/sim-cf-viewer-certificate-validator.js";
+import { SimCfEdgeAssociationValidator } from "../../edge/sim-cf-edge-association-validator.js";
+import type { SimCfEdgeFunctions } from "../../edge/sim-cf-edge-functions.js";
 import { SimCloudFrontNoSuchDistribution } from "../../error/sim-cloudfront.error.js";
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
@@ -46,6 +48,7 @@ interface UpdateDistributionCommandHandlerProperties {
   readonly webAclResolver?: SimCfWebAclResolver | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
+  readonly edgeFunctions?: SimCfEdgeFunctions | undefined;
   readonly background?: BackgroundScheduler;
 }
 
@@ -68,6 +71,7 @@ export class UpdateDistributionCommandHandler implements CommandHandler<
   >;
   private readonly reconfigurer: SimCloudFrontDistributionReconfigurer;
   private readonly viewerCertificateValidator: SimCloudFrontViewerCertificateValidator;
+  private readonly edgeAssociationValidator: SimCfEdgeAssociationValidator;
   private readonly authorizer: UpdateDistributionAuthorizer;
   private readonly background: BackgroundScheduler;
 
@@ -82,6 +86,10 @@ export class UpdateDistributionCommandHandler implements CommandHandler<
     this.reconfigurer = new SimCloudFrontDistributionReconfigurer(properties);
     this.viewerCertificateValidator =
       new SimCloudFrontViewerCertificateValidator(properties);
+    this.edgeAssociationValidator = new SimCfEdgeAssociationValidator({
+      iam,
+      edgeFunctions: properties.edgeFunctions,
+    });
     this.authorizer = new UpdateDistributionAuthorizer({ accountId, iam });
     this.background = background;
   }
@@ -120,9 +128,13 @@ export class UpdateDistributionCommandHandler implements CommandHandler<
       );
     }
 
-    // Reject an unusable viewer certificate before the Distribution is
-    // touched, as CloudFront rejects the whole request.
+    // Reject an unusable viewer certificate or Lambda@Edge association before
+    // the Distribution is touched, as CloudFront rejects the whole request.
     this.viewerCertificateValidator.validate(distributionConfig);
+    await this.edgeAssociationValidator.validate(
+      distributionConfig,
+      options?.caller,
+    );
 
     this.reconfigurer.reconfigure(distribution, distributionConfig);
 

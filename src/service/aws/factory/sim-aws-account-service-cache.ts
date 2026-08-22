@@ -9,6 +9,7 @@ import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 import { makeSimCfCustomOriginDispatcher } from "../../cloudfront/origin/custom/sim-cf-custom-origin-dispatcher.factory.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
+import { SimAwsCfEdgeFunctions } from "../../cloudfront/edge/sim-aws-cf-edge-functions.js";
 import { makeSimCfWebAclResolver } from "../../cloudfront/web-acl/sim-cf-web-acl-resolver.factory.js";
 import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
@@ -127,6 +128,10 @@ export class SimAwsAccountServiceCache {
           // Region its ARN names, which CloudFront reaches through the
           // simulation rather than holding itself.
           webAclResolver: makeSimCfWebAclResolver(this.simAws),
+          // A Lambda@Edge function lives in us-east-1 and is named by ARN, so
+          // CloudFront reaches it through the simulation rather than through
+          // the Lambda of its own scope.
+          edgeFunctions: new SimAwsCfEdgeFunctions(this.simAws),
           background: this.background,
         }),
     );

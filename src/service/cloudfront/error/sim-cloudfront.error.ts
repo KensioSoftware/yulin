@@ -232,3 +232,20 @@ export class SimCloudFrontInvalidWebAclId extends SimCloudFrontError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated CloudFront InvalidLambdaFunctionAssociation error.
+ *
+ * What CloudFront answers for every way a `LambdaFunctionAssociations` entry
+ * can be unusable: an ARN that names no published version, a function outside
+ * us-east-1, an execution role Lambda@Edge cannot assume, and a Behavior that
+ * mixes a CloudFront Function with a Lambda@Edge function at the viewer
+ * events.
+ */
+export class SimCloudFrontInvalidLambdaFunctionAssociation extends SimCloudFrontError {
+  public override readonly name = "InvalidLambdaFunctionAssociation";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

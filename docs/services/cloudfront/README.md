@@ -1211,6 +1211,148 @@ headers.
 The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
 covers what the factories have in common.
 
+## Simulated Lambda@Edge
+
+A cache Behavior can run a Lambda function at `viewer-request` and `viewer-response` through
+`LambdaFunctionAssociations`. Where a CloudFront Function is a small piece of JavaScript running in
+CloudFront's own runtime, a Lambda@Edge function is an ordinary simulated Lambda function, with an
+execution role, an environment and whatever SDK calls its handler makes.
+
+Three things about Lambda@Edge catch people out on AWS, and simulated CloudFront refuses all three
+the way AWS refuses them, when the Distribution is written rather than when a request arrives.
+
+- **The function lives in `us-east-1`**, wherever the rest of the stack lives.
+- **The association names a published version**, such as `:1`. An unqualified ARN, `$LATEST` and an
+  alias are each refused.
+- **The execution role trusts `edgelambda.amazonaws.com`** as well as `lambda.amazonaws.com`. A role
+  set up for an ordinary function is the usual reason a first Lambda@Edge deploy fails.
+
+```typescript sim-cloudfront-lambda-edge
+/**
+ * A Lambda@Edge function rewriting a request at the viewer.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import {
+  CreateFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import type { LambdaAtEdge } from "@kensio/yulin/cloudfront";
+
+const simAws = new SimAws();
+
+// A Lambda@Edge execution role trusts both service principals.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "EdgeRewriteRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: {
+          Service: ["lambda.amazonaws.com", "edgelambda.amazonaws.com"],
+        },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// The function has to be in us-east-1, and the Behavior names a version.
+const edgeLambda = simAws.region("us-east-1").lambda();
+
+await edgeLambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "rewrite-uri",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: LambdaAtEdge.RequestEvent) => {
+        const { request } = event.Records[0].cf;
+
+        // A header is a list keyed by its lowercase name, and a status is a
+        // string. Both differ from the CloudFront Functions shapes.
+        if (request.headers["x-preview"]?.[0]?.value === "1") {
+          return {
+            status: "302",
+            headers: {
+              location: [{ key: "Location", value: "/preview.html" }],
+            },
+          };
+        }
+
+        request.uri = "/index.html";
+
+        return request;
+      }),
+    },
+  }),
+);
+
+const version = await edgeLambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "rewrite-uri" }),
+);
+
+await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "edge-rewrite",
+      Comment: "Rewriting at the viewer",
+      Enabled: true,
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "site-origin",
+            DomainName: "edge-site.s3.amazonaws.com",
+            S3OriginConfig: { OriginAccessIdentity: "" },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "site-origin",
+        ViewerProtocolPolicy: "allow-all",
+        LambdaFunctionAssociations: {
+          Quantity: 1,
+          Items: [
+            {
+              EventType: "viewer-request",
+              LambdaFunctionARN: version.FunctionArn,
+              IncludeBody: false,
+            },
+          ],
+        },
+      },
+    },
+  }),
+);
+```
+
+A `viewer-request` handler returning the request carries on to the Origin with whatever it changed.
+Returning a response answers the viewer there and then, and the Origin is never read. A
+`viewer-response` handler returns the response the viewer gets.
+
+Set `IncludeBody` to give a `viewer-request` handler the request body, which arrives base64 encoded
+under `request.body.data`. A handler setting `request.body.action` to `replace` sends its own body
+to the Origin.
+
+A handler that throws answers the viewer with a 502, as CloudFront answers a failed edge function.
+The error reaches the function's own output and nothing else.
+
+### Which edge function runs where
+
+CloudFront takes one edge function per event type, and it does not combine CloudFront Functions with
+Lambda@Edge at the viewer events. A Behavior with a viewer-request CloudFront Function and a
+viewer-response Lambda@Edge function is refused, and so is a Behavior naming both at one event type.
+Simulated CloudFront refuses the same combinations.
+
+Both kinds of function see the `host` header as the hostname the viewer reached CloudFront with,
+rather than the Yulin-local host a request served on localhost arrives with. As on AWS, `host` is
+read-only at the viewer request, and a host a handler writes is discarded before the Origin sees it.
+
 ## Web ACLs
 
 A Distribution can put a WAFv2 web ACL in front of everything it serves. Name the web ACL's ARN in
@@ -2139,6 +2281,7 @@ Sim CloudFront currently supports:
 - Default cache Behavior and path-based cache Behaviors
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions, including async ones
+- `viewer-request` and `viewer-response` Lambda@Edge functions, through `LambdaFunctionAssociations`
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
@@ -2155,6 +2298,21 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
+- **Lambda@Edge runs at the two viewer events only.** CloudFront runs an edge function at
+  `origin-request` and `origin-response` as well, and both are refused by name rather than being
+  accepted and never run. The request pipeline has no hook either side of the Origin fetch yet.
+- **Nothing is replicated.** Real Lambda@Edge copies the function out to every Region and creates the
+  `AWSServiceRoleForLambdaReplicator` service-linked role to do it. Here the function is invoked
+  where it was created. The trust policy and the `lambda:GetFunction` and `lambda:EnableReplication`
+  permissions a real association needs are still checked, because those are what a first deploy
+  fails on.
+- **A Lambda@Edge body is never truncated.** CloudFront caps the body it sends a `viewer-request`
+  function and reports `inputTruncated` when it had to cut one. Every simulated body arrives whole
+  and `inputTruncated` is always false, so a test finds out nothing about whether its request would
+  be too large for a real edge function.
+- **CloudFront's disallowed and read-only header lists go unchecked.** Real CloudFront answers 502
+  when an edge function adds `Connection` or edits `Content-Length`. Both kinds of function here
+  write what they like, apart from the viewer-request `host`, which is restored.
 - **An S3 Origin with no origin access control reads its Bucket anonymously.** That is the unsigned
   request real CloudFront sends to the S3 REST endpoint without one. The Bucket policy has to make
   an Object publicly readable for the Distribution to serve it. A legacy

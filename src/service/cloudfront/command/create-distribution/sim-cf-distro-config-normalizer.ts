@@ -4,6 +4,7 @@ import type {
   SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontDistributionConfig,
   SimCloudFrontFunctionAssociation,
+  SimCloudFrontLambdaFunctionAssociation,
   SimCloudFrontOriginConfig,
 } from "./create-distribution.command.js";
 import {
@@ -73,6 +74,11 @@ export class SimCloudFrontDistributionConfigNormalizer {
         normalizeSimCfList<SimCloudFrontFunctionAssociation>(
           "FunctionAssociations",
           cacheBehaviorRecord["FunctionAssociations"],
+        ),
+      LambdaFunctionAssociations:
+        normalizeSimCfList<SimCloudFrontLambdaFunctionAssociation>(
+          "LambdaFunctionAssociations",
+          cacheBehaviorRecord["LambdaFunctionAssociations"],
         ),
     };
   }

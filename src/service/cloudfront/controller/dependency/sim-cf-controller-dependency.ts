@@ -5,6 +5,8 @@ import { SimCloudFrontDistroRouter as DefaultSimCloudFrontDistroRouter } from ".
 import type { SimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCffApplicator } from "../cff/sim-cff-applicator.js";
+import { SimLambdaEdgeApplicator } from "../edge/sim-lambda-edge-applicator.js";
+import { SimAwsCfEdgeFunctions } from "../../edge/sim-aws-cf-edge-functions.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 import { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
 import { SimCfResponseHeadersApplicator } from "../response-headers/sim-cf-response-headers-applicator.js";
@@ -18,6 +20,7 @@ export interface SimCloudFrontServiceControllerProperties {
   readonly webAclGuard?: SimCfWebAclGuard;
   readonly behaviourResolver?: SimCloudFrontBehaviorResolver;
   readonly cffApplicator?: SimCffApplicator;
+  readonly edgeApplicator?: SimLambdaEdgeApplicator;
   readonly originFetcher?: SimCloudFrontOriginFetcher;
   readonly customErrorResponder?: SimCfCustomErrorResponder;
   readonly responseHeadersApplicator?: SimCfResponseHeadersApplicator;
@@ -28,6 +31,7 @@ export interface SimCloudFrontControllerDependencies {
   readonly webAclGuard: SimCfWebAclGuard;
   readonly behaviourResolver: SimCloudFrontBehaviorResolver;
   readonly cffApplicator: SimCffApplicator;
+  readonly edgeApplicator: SimLambdaEdgeApplicator;
   readonly originFetcher: SimCloudFrontOriginFetcher;
   readonly customErrorResponder: SimCfCustomErrorResponder;
   readonly responseHeadersApplicator: SimCfResponseHeadersApplicator;
@@ -68,6 +72,11 @@ export class SimCloudFrontControllerDependenciesFactory {
         new SimCfWebAclGuard(makeSimCfWebAclResolver(simAws)),
       behaviourResolver,
       cffApplicator: properties.cffApplicator ?? new SimCffApplicator(),
+      edgeApplicator:
+        properties.edgeApplicator ??
+        new SimLambdaEdgeApplicator({
+          edgeFunctions: new SimAwsCfEdgeFunctions(simAws),
+        }),
       originFetcher,
       customErrorResponder:
         properties.customErrorResponder ??
