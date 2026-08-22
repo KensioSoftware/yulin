@@ -16,6 +16,8 @@ export function checkSimStatesTransitions(
   states: ReadonlyMap<string, SimStatesState>,
 ): void {
   for (const [name, state] of states) {
+    checkCatchers(name, state, states);
+
     if (isSimStatesTerminal(state)) {
       checkTerminal(name, state);
       continue;
@@ -39,6 +41,30 @@ function checkTerminal(name: string, state: SimStatesState): void {
       throw new SimStatesInvalidDefinition(
         `The ${state.Type} state ${name} carries ${field}. A ${state.Type} ` +
           "state ends the execution and carries neither.",
+      );
+    }
+  }
+}
+
+/**
+ * A catcher moves the execution on as well, to the state it names.
+ */
+function checkCatchers(
+  name: string,
+  state: SimStatesState,
+  states: ReadonlyMap<string, SimStatesState>,
+): void {
+  if (state.Type !== "Task") {
+    return;
+  }
+
+  const catchers = state.Catch ?? [];
+
+  for (const catcher of catchers) {
+    if (!states.has(catcher.Next)) {
+      throw new SimStatesInvalidDefinition(
+        `A catcher in the Task state ${name} moves to ${catcher.Next}, ` +
+          "which is not one of this state machine's states.",
       );
     }
   }

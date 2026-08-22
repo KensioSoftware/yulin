@@ -52,20 +52,20 @@ describe("Step Functions Task state refusals", () => {
         Type: "Task",
         Resource: "arn:aws:states:::lambda:invoke",
         Parameters: { FunctionName: "check-enrolment" },
-        Retry: [{ ErrorEquals: ["States.TaskFailed"], MaxAttempts: 2 }],
+        TimeoutSecondsPath: "$.allowed",
         End: true,
       }),
-      "carries Retry",
+      "carries TimeoutSecondsPath",
     );
     assertStringIncludes(
       refusalForTask({
         Type: "Task",
         Resource: "arn:aws:states:::lambda:invoke",
         Parameters: { FunctionName: "check-enrolment" },
-        TimeoutSeconds: 30,
+        Credentials: { RoleArn: "arn:aws:iam::123456789012:role/Other" },
         End: true,
       }),
-      "carries TimeoutSeconds",
+      "carries Credentials",
     );
   });
 

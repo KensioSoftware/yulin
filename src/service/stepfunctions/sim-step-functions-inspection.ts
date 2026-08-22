@@ -1,3 +1,4 @@
+import type { SimStatesAttempt } from "./execution/sim-states-attempt.js";
 import type { SimStatesExecutionStore } from "./execution/sim-states-execution-store.js";
 
 /**
@@ -20,6 +21,17 @@ export class SimStepFunctionsInspection {
    */
   visitedStates(executionArn: string): readonly string[] {
     return this.#executions.find(executionArn)?.visitedStates ?? [];
+  }
+
+  /**
+   * Every run of a state one execution made, in the order it made them.
+   *
+   * A state a `Retry` ran again appears once per attempt, so this says how many
+   * times a task ran where `visitedStates` says only that the execution reached
+   * it. Each attempt carries the error name it failed with, where it failed.
+   */
+  attempts(executionArn: string): readonly SimStatesAttempt[] {
+    return this.#executions.find(executionArn)?.attempts ?? [];
   }
 
   /**

@@ -12,6 +12,7 @@ export {
 export type { SimStateMachineLocation } from "./machine/sim-state-machine-arn.js";
 export { SimStatesExecution } from "./execution/sim-states-execution.js";
 export type { SimStatesExecutionStatus } from "./execution/sim-states-execution.js";
+export type { SimStatesAttempt } from "./execution/sim-states-attempt.js";
 export type { SimStatesDefinition } from "./definition/sim-states-definition.js";
 export {
   simStatesRunnableTypes,
@@ -25,6 +26,9 @@ export type {
   SimStatesWaitState,
 } from "./definition/sim-states-state.js";
 export { SimStatesChoiceRule } from "./choice/sim-states-choice-rule.js";
+export type { SimStatesCatcher } from "./retry/sim-states-catcher.js";
+export type { SimStatesRetrier } from "./retry/sim-states-retrier.js";
+export type { SimStatesTaskHandling } from "./retry/sim-states-task-handling.js";
 export {
   SimStateMachineAlreadyExists,
   SimStatesExecutionAlreadyExists,

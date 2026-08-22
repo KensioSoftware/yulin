@@ -8,6 +8,8 @@ import {
   SimStatesInvalidDefinition,
   SimStatesUnsimulatedInput,
 } from "../error/sim-step-functions.error.js";
+import { parseSimStatesCatchers } from "../retry/sim-states-catch-parse.js";
+import { parseSimStatesRetriers } from "../retry/sim-states-retry-parse.js";
 import { checkSimStatesTaskFields } from "../task/sim-states-task-fields.js";
 import { parseSimStatesTaskResource } from "../task/sim-states-task-resource.js";
 import { checkSimStatesWaitFields } from "../wait/sim-states-wait-fields.js";
@@ -94,7 +96,9 @@ function readChoiceState(
  * Read a `Task` state, whose `Resource` is read as the state is.
  *
  * The target becomes the object the state invokes through, so a `Task` state
- * that runs has already had its `Resource` and its `Parameters` read.
+ * that runs has already had its `Resource` and its `Parameters` read. Its
+ * `Retry` and `Catch` are read the same way, leaving the intervals, the
+ * attempt counts and the paths known before an execution reaches the state.
  */
 function readTaskState(
   name: string,
@@ -102,8 +106,13 @@ function readTaskState(
 ): SimStatesTaskState {
   checkSimStatesTaskFields(name, state);
 
+  const retriers = parseSimStatesRetriers(name, state);
+  const catchers = parseSimStatesCatchers(name, state);
+
   return {
     ...(state as unknown as SimStatesTaskState),
     target: parseSimStatesTaskResource(name, state),
+    ...(retriers !== undefined && { Retry: retriers }),
+    ...(catchers !== undefined && { Catch: catchers }),
   };
 }
