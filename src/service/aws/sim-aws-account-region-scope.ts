@@ -3,6 +3,7 @@ import type { AwsRegionName, SimAwsRegion } from "./sim-aws-region.js";
 import { Memo } from "../../util/memo/memo.js";
 import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
+import type { SimBedrock } from "../bedrock/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimScheduler } from "../scheduler/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
@@ -80,6 +81,13 @@ export class SimAwsAccountRegionContainer {
   /** Get simulated ACM for this account and region. */
   acm(): SimAcm {
     return this.memo.getOrCreate("acm", () => this.factory.createAcm(this));
+  }
+
+  /** Get simulated Bedrock for this account and region. */
+  bedrock(): SimBedrock {
+    return this.memo.getOrCreate("bedrock", () =>
+      this.factory.createBedrock(this),
+    );
   }
 
   /** Get simulated API Gateway REST APIs for this account and region. */

@@ -8,6 +8,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [ACM](./services/acm/ "Simulated ACM usage docs")
 - [API Gateway HTTP APIs](./services/apigatewayv2/ "Simulated API Gateway HTTP API usage docs")
 - [API Gateway REST APIs](./services/apigateway/ "Simulated API Gateway REST API usage docs")
+- [Bedrock](./services/bedrock/ "Simulated Amazon Bedrock usage docs")
 - [CloudFormation](./services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [CloudWatch metrics](./services/cloudwatch/ "Simulated CloudWatch metrics usage docs")

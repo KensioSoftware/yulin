@@ -55,6 +55,10 @@
       "import": "./dist/service/apigatewayv2/index.js",
       "types": "./dist/service/apigatewayv2/index.d.ts"
     },
+    "./bedrock": {
+      "import": "./dist/service/bedrock/index.js",
+      "types": "./dist/service/bedrock/index.d.ts"
+    },
     "./cloudformation": {
       "import": "./dist/service/cloudformation/index.js",
       "types": "./dist/service/cloudformation/index.d.ts"
@@ -197,6 +201,7 @@
     "@aws-sdk/client-acm": "^3.1101.0",
     "@aws-sdk/client-api-gateway": "^3.1112.0",
     "@aws-sdk/client-apigatewayv2": "^3.1101.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1115.0",
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",
     "@aws-sdk/client-cloudfront-keyvaluestore": "^3.1108.0",
