@@ -1,5 +1,6 @@
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
 import type { SimCfnResourceValueAdapter } from "./sim-cfn-resource-value-adapter.js";
+import { simCfnUnansweredAttribute } from "./sim-cfn-unanswered-attribute.js";
 
 interface SimCfnDefaultResourceValueAdapterProperties {
   readonly logicalId: string;
@@ -27,6 +28,6 @@ export class SimCfnDefaultResourceValueAdapter implements SimCfnResourceValueAda
    * Default attribute stand-in.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
-    return `${this.logicalId}.${attributeName}`;
+    return simCfnUnansweredAttribute(this.logicalId, attributeName);
   }
 }

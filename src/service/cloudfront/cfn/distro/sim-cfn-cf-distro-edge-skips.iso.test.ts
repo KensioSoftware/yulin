@@ -176,6 +176,81 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
     );
   });
 
+  it("serves from a Distribution whose association ARN never arrived", async () => {
+    // Given a Bucket holding the page the Distribution serves, and a Resource
+    // this simulation does not create standing where the function ARN comes
+    // from. A CDK EdgeFunction outside us-east-1 leaves the same thing behind
+    // when the support Stack holding its ARN was not deployed.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {
+      "index.html": "<h1>Home</h1>",
+    });
+
+    // When the template deploys.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "edge-site",
+      template: edgeDistributionTemplateFactory.make({
+        associations: [
+          {
+            EventType: "viewer-request",
+            LambdaFunctionARN: { "Fn::GetAtt": ["ArnSource", "FunctionArn"] },
+          },
+        ],
+        extraResources: {
+          ArnSource: { Type: "AWS::Ivs::Channel", Properties: {} },
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the Distribution deployed and serves the page, with the association
+    // recorded rather than refused as a malformed ARN.
+    const response = await simCfSiteRequest(
+      simAws,
+      deployedDistribution(stack).distributionId,
+      "/index.html",
+    );
+
+    assertResponseStatus(response, 200);
+    assertIdentical(await response.text(), "<h1>Home</h1>");
+
+    const ignoredProperty = stack.ignoredProperties.find(
+      (property) => property.resourceType === "AWS::CloudFront::Distribution",
+    );
+    assertNonNullable(ignoredProperty);
+    assertIdentical(
+      ignoredProperty.path,
+      "DistributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations.viewer-request",
+    );
+    assertStringIncludes(ignoredProperty.reason, "ArnSource.FunctionArn");
+  });
+
+  it("fails the stack over an ARN written by hand that is not one", async () => {
+    // Given a template whose association names something that is not an ARN
+    // and stands for nothing in the Stack either.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {});
+
+    // When it deploys.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "edge-site",
+        template: edgeDistributionTemplateFactory.make({
+          associations: [
+            {
+              EventType: "viewer-request",
+              LambdaFunctionARN: "edge-function",
+            },
+          ],
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the deployment failed on the ARN, as a real deploy fails on it.
+    assertStringIncludes(error.message, "is not a Lambda function ARN");
+  });
+
   it("fails the stack over a role Lambda@Edge cannot assume", async () => {
     // Given a template whose edge function runs as an ordinary Lambda
     // execution role, trusting lambda.amazonaws.com alone.
