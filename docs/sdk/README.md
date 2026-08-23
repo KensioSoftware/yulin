@@ -244,8 +244,8 @@ descriptors is in [the sim DynamoDB docs](https://yulinsim.dev/services/dynamodb
 These simulated services support SDK interception: ACM, API Gateway v2, CloudFormation, CloudFront,
 CloudWatch, CloudWatch Logs, Cognito, DynamoDB, DynamoDB Streams, ECS, Elastic Load Balancing v2,
 EventBridge, EventBridge Scheduler, IAM, KMS, Lambda, Rekognition, Route53, S3, Secrets Manager,
-SES, SNS, SQS, SSM, STS and WAFv2. Each service's own docs under
-[docs/services](../services/) list the Commands it simulates.
+SES, SNS, SQS, SSM, STS and WAFv2. Each service's own docs list the Commands it
+simulates.
 
 A gap in that coverage is refused on send, with a different error for each kind:
 
