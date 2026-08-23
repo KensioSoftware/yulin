@@ -105,6 +105,16 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
   }
 
   /**
+   * The logical IDs of every Resource in the Stack this Resource belongs to.
+   *
+   * Read by a service that has met a value one of them stands behind, such as
+   * an `Fn::GetAtt` on a Resource that had no attribute to answer with.
+   */
+  public get stackResourceLogicalIds(): ReadonlySet<string> {
+    return this.resourceLogicalIds;
+  }
+
+  /**
    * The DeletionPolicy attribute from the Resource template, if it has one.
    */
   public get deletionPolicy(): string | undefined {

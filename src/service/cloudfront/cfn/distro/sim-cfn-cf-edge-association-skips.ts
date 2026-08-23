@@ -6,22 +6,16 @@ import type {
   SimCloudFrontLambdaFunctionAssociation,
 } from "../../command/create-distribution/create-distribution.command.js";
 import { normalizeSimCfList } from "../../command/create-distribution/sim-cf-normalize-list.js";
-import { isSimulatedEdgeEventType } from "../../edge/sim-cf-edge-association-checks.js";
-import { readEdgeFunctionArnParts } from "../../edge/sim-cf-edge-function-arn.js";
-import { findSimCfEdgeFunctionVersion } from "../../edge/sim-cf-edge-function-version.js";
+import { simCfnCfEdgeSkipReason } from "./sim-cfn-cf-edge-skip-reason.js";
 
 /**
- * Decides which of a template Behavior's Lambda@Edge associations this
- * simulation can run, recording the rest on the CloudFormation Resource.
+ * Leaves out the Lambda@Edge associations of a template Behavior this
+ * simulation cannot run, recording each one on the CloudFormation Resource.
  *
- * An association is left out for two reasons. One names a function version
- * this simulation does not hold, as a template pointing at a function in a
- * real account does. The other is on an event type this simulation has no hook
- * for.
- *
- * Everything else is left where `CreateDistribution` meets it, including the
- * mistakes real CloudFront refuses. A template carrying one of those fails a
- * real deploy too.
+ * Which those are is `simCfnCfEdgeSkipReason`'s to say. This is the
+ * bookkeeping around it: reading the list a template wrote, counting what a
+ * Behavior has to be rewritten for, and recording each skip under the path and
+ * the event type it was on.
  */
 export class SimCfnCfEdgeAssociationSkips {
   /** How many associations have been left out so far. */
@@ -74,50 +68,16 @@ export class SimCfnCfEdgeAssociationSkips {
     association: SimCloudFrontLambdaFunctionAssociation,
     behaviorPath: string,
   ): boolean {
-    const { EventType, LambdaFunctionARN } = association;
+    const eventType = association.EventType;
+    const reason = simCfnCfEdgeSkipReason(association, {
+      simAws: this.simAws,
+      stackResourceLogicalIds: this.resource.stackResourceLogicalIds,
+    });
 
-    if (EventType === undefined || LambdaFunctionARN === undefined) {
+    if (reason === undefined || eventType === undefined) {
       return true;
     }
 
-    if (!isSimulatedEdgeEventType(EventType)) {
-      return this.skip(
-        behaviorPath,
-        EventType,
-        `simulated CloudFront runs a Lambda@Edge function at viewer-request ` +
-          `and viewer-response, so the Behavior is deployed without the ` +
-          `${EventType} function ${LambdaFunctionARN} and runs nothing there`,
-      );
-    }
-
-    const arn = readEdgeFunctionArnParts(LambdaFunctionARN);
-
-    if (arn === undefined) {
-      return true;
-    }
-
-    if (findSimCfEdgeFunctionVersion(this.simAws, arn) !== undefined) {
-      return true;
-    }
-
-    return this.skip(
-      behaviorPath,
-      EventType,
-      `Lambda@Edge function ${LambdaFunctionARN} is not held by this ` +
-        `simulation, so the Behavior is deployed without it and runs nothing ` +
-        `at ${EventType}`,
-    );
-  }
-
-  /**
-   * Record one skipped association, answering with what a filter does about
-   * it.
-   */
-  private skip(
-    behaviorPath: string,
-    eventType: string,
-    reason: string,
-  ): boolean {
     this.count += 1;
     this.resource.ignoreProperty(
       `${behaviorPath}.LambdaFunctionAssociations.${eventType}`,

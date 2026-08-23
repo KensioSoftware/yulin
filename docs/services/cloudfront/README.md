@@ -1467,9 +1467,23 @@ exports.handler = async (event) => {
 ```
 
 `cloudfront.experimental.EdgeFunction` deploys from a us-east-1 stack, where the construct creates
-the function alongside everything else. From a stack in any other Region it writes the function into
-a second stack and reads the ARN back through a custom resource, and that route is unsupported (see
-[Limitations](#limitations)).
+the function alongside everything else.
+
+From a stack in any other Region the construct writes the function, its published version and an SSM
+parameter holding the version ARN into a support stack in us-east-1. The stack using the function
+reads that parameter back through a `Custom::CrossRegionStringParameterReader` resource, and the
+Behavior's `LambdaFunctionARN` is an `Fn::GetAtt` on it. Simulated CloudFormation makes that read
+itself, against the Region the resource names, and the association ends up holding the ARN the
+support stack published. Both stacks have to deploy, which is what deploying the whole cloud
+assembly does:
+
+```typescript
+await simAws.cloudFormation().deployCdkOut("cdk.out");
+```
+
+Deploy the using stack's template on its own and no parameter has been written. The read finds
+nothing and says so on `stack.ignoredProperties`, the Behavior deploys without the association, and
+the site serves from the Origin (see [Limitations](#limitations)).
 
 ## Web ACLs
 
@@ -2423,12 +2437,12 @@ Where sim CloudFront knowingly behaves differently from AWS:
   rather than accepting one that would never run. A Distribution deployed from a template records
   the association and deploys without it. A site naming one origin function still serves. The
   request pipeline has no hook either side of the Origin fetch yet.
-- **A CDK `EdgeFunction` outside us-east-1 fails the deployment.**
+- **A CDK `EdgeFunction` outside us-east-1 wants the whole cloud assembly.**
   `cloudfront.experimental.EdgeFunction` writes the function into a us-east-1 support stack and
-  reads its ARN back through a custom resource in the stack that uses it. That custom resource
-  goes unresolved here, and the association is left holding the attribute reference. An
-  `EdgeFunction` in a us-east-1 stack deploys, as the construct creates the function there
-  directly. A `lambda.Version` handed to `edgeLambdas` is the route that works from a template.
+  reads its ARN back through a custom resource in the stack that uses it. `deployCdkOut` deploys
+  both stacks and the read finds the ARN. `deployTemplateFile` on the using stack's template alone
+  deploys one of them, the read finds nothing, and the Distribution goes up without the
+  association, recorded on `stack.ignoredProperties`. `cdk deploy` deploys both either way.
 - **Nothing is replicated.** Real Lambda@Edge copies the function out to every Region and creates the
   `AWSServiceRoleForLambdaReplicator` service-linked role to do it. Here the function is invoked
   where it was created. The trust policy and the `lambda:GetFunction` and `lambda:EnableReplication`

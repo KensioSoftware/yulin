@@ -53,6 +53,12 @@ export interface EdgeDistributionTemplateInput {
 
   /** The path-based cache Behaviors, each stated whole. */
   readonly cacheBehaviors: readonly SimCfnTemplateValueRecord[];
+
+  /**
+   * Resources added beside the ones every edge template has, for a test whose
+   * association names something other than the version declared here.
+   */
+  readonly extraResources: SimCfnTemplateValueRecord;
 }
 
 /**
@@ -84,9 +90,11 @@ export const edgeDistributionTemplateFactory = new MappedFactory<
       },
     ],
     cacheBehaviors: [],
+    extraResources: {},
   }),
   (input) => ({
     Resources: {
+      ...input.extraResources,
       EdgeRole: {
         Type: "AWS::IAM::Role",
         Properties: {

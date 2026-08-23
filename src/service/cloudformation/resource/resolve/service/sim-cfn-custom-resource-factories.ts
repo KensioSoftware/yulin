@@ -1,6 +1,7 @@
 import type { SimCfnServiceResourceFactory } from "../../factory/sim-cfn-resource-factory.type.js";
 import { SimCdkBucketDeploymentResourceFactory } from "../../../cdk/s3/bucket-deployment/sim-cdk-bucket-deployment.js";
 import { SimCdkBucketNotificationsResourceFactory } from "../../../cdk/s3/bucket-notifications/sim-cdk-bucket-notifications.js";
+import { SimCdkCrossRegionParameterReaderResourceFactory } from "../../../cdk/ssm/cross-region-parameter/sim-cdk-cross-region-parameter-reader.js";
 
 /**
  * How one CDK custom Resource hands over its factory.
@@ -30,6 +31,11 @@ export const simCdkCustomResourceFactories: ReadonlyMap<
     "CDKBucketDeployment",
     (): SimCfnServiceResourceFactory =>
       new SimCdkBucketDeploymentResourceFactory(),
+  ],
+  [
+    "CrossRegionStringParameterReader",
+    (): SimCfnServiceResourceFactory =>
+      new SimCdkCrossRegionParameterReaderResourceFactory(),
   ],
   [
     "S3BucketNotifications",

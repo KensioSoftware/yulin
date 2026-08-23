@@ -1270,6 +1270,11 @@ Stacks deploy in an order their manifest dependencies allow, so a Stack that con
 Stack's export goes second. The deployed Stacks come back keyed by name, each one the same
 `SimCfnStack` `deployTemplateFile(...)` answers with.
 
+`cloudfront.experimental.EdgeFunction` in a Stack outside us-east-1 is one construct that needs the
+whole assembly. It puts the function in a us-east-1 support Stack, and the using Stack reads the
+function's ARN back from an SSM parameter that Stack wrote. Both have to deploy for the read to find
+anything. See [simulated Lambda@Edge](../cloudfront/README.md#simulated-lambdaedge).
+
 ### Deploying part of an assembly
 
 Most apps synthesize Stacks a test has no use for, a deployment pipeline among them. `stackNames`
@@ -3268,7 +3273,8 @@ The resource types it creates are:
 - `AWS::SQS::Queue`
 - `AWS::SSM::Parameter`
 - `AWS::StepFunctions::StateMachine`
-- selected CDK custom resources: `Custom::CDKBucketDeployment` and `Custom::S3BucketNotifications`
+- selected CDK custom resources: `Custom::CDKBucketDeployment`, `Custom::S3BucketNotifications` and
+  `Custom::CrossRegionStringParameterReader`
 
 Each service's own docs describe what its resource types support.
 
