@@ -55,8 +55,9 @@ describe("Step Functions Map state refusals", () => {
   });
 
   it("refuses a processor that runs as a Distributed Map", () => {
-    // Given an ItemProcessor whose ProcessorConfig asks for DISTRIBUTED.
-    // When it is read, it is refused by the mode it named.
+    // Given an ItemProcessor asking for DISTRIBUTED, and one asking for an
+    // execution type without saying so.
+    // When each is read, each is refused by the configuration it carries.
     assertStringIncludes(
       refusalFor({
         ItemProcessor: {
@@ -64,7 +65,16 @@ describe("Step Functions Map state refusals", () => {
           ProcessorConfig: { Mode: "DISTRIBUTED", ExecutionType: "STANDARD" },
         },
       }),
-      'ProcessorConfig Mode of "DISTRIBUTED"',
+      '"Mode":"DISTRIBUTED"',
+    );
+    assertStringIncludes(
+      refusalFor({
+        ItemProcessor: {
+          ...registering,
+          ProcessorConfig: { Mode: "INLINE", ExecutionType: "EXPRESS" },
+        },
+      }),
+      "which this simulator does not run",
     );
   });
 
@@ -86,10 +96,15 @@ describe("Step Functions Map state refusals", () => {
   });
 
   it("refuses an ItemSelector that is not a Payload Template", () => {
-    // Given an ItemSelector written as something other than an object.
-    // When it is read, it says what an ItemSelector is.
+    // Given an ItemSelector written as a path, and one written as null.
+    // When each is read, each says what an ItemSelector is. A null one is
+    // refused rather than read as a Map state that carries none.
     assertStringIncludes(
       refusalFor({ ItemProcessor: registering, ItemSelector: "$.students" }),
+      "has an ItemSelector that is not an object",
+    );
+    assertStringIncludes(
+      refusalFor({ ItemProcessor: registering, ItemSelector: null }),
       "has an ItemSelector that is not an object",
     );
   });

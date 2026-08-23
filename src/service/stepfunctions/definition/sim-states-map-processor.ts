@@ -50,6 +50,10 @@ export function readSimStatesMapProcessor(
 
 /**
  * Refuse a processor that runs as a Distributed Map.
+ *
+ * `ExecutionType` says what a Distributed Map's child executions run as, and
+ * an inline processor has none of those, so it is refused alongside the mode
+ * that gives it a meaning.
  */
 function checkProcessorConfig(
   named: string,
@@ -60,12 +64,14 @@ function checkProcessorConfig(
   }
 
   const mode = config["Mode"];
+  const distributed = mode !== undefined && mode !== inlineMode;
 
-  if (mode !== undefined && mode !== inlineMode) {
+  if (distributed || Object.hasOwn(config, "ExecutionType")) {
     throw new SimStatesUnsimulatedInput(
-      `The ${named} has a ProcessorConfig Mode of ${JSON.stringify(mode)}, ` +
-        `which this simulator does not run. It runs ${inlineMode}, where the ` +
-        "iterations are states of the execution that reached the Map state.",
+      `The ${named} has a ProcessorConfig of ${JSON.stringify(config)}, ` +
+        `which this simulator does not run. It runs a Mode of ${inlineMode} ` +
+        "with no ExecutionType, where the iterations are states of the " +
+        "execution that reached the Map state.",
     );
   }
 }

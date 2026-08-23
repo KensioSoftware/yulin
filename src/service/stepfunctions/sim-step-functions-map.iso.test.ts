@@ -92,6 +92,37 @@ describe("Simulated Step Functions Map", () => {
     );
   });
 
+  it("answers in item order whatever order the iterations finished in", async () => {
+    // Given iterations that wait for as long as their own item says, so the
+    // last item is the first one done.
+    const simAws = new SimAws();
+    const executionArn = await runWorkflow(
+      simAws,
+      {
+        Type: "Map",
+        ItemProcessor: {
+          StartAt: "Settle",
+          States: {
+            Settle: { Type: "Wait", SecondsPath: "$.wait", Next: "Register" },
+            Register: { Type: "Pass", End: true },
+          },
+        },
+        End: true,
+      },
+      '[{"id":"wei","wait":180},{"id":"mei","wait":120},{"id":"jun","wait":60}]',
+    );
+
+    // When simulated time passes all three waits.
+    await simAws.clock().advanceBy({ minutes: 5 });
+
+    // Then the result is in the order the items were in.
+    assertObjectEquals(await outputOf(simAws, executionArn), [
+      { id: "wei", wait: 180 },
+      { id: "mei", wait: 120 },
+      { id: "jun", wait: 60 },
+    ]);
+  });
+
   it("builds each iteration's input from the ItemSelector", async () => {
     // Given a Map state whose ItemSelector reads the item, its index and the
     // state's own input, and a task that answers with what it was given.

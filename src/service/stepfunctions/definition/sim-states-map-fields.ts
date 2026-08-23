@@ -24,7 +24,10 @@ export function readSimStatesItemSelector(
     );
   }
 
-  const written = selector ?? parameters;
+  // A field written as null is a Payload Template that is not an object, and
+  // is refused below. Falling back to the other spelling would take it for a
+  // Map state that carries neither.
+  const written = selector === undefined ? parameters : selector;
 
   if (written === undefined) {
     return {};
