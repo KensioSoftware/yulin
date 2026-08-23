@@ -85,6 +85,34 @@ describe("S3 PutObjectCommand system metadata", () => {
     assertIdentical(objectOut.ContentType, "text/css");
   });
 
+  it("keeps a user metadata key that names a header S3 sets itself", async () => {
+    // Given a Bucket.
+    const simS3 = new SimAws().s3();
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
+
+    // When an Object is written with a user metadata key called content-type,
+    // and no content type of its own.
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "bucket-a",
+        Key: "notes.txt",
+        Body: "nothing to say",
+        Metadata: { "content-type": "whatever the caller meant" },
+      }),
+    );
+
+    // Then the two stay apart. Real S3 carries user metadata under
+    // `x-amz-meta-`, so a caller's key can name a header S3 sets itself
+    // without becoming it.
+    const objectOut = await simS3.getObject(
+      new GetObjectCommand({ Bucket: "bucket-a", Key: "notes.txt" }),
+    );
+    assertObjectEquals(objectOut.Metadata, {
+      "content-type": "whatever the caller meant",
+    });
+    assertIdentical(objectOut.ContentType, "binary/octet-stream");
+  });
+
   it("reports the type S3 gives an Object that was written without one", async () => {
     // Given a Bucket.
     const simS3 = new SimAws().s3();

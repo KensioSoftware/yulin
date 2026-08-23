@@ -1,5 +1,6 @@
 import {
   simS3SystemMetadataHeaders,
+  simS3UserMetadataPrefix,
   type SimS3SystemMetadataField,
   type SimS3SystemMetadataHeader,
 } from "./s3-system-metadata.js";
@@ -89,13 +90,24 @@ export function simS3SystemMetadataHeadersFrom(
 }
 
 /**
- * Whether a metadata key is one of the headers S3 keeps about an Object.
+ * The metadata a caller attached to an Object, under the keys it used.
  *
- * What is left over is the user-defined metadata. That is the whole of what
- * real S3 answers a read's `Metadata` with.
+ * Stored under the `x-amz-meta-` prefix and answered without it, which is what
+ * real S3 does with a read's `Metadata`. A key naming a header S3 sets itself
+ * survives the round trip and stays out of the Object's own fields.
  */
-export function isSimS3SystemMetadataHeader(key: string): boolean {
-  return simS3SystemMetadataHeaders.some((header) => header.name === key);
+export function simS3UserDefinedMetadata(
+  headers: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const metadata: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.startsWith(simS3UserMetadataPrefix)) {
+      metadata[key.slice(simS3UserMetadataPrefix.length)] = value;
+    }
+  }
+
+  return metadata;
 }
 
 /** The output field a stored header is reported in. */
