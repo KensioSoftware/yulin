@@ -168,6 +168,28 @@ describe("Simulated Step Functions Map", () => {
     ]);
   });
 
+  it("reads the older spellings CDK still writes", async () => {
+    // Given a Map state written with Iterator and Parameters, as CDK writes
+    // one built through its deprecated call and property.
+    const simAws = new SimAws();
+    const executionArn = await runWorkflow(simAws, {
+      Type: "Map",
+      ItemsPath: "$.students",
+      Parameters: { "id.$": "$$.Map.Item.Value.id", "term.$": "$.term" },
+      Iterator: echoing,
+      End: true,
+    });
+
+    // When it runs, Iterator ran as the item processor and Parameters built
+    // each iteration's input.
+    assertObjectEquals(await outputOf(simAws, executionArn), [
+      { id: "wei", term: 3 },
+      { id: "mei", term: 3 },
+      { id: "jun", term: 3 },
+      { id: "lan", term: 3 },
+    ]);
+  });
+
   it("answers with an empty array where there are no items", async () => {
     // Given a Map state over an array holding nothing.
     const simAws = new SimAws();
