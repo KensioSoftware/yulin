@@ -21,7 +21,8 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  * - a missing storage entry becomes the S3 NoSuchKey error;
  * - the stored Buffer, or the part of it the read asked for, becomes the
  *   readable response body;
- * - stored metadata becomes SDK response metadata;
+ * - what S3 was told about the Object becomes the response's own fields, and
+ *   what the caller attached to it becomes the response metadata;
  * - the Object's content hash and write time become its ETag and LastModified.
  *
  * Bucket resolution remains in the command handler because AWS request ordering
@@ -50,8 +51,9 @@ export class GetObjectLoader {
         : object.body.subarray(range.start, range.end + 1);
 
     return {
+      ...object.metadata.system,
       Body: Readable.from([body]),
-      Metadata: object.metadata.values,
+      Metadata: object.metadata.userDefined,
       // The ETag identifies the Object rather than the bytes being sent. A
       // client reading it in pieces compares the value across them to see
       // whether the Object changed underneath it.

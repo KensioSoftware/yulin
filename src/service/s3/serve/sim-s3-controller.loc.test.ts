@@ -47,9 +47,7 @@ describe("Simulated S3 local HTTP controller", () => {
         Bucket: "foo-site",
         Key: "index.html",
         Body: "<h1>Hello, world!</h1>",
-        Metadata: {
-          "content-type": "text/html; charset=utf-8",
-        },
+        ContentType: "text/html; charset=utf-8",
       }),
     );
 
@@ -88,9 +86,7 @@ describe("Simulated S3 local HTTP controller", () => {
         Bucket: "head-site",
         Key: "index.html",
         Body: "<h1>Hello, world!</h1>",
-        Metadata: {
-          "content-type": "text/html; charset=utf-8",
-        },
+        ContentType: "text/html; charset=utf-8",
       }),
     );
 
@@ -130,9 +126,7 @@ describe("Simulated S3 local HTTP controller", () => {
         Bucket: "encoded-path-site",
         Key: "folder/hello world.txt",
         Body: "Hello from an encoded path",
-        Metadata: {
-          "content-type": "text/plain; charset=utf-8",
-        },
+        ContentType: "text/plain; charset=utf-8",
       }),
     );
 
@@ -166,9 +160,7 @@ describe("Simulated S3 local HTTP controller", () => {
         Bucket: "folder-index-redirect-site",
         Key: "docs/index.html",
         Body: "<h1>Docs index</h1>",
-        Metadata: {
-          "content-type": "text/html; charset=utf-8",
-        },
+        ContentType: "text/html; charset=utf-8",
       }),
     );
 
@@ -206,9 +198,7 @@ describe("Simulated S3 local HTTP controller", () => {
         Bucket: "folder-index-follow-site",
         Key: "docs/index.html",
         Body: "<h1>Docs index after redirect</h1>",
-        Metadata: {
-          "content-type": "text/html; charset=utf-8",
-        },
+        ContentType: "text/html; charset=utf-8",
       }),
     );
 

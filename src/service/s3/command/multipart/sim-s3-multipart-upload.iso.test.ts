@@ -209,11 +209,11 @@ describe("Simulated S3 multipart upload", () => {
     );
 
     // Then the Object carries it, as one written by a PutObject would: the
-    // system metadata under the header names a read hands back, and the
+    // system metadata in the fields a read describes an Object with, and the
     // user-defined metadata as it was given.
+    assertIdentical(read.ContentType, "text/html");
+    assertIdentical(read.CacheControl, "max-age=60");
     assertDefined(read.Metadata, "the read Object metadata");
-    assertIdentical(read.Metadata["content-type"], "text/html");
-    assertIdentical(read.Metadata["cache-control"], "max-age=60");
     assertIdentical(read.Metadata["author"], "yulin");
   });
 

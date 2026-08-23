@@ -1,5 +1,9 @@
 import { SimS3ObjectMetadata } from "./s3-object.js";
-import { simS3SystemMetadataHeaders } from "./s3-system-metadata.js";
+import {
+  simS3DefaultContentType,
+  simS3SystemMetadataHeaders,
+  simS3UserMetadataPrefix,
+} from "./s3-system-metadata.js";
 
 /**
  * The metadata members of a request that says what an Object is.
@@ -26,16 +30,25 @@ export interface SimS3ObjectWriteMetadata {
 /**
  * Convert the metadata members of a write into what an Object stores.
  *
- * User-defined metadata is retained as supplied. System metadata is read by
- * the same list of headers a read returns, under the lowercase key that read
- * looks the value up by, so a write and a read agree on what S3 remembers
- * about an Object. An omitted header leaves its key absent rather than
- * assigning an undefined value.
+ * User-defined metadata is stored under the `x-amz-meta-` prefix S3 carries it
+ * with, which keeps a caller's own `content-type` key apart from the Object's
+ * content type. System metadata is read by the same list of headers a read
+ * returns, under the lowercase key that read looks the value up by, so a write
+ * and a read agree on what S3 remembers about an Object. An omitted header
+ * leaves its key absent rather than assigning an undefined value.
+ *
+ * Content type is the exception, because S3 gives an Object one whether the
+ * write named it or not.
  */
 export function simS3WriteMetadata(
   input: SimS3ObjectWriteMetadata,
 ): SimS3ObjectMetadata {
-  const metadata: Record<string, string> = { ...input.Metadata };
+  const metadata: Record<string, string> = {};
+  const userDefined = Object.entries(input.Metadata ?? {});
+
+  for (const [key, value] of userDefined) {
+    metadata[`${simS3UserMetadataPrefix}${key}`] = value;
+  }
 
   for (const header of simS3SystemMetadataHeaders) {
     const value = metadataValue(input[header.field]);
@@ -44,6 +57,8 @@ export function simS3WriteMetadata(
       metadata[header.name] = value;
     }
   }
+
+  metadata["content-type"] ??= simS3DefaultContentType;
 
   return new SimS3ObjectMetadata(metadata);
 }

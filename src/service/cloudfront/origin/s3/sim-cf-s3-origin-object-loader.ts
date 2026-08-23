@@ -2,10 +2,8 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3BucketName } from "../../../s3/bucket/sim-s3-bucket.js";
 import type { SimS3RequestOptions } from "../../../s3/command/sim-s3-request-options.js";
 import { SimS3NoSuchKey } from "../../../s3/error/sim-s3.error.js";
-import {
-  SimS3Object,
-  SimS3ObjectMetadata,
-} from "../../../s3/object/s3-object.js";
+import { SimS3Object } from "../../../s3/object/s3-object.js";
+import { simS3WriteMetadata } from "../../../s3/object/s3-write-metadata.js";
 import type { SimS3 } from "../../../s3/sim-s3.js";
 import { simS3BodyToBuffer } from "../../../s3/storage/s3-body-buffer.js";
 import type { SimCfS3OriginBucket } from "./sim-cf-s3-origin-bucket.js";
@@ -49,10 +47,14 @@ export class SimCfS3OriginObjectLoader {
         requestOptions,
       );
 
+      // A read answers with the same metadata members a write carries, so the
+      // Object the Origin serves is rebuilt from them the way one being stored
+      // would be. Reading only `Metadata` would drop the content type and the
+      // encoding, and the Distribution would serve bytes no client can decode.
       return new SimS3Object({
         key: objectKey,
         body: await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
-        metadata: new SimS3ObjectMetadata({ ...output.Metadata }),
+        metadata: simS3WriteMetadata(output),
       });
     } catch (error) {
       if (error instanceof SimS3NoSuchKey) {

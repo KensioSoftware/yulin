@@ -60,6 +60,25 @@ export const simS3SystemMetadataHeaders: readonly SimS3SystemMetadataHeader[] =
   ];
 
 /**
+ * The prefix S3 carries user-defined metadata under.
+ *
+ * It is what keeps a caller's own key from colliding with a header S3 sets
+ * itself. A write attaching `content-type` as user metadata is stored under
+ * `x-amz-meta-content-type` and is a different thing from the Object's content
+ * type.
+ */
+export const simS3UserMetadataPrefix = "x-amz-meta-";
+
+/**
+ * The type S3 gives an Object whose write named none.
+ *
+ * S3 guesses nothing from the key, so a `.txt` file uploaded without a content
+ * type is served as bytes. Tooling that appears to guess, such as `aws s3
+ * sync`, sets the header itself before the upload.
+ */
+export const simS3DefaultContentType = "binary/octet-stream";
+
+/**
  * Read system metadata written as headers back into the fields it is declared
  * with.
  *

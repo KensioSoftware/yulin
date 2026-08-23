@@ -1,4 +1,5 @@
 import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-headers.js";
+import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-read.js";
 
 /**
  * The responses a HEAD is answered with.
@@ -20,7 +21,7 @@ export function simS3HeadObjectResponse(
   return new Response(undefined, {
     status: 200,
     headers: simS3ObjectResponseHeaders({
-      metadata: output["Metadata"] as Record<string, string> | undefined,
+      metadata: simS3SystemMetadataHeadersFrom(output),
       bodyLength: (output["ContentLength"] as number | undefined) ?? 0,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,
