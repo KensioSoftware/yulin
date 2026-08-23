@@ -1,5 +1,5 @@
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
-import type { SimLambdaEdgeDistributionConfig } from "../../edge/adapter/sim-lambda-edge-event-adapter.js";
+import type { SimLambdaEdgeDistributionConfig } from "../../edge/adapter/sim-lambda-edge-event-config.js";
 
 /**
  * What an edge function is told about the Distribution it is running for.

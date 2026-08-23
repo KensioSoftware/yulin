@@ -1,16 +1,10 @@
-import { randomUUID } from "node:crypto";
-
 import type { LambdaAtEdge } from "../../typings/lambda-at-edge.namespace.js";
+import {
+  edgeEventConfig,
+  type SimLambdaEdgeDistributionConfig,
+} from "./sim-lambda-edge-event-config.js";
 import { SimLambdaEdgeRequestAdapter } from "./sim-lambda-edge-request-adapter.js";
 import { SimLambdaEdgeResponseAdapter } from "./sim-lambda-edge-response-adapter.js";
-
-/**
- * Which Distribution an edge function is told it is running for.
- */
-export interface SimLambdaEdgeDistributionConfig {
-  readonly distributionId: string;
-  readonly distributionDomainName: string;
-}
 
 /**
  * Converts between native Fetch API Request and Response objects and the
@@ -32,7 +26,7 @@ export class SimLambdaEdgeEventAdapter {
       Records: [
         {
           cf: {
-            config: this.config(distribution, "viewer-request"),
+            config: edgeEventConfig(distribution, "viewer-request"),
             request: await this.requestAdapter.toEdgeRequest(
               request,
               includeBody,
@@ -59,7 +53,7 @@ export class SimLambdaEdgeEventAdapter {
       Records: [
         {
           cf: {
-            config: this.config(distribution, "viewer-response"),
+            config: edgeEventConfig(distribution, "viewer-response"),
             request: await this.requestAdapter.toEdgeRequest(request, false),
             response: this.responseAdapter.toEdgeResponse(response),
           },
@@ -84,28 +78,16 @@ export class SimLambdaEdgeEventAdapter {
   }
 
   /**
-   * Read what a viewer-response handler answered with.
+   * Read what a viewer-response or origin-response handler answered with.
    */
   fromResponseResult(
     result: LambdaAtEdge.Response,
     originalResponse: Response,
   ): Response {
-    return this.responseAdapter.fromEdgeViewerResponse(
+    return this.responseAdapter.fromEdgeHandlerResponse(
       result,
       originalResponse,
     );
-  }
-
-  private config<TEvent extends LambdaAtEdge.EventType>(
-    distribution: SimLambdaEdgeDistributionConfig,
-    eventType: TEvent,
-  ): LambdaAtEdge.Config & { eventType: TEvent } {
-    return {
-      distributionId: distribution.distributionId,
-      distributionDomainName: distribution.distributionDomainName,
-      eventType,
-      requestId: randomUUID(),
-    };
   }
 }
 

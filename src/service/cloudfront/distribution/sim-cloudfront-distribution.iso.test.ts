@@ -129,7 +129,11 @@ describe("SimCloudFrontDistribution", () => {
 });
 
 function makeOrigin(): SimCloudFrontOrigin {
-  return {
+  const origin: SimCloudFrontOrigin = {
     fetch: () => Promise.resolve(new Response("ok")),
+    toEdgeOrigin: () => ({}),
+    withEdgeOrigin: () => origin,
   };
+
+  return origin;
 }

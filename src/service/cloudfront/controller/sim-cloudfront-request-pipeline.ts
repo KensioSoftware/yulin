@@ -5,10 +5,10 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
  * Runs a single simulated CloudFront request through its lifecycle:
  * route to a Distribution, put the request through the Distribution's web ACL,
  * apply the default root object, resolve the matching Behavior, run
- * viewer-request hooks, fetch from the Origin, replace an error response with
- * the Distribution's custom error page, apply the Behavior's response headers
- * policy, then run viewer-response hooks where the Origin did not answer with
- * an error.
+ * viewer-request hooks, fetch from the Origin with the origin hooks either
+ * side of the fetch, replace an error response with the Distribution's custom
+ * error page, apply the Behavior's response headers policy, then run
+ * viewer-response hooks where the Origin did not answer with an error.
  *
  * A viewer hook is a CloudFront Function or a Lambda@Edge function. A Behavior
  * carries at most one of the two kinds at the viewer events, which
@@ -85,7 +85,11 @@ export class SimCloudFrontRequestPipeline {
     }
     requestReference = edgeResult;
 
-    const originResponse = await this.stages.originFetcher.fetch(
+    // Fetch from the Origin, running the origin-request and origin-response
+    // Lambda@Edge functions on either side of the fetch. An origin-request
+    // function that answered with a response of its own leaves the Origin
+    // unread, and the response takes the Origin response's place from here on.
+    const originResult = await this.stages.originStage.fetch(
       requestReference,
       distro,
       behaviour,
@@ -96,7 +100,7 @@ export class SimCloudFrontRequestPipeline {
     const errorResponse = await this.stages.customErrorResponder.apply(
       requestReference,
       distro,
-      originResponse,
+      originResult.response,
     );
 
     // Apply the Behavior's response headers policy, if it names one. CloudFront
@@ -112,9 +116,10 @@ export class SimCloudFrontRequestPipeline {
 
     // CloudFront runs no viewer-response function when the Origin answered
     // 400 or higher, for either kind of function. The status that decides it
-    // is the one the Origin returned, so a custom error response carrying
-    // `ResponseCode: 200` above does not bring the function back.
-    if (originResponse.status >= 400) {
+    // is the one the Origin returned, so neither a custom error response
+    // carrying `ResponseCode: 200` above nor an origin-response function that
+    // replaced the status brings the function back.
+    if (originResult.originStatus >= 400) {
       return response;
     }
 

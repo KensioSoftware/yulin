@@ -43,6 +43,55 @@ export declare namespace LambdaAtEdge {
     querystring: string;
     headers: Headers;
     body?: Body;
+    /**
+     * The Origin the request is on its way to, present at an origin event and
+     * absent at a viewer event.
+     */
+    origin?: Origin;
+  }
+
+  /**
+   * A custom Origin as an origin event presents it.
+   */
+  export interface CustomOrigin {
+    /** The Origin's own headers, keyed by lowercase name. */
+    customHeaders: Headers;
+    domainName: string;
+    keepaliveTimeout: number;
+    /** The Origin path, which goes in front of `request.uri`. */
+    path: string;
+    port: number;
+    protocol: "http" | "https";
+    readTimeout: number;
+    sslProtocols: string[];
+  }
+
+  /**
+   * An S3 Origin as an origin event presents it.
+   */
+  export interface S3Origin {
+    /** Whether CloudFront signs what it reads from the Bucket. */
+    authMethod: "origin-access-identity" | "none";
+    customHeaders: Headers;
+    domainName: string;
+    /** The Origin path, which goes in front of the object key. */
+    path: string;
+    region: string;
+  }
+
+  /**
+   * The Origin a request is on its way to, one kind or the other.
+   */
+  export interface Origin {
+    custom?: CustomOrigin;
+    s3?: S3Origin;
+  }
+
+  /**
+   * A request at an origin event, which always carries the Origin.
+   */
+  export interface OriginRequest extends Request {
+    origin: Origin;
   }
 
   export interface Response {
@@ -54,7 +103,11 @@ export declare namespace LambdaAtEdge {
     bodyEncoding?: "text" | "base64";
   }
 
-  export type EventType = "viewer-request" | "viewer-response";
+  export type EventType =
+    | "viewer-request"
+    | "viewer-response"
+    | "origin-request"
+    | "origin-response";
 
   export interface Config {
     distributionDomainName: string;
@@ -78,6 +131,21 @@ export declare namespace LambdaAtEdge {
     };
   }
 
+  export interface OriginRequestRecord {
+    cf: {
+      config: Config & { eventType: "origin-request" };
+      request: OriginRequest;
+    };
+  }
+
+  export interface OriginResponseRecord {
+    cf: {
+      config: Config & { eventType: "origin-response" };
+      request: OriginRequest;
+      response: Response;
+    };
+  }
+
   export interface RequestEvent {
     Records: [RequestRecord];
   }
@@ -86,10 +154,22 @@ export declare namespace LambdaAtEdge {
     Records: [ResponseRecord];
   }
 
-  export type Event = RequestEvent | ResponseEvent;
+  export interface OriginRequestEvent {
+    Records: [OriginRequestRecord];
+  }
+
+  export interface OriginResponseEvent {
+    Records: [OriginResponseRecord];
+  }
+
+  export type Event =
+    | RequestEvent
+    | ResponseEvent
+    | OriginRequestEvent
+    | OriginResponseEvent;
 
   /**
-   * What a viewer-request handler answers with.
+   * What a request handler answers with, at the viewer or at the Origin.
    *
    * Returning the request carries on to the origin with whatever the handler
    * changed. Returning a response answers the viewer there and then.

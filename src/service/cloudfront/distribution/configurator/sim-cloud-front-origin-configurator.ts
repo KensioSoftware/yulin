@@ -67,6 +67,7 @@ export class SimCloudFrontOriginConfigurator {
         origin.Id,
         new SimCloudFrontS3Origin({
           originBucket,
+          domainName: origin.DomainName,
           originPath: origin.OriginPath,
           ...(originAccessControl !== undefined && { originAccessControl }),
         }),

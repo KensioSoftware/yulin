@@ -2,9 +2,9 @@ import type { LambdaAtEdge } from "../../typings/lambda-at-edge.namespace.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimLambdaEdgeEventAdapter } from "../../edge/adapter/sim-lambda-edge-event-adapter.js";
-import type { SimCfEdgeAssociation } from "../../edge/sim-cf-edge-association.js";
 import type { SimCfEdgeFunctions } from "../../edge/sim-cf-edge-functions.js";
 import { simCfEdgeDistributionConfig } from "./sim-lambda-edge-distribution.js";
+import { runEdgeFunction } from "./sim-lambda-edge-run.js";
 
 interface SimLambdaEdgeApplicatorProperties {
   /**
@@ -17,7 +17,9 @@ interface SimLambdaEdgeApplicatorProperties {
 }
 
 /**
- * Runs the Lambda@Edge functions a resolved Behavior associates.
+ * Runs the Lambda@Edge functions a resolved Behavior associates at the viewer
+ * events. `SimLambdaEdgeOriginApplicator` runs the two either side of the
+ * Origin fetch.
  *
  * A function that throws answers the viewer with a 502 and takes the request
  * no further, which is what CloudFront does with a failed edge function. The
@@ -50,7 +52,7 @@ export class SimLambdaEdgeApplicator {
       return request;
     }
 
-    return await this.running(association, async () => {
+    return await runEdgeFunction(association, async () => {
       const event = await this.eventAdapter.toRequestEvent(
         request,
         association.includeBody,
@@ -83,7 +85,7 @@ export class SimLambdaEdgeApplicator {
       return response;
     }
 
-    return await this.running(association, async () => {
+    return await runEdgeFunction(association, async () => {
       const event = await this.eventAdapter.toResponseEvent(
         request,
         response,
@@ -98,28 +100,5 @@ export class SimLambdaEdgeApplicator {
         response,
       );
     });
-  }
-
-  /**
-   * Run one edge function, answering with the 502 a failed one gets.
-   *
-   * A handler that threw, a handler that answered with something the adapter
-   * cannot read as a request or a response, and a request whose body could not
-   * be read into the event, are all the same thing to CloudFront. Each is a
-   * failure at the edge the viewer sees as a 502, which is why building the
-   * event happens in here rather than before it.
-   */
-  private async running<TResult extends Request | Response>(
-    association: SimCfEdgeAssociation,
-    run: () => Promise<TResult>,
-  ): Promise<TResult | Response> {
-    try {
-      return await run();
-    } catch {
-      return new Response(
-        `The Lambda@Edge function ${association.functionArn} failed`,
-        { status: 502 },
-      );
-    }
   }
 }

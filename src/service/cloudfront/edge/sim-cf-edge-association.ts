@@ -15,10 +15,13 @@ export interface SimCfEdgeAssociation {
 /**
  * The Lambda@Edge functions one cache Behavior runs, by event type.
  *
- * Only the two viewer events are here. The two origin events run either side
- * of the Origin fetch, which the request pipeline has no hook for yet.
+ * All four of CloudFront's events are here, in the order a request meets them:
+ * the two viewer events at the edge, and the two origin events either side of
+ * the Origin fetch.
  */
 export interface SimCfEdgeAssociations {
   readonly viewerRequest?: SimCfEdgeAssociation;
+  readonly originRequest?: SimCfEdgeAssociation;
+  readonly originResponse?: SimCfEdgeAssociation;
   readonly viewerResponse?: SimCfEdgeAssociation;
 }

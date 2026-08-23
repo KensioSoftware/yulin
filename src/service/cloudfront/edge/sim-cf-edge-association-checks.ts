@@ -11,20 +11,36 @@ import { SimCloudFrontInvalidLambdaFunctionAssociation } from "../error/sim-clou
  */
 
 /**
- * The event types this simulation runs a Lambda@Edge function at.
+ * The event types this simulation runs a Lambda@Edge function at, which are
+ * all four of CloudFront's own.
  */
-export type SimulatedEdgeEventType = "viewer-request" | "viewer-response";
+export type SimulatedEdgeEventType =
+  | "viewer-request"
+  | "origin-request"
+  | "origin-response"
+  | "viewer-response";
+
+/**
+ * The same event types to match a name against, in the order a request meets
+ * them.
+ */
+const simulatedEdgeEventTypes = new Set<string>([
+  "viewer-request",
+  "origin-request",
+  "origin-response",
+  "viewer-response",
+] satisfies SimulatedEdgeEventType[]);
 
 type BehaviorConfig =
   | SimCloudFrontDefaultCacheBehaviorConfig
   | SimCloudFrontCacheBehaviorConfig;
 
 /**
- * Refuse an event type this simulation has no hook for.
+ * Refuse an event type CloudFront has no such event for.
  *
- * CloudFront runs a Lambda@Edge function at all four events, and this runs one
- * at the two viewer events. An origin association is told so here rather than
- * being configured into a Behavior that would never run it.
+ * All four of CloudFront's own event types run here, so what this catches is a
+ * name that is not one of them, rather than one this simulation has no hook
+ * for.
  */
 export function assertSimulatedEventType(
   eventType: string | undefined,
@@ -34,9 +50,9 @@ export function assertSimulatedEventType(
   }
 
   throw new SimCloudFrontInvalidLambdaFunctionAssociation(
-    `Sim CloudFront Lambda@Edge association EventType ${eventType} is not ` +
-      `simulated. Simulated CloudFront runs a Lambda@Edge function at ` +
-      `viewer-request and viewer-response.`,
+    `Sim CloudFront Lambda@Edge association EventType ${eventType} is not a ` +
+      `CloudFront event type. A Lambda@Edge function runs at viewer-request, ` +
+      `origin-request, origin-response or viewer-response.`,
   );
 }
 
@@ -46,7 +62,7 @@ export function assertSimulatedEventType(
 export function isSimulatedEdgeEventType(
   eventType: string | undefined,
 ): eventType is SimulatedEdgeEventType {
-  return eventType === "viewer-request" || eventType === "viewer-response";
+  return eventType !== undefined && simulatedEdgeEventTypes.has(eventType);
 }
 
 /**

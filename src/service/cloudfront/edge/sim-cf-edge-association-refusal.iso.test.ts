@@ -5,6 +5,7 @@ import {
 } from "@kensio/smartass";
 import {
   CreateDistributionCommand,
+  type EventType,
   UpdateDistributionCommand,
 } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
@@ -90,20 +91,25 @@ describe("Simulated CloudFront Lambda@Edge association refusals", () => {
     assertStringIncludes(error.message, "AssumeRolePolicyDocument");
   });
 
-  it("refuses an origin event type, which this simulation does not run", async () => {
+  it("refuses an event type CloudFront has no such event for", async () => {
     const simAws = new SimAws();
     const functionArn = await makeEdgeFunctionVersionArn({
       simAws,
-      functionName: "origin-request-edge",
+      functionName: "unknown-event-edge",
       handler: (event: unknown) => event,
     });
 
     const error = await refusalFor(simAws, {
-      edge: [{ EventType: "origin-request", LambdaFunctionARN: functionArn }],
+      edge: [
+        {
+          EventType: "viewer-redirect" as EventType,
+          LambdaFunctionARN: functionArn,
+        },
+      ],
     });
 
-    assertStringIncludes(error.message, "origin-request");
-    assertStringIncludes(error.message, "not simulated");
+    assertStringIncludes(error.message, "viewer-redirect");
+    assertStringIncludes(error.message, "not a CloudFront event type");
   });
 
   it("refuses a Behavior mixing a CloudFront Function and Lambda@Edge at the viewer events", async () => {
