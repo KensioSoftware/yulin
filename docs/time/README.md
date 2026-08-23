@@ -243,7 +243,7 @@ follows the same rule where it builds events. A Function URL request carries sim
 An SQS event source mapping does the same. The `SentTimestamp` and
 `ApproximateFirstReceiveTimestamp` attributes on a delivered record are simulated time, and a
 handler reading the event's time reads the clock the test controls. See
-[simulated Lambda](../services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event source mapping docs").
+[simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event source mapping docs").
 
 Handler code that takes a clock as a dependency stays the most testable option, on real AWS and
 here, and needs none of the machinery above.
@@ -263,10 +263,10 @@ on a clock a test can control with `await simSdk.simAws.clock().advanceBy({ hour
 ## Limitations
 
 - Advancing the clock is the only thing that fires a scheduled
-  [EventBridge rule](../services/eventbridge/#rules-that-fire-on-a-schedule). Nothing runs on the
+  [EventBridge rule](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule). Nothing runs on the
   host's clock. A simulation left alone in real time fires nothing however long it is left.
 - Advancing the clock is also the only thing that fires an
-  [EventBridge Scheduler schedule](../services/scheduler/#firing-a-schedule), including a one-time
+  [EventBridge Scheduler schedule](https://yulinsim.dev/services/scheduler/#firing-a-schedule), including a one-time
   `at(...)` one.
 - Only `SimAws` exposes time control. Services constructed standalone, such as `new SimS3()`, get
   their own real clock and no way to move it.

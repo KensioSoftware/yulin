@@ -119,7 +119,7 @@ A timeout of zero gives the message straight back to the queue.
 `ChangeMessageVisibility` on a message whose timeout has already lapsed fails with
 `MessageNotInflight`. There is no timeout left to change, and real SQS answers the same way.
 
-See [simulated time](../../time/ "Simulated time docs") for what else the clock can do.
+See [simulated time](https://yulinsim.dev/time/ "Simulated time docs") for what else the clock can do.
 
 ## Receipt handles
 
@@ -621,7 +621,7 @@ entirely, and a statement conditioned on it matches nothing.
 
 A simulated S3 Bucket notifying a queue supplies both. The `ArnLike aws:SourceArn` condition CDK
 writes and the `StringEquals aws:SourceAccount` guard AWS documents are each enough on their own.
-See [Event notifications](../s3/#event-notifications) on the S3 page for the whole chain.
+See [Event notifications](https://yulinsim.dev/services/s3/#event-notifications) on the S3 page for the whole chain.
 
 A caller from another account needs both sides to allow the request, as it does on real AWS. The
 queue policy has to name the principal, and that principal's own account has to allow the action.
@@ -859,10 +859,10 @@ const invoked = await simAws
 console.log(Buffer.from(invoked.Payload ?? []).toString("utf8")); // "\"order-1\""
 ```
 
-See [simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles
+See [simulated Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs") for how function code and execution roles
 work. `SimSdk` interception works the same way. Intercepting `SQSClient` routes ordinary SDK code
 into the simulation with nothing touching the network, covered under
-[AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
+[AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs").
 
 ## Triggering a Lambda from a queue
 
@@ -984,7 +984,7 @@ the clock is what drives it:
 await simAws.clock().advanceBy({ seconds: 31 });
 ```
 
-See [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
+See [simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
 source mapping docs") for the event shape, partial batch failures, and the
 `AWS::Lambda::EventSourceMapping` template resource.
 
@@ -1064,7 +1064,7 @@ under the name the template gave it.
 
 The properties this simulation has no behaviour for are a different case. The queue is created without
 them and each one is recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 A stack full of queues still deploys. Those properties are `RedrivePolicy`, `RedriveAllowPolicy`,
 `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`,
 `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property
@@ -1176,7 +1176,7 @@ Current documented limitations:
 - `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are absent.
 - A Lambda event source mapping polls one batch at a time. Real Lambda runs several pollers at once
   and scales them with the queue, and what that concurrency does to ordering is invisible here. See
-  [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
+  [simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
 source mapping docs") for the rest of the mapping limitations.
 - `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` are the SQS resource types CloudFormation creates.
   Any other is reported as unsupported and skipped. A queue attribute outside the range real SQS

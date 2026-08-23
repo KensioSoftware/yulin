@@ -76,7 +76,7 @@ console.log(stack.stackName);
 `deployPlan` answers with the Stack and a report of what reading the plan made of it.
 
 The Stack is an ordinary simulated CloudFormation Stack, and everything the [CloudFormation
-docs](../services/cloudformation/ "Simulated CloudFormation usage docs") describe applies to it.
+docs](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation usage docs") describe applies to it.
 Resources are read with `stack.getResource(...)`, Outputs with `stack.output(...)`, and the whole
 thing is torn down with `stack.delete()`.
 

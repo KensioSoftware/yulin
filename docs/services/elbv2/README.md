@@ -6,10 +6,10 @@ authorized by simulated IAM. ELBv2-specific types are imported from the `@kensio
 subpath.
 
 A load balancer created here has a DNS name of the shape real ELB issues, and a
-[Route53](../route53/) record pointing at that name resolves to it. A request made to your own
+[Route53](https://yulinsim.dev/services/route53/) record pointing at that name resolves to it. A request made to your own
 hostname reaches the load balancer as it would deployed. A request is matched to a listener by port
 and then to one of that listener's rules, and a `forward` action sends it to a target group, where a
-registered [Lambda](../lambda/) function is invoked with the request and its response becomes the
+registered [Lambda](https://yulinsim.dev/services/lambda/) function is invoked with the request and its response becomes the
 HTTP response.
 
 Only the application load balancer is simulated. A network or gateway load balancer routes below
@@ -948,7 +948,7 @@ and a policy that is later removed stops the requests.
 
 ## Carrying a request to an ECS service
 
-An `ip` target group is answered by the simulated [ECS](../ecs/) service registered into it. A
+An `ip` target group is answered by the simulated [ECS](https://yulinsim.dev/services/ecs/) service registered into it. A
 service declares `loadBalancers` naming a target group, a container and a container port. Each task
 it keeps running is registered into that group as an address, and a request forwarded there reaches
 the handler bound to the service's container.
@@ -1174,7 +1174,7 @@ values in its event, since both are written by the same rules.
 ### Which container answers, and what a 503 means
 
 Which container of a task a request reaches is a deliberate divergence, documented in full under
-[the ECS service docs](../ecs/#which-container-of-a-task-answers). In short, real ECS routes to the
+[the ECS service docs](https://yulinsim.dev/services/ecs/#which-container-of-a-task-answers). In short, real ECS routes to the
 container the registration names on the port it names, the common real task puts an unsimulated
 proxy on that port, and the request here goes to a container that is bound.
 
@@ -1191,7 +1191,7 @@ as it goes no further on real AWS.
 
 ## Reaching a load balancer by name
 
-A load balancer's DNS name resolves through simulated [Route53](../route53/), and a record pointing
+A load balancer's DNS name resolves through simulated [Route53](https://yulinsim.dev/services/route53/), and a record pointing
 at it reaches its listeners and rules. An alias record is the usual way, and a CNAME below the apex
 works too, the same as on real AWS. The record's value is `DNSName` exactly as a describe reported
 it.
@@ -1545,7 +1545,7 @@ const unclaimed = await simElbV2Fetch(simAws, `http://${dnsName}/other`);
 console.log(unclaimed.status); // 404
 ```
 
-A listener's `Certificates` resolves against simulated [ACM](../acm/), and a stack that creates a
+A listener's `Certificates` resolves against simulated [ACM](https://yulinsim.dev/services/acm/), and a stack that creates a
 certificate and attaches it to an HTTPS listener works end to end. A certificate that was never
 issued, or that belongs to another account or region, fails the deployment outright. A `Fn::GetAtt`
 on `DNSName` is a name a Route53 alias in the same stack can point at and reach.
@@ -1653,7 +1653,7 @@ listener, a listener before its load balancer, and a target group after everythi
 
 ## IAM authorization
 
-Every operation is authorized by simulated [IAM](../iam/) as the caller making it, against the
+Every operation is authorized by simulated [IAM](https://yulinsim.dev/services/iam/) as the caller making it, against the
 `elasticloadbalancing:` action and the ARN of whatever it names. An operation that names no existing
 resource, such as `CreateLoadBalancer` or a describe, is authorized against `*`, and only a policy
 whose Resource is `*` allows it.
@@ -1730,7 +1730,7 @@ try {
 ## AWS SDK interception
 
 An `ElasticLoadBalancingV2Client` can be intercepted so ordinary SDK code reaches the simulation
-without being handed a simulator object. See [AWS SDK interception](../../sdk/) for how that works.
+without being handed a simulator object. See [AWS SDK interception](https://yulinsim.dev/sdk/) for how that works.
 
 ```typescript sim-elbv2-sdk-interception
 /**
@@ -1817,7 +1817,7 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - Requests are never shared between the targets of a group. An ECS service's desired count is state
   and not concurrency, and a group holding three targets calls one container handler.
 - Which container of an ECS task a request reaches diverges from real ECS on purpose, and is
-  documented under [the ECS docs](../ecs/#which-container-of-a-task-answers).
+  documented under [the ECS docs](https://yulinsim.dev/services/ecs/#which-container-of-a-task-answers).
 - A redirect goes unchecked against the listener it is on, and redirecting HTTPS to HTTP is accepted
   where real ELB refuses it. Nothing here performs TLS, and the listener's protocol says nothing
   about what a request really arrived over.
@@ -1847,7 +1847,7 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   `https:` URL. The port such a request carries belongs to the local server, and cannot say which
   listener it is for. To reach a listener on another port over localhost, serve on that port and
   request the hostname without the suffix, which needs a resolver pointed at the simulator as
-  described in [Route53](../route53/README.md#ports).
+  described in [Route53](https://yulinsim.dev/services/route53/#ports).
 - A DNS lookup for a name pointing at a load balancer that has been deleted still answers with the
   local server address, because a load balancer host name is recognised by its shape. The request
   that follows is the thing that fails, naming the host name nothing answers on.

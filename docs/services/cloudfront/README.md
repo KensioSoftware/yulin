@@ -377,7 +377,7 @@ A test that needs no browser can skip the port. `SimAwsHttp` answers the same re
 process, with no server listening and no URL to adapt. An alternate domain name a simulated Route53
 answers for is requested by its own name, and `simAwsHttp.fetch("https://cdn.example.test/")` reaches
 the Distribution behind it. See
-[requests without a port](../../serve/#requests-without-a-port "Requests without a port docs").
+[requests without a port](https://yulinsim.dev/serve/#requests-without-a-port "Requests without a port docs").
 
 ## Custom Origins
 
@@ -1143,7 +1143,7 @@ export function handler(event) {
 CloudFront Functions run JS2, ECMAScript 5.1 plus a named subset of ES 6 to 12. It refuses
 constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs that report those
 refusals in the editor, ahead of publication. See
-[Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
+[Linting CloudFront Functions JS2](https://yulinsim.dev/lint/ "CloudFront Functions JS2 lint config usage docs").
 
 CloudFront also caps Function code at 10 KB, counted on the source as uploaded, comments and all.
 Simulated `CreateFunction` refuses anything larger with `FunctionSizeLimitExceeded`, as the real
@@ -1214,7 +1214,7 @@ The defaults describe a request for `/cloudfront/` reaching the Distribution, wi
 that asked for it as well as the response, and the response's own defaults are a status code and no
 headers.
 
-The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+The [event factories page](https://yulinsim.dev/factories/ "Test factories for AWS event shapes usage docs")
 covers what the factories have in common.
 
 ## Simulated Lambda@Edge
@@ -1672,7 +1672,7 @@ Origin.
 CloudFront takes its web ACL this way. WAFv2's `AssociateWebACL` covers the regional resource types.
 
 The web ACL has to be a `CLOUDFRONT` scope one, created in `us-east-1` (see
-[scopes](../wafv2/README.md#scopes)). A `WebACLId` naming a `REGIONAL` web ACL, or one this
+[scopes](https://yulinsim.dev/services/wafv2/#scopes)). A `WebACLId` naming a `REGIONAL` web ACL, or one this
 simulation never created, is refused with `InvalidWebACLId` at `CreateDistribution` and at
 `UpdateDistribution`.
 
@@ -1808,7 +1808,7 @@ try {
 }
 ```
 
-See [simulated WAFv2](../wafv2/README.md) for what a rule can inspect and how a blocked request is
+See [simulated WAFv2](https://yulinsim.dev/services/wafv2/) for what a rule can inspect and how a blocked request is
 answered.
 
 ## Response headers policies

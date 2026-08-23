@@ -8,7 +8,7 @@ are authorized by simulated IAM, as on real Lambda.
 
 Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath. Real `LambdaClient`
 instances can be routed into sim Lambda with
-[SDK interception](../../sdk/ "Simulated AWS SDK interception docs").
+[SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK interception docs").
 
 ## Creating and invoking a function
 
@@ -178,7 +178,7 @@ runs here. Its `Metrics` writes its embedded metric format document to standard 
 metrics a handler emitted can be read back the same way its log lines can.
 
 What a handler prints is recorded into the function's log group in
-[simulated CloudWatch Logs](../logs/ "Simulated CloudWatch Logs usage docs"), at
+[simulated CloudWatch Logs](https://yulinsim.dev/services/logs/ "Simulated CloudWatch Logs usage docs"), at
 `/aws/lambda/<function name>`. A test asserts on it by searching that group:
 
 ```typescript
@@ -623,10 +623,10 @@ difference which client the handler was written with.
 
 Two kinds of hostname are served. Everything simulated Route53 resolves is answered over the same
 in-process HTTP entry point a browser on localhost reaches. That covers a
-[Cognito user pool domain](../cognito/ "Simulated Cognito usage docs") in both of its forms
+[Cognito user pool domain](https://yulinsim.dev/services/cognito/ "Simulated Cognito usage docs") in both of its forms
 (`<prefix>.auth.<region>.amazoncognito.com` and a custom domain such as `auth.example.com`), an
-[API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway usage docs"), a
-[load balancer](../elbv2/ "Simulated ELBv2 usage docs") and anything a hosted-zone record points at
+[API Gateway HTTP API](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway usage docs"), a
+[load balancer](https://yulinsim.dev/services/elbv2/ "Simulated ELBv2 usage docs") and anything a hosted-zone record points at
 one of those.
 
 The AWS service API endpoints are the other kind, and a request to one is read for what it carries.
@@ -782,7 +782,7 @@ The pool's OpenID configuration is served at the same endpoint, at
 `/<userPoolId>/.well-known/openid-configuration`. Its `issuer` and `jwks_uri` name the local
 hostname the simulation answered on, and a handler that discovered the document can fetch the keys
 it points at. See
-[serving a pool's JWKS](../cognito/#serving-a-pools-jwks-on-localhost "Simulated Cognito usage docs").
+[serving a pool's JWKS](https://yulinsim.dev/services/cognito/#serving-a-pools-jwks-on-localhost "Simulated Cognito usage docs").
 
 A Command the same function sends still reaches simulated Cognito. An SDK bundled into the
 deployment package addresses `cognito-idp.<region>.amazonaws.com` as well, and its requests carry
@@ -1132,7 +1132,7 @@ ARN. A `FunctionName` carrying a qualifier (`orders:live`) is refused with an
 
 ## Triggering a function from an SQS queue
 
-An event source mapping connects a [simulated queue](../sqs/ "Simulated SQS docs") to a function.
+An event source mapping connects a [simulated queue](https://yulinsim.dev/services/sqs/ "Simulated SQS docs") to a function.
 Messages sent to the queue are delivered to the handler as an SQS event, with the `Records` shape
 real Lambda uses.
 
@@ -1377,7 +1377,7 @@ await simAws.clock().advanceBy({ seconds: 31 });
 
 A queue with a `RedrivePolicy` eventually gives up on a message the handler keeps throwing on and
 moves it to the dead-letter queue, exactly as it would for any other failing consumer. See
-[dead-letter queues](../sqs/#dead-letter-queues "Simulated SQS dead-letter queue docs").
+[dead-letter queues](https://yulinsim.dev/services/sqs/#dead-letter-queues "Simulated SQS dead-letter queue docs").
 
 The handler error itself goes unreported to whoever sent the message, as it does on real AWS. What
 the sender sees is the message coming back.
@@ -1470,7 +1470,7 @@ a template naming one is refused. The same Resource deploys a
 
 ## Triggering a function from a DynamoDB stream
 
-An event source mapping also connects a [simulated table's stream](../dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs")
+An event source mapping also connects a [simulated table's stream](https://yulinsim.dev/services/dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs")
 to a function. Changes to the table are delivered to the handler as a DynamoDB stream event, with
 the `Records` shape real Lambda uses.
 
@@ -1638,7 +1638,7 @@ Each record carries `eventID`, `eventName`, `eventVersion`, `eventSource`, `awsR
 since the epoch. A time to live removal also carries
 `userIdentity: { type: "Service", principalId: "dynamodb.amazonaws.com" }`. A handler tells an
 expiry from a deletion the application asked for by that. The event lower-cases those two fields
-where [the Streams API capitalizes them](../dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs").
+where [the Streams API capitalizes them](https://yulinsim.dev/services/dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs").
 
 `SimLambdaDynamoDbStreamEvent` and `SimLambdaDynamoDbStreamEventRecord` are exported from
 `@kensio/yulin/lambda` for typing a handler, and are minimal structural equivalents of the
@@ -1647,7 +1647,7 @@ where [the Streams API capitalizes them](../dynamodb/#reading-a-streams-records 
 A binary attribute reaches the handler as a base64 string, as it does on AWS. The event arrives as
 JSON, and JSON has no bytes. `Buffer.from(value.B, "base64")`
 therefore reads the same here as it does deployed. The
-[Streams API](../dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs") hands out
+[Streams API](https://yulinsim.dev/services/dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs") hands out
 bytes for the same attribute, because its client decodes them. Nesting makes no difference, and
 binary inside a list or a map is encoded too.
 
@@ -1799,7 +1799,7 @@ on it should say what it expects.
 
 `AWS::Lambda::EventSourceMapping` deploys a stream mapping too. `EventSourceArn` takes the
 `Fn::GetAtt … StreamArn` of a
-[streamed table](../dynamodb/#deploying-a-table-with-a-stream "Simulated DynamoDB table stream in CloudFormation docs")
+[streamed table](https://yulinsim.dev/services/dynamodb/#deploying-a-table-with-a-stream "Simulated DynamoDB table stream in CloudFormation docs")
 in the same template. That reference is also what makes the mapping wait for the table.
 `StartingPosition` is required, as it is for an SDK caller, and the properties go to
 `CreateEventSourceMapping` unjudged. A template that gets one wrong is refused in the words the
@@ -1933,7 +1933,7 @@ Write the grant as an inline policy, as the example above and CDK both do.
 
 ## Triggering a function from a Kinesis stream
 
-An event source mapping also connects a [simulated Kinesis stream](../kinesis/ "Simulated Kinesis Data Streams docs")
+An event source mapping also connects a [simulated Kinesis stream](https://yulinsim.dev/services/kinesis/ "Simulated Kinesis Data Streams docs")
 to a function. Records put onto the stream are delivered to the handler as a Kinesis event, with the
 `Records` shape real Lambda uses.
 
@@ -2066,7 +2066,7 @@ than within one shard. `invokeIdentityArn` is the execution role the records wer
 The two translations worth knowing are the payload and the instant. `data` is base64 of the bytes
 that were put, because the event is JSON and JSON has no bytes, and `approximateArrivalTimestamp` is
 seconds since the epoch where
-[the Kinesis API](../kinesis/#putting-a-record-and-reading-it-back "Simulated Kinesis docs") hands
+[the Kinesis API](https://yulinsim.dev/services/kinesis/#putting-a-record-and-reading-it-back "Simulated Kinesis docs") hands
 out a `Date`. Both are what a deployed function receives.
 
 `SimLambdaKinesisStreamEvent` and `SimLambdaKinesisStreamEventRecord` are exported from
@@ -2273,7 +2273,7 @@ request context follows the override. Overriding both copies with different valu
 for a test that wants an event no real invocation produces.
 
 The same events go to a handler through
-[the API Gateway HTTP API](../apigatewayv2/ "Simulated API Gateway HTTP API usage docs") too, where
+[the API Gateway HTTP API](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway HTTP API usage docs") too, where
 the route key, the stage and the path parameters are the endpoint's rather than a Function URL's
 `$default`. An event for one of those is this factory with those fields overridden.
 
@@ -2295,7 +2295,7 @@ of them grants only that one here as well.
 
 The caller comes from the request itself, through either a SigV4 signature or an `x-sim-aws-caller`
 header naming a principal directly. A request that offers no caller at all is anonymous, owns no
-policies, and is refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how
+policies, and is refused. See [callers of HTTP requests](https://yulinsim.dev/services/iam/#callers-of-http-requests) in the IAM docs for how
 that resolution works and how to sign a served request.
 
 A grant conditioned on `AWS:SourceArn` or `AWS:SourceAccount` is evaluated against what the request
@@ -2303,7 +2303,7 @@ says it is being made for. That is how a permission granting `cloudfront.amazona
 Distribution. Sim CloudFront states that itself when it reaches a Function URL Origin through an
 origin access control, and a Function URL behind a Distribution runs for that Distribution and
 refuses everything else. See
-[origin access controls](../cloudfront/README.md#origin-access-controls) in the CloudFront docs.
+[origin access controls](https://yulinsim.dev/services/cloudfront/#origin-access-controls) in the CloudFront docs.
 
 A request declaring what its body hashes to in an `x-amz-content-sha256` header is held to it,
 whichever method it used. The header is checked against the bytes that arrived, and a request
@@ -2311,7 +2311,7 @@ declaring `UNSIGNED-PAYLOAD` is refused with `403` and `The request signature we
 match the signature you provided`, because Lambda supports no unsigned payload. A request that
 declares no hash is invoked as before. That is what makes a POST through a CloudFront origin access
 control need the viewer's own digest. See
-[posting to a Function URL Origin](../cloudfront/README.md#posting-to-a-function-url-origin) in the
+[posting to a Function URL Origin](https://yulinsim.dev/services/cloudfront/#posting-to-a-function-url-origin) in the
 CloudFront docs.
 
 CloudFront is the exception to the two actions being separate. A request from
@@ -2425,7 +2425,7 @@ says what a principal may do, and a resource policy says who may act on the func
 enough to allow a call within the same Account. A principal from another Account needs both, the
 grant on the function and an identity policy in its own Account allowing the action. That is how AWS
 decides a cross-Account request. See
-[Cross-Account requests](../iam/README.md#cross-account-requests).
+[Cross-Account requests](https://yulinsim.dev/services/iam/#cross-account-requests).
 
 `AddPermissionCommand` grants a statement, `RemovePermissionCommand` revokes it by `StatementId`,
 and `GetPolicyCommand` returns the assembled document. `AddPermission` is a shorthand. Lambda expands
@@ -2491,8 +2491,8 @@ authorizer, a simulated S3 Bucket delivering an event notification, a simulated 
 a message, a simulated Cognito user pool running a Lambda trigger, and an EventBridge or ELBv2
 target. The source ARN is what that service is invoking the function for, and the source Account is
 that service's resource's own. See
-[Granting the API permission to invoke the function](../apigatewayv2/README.md#granting-the-api-permission-to-invoke-the-function)
-and [Lambda triggers](../cognito/README.md#lambda-triggers). A served Function URL request carries a
+[Granting the API permission to invoke the function](https://yulinsim.dev/services/apigatewayv2/#granting-the-api-permission-to-invoke-the-function)
+and [Lambda triggers](https://yulinsim.dev/services/cognito/#lambda-triggers). A served Function URL request carries a
 source ARN when it says what it is being made for, which is how a CloudFront origin access control
 reaches one. A direct `Invoke` and an SQS event source mapping supply no value for either, and a
 statement carrying one matches no request of theirs.
@@ -2611,7 +2611,7 @@ variables on the function keeps the test explicit about where they came from. Zi
 the vm runtime gets the function's own variables either way, and never the test process's.
 
 This is also how a function reaches something outside the simulation, such as a Redis or a
-Postgres. See [non-AWS dependencies](../../non-aws-dependencies/README.md).
+Postgres. See [non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/).
 
 Variable names are validated as on real AWS. A name must match the Lambda name pattern
 `[a-zA-Z]([a-zA-Z0-9_])+`, meaning it starts with a letter, is at least two characters, and otherwise
@@ -2661,7 +2661,7 @@ handler with a constant budget, where it would otherwise drain in real time.
 Zip code gets this from its own vm sandbox. A real in-process handler gets it from a substituted
 global `Date` that reports the invocation's clock while an invocation is running and the host clock
 otherwise. A time read at module scope is therefore read too early, exactly as it is for environment
-variables. See [simulated time](../../time/README.md) for the whole picture, including where real
+variables. See [simulated time](https://yulinsim.dev/time/) for the whole picture, including where real
 AWS puts the time on the event.
 
 ## CloudFormation functions
@@ -2808,7 +2808,7 @@ different shapes of test:
 - Bind one to the function for this deploy, the same mechanism as
   [executable bindings](#executable-bindings) and shown below.
 - Register one as the image in a
-  [simulated ECR repository](../ecr/ "Simulated ECR usage docs"). That is a standing statement about
+  [simulated ECR repository](https://yulinsim.dev/services/ecr/ "Simulated ECR usage docs"). That is a standing statement about
   what the image is, made once and good for every stack that runs it, and for a function created
   directly through `CreateFunction`.
 
@@ -3394,7 +3394,7 @@ A function matched this way is created from the bound handler, and never reaches
 from another repository are skipped as usual.
 
 A binding like this and a handler registered in
-[simulated ECR](../ecr/ "Simulated ECR usage docs") match on the same thing, and the binding is what
+[simulated ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR usage docs") match on the same thing, and the binding is what
 backs the function where both could. Reach for the binding when the handler belongs to one deploy,
 and for the repository when it belongs to the image.
 
@@ -3403,7 +3403,7 @@ and for the repository when it belongs to the image.
 Sim Lambda currently supports:
 
 - `CreateFunctionCommand` and `GetFunctionCommand`, including a function created from the
-  [simulated ECR](../ecr/ "Simulated ECR usage docs") image its `Code.ImageUri` names
+  [simulated ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR usage docs") image its `Code.ImageUri` names
 - `UpdateFunctionCodeCommand`, replacing the code `$LATEST` runs while the function keeps its
   policy, Function URL, versions and aliases
 - `UpdateFunctionConfigurationCommand`, changing the `Role`, `Handler`, `Runtime`, `Description`,
@@ -3548,7 +3548,7 @@ Current documented limitations:
   Docker-free.
   A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
   in-process handler stands in for its image, either one bound to it or one registered in the
-  [simulated ECR](../ecr/ "Simulated ECR usage docs") repository the image URI names. See
+  [simulated ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR usage docs") repository the image URI names. See
   [Container image functions](#container-image-functions).
 - Lambda Layers are left out.
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
@@ -3617,6 +3617,6 @@ Current documented limitations:
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
 - `serveSimAws` serves nineteen of these operations over HTTP, listed in the
-  [serving docs](../../serve/README.md#lambda-over-the-endpoint). The version and alias operations have no
+  [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
-  [SDK interception](../../sdk/) instead.
+  [SDK interception](https://yulinsim.dev/sdk/) instead.

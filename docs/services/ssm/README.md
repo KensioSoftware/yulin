@@ -442,7 +442,7 @@ parameter another resource of the same stack creates is only there in time when 
 
 A `SecureString` parameter is read through `{{resolve:ssm-secure:...}}`, which the next section
 covers. `{{resolve:secretsmanager:...}}` reads a secret, and
-[simulated Secrets Manager](../secretsmanager/README.md#reading-a-secret-with-a-dynamic-reference)
+[simulated Secrets Manager](https://yulinsim.dev/services/secretsmanager/#reading-a-secret-with-a-dynamic-reference)
 covers that one.
 
 ### A reference the simulation cannot answer
@@ -452,7 +452,7 @@ resolves to `dummy-value-for-<name>`, and the stack carries on deploying. A temp
 configuration a test does not care about is still worth deploying for everything else in it.
 
 The substitution is recorded on
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 naming the property that held the reference and why the value is a stand-in. A version the parameter
 never had, a `SecureString`, and a body that is not a name and an optional integer version are all
 recorded the same way.
@@ -553,7 +553,7 @@ The best-effort path is the one plain `ssm` references take. A reference naming 
 never created, or a version the parameter never had, resolves to `dummy-value-for-<name>` and the
 stack carries on deploying. So does a body that is not a name and an optional integer version. Each
 substitution is recorded on
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 
 ## Reading a parameter through a template Parameter
 
@@ -629,7 +629,7 @@ to `dummy-value-for-<name>`, and the stack carries on deploying. A `SecureString
 too, since real CloudFormation refuses to read one into a template Parameter.
 
 The substitution is recorded on
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 The `logicalId` names the template Parameter, the `resourceType` gives its declared type, and the
 `path` is `Parameters.<parameter name>`.
 

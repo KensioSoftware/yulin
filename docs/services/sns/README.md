@@ -1536,7 +1536,7 @@ them away, leaving the S3 event document as the message body.
 The topic has to be in the Bucket's Region, as real S3 requires. A subscription is looser, and a
 topic delivers to a queue in any Region. The Accounts can differ on both hops.
 
-See [simulated S3](../s3/README.md#event-notifications "Simulated S3 event notification docs") for the
+See [simulated S3](https://yulinsim.dev/services/s3/#event-notifications "Simulated S3 event notification docs") for the
 rest of the Bucket side, including the object key filters and what a record carries.
 
 ## Scoping
@@ -1583,11 +1583,11 @@ that account's own topics unreachable from this one.
 Function code requiring `@aws-sdk/client-sns` is routed into the same simulated AWS environment, with
 the function's execution role as the caller. A handler publishing to a topic therefore has to be
 allowed to, by that role's policy, the same as on real AWS. See
-[simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles work.
+[simulated Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs") for how function code and execution roles work.
 
 `SimSdk` interception works the same way. Intercepting `SNSClient` routes ordinary SDK code into the
 simulation with nothing touching the network, covered under
-[AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
+[AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs").
 
 ## Deploying a topic from CloudFormation
 
@@ -1748,7 +1748,7 @@ and `Region` on a subscription. Most of them are refused by simulated SNS itself
 topic or subscription attributes of the same name, and the reason is the same one an SDK caller gets.
 A property the resource type never had is refused too. The failure is worded as an invalid resource,
 which fails the resource where an unsupported one would be
-[skipped](../cloudformation/README.md#values-from-a-skipped-resource). A topic that cannot be created
+[skipped](https://yulinsim.dev/services/cloudformation/#values-from-a-skipped-resource). A topic that cannot be created
 as the template asked for it would otherwise leave a stack that looks deployed with no publisher
 behind it.
 

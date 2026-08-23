@@ -4,7 +4,7 @@ Yulin includes a simulated Amazon EventBridge Scheduler for tests and local deve
 are held in memory and every operation is authorized by simulated IAM. Scheduler-specific types are
 imported from the `@kensio/yulin/scheduler` subpath.
 
-Scheduler is a separate service from [EventBridge](../eventbridge/), not a corner of it. It has its
+Scheduler is a separate service from [EventBridge](https://yulinsim.dev/services/eventbridge/), not a corner of it. It has its
 own SDK client, its own ARN shape, and its own way of reaching a target. A schedule assumes an IAM
 execution role, where an EventBridge rule relies on a resource policy admitting a service principal.
 A project using Scheduler cannot be tested against simulated EventBridge rules. That is why this
@@ -57,7 +57,7 @@ IAM policy naming a schedule needs the group in it, or it matches no schedule.
 ## Writing the schedule expression
 
 Three forms, and the same parser as an [EventBridge scheduled
-rule](../eventbridge/#rules-that-fire-on-a-schedule) with two differences:
+rule](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule) with two differences:
 
 - `at(yyyy-mm-ddThh:mm:ss)` runs once, at that instant. The timezone is a separate setting on the
   schedule, outside the expression, and a trailing `Z` is refused.
@@ -163,7 +163,7 @@ own to describe.
 
 ### The execution role
 
-This is the part that differs most from an [EventBridge rule](../eventbridge/), and the part that
+This is the part that differs most from an [EventBridge rule](https://yulinsim.dev/services/eventbridge/), and the part that
 most often goes wrong in a real account. A rule reaches its target as the `events.amazonaws.com`
 service principal, and the target's own resource policy decides. A schedule assumes the `RoleArn` on
 its target, and that role's policies decide. No resource policy on the target is involved at all.
@@ -245,7 +245,7 @@ changes the expression reschedules from the new one.
 
 ## Running an ECS task on a schedule
 
-A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task, in place of being
+A target whose ARN names an ECS cluster runs a [simulated ECS](https://yulinsim.dev/services/ecs/) task, in place of being
 invoked with a payload. That is the shape a nightly batch job usually has. A container runs, does
 its work and stops.
 
@@ -360,7 +360,7 @@ An ECS target's `Input` is the task's overrides, since a task has nowhere to rec
 target with no `Input` runs the task with no overrides.
 `EcsParameters` on a target whose ARN names anything else is refused, since it would do nothing.
 
-[Simulated ECS](../ecs/) decides which containers actually run. A container
+[Simulated ECS](https://yulinsim.dev/services/ecs/) decides which containers actually run. A container
 with a binding runs its handler, and a container without one is recorded as not simulated.
 A target naming a task definition with nothing bound therefore records a task that never started,
 and the schedule counts as invoked.
@@ -504,7 +504,7 @@ against the `RoleArn` on the target.
 
 ## Deploying from a CloudFormation template
 
-`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](../cloudformation/). A stack
+`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](https://yulinsim.dev/services/cloudformation/). A stack
 that declares its schedules can be exercised end to end, with no SDK calls of its own. Everything the
 Resource carries lines up with `CreateSchedule`, and a target ARN or execution role resolved by
 `Fn::GetAtt` from the same template works as it would in a real deployment.

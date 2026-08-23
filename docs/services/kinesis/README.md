@@ -208,14 +208,14 @@ console.log(Records.length);
 
 ## Triggering a Lambda function
 
-A [Lambda event source mapping](../lambda/#triggering-a-function-from-a-kinesis-stream "Simulated Lambda Kinesis event source docs")
+A [Lambda event source mapping](https://yulinsim.dev/services/lambda/#triggering-a-function-from-a-kinesis-stream "Simulated Lambda Kinesis event source docs")
 polls a stream and invokes a function with the records it reads. Every shard is read by a processor
 of its own, as real Lambda reads one, and the function's execution role is what the polling is done
 as.
 
 ## Feeding a Firehose delivery stream
 
-A [Firehose delivery stream](../firehose/#reading-from-a-kinesis-stream "Simulated Firehose Kinesis source docs")
+A [Firehose delivery stream](https://yulinsim.dev/services/firehose/#reading-from-a-kinesis-stream "Simulated Firehose Kinesis source docs")
 can read a stream and buffer what it reads into an S3 Bucket. It reads every shard as its source
 `RoleARN`, starting at the end of the stream when the delivery stream is created.
 

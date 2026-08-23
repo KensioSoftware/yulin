@@ -802,7 +802,7 @@ execution carry straight on.
 
 The execution stops at the instant it was waiting for, and `DescribeExecution` reports that as its
 `stopDate`. A failure after a wait is recorded on the execution, and `advanceBy` returns as it would
-for one that succeeded. [Simulated time](../../time/ "Simulated time docs") covers what else
+for one that succeeded. [Simulated time](https://yulinsim.dev/time/ "Simulated time docs") covers what else
 advancing the clock runs.
 
 ## Running branches at once

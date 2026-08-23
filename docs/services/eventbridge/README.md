@@ -5,7 +5,7 @@ in memory and every operation is authorized by simulated IAM.
 
 Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
 function, SQS queue or SNS topic, run a simulated ECS task, or fire on a schedule when a test
-advances simulated time. [EventBridge Scheduler](../scheduler/) is a separate service with its own
+advances simulated time. [EventBridge Scheduler](https://yulinsim.dev/services/scheduler/) is a separate service with its own
 docs. EventBridge-specific types are imported from the `@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
@@ -570,7 +570,7 @@ target stays as it is. A target naming no version and no alias is recorded on
 
 ## Running an ECS task
 
-A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task instead of receiving
+A target whose ARN names an ECS cluster runs a [simulated ECS](https://yulinsim.dev/services/ecs/) task instead of receiving
 the event. `EcsParameters` says which task definition and how many tasks, and the target's `RoleArn`
 is the role the rule runs it as, both of which real EventBridge requires for the same reasons.
 
@@ -703,7 +703,7 @@ The role is the whole of the decision. It has to trust `events.amazonaws.com` in
 the target runs. A role that may not becomes a recorded
 [delivery failure](#reading-back-a-failed-delivery), and the caller who put the event sees no error.
 
-Which containers actually run is [simulated ECS](../ecs/)'s answer, and never the rule's. A
+Which containers actually run is [simulated ECS](https://yulinsim.dev/services/ecs/)'s answer, and never the rule's. A
 container with a binding runs its handler, and a container without one is recorded as not simulated.
 A target naming a task definition with nothing bound therefore records a task that never started,
 and the rule counts as delivered.
@@ -817,7 +817,7 @@ useful for asserting on the schedule itself before there is anything to deliver 
 ## Deploying from a CloudFormation template
 
 `AWS::Events::EventBus` and `AWS::Events::Rule` deploy through
-[simulated CloudFormation](../cloudformation/). A stack that declares its routing in a template can
+[simulated CloudFormation](https://yulinsim.dev/services/cloudformation/). A stack that declares its routing in a template can
 be exercised end to end. A rule carries its `EventPattern` or `ScheduleExpression`, its `State`, and
 its inline `Targets`, and a target ARN resolved by `Fn::GetAtt` from a function or queue in the same
 template works as it would in a real deployment.
@@ -1083,7 +1083,7 @@ no permission for.
 - Firing is exact and exactly once. Real EventBridge may deliver a scheduled event a few seconds
   late, and may deliver it more than once.
 - EventBridge Scheduler is a separate service, simulated separately. See
-  [simulated Scheduler](../scheduler/).
+  [simulated Scheduler](https://yulinsim.dev/services/scheduler/).
 - Rule tags, a rule `RoleArn`, managed rules and the `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`
   state are all refused.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge

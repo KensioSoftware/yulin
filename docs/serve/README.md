@@ -270,7 +270,7 @@ A request carrying no signature is anonymous and reaches nothing. In process an 
 
 S3, STS, IAM, ELBv2, SNS, CloudFormation, Lambda, and the services that speak the AWS JSON protocol. Those are DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and Rekognition.
 
-A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](../sdk/README.md), whether or not it answers here.
+A request to any other service is refused with `501 Not Implemented` and a body saying why. Every service is reachable in process through `SimAws` and through [SDK interception](https://yulinsim.dev/sdk/), whether or not it answers here.
 
 CloudWatch's windowed reads, `GetMetricStatistics` and `GetMetricData`, are the exception among the operations those services implement. The JSON protocol carries a timestamp as epoch seconds, and the endpoint passes that number through as it arrives. The simulation is handed a number where it expects a date. Both reads answer in process and through SDK interception.
 
@@ -507,8 +507,8 @@ and it is what a browser and a webhook reach.
 `close()` stops serving and lets go of everything Yulin was holding, leaving the process free to
 exit. That is the HTTP port, the DNS port and the connections the server is holding, along with the
 simulated environment it was serving with them. The environment covers the template files a
-deployment is [watching](../services/cloudformation/README.md#watching-a-template-file) and the
-directories a [mount](../services/s3/README.md#reloading-the-browser-when-the-directory-changes) is
+deployment is [watching](https://yulinsim.dev/services/cloudformation/#watching-a-template-file) and the
+directories a [mount](https://yulinsim.dev/services/s3/#reloading-the-browser-when-the-directory-changes) is
 watching, in whichever Account and Region each of them lives in. One call covers all of it. A script
 that hangs on exit is not a hunt for the handle you missed.
 
@@ -734,7 +734,7 @@ simAws
 ```
 
 One build is one reload, however many files it wrote. See
-[filesystem-backed Bucket storage](../services/s3/README.md#reloading-the-browser-when-the-directory-changes)
+[filesystem-backed Bucket storage](https://yulinsim.dev/services/s3/#reloading-the-browser-when-the-directory-changes)
 for the `settleMs` override and for stopping the watch.
 
 ### What gets the script
@@ -848,7 +848,7 @@ A text part is printed up to 2000 characters. What runs past that is counted and
 
 A user pool sending its email through simulated SES prints twice, once for the SES send and once for
 the message the pool kept. Both services recorded it, and each block says what that service holds.
-See [Sending a pool's email through SES](../services/cognito/README.md#sending-a-pools-email-through-ses).
+See [Sending a pool's email through SES](https://yulinsim.dev/services/cognito/#sending-a-pools-email-through-ses).
 
 `emailTextLimit` moves that limit. It sits beside the per-kind switches on the same option:
 
@@ -1018,7 +1018,7 @@ and not the write. The page comes back on the resources the new template asked f
 that failed reloads nothing. Whatever the change left alone keeps what it holds in simulated S3,
 DynamoDB and SQS, where a restart would have taken all of it. The process names the template as one
 it is answering itself, and the supervisor takes it off its own list. See
-[watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
+[watching a template file](https://yulinsim.dev/services/cloudformation/#watching-a-template-file) for what
 an update does to the resources.
 
 A directory mounted with somewhere to reload is left alone the same way. The Bucket is reading the
@@ -1062,7 +1062,7 @@ await simAws.cloudFormation().deployTemplateFile({
 
 A transform that throws is reported the way a failed update is. The process and the resources it is
 serving are left where they were. See
-[adapting a synthesized template](../services/cloudformation/README.md#adapting-a-synthesized-template-on-the-way-in).
+[adapting a synthesized template](https://yulinsim.dev/services/cloudformation/#adapting-a-synthesized-template-on-the-way-in).
 
 Both work with no supervisor at all. A dev script started from an IDE debugger picks up a re-synth
 or a rebuild with the debugger attached throughout.

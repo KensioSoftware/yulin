@@ -19,43 +19,43 @@ npm i -D @kensio/yulin
 
 ## Service specific docs
 
-- [ACM](./docs/services/acm "Simulated ACM docs")
-- [API Gateway HTTP APIs](./docs/services/apigatewayv2 "Simulated API Gateway HTTP API docs")
-- [API Gateway REST APIs](./docs/services/apigateway "Simulated API Gateway REST API docs")
-- [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
-- [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
-- [CloudWatch metrics](./docs/services/cloudwatch "Simulated CloudWatch metrics docs")
-- [Cognito user pools](./docs/services/cognito "Simulated Cognito user pools docs")
-- [DynamoDB](./docs/services/dynamodb "Simulated DynamoDB docs")
-- [ECR](./docs/services/ecr "Simulated ECR docs")
-- [ECS](./docs/services/ecs "Simulated ECS docs")
-- [EventBridge](./docs/services/eventbridge "Simulated EventBridge docs")
-- [IAM](./docs/services/iam "Simulated IAM docs")
-- [KMS](./docs/services/kms "Simulated KMS docs")
-- [Lambda](./docs/services/lambda "Simulated Lambda docs")
-- [CloudWatch Logs](./docs/services/logs "Simulated CloudWatch Logs docs")
-- [Personalize](./docs/services/personalize "Simulated Amazon Personalize docs")
-- [Rekognition](./docs/services/rekognition "Simulated Rekognition docs")
-- [Route53](./docs/services/route53 "Simulated Route53 docs")
-- [S3](./docs/services/s3 "Simulated S3 docs")
-- [Scheduler](./docs/services/scheduler "Simulated EventBridge Scheduler docs")
-- [Secrets Manager](./docs/services/secretsmanager "Simulated Secrets Manager docs")
-- [SES](./docs/services/ses "Simulated SES docs")
-- [SNS](./docs/services/sns "Simulated SNS docs")
-- [SQS](./docs/services/sqs "Simulated SQS docs")
-- [SSM Parameter Store](./docs/services/ssm "Simulated SSM Parameter Store docs")
-- [Step Functions](./docs/services/stepfunctions "Simulated Step Functions docs")
-- [STS](./docs/services/sts "Simulated STS docs")
-- [WAFv2](./docs/services/wafv2 "Simulated WAFv2 docs")
+- [ACM](https://yulinsim.dev/services/acm/ "Simulated ACM docs")
+- [API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway HTTP API docs")
+- [API Gateway REST APIs](https://yulinsim.dev/services/apigateway/ "Simulated API Gateway REST API docs")
+- [CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs")
+- [CloudFront](https://yulinsim.dev/services/cloudfront/ "Simulated CloudFront docs")
+- [CloudWatch metrics](https://yulinsim.dev/services/cloudwatch/ "Simulated CloudWatch metrics docs")
+- [Cognito user pools](https://yulinsim.dev/services/cognito/ "Simulated Cognito user pools docs")
+- [DynamoDB](https://yulinsim.dev/services/dynamodb/ "Simulated DynamoDB docs")
+- [ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR docs")
+- [ECS](https://yulinsim.dev/services/ecs/ "Simulated ECS docs")
+- [EventBridge](https://yulinsim.dev/services/eventbridge/ "Simulated EventBridge docs")
+- [IAM](https://yulinsim.dev/services/iam/ "Simulated IAM docs")
+- [KMS](https://yulinsim.dev/services/kms/ "Simulated KMS docs")
+- [Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs")
+- [CloudWatch Logs](https://yulinsim.dev/services/logs/ "Simulated CloudWatch Logs docs")
+- [Personalize](https://yulinsim.dev/services/personalize/ "Simulated Amazon Personalize docs")
+- [Rekognition](https://yulinsim.dev/services/rekognition/ "Simulated Rekognition docs")
+- [Route53](https://yulinsim.dev/services/route53/ "Simulated Route53 docs")
+- [S3](https://yulinsim.dev/services/s3/ "Simulated S3 docs")
+- [Scheduler](https://yulinsim.dev/services/scheduler/ "Simulated EventBridge Scheduler docs")
+- [Secrets Manager](https://yulinsim.dev/services/secretsmanager/ "Simulated Secrets Manager docs")
+- [SES](https://yulinsim.dev/services/ses/ "Simulated SES docs")
+- [SNS](https://yulinsim.dev/services/sns/ "Simulated SNS docs")
+- [SQS](https://yulinsim.dev/services/sqs/ "Simulated SQS docs")
+- [SSM Parameter Store](https://yulinsim.dev/services/ssm/ "Simulated SSM Parameter Store docs")
+- [Step Functions](https://yulinsim.dev/services/stepfunctions/ "Simulated Step Functions docs")
+- [STS](https://yulinsim.dev/services/sts/ "Simulated STS docs")
+- [WAFv2](https://yulinsim.dev/services/wafv2/ "Simulated WAFv2 docs")
 
 ## Feature specific docs
 
-- [AI skill](./docs/ai-skill "Yulin AI skill docs")
-- [The AWS CLI](./docs/cli "The AWS CLI against simulated AWS docs")
-- [AWS SDK interception](./docs/sdk "Simulated AWS SDK docs")
-- [Serving on localhost](./docs/serve "Serving simulated AWS on localhost docs")
-- [Simulated time](./docs/time "Simulated time docs")
-- [Terraform](./docs/terraform "Deploying Terraform into simulated AWS docs")
+- [AI skill](https://yulinsim.dev/ai-skill/ "Yulin AI skill docs")
+- [The AWS CLI](https://yulinsim.dev/cli/ "The AWS CLI against simulated AWS docs")
+- [AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs")
+- [Serving on localhost](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost docs")
+- [Simulated time](https://yulinsim.dev/time/ "Simulated time docs")
+- [Terraform](https://yulinsim.dev/terraform/ "Deploying Terraform into simulated AWS docs")
 
 ## Usage
 
@@ -105,7 +105,7 @@ Each `SimSdk` owns its own isolated simulated AWS, available as `simSdk.simAws` 
 to seed or inspect simulated state directly. To share state with an existing simulation, wrap it
 with `new SimSdk({ simAws })`.
 
-See the [simulated AWS SDK docs](./docs/sdk "Simulated AWS SDK docs") for full usage.
+See the [simulated AWS SDK docs](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs") for full usage.
 
 ### Direct interaction with simulated AWS
 
@@ -235,7 +235,7 @@ A URL a simulated service gives out is fetched as it is, with no `localUrl(...)`
 hostname a simulated Route53 answers for is requested by its own name. Both routes go through the
 same authentication, routing and service code. Reach for `serveSimAws` when the request comes from
 outside the process. See the
-[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for how to choose.
+[serving docs](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost docs") for how to choose.
 
 #### Restarting a served environment
 
@@ -282,7 +282,7 @@ yulin watch -- tsx dev.ts
 
 It watches the working directory. It also watches the paths Yulin is holding that a module graph
 never mentions, a directory mounted into a Bucket and a synthesized template. See the
-[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script, what
+[serving docs](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost docs") for what gets the script, what
 is watched, and what is not.
 
 #### Update a stack when its template changes
@@ -304,7 +304,7 @@ await simAws.cloudFormation().deployTemplateFile({
 Resources the change left alone keep what they hold, so simulated S3, DynamoDB and SQS survive a
 `cdk synth`. Under `yulin watch` the template is left to the process watching it, and never triggers
 a restart. See the
-[CloudFormation docs](./docs/services/cloudformation "Simulated CloudFormation docs") for what an
+[CloudFormation docs](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs") for what an
 update does to each resource.
 
 ### Control simulated time
@@ -337,7 +337,7 @@ await simAws.clock().advanceBy({ minutes: 20 });
 Advancing runs whatever falls due during the interval and returns once the simulation has settled.
 The next line can assert. Time belongs to the `SimAws` instance, so moving it never disturbs another
 simulation, or the real clock. See the
-[simulated time docs](./docs/time "Simulated time docs") for full usage.
+[simulated time docs](https://yulinsim.dev/time/ "Simulated time docs") for full usage.
 
 ## What is Yulin?
 

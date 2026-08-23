@@ -592,7 +592,7 @@ window refuses it with `AccessDenied` and `Request has expired`.
 
 URLs built by the real presigner, `getSignedUrl` from `@aws-sdk/s3-request-presigner`, verify here
 without anything simulator-specific. See
-[the sim S3 docs](../s3/README.md#presigned-urls) for the whole path from presigning to fetching.
+[the sim S3 docs](https://yulinsim.dev/services/s3/#presigned-urls) for the whole path from presigning to fetching.
 
 ### What the simulator reports back
 

@@ -861,7 +861,7 @@ The response is `{ "messages": [ ... ] }`, each message carrying `username`, `re
 A pool created with `EmailConfiguration: { EmailSendingAccount: "DEVELOPER", ... }` sends its email
 through simulated SES, in the region its `SourceArn` names. That is the CDK
 `cognito.UserPoolEmail.withSES({ ... })` configuration. An account still in the
-[SES sandbox](../ses#the-sandbox) reaches only verified recipients, which is most of a real sign-up
+[SES sandbox](https://yulinsim.dev/services/ses/#the-sandbox) reaches only verified recipients, which is most of a real sign-up
 list turned away, and a pool recording only its own messages would report that as a working
 sign-up.
 
@@ -1951,7 +1951,7 @@ console.log(claims["email"]); // "someone@example.com"
 A simulated Lambda reaches the same token endpoint. A handler that exchanges the code with `fetch`
 or `node:https` is answered by the simulated domain on the hostname its own code already names, so
 the callback the whole of a site's sign-in passes through can be tested as it is deployed. See
-[the HTTP requests function code makes](../lambda/#the-http-requests-function-code-makes "Simulated Lambda usage docs").
+[the HTTP requests function code makes](https://yulinsim.dev/services/lambda/#the-http-requests-function-code-makes "Simulated Lambda usage docs").
 
 The pool creates a user of its own for each external subject the first time it signs in, exactly as
 real Cognito does. The username is the provider name and the subject with an underscore between
@@ -2280,7 +2280,7 @@ that only the matching `code_verifier` exchanges. `plain` is refused, as it is b
 pool's endpoints are then evaluated against it. A blocked request gets 403 and the endpoint behind
 it never runs. A blocked sign-up creates no user. The two `.well-known` documents are covered along
 with the hosted domain pages, and the `/<pool-id>/messages` listing is left outside. See
-[protecting a Cognito user pool](../wafv2/README.md#protecting-a-cognito-user-pool) for the whole
+[protecting a Cognito user pool](https://yulinsim.dev/services/wafv2/#protecting-a-cognito-user-pool) for the whole
 example, including the request body that Cognito withholds from AWS WAF at a hosted domain.
 
 ## Lambda triggers
@@ -3293,7 +3293,7 @@ The properties each type reads are the ones this simulation models:
   `ProviderDetails`, `AttributeMapping` and `IdpIdentifiers`. `Ref` returns the provider name.
 
 Any other property is left out of what is created and recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 naming the logical id, the property and the ones this can act on instead. The pool or client is
 created either way. A stack full of Cognito resources deploys, and the record says which of them
 behaves differently to the template. A stack that forgets `ALLOW_ADMIN_USER_PASSWORD_AUTH` still
@@ -3649,7 +3649,7 @@ client that discovers the document can go on to fetch the keys it points at. The
 real `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` in `iss`, what a verifier built from
 a pool id checks against. The two disagree here where they agree on real Cognito.
 
-A [simulated Lambda](../lambda/#verifying-a-cognito-token-in-a-handler "Simulated Lambda usage docs")
+A [simulated Lambda](https://yulinsim.dev/services/lambda/#verifying-a-cognito-token-in-a-handler "Simulated Lambda usage docs")
 reads both documents at the real regional endpoint, with no local server and no URL rewriting. A
 `CognitoJwtVerifier` inside a handler fetches the pool's JWKS for itself and verifies the token,
 which is the verifier setup the deployed code already has.

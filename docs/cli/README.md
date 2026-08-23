@@ -3,7 +3,7 @@
 The real `aws` CLI reaches a served simulated environment over a local endpoint URL, and twenty of
 Yulin's twenty-five SDK-facing services answer it.
 
-[Serving on localhost](../serve/README.md) is the reference for what each service serves. This page
+[Serving on localhost](https://yulinsim.dev/serve/) is the reference for what each service serves. This page
 covers the way in from a shell.
 
 ## An endpoint and a key to sign with
@@ -147,7 +147,7 @@ export AWS_SESSION_TOKEN=11568oBDksY9czECUMiAWk9tzmvG7zlQNjtLI1WmhZFS...
 ```
 
 The expiry is stamped from the simulation's own clock, and
-[advancing it](../time/README.md) past the expiry stops the session authenticating.
+[advancing it](https://yulinsim.dev/time/) past the expiry stops the session authenticating.
 
 ## What answers
 
@@ -171,7 +171,7 @@ aws logs describe-log-groups --query 'logGroups[].logGroupName' --output text
 `--query`, `--output text` and the rest of the CLI's own machinery work throughout, because they run
 client-side over an ordinary AWS response.
 
-[The serve docs](../serve/README.md#which-services-answer) list the operations each service
+[The serve docs](https://yulinsim.dev/serve/#which-services-answer) list the operations each service
 implements. Anything outside those lists is refused as `NotImplemented`.
 
 ## CLI traps
@@ -235,7 +235,7 @@ aws --endpoint-url http://s3.us-east-1.sim-aws.localhost:8787 s3 presign s3://wi
 ```
 
 The URL that comes back is fetchable by anything, including `curl` and a browser. The same hostname
-serves [presigned URLs built by the SDK](../services/s3/README.md#presigned-urls).
+serves [presigned URLs built by the SDK](https://yulinsim.dev/services/s3/#presigned-urls).
 
 ### A bad key looks like an XML parse failure
 
@@ -257,7 +257,7 @@ rejection as a plain `403`.
 
 - Five services are refused with `501 Not Implemented`. Route 53 and CloudFront speak REST-XML, and
   API Gateway v2, SES v2 and EventBridge Scheduler speak REST-JSON. Every one of them is reachable
-  in process through `SimAws` and through [SDK interception](../sdk/README.md). Simulated ECR is
+  in process through `SimAws` and through [SDK interception](https://yulinsim.dev/sdk/). Simulated ECR is
   refused the same way and has no AWS API surface at all, since its images are registered in
   process.
 - An operation a served service has not implemented is refused as `NotImplemented`. That is a

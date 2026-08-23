@@ -2372,7 +2372,7 @@ it. The attribute holds epoch seconds in a Number. An item without it, or holdin
 anything else, never expires, and that is allowed. Nor does an item whose timestamp is more than
 five years in the past, which DynamoDB treats as a malformed value rather than as long overdue.
 
-Expiry runs on [the simulated clock](../../time/). Moving the clock forward is what deletes items
+Expiry runs on [the simulated clock](https://yulinsim.dev/time/). Moving the clock forward is what deletes items
 whose time to live has run out, so one `advanceBy` expires a table's sessions alongside whatever
 else that advance causes elsewhere in the simulation. That is the only call a test has.
 
@@ -2709,7 +2709,7 @@ been trimmed. A trimmed stream reads as empty, never as missing.
 
 Most applications consume a stream by having a Lambda function run on it rather than by polling it
 themselves, and that is a
-[Lambda event source mapping](../lambda/#triggering-a-function-from-a-dynamodb-stream "Simulated Lambda event source mapping docs").
+[Lambda event source mapping](https://yulinsim.dev/services/lambda/#triggering-a-function-from-a-dynamodb-stream "Simulated Lambda event source mapping docs").
 Create the mapping, write to the table, and the function is invoked with the changes. The
 `GetRecords` loop above is still there for a consumer that wants to read a stream directly.
 
@@ -2857,7 +2857,7 @@ as `TransactWriteCommand`, is refused by name before anything tries to convert i
 
 Intercept the document client itself. `DynamoDBDocumentClient.from(client)` builds a separate object
 outside the `DynamoDBClient` class, so intercepting the base client leaves Commands sent through the
-document one untouched. See [the SDK docs](../../sdk/README.md#the-dynamodb-document-client).
+document one untouched. See [the SDK docs](https://yulinsim.dev/sdk/#the-dynamodb-document-client).
 
 ### Querying and scanning through the document client
 
@@ -3119,7 +3119,7 @@ stream ARN would read as a working stream to whatever the template handed it to.
 refuses the same template while validating it, where this refuses when the attribute is asked for.
 
 A property with behaviour that is absent is left out and recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 and the table is created and the rest of the stack still deploys. Those properties are
 `KinesisStreamSpecification`, `SSESpecification`, `PointInTimeRecoverySpecification`,
 `ContributorInsightsSpecification`, `ImportSourceSpecification`, `ResourcePolicy`,
@@ -3339,7 +3339,7 @@ caller in.
 
 `StreamSpecification.ResourcePolicy` is a policy on the stream rather than on the table. It is
 absent. The table is created without it and the whole property path is recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 
 Changing `StreamViewType` in a deployed template is a different thing here to what it is on real
 CloudFormation, which replaces the table. `UpdateTable` refuses the change in place, so switching
@@ -3427,7 +3427,7 @@ split the same way. The table declares the index and provisions its writes, and 
 
 A global table naming two or more replica regions is created as an ordinary table in the region the
 stack is deploying into, with `Replicas` recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without)
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without)
 naming the regions. Replication genuinely is absent, so everything the table does within one region
 behaves as the template describes and nothing is copied to the others.
 
@@ -3552,7 +3552,7 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
   this simulation lacks yet. The transactions are simulated as operations, so only the document form
   of them is missing. Both are refused by name, never half converted.
 - A document client's translate config goes unread. The marshalling options it was built with do not
-  apply. See [the SDK docs](../../sdk/README.md#limitations).
+  apply. See [the SDK docs](https://yulinsim.dev/sdk/#limitations).
 - `Expected`, `ConditionalOperator`, `AttributeUpdates`, `KeyConditions`, `QueryFilter` and
   `ScanFilter` go unconverted for the document client, because simulated DynamoDB refuses all six
   anyway. A request carrying one is refused by the operation rather than by the conversion.

@@ -462,7 +462,7 @@ A parameter with no supplied value takes the template default, when the template
 
 A parameter's `Type` is read for the `AWS::SSM::Parameter::Value<...>` types, which hold a Parameter
 Store name and resolve to the value stored under it. See
-[reading a parameter through a template Parameter](../ssm/README.md#reading-a-parameter-through-a-template-parameter).
+[reading a parameter through a template Parameter](https://yulinsim.dev/services/ssm/#reading-a-parameter-through-a-template-parameter).
 Every other type is accepted and its value used as written, with no validation of the value against
 the type.
 
@@ -937,12 +937,12 @@ writes that shape whenever a secret sits in the same stack as the resource readi
 ARN arrives as a `Ref`).
 
 `{{resolve:ssm:name}}` and `{{resolve:ssm:name:3}}` read a simulated SSM parameter. See
-[reading a parameter with a dynamic reference](../ssm/README.md#reading-a-parameter-with-a-dynamic-reference)
+[reading a parameter with a dynamic reference](https://yulinsim.dev/services/ssm/#reading-a-parameter-with-a-dynamic-reference)
 for what they resolve to, and for what happens when Parameter Store cannot answer one.
 
 `{{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}` reads a
 simulated secret. See
-[reading a secret with a dynamic reference](../secretsmanager/README.md#reading-a-secret-with-a-dynamic-reference)
+[reading a secret with a dynamic reference](https://yulinsim.dev/services/secretsmanager/#reading-a-secret-with-a-dynamic-reference)
 for the segments and for what a reference Secrets Manager cannot answer resolves to.
 
 `{{resolve:ssm-secure:...}}` is left in the template as written, and is not resolved yet.
@@ -1273,7 +1273,7 @@ Stack's export goes second. The deployed Stacks come back keyed by name, each on
 `cloudfront.experimental.EdgeFunction` in a Stack outside us-east-1 is one construct that needs the
 whole assembly. It puts the function in a us-east-1 support Stack, and the using Stack reads the
 function's ARN back from an SSM parameter that Stack wrote. Both have to deploy for the read to find
-anything. See [simulated Lambda@Edge](../cloudfront/README.md#simulated-lambdaedge).
+anything. See [simulated Lambda@Edge](https://yulinsim.dev/services/cloudfront/#simulated-lambdaedge).
 
 ### Deploying part of an assembly
 
@@ -1567,7 +1567,7 @@ without serving anything.
 
 A server serving without live reload can never reload anything, and says so as the deployment asks it
 to. Saying it on the first change instead would be a long way from the mistake. Serve with
-[`{ liveReload: true }`](../../serve/README.md#live-reload).
+[`{ liveReload: true }`](https://yulinsim.dev/serve/#live-reload).
 
 `onUpdated` runs once the update is complete too, for whatever else a change is worth doing, with or
 without a `reload` alongside it. Given both, the callback runs first and the reload follows it, and a
@@ -1581,7 +1581,7 @@ deploys leaves a working environment where a restart on it would leave none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
 until they stop arriving. `settleMs` is how long that wait is, and it defaults to the 250ms
-[`yulin watch` settles at](../../serve/README.md#one-restart-for-a-burst-of-writes). A synth that
+[`yulin watch` settles at](https://yulinsim.dev/serve/#one-restart-for-a-burst-of-writes). A synth that
 keeps writing is updated from after five seconds of it, without waiting for it to stop.
 
 [`transform`](#adapting-a-synthesized-template-on-the-way-in) runs again on every change. A template
@@ -1591,7 +1591,7 @@ Watching holds a filesystem handle open, so the process stays alive on its own. 
 process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is
 done. `watchedTemplateFiles()` names what is being watched. Both are per Account and Region, and a
 simulation deploying into more than one has one call each.
-[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the exception. It lets go of the
+[`simAws.close()`](https://yulinsim.dev/serve/#stopping-and-restarting) is the exception. It lets go of the
 template watches in every scope, along with everything else the environment is holding, and a served
 environment gets that from `srv.close()`.
 
@@ -1600,7 +1600,7 @@ the watch pick up what it writes.
 
 ### Under `yulin watch`
 
-[`yulin watch`](../../serve/README.md#restarting-on-a-file-change) restarts the process when a
+[`yulin watch`](https://yulinsim.dev/serve/#restarting-on-a-file-change) restarts the process when a
 deployed template changes. A watched template is left to the process that is watching it instead. The
 stack updates in place, and everything held in simulated S3, DynamoDB and SQS stays where it is. That
 needs no configuring, because the process names the file it is holding.
@@ -1651,9 +1651,9 @@ around it are read the same way:
   copied. `*` matches across `/`, so `data/*` covers everything under a `data` directory.
 - `SystemMetadata` sets content headers on every Object the deployment copies, such as
   `content-encoding` or `cache-control`. Without it, the content type is guessed from the file
-  extension. See [Object system metadata](../s3/README.md#object-system-metadata) for what comes back
+  extension. See [Object system metadata](https://yulinsim.dev/services/s3/#object-system-metadata) for what comes back
   on a read. The deployment also tells the destination Bucket what it publishes. A directory
-  [mounted over that Bucket](../s3/README.md#inheriting-what-the-deployment-set) for local
+  [mounted over that Bucket](https://yulinsim.dev/services/s3/#inheriting-what-the-deployment-set) for local
   development is then served with the same headers without restating them.
 - `Prune` removes the Objects the deployment covers and its source no longer holds. It is on unless
   the deployment turns it off, as the construct is. Pruning only considers what the filters and the
@@ -1709,7 +1709,7 @@ S3 validates the destination. Simulated CloudFormation needs the same, and surfa
 a dependency resolution failure.
 
 Note that every other `AWS::S3::Bucket` property the simulator has no behaviour for fails the stack
-by name. See [Buckets from CloudFormation](../s3/README.md#buckets-from-cloudformation).
+by name. See [Buckets from CloudFormation](https://yulinsim.dev/services/s3/#buckets-from-cloudformation).
 
 ### From a CDK app
 
@@ -1722,7 +1722,7 @@ Deploy into an Account and Region matching the ones the CDK app synthesized for.
 on the `AWS::Lambda::Permission` CDK writes beside the notification is a synth-time literal. A stack
 deployed into another Account leaves S3 unable to validate the destination, and the stack fails.
 
-See [Event notifications](../s3/README.md#event-notifications) in the S3 docs for the configuration
+See [Event notifications](https://yulinsim.dev/services/s3/#event-notifications) in the S3 docs for the configuration
 itself and what it refuses.
 
 ## CloudFront resources from CDK
@@ -1971,7 +1971,7 @@ A binding names one of five targets. `logicalId`, `functionName`, `arn`, `cdkPat
 `imageRepository` are the five, and a literal naming two of them fails to compile. The same type
 covers a binding to a container an `AWS::ECS::TaskDefinition` declares, which carries `run`, `http`
 or `consumes` in place of `handler`. See
-[Deploying ECS from CloudFormation](../ecs/README.md#deploying-ecs-from-cloudformation) for those.
+[Deploying ECS from CloudFormation](https://yulinsim.dev/services/ecs/#deploying-ecs-from-cloudformation) for those.
 
 ## SAM templates
 
@@ -2992,7 +2992,7 @@ A skip is more than a whole Resource type nothing simulates. A service can decli
 type it does create, when that Resource asks for something the service cannot model, and the
 `skippedReason` says which part it was. An `AWS::Route53::RecordSet` declaring a record type sim
 Route53 has no room for is skipped with the record type named. A DNS stack carrying a record beside
-the point of the test still deploys. See [record types](../route53/README.md#record-types).
+the point of the test still deploys. See [record types](https://yulinsim.dev/services/route53/#record-types).
 
 A Resource that was skipped on create is stepped over by a teardown, never deleted, because nothing
 reached simulated AWS to delete. It reaches `DELETE_COMPLETE` and stays out of
@@ -3300,7 +3300,7 @@ Each service's own docs describe what its resource types support.
   one is left empty, because the provider is never invoked. A log group a stack declares for a
   Lambda function is the same group that function writes to, and a group already there is taken over
   rather than failing the deploy the way real CloudFormation does. See the
-  [simulated CloudWatch Logs docs](../logs/ "Simulated CloudWatch Logs usage docs").
+  [simulated CloudWatch Logs docs](https://yulinsim.dev/services/logs/ "Simulated CloudWatch Logs usage docs").
 - A resource property outside the simulation is left out and recorded in `stack.ignoredProperties`
   rather than failing the stack. The resource is created behaving differently to the one the
   template describes. See
