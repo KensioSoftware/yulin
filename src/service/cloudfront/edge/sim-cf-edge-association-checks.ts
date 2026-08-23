@@ -66,6 +66,33 @@ export function isSimulatedEdgeEventType(
 }
 
 /**
+ * Refuse an association reading a body at an event that carries none.
+ *
+ * `IncludeBody` is valid at `viewer-request` and `origin-request`, and
+ * CloudFront documents it that way. A response event runs once the request has
+ * been forwarded, and the event it builds carries no body for the flag to
+ * apply to.
+ */
+export function assertIncludableBody(
+  eventType: SimulatedEdgeEventType,
+  includeBody: boolean | undefined,
+): void {
+  if (includeBody !== true) {
+    return;
+  }
+
+  if (eventType === "viewer-request" || eventType === "origin-request") {
+    return;
+  }
+
+  throw new SimCloudFrontInvalidLambdaFunctionAssociation(
+    `Sim CloudFront Lambda@Edge association for ${eventType} sets ` +
+      `IncludeBody. CloudFront takes IncludeBody at viewer-request and ` +
+      `origin-request, the events that carry a request body.`,
+  );
+}
+
+/**
  * Refuse a Behavior that runs both kinds of edge function at the viewer.
  *
  * CloudFront takes one function per event type, and it takes CloudFront

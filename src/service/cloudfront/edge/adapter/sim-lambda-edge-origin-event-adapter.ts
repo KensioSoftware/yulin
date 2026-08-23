@@ -7,8 +7,8 @@ import { SimLambdaEdgeRequestAdapter } from "./sim-lambda-edge-request-adapter.j
 import { SimLambdaEdgeResponseAdapter } from "./sim-lambda-edge-response-adapter.js";
 
 /**
- * What an origin-request handler left for the fetch to use: the request to
- * send, and the Origin to send it to.
+ * What an origin-request handler left for the fetch to use. The request to send
+ * travels with the Origin to send it to.
  */
 export interface SimLambdaEdgeOriginRequest {
   readonly request: Request;
@@ -19,7 +19,7 @@ export interface SimLambdaEdgeOriginRequest {
  * Converts between Fetch API objects and the shapes the two origin events
  * carry. `SimLambdaEdgeEventAdapter` does the same for the viewer events.
  *
- * What sets an origin event apart is the Origin: the request carries the one
+ * The Origin is what sets an origin event apart. The request carries the one
  * the fetch is about to read, and a handler rewriting it sends the fetch
  * somewhere else.
  */
@@ -60,7 +60,7 @@ export class SimLambdaEdgeOriginEventAdapter {
    * Build the event an origin-response function is invoked with.
    *
    * The request travels with the response and carries no body, for the same
-   * reason a viewer-response event's does not: CloudFront has sent the request
+   * reason a viewer-response event's does not. CloudFront has sent the request
    * on by this point.
    */
   async toOriginResponseEvent(

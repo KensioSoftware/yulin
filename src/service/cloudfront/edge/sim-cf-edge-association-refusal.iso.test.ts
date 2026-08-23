@@ -112,6 +112,28 @@ describe("Simulated CloudFront Lambda@Edge association refusals", () => {
     assertStringIncludes(error.message, "not a CloudFront event type");
   });
 
+  it("refuses a body on an association at an event that carries none", async () => {
+    const simAws = new SimAws();
+    const functionArn = await makeEdgeFunctionVersionArn({
+      simAws,
+      functionName: "body-reading-edge",
+      handler: (event: unknown) => event,
+    });
+
+    const error = await refusalFor(simAws, {
+      edge: [
+        {
+          EventType: "origin-response",
+          LambdaFunctionARN: functionArn,
+          IncludeBody: true,
+        },
+      ],
+    });
+
+    assertStringIncludes(error.message, "IncludeBody");
+    assertStringIncludes(error.message, "origin-response");
+  });
+
   it("refuses a Behavior mixing a CloudFront Function and Lambda@Edge at the viewer events", async () => {
     const simAws = new SimAws();
     const functionArn = await makeEdgeFunctionVersionArn({

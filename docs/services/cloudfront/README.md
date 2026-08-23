@@ -1343,9 +1343,11 @@ A `viewer-request` handler returning the request carries on to the Origin with w
 Returning a response answers the viewer there and then, and the Origin is never read. A
 `viewer-response` handler returns the response the viewer gets.
 
-Set `IncludeBody` to give a `viewer-request` handler the request body, which arrives base64 encoded
-under `request.body.data`. A handler setting `request.body.action` to `replace` sends its own body
-to the Origin.
+Set `IncludeBody` to give a `viewer-request` or `origin-request` handler the request body, which
+arrives base64 encoded under `request.body.data`. A handler setting `request.body.action` to
+`replace` sends its own body to the Origin. The field belongs to the two request events, and an
+association setting it on `viewer-response` or `origin-response` is refused, as CloudFront refuses
+one.
 
 A handler that throws answers the viewer with a 502, as CloudFront answers a failed edge function.
 The error reaches the function's own output and nothing else.
@@ -2607,10 +2609,12 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
-- **Both origin events run on every request.** Real CloudFront runs `origin-request` and
-  `origin-response` on a cache miss, and serves a cache hit without reaching either. Simulated
-  CloudFront holds no cache. Every request is a miss here, and both functions run every time. A
-  test counting invocations is counting requests.
+- **The origin events run on every request that reaches the Origin.** Real CloudFront runs
+  `origin-request` and `origin-response` on a cache miss, and serves a cache hit without reaching
+  either. Simulated CloudFront holds no cache, and every request that gets as far as the Origin is a
+  miss here. A request a web ACL blocked or a viewer-request function answered reaches neither
+  event, and an `origin-request` function that returns a response leaves the Origin unread with no
+  `origin-response` event after it.
 - **An Origin keeps its kind and its Bucket through an origin-request function.** Real CloudFront
   lets a handler hand back `origin.s3` where it was given `origin.custom`, or point an S3 Origin at
   another Bucket. Both need something a simulated Origin does not hold, the dispatcher that reaches

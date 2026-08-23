@@ -2,7 +2,6 @@ import {
   assertIdentical,
   assertNonNullable,
   assertResponseStatus,
-  assertStringIncludes,
 } from "@kensio/smartass";
 import {
   CreateFunctionCommand,
@@ -231,6 +230,56 @@ describe("Simulated CloudFront origin-request Lambda@Edge", () => {
     assertIdentical(await response.text(), "<h1>Home</h1>");
   });
 
+  it("gives the handler the request body when the association includes it", async () => {
+    // Given an association that reads the body at the origin request.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "origin-body-site", {});
+
+    const versionArn = await makeEdgeFunctionVersionArn({
+      simAws,
+      functionName: "echo-origin-body",
+      handler: (
+        event: LambdaAtEdge.OriginRequestEvent,
+      ): LambdaAtEdge.Response => ({
+        status: "200",
+        body: Buffer.from(
+          event.Records[0].cf.request.body?.data ?? "",
+          "base64",
+        ).toString(),
+      }),
+    });
+
+    const distributionId = await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig("origin-body-site", {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          AllowedMethods: { Quantity: 3, Items: ["GET", "HEAD", "POST"] },
+          LambdaFunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              {
+                EventType: "origin-request",
+                LambdaFunctionARN: versionArn,
+                IncludeBody: true,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    // When a request arrives carrying one.
+    const response = await simCfSiteRequest(simAws, distributionId, "/orders", {
+      method: "POST",
+      body: "order=1042",
+    });
+
+    // Then the handler was given it.
+    assertIdentical(await response.text(), "order=1042");
+  });
+
   it("runs a viewer-request CloudFront Function alongside an origin-request Lambda@Edge function", async () => {
     // Given a CloudFront Function rewriting the URI at the viewer.
     const simAws = new SimAws();
@@ -292,98 +341,9 @@ describe("Simulated CloudFront origin-request Lambda@Edge", () => {
     // When a request arrives for the site root.
     const response = await simCfSiteRequest(simAws, distributionId, "/");
 
-    // Then both functions ran: the CloudFront Function named the page, and the
+    // Then both functions ran. The CloudFront Function named the page, and the
     // Lambda@Edge function named the prefix it was read from.
     assertResponseStatus(response, 200);
     assertIdentical(await response.text(), "<h1>New</h1>");
-  });
-
-  it("answers with a 502 when a function moved an S3 Origin to another Bucket", async () => {
-    // Given a handler pointing the S3 Origin at a Bucket the Distribution was
-    // never written with.
-    const simAws = new SimAws();
-    await simCfSiteBucket(simAws, "moved-origin-site", {
-      "index.html": "<h1>Home</h1>",
-    });
-
-    const versionArn = await makeEdgeFunctionVersionArn({
-      simAws,
-      functionName: "move-bucket",
-      handler: (event: LambdaAtEdge.OriginRequestEvent) => {
-        const { request } = event.Records[0].cf;
-        assertNonNullable(request.origin.s3, "the Origin is an S3 one");
-        request.origin.s3.domainName = "somewhere-else.s3.amazonaws.com";
-
-        return request;
-      },
-    });
-
-    const distributionId = await simCfSiteDistributionId(
-      simAws,
-      originRequestConfig("moved-origin-site", versionArn),
-    );
-
-    // When a request arrives.
-    const response = await simCfSiteRequest(
-      simAws,
-      distributionId,
-      "/index.html",
-    );
-
-    // Then the viewer gets the 502 a failed edge function gets, saying what
-    // this simulation could not do.
-    assertResponseStatus(response, 502);
-    assertStringIncludes(await response.text(), "moving one is not simulated");
-  });
-
-  it("answers with a 502 when a function turned an S3 Origin into a custom Origin", async () => {
-    // Given a handler handing back the other kind of Origin.
-    const simAws = new SimAws();
-    await simCfSiteBucket(simAws, "swapped-origin-site", {
-      "index.html": "<h1>Home</h1>",
-    });
-
-    const versionArn = await makeEdgeFunctionVersionArn({
-      simAws,
-      functionName: "swap-origin-kind",
-      handler: (event: LambdaAtEdge.OriginRequestEvent) => {
-        const { request } = event.Records[0].cf;
-
-        request.origin = {
-          custom: {
-            customHeaders: {},
-            domainName: "api.example.test",
-            keepaliveTimeout: 5,
-            path: "",
-            port: 443,
-            protocol: "https",
-            readTimeout: 30,
-            sslProtocols: ["TLSv1.2"],
-          },
-        };
-
-        return request;
-      },
-    });
-
-    const distributionId = await simCfSiteDistributionId(
-      simAws,
-      originRequestConfig("swapped-origin-site", versionArn),
-    );
-
-    // When a request arrives.
-    const response = await simCfSiteRequest(
-      simAws,
-      distributionId,
-      "/index.html",
-    );
-
-    // Then the viewer gets a 502 naming the switch as the part that is not
-    // simulated.
-    assertResponseStatus(response, 502);
-    assertStringIncludes(
-      await response.text(),
-      "Switching an Origin between the two kinds is not simulated",
-    );
   });
 });

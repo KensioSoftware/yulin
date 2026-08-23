@@ -2,12 +2,12 @@
  * A Distribution whose Origins are simulated Lambda Function URLs, for tests
  * about the Lambda@Edge functions running either side of the Origin fetch.
  *
- * A custom Origin is what an origin event has the most to say about: it is the
+ * A custom Origin is what an origin event has the most to say about. It is the
  * kind whose domain name, path and custom headers a handler can rewrite, and
  * the kind that can answer with a status of its own. This lives under `test/`
- * for the same reasons as the rest of `test/cloudfront/`: eslint rejects an
- * AWS SDK import from `src/` outside a test file, and more than one suite
- * needs the same steps.
+ * for the same reasons as the rest of `test/cloudfront/`. Eslint rejects an
+ * AWS SDK import from `src/` outside a test file, and more than one suite needs
+ * the same steps.
  */
 
 import { assertNonNullable } from "@kensio/smartass";

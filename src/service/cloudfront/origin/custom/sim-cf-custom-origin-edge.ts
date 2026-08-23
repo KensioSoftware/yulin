@@ -43,7 +43,7 @@ export function customOriginEdgeOrigin(
  * The custom Origin an origin-request handler left, ready to fetch from.
  *
  * A handler that handed back an S3 Origin asked for a switch this simulation
- * cannot make: the Bucket behind a domain name is resolved when the
+ * cannot make. The Bucket behind a domain name is resolved when the
  * Distribution is written.
  */
 export function customOriginEdgeParts(
