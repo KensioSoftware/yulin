@@ -16,6 +16,7 @@ import {
   SimS3ObjectMetadata,
 } from "../../../s3/object/s3-object.js";
 import { simCloudFrontBehaviorFactory } from "../../behaviour/sim-cloud-front-behavior.js";
+import { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
 import { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { bucketNameFromCfS3OriginDomainName } from "./sim-cf-s3-origin-bucket-name.js";
 import { SimCloudFrontS3Origin } from "./sim-cloudfront-s3-origin.js";
@@ -122,6 +123,34 @@ describe("sim CloudFront S3 Origin", () => {
 
     // Then the failure reaches the caller instead of becoming a 404.
     assertInstanceOf(error, SimS3NoSuchBucket);
+  });
+
+  it("tells an origin event that the Bucket read is signed", async () => {
+    // Given an Origin whose origin access control signs what it reads.
+    const simS3 = new SimAws().s3();
+    await simS3.createBucket({ input: { Bucket: "private-bucket" } });
+
+    const bucket = simS3.getSimBucketByName("private-bucket");
+    assertNonNullable(bucket);
+
+    const origin = new SimCloudFrontS3Origin({
+      originBucket: { bucket, simS3 },
+      domainName: "private-bucket.s3.amazonaws.com",
+      originAccessControl: new SimCloudFrontOriginAccessControl({
+        name: "site-oac",
+        originType: "s3",
+        signingBehavior: "always",
+      }),
+    });
+
+    // When an origin event asks what the Origin is.
+    const { s3 } = origin.toEdgeOrigin();
+
+    // Then the handler is told the read is signed, in CloudFront's own terms
+    // for it.
+    assertNonNullable(s3);
+    assertIdentical(s3.authMethod, "origin-access-identity");
+    assertIdentical(s3.domainName, "private-bucket.s3.amazonaws.com");
   });
 
   it("resolves bucket name fallback from non-S3 origin domain name", () => {

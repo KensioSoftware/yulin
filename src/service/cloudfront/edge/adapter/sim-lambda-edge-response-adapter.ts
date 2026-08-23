@@ -30,15 +30,15 @@ export class SimLambdaEdgeResponseAdapter {
   }
 
   /**
-   * Convert a viewer-response handler's result into a Node fetch Response,
-   * keeping the origin's body.
+   * Convert a response handler's result into a Node fetch Response, keeping
+   * the origin's body.
    *
-   * A viewer-response event carries no body, and a handler that returns
+   * Neither response event carries a body, and a handler that returns
    * `event.Records[0].cf.response` returns none either. Treating that as an
    * empty body would drop the page while leaving the origin's content-length
    * header describing it. A handler that did write a body replaces it.
    */
-  fromEdgeViewerResponse(
+  fromEdgeHandlerResponse(
     edgeResponse: LambdaAtEdge.Response,
     originalResponse: Response,
   ): Response {

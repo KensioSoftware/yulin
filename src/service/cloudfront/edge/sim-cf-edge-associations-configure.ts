@@ -4,7 +4,11 @@ import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
 } from "../command/create-distribution/create-distribution.command.js";
-import type { SimCfEdgeAssociations } from "./sim-cf-edge-association.js";
+import type {
+  SimCfEdgeAssociation,
+  SimCfEdgeAssociations,
+} from "./sim-cf-edge-association.js";
+import type { SimulatedEdgeEventType } from "./sim-cf-edge-association-checks.js";
 
 /**
  * Configure the Lambda@Edge associations of one cache Behavior.
@@ -12,9 +16,9 @@ import type { SimCfEdgeAssociations } from "./sim-cf-edge-association.js";
  * Returns undefined where the Behavior associates none. A Behavior without an
  * edge function carries no empty object describing that.
  *
- * Only the two viewer events are mapped. An association on an origin event has
- * already been refused by `SimCfEdgeAssociationValidator`, which runs before
- * any Distribution state is touched.
+ * All four event types are mapped. An event type CloudFront has no such event
+ * for has already been refused by `SimCfEdgeAssociationValidator`, which runs
+ * before any Distribution state is touched.
  */
 export function configureEdgeAssociations(
   cacheBehavior:
@@ -27,9 +31,7 @@ export function configureEdgeAssociations(
     return undefined;
   }
 
-  const associations: {
-    -readonly [Key in keyof SimCfEdgeAssociations]: SimCfEdgeAssociations[Key];
-  } = {};
+  let associations: SimCfEdgeAssociations = {};
 
   for (const association of items) {
     const { EventType, LambdaFunctionARN, IncludeBody } = association;
@@ -45,15 +47,34 @@ export function configureEdgeAssociations(
       includeBody: IncludeBody ?? false,
     };
 
-    if (EventType === "viewer-request") {
-      associations.viewerRequest = configured;
-      continue;
-    }
-
-    if (EventType === "viewer-response") {
-      associations.viewerResponse = configured;
-    }
+    associations = {
+      ...associations,
+      ...associationFor(EventType, configured),
+    };
   }
 
   return Object.keys(associations).length > 0 ? associations : undefined;
+}
+
+/**
+ * The association an event type is held under.
+ */
+function associationFor(
+  eventType: SimulatedEdgeEventType,
+  association: SimCfEdgeAssociation,
+): SimCfEdgeAssociations {
+  switch (eventType) {
+    case "viewer-request": {
+      return { viewerRequest: association };
+    }
+    case "origin-request": {
+      return { originRequest: association };
+    }
+    case "origin-response": {
+      return { originResponse: association };
+    }
+    case "viewer-response": {
+      return { viewerResponse: association };
+    }
+  }
 }

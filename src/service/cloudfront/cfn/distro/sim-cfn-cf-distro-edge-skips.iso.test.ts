@@ -1,4 +1,5 @@
 import {
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -89,7 +90,7 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
     assertStringIncludes(ignoredProperty.reason, absentVersionArn);
   });
 
-  it("deploys the rest of a Behavior whose association is on an origin event", async () => {
+  it("runs the origin-request function a template's Behavior associates", async () => {
     // Given a Bucket holding the page the edge function rewrites requests to.
     const simAws = new SimAws();
     await simCfSiteBucket(simAws, "edge-site", {
@@ -97,16 +98,11 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
       "index.html": "<h1>Home</h1>",
     });
 
-    // When a template whose Behavior runs the same function at the viewer and
-    // at the Origin deploys.
+    // When a template whose Behavior runs the function at the Origin deploys.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "edge-site",
       template: edgeDistributionTemplateFactory.make({
         associations: [
-          {
-            EventType: "viewer-request",
-            LambdaFunctionARN: { Ref: edgeVersionLogicalId },
-          },
           {
             EventType: "origin-request",
             LambdaFunctionARN: { Ref: edgeVersionLogicalId },
@@ -116,8 +112,7 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the viewer-request function still runs, and the origin-request one
-    // is recorded as the part that was left out.
+    // Then the function runs before the fetch, and nothing was left out.
     const response = await simCfSiteRequest(
       simAws,
       deployedDistribution(stack).distributionId,
@@ -126,14 +121,34 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
 
     assertResponseStatus(response, 200);
     assertIdentical(await response.text(), "<h1>Edge</h1>");
+    assertArrayLength(stack.ignoredProperties, 0);
+  });
 
-    const [ignoredProperty] = stack.ignoredProperties;
-    assertNonNullable(ignoredProperty);
-    assertIdentical(
-      ignoredProperty.path,
-      "DistributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations.origin-request",
-    );
-    assertStringIncludes(ignoredProperty.reason, "viewer-request");
+  it("fails the stack over an event type CloudFront has no such event for", async () => {
+    // Given a template whose association names something that is not one of
+    // CloudFront's four events.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {});
+
+    // When it deploys.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "edge-site",
+        template: edgeDistributionTemplateFactory.make({
+          associations: [
+            {
+              EventType: "viewer-redirect",
+              LambdaFunctionARN: { Ref: edgeVersionLogicalId },
+            },
+          ],
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the deployment failed, as a real one fails a template CloudFront
+    // will not take.
+    assertStringIncludes(error.message, "not a CloudFront event type");
   });
 
   it("records a skipped association under the Behavior's path pattern", async () => {

@@ -1,4 +1,10 @@
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { LambdaAtEdge } from "../../typings/lambda-at-edge.namespace.js";
+import {
+  s3OriginDomainName,
+  s3OriginEdgeOrigin,
+  s3OriginEdgePath,
+} from "./sim-cf-s3-origin-edge.js";
 import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
@@ -20,10 +26,15 @@ export function emptyCloudFrontS3OriginResolver(): undefined {
   return;
 }
 
-interface SimCloudFrontS3OriginProperties {
+export interface SimCloudFrontS3OriginProperties {
   readonly originBucket: SimCfS3OriginBucket;
   readonly originPath?: string | undefined;
   readonly originAccessControl?: SimCloudFrontOriginAccessControl | undefined;
+  /**
+   * The domain name the Origin was configured with, which an origin event
+   * reports. An Origin built without one reports the Bucket's REST endpoint.
+   */
+  readonly domainName?: string | undefined;
 }
 
 /**
@@ -55,8 +66,9 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   private readonly responses: SimCfS3OriginResponses;
   private readonly objectKey: SimCfS3OriginObjectKey;
   private readonly signer: SimCfS3OriginSigner;
+  private readonly domainName: string;
 
-  constructor(properties: SimCloudFrontS3OriginProperties) {
+  constructor(private readonly properties: SimCloudFrontS3OriginProperties) {
     this.loader = new SimCfS3OriginObjectLoader(properties.originBucket);
     this.signer = new SimCfS3OriginSigner(properties.originAccessControl);
     this.responses = new SimCfS3OriginResponses(
@@ -64,6 +76,7 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
     );
     this.objectKey = new SimCfS3OriginObjectKey(properties.originPath ?? "");
     this.originAccessControl = properties.originAccessControl;
+    this.domainName = s3OriginDomainName(properties);
   }
 
   /**
@@ -91,6 +104,23 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
     }
 
     return this.responses.foundObject(object, request.req);
+  }
+
+  /**
+   * This Origin as an origin event presents it.
+   */
+  toEdgeOrigin(): LambdaAtEdge.Origin {
+    return s3OriginEdgeOrigin(this.properties, this.domainName);
+  }
+
+  /**
+   * This Origin as an origin-request handler left it.
+   */
+  withEdgeOrigin(edgeOrigin: LambdaAtEdge.Origin): SimCloudFrontOrigin {
+    return new SimCloudFrontS3Origin({
+      ...this.properties,
+      originPath: s3OriginEdgePath(this.domainName, edgeOrigin),
+    });
   }
 
   private methodSupported(method: string): boolean {

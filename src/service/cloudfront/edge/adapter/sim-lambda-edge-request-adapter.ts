@@ -1,6 +1,7 @@
 import { simAwsRequestHostname } from "../../../../serve/http/url/sim-aws-request-hostname.js";
 import type { LambdaAtEdge } from "../../typings/lambda-at-edge.namespace.js";
 import { edgeRequestBody, replacementBody } from "./sim-lambda-edge-body.js";
+import { edgeOriginDomainName } from "./sim-lambda-edge-origin.js";
 import { fromEdgeHeaders, toEdgeHeaders } from "./sim-lambda-edge-headers.js";
 
 /**
@@ -37,6 +38,31 @@ export class SimLambdaEdgeRequestAdapter {
       querystring: url.search.replace(/^\?/u, ""),
       headers: this.viewerEdgeHeaders(request),
       ...(includeBody && { body: await edgeRequestBody(request) }),
+    };
+  }
+
+  /**
+   * Convert a Node fetch Request into the shape an origin event carries.
+   *
+   * The Origin the request is on its way to travels with it, and the host is
+   * the Origin's domain name rather than the one the viewer used. CloudFront
+   * has picked an Origin by this point and states the host it is about to send
+   * the request to.
+   */
+  async toOriginEdgeRequest(
+    request: Request,
+    includeBody: boolean,
+    origin: LambdaAtEdge.Origin,
+  ): Promise<LambdaAtEdge.OriginRequest> {
+    const edgeRequest = await this.toEdgeRequest(request, includeBody);
+
+    return {
+      ...edgeRequest,
+      headers: {
+        ...edgeRequest.headers,
+        host: [{ key: "Host", value: edgeOriginDomainName(origin) }],
+      },
+      origin,
     };
   }
 

@@ -8,6 +8,7 @@ import type {
 import { authorizeEdgeAssociation } from "./sim-cf-edge-association-auth-z.js";
 import {
   assertAssociatedFunctionArn,
+  assertIncludableBody,
   assertNoViewerFunctionMix,
   assertOneFunctionPerEvent,
   assertSimulatedEventType,
@@ -92,11 +93,12 @@ export class SimCfEdgeAssociationValidator {
     const eventTypes = new Set<string>();
 
     for (const association of associations) {
-      const { EventType, LambdaFunctionARN } = association;
+      const { EventType, IncludeBody, LambdaFunctionARN } = association;
 
       assertSimulatedEventType(EventType);
       assertOneFunctionPerEvent(eventTypes, EventType);
       assertAssociatedFunctionArn(LambdaFunctionARN, EventType);
+      assertIncludableBody(EventType, IncludeBody);
 
       // Read for the refusals reading it produces. The parts themselves
       // matter only where the function behind the ARN is looked up.

@@ -1,4 +1,9 @@
+import type { LambdaAtEdge } from "../../typings/lambda-at-edge.namespace.js";
 import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
+import {
+  customOriginEdgeOrigin,
+  customOriginEdgeParts,
+} from "./sim-cf-custom-origin-edge.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
 import type { SimCfCustomOriginDispatcher } from "./sim-cf-custom-origin-dispatcher.js";
@@ -40,14 +45,21 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
     | SimCloudFrontOriginAccessControl
     | undefined;
 
+  /**
+   * The parts of this Origin an origin event carries, which
+   * `SimCfCustomOriginEdgeParts` names.
+   */
+  public readonly domainName: string;
+  public readonly originPath: string;
+  public readonly customHeaders: Readonly<Record<string, string>>;
+
   private readonly originId: string;
-  private readonly domainName: string;
-  private readonly originPath: string;
   private readonly dispatcher: SimCfCustomOriginDispatcher;
   private readonly signer: SimCfCustomOriginSigner;
-  private readonly customHeaders: Readonly<Record<string, string>>;
 
-  constructor(properties: SimCloudFrontCustomOriginProperties) {
+  constructor(
+    private readonly properties: SimCloudFrontCustomOriginProperties,
+  ) {
     this.originId = properties.originId;
     this.domainName = properties.domainName;
     this.originPath = properties.originPath ?? "";
@@ -82,5 +94,28 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
     }
 
     return await this.dispatcher.fetch(originRequest);
+  }
+
+  /**
+   * This Origin as an origin event presents it.
+   */
+  toEdgeOrigin(): LambdaAtEdge.Origin {
+    return customOriginEdgeOrigin(this);
+  }
+
+  /**
+   * This Origin as an origin-request handler left it.
+   *
+   * The domain name, the Origin path and the custom headers are the parts the
+   * fetch reads, so a handler that rewrote any of them sends the request
+   * somewhere else, under another path, or carrying another header. A domain
+   * name naming nothing in this simulation fails the same way a misconfigured
+   * Origin does.
+   */
+  withEdgeOrigin(edgeOrigin: LambdaAtEdge.Origin): SimCloudFrontOrigin {
+    return new SimCloudFrontCustomOrigin({
+      ...this.properties,
+      ...customOriginEdgeParts(this.originId, edgeOrigin),
+    });
   }
 }

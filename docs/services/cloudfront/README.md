@@ -1219,10 +1219,12 @@ covers what the factories have in common.
 
 ## Simulated Lambda@Edge
 
-A cache Behavior can run a Lambda function at `viewer-request` and `viewer-response` through
-`LambdaFunctionAssociations`. Where a CloudFront Function is a small piece of JavaScript running in
-CloudFront's own runtime, a Lambda@Edge function is an ordinary simulated Lambda function, with an
-execution role, an environment and whatever SDK calls its handler makes.
+A cache Behavior can run a Lambda function at any of CloudFront's four events through
+`LambdaFunctionAssociations`. Those are `viewer-request` and `viewer-response` at the edge, and
+`origin-request` and `origin-response` either side of the Origin fetch. Where a CloudFront Function
+is a small piece of JavaScript running in CloudFront's own runtime, a Lambda@Edge function is an
+ordinary simulated Lambda function, with an execution role, an environment and whatever SDK calls
+its handler makes.
 
 Three things about Lambda@Edge catch people out on AWS, and simulated CloudFront refuses all three
 the way AWS refuses them, when the Distribution is written rather than when a request arrives.
@@ -1341,19 +1343,195 @@ A `viewer-request` handler returning the request carries on to the Origin with w
 Returning a response answers the viewer there and then, and the Origin is never read. A
 `viewer-response` handler returns the response the viewer gets.
 
-Set `IncludeBody` to give a `viewer-request` handler the request body, which arrives base64 encoded
-under `request.body.data`. A handler setting `request.body.action` to `replace` sends its own body
-to the Origin.
+Set `IncludeBody` to give a `viewer-request` or `origin-request` handler the request body, which
+arrives base64 encoded under `request.body.data`. A handler setting `request.body.action` to
+`replace` sends its own body to the Origin. The field belongs to the two request events, and an
+association setting it on `viewer-response` or `origin-response` is refused, as CloudFront refuses
+one.
 
 A handler that throws answers the viewer with a 502, as CloudFront answers a failed edge function.
 The error reaches the function's own output and nothing else.
+
+### The origin events
+
+An `origin-request` function runs after the Behavior has resolved the Origin and before the fetch.
+Its event carries `request.origin`, holding the Origin the fetch is about to read, under `custom` or
+`s3` for the kind it is. A handler rewriting `origin.custom.domainName` sends the fetch to another
+Origin, and one rewriting `path` reads under another prefix. A header added to `customHeaders`
+reaches the Origin and the viewer never sees it. A handler returning a response answers the viewer
+with the Origin unread.
+
+An `origin-response` function runs after the fetch and before the custom error page replaces an
+error status. It runs on whatever the Origin answered, including a 400 and above. That is where the
+origin events differ from the viewer events, and CloudFront documents it. Returning a response
+replaces what the viewer gets.
+
+At both origin events the `host` header holds the Origin's own domain name. A viewer event shows the
+domain the viewer used.
+
+```typescript sim-cloudfront-lambda-edge-origin
+/**
+ * A Lambda@Edge function choosing the Origin, and another one stamping what
+ * that Origin answered.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import {
+  CreateFunctionCommand,
+  PublishVersionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import type { LambdaAtEdge } from "@kensio/yulin/cloudfront";
+
+const simAws = new SimAws();
+
+// A Lambda@Edge execution role trusts both service principals, at the origin
+// events as at the viewer events.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "EdgeOriginRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: {
+          Service: ["lambda.amazonaws.com", "edgelambda.amazonaws.com"],
+        },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+const edgeLambda = simAws.region("us-east-1").lambda();
+
+await edgeLambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "route-origin",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: LambdaAtEdge.OriginRequestEvent) => {
+          const { request } = event.Records[0].cf;
+          const { custom } = request.origin;
+
+          if (custom === undefined) {
+            return request;
+          }
+
+          // Everything under /api is served by the second Origin.
+          if (request.uri.startsWith("/api/")) {
+            custom.domainName = "orders.example.test";
+          }
+
+          // A header the viewer never sent and never sees.
+          custom.customHeaders["x-from-cloudfront"] = [
+            { key: "X-From-CloudFront", value: "yes" },
+          ];
+
+          return request;
+        },
+      ),
+    },
+  }),
+);
+
+const routeVersion = await edgeLambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "route-origin" }),
+);
+
+await edgeLambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "stamp-origin-response",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: LambdaAtEdge.OriginResponseEvent): LambdaAtEdge.Response => {
+          const { response } = event.Records[0].cf;
+
+          // This runs for an Origin error too, so the status is worth keeping.
+          return {
+            ...response,
+            headers: {
+              ...response.headers,
+              "x-origin-status": [
+                { key: "X-Origin-Status", value: response.status },
+              ],
+            },
+          };
+        },
+      ),
+    },
+  }),
+);
+
+const stampVersion = await edgeLambda.publishVersion(
+  new PublishVersionCommand({ FunctionName: "stamp-origin-response" }),
+);
+
+const customOriginConfig = {
+  HTTPPort: 80,
+  HTTPSPort: 443,
+  OriginProtocolPolicy: "https-only",
+} as const;
+
+await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "edge-origin-routing",
+      Comment: "Choosing the Origin at the edge",
+      Enabled: true,
+      Origins: {
+        Quantity: 2,
+        Items: [
+          {
+            Id: "site-origin",
+            DomainName: "site.example.test",
+            CustomOriginConfig: customOriginConfig,
+          },
+          {
+            Id: "orders-origin",
+            DomainName: "orders.example.test",
+            CustomOriginConfig: customOriginConfig,
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "site-origin",
+        ViewerProtocolPolicy: "allow-all",
+        LambdaFunctionAssociations: {
+          Quantity: 2,
+          Items: [
+            {
+              EventType: "origin-request",
+              LambdaFunctionARN: routeVersion.FunctionArn,
+            },
+            {
+              EventType: "origin-response",
+              LambdaFunctionARN: stampVersion.FunctionArn,
+            },
+          ],
+        },
+      },
+    },
+  }),
+);
+```
+
+Two Origin rewrites are refused, and the viewer gets the 502 a failed edge function gets, carrying
+the reason (see [Limitations](#limitations)). One switches an Origin between `custom` and `s3`. The
+other moves an S3 Origin to another Bucket.
 
 ### Which edge function runs where
 
 CloudFront takes one edge function per event type, and it does not combine CloudFront Functions with
 Lambda@Edge at the viewer events. A Behavior with a viewer-request CloudFront Function and a
 viewer-response Lambda@Edge function is refused, and so is a Behavior naming both at one event type.
-Simulated CloudFront refuses the same combinations.
+Simulated CloudFront refuses the same combinations. The rule stops at the viewer. A viewer-request
+CloudFront Function runs alongside a Lambda@Edge function on either origin event.
 
 Neither kind runs at the viewer response once the Origin has answered 400 or higher. CloudFront
 skips that event for an Origin error, and the status the Origin returned is what decides it (see
@@ -1390,16 +1568,15 @@ SiteDistribution:
 
 The function still has to live in us-east-1. A stack holding one is a us-east-1 stack.
 
-Two kinds of association are left out of the deployed Distribution and recorded on
-`stack.ignoredProperties`, under the event type each was on. One names a function version this
-simulation does not hold, as a template pointing at a function in a real account does. The other is
-on `origin-request` or `origin-response`. The rest of the Behavior deploys either way, and the
-event the skipped association was on is left empty. A test that cares reads the record.
+An association naming a function version this simulation does not hold is left out of the deployed
+Distribution and recorded on `stack.ignoredProperties`, under the event type it was on. A template
+pointing at a function in a real account is the usual reason. The rest of the Behavior deploys, and
+the event the skipped association was on is left empty. A test that cares reads the record.
 
 Everything real CloudFront refuses still fails the deployment. A function outside us-east-1, an ARN
-without a version qualifier, an execution role missing the `edgelambda.amazonaws.com` trust, two
-functions on one event type and a viewer event running both kinds of edge function each fail a real
-deploy of the same template.
+without a version qualifier, an execution role missing the `edgelambda.amazonaws.com` trust, an
+`EventType` that is none of CloudFront's four, two functions on one event type and a viewer event
+running both kinds of edge function each fail a real deploy of the same template.
 
 CDK reaches a Behavior through `edgeLambdas`, given a `lambda.Version` from the same stack:
 
@@ -2414,7 +2591,7 @@ Sim CloudFront currently supports:
 - Default cache Behavior and path-based cache Behaviors
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions, including async ones
-- `viewer-request` and `viewer-response` Lambda@Edge functions, through `LambdaFunctionAssociations`
+- Lambda@Edge functions at all four events, through `LambdaFunctionAssociations`
 - `LambdaFunctionAssociations` on a template's Distribution, and CDK's `edgeLambdas`
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
@@ -2432,11 +2609,28 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
-- **Lambda@Edge runs at the two viewer events only.** CloudFront runs an edge function at
-  `origin-request` and `origin-response` as well, and `CreateDistribution` refuses both by name
-  rather than accepting one that would never run. A Distribution deployed from a template records
-  the association and deploys without it. A site naming one origin function still serves. The
-  request pipeline has no hook either side of the Origin fetch yet.
+- **The origin events run on every request that reaches the Origin.** Real CloudFront runs
+  `origin-request` and `origin-response` on a cache miss, and serves a cache hit without reaching
+  either. Simulated CloudFront holds no cache, and every request that gets as far as the Origin is a
+  miss here. A request a web ACL blocked or a viewer-request function answered reaches neither
+  event, and an `origin-request` function that returns a response leaves the Origin unread with no
+  `origin-response` event after it.
+- **An Origin keeps its kind and its Bucket through an origin-request function.** Real CloudFront
+  lets a handler hand back `origin.s3` where it was given `origin.custom`, or point an S3 Origin at
+  another Bucket. Both need something a simulated Origin does not hold, the dispatcher that reaches
+  a custom Origin and the Bucket a domain name resolved to when the Distribution was written. Each
+  is refused with the 502 a failed edge function gets, carrying the reason. The domain name, the
+  Origin path and the custom headers are the parts a handler can rewrite.
+- **A custom Origin reports CloudFront's default connection settings.** `keepaliveTimeout`,
+  `port`, `protocol`, `readTimeout` and `sslProtocols` are what an origin event carries for every
+  custom Origin, whatever `CustomOriginConfig` said, and a handler writing them changes nothing
+  about the fetch. Nothing here opens a socket for them to apply to. The `customHeaders` of an S3
+  Origin are empty for the same kind of reason. An S3 Origin reads its Bucket through GetObject and
+  builds no request for a header to travel on.
+- **A custom error page is fetched without the origin events.** CloudFront fetches
+  `ResponsePagePath` from the Origin, and an origin function runs for that fetch as it does for any
+  other. Here the page is fetched directly. An `origin-request` function that rewrote the Origin
+  leaves the error page coming from the Behavior's own Origin.
 - **A CDK `EdgeFunction` outside us-east-1 wants the whole cloud assembly.**
   `cloudfront.experimental.EdgeFunction` writes the function into a us-east-1 support stack and
   reads its ARN back through a custom resource in the stack that uses it. `deployCdkOut` deploys
@@ -2454,11 +2648,12 @@ Where sim CloudFront knowingly behaves differently from AWS:
   be too large for a real edge function.
 - **The Origin's status decides whether a viewer-response function runs.** CloudFront skips the
   viewer-response event once the Origin answers 400 or higher, and both kinds of function are
-  skipped here on that rule. Where a custom error response turns that status into another one, such
-  as the 200 a single-page app serves its shell with, the Origin's own status still decides. AWS
-  documents the restriction against the Origin's status and says nothing about the status a custom
-  error response puts in its place. A Distribution combining the two is where this simulation is
-  guessing.
+  skipped here on that rule. Where the status is replaced further down the pipeline, by a custom
+  error response or by an `origin-response` function, the Origin's own status still decides. AWS
+  documents the restriction against the Origin's status and says nothing about the status something
+  else puts in its place. A Distribution combining the two is where this simulation is guessing. A
+  response an `origin-request` function generated has no Origin status behind it, and its own status
+  stands in.
 - **CloudFront's disallowed and read-only header lists go unchecked.** Real CloudFront answers 502
   when an edge function adds `Connection` or edits `Content-Length`. Both kinds of function here
   write what they like, apart from the viewer-request `host`, which is restored.

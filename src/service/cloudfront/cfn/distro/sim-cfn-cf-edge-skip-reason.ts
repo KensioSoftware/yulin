@@ -1,7 +1,6 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import { namesSimCfnUnansweredAttribute } from "../../../cloudformation/resource/cfn/sim-cfn-unanswered-attribute.js";
 import type { SimCloudFrontLambdaFunctionAssociation } from "../../command/create-distribution/create-distribution.command.js";
-import { isSimulatedEdgeEventType } from "../../edge/sim-cf-edge-association-checks.js";
 import { readEdgeFunctionArnParts } from "../../edge/sim-cf-edge-function-arn.js";
 import { findSimCfEdgeFunctionVersion } from "../../edge/sim-cf-edge-function-version.js";
 
@@ -20,11 +19,10 @@ export interface SimCfnCfEdgeSkipContext {
  * Why this simulation cannot run one Lambda@Edge association, or nothing where
  * it can.
  *
- * Three answers leave an association out. The event type has no hook here. The
- * ARN names a function version this simulation does not hold, as a template
- * pointing at a function in a real account does. Or the ARN is the stand-in a
- * Resource in this Stack answered an `Fn::GetAtt` with, having no ARN of its
- * own to give.
+ * Two answers leave an association out. The ARN names a function version this
+ * simulation does not hold, as a template pointing at a function in a real
+ * account does. Or the ARN is the stand-in a Resource in this Stack answered an
+ * `Fn::GetAtt` with, having no ARN of its own to give.
  *
  * Everything else is left where `CreateDistribution` meets it, including the
  * mistakes real CloudFront refuses. A template carrying one of those fails a
@@ -40,10 +38,6 @@ export function simCfnCfEdgeSkipReason(
     return undefined;
   }
 
-  if (!isSimulatedEdgeEventType(eventType)) {
-    return unsimulatedEventReason(eventType, functionArn);
-  }
-
   const arn = readEdgeFunctionArnParts(functionArn);
 
   if (arn === undefined) {
@@ -55,20 +49,6 @@ export function simCfnCfEdgeSkipReason(
   }
 
   return absentFunctionReason(eventType, functionArn);
-}
-
-/**
- * The association is on an event type this simulation has no hook for.
- */
-function unsimulatedEventReason(
-  eventType: string,
-  functionArn: string,
-): string {
-  return (
-    `simulated CloudFront runs a Lambda@Edge function at viewer-request and ` +
-    `viewer-response, so the Behavior is deployed without the ${eventType} ` +
-    `function ${functionArn} and runs nothing there`
-  );
 }
 
 /**
