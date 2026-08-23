@@ -31,6 +31,6 @@ const objectOut = await simS3.getObject(
   new GetObjectCommand({ Bucket: "site", Key: "app.js" }),
 );
 
-// Each header is stored under the name a read returns it as.
-console.log(objectOut.Metadata?.["content-encoding"]); // br
-console.log(objectOut.Metadata?.["expires"]); // Sat, 02 Jan 2027 03:04:05 GMT
+// Each header comes back in the field a read describes an Object with.
+console.log(objectOut.ContentEncoding); // br
+console.log(objectOut.ExpiresString); // Sat, 02 Jan 2027 03:04:05 GMT

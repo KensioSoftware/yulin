@@ -5,6 +5,7 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3WebsiteRoute } from "../sim-s3-route.js";
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
+import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-read.js";
 import type { SimS3 } from "../../sim-s3.js";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimS3WebsiteObject } from "./sim-s3-website-object.js";
@@ -71,7 +72,7 @@ export class SimS3WebsiteObjectLoader {
 
       return new SimS3WebsiteObject({
         body: await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
-        metadata: output.Metadata,
+        metadata: simS3SystemMetadataHeadersFrom(output),
         etag: output.ETag,
         lastModified: output.LastModified,
       });

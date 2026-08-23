@@ -16,6 +16,7 @@ import { faker } from "@faker-js/faker";
 import { Readable } from "node:stream";
 import { describe, it } from "vitest";
 
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimSdk } from "../../../../sdk/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
@@ -137,9 +138,8 @@ describe("S3 CopyObjectCommand", () => {
       new GetObjectCommand({ Bucket: bucketName, Key: "logo-backup.svg" }),
     );
 
-    const metadata = copied.Metadata ?? {};
-    assertIdentical(metadata["content-type"], "image/svg+xml");
-    assertIdentical(metadata["designer"], "in-house");
+    assertIdentical(copied.ContentType, "image/svg+xml");
+    assertIdentical(copied.Metadata?.["designer"], "in-house");
   });
 
   it("takes the copy's metadata from the request under REPLACE", async () => {
@@ -177,10 +177,10 @@ describe("S3 CopyObjectCommand", () => {
       new GetObjectCommand({ Bucket: bucketName, Key: "page.html" }),
     );
 
-    const metadata = copied.Metadata ?? {};
-    assertIdentical(metadata["content-type"], "text/html");
-    assertIdentical(metadata["reviewed"], "2026-08");
-    assertUndefined(metadata["stale"]);
+    assertIdentical(copied.ContentType, "text/html");
+    assertDefined(copied.Metadata, "the copied Object metadata");
+    assertIdentical(copied.Metadata["reviewed"], "2026-08");
+    assertUndefined(copied.Metadata["stale"]);
   });
 
   it("copies a key holding a slash and a space", async () => {

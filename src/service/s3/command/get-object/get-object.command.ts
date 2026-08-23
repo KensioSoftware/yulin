@@ -1,5 +1,6 @@
 import type { Readable } from "node:stream";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3SystemMetadataOutput } from "../../object/s3-system-metadata-read.js";
 
 /**
  * Minimal structural sim S3 GetObject command.
@@ -32,8 +33,12 @@ export interface SimGetObjectCommandInput {
  * ranged read reports the size of its slice. `ContentRange` says which bytes
  * of the Object those are, and is set only for a read that asked for some of
  * them.
+ *
+ * The system metadata fields it extends are what S3 was told about the Object
+ * when it was written. `Metadata` is what the caller attached to it, and holds
+ * nothing else.
  */
-export interface SimGetObjectCommandOutput {
+export interface SimGetObjectCommandOutput extends SimS3SystemMetadataOutput {
   readonly Body?: Readable;
   readonly Metadata?: Record<string, string>;
   readonly ETag?: string;

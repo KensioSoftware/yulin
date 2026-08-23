@@ -240,8 +240,13 @@ Metadata is stored separately from the object body. `object/s3-write-metadata.ts
 what the Object is. `object/s3-write-body.ts` does the same for the body forms an upload can carry,
 which `PutObject` and `UploadPart` share.
 
-`GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
-metadata through `Metadata`, alongside the Object's `ETag` and `LastModified`.
+`GetObjectCommandHandler` returns object bodies as Node `Readable` streams, alongside the Object's
+`ETag` and `LastModified`. What S3 was told about the Object comes back in fields of its own
+(`ContentType`, `CacheControl` and the rest), and `Metadata` carries the user-defined metadata. One
+map of headers is stored, and `SimS3ObjectMetadata` splits it for a read.
+`object/s3-system-metadata-read.ts` owns that split, in both directions. The endpoints that serve an
+Object read it through GetObject, so they put the fields back under their header names on the way
+out.
 
 `object/s3-object-etag.ts` computes an Object's ETag as the MD5 of its body and quotes it for a
 response. The digest is what `SimS3Object` holds, computed on demand, because the two surfaces
@@ -256,7 +261,9 @@ because the part count is a fact about how the bytes arrived that the joined byt
 request field a write sets each one with against the lowercase key it is stored under. Both sides
 read that list, so a header cannot be written without being served or served without being writable.
 `SimPutObjectCommandInput` declares one field per entry, and the builder indexes the input by those
-field names, which makes a missing field a type error rather than a silently dropped header.
+field names, which makes a missing field a type error rather than a silently dropped header. It also
+holds the content type S3 falls back to (`binary/octet-stream`), which a write that names no type
+gets.
 
 `object/s3-object-response-headers.ts` is the single mapping from stored metadata to HTTP response
 headers, and every path that serves an Object goes through it: the S3 REST endpoint reader, the

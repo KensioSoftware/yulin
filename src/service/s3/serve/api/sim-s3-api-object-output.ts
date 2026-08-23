@@ -1,5 +1,6 @@
 import { xmlDocument, xmlValue } from "../../../../util/xml/xml-writer.js";
 import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-headers.js";
+import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-read.js";
 
 interface CopyObjectOutput {
   readonly CopyObjectResult?:
@@ -40,7 +41,7 @@ export async function simS3GetObjectResponse(
   return new Response(body, {
     status: contentRange === undefined ? 200 : 206,
     headers: simS3ObjectResponseHeaders({
-      metadata: output["Metadata"] as Record<string, string> | undefined,
+      metadata: simS3SystemMetadataHeadersFrom(output),
       bodyLength: body.length,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,

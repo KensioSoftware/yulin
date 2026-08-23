@@ -25,8 +25,9 @@ export class HeadObjectLoader {
     }
 
     return {
+      ...object.metadata.system,
       ContentLength: object.body.length,
-      Metadata: object.metadata.values,
+      Metadata: object.metadata.userDefined,
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
       $metadata: {},

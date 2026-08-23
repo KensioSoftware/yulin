@@ -215,7 +215,7 @@ describe("Copying an Object over the served S3 REST endpoint", () => {
     const read = await simS3.getObject(
       new GetObjectCommand({ Bucket: "archive", Key: "typed.pdf" }),
     );
-    assertIdentical(read.Metadata?.["content-type"], "application/pdf");
+    assertIdentical(read.ContentType, "application/pdf");
   });
 
   it("takes the destination's own metadata under REPLACE", async () => {
@@ -245,7 +245,7 @@ describe("Copying an Object over the served S3 REST endpoint", () => {
     const read = await simS3.getObject(
       new GetObjectCommand({ Bucket: "archive", Key: "retyped.txt" }),
     );
-    assertIdentical(read.Metadata?.["content-type"], "text/plain");
+    assertIdentical(read.ContentType, "text/plain");
   });
 
   it("answers a copy a Bucket policy refuses with the S3 error document", async () => {

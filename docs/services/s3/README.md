@@ -56,8 +56,8 @@ console.log(objectOut.Metadata?.["source"]);
 `PutObjectCommand` currently accepts `string`, `Uint8Array`, or `undefined` for `Body`. An undefined
 body is stored as an empty Object.
 
-`ContentType` is exposed as Object metadata under the `content-type` header name and is used when
-serving Bucket website responses. It is one of several headers a write can say about an Object. See
+A read hands `ContentType` back in the field of the same name, and Bucket website responses are
+served with it. It is one of several headers a write can say about an Object. See
 [Object system metadata](#object-system-metadata).
 
 ## Accounts and Regions
@@ -2512,9 +2512,9 @@ when a test needs deletion to work.
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
 file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.xml`, and common
 font and image formats. A served file whose extension falls outside that set gets
-`application/octet-stream`, as S3 reports for an object whose type it was never told. That only
-comes up for an extension a mount named itself, below. No other file is served at all, with or
-without a type.
+`binary/octet-stream`, as S3 reports for an Object whose type it was never told. That only comes up
+for an extension a mount named itself, below. No other file is served at all, with or without a
+type.
 
 ### Serving a file extension of your own
 
@@ -2667,6 +2667,10 @@ Sim S3 stores and returns `cache-control`, `content-disposition`, `content-encod
 `content-language`, `content-type` and `expires`, alongside a `content-length` describing the body
 being served.
 
+`GetObjectCommand` and `HeadObjectCommand` answer with these in fields of their own (`ContentType`,
+`CacheControl` and the rest), the way real S3 does. `Metadata` carries the user-defined metadata a
+write attached, and nothing else.
+
 Every path that serves an Object goes through the same mapping. The REST endpoint, the
 [website endpoint](#static-website-hosting) and a CloudFront S3 Origin all report the same headers
 for it. `content-encoding` is the one that matters most. Bytes served without it are bytes no client
@@ -2708,14 +2712,18 @@ const objectOut = await simS3.getObject(
   new GetObjectCommand({ Bucket: "site", Key: "app.js" }),
 );
 
-// Each header is stored under the name a read returns it as.
-console.log(objectOut.Metadata?.["content-encoding"]); // br
-console.log(objectOut.Metadata?.["expires"]); // Sat, 02 Jan 2027 03:04:05 GMT
+// Each header comes back in the field a read describes an Object with.
+console.log(objectOut.ContentEncoding); // br
+console.log(objectOut.ExpiresString); // Sat, 02 Jan 2027 03:04:05 GMT
 ```
 
 A header the write says nothing about is left unset, and never stored empty, so a read leaves it
-out. `Expires` is the one field that takes something other than a string. The SDK takes a `Date`,
-stored as the HTTP date a read hands back.
+out. Content type is the exception. S3 gives an Object one whether the write named it or not, and a
+read of an Object written without one reports `binary/octet-stream`.
+
+`Expires` is the one field that takes something other than a string. The SDK takes a `Date` on the
+way in. A read hands back the stored HTTP date as `ExpiresString`, alongside the same value parsed
+into a `Date` as `Expires`.
 
 A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
 [CDK S3 BucketDeployment](https://yulinsim.dev/services/cloudformation/#cdk-s3-bucketdeployment). A
@@ -2813,9 +2821,6 @@ These apply across the page. The sections above each list what is specific to th
 - Object tags, ACLs, lifecycle rules, replication and server-side encryption are left out.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend in place of putting Objects.
-- `GetObjectCommand` returns system metadata through `Metadata`, under the header name it is stored
-  as, rather than through the `ContentType`, `CacheControl` and other response fields real S3 uses.
-  See [Object system metadata](#object-system-metadata).
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
   a presigned `PUT` unable to set the rest. A `PutObjectCommand` through the SDK keeps all of them.
 - A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other

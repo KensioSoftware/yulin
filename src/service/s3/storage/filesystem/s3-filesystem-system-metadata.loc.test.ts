@@ -5,11 +5,7 @@ import {
   GetObjectCommand,
   PutBucketWebsiteCommand,
 } from "@aws-sdk/client-s3";
-import {
-  assertIdentical,
-  assertObjectMatches,
-  assertUndefined,
-} from "@kensio/smartass";
+import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 import { SimAwsLocalServer } from "../../../../serve/index.js";
@@ -65,14 +61,12 @@ describe("System metadata declared for a mounted directory", () => {
     );
 
     // Then the mirrored copy is brotli, still typed by its own extension.
-    assertObjectMatches(mirrored.Metadata, {
-      "content-encoding": "br",
-      "content-type": "text/javascript",
-    });
+    assertIdentical(mirrored.ContentEncoding, "br");
+    assertIdentical(mirrored.ContentType, "text/javascript");
 
     // And the copy outside the mirror is left as it is on disk.
-    assertUndefined(plain.Metadata?.["content-encoding"]);
-    assertIdentical(plain.Metadata?.["content-type"], "text/javascript");
+    assertUndefined(plain.ContentEncoding);
+    assertIdentical(plain.ContentType, "text/javascript");
   });
 
   it("serves a mounted mirror as bytes a client can decode", async () => {

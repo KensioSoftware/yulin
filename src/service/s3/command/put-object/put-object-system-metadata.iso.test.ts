@@ -1,10 +1,15 @@
 import {
   CreateBucketCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectEquals,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
@@ -13,7 +18,7 @@ import {
 } from "../../../../../test/s3/presign-simulation.js";
 
 describe("S3 PutObjectCommand system metadata", () => {
-  it("stores every system metadata header S3 keeps about an Object", async () => {
+  it("hands back every system metadata header S3 keeps about an Object", async () => {
     // Given a Bucket.
     const simS3 = new SimAws().s3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
@@ -33,44 +38,74 @@ describe("S3 PutObjectCommand system metadata", () => {
       }),
     );
 
-    // Then each one is remembered under the header name a read returns it as.
+    // Then each one comes back in the field a read carries it in, which is
+    // where a caller reading the Object looks for it.
     const objectOut = await simS3.getObject(
       new GetObjectCommand({ Bucket: "bucket-a", Key: "report.csv" }),
     );
-    assertObjectEquals(objectOut.Metadata, {
-      "cache-control": "public, max-age=31536000, immutable",
-      "content-disposition": 'attachment; filename="report.csv"',
-      "content-encoding": "br",
-      "content-language": "en-GB",
-      "content-type": "text/csv",
-      expires: "Wed, 21 Oct 2026 07:28:00 GMT",
-    });
+    assertIdentical(
+      objectOut.CacheControl,
+      "public, max-age=31536000, immutable",
+    );
+    assertIdentical(
+      objectOut.ContentDisposition,
+      'attachment; filename="report.csv"',
+    );
+    assertIdentical(objectOut.ContentEncoding, "br");
+    assertIdentical(objectOut.ContentLanguage, "en-GB");
+    assertIdentical(objectOut.ContentType, "text/csv");
+    assertIdentical(objectOut.ExpiresString, "Wed, 21 Oct 2026 07:28:00 GMT");
   });
 
-  it("records an expiry as the HTTP date a read hands back", async () => {
+  it("keeps user-defined metadata apart from what S3 remembers about the Object", async () => {
     // Given a Bucket.
     const simS3 = new SimAws().s3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
-    // When an Object is written with the Date the SDK takes for an expiry.
+    // When an Object is written with both.
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "bucket-a",
-        Key: "menu.json",
-        Body: "{}",
-        Expires: new Date("2027-01-02T03:04:05Z"),
+        Key: "styles.css",
+        Body: "body{}",
+        Metadata: { author: "hg" },
+        ContentEncoding: "gzip",
+        ContentType: "text/css",
       }),
     );
 
-    // Then it is stored as the header value itself, not as an object a read
-    // would have nothing to do with.
+    // Then the user-defined metadata is the whole of `Metadata`. S3 carries
+    // what it remembers about the Object in its own fields, so a caller
+    // reading `Metadata` gets back what it put there and nothing else.
     const objectOut = await simS3.getObject(
-      new GetObjectCommand({ Bucket: "bucket-a", Key: "menu.json" }),
+      new GetObjectCommand({ Bucket: "bucket-a", Key: "styles.css" }),
     );
-    assertIdentical(
-      objectOut.Metadata?.["expires"],
-      "Sat, 02 Jan 2027 03:04:05 GMT",
+    assertObjectEquals(objectOut.Metadata, { author: "hg" });
+    assertIdentical(objectOut.ContentEncoding, "gzip");
+    assertIdentical(objectOut.ContentType, "text/css");
+  });
+
+  it("reports the type S3 gives an Object that was written without one", async () => {
+    // Given a Bucket.
+    const simS3 = new SimAws().s3();
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
+
+    // When an Object is written with a body alone.
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "bucket-a",
+        Key: "notes.txt",
+        Body: "nothing to say",
+      }),
     );
+
+    // Then it has the type S3 falls back to rather than no type at all. S3
+    // guesses nothing from the key, so a `.txt` file uploaded without a type
+    // is served as bytes.
+    const objectOut = await simS3.getObject(
+      new GetObjectCommand({ Bucket: "bucket-a", Key: "notes.txt" }),
+    );
+    assertIdentical(objectOut.ContentType, "binary/octet-stream");
   });
 
   it("leaves out a system metadata header the write did not carry", async () => {
@@ -88,63 +123,45 @@ describe("S3 PutObjectCommand system metadata", () => {
       }),
     );
 
-    // Then the content type is the only thing stored: the five headers it said
-    // nothing about are absent, rather than undefined values a read would serve
-    // as empty headers.
+    // Then the five headers the write said nothing about are absent, rather
+    // than empty values a caller would have to tell apart from real ones.
     const objectOut = await simS3.getObject(
       new GetObjectCommand({ Bucket: "bucket-a", Key: "index.html" }),
     );
-    assertObjectEquals(objectOut.Metadata, { "content-type": "text/html" });
-  });
-
-  it("remembers nothing about an Object written without system metadata", async () => {
-    // Given a Bucket.
-    const simS3 = new SimAws().s3();
-    await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
-
-    // When an Object is written with a body alone.
-    await simS3.putObject(
-      new PutObjectCommand({
-        Bucket: "bucket-a",
-        Key: "notes.txt",
-        Body: "nothing to say",
-      }),
-    );
-
-    // Then nothing is stored about it.
-    const objectOut = await simS3.getObject(
-      new GetObjectCommand({ Bucket: "bucket-a", Key: "notes.txt" }),
-    );
+    assertIdentical(objectOut.ContentType, "text/html");
+    assertUndefined(objectOut.CacheControl);
+    assertUndefined(objectOut.ContentDisposition);
+    assertUndefined(objectOut.ContentEncoding);
+    assertUndefined(objectOut.ContentLanguage);
+    assertUndefined(objectOut.ExpiresString);
     assertObjectEquals(objectOut.Metadata, {});
   });
 
-  it("keeps user-defined metadata alongside system metadata", async () => {
-    // Given a Bucket.
+  it("describes an Object for a HEAD as a read describes it", async () => {
+    // Given an Object written with system and user metadata.
     const simS3 = new SimAws().s3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
-
-    // When an Object is written with both.
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "bucket-a",
-        Key: "styles.css",
-        Body: "body{}",
+        Key: "menu.json",
+        Body: "{}",
+        CacheControl: "max-age=60",
+        ContentType: "application/json",
         Metadata: { author: "hg" },
-        ContentEncoding: "gzip",
-        ContentType: "text/css",
       }),
     );
 
-    // Then the two sit side by side, since S3 keeps user metadata as well as
-    // what it remembers about the Object itself.
-    const objectOut = await simS3.getObject(
-      new GetObjectCommand({ Bucket: "bucket-a", Key: "styles.css" }),
+    // When it is described rather than read.
+    const headOut = await simS3.headObject(
+      new HeadObjectCommand({ Bucket: "bucket-a", Key: "menu.json" }),
     );
-    assertObjectEquals(objectOut.Metadata, {
-      author: "hg",
-      "content-encoding": "gzip",
-      "content-type": "text/css",
-    });
+
+    // Then a HEAD says what a read says, since it is the same answer without
+    // the body.
+    assertIdentical(headOut.CacheControl, "max-age=60");
+    assertIdentical(headOut.ContentType, "application/json");
+    assertObjectEquals(headOut.Metadata, { author: "hg" });
   });
 
   it("serves what a write said about an Object back over the REST endpoint", async () => {

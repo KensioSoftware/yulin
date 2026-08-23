@@ -1,10 +1,42 @@
 import { simS3ObjectETag } from "./s3-object-etag.js";
+import {
+  isSimS3SystemMetadataHeader,
+  simS3SystemMetadataOutput,
+  type SimS3SystemMetadataOutput,
+} from "./s3-system-metadata-read.js";
 
 /**
  * Simulated S3 object metadata.
+ *
+ * Held as one map of header names because that is the form every endpoint
+ * serving the Object wants it in. A read through the SDK wants the two halves
+ * apart, since S3 answers with what it knows about the Object in fields of its
+ * own and keeps `Metadata` for what the caller attached.
  */
 export class SimS3ObjectMetadata {
   constructor(public readonly values: Record<string, string> = {}) {}
+
+  /**
+   * What S3 knows about the Object, as the fields a read hands it back in.
+   */
+  get system(): SimS3SystemMetadataOutput {
+    return simS3SystemMetadataOutput(this.values);
+  }
+
+  /**
+   * What the caller attached to the Object.
+   *
+   * Real S3 carries these as `x-amz-meta-` headers, which is what keeps them
+   * from colliding with the ones S3 sets itself. The simulation stores one map,
+   * so the system metadata headers are taken back out here.
+   */
+  get userDefined(): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(this.values).filter(
+        ([key]) => !isSimS3SystemMetadataHeader(key),
+      ),
+    );
+  }
 }
 
 interface SimS3ObjectProperties {

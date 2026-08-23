@@ -142,7 +142,7 @@ describe("Filesystem simulated S3 storage safety", () => {
     // every extension a mount names for itself.
     assertIdentical(
       stored.metadata.values["content-type"],
-      "application/octet-stream",
+      "binary/octet-stream",
     );
   });
 
