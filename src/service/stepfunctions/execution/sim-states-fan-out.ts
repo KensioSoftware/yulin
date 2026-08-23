@@ -20,6 +20,11 @@ interface SimStatesFanOutProperties {
   readonly children: readonly SimStatesChildStart[];
 
   /**
+   * How many children may be running at once.
+   */
+  readonly limit: number;
+
+  /**
    * What one child is called, for the failure the state ends with.
    */
   readonly names: (index: number) => string;
@@ -63,6 +68,7 @@ export class SimStatesFanOut {
       kind: properties.kind,
       context: properties.context,
       children: properties.children,
+      limit: properties.limit,
       onSettled: async (run): Promise<void> => {
         await this.#settled(run);
       },
@@ -106,6 +112,7 @@ export class SimStatesFanOut {
       this.#children.abandon();
     }
 
+    await this.#children.start();
     await this.#resumed();
   }
 

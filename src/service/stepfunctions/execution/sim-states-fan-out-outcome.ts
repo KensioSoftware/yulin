@@ -23,8 +23,9 @@ export function simStatesFanOutOutcome(
   state: SimStatesFanOutState,
   input: JSONValue,
   outputs: readonly JSONValue[],
+  context: JSONValue,
 ): SimStatesMoveOnOutcome {
-  const output = simStatesEffectiveOutput(input, [...outputs], state);
+  const output = simStatesEffectiveOutput(input, [...outputs], state, context);
 
   return state.Next === undefined
     ? { kind: "succeed", output }

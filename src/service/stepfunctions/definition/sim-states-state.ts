@@ -7,10 +7,7 @@ import type { SimStatesTaskTarget } from "../task/sim-states-task-target.js";
 import type { SimStatesDefinition } from "./sim-states-definition.js";
 
 /**
- * Every state type Amazon States Language defines.
- *
- * The ones this simulator has no implementation for are named here so a
- * definition using one can be refused by its own name.
+ * Every state type Amazon States Language defines, all of which run.
  */
 export const simStatesStateTypes = [
   "Pass",
@@ -24,21 +21,6 @@ export const simStatesStateTypes = [
 ] as const;
 
 export type SimStatesStateType = (typeof simStatesStateTypes)[number];
-
-/**
- * The state types this simulator runs.
- */
-export const simStatesRunnableTypes = [
-  "Pass",
-  "Succeed",
-  "Fail",
-  "Task",
-  "Choice",
-  "Wait",
-  "Parallel",
-] as const;
-
-export type SimStatesRunnableType = (typeof simStatesRunnableTypes)[number];
 
 /**
  * What every state carries, whatever its type.
@@ -84,6 +66,24 @@ export interface SimStatesParallelState
   extends SimStatesCommonState, SimStatesErrorHandling {
   readonly Type: "Parallel";
   readonly Branches: readonly SimStatesDefinition[];
+}
+
+/**
+ * A `Map` state, which runs its `ItemProcessor` once per item.
+ *
+ * `ItemsPath` says where the items are, `ItemSelector` builds what each
+ * iteration is given, and `MaxConcurrency` bounds how many iterations run at
+ * once. A `Map` state has no `Parameters` of its own. Amazon States Language
+ * gave that field to the item, and it arrives here as the `ItemSelector` it
+ * was the older spelling of.
+ */
+export interface SimStatesMapState
+  extends Omit<SimStatesCommonState, "Parameters">, SimStatesErrorHandling {
+  readonly Type: "Map";
+  readonly ItemProcessor: SimStatesDefinition;
+  readonly ItemsPath?: string;
+  readonly ItemSelector?: JSONValue;
+  readonly MaxConcurrency?: number;
 }
 
 /**
@@ -141,6 +141,7 @@ export type SimStatesState =
   | SimStatesPassState
   | SimStatesTaskState
   | SimStatesParallelState
+  | SimStatesMapState
   | SimStatesSucceedState
   | SimStatesFailState
   | SimStatesChoiceState

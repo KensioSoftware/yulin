@@ -31,11 +31,14 @@ export function simStatesWalks(
   const walks: SimStatesChildWalks = (child) =>
     new SimStatesInterpreter({
       definition: child.definition,
-      record: child.record,
       background: properties.background,
-      tasks: properties.tasks,
-      roleArn: properties.roleArn,
-      walkChild: walks,
+      walk: {
+        record: child.record,
+        contextObject: child.contextObject,
+        tasks: properties.tasks,
+        roleArn: properties.roleArn,
+        walkChild: walks,
+      },
       ...(child.onSettled !== undefined && { onSettled: child.onSettled }),
     });
 

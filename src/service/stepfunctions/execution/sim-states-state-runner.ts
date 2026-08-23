@@ -1,5 +1,9 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
-import type { SimStatesAttemptState } from "../retry/sim-states-attempt-state.js";
+import { simStatesStateContext } from "../data/sim-states-context-object.js";
+import {
+  type SimStatesAttemptState,
+  simStatesRetriesSoFar,
+} from "../retry/sim-states-attempt-state.js";
 import { simStatesRecovered } from "../retry/sim-states-recovered.js";
 import { simStatesTimedOut } from "../retry/sim-states-task-deadline.js";
 import { simStatesFailureFrom } from "./sim-states-failure.js";
@@ -97,12 +101,19 @@ export class SimStatesStateRunner {
       return overdue;
     }
 
+    const now = this.#background.now();
+
     try {
       return await runSimStatesState(entry.state, entry.input, {
         ...this.#walk,
         stateName: entry.name,
-        now: this.#background.now(),
+        now,
         resume,
+        contextObject: simStatesStateContext(this.#walk.contextObject, {
+          name: entry.name,
+          enteredTime: now,
+          retryCount: simStatesRetriesSoFar(attempt),
+        }),
       });
     } catch (error) {
       return simStatesFailureFrom(error);

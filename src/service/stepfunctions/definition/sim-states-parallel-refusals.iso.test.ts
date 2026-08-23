@@ -60,12 +60,22 @@ describe("Step Functions Parallel state refusals", () => {
   });
 
   it("refuses a branch using something this simulator does not run", () => {
-    // Given a branch holding a state type still to come.
+    // Given a branch holding a Distributed Map.
     const refusal = refusalFor({
       Branches: [
         {
           StartAt: "Enrol",
-          States: { Enrol: { Type: "Map", End: true } },
+          States: {
+            Enrol: {
+              Type: "Map",
+              ItemReader: { Resource: "arn:aws:states:::s3:getObject" },
+              ItemProcessor: {
+                StartAt: "Register",
+                States: { Register: { Type: "Pass", End: true } },
+              },
+              End: true,
+            },
+          },
         },
       ],
       End: true,
@@ -74,7 +84,7 @@ describe("Step Functions Parallel state refusals", () => {
     // When it is read, the refusal names the branch and keeps what the state
     // itself said.
     assertStringIncludes(refusal, "Branch 1 of the Parallel state Fan:");
-    assertStringIncludes(refusal, "is a Map state, which this simulator does");
+    assertStringIncludes(refusal, "carries ItemReader, which this simulator");
   });
 
   it("refuses a branch moving to a state outside itself", () => {

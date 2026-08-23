@@ -8,8 +8,8 @@ Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunc
 
 ## What runs today
 
-Seven state types run. `Pass`, `Task`, `Succeed`, `Fail`, `Choice`, `Wait` and `Parallel`. A
-definition using `Map` is refused when the state machine is created, naming the state and its type.
+Every state type Amazon States Language defines runs. `Pass`, `Task`, `Succeed`, `Fail`, `Choice`,
+`Wait`, `Parallel` and `Map`.
 
 The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
 `OutputPath` apply in that order, reading Reference Paths and the intrinsic functions.
@@ -19,8 +19,11 @@ service, or starts another state machine. A `Resource` this simulator has no ans
 when the state machine is created, naming what the definition asked for.
 
 A `Task` state's `Retry` and `Catch` both run, on the simulation's clock, along with the
-`TimeoutSeconds` and `HeartbeatSeconds` it takes. A `Parallel` state takes the same `Retry` and
-`Catch`.
+`TimeoutSeconds` and `HeartbeatSeconds` it takes. A `Parallel` state and a `Map` state take the same
+`Retry` and `Catch`.
+
+The context object runs, so `$$.Execution`, `$$.StateMachine`, `$$.State` and `$$.Map` are all
+readable.
 
 ## Running a state machine
 
@@ -929,6 +932,98 @@ reads as `ABANDONED`. A `Parallel` state inside a branch reports its own branche
 deep they go. `visitedStates` on the execution holds the states outside the branches, while
 `attempts` covers every run of every state, branches included.
 
+## Running a state per item
+
+A `Map` state runs its `ItemProcessor` once per item, and answers with an array of what the
+iterations produced. The array is in the order the items were in, whatever order the iterations
+finished in.
+
+```typescript sim-step-functions-map
+/**
+ * Running a state per item with a Map state.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const created = await simAws.stepFunctions().createStateMachine({
+  input: {
+    name: "Enrolment",
+    roleArn: "arn:aws:iam::123456789012:role/WorkflowRole",
+    definition: JSON.stringify({
+      StartAt: "Enrol",
+      States: {
+        Enrol: {
+          Type: "Map",
+          ItemsPath: "$.students",
+          MaxConcurrency: 2,
+          ItemSelector: {
+            "id.$": "$$.Map.Item.Value.id",
+            "at.$": "$$.Map.Item.Index",
+            "term.$": "$.term",
+          },
+          ItemProcessor: {
+            StartAt: "Register",
+            States: { Register: { Type: "Pass", End: true } },
+          },
+          End: true,
+        },
+      },
+    }),
+  },
+});
+
+const started = await simAws.stepFunctions().startExecution({
+  input: {
+    stateMachineArn: created.stateMachineArn,
+    input: JSON.stringify({
+      term: 3,
+      students: [{ id: "wei" }, { id: "mei" }],
+    }),
+  },
+});
+
+const described = await simAws
+  .stepFunctions()
+  .describeExecution({ input: { executionArn: started.executionArn } });
+
+console.log(described.output);
+// [{"id":"wei","at":0,"term":3},{"id":"mei","at":1,"term":3}]
+
+console.log(
+  simAws.stepFunctions().inspection().iterations(started.executionArn).length,
+); // 2
+```
+
+`ItemsPath` says where the items are, and a `Map` state carrying none runs over its whole effective
+input. What it selects has to be an array. Anything else fails the state with `States.Runtime`,
+which is the failure real Step Functions gives it, and no `Catch` takes that one.
+
+`ItemSelector` builds what each iteration is given. It reads the `Map` state's own input through `$`
+and the item it is building for through `$$.Map.Item`, which holds `Value` and `Index`. The states
+inside the iteration read `$$.Map.Item` as well. A `Map` state carrying no `ItemSelector` gives each
+iteration the item itself.
+
+`MaxConcurrency` bounds how many iterations run at once. A bound of 0, and a `Map` state carrying no
+bound at all, runs every iteration together. An iteration reaching a `Wait` state is still one of
+the iterations running, so a bound of 1 holds the next item back until the wait is over.
+
+`Parameters` and `Iterator` are the older spellings of `ItemSelector` and `ItemProcessor`, and both
+are read. CDK still writes them for a `Map` built with its deprecated `parameters` property or its
+`iterator()` call. A state carrying both spellings of either is refused.
+
+An iteration that fails fails the `Map` state, the way a branch failing fails a `Parallel` state.
+The state fails with `States.BranchFailed`, the iterations still going are abandoned, and the items
+that had not started are left alone. `Retry` and `Catch` on the `Map` state work as they do on a
+`Task` state, and a retry runs every iteration again.
+
+Reading the iterations back is the same accessor the branches use:
+
+```typescript
+const iterations = simAws.stepFunctions().inspection().iterations(executionArn);
+```
+
 ## Through an intercepted SDK client
 
 An `SFNClient` handed to `SimSdk` reaches the same simulated service:
@@ -1110,8 +1205,42 @@ raise. A path that would have selected the wrong node fails, and no state is ans
 data. A dotted field name is held to the JsonPath `member-name-shorthand` rule. `$.a-b` is refused,
 and `$['a-b']` is the way to write it.
 
-`$$`, the context object, is unsimulated. A path reading it fails the state with
-`States.QueryEvaluationError`, saying that only paths rooted at `$` are read.
+A path rooted at `$$` reads the context object rather than the state's data. See below.
+
+## The context object
+
+`$$` reads what the execution knows about itself. It is read in `InputPath`, `OutputPath`,
+`ItemsPath`, the Payload Template fields (`Parameters`, `ResultSelector` and `ItemSelector`) and an
+intrinsic function's arguments.
+
+```json
+{
+  "Execution": {
+    "Id": "arn:aws:states:eu-west-2:123456789012:execution:Enrolment:execution-1",
+    "Input": { "student": "Wei" },
+    "Name": "execution-1",
+    "RoleArn": "arn:aws:iam::123456789012:role/WorkflowRole",
+    "StartTime": "2026-07-26T09:00:00.000Z"
+  },
+  "StateMachine": {
+    "Id": "arn:aws:states:eu-west-2:123456789012:stateMachine:Enrolment",
+    "Name": "Enrolment"
+  },
+  "State": {
+    "EnteredTime": "2026-07-26T09:00:00.000Z",
+    "Name": "Check",
+    "RetryCount": 0
+  },
+  "Map": { "Item": { "Index": 0, "Value": { "id": "wei" } } }
+}
+```
+
+`State` is the state now running, and `RetryCount` counts the retries this entry to it has taken.
+`Map` is there inside a `Map` state's `ItemSelector` and inside the iteration it built.
+
+`$$.Task.Token` is unsimulated, along with the task tokens it belongs to. A path reading it selects
+nothing and fails the state that read it. A field that writes, such as `ResultPath`, takes a path
+rooted at `$`, since the context object is read rather than written.
 
 ## Intrinsic functions
 
@@ -1167,7 +1296,15 @@ A test asserting on the output of a state machine that used one could only asser
   nothing catches, and a state around a branch is no more able to carry on than the branch was.
 - **A branch's own states are reported apart from the execution's.** Real Step Functions writes
   them into one execution history, under events naming the branch. The inspection accessor answers
-  `branches` instead, since a test asserting on a branch is asking about that branch.
+  `branches` and `iterations` instead, since a test asserting on a branch is asking about that
+  branch.
+- **A Distributed Map is refused.** `ItemReader`, `ResultWriter`, `ItemBatcher`, the two
+  `ToleratedFailure` fields and a `ProcessorConfig` asking for `DISTRIBUTED` are all refused when
+  the state machine is created. A Distributed Map reads its items from S3 and runs a child
+  execution per batch, which is a second execution model rather than a field or two on this one.
+- **A `Map` state's iterations that had not started are left alone when one fails.** The ones
+  running are abandoned, and `inspection().iterations()` reports only the iterations that ran. Real
+  Step Functions stops the same work, and its execution history says as much.
 
 - **A state machine is the only resource that holds tags.** An activity and an execution both take
   tags on real Step Functions, and both are unsimulated here. A tag request naming one is refused
@@ -1190,7 +1327,6 @@ two and is what this follows.
 
 ## Still to come
 
-- `Map` states, with `ItemsPath`, `ItemSelector` and `MaxConcurrency`.
+- Distributed Map, with `ItemReader`, `ResultWriter` and the `ToleratedFailure` fields.
 - The `.sync` pattern, task tokens and activities.
-- The context object, `$$`.
 - JSONata as a query language, and the `Assign` variables that go with it.

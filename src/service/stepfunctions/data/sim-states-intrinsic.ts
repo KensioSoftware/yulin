@@ -1,10 +1,9 @@
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesIntrinsicFailure } from "../error/sim-step-functions.error.js";
 import type { SimStatesIntrinsicArgument } from "./sim-states-intrinsic-argument.js";
+import { selectSimStatesReadPath } from "./sim-states-context-path.js";
 import { simStatesIntrinsics } from "./sim-states-intrinsic-functions.js";
 import { parseSimStatesIntrinsic } from "./sim-states-intrinsic-parse.js";
-import { selectSimStatesPath } from "./sim-states-path-segment.js";
-import { parseSimStatesReferencePath } from "./sim-states-reference-path.js";
 
 /**
  * The names this simulator answers, for a message listing them.
@@ -19,6 +18,7 @@ export const simStatesIntrinsicNames: readonly string[] = simStatesIntrinsics
 export function evaluateSimStatesIntrinsic(
   expression: string,
   document: JSONValue,
+  context: JSONValue = null,
 ): JSONValue {
   const call = parseSimStatesIntrinsic(expression);
   const intrinsic = simStatesIntrinsics.get(call.name);
@@ -32,7 +32,7 @@ export function evaluateSimStatesIntrinsic(
 
   return intrinsic(
     call.arguments.map((argument) =>
-      resolveArgument(argument, document, expression),
+      resolveArgument(argument, document, expression, context),
     ),
     expression,
   );
@@ -45,19 +45,17 @@ function resolveArgument(
   argument: SimStatesIntrinsicArgument,
   document: JSONValue,
   expression: string,
+  context: JSONValue,
 ): JSONValue {
   if (argument.kind === "literal") {
     return argument.value;
   }
 
   if (argument.kind === "call") {
-    return evaluateSimStatesIntrinsic(argument.expression, document);
+    return evaluateSimStatesIntrinsic(argument.expression, document, context);
   }
 
-  const selected = selectSimStatesPath(
-    document,
-    parseSimStatesReferencePath(argument.path),
-  );
+  const selected = selectSimStatesReadPath(argument.path, document, context);
 
   if (selected === undefined) {
     throw new SimStatesIntrinsicFailure(

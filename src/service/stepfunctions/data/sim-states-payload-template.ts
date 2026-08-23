@@ -6,29 +6,32 @@ import {
   SimStatesPathMatchFailure,
   SimStatesUnsimulatedInput,
 } from "../error/sim-step-functions.error.js";
+import { selectSimStatesReadPath } from "./sim-states-context-path.js";
 import { isSimStatesIntrinsic } from "./sim-states-intrinsic-argument.js";
 import { evaluateSimStatesIntrinsic } from "./sim-states-intrinsic.js";
-import { selectSimStatesPath } from "./sim-states-path-segment.js";
-import { parseSimStatesReferencePath } from "./sim-states-reference-path.js";
 
 const resolvedKeySuffix = ".$";
 
 /**
  * Build a value from a Payload Template.
  *
- * `Parameters` and `ResultSelector` are both Payload Templates. A field whose
- * name ends in `.$` takes its value from a Reference Path or an intrinsic
- * function, and the `.$` comes off the name. Every other field is copied as it
- * stands, with objects and arrays walked so a `.$` field nested inside one is
- * still resolved.
+ * `Parameters`, `ResultSelector` and `ItemSelector` are all Payload Templates.
+ * A field whose name ends in `.$` takes its value from a Reference Path or an
+ * intrinsic function, and the `.$` comes off the name. Every other field is
+ * copied as it stands, with objects and arrays walked so a `.$` field nested
+ * inside one is still resolved.
+ *
+ * A path rooted at `$$` reads the context object the caller was given. One
+ * given none reads nothing there, and the field fails the state.
  */
 export function evaluateSimStatesPayloadTemplate(
   template: JSONValue,
   document: JSONValue,
+  context: JSONValue = null,
 ): JSONValue {
   if (Array.isArray(template)) {
     return template.map((element) =>
-      evaluateSimStatesPayloadTemplate(element, document),
+      evaluateSimStatesPayloadTemplate(element, document, context),
     );
   }
 
@@ -50,8 +53,8 @@ export function evaluateSimStatesPayloadTemplate(
     }
 
     built[field] = resolved
-      ? resolveField(key, value, document)
-      : evaluateSimStatesPayloadTemplate(value, document);
+      ? resolveField(key, value, document, context)
+      : evaluateSimStatesPayloadTemplate(value, document, context);
   }
 
   return built;
@@ -64,6 +67,7 @@ function resolveField(
   key: string,
   value: JSONValue,
   document: JSONValue,
+  context: JSONValue,
 ): JSONValue {
   if (typeof value !== "string") {
     throw new SimStatesUnsimulatedInput(
@@ -73,13 +77,10 @@ function resolveField(
   }
 
   if (isSimStatesIntrinsic(value)) {
-    return evaluateSimStatesIntrinsic(value, document);
+    return evaluateSimStatesIntrinsic(value, document, context);
   }
 
-  const selected = selectSimStatesPath(
-    document,
-    parseSimStatesReferencePath(value),
-  );
+  const selected = selectSimStatesReadPath(value, document, context);
 
   if (selected === undefined) {
     throw new SimStatesPathMatchFailure(

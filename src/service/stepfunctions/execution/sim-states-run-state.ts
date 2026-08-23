@@ -10,6 +10,7 @@ import type {
   SimStatesSucceedState,
 } from "../definition/sim-states-state.js";
 import { runSimStatesChoice } from "./sim-states-run-choice.js";
+import { runSimStatesMap } from "./sim-states-run-map.js";
 import { runSimStatesParallel } from "./sim-states-run-parallel.js";
 import { runSimStatesTask } from "./sim-states-run-task.js";
 import { runSimStatesWait } from "./sim-states-run-wait.js";
@@ -29,8 +30,8 @@ const unnamedFailError = "States.Unknown";
  * A data-flow field raising is left to the caller, which reads the Amazon
  * States Language error name off whatever came out.
  *
- * This waits on the work a `Task` state does, and on the branches a `Parallel`
- * state runs as far as they get. Every other state type answers without
+ * This waits on the work a `Task` state does, and on the branches or
+ * iterations a `Parallel` or a `Map` state runs as far as they get. Every other state type answers without
  * waiting for anything. A `Wait` state pauses the walk rather than blocking
  * it, and answers by saying what it is waiting for.
  */
@@ -48,7 +49,7 @@ export async function runSimStatesState(
   }
 
   if (state.Type === "Succeed") {
-    return runSucceed(state, input);
+    return runSucceed(state, input, context);
   }
 
   if (state.Type === "Choice") {
@@ -63,7 +64,11 @@ export async function runSimStatesState(
     return await runSimStatesParallel(state, input, context);
   }
 
-  return runPass(state, input);
+  if (state.Type === "Map") {
+    return await runSimStatesMap(state, input, context);
+  }
+
+  return runPass(state, input, context);
 }
 
 /**
@@ -72,10 +77,20 @@ export async function runSimStatesState(
 function runPass(
   state: SimStatesPassState,
   input: JSONValue,
+  context: SimStatesStateContext,
 ): SimStatesStateOutcome {
-  const effective = simStatesEffectiveInput(input, state);
+  const effective = simStatesEffectiveInput(
+    input,
+    state,
+    context.contextObject,
+  );
   const result = state.Result === undefined ? effective : state.Result;
-  const output = simStatesEffectiveOutput(input, result, state);
+  const output = simStatesEffectiveOutput(
+    input,
+    result,
+    state,
+    context.contextObject,
+  );
 
   return state.Next === undefined
     ? { kind: "succeed", output }
@@ -88,12 +103,22 @@ function runPass(
 function runSucceed(
   state: SimStatesSucceedState,
   input: JSONValue,
+  context: SimStatesStateContext,
 ): SimStatesStateOutcome {
-  const effective = simStatesEffectiveInput(input, state);
+  const effective = simStatesEffectiveInput(
+    input,
+    state,
+    context.contextObject,
+  );
 
   return {
     kind: "succeed",
-    output: simStatesEffectiveOutput(effective, effective, state),
+    output: simStatesEffectiveOutput(
+      effective,
+      effective,
+      state,
+      context.contextObject,
+    ),
   };
 }
 
