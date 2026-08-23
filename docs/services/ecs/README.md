@@ -24,7 +24,7 @@ back exactly as declared.
 
 The case this leaves out is a sidecar the application depends on, such as a Redis or a database in
 the same task. Point its connection details, which are ordinary environment variables, at a real one
-you run yourself. See [non-AWS dependencies](../../non-aws-dependencies/README.md) for how that fits
+you run yourself. See [non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/) for how that fits
 together.
 
 ## Registering a task definition
@@ -722,7 +722,7 @@ a JSON key the secret lacks each stop it the same way with their own reason.
 ## Running a task from a rule or a schedule
 
 A `RunTask` call is one way to start a task, and there are two others. A
-[simulated EventBridge](../eventbridge/) rule target and a [simulated Scheduler](../scheduler/)
+[simulated EventBridge](https://yulinsim.dev/services/eventbridge/) rule target and a [simulated Scheduler](https://yulinsim.dev/services/scheduler/)
 schedule target can both name an ECS cluster, and both then run a task here when the rule matches an
 event or the schedule falls due. That is the usual shape of a nightly batch job or an import kicked
 off by something happening.
@@ -739,8 +739,8 @@ inside the task definition is still what the containers' own AWS calls are attri
 The container model applies unchanged. Only a bound container runs, and a target naming a task
 definition with nothing bound records a task that never started, leaving the rule or the schedule
 itself successful. Writing one of these targets is documented where the target is written, in
-[running an ECS task](../eventbridge/#running-an-ecs-task) for a rule and
-[running an ECS task on a schedule](../scheduler/#running-an-ecs-task-on-a-schedule) for a schedule.
+[running an ECS task](https://yulinsim.dev/services/eventbridge/#running-an-ecs-task) for a rule and
+[running an ECS task on a schedule](https://yulinsim.dev/services/scheduler/#running-an-ecs-task-on-a-schedule) for a schedule.
 
 ## Describing, listing and stopping tasks
 
@@ -1051,7 +1051,7 @@ A service container that answers HTTP requests declares `http` in place of `run`
 handler is fetch-style. It is given a `Request` and answers with a `Response`, the same shape a
 simulated load balancer already answers a served request with.
 
-What reaches it is a request routed through simulated [Elastic Load Balancing](../elbv2/). A service
+What reaches it is a request routed through simulated [Elastic Load Balancing](https://yulinsim.dev/services/elbv2/). A service
 declares `loadBalancers` naming a target group, a container and a container port. Creating the
 service registers each of its tasks into that target group, and a request the load balancer forwards
 there reaches the bound container's handler.

@@ -798,7 +798,7 @@ The hostname you fetch has to be one of the Distribution's alternate domain name
 would be in real CloudFront, which refuses a `Host` outside the ones it serves. So the record name
 goes in the Distribution's `Aliases` as well as in the Route53 record. Real CloudFront also wants an
 ACM certificate covering those names, described under
-[Viewer certificates](../cloudfront/README.md#viewer-certificates). It is left out here because this
+[Viewer certificates](https://yulinsim.dev/services/cloudfront/#viewer-certificates). It is left out here because this
 request is served over plain HTTP on localhost.
 
 ```typescript sim-route53-cloudfront-localhost
@@ -949,15 +949,15 @@ the server to adapt it to the selected local port.
 A record chain ends when it reaches a hostname a simulated service owns. Those are recognised by
 their shape, and the value to point a record at is whatever the service reported:
 
-| Hostname                                 | What it reaches                               |
-| ---------------------------------------- | --------------------------------------------- |
-| `<distribution-id>.cloudfront.net`       | a [CloudFront](../cloudfront/) distribution   |
-| `<name>-<id>.<region>.elb.amazonaws.com` | an [ELBv2](../elbv2/) load balancer           |
-| `<bucket>.s3-website.<region>`           | an [S3](../s3/) bucket website                |
-| `<bucket>.s3.<region>`                   | the S3 REST endpoint                          |
-| `<url-id>.lambda-url.<region>`           | a [Lambda](../lambda/) Function URL           |
-| `<api-id>.execute-api.<region>`          | an [API Gateway](../apigatewayv2/) HTTP API   |
-| `cognito-idp.<region>`                   | the [Cognito](../cognito/) user pool endpoint |
+| Hostname                                 | What it reaches                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `<distribution-id>.cloudfront.net`       | a [CloudFront](https://yulinsim.dev/services/cloudfront/) distribution   |
+| `<name>-<id>.<region>.elb.amazonaws.com` | an [ELBv2](https://yulinsim.dev/services/elbv2/) load balancer           |
+| `<bucket>.s3-website.<region>`           | an [S3](https://yulinsim.dev/services/s3/) bucket website                |
+| `<bucket>.s3.<region>`                   | the S3 REST endpoint                                                     |
+| `<url-id>.lambda-url.<region>`           | a [Lambda](https://yulinsim.dev/services/lambda/) Function URL           |
+| `<api-id>.execute-api.<region>`          | an [API Gateway](https://yulinsim.dev/services/apigatewayv2/) HTTP API   |
+| `cognito-idp.<region>`                   | the [Cognito](https://yulinsim.dev/services/cognito/) user pool endpoint |
 
 The hostnames the AWS SDK talks to are written without their `.amazonaws.com` or `.on.aws` tail,
 the same rewriting Yulin applies to an SDK endpoint. A load balancer's name keeps its whole domain,
@@ -1058,7 +1058,7 @@ try {
 
 A request served under the suffix reaches the listener on port 80, since the port such a request
 carries is the local server's and never one a client chose. See
-[Simulated Elastic Load Balancing](../elbv2/) for what happens once the request is there.
+[Simulated Elastic Load Balancing](https://yulinsim.dev/services/elbv2/) for what happens once the request is there.
 
 ## DNSSEC
 

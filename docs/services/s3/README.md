@@ -112,7 +112,7 @@ all tests, as you prefer.
 
 ## Listing Buckets
 
-Use `ListBucketsCommand` to inspect Buckets in the selected simulated S3 scope. Each Bucket reports the instant it was created, taken from [simulated time](../../time/README.md) rather than the host clock.
+Use `ListBucketsCommand` to inspect Buckets in the selected simulated S3 scope. Each Bucket reports the instant it was created, taken from [simulated time](https://yulinsim.dev/time/) rather than the host clock.
 
 ```typescript sim-s3-list-buckets
 /**
@@ -1621,7 +1621,7 @@ of the Bucket named, and a removal carries no `size` and no `eTag` where a creat
 The key is carried as a record carries it, form-URL-encoded, and a key with a space in it goes in as
 `red+flower.jpg`.
 
-The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+The [event factories page](https://yulinsim.dev/factories/ "Test factories for AWS event shapes usage docs")
 covers what these have in common with the factories for the other event shapes.
 
 ### When delivery fails
@@ -1699,7 +1699,7 @@ An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on. Thos
 CloudFormation invents a generated name.
 
 Any other property is left out and recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 and the Bucket is created and the stack carries on. That matters because a Bucket deployed without
 the lifecycle rules, versioning or CORS configuration its template asked for looks configured and
 behaves as though it were bare, and the failure that causes turns up somewhere else entirely. The
@@ -1846,7 +1846,7 @@ key out entirely, and a statement conditioned on it fails to match. Condition ke
 case insensitively, so CDK's `AWS:SourceArn` spelling matches the same key.
 
 Sim CloudFront supplies both when a Distribution's S3 Origin has an origin access control, and that
-is [how it serves a private Bucket](../cloudfront/README.md#origin-access-controls).
+is [how it serves a private Bucket](https://yulinsim.dev/services/cloudfront/#origin-access-controls).
 
 ## Block Public Access
 
@@ -2104,7 +2104,7 @@ to the service endpoint for itself.
 A client pointed at an endpoint URL presigns too, the `http://localhost:<port>` form that
 `--endpoint-url` and `AWS_ENDPOINT_URL` take. Such a URL names no service in its hostname and is
 routed by the credential scope it carries, so sign it with `forcePathStyle` and the Bucket goes in
-the path. See [S3 over the endpoint](../../serve/README.md#s3-over-the-endpoint).
+the path. See [S3 over the endpoint](https://yulinsim.dev/serve/#s3-over-the-endpoint).
 
 ```typescript sim-s3-presigned-url
 /**
@@ -2199,7 +2199,7 @@ A request to the REST endpoint presenting no signature and naming no principal i
 otherwise. That header is always enabled and wins over a signature, and a request driven by hand can
 be any principal without signing anything, exactly as it can against the other simulated services
 that serve HTTP. See
-[the sim IAM docs](../iam/README.md#what-the-simulator-reports-back) for the whole boundary.
+[the sim IAM docs](https://yulinsim.dev/services/iam/#what-the-simulator-reports-back) for the whole boundary.
 
 ### Expiry in simulated time
 
@@ -2482,11 +2482,11 @@ The watch is recursive, and holds an open filesystem handle that keeps the proce
 process wants exactly that. Anything with an end, such as a test, calls
 `simAws.s3().stopWatchingMountedDirectories()` when it is done.
 `simAws.s3().watchedMountedDirectories()` says which directories are being watched.
-[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that names no service
+[`simAws.close()`](https://yulinsim.dev/serve/#stopping-and-restarting) is the one that names no service
 and no scope. It lets go of the mounted directory watches along with everything else the environment
 is holding, and a served environment gets that from `srv.close()`.
 
-Under [`yulin watch`](../../serve/README.md#restarting-on-a-file-change), a mount that reloads for
+Under [`yulin watch`](https://yulinsim.dev/serve/#restarting-on-a-file-change), a mount that reloads for
 itself is left alone by the supervisor. A rebuild reloads the page rather than restarting the
 process and taking every simulated Bucket, Table and Stack with it. A mount without a reload target
 is still reported to the supervisor as a directory to watch, and a change in it restarts the
@@ -2587,7 +2587,7 @@ Object in the Bucket. A declared `ContentType` replaces the one guessed from the
 ### Inheriting what the deployment set
 
 A mount rarely has to declare any of that, because something in the same simulated account has
-already said it. A CDK [`BucketDeployment`](../cloudformation/README.md#cdk-s3-bucketdeployment)
+already said it. A CDK [`BucketDeployment`](https://yulinsim.dev/services/cloudformation/#cdk-s3-bucketdeployment)
 sets these headers through its own `SystemMetadata`, and says so on the destination Bucket as well as
 setting them on the Objects it copies. Mounting a directory over that Bucket replaces the Objects and
 inherits what the Bucket was told about them. The files on disk are then served as the deployed ones
@@ -2656,7 +2656,7 @@ simAws
   });
 ```
 
-Pages served with [live reload](../../serve/README.md) are already sent `no-store`, and an HTML
+Pages served with [live reload](https://yulinsim.dev/serve/) are already sent `no-store`, and an HTML
 document is never what a stale cache is holding on to. Assets a build rewrites in place are, and a
 declaration like this one is what they need.
 
@@ -2718,7 +2718,7 @@ out. `Expires` is the one field that takes something other than a string. The SD
 stored as the HTTP date a read hands back.
 
 A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
-[CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment). A
+[CDK S3 BucketDeployment](https://yulinsim.dev/services/cloudformation/#cdk-s3-bucketdeployment). A
 [mounted directory](#metadata-a-file-cannot-carry) declares them for the Objects under a key prefix,
 since a file on disk carries none of them.
 

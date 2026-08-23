@@ -271,7 +271,7 @@ action, and the ones under it carry on to the next rule. A `Count` action record
 lets evaluation continue, the way it does for every other statement kind.
 
 `EvaluationWindowSec` is 60, 120, 300 or 600 seconds. A statement naming none counts over 300. The
-window is measured against [simulated time](../../time/README.md), so `advanceBy` past it drops
+window is measured against [simulated time](https://yulinsim.dev/time/), so `advanceBy` past it drops
 what the rule counted.
 
 `AggregateKeyType` is `IP` or `CONSTANT`. `IP` counts each client address on its own. Every request
@@ -875,7 +875,7 @@ before a cache behaviour, a viewer-request CloudFront Function or the origin see
 
 CloudFront is associated this way and not through `AssociateWebACL`, which real WAF keeps for the
 regional resource types. The ARN has to name a `CLOUDFRONT` [scope](#scopes) web ACL. See
-[web ACLs in the CloudFront docs](../cloudfront/README.md#web-acls) for the whole example.
+[web ACLs in the CloudFront docs](https://yulinsim.dev/services/cloudfront/#web-acls) for the whole example.
 
 CloudFront has no association Resource, so in a template the reference is a property of the
 distribution itself. A `WebACLId` naming a web ACL from outside this simulation is left out and
@@ -1270,7 +1270,7 @@ console.log(read.WebACL?.Name);
 ## SDK interception
 
 An intercepted `WAFV2Client` routes to the simulated WAFv2 in the Account and Region the client was
-configured for. See [the SDK docs](../../sdk/README.md) for how interception works.
+configured for. See [the SDK docs](https://yulinsim.dev/sdk/) for how interception works.
 
 ```typescript sim-wafv2-sdk-interception
 /**

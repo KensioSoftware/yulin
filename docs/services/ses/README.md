@@ -735,7 +735,7 @@ A simulated Cognito user pool whose `EmailConfiguration` names `EmailSendingAcco
 sends its verification messages and invitations through the SES of the region its `SourceArn` names.
 Those messages land in `sentEmails()` alongside the ones an SDK client sent, and the sandbox and
 suppression rules above decide them the same way. See
-[Sending a pool's email through SES](../cognito#sending-a-pools-email-through-ses).
+[Sending a pool's email through SES](https://yulinsim.dev/services/cognito/#sending-a-pools-email-through-ses).
 
 Such a send skips IAM. Real Cognito sends through a service-linked role rather than as whoever
 called `SignUp`, so the permissions of that caller decide nothing about it. Nothing else about the
@@ -764,12 +764,12 @@ bury the rest of the block.
 
 The text part is printed up to 2000 characters, and what runs past that is counted. Move the limit
 with `emailTextLimit`, and turn the SES lines off with `ses: false`, both on the `messageLogging`
-option. See [Messages on the console](../../serve/README.md#messages-on-the-console) for the rest of
+option. See [Messages on the console](https://yulinsim.dev/serve/#messages-on-the-console) for the rest of
 it.
 
 A user pool sending through SES prints twice, once for the SES send and once for the message the
 pool kept. Both services recorded it, and each block says what that service holds. See
-[Sending a pool's email through SES](../cognito/README.md#sending-a-pools-email-through-ses).
+[Sending a pool's email through SES](https://yulinsim.dev/services/cognito/#sending-a-pools-email-through-ses).
 
 ## Permissions
 

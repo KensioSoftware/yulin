@@ -667,7 +667,7 @@ by any of it:
 
 Every client of a route draws on the same bucket. Two callers sending one request each spend two
 tokens between them. A WAFv2 `RateBasedStatement` counts each client on its own (see
-[Rate limiting](../wafv2/#rate-limiting)), and a stack often carries both.
+[Rate limiting](https://yulinsim.dev/services/wafv2/#rate-limiting)), and a stack often carries both.
 
 A route is throttled here only where the settings reaching it name both limits. Naming one alone
 leaves the other at the account limit on real AWS. Account limits are outside this simulation, and a
@@ -684,7 +684,7 @@ are refused by `CreateStage`. A template carrying one deploys, and the member it
 A JWT authorizer verifies a signed token before the integration is invoked. `CreateAuthorizerCommand`
 creates one, and a route asks for it with `AuthorizationType: "JWT"` and the authorizer's id.
 
-The issuer is a URL. Point it at a [simulated Cognito user pool](../cognito/ "Simulated Cognito docs")
+The issuer is a URL. Point it at a [simulated Cognito user pool](https://yulinsim.dev/services/cognito/ "Simulated Cognito docs")
 and the pool's own signing key verifies the token. A token from `InitiateAuthCommand` or
 `AdminInitiateAuthCommand` reaches the route, and anything else is turned away. The audience is the
 app client ids the authorizer admits.
@@ -939,7 +939,7 @@ no authorizer, and naming one is refused.
 
 The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
 naming a principal directly. A request offering neither is anonymous, owns no policies, and is
-refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how that
+refused. See [callers of HTTP requests](https://yulinsim.dev/services/iam/#callers-of-http-requests) in the IAM docs for how that
 resolution works and how to sign a served request.
 
 The ARN a request is authorized against is:
@@ -1623,10 +1623,10 @@ test describes a request that has been through one: `{ jwt: { claims, scopes } }
 [Lambda authorizer](#protecting-a-route-with-a-lambda-authorizer). A Lambda authorizer's own event
 is a different shape, `SimHttpApiAuthorizerEvent`, and has no factory.
 
-The [event factories page](../../factories/ "Test factories for AWS event shapes usage docs")
+The [event factories page](https://yulinsim.dev/factories/ "Test factories for AWS event shapes usage docs")
 covers what the factories have in common. A Function URL invocation is the same event from a different
 endpoint, and has
-[its own factory](../lambda/#making-an-invocation-event-without-a-request "Simulated Lambda usage docs").
+[its own factory](https://yulinsim.dev/services/lambda/#making-an-invocation-event-without-a-request "Simulated Lambda usage docs").
 
 ## The response the handler returns
 
@@ -1969,7 +1969,7 @@ and a value carrying more is refused, as more than one `IdentitySource` is on `C
 
 ## CloudFormation
 
-[Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
+[Simulated CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs") deploys
 `AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Authorizer`, `AWS::ApiGatewayV2::Integration`,
 `AWS::ApiGatewayV2::Route` and `AWS::ApiGatewayV2::Stage`. A synthesized or hand-written template
 produces an API that serves requests.
@@ -2116,7 +2116,7 @@ await srv.close();
 ```
 
 Every property outside the simulated set is left out of what is created and recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 naming the Resource type, the logical id and the ones this can act on instead. The API, authorizer,
 integration, route or stage is created either way. The stack deploys, and the record says which of its
 parts behaves differently to the template. The simulated properties are:
@@ -2140,7 +2140,7 @@ its issuer from `Fn::GetAtt <UserPool>.ProviderURL`, which resolves to the same 
 tokens name as their issuer. A CDK-declared authorizer and a CDK-deployed pool agree, with no
 configuration to write. Pass the app client explicitly through `userPoolClients`, because otherwise the
 authorizer adds a client of its own with CDK's defaults, and those emit the OAuth properties
-[simulated Cognito refuses](../cognito/#limitations).
+[simulated Cognito refuses](https://yulinsim.dev/services/cognito/#limitations).
 
 An `Authorizer` with `AuthorizerType: "REQUEST"` deploys as a Lambda authorizer, and a `Route` with
 `AuthorizationType: "CUSTOM"` and a `Ref` to it is decided by that authorizer's function.
@@ -2230,7 +2230,7 @@ matches none on real AWS.
 
 An `ApiGatewayV2Client` can be intercepted, so application code that builds its own client reaches
 the simulation without being given one. See the
-[SDK interception docs](../../sdk/ "Simulated AWS SDK interception docs").
+[SDK interception docs](https://yulinsim.dev/sdk/ "Simulated AWS SDK interception docs").
 
 ## Available functionality
 
@@ -2443,7 +2443,7 @@ Current documented limitations:
   resource policy. The real Resource type has no such property. A template carrying one was written
   for a REST API, not against a gap here.
 - A stack update replaces a changed resource of these types rather than updating it in place, as it
-  does for any other type. See the [CloudFormation limitations](../cloudformation/#limitations).
+  does for any other type. See the [CloudFormation limitations](https://yulinsim.dev/services/cloudformation/#limitations).
 - Access logging, usage plans and API keys are outside the simulation. Stage and route
   throttling is simulated (see [Throttling a stage and a route](#throttling-a-stage-and-a-route)).
   The account-level rate and burst limits are not. A stage that names no limit throttles nothing,

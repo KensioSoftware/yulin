@@ -6,7 +6,7 @@ and the deployments and stages that publish them. REST-API-specific types are im
 `@kensio/yulin/apigateway` subpath.
 
 This is the v1 service. HTTP APIs are v2, on a separate SDK client, and they are documented under
-[API Gateway HTTP APIs](../apigatewayv2/). The two hold separate state. A REST API created here
+[API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/). The two hold separate state. A REST API created here
 stays out of `simAws.apiGatewayV2()`.
 
 A handler behind a REST API can be tested against a real HTTP request, with no hand-built event to
@@ -456,7 +456,7 @@ ProdStage:
 
 Every client of a method draws on the same bucket. Two callers sending one request each spend two
 tokens between them. A WAFv2 `RateBasedStatement` counts each client on its own (see
-[Rate limiting](../wafv2/#rate-limiting)), and a stack often carries both.
+[Rate limiting](https://yulinsim.dev/services/wafv2/#rate-limiting)), and a stack often carries both.
 
 A method is throttled here only where the settings reaching it name both limits. Naming one alone
 leaves the other at the account limit on real AWS. Account limits are outside this simulation, and a
@@ -852,7 +852,7 @@ authorizer, and naming one is refused by `PutMethod`.
 
 The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
 naming a principal directly. A request offering neither is anonymous, owns no policies, and is
-refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how that
+refused. See [callers of HTTP requests](https://yulinsim.dev/services/iam/#callers-of-http-requests) in the IAM docs for how that
 resolution works and how to sign a served request.
 
 The ARN a request is authorized against is:
@@ -1157,7 +1157,7 @@ builds.
 The web ACL sees the request before the method is matched and before any authorizer runs, ahead of
 IAM, a Lambda authorizer and a Cognito authorizer alike. A blocked request gets 403 with WAF's body,
 and the integration is never invoked. See
-[Protecting an API Gateway REST API stage](../wafv2/#protecting-an-api-gateway-rest-api-stage) in
+[Protecting an API Gateway REST API stage](https://yulinsim.dev/services/wafv2/#protecting-an-api-gateway-rest-api-stage) in
 the WAFv2 docs.
 
 ## Intercepting an SDK client
@@ -1533,7 +1533,7 @@ clearer than one serving half of each document.
 
 ## Deploying from CloudFormation and CDK
 
-[Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
+[Simulated CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs") deploys
 `AWS::ApiGateway::RestApi`, `AWS::ApiGateway::Resource`, `AWS::ApiGateway::Method`,
 `AWS::ApiGateway::Deployment` and `AWS::ApiGateway::Stage`. A synthesized or hand-written template
 produces an API that serves requests.
@@ -1732,7 +1732,7 @@ await srv.close();
 ```
 
 Every property outside the simulated set is left out of what is created and recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 naming the Resource type, the logical id and the ones this can act on. The API, resource, method,
 deployment or stage is created either way. The stack deploys, and the record says which of its parts
 behaves differently to the template. The simulated properties are:
@@ -1793,7 +1793,7 @@ A template naming the SAM transform reaches the same resource types.
 `AWS::Serverless::Api` becomes a REST API with its deployment and stage, and the `Api` event of an
 `AWS::Serverless::Function` becomes the path resources, the method and the invoke permission that
 put the function behind it. Events naming no `RestApiId` share one API on a `Prod` stage.
-[The SAM section of the CloudFormation docs](../cloudformation/README.md#rest-apis) covers both.
+[The SAM section of the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#rest-apis) covers both.
 
 ### CDK
 
@@ -1813,7 +1813,7 @@ stack declares is reached through the `Fn::GetAtt` on its ARN that CDK writes.
 
 CDK also writes an `AWS::ApiGateway::Account` and a CloudWatch role beside a default `RestApi`.
 Neither is simulated. The `Account` Resource is recorded in
-[`stack.skippedResources`](../cloudformation/README.md#inspecting-stacks-and-resources) and the rest of the
+[`stack.skippedResources`](https://yulinsim.dev/services/cloudformation/#inspecting-stacks-and-resources) and the rest of the
 stack deploys.
 
 `ApiKey`, `UsagePlan`, `UsagePlanKey`, `RequestValidator`, `Model`, `DomainName` and

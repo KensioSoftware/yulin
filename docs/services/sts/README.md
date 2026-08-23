@@ -4,7 +4,7 @@ Yulin includes a simulated STS (Security Token Service) for tests and local deve
 
 Sim STS is used through `SimAws` as `simAws.sts()`, scoped to the Account making the assume request.
 It simulates assuming IAM Roles. An assume request is evaluated against
-[simulated IAM](../iam/) policies, and a request that passes issues temporary session credentials
+[simulated IAM](https://yulinsim.dev/services/iam/) policies, and a request that passes issues temporary session credentials
 that the rest of the simulated environment authenticates like real AWS credentials.
 
 ## Basic usage
@@ -56,7 +56,7 @@ temporary `AccessKeyId`, `SecretAccessKey`, `SessionToken`, and `Expiration`.
 
 The issued credentials are registered with the target Account's sim IAM. They authenticate later
 simulated requests, for example as the `caller` of an IAM authorization attempt, where identity
-policies come from the underlying Role. See [the sim IAM docs](../iam/#sts-assumerole-sessions) for a
+policies come from the underlying Role. See [the sim IAM docs](https://yulinsim.dev/services/iam/#sts-assumerole-sessions) for a
 full example. Credentials missing their session token, or used after `Expiration`, are rejected with
 an AWS-like invalid-credentials error.
 
@@ -228,4 +228,4 @@ Sim STS models Role assumption. Notable gaps:
   web-identity support
 - Session policies (`Policy` / `PolicyArns`), tags, and `SourceIdentity` requests are not evaluated
 - Condition support in trust policies is limited to the operators supported by
-  [sim IAM](../iam/#policy-conditions)
+  [sim IAM](https://yulinsim.dev/services/iam/#policy-conditions)

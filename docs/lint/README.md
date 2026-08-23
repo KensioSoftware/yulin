@@ -7,7 +7,7 @@ absent and there is no network to reach. Both are a long way from where the code
 Yulin publishes lint configs that refuse the same things in the editor.
 
 The configs apply to `**/*.cff.js` files. That is the naming
-[sim CloudFront](../services/cloudfront/ "Simulated CloudFront usage docs") already uses for
+[sim CloudFront](https://yulinsim.dev/services/cloudfront/ "Simulated CloudFront usage docs") already uses for
 CloudFront Function source.
 
 Every restriction comes from the runtime's

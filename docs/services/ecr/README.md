@@ -255,7 +255,7 @@ is created without it. That covers `ImageScanningConfiguration`, `ImageTagMutabi
 
 Two things can back a container image function, and a deploy is looked at in this order:
 
-1. An [executable binding](../lambda/#executable-bindings) given to that deploy, including one
+1. An [executable binding](https://yulinsim.dev/services/lambda/#executable-bindings) given to that deploy, including one
    naming the image repository. A binding is the more specific thing to have said, since it is about
    one deploy.
 2. The simulated ECR repository the function's `Code.ImageUri` names. That is a standing statement

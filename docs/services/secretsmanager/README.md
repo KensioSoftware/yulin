@@ -326,7 +326,7 @@ console.log(recreated.Name); // "db-creds"
 `ForceDeleteWithoutRecovery` deletes at once and frees the name straight away. Asking for it
 alongside `RecoveryWindowInDays` is a contradiction, and is refused.
 
-See [simulated time](../../time/ "Simulated time docs") for what else the clock can do.
+See [simulated time](https://yulinsim.dev/time/ "Simulated time docs") for what else the clock can do.
 
 ## Scoping
 
@@ -561,7 +561,7 @@ resolves to `dummy-value-for-<secret-id>`, and the stack carries on deploying. A
 secret a test does not care about is still worth deploying for everything else in it.
 
 The substitution is recorded on
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 naming the property that held the reference and why the value is a stand-in. A `json-key` the secret
 has no value for, a version stage no version carries, a `secret-string` segment other than
 `SecretString`, and a reference naming both a version stage and a version id are all recorded the
@@ -586,12 +586,12 @@ way.
 Function code requiring `@aws-sdk/client-secrets-manager` is routed into the same simulated AWS
 environment, with the function's execution role as the caller. A handler fetching a secret therefore
 has to be allowed to, by that role's policy, the same as on real AWS. See
-[simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles
+[simulated Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs") for how function code and execution roles
 work.
 
 The same applies to `SimSdk` interception. Intercepting `SecretsManagerClient` routes ordinary SDK
 code into the simulation, served in process. See
-[AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
+[AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs").
 
 ## Available functionality
 

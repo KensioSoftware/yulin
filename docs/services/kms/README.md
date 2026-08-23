@@ -574,7 +574,7 @@ console.log(stack.output("KeyArn")); // "arn:aws:kms:...:key/..."
 
 A property asking for behaviour Yulin leaves out still deploys. The key is created without it, and
 the property is recorded in
-[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 The template deploys, and the record says what the key leaves out. `EnableKeyRotation`,
 `RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way. The key encrypts and
 decrypts, its material stays as it was, it exists in one region, and its tags go unread.
@@ -589,7 +589,7 @@ exists.
 Function code requiring `@aws-sdk/client-kms` is routed into the same simulated AWS environment, with
 the function's execution role as the caller. A handler that decrypts a value therefore has to be
 allowed to, by both the key policy and the role's identity policy, the same as on real AWS. See
-[simulated Lambda](../lambda/) for how function code and execution roles work.
+[simulated Lambda](https://yulinsim.dev/services/lambda/) for how function code and execution roles work.
 
 ## Available functionality
 

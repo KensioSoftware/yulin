@@ -77,7 +77,7 @@ Each sent Command resolves its own simulated Account and Region scope:
 2. The **Account** comes from the ambient `simAws.runAs(...)` caller when one is set, falling back
    to the simulation default Account.
 
-The resolved caller reaches the simulated service, and simulated [IAM](../services/iam/)
+The resolved caller reaches the simulated service, and simulated [IAM](https://yulinsim.dev/services/iam/)
 authorization applies to it exactly as it does for direct sim service use. A caller without
 permission for a Command is denied, as on real AWS. Where no caller can be identified, Commands run
 as the simulation's default Account root.
@@ -237,7 +237,7 @@ resolves the same Account and Region.
 The real document client converts values in middleware, which runs inside the `send` that
 interception replaces. So the conversion happens at the interception boundary instead, using the
 option defaults `lib-dynamodb` sets (not the `util-dynamodb` ones). Which native types map to which
-descriptors is in [the sim DynamoDB docs](../services/dynamodb/README.md#the-document-client).
+descriptors is in [the sim DynamoDB docs](https://yulinsim.dev/services/dynamodb/#the-document-client).
 
 ## Supported services and Commands
 
@@ -258,7 +258,7 @@ A gap in that coverage is refused on send, with a different error for each kind:
 
 - Only `client.send(command)` is intercepted. SDK utilities that bypass `send`, such as
   `getSignedUrl`, run against real AWS. Paginators and waiters go through `send`, so they work. Presigning works without interception. Point the client at the simulated endpoint, as
-  [the sim S3 presigned URL docs](../services/s3/README.md#presigned-urls) show.
+  [the sim S3 presigned URL docs](https://yulinsim.dev/services/s3/#presigned-urls) show.
 - Simulated errors carry SDK-shaped `name` and `$metadata`, but are not instances of the real SDK
   exception classes. Match an error by its `error.name`. An `instanceof` check against the SDK class
   fails.

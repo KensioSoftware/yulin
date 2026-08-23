@@ -9,7 +9,7 @@ A simulated Lambda function and a simulated ECS container both run your own code
 process as the test. Everything that code talks to falls into one of two categories.
 
 Simulated AWS services are handled by Yulin. A DynamoDB call reaches an in-memory table and an S3
-call reaches an in-memory bucket, with no network involved. [AWS SDK interception](../sdk/README.md)
+call reaches an in-memory bucket, with no network involved. [AWS SDK interception](https://yulinsim.dev/sdk/)
 is how an ordinary SDK client in the code under test gets there.
 
 Everything else is yours to provide, and connects the way it normally would. Yulin leaves it alone
@@ -244,7 +244,7 @@ the host value.
 That matters here because a connection is often built at module scope. Read inside the handler, or
 build the client there, to get the configured value. Sim Lambda warns on the console when the
 difference changes what the code sees, which is covered under
-[environment variables](../services/lambda/README.md#environment-variables) on the simulated Lambda
+[environment variables](https://yulinsim.dev/services/lambda/#environment-variables) on the simulated Lambda
 page. Zip code running in the vm runtime is unaffected, because it is imported during an invocation.
 
 ## Limitations
