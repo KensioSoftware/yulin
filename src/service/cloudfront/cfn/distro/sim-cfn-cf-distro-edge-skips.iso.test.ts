@@ -251,6 +251,33 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
     assertStringIncludes(error.message, "is not a Lambda function ARN");
   });
 
+  it("fails the stack over an ARN that only starts like a reference", async () => {
+    // Given an association naming a Resource in the Stack followed by
+    // something no attribute is called.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "edge-site", {});
+
+    // When it deploys.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "edge-site",
+        template: edgeDistributionTemplateFactory.make({
+          associations: [
+            {
+              EventType: "viewer-request",
+              LambdaFunctionARN: "EdgeFunction.the one in us-east-1",
+            },
+          ],
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the deployment failed on the ARN. Only the whole shape an
+    // unanswered Fn::GetAtt resolves to counts as one this simulation wrote.
+    assertStringIncludes(error.message, "is not a Lambda function ARN");
+  });
+
   it("fails the stack over a role Lambda@Edge cannot assume", async () => {
     // Given a template whose edge function runs as an ordinary Lambda
     // execution role, trusting lambda.amazonaws.com alone.

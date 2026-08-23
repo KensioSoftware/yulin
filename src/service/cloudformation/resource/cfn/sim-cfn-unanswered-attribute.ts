@@ -18,19 +18,39 @@ export function simCfnUnansweredAttribute(
 }
 
 /**
+ * What every dot-separated part of a stand-in looks like.
+ *
+ * A logical ID is alphanumeric and holds no dot at all, so the part before the
+ * first one is the whole of it. An attribute name does hold dots, as
+ * `Endpoint.Address` and `Outputs.NestedStackOutput` do.
+ */
+const alphanumericPattern = /^[A-Za-z0-9]+$/u;
+
+/**
  * Whether a value is the stand-in for an attribute of a Resource in this
  * Stack.
  *
  * Read by a service deciding what to do about a property whose value never
- * arrived. Nothing a template writes by hand looks like this, since the
- * logical ID has to be one the Stack holds.
+ * arrived. A value has to carry the whole shape and name a Resource the Stack
+ * holds, which is more than a template writes by hand.
  */
 export function namesSimCfnUnansweredAttribute(
   value: string,
   logicalIds: Iterable<string>,
 ): boolean {
+  const parts = value.split(".");
+
+  if (
+    parts.length < 2 ||
+    parts.some((part) => !alphanumericPattern.test(part))
+  ) {
+    return false;
+  }
+
+  const named = parts[0];
+
   for (const logicalId of logicalIds) {
-    if (value.startsWith(`${logicalId}.`)) {
+    if (logicalId === named) {
       return true;
     }
   }
