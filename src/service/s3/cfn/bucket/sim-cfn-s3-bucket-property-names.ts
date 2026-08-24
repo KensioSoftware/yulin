@@ -3,6 +3,7 @@
  */
 export const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "BucketName",
+  "LifecycleConfiguration",
   "NotificationConfiguration",
   "PublicAccessBlockConfiguration",
   "WebsiteConfiguration",
@@ -52,11 +53,6 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
     "storage classes are not simulated, so nothing transitions between them",
   ],
   ["InventoryConfigurations", "Bucket inventory reports are not simulated"],
-  [
-    "LifecycleConfiguration",
-    "the rules are stored and GetBucketLifecycleConfiguration hands them " +
-      "back, and simulated S3 expires or transitions no Object against them",
-  ],
   ["LoggingConfiguration", "server access logging is not simulated"],
   ["MetadataConfiguration", "Bucket metadata tables are not simulated"],
   ["MetadataTableConfiguration", "Bucket metadata tables are not simulated"],

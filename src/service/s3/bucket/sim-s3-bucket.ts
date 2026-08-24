@@ -1,5 +1,5 @@
-import { BackgroundTasks } from "../../../util/background/background.js";
 import type { Brand } from "../../../util/brand.type.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
@@ -7,6 +7,7 @@ import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
 import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
+import { SimS3LifecycleSweep } from "./lifecycle/sim-s3-lifecycle-sweep.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
@@ -27,6 +28,12 @@ interface SimS3BucketProperties {
   readonly notifications?: SimS3NotificationConfiguration;
   readonly lifecycle?: SimS3LifecycleConfiguration;
   /**
+   * The simulation's sense of time, which is what a lifecycle rule is measured
+   * against. A Bucket made outside a simulated environment has none to be
+   * given, and runs on the host clock.
+   */
+  readonly clock?: SimClock;
+  /**
    * When the Bucket came into being, in simulated time.
    *
    * Real S3 reports this on every Bucket a listing returns, and the `aws` CLI
@@ -43,6 +50,7 @@ export class SimS3Bucket {
   public readonly creationDate: Date;
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly clock: SimClock;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
   private readonly multipartUploads = new SimS3MultipartUploads();
   private storage: SimS3BucketStorage;
@@ -62,13 +70,15 @@ export class SimS3Bucket {
       publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
       notifications = SimS3NotificationConfiguration.empty(),
       lifecycle = SimS3LifecycleConfiguration.empty(),
-      creationDate = new BackgroundTasks().now(),
+      clock = new SimRealClock(),
+      creationDate = clock.now(),
     } = properties;
 
     validateS3BucketName(bucketName);
 
     this.bucketName = bucketName;
     this.accountRegionScope = accountRegionScope;
+    this.clock = clock;
     this.storage = storage;
     this.website = website;
     this.policy = policy;
@@ -87,16 +97,19 @@ export class SimS3Bucket {
 
   /**
    * Get a simulated S3 Object from storage.
+   *
+   * An Object a lifecycle rule has expired goes on the way past. Every read of
+   * it then finds the key empty.
    */
   async getObject(key: string): Promise<SimS3Object | undefined> {
-    return await this.storage.getObject(key);
+    return await this.sweep().object(await this.storage.getObject(key));
   }
 
   /**
    * List simulated S3 Objects from storage.
    */
   async listObjects(prefix?: string): Promise<SimS3Object[]> {
-    return await this.storage.listObjects(prefix);
+    return await this.sweep().objects(await this.storage.listObjects(prefix));
   }
 
   /**
@@ -120,6 +133,11 @@ export class SimS3Bucket {
    * completing the upload puts anything under a key.
    */
   getMultipartUploads(): SimS3MultipartUploads {
+    const now = this.clock.now();
+    this.multipartUploads.discardAbandoned((upload) =>
+      this.lifecycle.abandons(upload, now),
+    );
+
     return this.multipartUploads;
   }
 
@@ -263,6 +281,15 @@ export class SimS3Bucket {
       this.bucketName,
       this.accountRegionScope,
       this.website,
+    );
+  }
+
+  /** What this Bucket's rules have expired, as they stand at this moment. */
+  private sweep(): SimS3LifecycleSweep {
+    return new SimS3LifecycleSweep(
+      this.storage,
+      this.lifecycle,
+      this.clock.now(),
     );
   }
 }

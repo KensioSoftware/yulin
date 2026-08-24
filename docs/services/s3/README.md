@@ -594,9 +594,9 @@ A completed upload raises `s3:ObjectCreated:CompleteMultipartUpload`. A single-r
   `EntityTooSmall` for one that is not. Sim S3 takes a part of any size.
 - A listing of uploads or of parts comes back on one page. `MaxUploads`, `MaxParts`, the markers that
   page them, and `Delimiter` are all left out.
-- An upload has no expiry, and nothing abandons one on its own. An
-  `AbortIncompleteMultipartUpload` lifecycle rule is stored and read back, and nothing acts on it.
-  See [Lifecycle configuration](#lifecycle-configuration).
+- No caller has to abort an upload. An `AbortIncompleteMultipartUpload` lifecycle rule abandons one
+  the clock has left unfinished for long enough, and takes its parts with it. See
+  [Lifecycle configuration](#lifecycle-configuration).
 
 ## Reading part of an Object
 
@@ -1694,13 +1694,11 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 
 ## Buckets from CloudFormation
 
-An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on. Those are `BucketName`,
-`NotificationConfiguration`, `PublicAccessBlockConfiguration` and `WebsiteConfiguration`. A fifth,
-`LifecycleConfiguration`, is stored and readable while nothing acts on it, and is recorded alongside
-the properties below for that reason. See [Lifecycle configuration](#lifecycle-configuration).
-Without
-`BucketName` the Bucket is named after the resource's logical id, lowercased, where real
-CloudFormation invents a generated name.
+An `AWS::S3::Bucket` resource carries five properties simulated S3 acts on. Those are `BucketName`,
+`LifecycleConfiguration`, `NotificationConfiguration`, `PublicAccessBlockConfiguration` and
+`WebsiteConfiguration`. See [Lifecycle configuration](#lifecycle-configuration) for the parts of a
+rule that are read. Without `BucketName` the Bucket is named after the resource's logical id,
+lowercased, where real CloudFormation invents a generated name.
 
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
@@ -1914,13 +1912,87 @@ them disabled in favour of policies.
 
 ## Lifecycle configuration
 
-Sim S3 stores a Bucket's lifecycle rules and hands them back. Nothing expires or transitions an
-Object against them, so a rule here records what the Bucket was configured with rather than
-something that happens.
+Sim S3 stores a Bucket's lifecycle rules and acts on them. An `Expiration` rule removes the Objects
+it selects once simulated time passes the boundary, and an `AbortIncompleteMultipartUpload` rule
+discards uploads that were started and left unfinished.
 
-That is enough to test the configuration side of a construct or a template, which is otherwise
-only checkable by asserting on synthesized CloudFormation. Reading the rules off a deployed Bucket
-says the rules arrived, where a template assertion says only that CloudFormation was asked for them.
+Retention is otherwise the one property of a log or a backup Bucket a test cannot demonstrate.
+Reading the rules back off a deployed Bucket says the rules arrived. Putting an Object, moving the
+clock and finding the Object gone says the Bucket keeps what it was configured to keep.
+
+```typescript sim-s3-lifecycle-expiry
+/**
+ * Expiring simulated S3 Objects against a lifecycle rule.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutBucketLifecycleConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.region("eu-west-2").s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "logs" }));
+await simS3.putBucketLifecycleConfiguration(
+  new PutBucketLifecycleConfigurationCommand({
+    Bucket: "logs",
+    LifecycleConfiguration: {
+      Rules: [
+        {
+          ID: "expire-raw-logs",
+          Status: "Enabled",
+          Filter: { Prefix: "raw/" },
+          Expiration: { Days: 365 },
+        },
+      ],
+    },
+  }),
+);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "logs",
+    Key: "raw/2026-08-24.gz",
+    Body: "one raw log line",
+  }),
+);
+
+await simAws.clock().advanceBy({ days: 366 });
+
+const listing = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "logs", Prefix: "raw/" }),
+);
+
+// The rule expired the Object, so the listing is empty.
+console.log(listing.Contents ?? []);
+```
+
+An Object goes the moment the clock reaches the boundary. Real S3 removes an expired Object some
+time after it and bills up to the removal, which a test would have to wait out. Expiring on the
+boundary is the answer a test can assert against.
+
+Expiry happens when the Bucket is read. What `ListObjectsV2`, `GetObject` and `HeadObject` find is
+what the rules leave at that instant, and a Bucket carrying no rules costs one comparison. Moving
+the clock backwards afterwards leaves an expired Object gone, because the rule deleted it on the way
+past.
+
+### What a rule selects
+
+A rule selects Objects by its `Filter`, or by the older top-level `Prefix`. A rule with no scope at
+all covers every key in the Bucket. `Filter.Prefix`, `Filter.And.Prefix`, `ObjectSizeGreaterThan` and
+`ObjectSizeLessThan` are all read. A `Disabled` rule is stored and skipped.
+
+A multipart upload is selected by its key alone. Half an upload has no size. A rule narrowed by an
+object size bound abandons no upload.
+
+Sim S3 holds no Object tags. A rule narrowed by `Filter.Tag`, `Filter.And.Tags` or a template's
+`TagFilters` selects no Object, and expires none.
+
+### Reading and replacing the rules
 
 ```typescript sim-s3-lifecycle-configuration
 import {
@@ -2001,23 +2073,26 @@ CloudFormation spells some rule fields differently from the request. `Id` become
 `Transitions` joins the list. Everything else, `Status`, `Prefix`, `AbortIncompleteMultipartUpload`,
 `TagFilters` and the object size bounds among them, is carried across as the template stated it.
 
-`LifecycleConfiguration` is still recorded in
-[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
-under a reason saying the rules are readable and that nothing acts on them. A test reading the
-configuration back would otherwise take it for proof that retention works.
+`LifecycleConfiguration` is one of the properties simulated S3 acts on. It stays out of
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
+The parts of a rule it acts on are the ones listed under
+[What a rule selects](#what-a-rule-selects).
 
 ### Limitations
 
-No Object is ever expired, and no Object moves between storage classes. Storage classes are left out
-of the simulator entirely, so a `Transitions` rule is stored and read back and goes no further. An
-incomplete multipart upload is never abandoned, whatever `AbortIncompleteMultipartUpload` says.
+No Object moves between storage classes. Storage classes are left out of the simulator entirely. A
+`Transitions` rule is stored and read back and goes no further.
 
-Nothing reads a rule's `Filter`, `Prefix`, `TagFilters` or object size bounds, since nothing selects
-Objects against a rule in the first place.
+Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object. That event family is
+among the ones sim S3 leaves out. An expiry here is silent.
 
-The `s3:LifecycleExpiration:*` event notification family is left out along with the expiry that
-would raise it. `NoncurrentVersionExpiration` and `ExpiredObjectDeleteMarker` are stored and
-unread, because Object versions are left out.
+`NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
+stored and unread, because Object versions are left out.
+
+A Bucket mounted on a filesystem directory refuses the deletion an expiry asks for, the way it
+refuses `DeleteObject`, and answers `NotImplemented`. Removing a real file off the mounted directory
+is worse than reporting that the rule cannot run. Use the default in-memory storage to test
+retention.
 
 `GetBucketLifecycleConfiguration` and its siblings are reachable through the SDK and not over the
 served S3 REST endpoint.
@@ -2935,8 +3010,9 @@ These apply across the page. The sections above each list what is specific to th
 - A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
   left out, and every Object is in that one.
 - `EncodingType` is ignored on a listing, and keys come back unencoded.
-- Object tags, ACLs, replication and server-side encryption are left out. Lifecycle rules are stored
-  and read back, and nothing expires or transitions an Object against them.
+- Object tags, ACLs, replication and server-side encryption are left out. A lifecycle rule expires
+  Objects and abandons uploads, and transitions nothing between storage classes. See
+  [Lifecycle configuration](#lifecycle-configuration).
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend in place of putting Objects.
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
