@@ -83,9 +83,7 @@ export function requireSimLogsDeliverySource(
 
   if (regionName !== simLogsCloudFrontDeliveryRegion) {
     throw new SimLogsValidationException(
-      `A CloudFront delivery source can only be created in ` +
-        `${simLogsCloudFrontDeliveryRegion}, and this request was made in ` +
-        regionName,
+      `A CloudFront delivery source can only be created in ${simLogsCloudFrontDeliveryRegion}, and this request was made in ${regionName}`,
     );
   }
 
