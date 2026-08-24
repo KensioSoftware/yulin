@@ -52,6 +52,9 @@ export interface SimS3LifecycleRule {
   readonly NoncurrentVersionExpiration?:
     | SimS3LifecycleNoncurrentVersionExpiration
     | undefined;
+  readonly NoncurrentVersionTransitions?:
+    | readonly SimS3LifecycleNoncurrentVersionTransition[]
+    | undefined;
 }
 
 /**
@@ -113,5 +116,14 @@ export interface SimS3LifecycleAbortIncompleteMultipartUpload {
  */
 export interface SimS3LifecycleNoncurrentVersionExpiration {
   readonly NoncurrentDays?: number | undefined;
+  readonly NewerNoncurrentVersions?: number | undefined;
+}
+
+/**
+ * Minimal structural sim S3 lifecycle noncurrent version transition.
+ */
+export interface SimS3LifecycleNoncurrentVersionTransition {
+  readonly NoncurrentDays?: number | undefined;
+  readonly StorageClass?: string | undefined;
   readonly NewerNoncurrentVersions?: number | undefined;
 }
