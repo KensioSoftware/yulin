@@ -18,16 +18,18 @@ const ruleActionNames =
  * Whether a rule states an action to take on the Objects it selects.
  *
  * Real S3 refuses a rule stating none, because a rule that selects Objects and
- * then does nothing with them is a configuration with no meaning.
+ * then does nothing with them is a configuration with no meaning. An empty
+ * list of transitions counts as none. The field is there and the rule still
+ * transitions nothing.
  */
 function statesAnAction(rule: SimS3LifecycleRule): boolean {
   return [
-    rule.Expiration,
-    rule.Transitions,
-    rule.NoncurrentVersionExpiration,
-    rule.NoncurrentVersionTransitions,
-    rule.AbortIncompleteMultipartUpload,
-  ].some((action) => action !== undefined);
+    rule.Expiration !== undefined,
+    rule.NoncurrentVersionExpiration !== undefined,
+    rule.AbortIncompleteMultipartUpload !== undefined,
+    (rule.Transitions ?? []).length > 0,
+    (rule.NoncurrentVersionTransitions ?? []).length > 0,
+  ].includes(true);
 }
 
 /**

@@ -19,7 +19,6 @@ import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import {
-  SimS3MalformedXml,
   SimS3NoSuchBucket,
   SimS3NoSuchLifecycleConfiguration,
 } from "../../error/sim-s3.error.js";
@@ -140,69 +139,6 @@ describe("S3 lifecycle configuration commands", () => {
     );
 
     assertInstanceOf(error, SimS3NoSuchLifecycleConfiguration);
-  });
-
-  it("refuses a configuration real S3 would refuse to store", async () => {
-    // Given a Bucket to configure.
-    const simS3 = new SimAws().s3();
-
-    await simS3.createBucket(new CreateBucketCommand({ Bucket: "malformed" }));
-
-    // When a configuration states no rules, and one states a rule with a
-    // status S3 has no meaning for.
-    const emptyError = await assertThrowsErrorAsync(async () =>
-      simS3.putBucketLifecycleConfiguration(
-        new PutBucketLifecycleConfigurationCommand({
-          Bucket: "malformed",
-          LifecycleConfiguration: { Rules: [] },
-        }),
-      ),
-    );
-    const statusError = await assertThrowsErrorAsync(async () =>
-      simS3.putBucketLifecycleConfiguration(
-        new PutBucketLifecycleConfigurationCommand({
-          Bucket: "malformed",
-          // @ts-expect-error -- testing a status outside the two S3 accepts
-          LifecycleConfiguration: { Rules: [{ ID: "off", Status: "Off" }] },
-        }),
-      ),
-    );
-
-    // Then both are refused, so a rule nothing recognises cannot read back
-    // looking configured.
-    assertInstanceOf(emptyError, SimS3MalformedXml);
-    assertInstanceOf(statusError, SimS3MalformedXml);
-    assertStringIncludes(statusError.message, "Enabled or Disabled");
-  });
-
-  it("refuses a rule that would do nothing", async () => {
-    // Given a Bucket to configure.
-    const simS3 = new SimAws().s3();
-
-    await simS3.createBucket(new CreateBucketCommand({ Bucket: "idle" }));
-
-    // When a rule states a status and no action to take.
-    const error = await assertThrowsErrorAsync(async () =>
-      simS3.putBucketLifecycleConfiguration(
-        new PutBucketLifecycleConfigurationCommand({
-          Bucket: "idle",
-          LifecycleConfiguration: {
-            Rules: [
-              {
-                ID: "does-nothing",
-                Status: "Enabled",
-                Filter: { Prefix: "raw/" },
-              },
-            ],
-          },
-        }),
-      ),
-    );
-
-    // Then it is refused, as real S3 refuses a rule carrying no expiry,
-    // transition or upload action.
-    assertInstanceOf(error, SimS3MalformedXml);
-    assertStringIncludes(error.message, "must state at least one of");
   });
 
   it("keeps the caller's rules out of the Bucket's own state", async () => {

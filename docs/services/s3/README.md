@@ -1987,9 +1987,11 @@ carrying no rules answers `GetBucketLifecycleConfigurationCommand` with
 `NoSuchLifecycleConfiguration` rather than an empty list, which is how real S3 separates a Bucket
 nobody configured from one configured to do nothing.
 
-A configuration stating no rules at all is refused with `MalformedXML`, and so is a rule whose
-`Status` is anything but `Enabled` or `Disabled`. A rule stored under a status nothing recognises
-would read back looking configured.
+A configuration stating no rules at all is refused with `MalformedXML`. So is a rule whose `Status`
+is anything but `Enabled` or `Disabled`, and a rule stating no action to take, meaning none of
+`Expiration`, `Transitions`, `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` or
+`AbortIncompleteMultipartUpload`. An empty list of transitions counts as no action. Real S3 refuses
+all three, and a rule stored here that real S3 would have rejected reads back looking configured.
 
 ### From a CloudFormation template
 
