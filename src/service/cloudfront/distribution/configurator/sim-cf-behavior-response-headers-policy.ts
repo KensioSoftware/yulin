@@ -57,10 +57,9 @@ export class SimCfBehaviorResponseHeadersPolicy {
     throw new SimCloudFrontInvalidResponseHeadersPolicyId(
       `Sim CloudFront Behavior for Origin ${targetOriginId} names response ` +
         `headers policy ${responseHeadersPolicyId}, which does not exist. ` +
-        `Only a policy an AWS::CloudFront::ResponseHeadersPolicy Resource ` +
-        `created in this simulation can be named, so a managed policy ID, ` +
-        `which names a policy AWS owns rather than one a template creates, ` +
-        `will not be found.`,
+        `A Behavior names one of CloudFront's five managed policies, or a ` +
+        `policy an AWS::CloudFront::ResponseHeadersPolicy Resource created in ` +
+        `this simulation. A policy ID from a real account is neither.`,
     );
   }
 }

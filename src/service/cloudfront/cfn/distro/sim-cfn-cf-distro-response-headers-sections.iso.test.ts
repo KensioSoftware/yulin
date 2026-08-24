@@ -204,9 +204,9 @@ describe("CloudFormation Distribution response headers policy sections", () => {
   });
 
   it("fails the stack for a Behavior naming a response headers policy that does not exist", async () => {
-    // Given a Distribution whose default Behavior names an ID nothing in this
-    // simulation created, which is what a CloudFront managed policy ID is
-    // here.
+    // Given a Distribution whose default Behavior names an ID that is neither
+    // a managed policy nor one this simulation created, which is what a policy
+    // ID from a real account is here.
     const simAws = new SimAws();
 
     // When the template is deployed, then it fails at deploy time rather than
@@ -221,7 +221,7 @@ describe("CloudFormation Distribution response headers policy sections", () => {
             DefaultCacheBehavior: {
               TargetOriginId: "SiteOrigin",
               ViewerProtocolPolicy: "redirect-to-https",
-              ResponseHeadersPolicyId: "67f7725c-6f97-4210-82d7-5512b31e9d03",
+              ResponseHeadersPolicyId: "11111111-2222-3333-4444-555555555555",
             },
           },
         ),
@@ -230,7 +230,7 @@ describe("CloudFormation Distribution response headers policy sections", () => {
       await stack.waitForDeployComplete();
     });
 
-    assertStringIncludes(error.message, "67f7725c-6f97-4210-82d7-5512b31e9d03");
-    assertStringIncludes(error.message, "managed policy ID");
+    assertStringIncludes(error.message, "11111111-2222-3333-4444-555555555555");
+    assertStringIncludes(error.message, "does not exist");
   });
 });

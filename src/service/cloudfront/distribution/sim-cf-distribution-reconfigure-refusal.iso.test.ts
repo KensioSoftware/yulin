@@ -72,7 +72,7 @@ describe("Refusing a sim CloudFront Distribution update", () => {
               DefaultCacheBehavior: {
                 TargetOriginId: "site-origin",
                 ViewerProtocolPolicy: "allow-all",
-                ResponseHeadersPolicyId: "67f7725c-6f97-4210-82d7-5512b31e9d03",
+                ResponseHeadersPolicyId: "11111111-2222-3333-4444-555555555555",
               },
             },
           ),
@@ -124,7 +124,7 @@ describe("Refusing a sim CloudFront Distribution update", () => {
               DefaultCacheBehavior: {
                 TargetOriginId: "site-origin",
                 ViewerProtocolPolicy: "allow-all",
-                ResponseHeadersPolicyId: "67f7725c-6f97-4210-82d7-5512b31e9d03",
+                ResponseHeadersPolicyId: "11111111-2222-3333-4444-555555555555",
               },
             },
           ),
