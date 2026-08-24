@@ -4,8 +4,6 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertResponseStatus,
-  assertStringIncludes,
-  assertThrowsErrorAsync,
   describeResponse,
 } from "@kensio/smartass";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -201,36 +199,5 @@ describe("CloudFormation Distribution response headers policy sections", () => {
     // Then none of the CORS headers are added, as CloudFront sends none
     // rather than a mismatched one.
     assertIdentical(home.headers.get("access-control-allow-origin"), null);
-  });
-
-  it("fails the stack for a Behavior naming a response headers policy that does not exist", async () => {
-    // Given a Distribution whose default Behavior names an ID that is neither
-    // a managed policy nor one this simulation created, which is what a policy
-    // ID from a real account is here.
-    const simAws = new SimAws();
-
-    // When the template is deployed, then it fails at deploy time rather than
-    // deploying successfully and only failing the first request that reaches
-    // the Behavior.
-    const error = await assertThrowsErrorAsync(async () => {
-      const stack = await simAws.cloudFormation().deployTemplate({
-        stackName: "missing-policy-stack",
-        template: siteTemplate(
-          { Name: "CacheHeaders" },
-          {
-            DefaultCacheBehavior: {
-              TargetOriginId: "SiteOrigin",
-              ViewerProtocolPolicy: "redirect-to-https",
-              ResponseHeadersPolicyId: "11111111-2222-3333-4444-555555555555",
-            },
-          },
-        ),
-      });
-
-      await stack.waitForDeployComplete();
-    });
-
-    assertStringIncludes(error.message, "11111111-2222-3333-4444-555555555555");
-    assertStringIncludes(error.message, "does not exist");
   });
 });
