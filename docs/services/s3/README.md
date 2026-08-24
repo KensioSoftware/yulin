@@ -1703,12 +1703,12 @@ lowercased, where real CloudFormation invents a generated name.
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 and the Bucket is created and the stack carries on. That matters because a Bucket deployed without
-the lifecycle rules, versioning or CORS configuration its template asked for looks configured and
+the versioning, replication or CORS configuration its template asked for looks configured and
 behaves as though it were bare, and the failure that causes turns up somewhere else entirely. The
 record is where a test checks which of those it is standing on. A property name `AWS::S3::Bucket`
 never had is recorded the same way, and a typo leaves the stack standing.
 
-One of the four given in the wrong shape still fails the stack, and so does a `BucketName` that is
+One of the five given in the wrong shape still fails the stack, and so does a `BucketName` that is
 something other than a string. There is no Bucket to create under a name nothing else in the
 template refers to.
 
@@ -2075,7 +2075,9 @@ CloudFormation spells some rule fields differently from the request. `Id` become
 
 `LifecycleConfiguration` is one of the properties simulated S3 acts on. It stays out of
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
-The parts of a rule it acts on are the ones listed under
+The two actions it enforces are `Expiration`, whether the template flattened it onto the rule or
+not, and `AbortIncompleteMultipartUpload`. A `Transitions` rule is stored and read back and goes no
+further. Which Objects an enforced action reaches is decided by the fields listed under
 [What a rule selects](#what-a-rule-selects).
 
 ### Limitations

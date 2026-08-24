@@ -102,14 +102,15 @@ describe("Simulated S3 lifecycle abandoned uploads", () => {
     assertIdentical(inProgress.join(","), "raw/big.gz");
   });
 
-  it("drops an upload the clock has carried past the abort", async () => {
+  it("drops an upload the moment the clock reaches the abort", async () => {
     // Given a Bucket abandoning uploads a week after they start.
     const { simAws } = await abandonedUpload([abortStaleUploads]);
 
-    // When simulated time moves past the week.
-    await simAws.clock().advanceBy({ days: 8 });
+    // When simulated time reaches the week exactly.
+    await simAws.clock().advanceBy({ days: 7 });
 
-    // Then nothing is in progress any more.
+    // Then the upload has already gone, because it is abandoned on the
+    // boundary rather than some time after it.
     assertArrayLength(await uploadsInProgress(simAws), 0);
   });
 

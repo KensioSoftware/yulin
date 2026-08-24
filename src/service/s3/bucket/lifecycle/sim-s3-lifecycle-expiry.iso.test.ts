@@ -95,15 +95,16 @@ describe("Simulated S3 lifecycle expiry", () => {
     assertIdentical(keys.join(","), "raw/2026-08-24.gz,reports/august.csv");
   });
 
-  it("drops an Object the clock has carried past the expiry", async () => {
+  it("drops an Object the moment the clock reaches the expiry", async () => {
     // Given a Bucket expiring raw logs after a year.
     const simAws = await loggingSimulation([expireRawLogs]);
 
-    // When simulated time moves past the year.
-    await simAws.clock().advanceBy({ days: 366 });
+    // When simulated time reaches the year exactly.
+    await simAws.clock().advanceBy({ days: 365 });
 
-    // Then the log has gone and the report the rule does not select is left
-    // where it is.
+    // Then the log has already gone, because an Object expires on the
+    // boundary rather than some time after it. The report the rule does not
+    // select is left where it is.
     const keys = await storedKeys(simAws);
     assertIdentical(keys.join(","), "reports/august.csv");
   });
@@ -147,10 +148,11 @@ describe("Simulated S3 lifecycle expiry", () => {
       },
     ]);
 
-    // When simulated time reaches the day before and then the day after.
+    // When simulated time reaches the second before, and then the instant
+    // itself.
     await simAws.clock().setTo(new Date("2026-12-31T23:59:59.000Z"));
     const beforeTheDate = await storedKeys(simAws);
-    await simAws.clock().setTo(new Date("2027-01-01T00:00:01.000Z"));
+    await simAws.clock().setTo(new Date("2027-01-01T00:00:00.000Z"));
 
     // Then the instant in the rule is what separates the two readings.
     const afterTheDate = await storedKeys(simAws);
