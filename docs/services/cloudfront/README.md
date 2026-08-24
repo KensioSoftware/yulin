@@ -1986,10 +1986,16 @@ a stack reaching for one deploys and serves the headers.
 The managed policies sit in CloudFront's own namespace. A template may create a policy called
 `SecurityHeadersPolicy` of its own, and deleting that stack leaves the managed one where it was.
 
-A Behavior's `ResponseHeadersPolicyId` is still checked when the Distribution is created or updated.
-An ID that is neither managed nor created here, whether mistyped or taken from a real account, fails
-the Stack there. The alternative would be a successful deploy that fails the first request reaching
-the Behavior.
+A CloudFormation Distribution whose Behavior names a policy that is neither managed nor created here
+deploys without one. The `ResponseHeadersPolicyId` lands on `stack.ignoredProperties` under that
+Behavior, and the Behavior serves every response without the headers the policy would have set. A
+template naming a policy from a real account, or one another stack created, is ordinary, and a site
+that failed to deploy over a set of headers would cost a local dev server and a test suite every
+request they make. One Behavior losing its policy leaves the others holding theirs, and a path
+Behavior is recorded under its `PathPattern`, the way a skipped Lambda@Edge association is.
+
+`CreateDistribution` and `UpdateDistribution` still refuse the same ID, as real CloudFront refuses
+it.
 
 ## Origin access controls
 

@@ -12,6 +12,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.command.js";
 import { SimCfnCfDistroConfigValidator } from "./sim-cfn-cf-distro-config-validator.js";
 import { simCfnCfDistroWithRunnableEdgeAssociations } from "./sim-cfn-cf-distro-edge-associations.js";
+import { simCfnCfDistroWithHeldResponseHeadersPolicies } from "./sim-cfn-cf-distro-response-headers-policy.js";
 import { simCfnCfDistroWithoutAbsentWebAcl } from "./sim-cfn-cf-distro-web-acl.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 
@@ -23,11 +24,12 @@ interface SimCfnCfDistroCreatorProperties {
  * Creates simulated CloudFront Distributions from CloudFormation Resources.
  *
  * A `WebACLId` naming a web ACL this simulation does not hold is left out and
- * recorded, and so is a Lambda@Edge association it cannot run. CloudFront has
- * no association Resource for either, so both live on the Distribution itself,
- * and refusing one would take the Distribution down over something that was
- * never the point of the template. The site a local dev server and a suite of
- * tests make requests to has to survive that.
+ * recorded, and so are a Lambda@Edge association it cannot run and a
+ * `ResponseHeadersPolicyId` naming a policy it does not hold. CloudFront has no
+ * Resource of its own for any of the three, so all of them live on the
+ * Distribution itself, and refusing one would take the Distribution down over
+ * something that was never the point of the template. The site a local dev
+ * server and a suite of tests make requests to has to survive that.
  */
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;
@@ -66,6 +68,7 @@ export class SimCfnCfDistroCreator {
           resource,
           validator.validate(),
           context.simAws,
+          this.cloudFront,
         ),
       },
     });
@@ -95,13 +98,18 @@ function deployableConfig(
   resource: SimCfnResource,
   distributionConfig: SimCloudFrontDistributionConfig,
   simAws: SimAws,
+  cloudFront: SimCloudFront,
 ): SimCloudFrontDistributionConfig {
   return simCfnCfDistroWithoutAbsentWebAcl(
     resource,
-    simCfnCfDistroWithRunnableEdgeAssociations(
+    simCfnCfDistroWithHeldResponseHeadersPolicies(
       resource,
-      distributionConfig,
-      simAws,
+      simCfnCfDistroWithRunnableEdgeAssociations(
+        resource,
+        distributionConfig,
+        simAws,
+      ),
+      cloudFront,
     ),
     simAws,
   );
