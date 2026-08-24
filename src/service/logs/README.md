@@ -101,8 +101,8 @@ ignored here would be applied in an account.
 
 ## CloudFormation
 
-`cfn/` creates `AWS::Logs::LogGroup` from a template, following the shape every other service's
-resource factory has. `SimCfnLogGroupProperties` reads the two properties this simulation acts on
+`cfn/` creates `AWS::Logs::LogGroup` and the three delivery Resource types from a template,
+following the shape every other service's resource factory has. `SimCfnLogGroupProperties` reads the two properties this simulation acts on
 and `SimCfnLogGroupPropertyRules` records the rest, so a reader can tell a real property this
 simulation chose not to act on from one CloudWatch Logs has never had.
 
@@ -150,6 +150,43 @@ Failures are kept rather than thrown. Real CloudWatch Logs tells nobody about a 
 which would leave a test with a handler that mysteriously never ran, so every failure lands in
 `subscriptionFailures` for a test to read.
 
+## Delivery
+
+`delivery/` holds the three resources that carry another service's logs somewhere. CloudFront
+standard logging v2 is what they were built for here. A distribution has no logging property of its
+own, and a template that turns logging on is these three resources and nothing else.
+
+Each of the three has its own store, because their identities differ. A source and a destination are
+named by the caller, and a delivery is named by an identifier `SimLogsDeliveryIds` issues. In two of
+the three the key that matters most is a second one. A source is unique by the resource it covers,
+and that is what refuses a second delivery source over one distribution. A delivery is unique by the
+source and destination pair it joins.
+
+`requiredSimLogsDeliveredService` reads the service off the resource ARN, as CloudWatch Logs does,
+and `requireSimLogsDeliveryRegion` is where the CloudFront region rule lives. That one rule is the
+only one modelled. CloudFront is the one service whose delivery is pinned to a region other than its
+own resource's.
+
+The output format rule lives in `SimLogsDeliveryDestinationStore`. It compares two puts, and a
+destination on its own holds only the one value. A put that would change the format is refused, and
+a caller changing a format has to delete the destination and make it again. In a template that is a
+replacement, which sim CloudFormation already does to any Resource whose entry changed.
+
+The errors here are `ValidationException` and `ConflictException`. The delivery operations were
+added to CloudWatch Logs long after the log group operations and carry the error shape AWS gives
+newer APIs. The two halves of one service therefore report a bad input under different names, and a
+caller catching by name has to know which half it is talking to.
+
+The CloudFormation creators go through the ordinary commands, unlike the log group creator, which
+writes to its store directly. There is no equivalent here of a log group a function already made for
+itself. A
+template therefore hits the same refusals an SDK caller would, down to the region rule and the one
+source per distribution.
+
+`SimLogsDeliveryOperations` and `SimLogsDeliveryInspection` hold the facade's nine delivery methods
+and its delivery accessors. `SimLogs` grows by one delegating method per simulated operation and was
+already at the length this codebase allows.
+
 ## Writing from the rest of the simulation
 
 `SimLogsServiceWriter`, under `write/`, is how a simulated service records its own output. It is
@@ -175,6 +212,10 @@ Nothing expires, as above. Metric filters, Logs Insights queries, export tasks, 
 and data protection policies are all absent, and `metricFilterCount` is always zero. A stream's
 `storedBytes` is always zero too, which matches real CloudWatch Logs: it stopped reporting the
 figure per stream in 2019.
+
+No log file is ever delivered. A delivery records that a source was joined to a destination and how
+the records would be written, which is what a test of a construct that sets logging up has to assert
+on. Writing CloudFront access log files into the bucket is a separate piece of work.
 
 Subscription filters deliver to a Lambda destination only. Kinesis, Firehose and the logical
 destinations that reach another Account are refused rather than accepted and never delivered to,

@@ -54,3 +54,41 @@ export type {
   SimPutSubscriptionFilterCommandInput,
   SimPutSubscriptionFilterCommandOutput,
 } from "./subscription/subscription.command.js";
+export type {
+  SimDeleteDeliverySourceCommand,
+  SimDeleteDeliverySourceCommandInput,
+  SimDeleteDeliverySourceCommandOutput,
+  SimDescribeDeliverySourcesCommand,
+  SimDescribeDeliverySourcesCommandInput,
+  SimDescribeDeliverySourcesCommandOutput,
+  SimLogsDeliverySourceDetail,
+  SimPutDeliverySourceCommand,
+  SimPutDeliverySourceCommandInput,
+  SimPutDeliverySourceCommandOutput,
+} from "./delivery/delivery-source.command.js";
+export type {
+  SimDeleteDeliveryDestinationCommand,
+  SimDeleteDeliveryDestinationCommandInput,
+  SimDeleteDeliveryDestinationCommandOutput,
+  SimDescribeDeliveryDestinationsCommand,
+  SimDescribeDeliveryDestinationsCommandInput,
+  SimDescribeDeliveryDestinationsCommandOutput,
+  SimLogsDeliveryDestinationConfiguration,
+  SimLogsDeliveryDestinationDetail,
+  SimPutDeliveryDestinationCommand,
+  SimPutDeliveryDestinationCommandInput,
+  SimPutDeliveryDestinationCommandOutput,
+} from "./delivery/delivery-destination.command.js";
+export type {
+  SimCreateDeliveryCommand,
+  SimCreateDeliveryCommandInput,
+  SimCreateDeliveryCommandOutput,
+  SimDeleteDeliveryCommand,
+  SimDeleteDeliveryCommandInput,
+  SimDeleteDeliveryCommandOutput,
+  SimDescribeDeliveriesCommand,
+  SimDescribeDeliveriesCommandInput,
+  SimDescribeDeliveriesCommandOutput,
+  SimLogsDeliveryDetail,
+  SimLogsS3DeliveryConfiguration,
+} from "./delivery/delivery.command.js";

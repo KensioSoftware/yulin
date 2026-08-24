@@ -20,6 +20,21 @@ import type {
   SimDescribeLogStreamsCommand,
 } from "../command/stream/stream.command.js";
 import type {
+  SimDeleteDeliveryDestinationCommand,
+  SimDescribeDeliveryDestinationsCommand,
+  SimPutDeliveryDestinationCommand,
+} from "../command/delivery/delivery-destination.command.js";
+import type {
+  SimDeleteDeliverySourceCommand,
+  SimDescribeDeliverySourcesCommand,
+  SimPutDeliverySourceCommand,
+} from "../command/delivery/delivery-source.command.js";
+import type {
+  SimCreateDeliveryCommand,
+  SimDeleteDeliveryCommand,
+  SimDescribeDeliveriesCommand,
+} from "../command/delivery/delivery.command.js";
+import type {
   SimDeleteSubscriptionFilterCommand,
   SimDescribeSubscriptionFiltersCommand,
   SimPutSubscriptionFilterCommand,
@@ -135,6 +150,78 @@ export class SimLogsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLogs.filterLogEvents(
             command as SimFilterLogEventsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutDeliverySourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.putDeliverySource(
+            command as SimPutDeliverySourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeDeliverySourcesCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.describeDeliverySources(
+            command as SimDescribeDeliverySourcesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteDeliverySourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.deleteDeliverySource(
+            command as SimDeleteDeliverySourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutDeliveryDestinationCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.putDeliveryDestination(
+            command as SimPutDeliveryDestinationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeDeliveryDestinationsCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.describeDeliveryDestinations(
+            command as SimDescribeDeliveryDestinationsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteDeliveryDestinationCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.deleteDeliveryDestination(
+            command as SimDeleteDeliveryDestinationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateDeliveryCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.createDelivery(
+            command as SimCreateDeliveryCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeDeliveriesCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.describeDeliveries(
+            command as SimDescribeDeliveriesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteDeliveryCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.deleteDelivery(
+            command as SimDeleteDeliveryCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -8,6 +8,7 @@ import {
   SimLogsCommands,
   type SimLogsProperties,
 } from "./sim-logs-commands.js";
+import { SimLogsDeliveryOperations } from "./sim-logs-delivery-operations.js";
 import type { SimLogsSubscriptionFailure } from "./subscription/sim-logs-subscription-fan-out.js";
 import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -23,14 +24,20 @@ import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
  * than acted on, because a test would have to move the clock by months to see
  * an event expire, and what teams get wrong about retention is the value they
  * deployed rather than the deletion that eventually follows from it.
+ *
+ * The delivery operations are held apart in `SimLogsDeliveryOperations`, which
+ * this extends, because this file grows by one delegating method per simulated
+ * operation and is at the length this codebase allows.
  */
-export class SimLogs {
-  readonly #commands: SimLogsCommands;
+export class SimLogs extends SimLogsDeliveryOperations {
+  protected readonly commands: SimLogsCommands;
+
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);
   readonly #cfnFactory = new SimLogsCfnResourceFactory({ logs: this });
 
   constructor(properties: SimLogsProperties = {}) {
-    this.#commands = new SimLogsCommands(properties);
+    super();
+    this.commands = new SimLogsCommands(properties);
   }
 
   /**
@@ -40,14 +47,14 @@ export class SimLogs {
    * state without going through a Command and its authorization.
    */
   findLogGroup(logGroupName: string): SimLogsLogGroup | undefined {
-    return this.#commands.groups.find(logGroupName);
+    return this.commands.groups.find(logGroupName);
   }
 
   /**
    * Every log group in this scope, in creation order.
    */
   allLogGroups(): readonly SimLogsLogGroup[] {
-    return this.#commands.groups.all;
+    return this.commands.groups.all;
   }
 
   /**
@@ -61,7 +68,7 @@ export class SimLogs {
    * documented instead.
    */
   serviceWriter(): SimLogsServiceWriter {
-    return this.#commands.serviceWriter;
+    return this.commands.serviceWriter;
   }
 
   /**
@@ -71,8 +78,8 @@ export class SimLogs {
     command: simLogsCommands.SimCreateLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimCreateLogGroupCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.logGroups.createLogGroup(command, options);
+    await this.commands.background.sequence();
+    return this.commands.logGroups.createLogGroup(command, options);
   }
 
   /**
@@ -82,8 +89,8 @@ export class SimLogs {
     command: simLogsCommands.SimDeleteLogGroupCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDeleteLogGroupCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.logGroups.deleteLogGroup(command, options);
+    await this.commands.background.sequence();
+    return this.commands.logGroups.deleteLogGroup(command, options);
   }
 
   /**
@@ -93,8 +100,8 @@ export class SimLogs {
     command: simLogsCommands.SimDescribeLogGroupsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDescribeLogGroupsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.logGroups.describeLogGroups(command, options);
+    await this.commands.background.sequence();
+    return this.commands.logGroups.describeLogGroups(command, options);
   }
 
   /**
@@ -104,8 +111,8 @@ export class SimLogs {
     command: simLogsCommands.SimPutRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimPutRetentionPolicyCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.retention.putRetentionPolicy(command, options);
+    await this.commands.background.sequence();
+    return this.commands.retention.putRetentionPolicy(command, options);
   }
 
   /**
@@ -115,8 +122,8 @@ export class SimLogs {
     command: simLogsCommands.SimDeleteRetentionPolicyCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDeleteRetentionPolicyCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.retention.deleteRetentionPolicy(command, options);
+    await this.commands.background.sequence();
+    return this.commands.retention.deleteRetentionPolicy(command, options);
   }
 
   /**
@@ -126,8 +133,8 @@ export class SimLogs {
     command: simLogsCommands.SimCreateLogStreamCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimCreateLogStreamCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.streams.createLogStream(command, options);
+    await this.commands.background.sequence();
+    return this.commands.streams.createLogStream(command, options);
   }
 
   /**
@@ -137,8 +144,8 @@ export class SimLogs {
     command: simLogsCommands.SimDescribeLogStreamsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDescribeLogStreamsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.streams.describeLogStreams(command, options);
+    await this.commands.background.sequence();
+    return this.commands.streams.describeLogStreams(command, options);
   }
 
   /**
@@ -148,8 +155,8 @@ export class SimLogs {
     command: simLogsCommands.SimPutLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimPutLogEventsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.putLogEvents.handle(command, options);
+    await this.commands.background.sequence();
+    return this.commands.putLogEvents.handle(command, options);
   }
 
   /**
@@ -159,8 +166,8 @@ export class SimLogs {
     command: simLogsCommands.SimGetLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimGetLogEventsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.getLogEvents.handle(command, options);
+    await this.commands.background.sequence();
+    return this.commands.getLogEvents.handle(command, options);
   }
 
   /**
@@ -170,8 +177,8 @@ export class SimLogs {
     command: simLogsCommands.SimFilterLogEventsCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimFilterLogEventsCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.filterLogEvents.handle(command, options);
+    await this.commands.background.sequence();
+    return this.commands.filterLogEvents.handle(command, options);
   }
 
   /**
@@ -182,7 +189,7 @@ export class SimLogs {
    * subscription it set up never reached anything.
    */
   get subscriptionFailures(): readonly SimLogsSubscriptionFailure[] {
-    return this.#commands.fanOut.failures;
+    return this.commands.fanOut.failures;
   }
 
   /**
@@ -192,8 +199,8 @@ export class SimLogs {
     command: simLogsCommands.SimPutSubscriptionFilterCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimPutSubscriptionFilterCommandOutput> {
-    await this.#commands.background.sequence();
-    return await this.#commands.subscriptions.putSubscriptionFilter(
+    await this.commands.background.sequence();
+    return await this.commands.subscriptions.putSubscriptionFilter(
       command,
       options,
     );
@@ -206,8 +213,8 @@ export class SimLogs {
     command: simLogsCommands.SimDescribeSubscriptionFiltersCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDescribeSubscriptionFiltersCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.subscriptions.describeSubscriptionFilters(
+    await this.commands.background.sequence();
+    return this.commands.subscriptions.describeSubscriptionFilters(
       command,
       options,
     );
@@ -220,8 +227,8 @@ export class SimLogs {
     command: simLogsCommands.SimDeleteSubscriptionFilterCommand,
     options?: SimLogsRequestOptions,
   ): Promise<simLogsCommands.SimDeleteSubscriptionFilterCommandOutput> {
-    await this.#commands.background.sequence();
-    return this.#commands.subscriptions.deleteSubscriptionFilter(
+    await this.commands.background.sequence();
+    return this.commands.subscriptions.deleteSubscriptionFilter(
       command,
       options,
     );

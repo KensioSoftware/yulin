@@ -13,6 +13,15 @@ import {
   PutSubscriptionFilterCommand,
   DescribeSubscriptionFiltersCommand,
   DeleteSubscriptionFilterCommand,
+  CreateDeliveryCommand,
+  DeleteDeliveryCommand,
+  DeleteDeliveryDestinationCommand,
+  DeleteDeliverySourceCommand,
+  DescribeDeliveriesCommand,
+  DescribeDeliveryDestinationsCommand,
+  DescribeDeliverySourcesCommand,
+  PutDeliveryDestinationCommand,
+  PutDeliverySourceCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
   AddPermissionCommand,
@@ -58,6 +67,15 @@ describe("SimLogsSdkCommandRouter", () => {
       "PutSubscriptionFilterCommand",
       "DescribeSubscriptionFiltersCommand",
       "DeleteSubscriptionFilterCommand",
+      "PutDeliverySourceCommand",
+      "DescribeDeliverySourcesCommand",
+      "DeleteDeliverySourceCommand",
+      "PutDeliveryDestinationCommand",
+      "DescribeDeliveryDestinationsCommand",
+      "DeleteDeliveryDestinationCommand",
+      "CreateDeliveryCommand",
+      "DescribeDeliveriesCommand",
+      "DeleteDeliveryCommand",
     ]);
   });
 
@@ -211,5 +229,68 @@ describe("CloudWatch Logs SDK interception", () => {
       ["starting"],
     );
     assertArrayLength(afterDelete.logGroups ?? [], 0);
+  });
+});
+
+describe("CloudWatch Logs delivery SDK interception", () => {
+  it("sets CloudFront logging up through the intercepted client", async () => {
+    // Given an intercepted client in the one Region CloudFront delivery is
+    // set up from.
+    using simSdk = new SimSdk();
+    simSdk.intercept(CloudWatchLogsClient);
+
+    const client = new CloudWatchLogsClient({ region: "us-east-1" });
+
+    // When ordinary SDK code sets up standard logging v2 for a distribution.
+    await client.send(
+      new PutDeliverySourceCommand({
+        name: "site-access-logs",
+        resourceArn: "arn:aws:cloudfront::123456789012:distribution/E1EX",
+        logType: "ACCESS_LOGS",
+      }),
+    );
+
+    const destination = await client.send(
+      new PutDeliveryDestinationCommand({
+        name: "site-access-logs",
+        outputFormat: "json",
+        deliveryDestinationConfiguration: {
+          destinationResourceArn: "arn:aws:s3:::example-access-logs",
+        },
+      }),
+    );
+
+    await client.send(
+      new CreateDeliveryCommand({
+        deliverySourceName: "site-access-logs",
+        deliveryDestinationArn: destination.deliveryDestination?.arn,
+      }),
+    );
+
+    // Then all three read back through the same client.
+    const sources = await client.send(new DescribeDeliverySourcesCommand({}));
+    const destinations = await client.send(
+      new DescribeDeliveryDestinationsCommand({}),
+    );
+    const deliveries = await client.send(new DescribeDeliveriesCommand({}));
+
+    assertArrayLength(sources.deliverySources ?? [], 1);
+    assertArrayLength(destinations.deliveryDestinations ?? [], 1);
+    assertArrayLength(deliveries.deliveries ?? [], 1);
+
+    // And each can be taken down again.
+    await client.send(
+      new DeleteDeliveryCommand({ id: deliveries.deliveries?.at(0)?.id }),
+    );
+    await client.send(
+      new DeleteDeliveryDestinationCommand({ name: "site-access-logs" }),
+    );
+    await client.send(
+      new DeleteDeliverySourceCommand({ name: "site-access-logs" }),
+    );
+
+    const remaining = await client.send(new DescribeDeliveriesCommand({}));
+
+    assertArrayLength(remaining.deliveries ?? [], 0);
   });
 });

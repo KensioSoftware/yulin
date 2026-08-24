@@ -301,6 +301,134 @@ Two divergences to know about:
   resource whose template entry changed is deleted and created again. The retention ends up correct,
   but the events the group held are gone, where a real update to `RetentionInDays` keeps them.
 
+## Delivering logs from another service
+
+CloudWatch Logs delivery carries the logs of another service somewhere. CloudFront standard logging
+v2 is the clearest case. A distribution has no logging property of its own, and turning logging on
+means three CloudWatch Logs resources.
+
+A delivery source names what is being logged and which of its logs. A delivery destination names
+where they land and in what form. A delivery joins one to the other.
+
+```typescript sim-logs-delivery
+/**
+ * Setting up CloudFront standard logging v2 delivery into a bucket.
+ */
+
+import {
+  CreateDeliveryCommand,
+  DescribeDeliveriesCommand,
+  PutDeliveryDestinationCommand,
+  PutDeliverySourceCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const logs = simAws.logs();
+
+await logs.putDeliverySource(
+  new PutDeliverySourceCommand({
+    name: "site-access-logs",
+    resourceArn: "arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE",
+    logType: "ACCESS_LOGS",
+  }),
+);
+
+const destination = await logs.putDeliveryDestination(
+  new PutDeliveryDestinationCommand({
+    name: "site-access-logs",
+    outputFormat: "json",
+    deliveryDestinationConfiguration: {
+      destinationResourceArn: "arn:aws:s3:::example-access-logs",
+    },
+  }),
+);
+
+await logs.createDelivery(
+  new CreateDeliveryCommand({
+    deliverySourceName: "site-access-logs",
+    deliveryDestinationArn: destination.deliveryDestination?.arn,
+    s3DeliveryConfiguration: {
+      suffixPath: "{DistributionId}/{yyyy}/{MM}/{dd}/{HH}",
+      enableHiveCompatiblePath: true,
+    },
+  }),
+);
+
+const deliveries = await logs.describeDeliveries(
+  new DescribeDeliveriesCommand({}),
+);
+
+// S3, and the layout the bucket will be partitioned by.
+console.log(
+  deliveries.deliveries?.[0]?.deliveryDestinationType,
+  deliveries.deliveries?.[0]?.s3DeliveryConfiguration?.suffixPath,
+);
+```
+
+The delivery destination has an ARN of its own, and `CreateDelivery` names that one. The bucket
+behind it keeps its own ARN, and the two are easy to mix up.
+
+The service a delivery source is for is read off the resource ARN. A caller never states it. Four
+rules from real AWS are modelled here, each of them a deploy that looks fine until it runs:
+
+- **One delivery source per resource.** A second source over a distribution that already has one
+  fails with `ConflictException`, carrying the message an account gives, "This ResourceId has
+  already been used in another Delivery Source in this account".
+- **CloudFront delivery is set up from `us-east-1`**, whatever region the destination bucket is in.
+  A CloudFront delivery source put from anywhere else is refused.
+- **Output format is fixed once the destination exists.** A `PutDeliveryDestination` that would
+  change it is refused. Changing a format means deleting the destination and making it again.
+- **Parquet is written to S3 only.** A log group or Firehose destination asking for it is refused.
+
+The suffix path decides the key each log file lands under. `{DistributionId}`, `{distributionid}`,
+`{yyyy}`, `{MM}`, `{dd}`, `{HH}` and `{accountid}` are substituted, and a variable outside that set
+is refused. Delivery would write the text out literally, and the bucket would look partitioned when
+it was not.
+
+### Declaring delivery in a template
+
+The same three resources in a template, which is the whole of what a CDK construct for CloudFront
+logging synthesises.
+
+```yaml
+AccessLogsSource:
+  Type: AWS::Logs::DeliverySource
+  Properties:
+    Name: site-access-logs
+    ResourceArn: arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE
+    LogType: ACCESS_LOGS
+
+AccessLogsDestination:
+  Type: AWS::Logs::DeliveryDestination
+  Properties:
+    Name: site-access-logs
+    DestinationResourceArn: arn:aws:s3:::example-access-logs
+    OutputFormat: json
+
+AccessLogsDelivery:
+  Type: AWS::Logs::Delivery
+  Properties:
+    DeliverySourceName: !Ref AccessLogsSource
+    DeliveryDestinationArn: !GetAtt AccessLogsDestination.Arn
+    S3SuffixPath: "{DistributionId}/{yyyy}/{MM}/{dd}/{HH}"
+    S3EnableHiveCompatiblePath: true
+```
+
+The template carries the S3 layout as two flat properties, and the API takes them nested under
+`s3DeliveryConfiguration`.
+
+`Ref` resolves to the name on the source and the destination, and to the delivery ID on the
+delivery. CloudWatch Logs issues that ID. A template cannot predict it.
+
+`Fn::GetAtt` gives `Arn` on all three. The source also publishes `Service` and `ResourceArns`, the
+destination `DeliveryDestinationType`, and the delivery `DeliveryId`, `DeliverySourceName`,
+`DeliveryDestinationArn` and `DeliveryDestinationType`.
+
+`Tags` and `DeliveryDestinationPolicy` are recorded as ignored properties, and the stack still
+deploys.
+
 ## Subscription filters
 
 A subscription filter delivers the events matching its pattern to a Lambda function. Code written to
@@ -641,8 +769,17 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 - **Metric filters.** Absent, so `metricFilterCount` is always zero.
 - **Subscription filter destinations other than Lambda**, and `Distribution`. `Distribution` is
   accepted and reported, and with no shards to spread across it has no effect.
-- **`AWS::Logs::SubscriptionFilter` and `AWS::Logs::MetricFilter`.** `AWS::Logs::LogGroup` is the
-  only CloudFormation resource type here, and the others are recorded as gaps.
+- **`AWS::Logs::SubscriptionFilter` and `AWS::Logs::MetricFilter`.** Both are recorded as gaps. The
+  log group and the three delivery resource types are what simulated CloudFormation deploys here.
+- **Nothing is actually delivered.** A delivery records that a source was joined to a destination
+  and how the records would be written. No access log file ever reaches the bucket.
+- **A delivery source can be deleted while a delivery still uses it.** Real CloudWatch Logs has its
+  own rule about the order, and this simulation does not model it.
+- **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent. The three `Describe`
+  operations report the same resources.
+- **Delivery resource tags and cross-account delivery.** `PutDeliverySource`,
+  `PutDeliveryDestination` and `CreateDelivery` refuse tags outright. `DeliveryDestinationPolicy` in
+  a template is recorded and acted on by nothing.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
   `kmsKeyId` on `CreateLogGroup` are refused outright. A property cannot look set here and behave
   differently in an account.

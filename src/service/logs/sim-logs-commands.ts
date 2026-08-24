@@ -9,6 +9,12 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLogsAuthorizer } from "./command/authorize/sim-logs-authorizer.js";
+import { SimLogsDeliveryCommands } from "./command/delivery/sim-logs-delivery-commands.js";
+import { SimLogsDeliveryDestinationCommands } from "./command/delivery/sim-logs-delivery-destination-commands.js";
+import { SimLogsDeliverySourceCommands } from "./command/delivery/sim-logs-delivery-source-commands.js";
+import { SimLogsDeliveryDestinationStore } from "./delivery/sim-logs-delivery-destination-store.js";
+import { SimLogsDeliverySourceStore } from "./delivery/sim-logs-delivery-source-store.js";
+import { SimLogsDeliveryStore } from "./delivery/sim-logs-delivery-store.js";
 import { SimLogsFilterLogEvents } from "./command/event/sim-logs-filter-log-events.js";
 import { SimLogsGetLogEvents } from "./command/event/sim-logs-get-log-events.js";
 import { SimLogsPutLogEvents } from "./command/event/sim-logs-put-log-events.js";
@@ -57,6 +63,12 @@ export class SimLogsCommands {
   readonly subscriptions: SimLogsSubscriptionCommands;
   readonly serviceWriter: SimLogsServiceWriter;
   readonly fanOut: SimLogsSubscriptionFanOut;
+  readonly deliverySourceStore: SimLogsDeliverySourceStore;
+  readonly deliveryDestinationStore: SimLogsDeliveryDestinationStore;
+  readonly deliveryStore: SimLogsDeliveryStore;
+  readonly deliverySources: SimLogsDeliverySourceCommands;
+  readonly deliveryDestinations: SimLogsDeliveryDestinationCommands;
+  readonly deliveries: SimLogsDeliveryCommands;
   readonly background: BackgroundScheduler;
 
   constructor(properties: SimLogsProperties = {}) {
@@ -110,6 +122,31 @@ export class SimLogsCommands {
       eventIds,
       clock: background,
       fanOut,
+    });
+
+    const deliverySources = new SimLogsDeliverySourceStore();
+    const deliveryDestinations = new SimLogsDeliveryDestinationStore();
+    const deliveries = new SimLogsDeliveryStore();
+
+    this.deliverySourceStore = deliverySources;
+    this.deliveryDestinationStore = deliveryDestinations;
+    this.deliveryStore = deliveries;
+    this.deliverySources = new SimLogsDeliverySourceCommands({
+      sources: deliverySources,
+      authorizer,
+      accountRegionScope,
+    });
+    this.deliveryDestinations = new SimLogsDeliveryDestinationCommands({
+      destinations: deliveryDestinations,
+      authorizer,
+      accountRegionScope,
+    });
+    this.deliveries = new SimLogsDeliveryCommands({
+      sources: deliverySources,
+      destinations: deliveryDestinations,
+      deliveries,
+      authorizer,
+      accountRegionScope,
     });
   }
 }
