@@ -252,4 +252,31 @@ describe("SimCloudFrontResponseHeadersPolicyCors", () => {
       assertIdentical(headers.get("vary"), "Origin");
     }
   });
+
+  it("leaves an Origin's own preflight headers on a simple response", () => {
+    // Given a policy that overrides the Origin, and an Origin answering a
+    // simple request with CORS headers of its own.
+    const headers = new Headers({
+      "Access-Control-Allow-Methods": "GET",
+      "Access-Control-Max-Age": "60",
+    });
+
+    cors({
+      allowMethods: ["GET", "POST"],
+      maxAgeSec: 600,
+      originOverride: true,
+    }).apply(headers, "https://example.com");
+
+    // Then the policy sets the Origin header it decides and passes the rest
+    // through. `OriginOverride` decides which value wins where the policy sets
+    // a header, and `RemoveHeadersConfig` is the only thing that takes one
+    // away. A CORS section that dropped them here would strip a header the
+    // site sent for itself.
+    assertIdentical(
+      headers.get("access-control-allow-origin"),
+      "https://example.com",
+    );
+    assertIdentical(headers.get("access-control-allow-methods"), "GET");
+    assertIdentical(headers.get("access-control-max-age"), "60");
+  });
 });
