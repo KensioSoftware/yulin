@@ -7,7 +7,7 @@ import {
 import {
   assertFalse,
   assertIdentical,
-  assertTrue,
+  assertStringMatches,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
@@ -30,10 +30,7 @@ describe("Sim API Gateway v2 API commands", () => {
     );
 
     // Then the API has the id and endpoint real API Gateway would give it
-    assertTrue(
-      /^[a-z0-9]{10}$/.test(created.ApiId),
-      `Unexpected API id ${created.ApiId}`,
-    );
+    assertStringMatches(created.ApiId, /^[a-z0-9]{10}$/);
     assertIdentical(
       created.ApiEndpoint,
       `https://${created.ApiId}.execute-api.us-east-1.amazonaws.com`,

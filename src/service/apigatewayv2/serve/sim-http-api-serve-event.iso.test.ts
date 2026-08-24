@@ -2,7 +2,7 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertNonNullable,
-  assertTrue,
+  assertStringMatches,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -72,11 +72,9 @@ describe("The event a served sim HTTP API builds", () => {
     assertIdentical(requestContext.domainPrefix, api.apiId);
     assertIdentical(requestContext.routeKey, "$default");
     assertIdentical(requestContext.stage, "$default");
-    assertTrue(
-      /^\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2} \+0000$/.test(
-        requestContext.time,
-      ),
-      `Unexpected request context time ${requestContext.time}`,
+    assertStringMatches(
+      requestContext.time,
+      /^\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2} \+0000$/,
     );
 
     // And no caller, because a NONE route authenticates nobody
@@ -106,11 +104,9 @@ describe("The event a served sim HTTP API builds", () => {
     assertIdentical(headers["x-forwarded-proto"], "https");
     assertIdentical(headers["x-forwarded-port"], "443");
     assertIdentical(headers["x-forwarded-for"], "127.0.0.1");
-    assertTrue(
-      /^Root=1-[0-9a-f]{8}-[0-9a-f]{24}$/.test(
-        headers["x-amzn-trace-id"] ?? "",
-      ),
-      `Unexpected trace id ${headers["x-amzn-trace-id"] ?? "(none)"}`,
+    assertStringMatches(
+      headers["x-amzn-trace-id"],
+      /^Root=1-[0-9a-f]{8}-[0-9a-f]{24}$/,
     );
   });
 

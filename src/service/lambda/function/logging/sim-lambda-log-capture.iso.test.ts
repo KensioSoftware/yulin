@@ -8,8 +8,8 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringMatches,
   assertStringStartsWith,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -159,9 +159,9 @@ describe("Lambda handler output in CloudWatch Logs", () => {
     assertIdentical(messages.at(0), logGroupName);
     const logStreamName = messages.at(1);
 
-    assertNonNullable(logStreamName);
-    assertTrue(
-      /^\d{4}\/\d{2}\/\d{2}\/\[\$LATEST][\da-f]{32}$/.test(logStreamName),
+    assertStringMatches(
+      logStreamName,
+      /^\d{4}\/\d{2}\/\d{2}\/\[\$LATEST][\da-f]{32}$/,
     );
   });
 

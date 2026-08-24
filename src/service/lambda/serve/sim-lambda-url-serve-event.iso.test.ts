@@ -7,6 +7,7 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertStringMatches,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -142,11 +143,9 @@ describe("The event a served sim Lambda Function URL builds", () => {
       event.requestContext.domainPrefix,
     );
     assertIdentical(event.requestContext.accountId, "anonymous");
-    assertTrue(
-      /^\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2} \+0000$/.test(
-        event.requestContext.time,
-      ),
-      `Unexpected request context time ${event.requestContext.time}`,
+    assertStringMatches(
+      event.requestContext.time,
+      /^\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2} \+0000$/,
     );
   });
 

@@ -2,8 +2,8 @@ import {
   assertFalse,
   assertStringIncludes,
   assertStringLength,
+  assertStringMatches,
   assertStringNotIncludes,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -40,7 +40,7 @@ describe("Secrets Manager generated password exclusions", () => {
 
     // Then they are lowercase letters and nothing else.
     for (const password of passwords) {
-      assertTrue(/^[a-z]+$/.test(password));
+      assertStringMatches(password, /^[a-z]+$/);
       assertFalse(/[A-Z\d]/.test(password));
     }
   });

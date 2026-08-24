@@ -2,10 +2,9 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
-  assertTypeString,
   assertStringIncludes,
+  assertStringMatches,
   assertThrowsErrorAsync,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -119,10 +118,9 @@ describe("Lambda CloudFormation Function URL deployment", () => {
     const output = stack.outputs.get("FunctionUrl")?.value;
 
     // Then the endpoint URL is what Fn::GetAtt FunctionUrl resolved to.
-    assertTypeString(output);
-    assertTrue(
-      /^https:\/\/[a-z0-9]{32}\.lambda-url\.us-east-1\.on\.aws\/$/.test(output),
-      `Unexpected Function URL output ${output}`,
+    assertStringMatches(
+      output,
+      /^https:\/\/[a-z0-9]{32}\.lambda-url\.us-east-1\.on\.aws\/$/,
     );
 
     // And Ref resolves to the same endpoint.

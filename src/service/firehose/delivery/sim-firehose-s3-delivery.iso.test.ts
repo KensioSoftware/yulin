@@ -7,8 +7,8 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringLength,
+  assertStringMatches,
   assertStringStartsWith,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -31,10 +31,7 @@ function orderLine(id: string): Uint8Array {
  */
 function assertKeyMatches(key: string | undefined, pattern: RegExp): void {
   assertNonNullable(key, "An Object was delivered under a key");
-  assertTrue(
-    pattern.test(key),
-    `Expected the delivered key ${key} to match ${pattern.source}`,
-  );
+  assertStringMatches(key, pattern);
 }
 
 describe("Delivering simulated Firehose records into S3", () => {
