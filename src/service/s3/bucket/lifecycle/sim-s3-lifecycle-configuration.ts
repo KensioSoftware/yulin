@@ -19,10 +19,10 @@ interface SimS3LifecycleConfigurationProperties {
  * to add one rule without restating the others.
  */
 export class SimS3LifecycleConfiguration {
-  public readonly rules: readonly SimS3LifecycleRule[];
+  private readonly storedRules: readonly SimS3LifecycleRule[];
 
   constructor(properties: SimS3LifecycleConfigurationProperties = {}) {
-    this.rules = properties.rules ?? [];
+    this.storedRules = structuredClone(properties.rules ?? []);
   }
 
   /**
@@ -44,6 +44,17 @@ export class SimS3LifecycleConfiguration {
   }
 
   /**
+   * The rules this Bucket carries.
+   *
+   * Cloned on the way out as they were on the way in. A caller holding the
+   * objects it put, or the ones a read gave it, could otherwise change what
+   * the Bucket is configured with by mutating them.
+   */
+  get rules(): readonly SimS3LifecycleRule[] {
+    return structuredClone(this.storedRules);
+  }
+
+  /**
    * Whether the Bucket carries any rule at all.
    *
    * Real S3 distinguishes a Bucket with no configuration from one with an
@@ -51,6 +62,6 @@ export class SimS3LifecycleConfiguration {
    * unconfigured Bucket and a Bucket whose rules were all removed read alike.
    */
   get isEmpty(): boolean {
-    return this.rules.length === 0;
+    return this.storedRules.length === 0;
   }
 }

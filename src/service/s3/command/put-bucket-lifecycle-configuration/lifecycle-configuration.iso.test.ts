@@ -9,6 +9,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -172,6 +173,76 @@ describe("S3 lifecycle configuration commands", () => {
     assertInstanceOf(emptyError, SimS3MalformedXml);
     assertInstanceOf(statusError, SimS3MalformedXml);
     assertStringIncludes(statusError.message, "Enabled or Disabled");
+  });
+
+  it("refuses a rule that would do nothing", async () => {
+    // Given a Bucket to configure.
+    const simS3 = new SimAws().s3();
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "idle" }));
+
+    // When a rule states a status and no action to take.
+    const error = await assertThrowsErrorAsync(async () =>
+      simS3.putBucketLifecycleConfiguration(
+        new PutBucketLifecycleConfigurationCommand({
+          Bucket: "idle",
+          LifecycleConfiguration: {
+            Rules: [
+              {
+                ID: "does-nothing",
+                Status: "Enabled",
+                Filter: { Prefix: "raw/" },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused, as real S3 refuses a rule carrying no expiry,
+    // transition or upload action.
+    assertInstanceOf(error, SimS3MalformedXml);
+    assertStringIncludes(error.message, "must state at least one of");
+  });
+
+  it("keeps the caller's rules out of the Bucket's own state", async () => {
+    // Given a Bucket configured from a rule object the caller still holds.
+    const simS3 = new SimAws().s3();
+    const rule = {
+      ID: "expire-raw-logs",
+      Status: "Enabled" as const,
+      Expiration: { Days: 365 },
+    };
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "isolated" }));
+    await simS3.putBucketLifecycleConfiguration(
+      new PutBucketLifecycleConfigurationCommand({
+        Bucket: "isolated",
+        LifecycleConfiguration: { Rules: [rule] },
+      }),
+    );
+
+    // When the caller mutates that object, and mutates what a read gives it.
+    rule.Expiration.Days = 1;
+    const firstRead = await simS3.getBucketLifecycleConfiguration(
+      new GetBucketLifecycleConfigurationCommand({ Bucket: "isolated" }),
+    );
+    assertNonNullable(firstRead.Rules[0]);
+    // A read result is readonly to a TypeScript caller, so this reaches past
+    // the type. The isolation being tested is in the value, not the type.
+    (firstRead.Rules[0] as { Status: string }).Status = "Disabled";
+
+    // Then the Bucket still reads back what it was configured with. Changing
+    // a Bucket's configuration takes another write.
+    const secondRead = await simS3.getBucketLifecycleConfiguration(
+      new GetBucketLifecycleConfigurationCommand({ Bucket: "isolated" }),
+    );
+
+    assertObjectEquals(secondRead.Rules[0], {
+      ID: "expire-raw-logs",
+      Status: "Enabled",
+      Expiration: { Days: 365 },
+    });
   });
 
   it("rejects a non-existent Bucket", async () => {

@@ -155,19 +155,22 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
       {
         Id: "big-tagged-objects",
         Status: "Enabled",
+        ExpirationInDays: 30,
         ObjectSizeGreaterThan: 1024,
         TagFilters: [{ Key: "class", Value: "raw" }],
       },
     ]);
 
-    // Then both arrive as the template stated them. Dropping either would read
-    // back as a Bucket configured with less than the template asked for.
+    // Then both arrive as the template stated them, under the CloudFormation
+    // names. Dropping either would read back as a Bucket configured with less
+    // than the template asked for.
     const rules = await readRules(simAws);
 
     assertArrayLength(rules, 1);
     assertObjectEquals(rules[0], {
       ID: "big-tagged-objects",
       Status: "Enabled",
+      Expiration: { Days: 30 },
       ObjectSizeGreaterThan: 1024,
       TagFilters: [{ Key: "class", Value: "raw" }],
     });
