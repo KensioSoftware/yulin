@@ -18,6 +18,7 @@ describe("Managed CloudFront response headers policies", () => {
     policyId: string,
     originHeaders: Record<string, string> = {},
     requestOrigin: string | null = null,
+    requestMethod = "GET",
   ): Headers {
     const policy = new SimCloudFrontResponseHeadersPolicyRegistry().byId(
       policyId,
@@ -28,6 +29,7 @@ describe("Managed CloudFront response headers policies", () => {
     return policy.apply(
       new Response("body", { headers: originHeaders }),
       requestOrigin,
+      requestMethod,
     ).headers;
   }
 
@@ -108,13 +110,14 @@ describe("Managed CloudFront response headers policies", () => {
     assertIdentical(headers.get("access-control-expose-headers"), null);
   });
 
-  it("names every method CORS-With-Preflight allows", () => {
+  it("names every method CORS-With-Preflight allows, on a preflight", () => {
     // Given a Behavior on CORS-With-Preflight.
-    // When a request naming an Origin passes through it.
+    // When a preflight naming an Origin passes through it.
     const headers = served(
       simCfManagedResponseHeadersPolicyIds.corsWithPreflight,
       {},
       "https://app.example.com",
+      "OPTIONS",
     );
 
     // Then the method list and the wildcard expose list come with the Origin.
@@ -124,6 +127,22 @@ describe("Managed CloudFront response headers policies", () => {
       "DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT",
     );
     assertIdentical(headers.get("access-control-expose-headers"), "*");
+  });
+
+  it("holds the method list back from a simple CORS-With-Preflight request", () => {
+    // Given a Behavior on CORS-With-Preflight.
+    // When a plain GET naming an Origin passes through it.
+    const headers = served(
+      simCfManagedResponseHeadersPolicyIds.corsWithPreflight,
+      {},
+      "https://app.example.com",
+    );
+
+    // Then the Origin and the expose list come back without the method list,
+    // which is what AWS documents for a simple CORS request.
+    assertIdentical(headers.get("access-control-allow-origin"), "*");
+    assertIdentical(headers.get("access-control-expose-headers"), "*");
+    assertIdentical(headers.get("access-control-allow-methods"), null);
   });
 
   it("combines both sections in CORS-and-SecurityHeadersPolicy", () => {

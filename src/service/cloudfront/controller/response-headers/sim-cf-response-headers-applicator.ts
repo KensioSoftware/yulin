@@ -39,6 +39,10 @@ export class SimCfResponseHeadersApplicator {
       );
     }
 
-    return policy.apply(response, request.headers.get("origin"));
+    return policy.apply(
+      response,
+      request.headers.get("origin"),
+      request.method,
+    );
   }
 }

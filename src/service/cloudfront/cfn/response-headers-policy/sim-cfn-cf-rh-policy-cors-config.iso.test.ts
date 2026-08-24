@@ -45,10 +45,11 @@ describe("simCfnCfResponseHeadersPolicyCors", () => {
       OriginOverride: true,
     });
 
-    // Then applying it for the allowed Origin sets every header the section
-    // names.
+    // Then applying it to a preflight from the allowed Origin sets every
+    // header the section names. The method, header and max-age lists answer
+    // what a preflight asks, so only an OPTIONS request sees them.
     const headers = new Headers();
-    cors.apply(headers, "https://example.com");
+    cors.apply(headers, "https://example.com", "OPTIONS");
 
     assertIdentical(
       headers.get("access-control-allow-origin"),

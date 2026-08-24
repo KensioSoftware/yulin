@@ -81,7 +81,11 @@ describe("SimCloudFrontResponseHeadersPolicyCors", () => {
     // Given a policy allowing every method.
     const headers = new Headers();
 
-    cors({ allowMethods: ["ALL"] }).apply(headers, "https://example.com");
+    cors({ allowMethods: ["ALL"] }).apply(
+      headers,
+      "https://example.com",
+      "OPTIONS",
+    );
 
     // Then the header names every method CloudFront documents for ALL.
     assertIdentical(
@@ -183,5 +187,96 @@ describe("SimCloudFrontResponseHeadersPolicyCors", () => {
       "https://app.example.com",
     );
     assertIdentical(headers.get("vary"), "Origin");
+  });
+
+  it("holds the preflight headers back from a simple request", () => {
+    // Given a policy naming methods, headers and a max age.
+    const headers = new Headers();
+
+    // When a plain GET from the allowed Origin passes through it.
+    cors({
+      allowHeaders: ["X-Custom"],
+      allowMethods: ["GET", "POST"],
+      maxAgeSec: 600,
+    }).apply(headers, "https://example.com");
+
+    // Then the three a preflight asks for stay off. CloudFront documents each
+    // against a preflight request, and a browser reads none of them here.
+    assertIdentical(headers.get("access-control-allow-methods"), null);
+    assertIdentical(headers.get("access-control-allow-headers"), null);
+    assertIdentical(headers.get("access-control-max-age"), null);
+  });
+
+  it("answers a preflight with the methods, headers and max age", () => {
+    // Given the same policy.
+    const headers = new Headers();
+
+    // When an OPTIONS request from the allowed Origin passes through it.
+    cors({
+      allowHeaders: ["X-Custom"],
+      allowMethods: ["GET", "POST"],
+      maxAgeSec: 600,
+    }).apply(headers, "https://example.com", "OPTIONS");
+
+    // Then all three come back.
+    assertIdentical(headers.get("access-control-allow-methods"), "GET,POST");
+    assertIdentical(headers.get("access-control-allow-headers"), "X-Custom");
+    assertIdentical(headers.get("access-control-max-age"), "600");
+  });
+
+  it("sends the Origin, credentials and expose list on either kind", () => {
+    // Given a policy allowing credentials and exposing a header.
+    const properties = {
+      allowCredentials: true,
+      exposeHeaders: ["X-Request-Id"],
+    };
+    const simple = new Headers();
+    const preflight = new Headers();
+
+    // When a simple request and a preflight each pass through it.
+    cors(properties).apply(simple, "https://example.com");
+    cors(properties).apply(preflight, "https://example.com", "OPTIONS");
+
+    // Then the headers CloudFront documents against CORS requests generally
+    // are on both, including the cache Vary.
+    for (const headers of [simple, preflight]) {
+      assertIdentical(
+        headers.get("access-control-allow-origin"),
+        "https://example.com",
+      );
+      assertIdentical(headers.get("access-control-allow-credentials"), "true");
+      assertIdentical(
+        headers.get("access-control-expose-headers"),
+        "X-Request-Id",
+      );
+      assertIdentical(headers.get("vary"), "Origin");
+    }
+  });
+
+  it("leaves an Origin's own preflight headers on a simple response", () => {
+    // Given a policy that overrides the Origin, and an Origin answering a
+    // simple request with CORS headers of its own.
+    const headers = new Headers({
+      "Access-Control-Allow-Methods": "GET",
+      "Access-Control-Max-Age": "60",
+    });
+
+    cors({
+      allowMethods: ["GET", "POST"],
+      maxAgeSec: 600,
+      originOverride: true,
+    }).apply(headers, "https://example.com");
+
+    // Then the policy sets the Origin header it decides and passes the rest
+    // through. `OriginOverride` decides which value wins where the policy sets
+    // a header, and `RemoveHeadersConfig` is the only thing that takes one
+    // away. A CORS section that dropped them here would strip a header the
+    // site sent for itself.
+    assertIdentical(
+      headers.get("access-control-allow-origin"),
+      "https://example.com",
+    );
+    assertIdentical(headers.get("access-control-allow-methods"), "GET");
+    assertIdentical(headers.get("access-control-max-age"), "60");
   });
 });

@@ -166,16 +166,28 @@ describe("CloudFormation Distribution response headers policy sections", () => {
       headers: { Origin: "https://example.com" },
     });
 
-    // Then the CORS headers name it, and the response varies on Origin.
+    // Then the CORS headers name it, and the response varies on Origin. The
+    // method list stays off a simple request, which is where CloudFront keeps
+    // it.
     assertIdentical(
       home.headers.get("access-control-allow-origin"),
       "https://example.com",
     );
+    assertIdentical(home.headers.get("access-control-allow-methods"), null);
+    assertIdentical(home.headers.get("vary"), "Origin");
+
+    // And a preflight to the same page is answered with the method and header
+    // lists it asked for.
+    const preflight = await simCfSiteRequest(simAws, distributionId, "/", {
+      method: "OPTIONS",
+      headers: { Origin: "https://example.com" },
+    });
+
     assertIdentical(
-      home.headers.get("access-control-allow-methods"),
+      preflight.headers.get("access-control-allow-methods"),
       "GET,HEAD",
     );
-    assertIdentical(home.headers.get("vary"), "Origin");
+    assertIdentical(preflight.headers.get("access-control-allow-headers"), "*");
   });
 
   it("omits a policy's CORS headers for an Origin it does not allow", async () => {
