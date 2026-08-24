@@ -1960,6 +1960,13 @@ them, matching CloudFront, which sends none in preference to a mismatched one.
 `AccessControlAllowCredentials: false` leaves `Access-Control-Allow-Credentials` off entirely, since
 a header naming `false` means the same as its absence to a browser.
 
+`AccessControlAllowMethods`, `AccessControlAllowHeaders` and `AccessControlMaxAgeSec` answer what a
+preflight asks, and their headers go on a response to an `OPTIONS` request alone. Every other method
+is answered without them, as CloudFront answers it. `Access-Control-Allow-Origin`,
+`Access-Control-Allow-Credentials` and `Access-Control-Expose-Headers` come back either way, and so
+does the `Vary: Origin` a reflected Origin carries. A list left empty sends no header at all, which
+is how `SimpleCORS` answers with the Origin header by itself.
+
 An allow-list entry may use the wildcard on its own, meaning every Origin, or as the leftmost
 subdomain, so `*.example.org` matches `https://site.example.org`. It stands for exactly one label, as
 a wildcard certificate does, and it leaves `https://deep.site.example.org` unmatched. An entry naming
@@ -2758,10 +2765,6 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **A CORS section sends its preflight headers on every request.** Real CloudFront puts
-  `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` and `Access-Control-Max-Age` on a
-  preflight response alone. This simulation puts them on every response the Behavior serves. A list
-  left empty sends no header at all, so `SimpleCORS` still answers with the Origin header by itself.
 - **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront models no
   edge caching. A Behavior's cache policy, including an AWS managed policy such as
   `CachingOptimized`, is left unvalidated and unapplied to TTLs and the cache key. Every request

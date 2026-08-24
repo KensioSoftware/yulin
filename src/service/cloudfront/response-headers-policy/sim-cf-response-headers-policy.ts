@@ -50,12 +50,20 @@ export class SimCloudFrontResponseHeadersPolicy {
 
   /**
    * Return the response this policy makes of one the Origin gave back, for
-   * the `Origin` header the viewer request carried.
+   * the `Origin` header and the method the viewer request carried.
    *
    * The body is passed straight through. Only the headers change, so a response
    * whose body has already been read stays readable.
+   *
+   * The method reaches the CORS section alone, which answers a preflight with
+   * headers a simple request never sees. Every other section sets the same
+   * headers whatever the viewer asked for.
    */
-  apply(response: Response, requestOrigin: string | null = null): Response {
+  apply(
+    response: Response,
+    requestOrigin: string | null = null,
+    requestMethod = "GET",
+  ): Response {
     const headers = new Headers(response.headers);
 
     for (const headerName of this.headersToRemove) {
@@ -71,7 +79,7 @@ export class SimCloudFrontResponseHeadersPolicy {
     }
 
     this.serverTiming?.applyTo(headers);
-    this.cors?.apply(headers, requestOrigin);
+    this.cors?.apply(headers, requestOrigin, requestMethod);
 
     return new Response(response.body, {
       status: response.status,

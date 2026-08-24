@@ -67,15 +67,22 @@ export class SimCloudFrontResponseHeadersPolicyCors {
   }
 
   /**
-   * Set this policy's CORS headers on a response, for the `Origin` header a
-   * viewer request carried.
+   * Set this policy's CORS headers on a response, for the `Origin` header and
+   * the method a viewer request carried.
    *
    * `OriginOverride` decides the whole section rather than one header at a
    * time, unlike a custom or security header: without it, an Origin response
    * carrying any CORS header at all keeps every header this section would have
    * set off the response, whether or not the policy names that header.
+   *
+   * The method defaults to `GET`, which is to say a simple request. Only a
+   * caller with an `OPTIONS` request in hand needs to say so.
    */
-  apply(headers: Headers, requestOrigin: string | null): void {
+  apply(
+    headers: Headers,
+    requestOrigin: string | null,
+    requestMethod = "GET",
+  ): void {
     if (
       !this.originOverride &&
       corsResponseHeaders.some((n) => headers.has(n))
@@ -98,20 +105,6 @@ export class SimCloudFrontResponseHeadersPolicyCors {
       headers.append("Vary", "Origin");
     }
 
-    // An empty list names no method and no header. CloudFront leaves the
-    // header off there, the way it leaves off the expose list below, and a
-    // header carrying an empty value would mean something else to a browser.
-    if (this.allowMethods.length > 0) {
-      headers.set(
-        "Access-Control-Allow-Methods",
-        this.resolvedAllowMethods().join(","),
-      );
-    }
-
-    if (this.allowHeaders.length > 0) {
-      headers.set("Access-Control-Allow-Headers", this.allowHeaders.join(","));
-    }
-
     // A false Access-Control-Allow-Credentials is not a header value the
     // fetch spec recognises, so CloudFront leaves it off rather than sending
     // a value meaning the same as absence.
@@ -124,6 +117,34 @@ export class SimCloudFrontResponseHeadersPolicyCors {
         "Access-Control-Expose-Headers",
         this.exposeHeaders.join(","),
       );
+    }
+
+    if (requestMethod === "OPTIONS") {
+      this.applyPreflight(headers);
+    }
+  }
+
+  /**
+   * Set the headers CloudFront documents against a preflight request alone.
+   *
+   * `AccessControlAllowMethods`, `AccessControlAllowHeaders` and
+   * `AccessControlMaxAgeSec` each answer the question a preflight asks, and a
+   * browser reads none of them off a simple request.
+   *
+   * An empty list names no method and no header. CloudFront leaves the header
+   * off there, the way it leaves off the expose list, and a header carrying an
+   * empty value would mean something else to a browser.
+   */
+  private applyPreflight(headers: Headers): void {
+    if (this.allowMethods.length > 0) {
+      headers.set(
+        "Access-Control-Allow-Methods",
+        this.resolvedAllowMethods().join(","),
+      );
+    }
+
+    if (this.allowHeaders.length > 0) {
+      headers.set("Access-Control-Allow-Headers", this.allowHeaders.join(","));
     }
 
     if (this.maxAgeSec !== undefined) {
