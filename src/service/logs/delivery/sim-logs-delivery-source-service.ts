@@ -40,12 +40,14 @@ const arnSegmentCount = 6;
 export function requiredSimLogsDeliveredService(resourceArn: string): string {
   const segments = resourceArn.split(":");
   const [prefix, , service] = segments;
-  const resource = segments.slice(arnSegmentCount - 1).join(":");
+  const named = segments
+    .slice(arnSegmentCount - 1)
+    .some((segment) => segment !== "");
 
   if (
     service === undefined ||
     service === "" ||
-    resource === "" ||
+    !named ||
     prefix !== "arn" ||
     segments.length < arnSegmentCount
   ) {

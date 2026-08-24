@@ -58,6 +58,12 @@ export class SimLogsDeliveryS3Configuration {
  * not.
  */
 export function requireSimLogsDeliverySuffixPath(suffixPath: string): void {
+  if (suffixPath.length === 0) {
+    throw new SimLogsValidationException(
+      "suffixPath is empty, and CloudWatch Logs takes at least one character",
+    );
+  }
+
   if (suffixPath.length > maximumSuffixPathLength) {
     throw new SimLogsValidationException(
       `suffixPath is ${suffixPath.length} characters, and CloudWatch Logs ` +

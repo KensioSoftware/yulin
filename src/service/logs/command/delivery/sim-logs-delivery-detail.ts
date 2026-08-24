@@ -52,7 +52,13 @@ export function simLogsDeliveryDetail(
     deliverySourceName: delivery.deliverySourceName,
     deliveryDestinationArn: delivery.deliveryDestinationArn,
     deliveryDestinationType: delivery.deliveryDestinationType,
-    recordFields: delivery.recordFields,
+    // Copied, as it is on the way in. The delivery holds this list for the
+    // rest of the simulation's life and a caller is free to change what a
+    // command answered with.
+    recordFields:
+      delivery.recordFields === undefined
+        ? undefined
+        : [...delivery.recordFields],
     fieldDelimiter: delivery.fieldDelimiter,
     s3DeliveryConfiguration: s3DeliveryConfigurationDetail(delivery),
   };

@@ -79,8 +79,9 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
     // Given a simulated account.
     const simAws = new SimAws();
 
-    // When a delivery source names something that is not an ARN, and then a
-    // string naming a service and no resource.
+    // When a delivery source names something that is not an ARN, then a
+    // string naming a service and no resource, then one whose resource is
+    // only the separators between empty segments.
     const bare = await assertThrowsErrorAsync(async () => {
       await simAws
         .logs()
@@ -97,6 +98,15 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
           ),
         );
     });
+    const separators = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().putDeliverySource(
+        new PutDeliverySourceCommand(
+          putSourceInput({
+            resourceArn: "arn:aws:cloudfront::123456789012::",
+          }),
+        ),
+      );
+    });
 
     // Then both are refused. The service being logged is read from the ARN,
     // and a source over a service with no resource delivers nothing.
@@ -104,6 +114,8 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
     assertStringIncludes(bare.message, "is not the ARN of a resource");
     assertIdentical(serviceOnly.name, "ValidationException");
     assertStringIncludes(serviceOnly.message, "is not the ARN of a resource");
+    assertIdentical(separators.name, "ValidationException");
+    assertStringIncludes(separators.message, "is not the ARN of a resource");
   });
 
   it("refuses a log type CloudFront does not deliver", async () => {

@@ -112,4 +112,23 @@ describe("simulated CloudWatch Logs delivery destination refusals", () => {
     assertIdentical(error.name, "ValidationException");
     assertStringIncludes(error.message, "destinationResourceArn");
   });
+
+  it("refuses an ARN whose service is right and resource is not", async () => {
+    // Given a simulated account.
+    const simAws = new SimAws();
+
+    // When a destination names another delivery destination, which is a logs
+    // resource and not a log group.
+    const error = await assertThrowsErrorAsync(async () => {
+      await putDestination(
+        simAws,
+        "arn:aws:logs:us-east-1:123456789012:delivery-destination:other",
+      );
+    });
+
+    // Then it is refused. Reading the service alone would have taken it and
+    // built a destination that drops everything sent to it.
+    assertIdentical(error.name, "ValidationException");
+    assertStringIncludes(error.message, "names no delivery destination");
+  });
 });

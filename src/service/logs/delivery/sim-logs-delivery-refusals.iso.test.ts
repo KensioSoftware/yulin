@@ -225,7 +225,7 @@ describe("simulated CloudWatch Logs delivery refusals", () => {
     assertStringIncludes(destination.message, "while a delivery is associated");
   });
 
-  it("refuses a suffix path longer than CloudWatch Logs takes", async () => {
+  it("refuses a suffix path outside the length CloudWatch Logs takes", async () => {
     // Given a source and an S3 destination.
     const simAws = new SimAws();
 
@@ -247,9 +247,21 @@ describe("simulated CloudWatch Logs delivery refusals", () => {
         }),
       );
     });
+    const empty = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().createDelivery(
+        new CreateDeliveryCommand({
+          deliverySourceName: sourceName,
+          deliveryDestinationArn,
+          s3DeliveryConfiguration: { suffixPath: "" },
+        }),
+      );
+    });
 
-    // Then it is refused here rather than on a real deploy.
+    // Then both are refused here rather than on a real deploy. CloudWatch Logs
+    // takes between one and 256 characters.
     assertIdentical(error.name, "ValidationException");
     assertStringIncludes(error.message, "takes at most 256");
+    assertIdentical(empty.name, "ValidationException");
+    assertStringIncludes(empty.message, "takes at least one character");
   });
 });
