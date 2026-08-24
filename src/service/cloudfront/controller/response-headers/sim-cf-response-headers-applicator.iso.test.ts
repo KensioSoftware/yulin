@@ -94,7 +94,7 @@ describe("SimCfResponseHeadersApplicator", () => {
 
     assertInstanceOf(error, SimCloudFrontNoSuchResponseHeadersPolicy);
     assertStringIncludes(error.message, "658327ea-f89d-4fab-a63d-7e88639e58f6");
-    assertStringIncludes(error.message, "managed policy ID");
+    assertStringIncludes(error.message, "does not exist");
   });
 
   it("forgets a policy that has been removed", () => {

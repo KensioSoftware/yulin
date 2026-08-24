@@ -98,11 +98,19 @@ export class SimCloudFrontResponseHeadersPolicyCors {
       headers.append("Vary", "Origin");
     }
 
-    headers.set(
-      "Access-Control-Allow-Methods",
-      this.resolvedAllowMethods().join(","),
-    );
-    headers.set("Access-Control-Allow-Headers", this.allowHeaders.join(","));
+    // An empty list names no method and no header. CloudFront leaves the
+    // header off there, the way it leaves off the expose list below, and a
+    // header carrying an empty value would mean something else to a browser.
+    if (this.allowMethods.length > 0) {
+      headers.set(
+        "Access-Control-Allow-Methods",
+        this.resolvedAllowMethods().join(","),
+      );
+    }
+
+    if (this.allowHeaders.length > 0) {
+      headers.set("Access-Control-Allow-Headers", this.allowHeaders.join(","));
+    }
 
     // A false Access-Control-Allow-Credentials is not a header value the
     // fetch spec recognises, so CloudFront leaves it off rather than sending

@@ -1971,8 +1971,23 @@ else, and an entry placing one elsewhere (`example.*`, `test.*.example.org`, `*t
 header decides one header. Without it, an Origin response carrying any CORS header at all, named by
 the policy or otherwise, keeps every header the section would have set off the response.
 
-A Behavior's `ResponseHeadersPolicyId` is checked when the Distribution is created or updated. Naming
-a policy this simulation did not create, whether mistyped or a CloudFront managed policy ID, fails
+### Managed policies
+
+CloudFront's five managed policies are here from the start, under the IDs AWS publishes, and a
+Behavior names one without a template creating anything. `SecurityHeadersPolicy`
+(`67f7725c-6f97-4210-82d7-5512b31e9d03`), `SimpleCORS` (`60669652-455b-4ae9-85a4-c4c02393f86c`),
+`CORS-With-Preflight` (`5cc3b908-e619-4b99-88e5-2cf7f45965bd`), `CORS-and-SecurityHeadersPolicy`
+(`e61eb60c-9c35-4d20-a928-2b84e02af89c`) and `CORS-with-preflight-and-SecurityHeadersPolicy`
+(`eaab4381-ed33-4a86-88ca-d9558dc6cd63`) each carry the sections
+[AWS documents](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-response-headers-policies.html)
+for it. CDK's `ResponseHeadersPolicy.SECURITY_HEADERS` and its four siblings synthesize those IDs, so
+a stack reaching for one deploys and serves the headers.
+
+The managed policies sit in CloudFront's own namespace. A template may create a policy called
+`SecurityHeadersPolicy` of its own, and deleting that stack leaves the managed one where it was.
+
+A Behavior's `ResponseHeadersPolicyId` is still checked when the Distribution is created or updated.
+An ID that is neither managed nor created here, whether mistyped or taken from a real account, fails
 the Stack there. The alternative would be a successful deploy that fails the first request reaching
 the Behavior.
 
@@ -2737,11 +2752,10 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **A managed policy ID is unknown here.** CloudFront's managed policies belong to AWS, and this
-  simulation creates none of them. A Behavior naming one is refused with
-  `InvalidResponseHeadersPolicyId` when the Distribution is created or updated, the same point real
-  CloudFront refuses one at. The alternative would be a successful deploy that fails the first
-  request reaching the Behavior.
+- **A CORS section sends its preflight headers on every request.** Real CloudFront puts
+  `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` and `Access-Control-Max-Age` on a
+  preflight response alone. This simulation puts them on every response the Behavior serves. A list
+  left empty sends no header at all, so `SimpleCORS` still answers with the Origin header by itself.
 - **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront models no
   edge caching. A Behavior's cache policy, including an AWS managed policy such as
   `CachingOptimized`, is left unvalidated and unapplied to TTLs and the cache key. Every request

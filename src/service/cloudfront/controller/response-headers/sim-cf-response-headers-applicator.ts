@@ -33,9 +33,9 @@ export class SimCfResponseHeadersApplicator {
     if (policy === undefined) {
       throw new SimCloudFrontNoSuchResponseHeadersPolicy(
         `Sim CloudFront response headers policy ${policyId} does not exist. ` +
-          `Only a policy created in this simulation can be applied, so a ` +
-          `managed policy ID, which names a policy AWS owns rather than one a ` +
-          `template creates, will not be found.`,
+          `One of CloudFront's five managed policies can be applied, and so ` +
+          `can a policy created in this simulation. A policy ID from a real ` +
+          `account is neither.`,
       );
     }
 
