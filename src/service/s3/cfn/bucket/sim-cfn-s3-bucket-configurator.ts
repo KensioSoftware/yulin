@@ -1,6 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimS3 } from "../../sim-s3.js";
+import { SimCfnS3BucketLifecycleConfiguration } from "./lifecycle/sim-cfn-s3-bucket-lifecycle-configuration.js";
 import { SimCfnS3BucketNotificationConfiguration } from "./notification/sim-cfn-s3-bucket-notification-configuration.js";
 import { SimCfnS3BucketPublicAccessConfiguration } from "./public-access/sim-cfn-s3-bucket-public-access-configuration.js";
 import { SimCfnS3BucketWebsiteConfiguration } from "./website/sim-cfn-s3-bucket-website-configuration.js";
@@ -42,6 +43,7 @@ export class SimCfnS3BucketConfigurator {
   async configure(): Promise<void> {
     await this.configureWebsite();
     await this.configurePublicAccess();
+    await this.configureLifecycle();
     await this.configureNotifications();
   }
 
@@ -75,6 +77,21 @@ export class SimCfnS3BucketConfigurator {
         Bucket: this.bucketName,
         PublicAccessBlockConfiguration: config,
       },
+    });
+  }
+
+  private async configureLifecycle(): Promise<void> {
+    const config = new SimCfnS3BucketLifecycleConfiguration(
+      this.resource.logicalId,
+      this.properties,
+    ).read();
+
+    if (config === undefined) {
+      return;
+    }
+
+    await this.simS3.putBucketLifecycleConfiguration({
+      input: { Bucket: this.bucketName, LifecycleConfiguration: config },
     });
   }
 

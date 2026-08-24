@@ -46,6 +46,20 @@ export type {
   SimDeletePublicAccessBlockCommandOutput,
 } from "./delete-public-access-block/delete-public-access-block.command.js";
 export type {
+  SimDeleteBucketLifecycleCommand,
+  SimDeleteBucketLifecycleCommandOutput,
+} from "./delete-bucket-lifecycle/delete-bucket-lifecycle.command.js";
+export type {
+  SimGetBucketLifecycleConfigurationCommand,
+  SimGetBucketLifecycleConfigurationCommandOutput,
+} from "./get-bucket-lifecycle-configuration/get-bucket-lifecycle-configuration.command.js";
+export type {
+  SimPutBucketLifecycleConfigurationCommand,
+  SimPutBucketLifecycleConfigurationCommandOutput,
+  SimS3LifecycleConfiguration,
+  SimS3LifecycleRule,
+} from "./put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
+export type {
   SimGetBucketPolicyCommand,
   SimGetBucketPolicyCommandOutput,
 } from "./get-bucket-policy/get-bucket-policy.command.js";

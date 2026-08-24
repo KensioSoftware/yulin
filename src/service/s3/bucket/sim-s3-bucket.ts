@@ -6,6 +6,7 @@ import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
 import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
+import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
@@ -24,6 +25,7 @@ interface SimS3BucketProperties {
   readonly policy?: SimIamPolicyDocument | undefined;
   readonly publicAccessBlock?: SimS3PublicAccessBlock;
   readonly notifications?: SimS3NotificationConfiguration;
+  readonly lifecycle?: SimS3LifecycleConfiguration;
   /**
    * When the Bucket came into being, in simulated time.
    *
@@ -48,6 +50,7 @@ export class SimS3Bucket {
   private policy: SimIamPolicyDocument | undefined;
   private publicAccessBlock: SimS3PublicAccessBlock;
   private notifications: SimS3NotificationConfiguration;
+  private lifecycle: SimS3LifecycleConfiguration;
 
   constructor(properties: SimS3BucketProperties) {
     const {
@@ -58,6 +61,7 @@ export class SimS3Bucket {
       policy,
       publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
       notifications = SimS3NotificationConfiguration.empty(),
+      lifecycle = SimS3LifecycleConfiguration.empty(),
       creationDate = new BackgroundTasks().now(),
     } = properties;
 
@@ -70,6 +74,7 @@ export class SimS3Bucket {
     this.policy = policy;
     this.publicAccessBlock = publicAccessBlock;
     this.notifications = notifications;
+    this.lifecycle = lifecycle;
     this.creationDate = creationDate;
   }
 
@@ -214,6 +219,33 @@ export class SimS3Bucket {
    */
   getNotifications(): SimS3NotificationConfiguration {
     return this.notifications;
+  }
+
+  /**
+   * Replace this Bucket's lifecycle configuration.
+   *
+   * Real S3 holds one configuration per Bucket rather than a list of them, so
+   * this replaces what was there instead of adding to it.
+   */
+  configureLifecycle(lifecycle: SimS3LifecycleConfiguration): void {
+    this.lifecycle = lifecycle;
+  }
+
+  /**
+   * Get this Bucket's lifecycle configuration.
+   */
+  getLifecycle(): SimS3LifecycleConfiguration {
+    return this.lifecycle;
+  }
+
+  /**
+   * Remove this Bucket's lifecycle configuration.
+   *
+   * Real S3 DeleteBucketLifecycle is idempotent, so this reports nothing about
+   * whether there were rules to remove.
+   */
+  deleteLifecycle(): void {
+    this.lifecycle = SimS3LifecycleConfiguration.empty();
   }
 
   /**
