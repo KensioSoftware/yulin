@@ -71,7 +71,7 @@ function loggingTemplate(
       DestinationName: { Value: { Ref: "AccessLogsDestination" } },
       DestinationType: {
         Value: {
-          "Fn::GetAtt": ["AccessLogsDestination", "DeliveryDestinationType"],
+          "Fn::GetAtt": ["AccessLogsDelivery", "DeliveryDestinationType"],
         },
       },
       DeliveryId: { Value: { Ref: "AccessLogsDelivery" } },

@@ -1,5 +1,7 @@
 import {
   CreateDeliveryCommand,
+  DeleteDeliveryDestinationCommand,
+  DeleteDeliverySourceCommand,
   PutDeliveryDestinationCommand,
   PutDeliverySourceCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
@@ -178,5 +180,76 @@ describe("simulated CloudWatch Logs delivery refusals", () => {
     // Then it is refused: a log group has no keys to lay anything out under.
     assertIdentical(error.name, "ValidationException");
     assertStringIncludes(error.message, "only applies to an S3");
+  });
+
+  it("refuses deleting a source or destination a delivery holds", async () => {
+    // Given a source and a destination joined by a delivery.
+    const simAws = new SimAws();
+
+    await givenSource(simAws);
+
+    const deliveryDestinationArn = await givenDestination(
+      simAws,
+      "site-access-logs",
+      bucketArn,
+    );
+
+    await simAws.logs().createDelivery(
+      new CreateDeliveryCommand({
+        deliverySourceName: sourceName,
+        deliveryDestinationArn,
+      }),
+    );
+
+    // When either end of the delivery is deleted.
+    const source = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .deleteDeliverySource(
+          new DeleteDeliverySourceCommand({ name: sourceName }),
+        );
+    });
+    const destination = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .deleteDeliveryDestination(
+          new DeleteDeliveryDestinationCommand({ name: "site-access-logs" }),
+        );
+    });
+
+    // Then both are refused, as an account refuses them. The delivery has to
+    // go first.
+    assertIdentical(source.name, "ConflictException");
+    assertStringIncludes(source.message, "while a delivery is associated");
+    assertIdentical(destination.name, "ConflictException");
+    assertStringIncludes(destination.message, "while a delivery is associated");
+  });
+
+  it("refuses a suffix path longer than CloudWatch Logs takes", async () => {
+    // Given a source and an S3 destination.
+    const simAws = new SimAws();
+
+    await givenSource(simAws);
+
+    const deliveryDestinationArn = await givenDestination(
+      simAws,
+      "site-access-logs",
+      bucketArn,
+    );
+
+    // When a delivery asks for a suffix path one character over the limit.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().createDelivery(
+        new CreateDeliveryCommand({
+          deliverySourceName: sourceName,
+          deliveryDestinationArn,
+          s3DeliveryConfiguration: { suffixPath: "a".repeat(257) },
+        }),
+      );
+    });
+
+    // Then it is refused here rather than on a real deploy.
+    assertIdentical(error.name, "ValidationException");
+    assertStringIncludes(error.message, "takes at most 256");
   });
 });

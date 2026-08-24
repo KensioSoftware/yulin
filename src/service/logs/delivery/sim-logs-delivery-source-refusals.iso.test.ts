@@ -75,23 +75,54 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
     assertStringIncludes(error.message, "made in eu-west-2");
   });
 
-  it("refuses a resourceArn that is not an ARN", async () => {
+  it("refuses a resourceArn that is not the ARN of a resource", async () => {
     // Given a simulated account.
     const simAws = new SimAws();
 
-    // When a delivery source names something that is not an ARN.
-    const error = await assertThrowsErrorAsync(async () => {
+    // When a delivery source names something that is not an ARN, and then a
+    // string naming a service and no resource.
+    const bare = await assertThrowsErrorAsync(async () => {
       await simAws
         .logs()
         .putDeliverySource(
           new PutDeliverySourceCommand(putSourceInput({ resourceArn: "E1EX" })),
         );
     });
+    const serviceOnly = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .putDeliverySource(
+          new PutDeliverySourceCommand(
+            putSourceInput({ resourceArn: "arn:aws:cloudfront" }),
+          ),
+        );
+    });
 
-    // Then it is refused: the service being logged is read from the ARN, and
-    // a source with no service delivers nothing.
+    // Then both are refused. The service being logged is read from the ARN,
+    // and a source over a service with no resource delivers nothing.
+    assertIdentical(bare.name, "ValidationException");
+    assertStringIncludes(bare.message, "is not the ARN of a resource");
+    assertIdentical(serviceOnly.name, "ValidationException");
+    assertStringIncludes(serviceOnly.message, "is not the ARN of a resource");
+  });
+
+  it("refuses a log type CloudFront does not deliver", async () => {
+    // Given a simulated account.
+    const simAws = new SimAws();
+
+    // When a delivery source over a distribution asks for another log type.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .putDeliverySource(
+          new PutDeliverySourceCommand(putSourceInput({ logType: "OTHER" })),
+        );
+    });
+
+    // Then it is refused. Standard logging v2 carries access logs and nothing
+    // else.
     assertIdentical(error.name, "ValidationException");
-    assertStringIncludes(error.message, "is not an ARN");
+    assertStringIncludes(error.message, "ACCESS_LOGS is the only one it has");
   });
 
   it("refuses tags rather than dropping them", async () => {

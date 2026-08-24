@@ -36,7 +36,12 @@ export class SimLogsDelivery {
     this.deliverySourceName = properties.deliverySourceName;
     this.deliveryDestinationArn = properties.deliveryDestinationArn;
     this.deliveryDestinationType = properties.deliveryDestinationType;
-    this.recordFields = properties.recordFields;
+    // Copied, because the list arrives from the caller's own command input and
+    // nothing stops them holding on to it and changing it afterwards.
+    this.recordFields =
+      properties.recordFields === undefined
+        ? undefined
+        : [...properties.recordFields];
     this.fieldDelimiter = properties.fieldDelimiter;
     this.s3DeliveryConfiguration = properties.s3DeliveryConfiguration;
     this.arn = simLogsDeliveryArn(properties.accountRegionScope, properties.id);

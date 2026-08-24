@@ -3,6 +3,7 @@ import {
   DescribeDeliverySourcesCommand,
   PutDeliverySourceCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import { assertThrowsErrorAsync } from "@kensio/smartass";
 import {
   assertArrayEquals,
   assertArrayLength,
@@ -161,5 +162,31 @@ describe("simulated CloudWatch Logs delivery sources", () => {
 
     // Then the distribution has no delivery source left.
     assertUndefined(simAws.logs().findDeliverySource(sourceName));
+  });
+
+  it("takes a page of 50 and refuses one of 51", async () => {
+    // Given a delivery source.
+    const simAws = new SimAws();
+
+    await putSource(simAws);
+
+    // When the largest page CloudWatch Logs offers is asked for, and then one
+    // over it.
+    const largest = await simAws
+      .logs()
+      .describeDeliverySources(
+        new DescribeDeliverySourcesCommand({ limit: 50 }),
+      );
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .describeDeliverySources(
+          new DescribeDeliverySourcesCommand({ limit: 51 }),
+        );
+    });
+
+    // Then 50 is served and 51 is refused, as an account refuses it.
+    assertArrayLength(largest.deliverySources ?? [], 1);
+    assertStringIncludes(error.message, "limit");
   });
 });

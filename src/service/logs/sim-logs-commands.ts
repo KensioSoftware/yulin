@@ -133,11 +133,13 @@ export class SimLogsCommands {
     this.deliveryStore = deliveries;
     this.deliverySources = new SimLogsDeliverySourceCommands({
       sources: deliverySources,
+      deliveries,
       authorizer,
       accountRegionScope,
     });
     this.deliveryDestinations = new SimLogsDeliveryDestinationCommands({
       destinations: deliveryDestinations,
+      deliveries,
       authorizer,
       accountRegionScope,
     });

@@ -20,6 +20,9 @@ export const simLogsDeliverySuffixPathVariables: readonly string[] = [
 
 const suffixPathVariablePattern = /{([^{}]*)}/g;
 
+/** How long a suffix path real CloudWatch Logs accepts. */
+const maximumSuffixPathLength = 256;
+
 interface SimLogsDeliveryS3ConfigurationProperties {
   readonly suffixPath: string | undefined;
   readonly enableHiveCompatiblePath: boolean | undefined;
@@ -48,10 +51,20 @@ export class SimLogsDeliveryS3Configuration {
 }
 
 /**
- * Refuse a suffix path naming a partition variable that would never be
- * substituted.
+ * Refuse a suffix path real CloudWatch Logs would refuse.
+ *
+ * A variable outside the set delivery substitutes is written out as the
+ * literal text it is, so a path with a typo in it looks partitioned and is
+ * not.
  */
 export function requireSimLogsDeliverySuffixPath(suffixPath: string): void {
+  if (suffixPath.length > maximumSuffixPathLength) {
+    throw new SimLogsValidationException(
+      `suffixPath is ${suffixPath.length} characters, and CloudWatch Logs ` +
+        `takes at most ${maximumSuffixPathLength}`,
+    );
+  }
+
   for (const match of suffixPath.matchAll(suffixPathVariablePattern)) {
     const variable = match[1] ?? "";
 

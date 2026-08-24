@@ -5,6 +5,7 @@ import {
 } from "../../delivery/sim-logs-delivery-arn.js";
 import { SimLogsDeliveryDestination } from "../../delivery/sim-logs-delivery-destination.js";
 import type { SimLogsDeliveryDestinationStore } from "../../delivery/sim-logs-delivery-destination-store.js";
+import type { SimLogsDeliveryStore } from "../../delivery/sim-logs-delivery-store.js";
 import { requiredSimLogsDeliveryDestinationType } from "../../delivery/sim-logs-delivery-destination-type.js";
 import { requiredSimLogsDeliveryOutputFormat } from "../../delivery/sim-logs-delivery-output-format.js";
 import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
@@ -19,16 +20,18 @@ import type {
   SimPutDeliveryDestinationCommandOutput,
 } from "./delivery-destination.command.js";
 import { simLogsDeliveryDestinationDetail } from "./sim-logs-delivery-detail.js";
+import { refuseSimLogsDeliveryDestinationInUse } from "./sim-logs-delivery-in-use.js";
 import {
   refuseUnsimulatedDeliveryTags,
   requiredSimLogsDeliveryValue,
 } from "./sim-logs-delivery-input.js";
 
-/** The largest page of delivery destinations this simulation reports at once. */
-const maximumDescribeLimit = 100;
+/** The largest page the delivery listings take, as real CloudWatch Logs does. */
+const maximumDescribeLimit = 50;
 
 interface SimLogsDeliveryDestinationCommandsProperties {
   readonly destinations: SimLogsDeliveryDestinationStore;
+  readonly deliveries: SimLogsDeliveryStore;
   readonly authorizer: SimLogsAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -38,11 +41,13 @@ interface SimLogsDeliveryDestinationCommandsProperties {
  */
 export class SimLogsDeliveryDestinationCommands {
   readonly #destinations: SimLogsDeliveryDestinationStore;
+  readonly #deliveries: SimLogsDeliveryStore;
   readonly #authorizer: SimLogsAuthorizer;
   readonly #scope: SimAwsAccountRegionScope;
 
   constructor(properties: SimLogsDeliveryDestinationCommandsProperties) {
     this.#destinations = properties.destinations;
+    this.#deliveries = properties.deliveries;
     this.#authorizer = properties.authorizer;
     this.#scope = properties.accountRegionScope;
   }
@@ -127,7 +132,7 @@ export class SimLogsDeliveryDestinationCommands {
   }
 
   /**
-   * Remove a delivery destination.
+   * Remove a delivery destination no delivery is writing to.
    */
   deleteDeliveryDestination(
     command: SimDeleteDeliveryDestinationCommand,
@@ -141,6 +146,10 @@ export class SimLogsDeliveryDestinationCommands {
       options?.caller,
     );
 
+    refuseSimLogsDeliveryDestinationInUse(
+      this.#deliveries,
+      this.#destinations.require(name),
+    );
     this.#destinations.delete(name);
 
     return { $metadata: {} };

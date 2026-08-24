@@ -4,11 +4,12 @@ import {
   simLogsDeliverySourceArn,
 } from "../../delivery/sim-logs-delivery-arn.js";
 import {
-  requireSimLogsDeliveryRegion,
+  requireSimLogsDeliverySource,
   requiredSimLogsDeliveredService,
 } from "../../delivery/sim-logs-delivery-source-service.js";
 import { SimLogsDeliverySource } from "../../delivery/sim-logs-delivery-source.js";
 import type { SimLogsDeliverySourceStore } from "../../delivery/sim-logs-delivery-source-store.js";
+import type { SimLogsDeliveryStore } from "../../delivery/sim-logs-delivery-store.js";
 import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
 import { SimLogsPage } from "../sim-logs-page.js";
 import type { SimLogsRequestOptions } from "../sim-logs-request-options.js";
@@ -21,16 +22,18 @@ import type {
   SimPutDeliverySourceCommandOutput,
 } from "./delivery-source.command.js";
 import { simLogsDeliverySourceDetail } from "./sim-logs-delivery-detail.js";
+import { refuseSimLogsDeliverySourceInUse } from "./sim-logs-delivery-in-use.js";
 import {
   refuseUnsimulatedDeliveryTags,
   requiredSimLogsDeliveryValue,
 } from "./sim-logs-delivery-input.js";
 
-/** The largest page of delivery sources this simulation reports at once. */
-const maximumDescribeLimit = 100;
+/** The largest page the delivery listings take, as real CloudWatch Logs does. */
+const maximumDescribeLimit = 50;
 
 interface SimLogsDeliverySourceCommandsProperties {
   readonly sources: SimLogsDeliverySourceStore;
+  readonly deliveries: SimLogsDeliveryStore;
   readonly authorizer: SimLogsAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -40,11 +43,13 @@ interface SimLogsDeliverySourceCommandsProperties {
  */
 export class SimLogsDeliverySourceCommands {
   readonly #sources: SimLogsDeliverySourceStore;
+  readonly #deliveries: SimLogsDeliveryStore;
   readonly #authorizer: SimLogsAuthorizer;
   readonly #scope: SimAwsAccountRegionScope;
 
   constructor(properties: SimLogsDeliverySourceCommandsProperties) {
     this.#sources = properties.sources;
+    this.#deliveries = properties.deliveries;
     this.#authorizer = properties.authorizer;
     this.#scope = properties.accountRegionScope;
   }
@@ -77,7 +82,11 @@ export class SimLogsDeliverySourceCommands {
 
     const service = requiredSimLogsDeliveredService(resourceArn);
 
-    requireSimLogsDeliveryRegion(service, this.#scope.regionName);
+    requireSimLogsDeliverySource({
+      service,
+      regionName: this.#scope.regionName,
+      logType,
+    });
 
     const source = new SimLogsDeliverySource({
       name,
@@ -127,7 +136,7 @@ export class SimLogsDeliverySourceCommands {
   }
 
   /**
-   * Remove a delivery source.
+   * Remove a delivery source no delivery is carrying logs from.
    */
   deleteDeliverySource(
     command: SimDeleteDeliverySourceCommand,
@@ -141,6 +150,7 @@ export class SimLogsDeliverySourceCommands {
       options?.caller,
     );
 
+    refuseSimLogsDeliverySourceInUse(this.#deliveries, name);
     this.#sources.delete(name);
 
     return { $metadata: {} };

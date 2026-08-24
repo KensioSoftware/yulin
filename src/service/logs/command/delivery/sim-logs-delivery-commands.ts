@@ -25,8 +25,8 @@ import {
   requiredSimLogsDeliveryValue,
 } from "./sim-logs-delivery-input.js";
 
-/** The largest page of deliveries this simulation reports at once. */
-const maximumDescribeLimit = 100;
+/** The largest page the delivery listings take, as real CloudWatch Logs does. */
+const maximumDescribeLimit = 50;
 
 interface SimLogsDeliveryCommandsProperties {
   readonly sources: SimLogsDeliverySourceStore;

@@ -39,6 +39,7 @@ export {
 export {
   simLogsCloudFrontDeliveryRegion,
   simLogsCloudFrontDeliveryService,
+  simLogsCloudFrontLogType,
 } from "./delivery/sim-logs-delivery-source-service.js";
 export {
   simLogsDeliveryArn,

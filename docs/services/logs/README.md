@@ -376,6 +376,11 @@ rules from real AWS are modelled here, each of them a deploy that looks fine unt
 - **One delivery source per resource.** A second source over a distribution that already has one
   fails with `ConflictException`, carrying the message an account gives, "This ResourceId has
   already been used in another Delivery Source in this account".
+- **A delivery holds both its ends.** Deleting the source or the destination while a delivery joins
+  them fails with `ConflictException`. The delivery goes first, and CloudFormation orders that
+  itself when a stack is deleted.
+- **CloudFront delivers `ACCESS_LOGS` and nothing else.** Any other `logType` over a distribution is
+  refused.
 - **CloudFront delivery is set up from `us-east-1`**, whatever region the destination bucket is in.
   A CloudFront delivery source put from anywhere else is refused.
 - **Output format is fixed once the destination exists.** A `PutDeliveryDestination` that would
@@ -385,7 +390,7 @@ rules from real AWS are modelled here, each of them a deploy that looks fine unt
 The suffix path decides the key each log file lands under. `{DistributionId}`, `{distributionid}`,
 `{yyyy}`, `{MM}`, `{dd}`, `{HH}` and `{accountid}` are substituted, and a variable outside that set
 is refused. Delivery would write the text out literally, and the bucket would look partitioned when
-it was not.
+it was not. A path over the 256 characters CloudWatch Logs takes is refused too.
 
 ### Declaring delivery in a template
 
@@ -422,9 +427,10 @@ The template carries the S3 layout as two flat properties, and the API takes the
 `Ref` resolves to the name on the source and the destination, and to the delivery ID on the
 delivery. CloudWatch Logs issues that ID. A template cannot predict it.
 
-`Fn::GetAtt` gives `Arn` on all three. The source also publishes `Service` and `ResourceArns`, the
-destination `DeliveryDestinationType`, and the delivery `DeliveryId`, `DeliverySourceName`,
-`DeliveryDestinationArn` and `DeliveryDestinationType`.
+`Fn::GetAtt` gives `Arn` on all three. The source also publishes `Service` and `ResourceArns`, and
+the delivery publishes `DeliveryId` and `DeliveryDestinationType`. The destination publishes nothing
+else, and `DeliveryDestinationType` is a property of it rather than an attribute, so read that one
+off the delivery. Anything outside this set is refused here, as CloudFormation refuses it.
 
 `Tags` and `DeliveryDestinationPolicy` are recorded as ignored properties, and the stack still
 deploys.
@@ -773,13 +779,13 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   log group and the three delivery resource types are what simulated CloudFormation deploys here.
 - **Nothing is actually delivered.** A delivery records that a source was joined to a destination
   and how the records would be written. No access log file ever reaches the bucket.
-- **A delivery source can be deleted while a delivery still uses it.** Real CloudWatch Logs has its
-  own rule about the order, and this simulation does not model it.
 - **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent. The three `Describe`
   operations report the same resources.
 - **Delivery resource tags and cross-account delivery.** `PutDeliverySource`,
   `PutDeliveryDestination` and `CreateDelivery` refuse tags outright. `DeliveryDestinationPolicy` in
   a template is recorded and acted on by nothing.
+- **Log types for services other than CloudFront.** Any `logType` is taken over a resource that is
+  not a distribution, because the valid set varies by service and this simulation does not carry it.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
   `kmsKeyId` on `CreateLogGroup` are refused outright. A property cannot look set here and behave
   differently in an account.

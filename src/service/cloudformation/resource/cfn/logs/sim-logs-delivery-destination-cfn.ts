@@ -26,23 +26,22 @@ export class SimLogsDeliveryDestinationCfn implements SimCfnResourceValueAdapter
   /**
    * AWS::Logs::DeliveryDestination attributes.
    *
-   * The ARN here is the destination's own, and a delivery names that one. The
-   * bucket or log group behind it keeps its own ARN, and the two are easy to
-   * confuse in a template.
+   * The ARN is the only one CloudFormation publishes. It is the destination's
+   * own, and a delivery names that one. The bucket or log group behind it
+   * keeps its own ARN, and the two are easy to confuse in a template.
+   *
+   * `DeliveryDestinationType` is a property of this Resource rather than an
+   * attribute of it, so a template reading it back through `Fn::GetAtt` is
+   * refused here as CloudFormation refuses it. Read it off the delivery, which
+   * does publish it.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
-    switch (attributeName) {
-      case "Arn": {
-        return this.#destination.arn;
-      }
-      case "DeliveryDestinationType": {
-        return this.#destination.destinationType;
-      }
-      default: {
-        throw new Error(
-          `Unsupported AWS::Logs::DeliveryDestination attribute ${attributeName}`,
-        );
-      }
+    if (attributeName === "Arn") {
+      return this.#destination.arn;
     }
+
+    throw new Error(
+      `Unsupported AWS::Logs::DeliveryDestination attribute ${attributeName}`,
+    );
   }
 }

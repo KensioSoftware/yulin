@@ -28,6 +28,11 @@ export class SimLogsDeliveryCfn implements SimCfnResourceValueAdapter {
 
   /**
    * AWS::Logs::Delivery attributes.
+   *
+   * These three are the whole of what CloudFormation publishes.
+   * `DeliverySourceName` and `DeliveryDestinationArn` are properties of this
+   * Resource rather than attributes of it, so a template reading either back
+   * through `Fn::GetAtt` is refused here as CloudFormation refuses it.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
     switch (attributeName) {
@@ -36,12 +41,6 @@ export class SimLogsDeliveryCfn implements SimCfnResourceValueAdapter {
       }
       case "DeliveryId": {
         return this.#delivery.id;
-      }
-      case "DeliverySourceName": {
-        return this.#delivery.deliverySourceName;
-      }
-      case "DeliveryDestinationArn": {
-        return this.#delivery.deliveryDestinationArn;
       }
       case "DeliveryDestinationType": {
         return this.#delivery.deliveryDestinationType;

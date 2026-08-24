@@ -118,6 +118,47 @@ describe("AWS::Logs delivery Resource refusals", () => {
     assertStringIncludes(error.message, "{DistributionID}");
   });
 
+  it("refuses a Resource property read back as an attribute", async () => {
+    // Given a template reading DeliveryDestinationType off the delivery
+    // destination, which carries it as a property and publishes it on the
+    // delivery instead.
+    const error = await assertThrowsErrorAsync(async () => {
+      await new SimAws().cloudFormation().deployTemplate({
+        stackName: "site-logging",
+        template: {
+          Resources: {
+            AccessLogsDestination: {
+              Type: "AWS::Logs::DeliveryDestination",
+              Properties: {
+                Name: sourceName,
+                DestinationResourceArn: bucketArn,
+              },
+            },
+          },
+          Outputs: {
+            Kind: {
+              Value: {
+                "Fn::GetAtt": [
+                  "AccessLogsDestination",
+                  "DeliveryDestinationType",
+                ],
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then it is refused here, as CloudFormation refuses it. Resolving it
+    // would give a template that deploys against this simulation and fails
+    // against an account.
+    assertStringIncludes(
+      error.message,
+      "Unsupported AWS::Logs::DeliveryDestination attribute " +
+        "DeliveryDestinationType",
+    );
+  });
+
   it("refuses a delivery attribute CloudFormation does not publish", async () => {
     // Given a template reading an attribute off a delivery source that
     // AWS::Logs::DeliverySource does not have.

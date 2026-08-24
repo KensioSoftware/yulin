@@ -7,7 +7,14 @@ const tagsReason =
  * on, and why.
  */
 export const deliverySourceUnsimulatedReasons: ReadonlyMap<string, string> =
-  new Map([["Tags", tagsReason]]);
+  new Map([
+    ["Tags", tagsReason],
+    [
+      "DeliverySourceConfiguration",
+      "the configuration map only matters to the services whose delivery " +
+        "takes one, and CloudFront is the only source modelled here",
+    ],
+  ]);
 
 /**
  * The AWS::Logs::DeliveryDestination properties this simulation has nothing to
@@ -18,6 +25,11 @@ export const deliveryDestinationUnsimulatedReasons: ReadonlyMap<
   string
 > = new Map([
   ["Tags", tagsReason],
+  [
+    "DeliveryDestinationType",
+    "the kind of destination is read off DestinationResourceArn here, as " +
+      "CloudWatch Logs reads it, so a declared one would be ignored or wrong",
+  ],
   [
     "DeliveryDestinationPolicy",
     "the policy only decides which other accounts may deliver here, and " +

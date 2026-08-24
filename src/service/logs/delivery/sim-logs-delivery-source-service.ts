@@ -18,42 +18,81 @@ export const simLogsCloudFrontDeliveryService = "cloudfront";
 export const simLogsCloudFrontDeliveryRegion: AwsRegionName = "us-east-1";
 
 /**
+ * The one kind of log CloudFront delivers.
+ *
+ * Standard logging v2 carries access logs and nothing else, so an account
+ * refuses a source over a distribution asking for anything else.
+ */
+export const simLogsCloudFrontLogType = "ACCESS_LOGS";
+
+/** How many colon separated segments the shortest ARN has. */
+const arnSegmentCount = 6;
+
+/**
  * The AWS service a delivery source's resource belongs to.
  *
  * Real CloudWatch Logs works this out from the ARN and reports it as the
- * source's `service`, so a caller never states it. A malformed ARN is refused
- * here, because a source whose service could not be read would deliver
- * nothing and say nothing about why.
+ * source's `service`, so a caller never states it. The whole ARN is checked
+ * rather than the service segment alone. `arn:aws:cloudfront` names a service
+ * and no resource, and a source over it would deliver nothing and say nothing
+ * about why.
  */
 export function requiredSimLogsDeliveredService(resourceArn: string): string {
-  const [prefix, , service] = resourceArn.split(":", 3);
+  const segments = resourceArn.split(":");
+  const [prefix, , service] = segments;
+  const resource = segments.slice(arnSegmentCount - 1).join(":");
 
-  if (service === undefined || service === "" || prefix !== "arn") {
+  if (
+    service === undefined ||
+    service === "" ||
+    resource === "" ||
+    prefix !== "arn" ||
+    segments.length < arnSegmentCount
+  ) {
     throw new SimLogsValidationException(
-      `resourceArn '${resourceArn}' is not an ARN, so the service the ` +
-        `delivery source is for cannot be read from it`,
+      `resourceArn '${resourceArn}' is not the ARN of a resource, so the ` +
+        `service the delivery source is for cannot be read from it`,
     );
   }
 
   return service;
 }
 
+interface SimLogsDeliverySourceRules {
+  readonly service: string;
+  readonly regionName: AwsRegionName;
+  readonly logType: string;
+}
+
 /**
- * Refuse a delivery source for a service the request's region cannot reach.
+ * Refuse a delivery source an account would refuse.
  *
- * Only the CloudFront rule is modelled, because CloudFront is the one service
- * whose delivery is pinned to a region other than its resource's own.
+ * Only the CloudFront rules are modelled. CloudFront is the one service whose
+ * delivery is pinned to a region other than its own resource's, and the log
+ * types the other services take vary by service in a way this simulation does
+ * not carry.
  */
-export function requireSimLogsDeliveryRegion(
-  service: string,
-  regionName: AwsRegionName,
+export function requireSimLogsDeliverySource(
+  properties: SimLogsDeliverySourceRules,
 ): void {
-  if (
-    service === simLogsCloudFrontDeliveryService &&
-    regionName !== simLogsCloudFrontDeliveryRegion
-  ) {
+  const { service, regionName, logType } = properties;
+
+  if (service !== simLogsCloudFrontDeliveryService) {
+    return;
+  }
+
+  if (regionName !== simLogsCloudFrontDeliveryRegion) {
     throw new SimLogsValidationException(
-      `A CloudFront delivery source can only be created in ${simLogsCloudFrontDeliveryRegion}, and this request was made in ${regionName}`,
+      `A CloudFront delivery source can only be created in ` +
+        `${simLogsCloudFrontDeliveryRegion}, and this request was made in ` +
+        regionName,
+    );
+  }
+
+  if (logType !== simLogsCloudFrontLogType) {
+    throw new SimLogsValidationException(
+      `logType '${logType}' is not one CloudFront delivers. ` +
+        `${simLogsCloudFrontLogType} is the only one it has`,
     );
   }
 }
