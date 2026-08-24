@@ -87,8 +87,14 @@ export class SimClockControl implements SimClock {
    * due time rather than at the instant asked for. Simulated time got that far
    * and then something broke, and saying so is more use than claiming the whole
    * interval elapsed. Whatever was still queued stays queued.
+   *
+   * The clock freezes where it reads before any of that happens. Simulated time
+   * then moves only where this method moves it, and a task scheduling its own
+   * follow-up measures the delay from a still instant.
    */
   async setTo(instant: Date): Promise<void> {
+    this.clock.freeze();
+
     if (instant.getTime() >= this.now().getTime()) {
       await this.runDueTasksUpTo(instant);
     }
@@ -103,8 +109,14 @@ export class SimClockControl implements SimClock {
    *
    * Returns once the simulation has settled, so a test can advance and then
    * assert without waiting again.
+   *
+   * The duration is measured from a frozen instant. Advancing by exactly a
+   * buffering interval or a schedule period lands on the due instant every
+   * time, whatever the host clock does while the advance runs.
    */
   async advanceBy(duration: SimDuration | SimDurationInput): Promise<void> {
+    this.clock.freeze();
+
     const milliseconds = SimDuration.of(duration).toMilliseconds();
 
     await this.setTo(new Date(this.now().getTime() + milliseconds));

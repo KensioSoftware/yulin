@@ -3,9 +3,23 @@ import { describe, expect, it } from "vitest";
 import { BackgroundTasks } from "../background/background.js";
 import { SimClockControl } from "./sim-clock-control.js";
 import { SimControllableClock } from "./sim-controllable-clock.js";
-import { SimFixedClock } from "./sim-clock.js";
+import { SimFixedClock, type SimClock } from "./sim-clock.js";
 
 const start = new Date("2026-07-26T09:00:00.000Z");
+
+/**
+ * A host clock that reads a hundred milliseconds later every time it is asked,
+ * standing in for a machine busy enough to be preempted mid-advance.
+ */
+class DriftingClock implements SimClock {
+  private at = start.getTime();
+
+  now(): Date {
+    this.at += 100;
+
+    return new Date(this.at);
+  }
+}
 
 /**
  * A simulation's clock, its scheduler, and control over both, wired the way
@@ -49,6 +63,34 @@ describe("SimClockControl", () => {
     // Then simulated time has moved on, and stopped there
     expect(control.now()).toStrictEqual(new Date("2026-07-26T09:20:00.000Z"));
     expect(control.isFrozen).toBe(true);
+  });
+
+  it("measures an advance from where the clock stood when it started", async () => {
+    // Given a simulation on a host clock that moves while an advance runs, and
+    // work due now that buffers for an hour once it runs
+    const clock = new SimControllableClock({ base: new DriftingClock() });
+    const background = new BackgroundTasks({ clock });
+    const control = new SimClockControl({ clock, background });
+    let delivered = false;
+    background.scheduleAt(background.now(), async () => {
+      background.scheduleAt(
+        new Date(background.now().getTime() + 60 * 60 * 1000),
+        async () => {
+          delivered = true;
+
+          await Promise.resolve();
+        },
+      );
+
+      await Promise.resolve();
+    });
+
+    // When time is advanced by exactly that hour
+    await control.advanceBy({ hours: 1 });
+
+    // Then the hour reached the buffer's due instant. The host clock moving
+    // under the advance left the interval the length it was asked for.
+    expect(delivered).toBe(true);
   });
 
   it("runs work that falls due during the interval, at its own due time", async () => {
