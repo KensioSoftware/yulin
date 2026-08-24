@@ -93,3 +93,34 @@ export class SimLogsLimitExceededException extends SimLogsError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated CloudWatch Logs ValidationException error.
+ *
+ * The delivery operations report a bad input this way rather than as an
+ * `InvalidParameterException`. They were added to CloudWatch Logs long after
+ * the log group operations and carry the error shape AWS gives newer APIs, so
+ * a caller catching by name has to know which half of the service it is
+ * talking to.
+ */
+export class SimLogsValidationException extends SimLogsError {
+  public override readonly name = "ValidationException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated CloudWatch Logs ConflictException error.
+ *
+ * This is what the delivery operations report when a resource is already in
+ * use, such as a distribution that already has a delivery source.
+ */
+export class SimLogsConflictException extends SimLogsError {
+  public override readonly name = "ConflictException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}

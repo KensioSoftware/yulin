@@ -71,7 +71,15 @@ export class SimLogsAuthorizer {
     );
   }
 
-  private authorizeResource(
+  /**
+   * Ensure the caller may perform an action on a named resource ARN.
+   *
+   * The delivery operations authorize through this rather than through a
+   * method of their own. Each of the three delivery resource types has its own
+   * ARN form, and adding a pair of methods per type would make this class
+   * mostly ARN building.
+   */
+  authorizeResource(
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,

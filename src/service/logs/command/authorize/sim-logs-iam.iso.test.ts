@@ -3,6 +3,7 @@ import {
   CreateLogStreamCommand,
   DescribeLogGroupsCommand,
   FilterLogEventsCommand,
+  PutDeliverySourceCommand,
   PutLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
@@ -11,6 +12,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -211,5 +213,48 @@ describe("CloudWatch Logs IAM authorization", () => {
 
     // Then it is denied before the missing group is ever looked for.
     assertInstanceOf(error, SimIamAccessDenied);
+  });
+});
+
+describe("CloudWatch Logs delivery IAM authorization", () => {
+  const putSource = new PutDeliverySourceCommand({
+    name: "site-access-logs",
+    resourceArn: "arn:aws:cloudfront::111111111111:distribution/E1EX",
+    logType: "ACCESS_LOGS",
+  });
+
+  it("refuses a delivery source the Role has no permission for", async () => {
+    // Given a Role allowed to write logs and nothing else.
+    const simAws = await simAwsWithRole({
+      Action: "logs:PutLogEvents",
+      Resource: "*",
+    });
+
+    // When it puts a delivery source.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().putDeliverySource(putSource, asRole);
+    });
+
+    // Then it is denied, on the delivery source ARN the request reaches.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertUndefined(simAws.logs().findDeliverySource("site-access-logs"));
+  });
+
+  it("allows a delivery source a policy names", async () => {
+    // Given a Role allowed to put delivery sources.
+    const simAws = await simAwsWithRole({
+      Action: "logs:PutDeliverySource",
+      Resource: `arn:aws:logs:us-east-1:${accountIdOneOnes}:delivery-source:*`,
+    });
+
+    // When it puts a delivery source.
+    await simAws.logs().putDeliverySource(putSource, asRole);
+
+    // Then the source is there, so the ARN the policy names is the one the
+    // request authorizes against.
+    assertIdentical(
+      simAws.logs().findDeliverySource("site-access-logs")?.name,
+      "site-access-logs",
+    );
   });
 });
