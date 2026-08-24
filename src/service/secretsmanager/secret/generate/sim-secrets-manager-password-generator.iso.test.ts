@@ -1,4 +1,4 @@
-import { assertStringLength, assertTrue } from "@kensio/smartass";
+import { assertStringLength, assertStringMatches } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimSecretsManagerPasswordGenerator } from "./sim-secrets-manager-password-generator.js";
@@ -43,10 +43,10 @@ describe("Secrets Manager generated passwords", () => {
     // Then every one of them carries all four types, as real Secrets Manager
     // guarantees when RequireEachIncludedType is left alone.
     for (const password of passwords) {
-      assertTrue(/[A-Z]/.test(password));
-      assertTrue(/[a-z]/.test(password));
-      assertTrue(/\d/.test(password));
-      assertTrue(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(password));
+      assertStringMatches(password, /[A-Z]/);
+      assertStringMatches(password, /[a-z]/);
+      assertStringMatches(password, /\d/);
+      assertStringMatches(password, /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/);
     }
   });
 

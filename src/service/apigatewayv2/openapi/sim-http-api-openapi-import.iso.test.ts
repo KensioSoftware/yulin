@@ -7,7 +7,7 @@ import {
 import {
   assertIdentical,
   assertNonNullable,
-  assertTrue,
+  assertStringMatches,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -39,10 +39,7 @@ describe("Importing a sim HTTP API from an OpenAPI document", () => {
 
     // Then the API is named by the document, and each operation became a route
     // of its own with an integration behind it
-    assertTrue(
-      /^[a-z0-9]+$/.test(imported.ApiId),
-      `Unexpected API id ${imported.ApiId}`,
-    );
+    assertStringMatches(imported.ApiId, /^[a-z0-9]+$/);
     assertIdentical(imported.Name, "orders");
     assertIdentical(
       imported.ApiEndpoint,

@@ -3,7 +3,7 @@ import {
   CreateIntegrationCommand,
   GetIntegrationsCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical, assertTrue } from "@kensio/smartass";
+import { assertIdentical, assertStringMatches } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -36,10 +36,7 @@ describe("Sim API Gateway v2 integration commands", () => {
     );
 
     // Then it reports the integration API Gateway would have made
-    assertTrue(
-      /^[a-z0-9]+$/.test(created.IntegrationId),
-      `Unexpected integration id ${created.IntegrationId}`,
-    );
+    assertStringMatches(created.IntegrationId, /^[a-z0-9]+$/);
     assertIdentical(created.IntegrationType, "AWS_PROXY");
     assertIdentical(created.IntegrationUri, functionArn);
     assertIdentical(created.PayloadFormatVersion, "2.0");

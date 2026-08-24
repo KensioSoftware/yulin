@@ -8,6 +8,7 @@ import {
 import {
   assertIdentical,
   assertNonNullable,
+  assertStringMatches,
   assertTrue,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
@@ -53,10 +54,7 @@ describe("Importing a sim REST API from an OpenAPI document", () => {
 
     // Then the API is named by the document, and the path became a resource
     // carrying a method per operation
-    assertTrue(
-      /^[a-z0-9]+$/.test(imported.id),
-      `Unexpected API id ${imported.id}`,
-    );
+    assertStringMatches(imported.id, /^[a-z0-9]+$/);
     assertIdentical(imported.name, "pets");
 
     const resources = await simAws.apiGateway().getResources(

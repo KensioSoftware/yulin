@@ -1,7 +1,7 @@
 import {
   assertIdentical,
   assertSetSize,
-  assertTrue,
+  assertStringMatches,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -21,7 +21,7 @@ describe("Sim Lambda URL registry", () => {
     const urlId = registry.allocateFunctionUrlId();
 
     // Then it is a single lowercase alphanumeric label.
-    assertTrue(/^[a-z0-9]{32}$/.test(urlId), `Unexpected URL id ${urlId}`);
+    assertStringMatches(urlId, /^[a-z0-9]{32}$/);
   });
 
   it("allocates distinct URL ids", () => {

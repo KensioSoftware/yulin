@@ -7,6 +7,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
+  assertStringMatches,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -43,11 +44,9 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
     );
 
     // Then the URL has the AWS shape, naming the region it lives in.
-    assertTrue(
-      /^https:\/\/[a-z0-9]{32}\.lambda-url\.us-east-1\.on\.aws\/$/.test(
-        output.FunctionUrl,
-      ),
-      `Unexpected Function URL ${output.FunctionUrl}`,
+    assertStringMatches(
+      output.FunctionUrl,
+      /^https:\/\/[a-z0-9]{32}\.lambda-url\.us-east-1\.on\.aws\/$/,
     );
     assertIdentical(output.AuthType, "NONE");
     assertIdentical(output.InvokeMode, "BUFFERED");

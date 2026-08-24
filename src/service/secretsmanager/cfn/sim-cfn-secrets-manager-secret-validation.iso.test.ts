@@ -5,6 +5,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertStringLength,
+  assertStringMatches,
   assertThrowsError,
   assertTrue,
   assertTypeString,
@@ -325,6 +326,6 @@ describe("Secrets Manager CloudFormation Secret validation", () => {
 
     assertTypeString(read.SecretString);
     assertStringLength(read.SecretString, 18);
-    assertTrue(/^[\dA-Za-z]+$/.test(read.SecretString));
+    assertStringMatches(read.SecretString, /^[\dA-Za-z]+$/);
   });
 });

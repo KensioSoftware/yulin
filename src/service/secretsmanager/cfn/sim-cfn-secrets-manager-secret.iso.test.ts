@@ -7,8 +7,8 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringLength,
+  assertStringMatches,
   assertStringStartsWith,
-  assertTrue,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -176,7 +176,7 @@ describe("Secrets Manager CloudFormation Secret deployment", () => {
     assertIdentical(value.username, "app");
     assertTypeString(value.password);
     assertStringLength(value.password, 24);
-    assertTrue(/^[\dA-Za-z]+$/.test(value.password));
+    assertStringMatches(value.password, /^[\dA-Za-z]+$/);
   });
 
   it("generates a whole-value password for an empty GenerateSecretString", async () => {
