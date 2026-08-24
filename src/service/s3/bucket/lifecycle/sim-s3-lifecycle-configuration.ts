@@ -2,21 +2,46 @@ import type {
   SimS3LifecycleConfiguration as SimS3LifecycleConfigurationInput,
   SimS3LifecycleRule,
 } from "../../command/put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
+import {
+  simS3LifecycleReached,
+  simS3ObjectExpiryInstant,
+  simS3UploadAbortInstant,
+} from "./sim-s3-lifecycle-expiry.js";
+import { simS3LifecycleRuleSelects } from "./sim-s3-lifecycle-selection.js";
 
 interface SimS3LifecycleConfigurationProperties {
   readonly rules?: readonly SimS3LifecycleRule[];
 }
 
 /**
+ * An Object as a lifecycle rule reads it.
+ */
+export interface SimS3LifecycleObject {
+  readonly key: string;
+  readonly size: number;
+  readonly lastModified: Date;
+}
+
+/**
+ * A multipart upload in progress as a lifecycle rule reads it.
+ */
+export interface SimS3LifecycleUpload {
+  readonly key: string;
+  readonly initiated: Date;
+}
+
+/**
  * The lifecycle configuration of one simulated S3 Bucket.
- *
- * Simulated S3 holds the rules and hands them back. Objects live for as long
- * as the simulation runs, whatever a rule says, so a rule here is a record of
- * what the Bucket was configured with. Expiring Objects against one is #984.
  *
  * A Bucket has one configuration rather than a list of them, which is why
  * PutBucketLifecycleConfiguration replaces the whole thing. Real S3 has no way
  * to add one rule without restating the others.
+ *
+ * The configuration also answers what its rules have expired. An Object goes
+ * once the clock passes the boundary of a rule that selects it, and a Bucket
+ * asks on the way to its storage. Nothing sweeps a Bucket on a schedule. See
+ * `simS3ObjectExpiryInstant` for why the boundary is a pure function of the
+ * current time.
  */
 export class SimS3LifecycleConfiguration {
   private readonly storedRules: readonly SimS3LifecycleRule[];
@@ -63,5 +88,54 @@ export class SimS3LifecycleConfiguration {
    */
   get isEmpty(): boolean {
     return this.storedRules.length === 0;
+  }
+
+  /**
+   * Whether an enabled rule has expired an Object by the given instant.
+   *
+   * One rule is enough. Real S3 applies the shortest expiry among the rules
+   * selecting a key, and an Object past any of the boundaries is past the
+   * shortest one.
+   */
+  expires(object: SimS3LifecycleObject, now: Date): boolean {
+    return this.enabledRules().some(
+      (rule) =>
+        rule.Expiration !== undefined &&
+        simS3LifecycleRuleSelects(rule, object) &&
+        simS3LifecycleReached(
+          simS3ObjectExpiryInstant(rule.Expiration, object.lastModified),
+          now,
+        ),
+    );
+  }
+
+  /**
+   * Whether an enabled rule has abandoned a multipart upload by the given
+   * instant.
+   */
+  abandons(upload: SimS3LifecycleUpload, now: Date): boolean {
+    return this.enabledRules().some(
+      (rule) =>
+        rule.AbortIncompleteMultipartUpload !== undefined &&
+        simS3LifecycleRuleSelects(rule, { key: upload.key }) &&
+        simS3LifecycleReached(
+          simS3UploadAbortInstant(
+            rule.AbortIncompleteMultipartUpload,
+            upload.initiated,
+          ),
+          now,
+        ),
+    );
+  }
+
+  /**
+   * The rules that act, which are the ones whose `Status` is `Enabled`.
+   *
+   * Read from the stored rules rather than from `rules`, because every read of
+   * a Bucket asks and cloning the whole configuration each time would be the
+   * cost of having one.
+   */
+  private enabledRules(): readonly SimS3LifecycleRule[] {
+    return this.storedRules.filter((rule) => rule.Status === "Enabled");
   }
 }

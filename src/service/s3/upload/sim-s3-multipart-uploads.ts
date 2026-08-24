@@ -62,6 +62,24 @@ export class SimS3MultipartUploads {
   }
 
   /**
+   * Forget every upload a Bucket's lifecycle rules have abandoned.
+   *
+   * The Bucket asks before it hands the uploads to anything. An abandoned
+   * upload is then missing from a listing, and its id is as unknown as an
+   * aborted one. Real S3 does the same to an upload nobody finished, and keeps
+   * none of the parts.
+   */
+  discardAbandoned(
+    isAbandoned: (upload: SimS3MultipartUpload) => boolean,
+  ): void {
+    for (const [uploadId, upload] of this.uploads) {
+      if (isAbandoned(upload)) {
+        this.uploads.delete(uploadId);
+      }
+    }
+  }
+
+  /**
    * The uploads in progress, in the order real S3 lists them.
    *
    * S3 orders a multipart upload listing by key, and by when the upload was

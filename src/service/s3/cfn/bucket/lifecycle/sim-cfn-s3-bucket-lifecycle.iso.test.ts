@@ -1,4 +1,8 @@
-import { GetBucketLifecycleConfigurationCommand } from "@aws-sdk/client-s3";
+import {
+  GetBucketLifecycleConfigurationCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertFalse,
@@ -11,6 +15,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { SimFixedClock } from "../../../../../util/clock/sim-clock.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import type { SimCfnTemplateValue } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimS3NoSuchLifecycleConfiguration } from "../../../error/sim-s3.error.js";
@@ -176,7 +181,7 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
     });
   });
 
-  it("still records the property as one nothing acts on", async () => {
+  it("records nothing against a Resource whose rules are acted on", async () => {
     // Given a template expiring raw logs after a year.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
@@ -201,16 +206,42 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
     // When the Stack has settled.
     await stack.waitForDeployComplete();
 
-    // Then the property is recorded against the Resource even though the rules
-    // are readable, because no Object expires against them. A test reading the
-    // configuration back would otherwise take it for proof that retention
-    // works.
-    assertArrayLength(stack.ignoredProperties, 1);
-    const ignored = stack.ignoredProperties[0];
-    assertNonNullable(ignored);
-    assertIdentical(ignored.path, "LifecycleConfiguration");
-    assertStringIncludes(ignored.reason, "hands them back");
-    assertStringIncludes(ignored.reason, "expires or transitions no Object");
+    // Then nothing is recorded against the Resource. The Bucket expires an
+    // Object once the clock passes the rule, so the deployed rules are the
+    // behaviour the template asked for.
+    assertArrayLength(stack.ignoredProperties, 0);
+  });
+
+  it("expires an Object against the rule the template declared", async () => {
+    // Given a deployed Bucket expiring raw logs after a year, holding one.
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2026-08-24T09:00:00.000Z")),
+    });
+    await deployBucketWithRules(simAws, [
+      {
+        Id: "expire",
+        Status: "Enabled",
+        Prefix: "raw/",
+        ExpirationInDays: 365,
+      },
+    ]);
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "logs",
+        Key: "raw/2026-08-24.gz",
+        Body: "one raw log line",
+      }),
+    );
+
+    // When simulated time moves past the year.
+    await simAws.clock().advanceBy({ days: 366 });
+
+    // Then the Object has gone. The template asked for retention, and this is
+    // the retention rather than a record of the request for it.
+    const listing = await simAws
+      .s3()
+      .listObjectsV2(new ListObjectsV2Command({ Bucket: "logs" }));
+    assertArrayLength(listing.Contents ?? [], 0);
   });
 
   it("leaves a Bucket declaring no rules unconfigured", async () => {

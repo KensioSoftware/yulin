@@ -2,11 +2,10 @@
  * The bucket lifecycle configuration, which the provider declares as a
  * resource of its own and CloudFormation carries on the bucket.
  *
- * Simulated S3 expires and transitions nothing, and records the whole
- * `LifecycleConfiguration` property against the Resource as one it does not act
- * on. The rules are carried across so that record names what the bucket was
- * asked for, rather than the resource being skipped and the configuration
- * disappearing from the report.
+ * Simulated S3 expires an Object and abandons an upload against these rules,
+ * and transitions nothing between storage classes. The rules are carried
+ * across whole, transitions included, so that a bucket reads back configured
+ * as the plan asked for.
  *
  * Reading a plan means reading records whose keys come from the document
  * rather than from this code, so the object-injection rule fires on every
