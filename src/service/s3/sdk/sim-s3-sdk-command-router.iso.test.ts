@@ -5,14 +5,17 @@ import {
   DeleteBucketPolicyCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
+  DeleteBucketLifecycleCommand,
   DeletePublicAccessBlockCommand,
   GetBucketNotificationConfigurationCommand,
   GetBucketPolicyCommand,
+  GetBucketLifecycleConfigurationCommand,
   GetPublicAccessBlockCommand,
   ListObjectsCommand,
   ListObjectsV2Command,
   PutBucketNotificationConfigurationCommand,
   PutBucketPolicyCommand,
+  PutBucketLifecycleConfigurationCommand,
   PutBucketWebsiteCommand,
   PutObjectCommand,
   PutPublicAccessBlockCommand,
@@ -23,6 +26,7 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertThrowsErrorAsync,
   assertObjectEquals,
   assertStringIncludes,
   assertTrue,
@@ -207,6 +211,41 @@ describe("simulated S3 SDK Command routing", () => {
     assertTrue(restoredOut.PublicAccessBlockConfiguration?.BlockPublicPolicy);
   });
 
+  it("routes the lifecycle configuration Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-lc" }));
+
+    await client.send(
+      new PutBucketLifecycleConfigurationCommand({
+        Bucket: "bucket-lc",
+        LifecycleConfiguration: {
+          Rules: [
+            { ID: "expire", Status: "Enabled", Expiration: { Days: 30 } },
+          ],
+        },
+      }),
+    );
+
+    const readOut = await client.send(
+      new GetBucketLifecycleConfigurationCommand({ Bucket: "bucket-lc" }),
+    );
+    assertArrayLength(readOut.Rules ?? [], 1);
+
+    // Removing the configuration leaves the Bucket with no rules to read.
+    await client.send(
+      new DeleteBucketLifecycleCommand({ Bucket: "bucket-lc" }),
+    );
+    const removalError = await assertThrowsErrorAsync(async () =>
+      client.send(
+        new GetBucketLifecycleConfigurationCommand({ Bucket: "bucket-lc" }),
+      ),
+    );
+    assertIdentical(removalError.name, "NoSuchLifecycleConfiguration");
+  });
+
   it("routes the Object deletion Commands through an intercepted client", async () => {
     using simSdk = new SimSdk();
     const client = new S3Client({ region: "us-east-1" });
@@ -273,7 +312,7 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 27);
+    assertArrayLength(supported, 30);
     assertArrayIncludes(supported, "CopyObjectCommand");
     assertArrayIncludes(supported, "GetObjectCommand");
     assertArrayIncludes(supported, "ListObjectsV2Command");
@@ -285,6 +324,9 @@ describe("simulated S3 SDK Command routing", () => {
     assertArrayIncludes(supported, "GetBucketPolicyCommand");
     assertArrayIncludes(supported, "DeleteBucketPolicyCommand");
     assertArrayIncludes(supported, "PutPublicAccessBlockCommand");
+    assertArrayIncludes(supported, "PutBucketLifecycleConfigurationCommand");
+    assertArrayIncludes(supported, "GetBucketLifecycleConfigurationCommand");
+    assertArrayIncludes(supported, "DeleteBucketLifecycleCommand");
     assertArrayIncludes(supported, "HeadObjectCommand");
     assertArrayIncludes(supported, "HeadBucketCommand");
     assertArrayIncludes(supported, "CreateMultipartUploadCommand");

@@ -54,7 +54,8 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["InventoryConfigurations", "Bucket inventory reports are not simulated"],
   [
     "LifecycleConfiguration",
-    "simulated S3 does not expire or transition Objects on a schedule",
+    "the rules are stored and GetBucketLifecycleConfiguration hands them " +
+      "back, and simulated S3 expires or transitions no Object against them",
   ],
   ["LoggingConfiguration", "server access logging is not simulated"],
   ["MetadataConfiguration", "Bucket metadata tables are not simulated"],

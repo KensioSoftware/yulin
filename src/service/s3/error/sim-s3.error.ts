@@ -70,6 +70,21 @@ export class SimS3NoSuchBucketPolicy extends SimS3Error {
 }
 
 /**
+ * Simulated S3 NoSuchLifecycleConfiguration error.
+ *
+ * Real S3 distinguishes a Bucket that does not exist from a Bucket that exists
+ * without lifecycle rules, so GetBucketLifecycleConfiguration answers this
+ * rather than an empty list of rules.
+ */
+export class SimS3NoSuchLifecycleConfiguration extends SimS3Error {
+  public override readonly name = "NoSuchLifecycleConfiguration";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
  * Simulated S3 AccessDenied error.
  *
  * This is S3 itself refusing a request, as Block Public Access does, rather

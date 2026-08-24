@@ -4,36 +4,7 @@ import type {
   SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import { simSdkCallerOptions, simSdkStreamBody } from "../../../sdk/index.js";
-import type { SimAbortMultipartUploadCommand } from "../command/abort-multipart-upload/abort-multipart-upload.command.js";
-import type { SimCompleteMultipartUploadCommand } from "../command/complete-multipart-upload/complete-multipart-upload.command.js";
-import type { SimCopyObjectCommand } from "../command/copy-object/copy-object.command.js";
-import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.command.js";
-import type { SimCreateMultipartUploadCommand } from "../command/create-multipart-upload/create-multipart-upload.command.js";
-import type { SimListMultipartUploadsCommand } from "../command/list-multipart-uploads/list-multipart-uploads.command.js";
-import type { SimListPartsCommand } from "../command/list-parts/list-parts.command.js";
-import type { SimUploadPartCommand } from "../command/upload-part/upload-part.command.js";
-import type {
-  SimGetObjectCommand,
-  SimGetObjectCommandOutput,
-} from "../command/get-object/get-object.command.js";
-import type { SimHeadBucketCommand } from "../command/head-bucket/head-bucket.command.js";
-import type { SimHeadObjectCommand } from "../command/head-object/head-object.command.js";
-import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.command.js";
-import type { SimListObjectsCommand } from "../command/list-objects/list-objects.command.js";
-import type { SimListObjectsV2Command } from "../command/list-objects-v2/list-objects-v2.command.js";
-import type { SimDeleteBucketCommand } from "../command/delete-bucket/delete-bucket.command.js";
-import type { SimDeleteBucketPolicyCommand } from "../command/delete-bucket-policy/delete-bucket-policy.command.js";
-import type { SimDeleteObjectCommand } from "../command/delete-object/delete-object.command.js";
-import type { SimDeleteObjectsCommand } from "../command/delete-objects/delete-objects.command.js";
-import type { SimGetBucketNotificationConfigurationCommand } from "../command/get-bucket-notification-configuration/get-bucket-notification-configuration.command.js";
-import type { SimGetBucketPolicyCommand } from "../command/get-bucket-policy/get-bucket-policy.command.js";
-import type { SimPutBucketNotificationConfigurationCommand } from "../command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
-import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.command.js";
-import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.command.js";
-import type { SimPutObjectCommand } from "../command/put-object/put-object.command.js";
-import type { SimPutPublicAccessBlockCommand } from "../command/put-public-access-block/put-public-access-block.command.js";
-import type { SimGetPublicAccessBlockCommand } from "../command/get-public-access-block/get-public-access-block.command.js";
-import type { SimDeletePublicAccessBlockCommand } from "../command/delete-public-access-block/delete-public-access-block.command.js";
+import type * as simS3Commands from "../command/sim-s3-command.types.js";
 import type { SimS3 } from "../sim-s3.js";
 
 /**
@@ -48,7 +19,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "CreateBucketCommand",
         async (command, context): Promise<unknown> =>
           await simS3.createBucket(
-            command as SimCreateBucketCommand,
+            command as simS3Commands.SimCreateBucketCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -56,7 +27,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "CopyObjectCommand",
         async (command, context): Promise<unknown> =>
           await simS3.copyObject(
-            command as SimCopyObjectCommand,
+            command as simS3Commands.SimCopyObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -64,7 +35,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "DeleteBucketCommand",
         async (command, context): Promise<unknown> =>
           await simS3.deleteBucket(
-            command as SimDeleteBucketCommand,
+            command as simS3Commands.SimDeleteBucketCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -72,7 +43,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "DeleteBucketPolicyCommand",
         async (command, context): Promise<unknown> =>
           await simS3.deleteBucketPolicy(
-            command as SimDeleteBucketPolicyCommand,
+            command as simS3Commands.SimDeleteBucketPolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -80,7 +51,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "DeleteObjectCommand",
         async (command, context): Promise<unknown> =>
           await simS3.deleteObject(
-            command as SimDeleteObjectCommand,
+            command as simS3Commands.SimDeleteObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -88,7 +59,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "DeleteObjectsCommand",
         async (command, context): Promise<unknown> =>
           await simS3.deleteObjects(
-            command as SimDeleteObjectsCommand,
+            command as simS3Commands.SimDeleteObjectsCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -96,7 +67,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "GetBucketPolicyCommand",
         async (command, context): Promise<unknown> =>
           await simS3.getBucketPolicy(
-            command as SimGetBucketPolicyCommand,
+            command as simS3Commands.SimGetBucketPolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -104,7 +75,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "HeadBucketCommand",
         async (command, context): Promise<unknown> =>
           await simS3.headBucket(
-            command as SimHeadBucketCommand,
+            command as simS3Commands.SimHeadBucketCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -112,7 +83,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "HeadObjectCommand",
         async (command, context): Promise<unknown> =>
           await simS3.headObject(
-            command as SimHeadObjectCommand,
+            command as simS3Commands.SimHeadObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -121,7 +92,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await getObjectWithSdkStreamBody(
             simS3,
-            command as SimGetObjectCommand,
+            command as simS3Commands.SimGetObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -129,7 +100,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "ListBucketsCommand",
         async (command, context): Promise<unknown> =>
           await simS3.listBuckets(
-            command as SimListBucketsCommand,
+            command as simS3Commands.SimListBucketsCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -137,7 +108,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "ListObjectsCommand",
         async (command, context): Promise<unknown> =>
           await simS3.listObjects(
-            command as SimListObjectsCommand,
+            command as simS3Commands.SimListObjectsCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -145,7 +116,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "ListObjectsV2Command",
         async (command, context): Promise<unknown> =>
           await simS3.listObjectsV2(
-            command as SimListObjectsV2Command,
+            command as simS3Commands.SimListObjectsV2Command,
             simSdkCallerOptions(context),
           ),
       ],
@@ -153,7 +124,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "PutBucketPolicyCommand",
         async (command, context): Promise<unknown> =>
           await simS3.putBucketPolicy(
-            command as SimPutBucketPolicyCommand,
+            command as simS3Commands.SimPutBucketPolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -161,7 +132,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "PutBucketNotificationConfigurationCommand",
         async (command, context): Promise<unknown> =>
           await simS3.putBucketNotificationConfiguration(
-            command as SimPutBucketNotificationConfigurationCommand,
+            command as simS3Commands.SimPutBucketNotificationConfigurationCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -169,7 +140,31 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "GetBucketNotificationConfigurationCommand",
         async (command, context): Promise<unknown> =>
           await simS3.getBucketNotificationConfiguration(
-            command as SimGetBucketNotificationConfigurationCommand,
+            command as simS3Commands.SimGetBucketNotificationConfigurationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutBucketLifecycleConfigurationCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.putBucketLifecycleConfiguration(
+            command as simS3Commands.SimPutBucketLifecycleConfigurationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetBucketLifecycleConfigurationCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.getBucketLifecycleConfiguration(
+            command as simS3Commands.SimGetBucketLifecycleConfigurationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteBucketLifecycleCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.deleteBucketLifecycle(
+            command as simS3Commands.SimDeleteBucketLifecycleCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -177,7 +172,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "PutBucketWebsiteCommand",
         async (command, context): Promise<unknown> =>
           await simS3.putBucketWebsite(
-            command as SimPutBucketWebsiteCommand,
+            command as simS3Commands.SimPutBucketWebsiteCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -185,7 +180,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "PutPublicAccessBlockCommand",
         async (command, context): Promise<unknown> =>
           await simS3.putPublicAccessBlock(
-            command as SimPutPublicAccessBlockCommand,
+            command as simS3Commands.SimPutPublicAccessBlockCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -193,7 +188,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "GetPublicAccessBlockCommand",
         async (command, context): Promise<unknown> =>
           await simS3.getPublicAccessBlock(
-            command as SimGetPublicAccessBlockCommand,
+            command as simS3Commands.SimGetPublicAccessBlockCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -201,7 +196,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "DeletePublicAccessBlockCommand",
         async (command, context): Promise<unknown> =>
           await simS3.deletePublicAccessBlock(
-            command as SimDeletePublicAccessBlockCommand,
+            command as simS3Commands.SimDeletePublicAccessBlockCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -209,7 +204,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "PutObjectCommand",
         async (command, context): Promise<unknown> =>
           await simS3.putObject(
-            command as SimPutObjectCommand,
+            command as simS3Commands.SimPutObjectCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -217,7 +212,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "CreateMultipartUploadCommand",
         async (command, context): Promise<unknown> =>
           await simS3.createMultipartUpload(
-            command as SimCreateMultipartUploadCommand,
+            command as simS3Commands.SimCreateMultipartUploadCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -225,7 +220,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "UploadPartCommand",
         async (command, context): Promise<unknown> =>
           await simS3.uploadPart(
-            command as SimUploadPartCommand,
+            command as simS3Commands.SimUploadPartCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -233,7 +228,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "CompleteMultipartUploadCommand",
         async (command, context): Promise<unknown> =>
           await simS3.completeMultipartUpload(
-            command as SimCompleteMultipartUploadCommand,
+            command as simS3Commands.SimCompleteMultipartUploadCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -241,7 +236,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "AbortMultipartUploadCommand",
         async (command, context): Promise<unknown> =>
           await simS3.abortMultipartUpload(
-            command as SimAbortMultipartUploadCommand,
+            command as simS3Commands.SimAbortMultipartUploadCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -249,7 +244,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "ListMultipartUploadsCommand",
         async (command, context): Promise<unknown> =>
           await simS3.listMultipartUploads(
-            command as SimListMultipartUploadsCommand,
+            command as simS3Commands.SimListMultipartUploadsCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -257,7 +252,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         "ListPartsCommand",
         async (command, context): Promise<unknown> =>
           await simS3.listParts(
-            command as SimListPartsCommand,
+            command as simS3Commands.SimListPartsCommand,
             simSdkCallerOptions(context),
           ),
       ],
@@ -285,9 +280,9 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
  */
 async function getObjectWithSdkStreamBody(
   simS3: SimS3,
-  command: SimGetObjectCommand,
+  command: simS3Commands.SimGetObjectCommand,
   options: SimSdkCallerOptions | undefined,
-): Promise<SimGetObjectCommandOutput> {
+): Promise<simS3Commands.SimGetObjectCommandOutput> {
   const output = await simS3.getObject(command, options);
   if (output.Body === undefined) {
     return output;

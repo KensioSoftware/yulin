@@ -124,6 +124,30 @@ export abstract class SimS3Operations {
     return await this.commands.notifications.get(command, options);
   }
 
+  /** Handle a Put Bucket Lifecycle Configuration Command from the SDK. */
+  async putBucketLifecycleConfiguration(
+    command: simS3Commands.SimPutBucketLifecycleConfigurationCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimPutBucketLifecycleConfigurationCommandOutput> {
+    return await this.commands.lifecycles.put(command, options);
+  }
+
+  /** Handle a Get Bucket Lifecycle Configuration Command from the SDK. */
+  async getBucketLifecycleConfiguration(
+    command: simS3Commands.SimGetBucketLifecycleConfigurationCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimGetBucketLifecycleConfigurationCommandOutput> {
+    return await this.commands.lifecycles.get(command, options);
+  }
+
+  /** Handle a Delete Bucket Lifecycle Command from the SDK. */
+  async deleteBucketLifecycle(
+    command: simS3Commands.SimDeleteBucketLifecycleCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteBucketLifecycleCommandOutput> {
+    return await this.commands.lifecycles.delete(command, options);
+  }
+
   /** Handle a List Buckets Command from the SDK. */
   async listBuckets(
     command: simS3Commands.SimListBucketsCommand,

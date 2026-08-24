@@ -10,6 +10,7 @@ import {
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3BucketCommands } from "./command/bucket/sim-s3-bucket-commands.js";
 import { SimS3BucketPolicyCommands } from "./command/bucket-policy/sim-s3-bucket-policy-commands.js";
+import { SimS3LifecycleCommands } from "./command/lifecycle/sim-s3-lifecycle-commands.js";
 import { SimS3MultipartCommands } from "./command/multipart/sim-s3-multipart-commands.js";
 import { SimS3NotificationCommands } from "./command/notification/sim-s3-notification-commands.js";
 import { SimS3ObjectCommands } from "./command/object/sim-s3-object-commands.js";
@@ -62,6 +63,7 @@ export class SimS3Commands {
   public readonly bucketPolicies: SimS3BucketPolicyCommands;
   public readonly publicAccessBlocks: SimS3PublicAccessBlockCommands;
   public readonly notifications: SimS3NotificationCommands;
+  public readonly lifecycles: SimS3LifecycleCommands;
   public readonly objects: SimS3ObjectCommands;
   public readonly multipartUploads: SimS3MultipartCommands;
   public readonly objectNotifier: SimS3ObjectNotifier;
@@ -95,6 +97,7 @@ export class SimS3Commands {
     this.bucketPolicies = new SimS3BucketPolicyCommands(state);
     this.publicAccessBlocks = new SimS3PublicAccessBlockCommands(state);
     this.notifications = new SimS3NotificationCommands(state);
+    this.lifecycles = new SimS3LifecycleCommands(state);
     this.objects = new SimS3ObjectCommands(state);
     this.multipartUploads = new SimS3MultipartCommands(state);
   }
