@@ -77,35 +77,40 @@ describe("AWS::Glue::Table refusals", () => {
     assertUndefined(simAws.glue().findDatabase("site_logs"));
   });
 
-  it("refuses Fn::GetAtt Id, whose value CloudFormation leaves undocumented", async () => {
+  it("answers Fn::GetAtt Id with a value AWS documents no format for", async () => {
     // Given a template reading the table's one documented attribute.
-    const simAws = new SimAws();
+    const simAws = new SimAws({ defaultAccountId: "111111111111" });
 
     // When it is deployed.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cloudFormation().deployTemplate({
-        stackName: "analytics-stack",
-        template: {
-          Resources: {
-            LogDatabase: database,
-            LogTable: {
-              Type: "AWS::Glue::Table",
-              Properties: {
-                DatabaseName: { Ref: "LogDatabase" },
-                TableInput: { Name: "access_logs" },
-              },
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "analytics-stack",
+      template: {
+        Resources: {
+          LogDatabase: database,
+          LogTable: {
+            Type: "AWS::Glue::Table",
+            Properties: {
+              DatabaseName: { Ref: "LogDatabase" },
+              TableInput: { Name: "access_logs" },
             },
           },
-          Outputs: {
-            TableId: { Value: { "Fn::GetAtt": ["LogTable", "Id"] } },
-          },
         },
-      });
+        Outputs: {
+          TableId: { Value: { "Fn::GetAtt": ["LogTable", "Id"] } },
+        },
+      },
     });
 
-    // Then it is refused rather than answered with a stand-in a real deploy
-    // would disagree with.
-    assertStringIncludes(error.message, "Id is not simulated");
+    await stack.waitForDeployComplete();
+
+    // Then it resolves to the catalog, the database and the table joined.
+    // CloudFormation documents that this attribute exists and documents
+    // nothing about its value, so this format is a guess and a real deploy may
+    // disagree with it. `simGlueTableCfnId` is the one place to correct.
+    assertIdentical(
+      stack.outputs.get("TableId")?.value,
+      "111111111111|site_logs|access_logs",
+    );
 
     await simAws.backgroundTasksComplete();
   });

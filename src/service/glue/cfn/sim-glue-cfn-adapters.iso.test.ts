@@ -70,6 +70,12 @@ describe("SimGlueTableCfn attributes", () => {
     // Then it is refused by name.
     assertStringIncludes(error.message, "Unsupported");
     assertStringIncludes(error.message, "Arn");
+
+    // And the one it does have answers with the guessed identifier.
+    assertIdentical(
+      adapter.attributeValue("Id"),
+      `${table.catalogId}|site_logs|access_logs`,
+    );
   });
 
   it("reads no columns from a table with no storage descriptor", () => {

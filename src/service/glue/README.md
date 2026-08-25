@@ -45,9 +45,11 @@ behaviour for is reported through `ignoreProperty` and the resource is created a
 argument in issue #273. A property of the wrong type fails the deploy. A template declaring
 `TableInput` as a string is broken, and being ahead of the simulation is a different thing.
 
-**`Fn::GetAtt Id` on a table is refused.** CloudFormation documents the attribute and documents
-nothing about the value behind it. Answering with a plausible string would put a value in a template
-that a real deploy then disagrees with.
+**`Fn::GetAtt Id` on a table is a guess, and the only guess here.** CloudFormation documents the
+attribute and documents nothing about the value behind it, so `simGlueTableCfnId` joins the catalog
+id, the database name and the table name and says in its own comment that nothing has checked that
+against AWS. The format lives in that one function, so correcting it is that function and the test
+naming the value.
 
 **A `CatalogId` naming another account is refused.** Creating the resource in this account's catalog
 would give a template that deploys and a catalog holding something the template never asked for.

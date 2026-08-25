@@ -244,9 +244,12 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
   `BatchCreatePartition` have no counterpart here.
 - **A table keeps the definition it was created with.** `UpdateTable` and `UpdateDatabase` are
   absent, and `GetTable` reports the creation time as the update time.
-- **`Fn::GetAtt Id` on a table is refused.** CloudFormation documents the attribute without
-  documenting what its value contains. A stand-in would differ from the value a real deploy
-  resolves.
+- **`Fn::GetAtt Id` on a table answers with a guess.** It resolves to the catalog id, the database
+  name and the table name joined with `|`, as in `111111111111|site_logs|access_logs`. This is the
+  one piece of behaviour here that nothing has checked against AWS. CloudFormation documents that
+  the attribute exists and documents nothing about its value, so a template asserting on it agrees
+  with this simulation and may disagree with a real deploy. Confirming it takes one stack deployed
+  to an account with `!GetAtt Table.Id` as an output.
 - **Names keep the case they were given.** Real Glue lowercases a database or table name for Hive
   compatibility. A name that differs only by case is a different name here.
 - **Cross-account catalogs are refused.** A `CatalogId` naming another account is refused, in a
