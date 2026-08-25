@@ -217,6 +217,99 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertIdentical(derivedResource.simResource, derivedBucket);
   });
 
+  it("substitutes a pseudo parameter and a Resource Ref in the same string", async () => {
+    // Given a template naming a Bucket after both the Account it deploys into
+    // and another Resource. The pseudo parameter resolves in the template pass
+    // and the Ref in the Resource pass.
+    const mixedSubTemplate = {
+      Resources: {
+        SourceBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            BucketName: "source-bucket",
+          },
+        },
+        DerivedBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            BucketName: {
+              "Fn::Sub": "${AWS::AccountId}-${SourceBucket}-derived",
+            },
+          },
+        },
+      },
+    };
+
+    // When the template is deployed through sim CloudFormation.
+    const simAws = new SimAws({ defaultAccountId: "111111111111" });
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "test-stack",
+      template: mixedSubTemplate,
+    });
+
+    // Then both variables were substituted. Neither pass throws away what the
+    // other resolved.
+    const derivedBucket = simAws
+      .s3()
+      .getSimBucketByName("111111111111-source-bucket-derived");
+
+    assertNonNullable(derivedBucket);
+    assertInstanceOf(derivedBucket, SimS3Bucket);
+    assertIdentical(
+      stack.getResource("DerivedBucket")?.simResource,
+      derivedBucket,
+    );
+  });
+
+  it("substitutes a partition, a Region and an Account beside a Resource Ref", async () => {
+    // Given a template naming a Bucket from three pseudo parameters and a Ref,
+    // which is the shape of a hand-written ARN.
+    const arnSubTemplate = {
+      Resources: {
+        SourceBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            BucketName: "source-bucket",
+          },
+        },
+        DerivedBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            BucketName: {
+              "Fn::Sub":
+                "${AWS::Partition}-${AWS::Region}-${AWS::AccountId}-${SourceBucket}",
+            },
+          },
+        },
+      },
+    };
+
+    // When the template is deployed into a Region of its own.
+    const simAws = new SimAws({ defaultAccountId: "111111111111" });
+    const stack = await simAws
+      .account()
+      .region("eu-west-2")
+      .cloudFormation()
+      .deployTemplate({
+        stackName: "test-stack",
+        template: arnSubTemplate,
+      });
+
+    // Then all four variables are read from the scope the Stack deployed into.
+    const derivedBucket = simAws
+      .account()
+      .region("eu-west-2")
+      .s3()
+      .getSimBucketByName("aws-eu-west-2-111111111111-source-bucket");
+
+    assertNonNullable(derivedBucket);
+    assertInstanceOf(derivedBucket, SimS3Bucket);
+    assertIdentical(
+      stack.getResource("DerivedBucket")?.simResource,
+      derivedBucket,
+    );
+  });
+
   it("throws when an explicit Fn::Sub variable is not resolved while preserving an unresolved Resource Ref", async () => {
     // Given a template where Fn::Sub has a deferred Resource Ref and an explicit
     // variable map entry that is not used by the template string.
