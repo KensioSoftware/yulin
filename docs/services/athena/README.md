@@ -156,11 +156,9 @@ simAws
     bytesScanned: 2_000_000,
   });
 
-const started = await simAws
-  .athena()
-  .startQueryExecution({
-    input: { QueryString: sql, WorkGroup: "rainlytics" },
-  });
+const started = await simAws.athena().startQueryExecution({
+  input: { QueryString: sql, WorkGroup: "rainlytics" },
+});
 
 await simAws.backgroundTasksComplete();
 
@@ -222,12 +220,18 @@ const execution = await simAws.athena().getQueryExecution({
   input: { QueryExecutionId: started.QueryExecutionId },
 });
 
-// "FAILED", with a StateChangeReason naming the limit and what was scanned.
+// "FAILED"
 console.log(execution.QueryExecution?.Status?.State);
+
+// Names the limit and what the query scanned.
+console.log(execution.QueryExecution?.Status?.StateChangeReason);
 ```
 
 `GetQueryExecution` reports the bytes scanned in `Statistics` whichever way the query ended. A
 caller costing a mistake can still read it.
+
+A repeated `ClientRequestToken` answers with the execution it started the first time. A client
+retrying after a timeout is charged once.
 
 ## Where results go
 
@@ -319,8 +323,11 @@ Current documented limitations:
 - What a query scanned comes from that same declaration. The cutoff is enforced for real against
   that figure, which is a test's own statement about the query.
 - A query that exceeds the cutoff reaches `FAILED` here. AWS documents the per-query data usage
-  control as cancelling a query. A client matching on `CANCELLED` for this case would pass here
-  and miss it on real Athena.
+  control as cancelling a query. So a client matching on `FAILED` passes here and misses the
+  cancellation in production, and one matching on `CANCELLED` fails here while being right in
+  production. Match on the state being terminal, and read `StateChangeReason` for the why.
+- `GetQueryResults` pages up to 1000 rows, as Athena does. The listings of workgroups and named
+  queries stop at 50, which is their own documented maximum.
 - `ListQueryExecutions`, `BatchGetQueryExecution` and `GetQueryRuntimeStatistics` are absent, along
   with query result reuse, result encryption, `CREATE TABLE AS SELECT` and `INSERT INTO`.
 - Real Athena's own floor for the bytes scanned cutoff is 10MB. This simulation takes any whole

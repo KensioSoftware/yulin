@@ -6,7 +6,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 
 import { SimAws } from "../aws/sim-aws.js";
 
@@ -288,8 +288,9 @@ describe("simulated Athena query executions", () => {
     // carrying it through to a result.
     const execution = await simAws.athena().getQueryExecution({ input });
 
+    assertNonNullable(execution.QueryExecution);
     assertIdentical(running.QueryExecution?.Status?.State, "RUNNING");
-    assertIdentical(execution.QueryExecution?.Status?.State, "CANCELLED");
+    assertIdentical(execution.QueryExecution.Status?.State, "CANCELLED");
   });
 
   it("leaves a query alone when the stop arrives too late", async () => {
@@ -312,5 +313,40 @@ describe("simulated Athena query executions", () => {
     const execution = await simAws.athena().getQueryExecution({ input });
 
     assertIdentical(execution.QueryExecution?.Status?.State, "SUCCEEDED");
+  });
+
+  it("keeps a query cancelled when the stop lands during the write", async () => {
+    // Given a query whose result write is in flight, which is the window
+    // between the runner asking simulated S3 to put the object and being
+    // told it did.
+    const simAws = new SimAws();
+    const workGroup = await aWorkGroup(simAws);
+    const putObject = simAws.s3().putObject.bind(simAws.s3());
+    let stopping: Promise<unknown> = Promise.resolve();
+
+    const started = await simAws.athena().startQueryExecution({
+      input: { QueryString: pageviewsSql, WorkGroup: workGroup },
+    });
+    const input = { QueryExecutionId: started.QueryExecutionId };
+
+    vi.spyOn(simAws.s3(), "putObject").mockImplementation(
+      async (command, options) => {
+        // When the stop arrives while the write is still going.
+        stopping = simAws.athena().stopQueryExecution({ input });
+
+        await stopping;
+
+        return await putObject(command, options);
+      },
+    );
+
+    await simAws.backgroundTasksComplete();
+    await stopping;
+
+    // Then the write did not carry the query back to SUCCEEDED after its
+    // caller was told it had been stopped.
+    const execution = await simAws.athena().getQueryExecution({ input });
+
+    assertIdentical(execution.QueryExecution?.Status?.State, "CANCELLED");
   });
 });

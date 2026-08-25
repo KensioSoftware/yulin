@@ -27,11 +27,9 @@ simAws
     bytesScanned: 2_000_000,
   });
 
-const started = await simAws
-  .athena()
-  .startQueryExecution({
-    input: { QueryString: sql, WorkGroup: "rainlytics" },
-  });
+const started = await simAws.athena().startQueryExecution({
+  input: { QueryString: sql, WorkGroup: "rainlytics" },
+});
 
 await simAws.backgroundTasksComplete();
 

@@ -34,5 +34,8 @@ const execution = await simAws.athena().getQueryExecution({
   input: { QueryExecutionId: started.QueryExecutionId },
 });
 
-// "FAILED", with a StateChangeReason naming the limit and what was scanned.
+// "FAILED"
 console.log(execution.QueryExecution?.Status?.State);
+
+// Names the limit and what the query scanned.
+console.log(execution.QueryExecution?.Status?.StateChangeReason);

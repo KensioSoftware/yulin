@@ -1,8 +1,6 @@
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
-import {
-  isSettledQueryState,
-  type SimAthenaQueryState,
-} from "./sim-athena-query-state.js";
+import type { SimAthenaQueryState } from "./sim-athena-query-state.js";
+import { SimAthenaQueryStatus } from "./sim-athena-query-status.js";
 
 interface SimAthenaQueryExecutionProperties {
   readonly queryExecutionId: string;
@@ -33,9 +31,7 @@ export class SimAthenaQueryExecution {
   public readonly database: string | undefined;
   public readonly catalog: string | undefined;
 
-  #state: SimAthenaQueryState = "QUEUED";
-  #stateChangeReason: string | undefined;
-  #completedAt: Date | undefined;
+  readonly #status = new SimAthenaQueryStatus();
   #bytesScanned = 0;
   #result: SimAthenaResolvedResult | undefined;
 
@@ -50,15 +46,15 @@ export class SimAthenaQueryExecution {
   }
 
   get state(): SimAthenaQueryState {
-    return this.#state;
+    return this.#status.state;
   }
 
   get stateChangeReason(): string | undefined {
-    return this.#stateChangeReason;
+    return this.#status.stateChangeReason;
   }
 
   get completedAt(): Date | undefined {
-    return this.#completedAt;
+    return this.#status.completedAt;
   }
 
   /**
@@ -71,63 +67,40 @@ export class SimAthenaQueryExecution {
     return this.#bytesScanned;
   }
 
-  /**
-   * The rows this query answered with, once it has succeeded.
-   */
+  /** The rows this query answered with, once it has succeeded. */
   get result(): SimAthenaResolvedResult | undefined {
     return this.#result;
   }
 
-  /**
-   * Whether this query has finished.
-   */
+  /** Whether this query has finished. */
   get isSettled(): boolean {
-    return isSettledQueryState(this.#state);
+    return this.#status.isSettled;
   }
 
-  /**
-   * Move the query from queued to running.
-   */
+  /** Move the query from queued to running. */
   start(): void {
-    this.#state = "RUNNING";
+    this.#status.start();
   }
 
-  /**
-   * Record what the query scanned, whether or not it goes on to succeed.
-   */
+  /** Record what the query scanned, whether or not it goes on to succeed. */
   recordBytesScanned(bytesScanned: number): void {
     this.#bytesScanned = bytesScanned;
   }
 
-  /**
-   * Finish the query with the rows it answered.
-   */
+  /** Finish the query with the rows it answered. */
   succeed(result: SimAthenaResolvedResult, completedAt: Date): void {
-    this.#result = result;
-    this.settle("SUCCEEDED", undefined, completedAt);
+    if (this.#status.settle("SUCCEEDED", undefined, completedAt)) {
+      this.#result = result;
+    }
   }
 
-  /**
-   * Finish the query without an answer, saying why.
-   */
+  /** Finish the query without an answer, saying why. */
   fail(reason: string, completedAt: Date): void {
-    this.settle("FAILED", reason, completedAt);
+    this.#status.settle("FAILED", reason, completedAt);
   }
 
-  /**
-   * Give up on a query a caller stopped.
-   */
+  /** Give up on a query a caller stopped. */
   cancel(completedAt: Date): void {
-    this.settle("CANCELLED", "Query cancelled by user", completedAt);
-  }
-
-  private settle(
-    state: SimAthenaQueryState,
-    reason: string | undefined,
-    completedAt: Date,
-  ): void {
-    this.#state = state;
-    this.#stateChangeReason = reason;
-    this.#completedAt = completedAt;
+    this.#status.settle("CANCELLED", "Query cancelled by user", completedAt);
   }
 }

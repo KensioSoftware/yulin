@@ -8,6 +8,14 @@ import type {
 } from "./execution.command.js";
 
 /**
+ * The most rows one `GetQueryResults` carries.
+ *
+ * This paging is over rows rather than resources, and Athena lets it go far
+ * past the 50 a listing of workgroups or named queries stops at.
+ */
+const maximumResultRows = 1000;
+
+/**
  * One page of a finished query's rows.
  *
  * A query that has not succeeded has no rows to read, which real Athena
@@ -31,6 +39,7 @@ export function queryResultsPage(
     maxResults: input.MaxResults,
     nextToken: input.NextToken,
     minimumResults: 0,
+    maximumResults: maximumResultRows,
   });
 
   return {

@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAthenaQueryExecutionStore } from "../execution/sim-athena-query-execution-store.js";
 import type { SimAthenaQueryRunner } from "../execution/sim-athena-query-runner.js";
+import { SimAthenaQueryTokens } from "../execution/sim-athena-query-tokens.js";
 import type { SimAthenaNamedQueryStore } from "../named-query/sim-athena-named-query-store.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
 import { SimAthenaAuthorizer } from "./authorize/sim-athena-authorizer.js";
@@ -75,6 +76,7 @@ export class SimAthenaCommands {
       executions: properties.executions,
       workGroups,
       runner: properties.runner,
+      tokens: new SimAthenaQueryTokens(),
       authorizer,
       clock: properties.clock,
     });
