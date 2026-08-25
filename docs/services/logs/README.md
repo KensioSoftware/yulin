@@ -417,6 +417,9 @@ rules from real AWS are modelled here, each of them a deploy that looks fine unt
   refused.
 - **CloudFront delivery is set up from `us-east-1`**, whatever region the destination bucket is in.
   A CloudFront delivery source put from anywhere else is refused.
+- **Hive compatible paths write the `key=` half themselves.** A suffix path naming the partition
+  keys as well is refused. Delivery turns `{yyyy}` into `year=2026`, and `year={yyyy}` arrives
+  doubled, which an account answers with "Provided suffixPath is invalid".
 - **Output format is fixed once the destination exists.** A `PutDeliveryDestination` that would
   change it is refused. Changing a format means deleting the destination and making it again.
 - **Parquet is written to S3 only.** A log group or Firehose destination asking for it is refused.
@@ -425,6 +428,11 @@ The suffix path decides the key each log file lands under. `{DistributionId}`, `
 `{yyyy}`, `{MM}`, `{dd}`, `{HH}` and `{accountid}` are substituted, and a variable outside that set
 is refused. Delivery would write the text out literally, and the bucket would look partitioned when
 it was not. A path over the 256 characters CloudWatch Logs takes is refused too.
+
+Under `enableHiveCompatiblePath`, delivery writes each segment as `key=value` and supplies the key
+itself. `{yyyy}` lands as `year=2026` and `{distributionid}` as `distributionid=E1EXAMPLE1234`. A
+suffix path naming those keys is refused, because the key would arrive twice. Leave the segments as
+bare variables and let delivery name them.
 
 ### Declaring delivery in a template
 
@@ -844,6 +852,9 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 - **Delivery resource tags and cross-account delivery.** `PutDeliverySource`,
   `PutDeliveryDestination` and `CreateDelivery` refuse tags outright. `DeliveryDestinationPolicy` in
   a template is recorded and acted on by nothing.
+- **An `=` in a suffix path with Hive compatible paths off.** Taken. Whether real CloudWatch Logs
+  takes one is unverified. A path hand-rolling its own partition keys without the option is left
+  alone here, and refused with the option on.
 - **Log types for services other than CloudFront.** Any `logType` is taken over a resource that is
   not a distribution, because the valid set varies by service and this simulation does not carry it.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and

@@ -152,6 +152,49 @@ describe("AWS::Logs delivery Resource refusals", () => {
     assertStringIncludes(error.message, "{DistributionID}");
   });
 
+  it("fails a delivery writing the Hive key= segments in its suffix path", async () => {
+    // Given a whole logging stack asking for Hive compatible paths and naming
+    // the partition keys in the suffix path as well. This is what a CloudFront
+    // analytics stack synthesises when it renders the keys by hand.
+    const error = await assertThrowsErrorAsync(async () => {
+      await new SimAws().cloudFormation().deployTemplate({
+        stackName: "site-logging",
+        template: {
+          Resources: {
+            [deliveryDistributionLogicalId]: deliveryDistributionResource,
+            AccessLogsSource: {
+              Type: "AWS::Logs::DeliverySource",
+              Properties: sourceProperties,
+            },
+            AccessLogsDestination: {
+              Type: "AWS::Logs::DeliveryDestination",
+              Properties: {
+                Name: sourceName,
+                DestinationResourceArn: bucketArn,
+              },
+            },
+            AccessLogsDelivery: {
+              Type: "AWS::Logs::Delivery",
+              Properties: {
+                DeliverySourceName: { Ref: "AccessLogsSource" },
+                DeliveryDestinationArn: {
+                  "Fn::GetAtt": ["AccessLogsDestination", "Arn"],
+                },
+                S3EnableHiveCompatiblePath: true,
+                S3SuffixPath: "year={yyyy}/month={MM}",
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then the deploy fails here rather than on a real account, where the
+    // doubled key comes back as "Provided suffixPath is invalid".
+    assertStringIncludes(error.message, "year={yyyy}");
+    assertStringIncludes(error.message, "enableHiveCompatiblePath");
+  });
+
   it("refuses a Resource property read back as an attribute", async () => {
     // Given a template reading DeliveryDestinationType off the delivery
     // destination, which carries it as a property and publishes it on the
