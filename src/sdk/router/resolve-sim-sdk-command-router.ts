@@ -80,6 +80,7 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     "EventBridge",
     (scoped): SimSdkCommandRouter => scoped.eventBridge().sdkCommandRouter(),
   ],
+  ["Glue", (scoped): SimSdkCommandRouter => scoped.glue().sdkCommandRouter()],
   ["IAM", (scoped): SimSdkCommandRouter => scoped.iam().sdkCommandRouter()],
   [
     "Firehose",

@@ -25,6 +25,7 @@ import type { SimElbV2 } from "../../elbv2/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimFirehose } from "../../firehose/index.js";
+import type { SimGlue } from "../../glue/index.js";
 import type { SimKinesis } from "../../kinesis/index.js";
 import type { SimStepFunctions } from "../../stepfunctions/index.js";
 import type { SimKms } from "../../kms/index.js";
@@ -236,6 +237,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Kinesis Data Firehose for an Account Region scope. */
   createFirehose(scope: SimAwsAccountRegionContainer): SimFirehose {
     return this.selfContainedServices.createFirehose(scope);
+  }
+
+  /** Create simulated Glue for an Account Region scope. */
+  createGlue(scope: SimAwsAccountRegionContainer): SimGlue {
+    return this.selfContainedServices.createGlue(scope);
   }
 
   /** Create simulated Kinesis Data Streams for an Account Region scope. */

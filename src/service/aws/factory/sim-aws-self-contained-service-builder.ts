@@ -2,6 +2,7 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimFirehose } from "../../firehose/index.js";
+import { SimGlue } from "../../glue/index.js";
 import { SimKinesis } from "../../kinesis/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
@@ -74,6 +75,17 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createKinesis(scope: SimAwsAccountRegionContainer): SimKinesis {
     return new SimKinesis(this.scoped(scope));
+  }
+
+  /**
+   * Create simulated Glue for an Account Region scope.
+   *
+   * A Data Catalog belongs to one account, and a database ARN names the
+   * region. Nothing here reads an S3 object or runs a query, so the catalog
+   * reaches no other simulated service.
+   */
+  createGlue(scope: SimAwsAccountRegionContainer): SimGlue {
+    return new SimGlue(this.scoped(scope));
   }
 
   /**

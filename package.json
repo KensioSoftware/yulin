@@ -108,6 +108,10 @@
       "import": "./dist/service/eventbridge/index.js",
       "types": "./dist/service/eventbridge/index.d.ts"
     },
+    "./glue": {
+      "import": "./dist/service/glue/index.js",
+      "types": "./dist/service/glue/index.d.ts"
+    },
     "./iam": {
       "import": "./dist/service/iam/index.js",
       "types": "./dist/service/iam/index.d.ts"
@@ -227,6 +231,7 @@
     "@aws-sdk/client-elastic-load-balancing-v2": "^3.1109.0",
     "@aws-sdk/client-eventbridge": "^3.1109.0",
     "@aws-sdk/client-firehose": "^3.1115.0",
+    "@aws-sdk/client-glue": "^3.1116.0",
     "@aws-sdk/client-iam": "^3.1101.0",
     "@aws-sdk/client-kinesis": "^3.1115.0",
     "@aws-sdk/client-kms": "^3.1101.0",
