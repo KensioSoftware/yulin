@@ -13,8 +13,8 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { simLogsDeliveryDistributionArn } from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
 const bucketArn = "arn:aws:s3:::example-access-logs";
 const logGroupArn = "arn:aws:logs:us-east-1:123456789012:log-group:/site";
 const sourceName = "site-access-logs";
@@ -23,7 +23,7 @@ async function givenSource(simAws: SimAws): Promise<void> {
   await simAws.logs().putDeliverySource(
     new PutDeliverySourceCommand({
       name: sourceName,
-      resourceArn: distributionArn,
+      resourceArn: await simLogsDeliveryDistributionArn(simAws),
       logType: "ACCESS_LOGS",
     }),
   );

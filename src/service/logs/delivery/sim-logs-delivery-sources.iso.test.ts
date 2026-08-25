@@ -15,15 +15,19 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimLogs } from "../sim-logs.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
+import { simLogsDeliveryDistributionArn } from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
 const sourceName = "site-access-logs";
 
-async function putSource(
-  simAws: SimAws,
-  name = sourceName,
-  resourceArn = distributionArn,
-): Promise<void> {
+/**
+ * Put a delivery source over a distribution of its own, and report the ARN it
+ * was put over.
+ */
+async function putSource(simAws: SimAws, name = sourceName): Promise<string> {
+  const resourceArn = await simLogsDeliveryDistributionArn(simAws, name);
+
   await simAws.logs().putDeliverySource(
     new PutDeliverySourceCommand({
       name,
@@ -31,14 +35,17 @@ async function putSource(
       logType: "ACCESS_LOGS",
     }),
   );
+
+  return resourceArn;
 }
 
 describe("simulated CloudWatch Logs delivery sources", () => {
   it("puts a delivery source over a distribution", async () => {
-    // Given a simulated account.
+    // Given a distribution in the simulated account.
     const simAws = new SimAws();
+    const distributionArn = await simLogsDeliveryDistributionArn(simAws);
 
-    // When a delivery source is put over a distribution.
+    // When a delivery source is put over it.
     const put = await simAws.logs().putDeliverySource(
       new PutDeliverySourceCommand({
         name: sourceName,
@@ -65,7 +72,7 @@ describe("simulated CloudWatch Logs delivery sources", () => {
     const simAws = new SimAws();
 
     await putSource(simAws);
-    await putSource(simAws, "other-access-logs", `${distributionArn}2`);
+    await putSource(simAws, "other-access-logs");
 
     // When the delivery sources are described.
     const described = await simAws
@@ -85,7 +92,7 @@ describe("simulated CloudWatch Logs delivery sources", () => {
     const simAws = new SimAws();
 
     await putSource(simAws);
-    await putSource(simAws, "other-access-logs", `${distributionArn}2`);
+    await putSource(simAws, "other-access-logs");
 
     // When one is asked for at a time.
     const first = await simAws
@@ -113,8 +120,7 @@ describe("simulated CloudWatch Logs delivery sources", () => {
   it("updates a delivery source put again under the same name", async () => {
     // Given a delivery source over a distribution.
     const simAws = new SimAws();
-
-    await putSource(simAws);
+    const distributionArn = await putSource(simAws);
 
     // When the same name is put again for the same distribution.
     await simAws.logs().putDeliverySource(
@@ -145,6 +151,29 @@ describe("simulated CloudWatch Logs delivery sources", () => {
 
     // Then it is created: only CloudFront delivery is pinned to one region.
     assertNonNullable(logs.findDeliverySource("model-invocation-logs"));
+  });
+
+  it("takes a delivery source in a simulation with no CloudFront", async () => {
+    // Given simulated CloudWatch Logs on its own, which has no CloudFront to
+    // find a distribution in.
+    const logs = new SimLogs({
+      accountRegionScope: simAwsAccountRegionScopeFactory.make({
+        regionName: "us-east-1",
+      }),
+    });
+
+    // When a delivery source is put over a distribution ARN.
+    await logs.putDeliverySource({
+      input: {
+        name: sourceName,
+        resourceArn: "arn:aws:cloudfront::888888888888:distribution/E1EX",
+        logType: "ACCESS_LOGS",
+      },
+    });
+
+    // Then it is created. The account segment goes unread along with the
+    // distribution id, and a test about delivery alone needs neither.
+    assertNonNullable(logs.findDeliverySource(sourceName));
   });
 
   it("deletes a delivery source", async () => {

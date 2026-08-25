@@ -13,6 +13,10 @@ import { SimLogsDeliveryCommands } from "./command/delivery/sim-logs-delivery-co
 import { SimLogsDeliveryDestinationCommands } from "./command/delivery/sim-logs-delivery-destination-commands.js";
 import { SimLogsDeliverySourceCommands } from "./command/delivery/sim-logs-delivery-source-commands.js";
 import { SimLogsDeliveryDestinationStore } from "./delivery/sim-logs-delivery-destination-store.js";
+import {
+  type SimLogsDeliverySourceResources,
+  SimLogsUncheckedDeliverySourceResources,
+} from "./delivery/sim-logs-delivery-source-resources.js";
 import { SimLogsDeliverySourceStore } from "./delivery/sim-logs-delivery-source-store.js";
 import { SimLogsDeliveryStore } from "./delivery/sim-logs-delivery-store.js";
 import { SimLogsFilterLogEvents } from "./command/event/sim-logs-filter-log-events.js";
@@ -42,6 +46,13 @@ export interface SimLogsProperties {
    * none of them.
    */
   readonly subscriptionDestinations?: SimLogsSubscriptionDestinations;
+
+  /**
+   * What a delivery source's `resourceArn` is resolved against. A SimLogs
+   * built on its own has no simulated CloudFront to find a distribution in. It
+   * takes any ARN, the way it always did.
+   */
+  readonly deliverySourceResources?: SimLogsDeliverySourceResources;
 }
 
 /**
@@ -77,6 +88,7 @@ export class SimLogsCommands {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       subscriptionDestinations = new SimLogsNoSubscriptionDestinations(),
+      deliverySourceResources = new SimLogsUncheckedDeliverySourceResources(),
     } = properties;
 
     const authorizer = new SimLogsAuthorizer({ iam, accountRegionScope });
@@ -136,6 +148,7 @@ export class SimLogsCommands {
       deliveries,
       authorizer,
       accountRegionScope,
+      resources: deliverySourceResources,
     });
     this.deliveryDestinations = new SimLogsDeliveryDestinationCommands({
       destinations: deliveryDestinations,

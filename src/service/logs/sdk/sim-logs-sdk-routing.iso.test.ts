@@ -40,6 +40,7 @@ import { describe, it } from "vitest";
 import { SimSdk } from "../../../sdk/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import { simLogsDeliveryDistributionArn } from "../../../../test/logs/delivery-distribution-fixture.js";
 
 const logGroupName = "/aws/lambda/orders";
 const logStreamName = "2026/08/16/[$LATEST]abc";
@@ -235,17 +236,18 @@ describe("CloudWatch Logs SDK interception", () => {
 describe("CloudWatch Logs delivery SDK interception", () => {
   it("sets CloudFront logging up through the intercepted client", async () => {
     // Given an intercepted client in the one Region CloudFront delivery is
-    // set up from.
+    // set up from, and a distribution to deliver the logs of.
     using simSdk = new SimSdk();
     simSdk.intercept(CloudWatchLogsClient);
 
     const client = new CloudWatchLogsClient({ region: "us-east-1" });
+    const resourceArn = await simLogsDeliveryDistributionArn(simSdk.simAws);
 
     // When ordinary SDK code sets up standard logging v2 for a distribution.
     await client.send(
       new PutDeliverySourceCommand({
         name: "site-access-logs",
-        resourceArn: "arn:aws:cloudfront::123456789012:distribution/E1EX",
+        resourceArn,
         logType: "ACCESS_LOGS",
       }),
     );

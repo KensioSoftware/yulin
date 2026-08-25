@@ -3,6 +3,7 @@ import {
   simLogsAnyDeliverySourceArn,
   simLogsDeliverySourceArn,
 } from "../../delivery/sim-logs-delivery-arn.js";
+import type { SimLogsDeliverySourceResources } from "../../delivery/sim-logs-delivery-source-resources.js";
 import {
   requireSimLogsDeliverySource,
   requiredSimLogsDeliveredService,
@@ -10,6 +11,7 @@ import {
 import { SimLogsDeliverySource } from "../../delivery/sim-logs-delivery-source.js";
 import type { SimLogsDeliverySourceStore } from "../../delivery/sim-logs-delivery-source-store.js";
 import type { SimLogsDeliveryStore } from "../../delivery/sim-logs-delivery-store.js";
+import { SimLogsResourceNotFoundException } from "../../error/sim-logs.error.js";
 import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
 import { SimLogsPage } from "../sim-logs-page.js";
 import type { SimLogsRequestOptions } from "../sim-logs-request-options.js";
@@ -36,6 +38,7 @@ interface SimLogsDeliverySourceCommandsProperties {
   readonly deliveries: SimLogsDeliveryStore;
   readonly authorizer: SimLogsAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly resources: SimLogsDeliverySourceResources;
 }
 
 /**
@@ -46,12 +49,14 @@ export class SimLogsDeliverySourceCommands {
   readonly #deliveries: SimLogsDeliveryStore;
   readonly #authorizer: SimLogsAuthorizer;
   readonly #scope: SimAwsAccountRegionScope;
+  readonly #resources: SimLogsDeliverySourceResources;
 
   constructor(properties: SimLogsDeliverySourceCommandsProperties) {
     this.#sources = properties.sources;
     this.#deliveries = properties.deliveries;
     this.#authorizer = properties.authorizer;
     this.#scope = properties.accountRegionScope;
+    this.#resources = properties.resources;
   }
 
   /**
@@ -59,7 +64,9 @@ export class SimLogsDeliverySourceCommands {
    *
    * The service is read from the resource ARN, as real CloudWatch Logs reads
    * it, and the region the request was made in has to be one that service's
-   * delivery can be set up from.
+   * delivery can be set up from. The ARN is then resolved to a resource the
+   * account holds. A source over a distribution the account never created
+   * fails here, ahead of the delivery that would have carried nothing.
    */
   putDeliverySource(
     command: SimPutDeliverySourceCommand,
@@ -87,6 +94,12 @@ export class SimLogsDeliverySourceCommands {
       regionName: this.#scope.regionName,
       logType,
     });
+
+    const absent = this.#resources.refusalFor(resourceArn);
+
+    if (absent !== undefined) {
+      throw new SimLogsResourceNotFoundException(absent);
+    }
 
     const source = new SimLogsDeliverySource({
       name,

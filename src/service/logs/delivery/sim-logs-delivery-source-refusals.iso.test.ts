@@ -10,8 +10,12 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import {
+  simLogsDeliveryDistributionArn,
+  simLogsDistributionArn,
+} from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
+const distributionArn = "arn:aws:cloudfront::888888888888:distribution/E1EX";
 const sourceName = "site-access-logs";
 
 function putSourceInput(
@@ -29,20 +33,24 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
   it("refuses a second delivery source over the same distribution", async () => {
     // Given a distribution that already has a delivery source.
     const simAws = new SimAws();
+    const resourceArn = await simLogsDeliveryDistributionArn(simAws);
 
     await simAws
       .logs()
-      .putDeliverySource(new PutDeliverySourceCommand(putSourceInput()));
+      .putDeliverySource(
+        new PutDeliverySourceCommand(putSourceInput({ resourceArn })),
+      );
 
     // When a second source is put over the same distribution.
     const error = await assertThrowsErrorAsync(async () => {
-      await simAws
-        .logs()
-        .putDeliverySource(
-          new PutDeliverySourceCommand(
-            putSourceInput({ name: "second-access-logs" }),
-          ),
-        );
+      await simAws.logs().putDeliverySource(
+        new PutDeliverySourceCommand(
+          putSourceInput({
+            name: "second-access-logs",
+            resourceArn,
+          }),
+        ),
+      );
     });
 
     // Then it is refused the way an account refuses it, which is what anyone
@@ -53,6 +61,50 @@ describe("simulated CloudWatch Logs delivery source refusals", () => {
       "This ResourceId has already been used in another Delivery Source in " +
         "this account",
     );
+  });
+
+  it("refuses a delivery source over a distribution that is not there", async () => {
+    // Given a simulated account holding no distributions.
+    const simAws = new SimAws();
+
+    // When a delivery source names one anyway, as a template pinning the
+    // distribution id of a real account does.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .logs()
+        .putDeliverySource(new PutDeliverySourceCommand(putSourceInput()));
+    });
+
+    // Then it is refused. An account does the same with a source over a
+    // resource it has never held.
+    assertIdentical(error.name, "ResourceNotFoundException");
+    assertStringIncludes(error.message, "names no CloudFront distribution");
+    assertStringIncludes(error.message, "888888888888");
+  });
+
+  it("refuses a delivery source over another account's distribution", async () => {
+    // Given a distribution in the simulated account, named by an ARN that
+    // says it belongs to another one.
+    const simAws = new SimAws();
+    const held = await simLogsDeliveryDistributionArn(simAws);
+    const distributionId = held.split("/").at(-1) ?? "";
+
+    // When a delivery source is put over that ARN.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().putDeliverySource(
+        new PutDeliverySourceCommand(
+          putSourceInput({
+            resourceArn: `arn:aws:cloudfront::207763040965:distribution/${distributionId}`,
+          }),
+        ),
+      );
+    });
+
+    // Then the account segment is read. An id that happens to match one this
+    // account holds carries a foreign ARN through without it.
+    assertIdentical(error.name, "ResourceNotFoundException");
+    assertStringIncludes(error.message, "names account 207763040965");
+    assertIdentical(simLogsDistributionArn(simAws, distributionId), held);
   });
 
   it("refuses a CloudFront delivery source outside us-east-1", async () => {
