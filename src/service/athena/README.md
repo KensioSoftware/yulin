@@ -1,17 +1,19 @@
 # Simulated Athena implementation
 
-This directory contains the simulated Athena implementation. Two resources are simulated,
-workgroups and named queries, both readable through the SDK and both deployable from a template.
+This directory contains the simulated Athena implementation. Workgroups and named queries are
+deployable from a template and readable through the SDK, and a query runs through its states without
+anything reading the SQL.
 
-The guiding decision is that no query runs. Athena's own value is in the query engine, and a query
-engine over Parquet and JSON objects in S3 is a different order of magnitude from the rest of this.
-The two resources are still worth holding without one. A workgroup is where the cost guardrail and
-the results location are configured, and a named query is the SQL somebody saved. A stack can prove
-it set both.
+The guiding decision is that no query is evaluated. Athena's own value is in the query engine, and a
+query engine over Parquet and JSON objects in S3 is a different order of magnitude from the rest of
+this. A test declares what a query answers with instead, and the simulation matches that declaration
+on the query text. Simulated Bedrock answers a prompt the same way and simulated Rekognition answers
+an image the same way, all three through `SimDeclaredResultRules`.
 
-That divergence is the one to be honest about. Simulated Athena accepts a query real Athena would
-reject, because the SQL goes unread. `docs/services/athena/README.md` says so in its Limitations
-list, and running a query is [issue 992](https://github.com/KensioSoftware/yulin/issues/992).
+What that leaves is worth having. The lifecycle a client polls is real, the bytes-scanned cutoff
+refuses a query for real, and a result set really is written to the workgroup's output location. The
+divergence to be honest about is that simulated Athena accepts a query real Athena would reject.
+`docs/services/athena/README.md` says so in its Limitations list.
 
 ## Entry points
 
@@ -54,6 +56,31 @@ itself, keeping the update rules next to the fields they are about.
 
 `SimAthenaResultConfiguration.isEmpty` handles the update that removed everything. A workgroup left
 with no results location reports no result configuration at all.
+
+## How a query runs
+
+`execution/` holds the one thing here that changes over time. `SimAthenaQueryExecution` is mutable
+for that reason, where every other resource in this service is replaced rather than mutated.
+
+`SimAthenaQueryRunner` moves it. Reaching `RUNNING` is one background task and finishing is another,
+scheduled from inside the first. That is what makes each state visible to a caller polling
+`GetQueryExecution`, since one lifecycle in a single task would be over before the first poll. Both
+tasks check whether the execution has already settled, so a query somebody stopped in between is
+left where it is.
+
+`result/` holds the declarations. `SimAthenaQueryResults` wraps `SimDeclaredResultRules` with query
+text as the leading key and workgroup name as the trailing one, which puts the specific tier first
+the way Bedrock puts prompt before model. `SimAthenaResolvedResult` fills in what a declaration left
+out, and it is the only place that knows how.
+
+The cutoff is checked in the runner against what the declaration says the query scanned. That is the
+whole of the cost guardrail, and the one thing this simulation can enforce for real without an
+engine.
+
+`SimAthenaResultWriter` writes the CSV through simulated S3 under the caller that started the query,
+because Athena writes a result under the identity that asked for it. Simulated Firehose does the
+same shape of thing under its delivery stream's role. A write that fails leaves the execution
+`FAILED` rather than raising at a caller who was answered long ago and has gone away to poll.
 
 ## The CloudFormation layer
 

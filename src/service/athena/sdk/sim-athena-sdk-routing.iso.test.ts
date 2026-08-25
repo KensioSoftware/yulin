@@ -1,6 +1,10 @@
 import {
   AthenaClient,
+  GetQueryExecutionCommand,
+  GetQueryResultsCommand,
+  ListDataCatalogsCommand,
   StartQueryExecutionCommand,
+  StopQueryExecutionCommand,
   BatchGetNamedQueryCommand,
   CreateNamedQueryCommand,
   CreateWorkGroupCommand,
@@ -132,9 +136,77 @@ describe("Athena SDK interception", () => {
     assertIdentical(error.name, "InvalidRequestException");
   });
 
+  it("runs a query through an intercepted client", async () => {
+    // Given an intercepted client, a workgroup with somewhere to put results,
+    // and a rollup a test says answers one row.
+    using simSdk = new SimSdk();
+    simSdk.intercept(AthenaClient);
+
+    const simAws = simSdk.simAws;
+
+    await simAws
+      .region("eu-west-2")
+      .account()
+      .s3()
+      .createBucket({
+        input: { Bucket: "results" },
+      });
+
+    const athena = simAws.region("eu-west-2").account().athena();
+
+    await athena.createWorkGroup({
+      input: {
+        Name: "rainlytics",
+        Configuration: {
+          ResultConfiguration: { OutputLocation: "s3://results/q/" },
+        },
+      },
+    });
+    athena.results().onWorkGroup("rainlytics", {
+      columns: ["views"],
+      rows: [["4213"]],
+    });
+
+    const client = new AthenaClient({ region: "eu-west-2" });
+
+    // When ordinary SDK code starts a query, waits for it and reads the rows.
+    const started = await client.send(
+      new StartQueryExecutionCommand({
+        QueryString: "SELECT count(*) FROM access_logs",
+        WorkGroup: "rainlytics",
+      }),
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    const execution = await client.send(
+      new GetQueryExecutionCommand({
+        QueryExecutionId: started.QueryExecutionId,
+      }),
+    );
+    const results = await client.send(
+      new GetQueryResultsCommand({
+        QueryExecutionId: started.QueryExecutionId,
+      }),
+    );
+
+    await client.send(
+      new StopQueryExecutionCommand({
+        QueryExecutionId: started.QueryExecutionId,
+      }),
+    );
+
+    // Then every one of them reached the simulation.
+    assertIdentical(execution.QueryExecution?.Status?.State, "SUCCEEDED");
+    assertIdentical(
+      results.ResultSet?.Rows?.[1]?.Data?.[0]?.VarCharValue,
+      "4213",
+    );
+  });
+
   it("says which commands it has when sent one it has not", async () => {
-    // Given an intercepted client sending a query execution command, which
-    // this simulation does not run.
+    // Given an intercepted client sending a data catalog command, which this
+    // simulation does not answer.
     using simSdk = new SimSdk();
     simSdk.intercept(AthenaClient);
 
@@ -142,17 +214,15 @@ describe("Athena SDK interception", () => {
 
     // When it is sent.
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(
-        new StartQueryExecutionCommand({ QueryString: "SELECT 1" }),
-      );
+      await client.send(new ListDataCatalogsCommand({}));
     });
 
     // Then the refusal lists the commands simulated Athena does handle, so a
     // caller can see how far it goes.
     assertStringIncludes(
       error.message,
-      "does not support SDK Command StartQueryExecutionCommand",
+      "does not support SDK Command ListDataCatalogsCommand",
     );
-    assertStringIncludes(error.message, "GetWorkGroupCommand");
+    assertStringIncludes(error.message, "StartQueryExecutionCommand");
   });
 });

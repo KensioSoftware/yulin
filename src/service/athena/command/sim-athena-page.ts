@@ -6,9 +6,9 @@ import { SimAthenaInvalidRequestException } from "../error/sim-athena.error.js";
 const defaultItemsPerPage = 50;
 
 /**
- * The most Athena lets one listing carry.
+ * The most a listing carries where the request asks for no maximum.
  */
-const maximumItemsPerPage = 50;
+const defaultMaximumItemsPerPage = 50;
 
 interface SimAthenaPageProperties<Item> {
   readonly listed: readonly Item[];
@@ -22,6 +22,14 @@ interface SimAthenaPageProperties<Item> {
    * 1 and `ListNamedQueries` starts at 0, so the two cannot share one.
    */
   readonly minimumResults: number;
+
+  /**
+   * The largest `MaxResults` this listing takes, where it is not 50.
+   *
+   * `GetQueryResults` pages rows rather than resources and goes up to 1000.
+   * The listings of workgroups and named queries stop at 50.
+   */
+  readonly maximumResults?: number | undefined;
 }
 
 /**
@@ -37,10 +45,7 @@ export class SimAthenaPage<Item> {
       properties.nextToken,
       listed.length,
     );
-    const pageSize = SimAthenaPage.pageSize(
-      properties.maxResults,
-      properties.minimumResults,
-    );
+    const pageSize = SimAthenaPage.pageSize(properties);
 
     this.items = listed.slice(startIndex, startIndex + pageSize);
     this.nextToken = SimAthenaPage.tokenFor(
@@ -54,22 +59,26 @@ export class SimAthenaPage<Item> {
    * Read the page size a request asked for, refusing one outside the range
    * AWS takes.
    */
-  private static pageSize(
-    maxResults: number | undefined,
-    minimumResults: number,
+  private static pageSize<Item>(
+    properties: SimAthenaPageProperties<Item>,
   ): number {
+    const maxResults = properties.maxResults;
+
     if (maxResults === undefined) {
       return defaultItemsPerPage;
     }
 
+    const minimum = properties.minimumResults;
+    const maximum = properties.maximumResults ?? defaultMaximumItemsPerPage;
+
     if (
       !Number.isSafeInteger(maxResults) ||
-      maxResults < minimumResults ||
-      maxResults > maximumItemsPerPage
+      maxResults < minimum ||
+      maxResults > maximum
     ) {
       throw new SimAthenaInvalidRequestException(
         `MaxResults ${String(maxResults)} is outside the range ` +
-          `${String(minimumResults)} to ${String(maximumItemsPerPage)}`,
+          `${String(minimum)} to ${String(maximum)}`,
       );
     }
 
