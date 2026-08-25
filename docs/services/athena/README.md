@@ -204,8 +204,9 @@ Current documented limitations:
 - `AWS::Athena::DataCatalog`, `AWS::Athena::PreparedStatement` and
   `AWS::Athena::CapacityReservation` fall outside this simulation. A template declaring one is
   recorded on the stack's `skippedResources` and the rest of the stack deploys.
-- Databases and tables fall outside it too. A named query's `Database` is a string this simulation
-  leaves unresolved, and a Glue catalog behind it would be a separate feature.
+- A named query's `Database` is a string simulated Athena leaves unresolved. Yulin does simulate the
+  [Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), and a saved
+  query naming a database that catalog has never heard of is stored all the same.
 - Workgroup tags, prepared statements, capacity reservations, query result reuse and Athena for
   Spark are all absent.
 - A `WorkGroupConfiguration` setting this simulation has no answer for, such as `ExecutionRole`,
