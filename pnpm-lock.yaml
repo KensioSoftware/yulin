@@ -39,6 +39,9 @@ importers:
       '@aws-sdk/client-apigatewayv2':
         specifier: ^3.1101.0
         version: 3.1112.0
+      '@aws-sdk/client-athena':
+        specifier: ^3.1115.0
+        version: 3.1116.0
       '@aws-sdk/client-bedrock-runtime':
         specifier: ^3.1115.0
         version: 3.1115.0
@@ -314,6 +317,10 @@ packages:
 
   '@aws-sdk/client-apigatewayv2@3.1112.0':
     resolution: {integrity: sha512-ZQyBFawlD8jZ4Op08nJf7yDM7fbsopl5CItIyFIuq0nVdDwhlgHr9uk3xDuuJ6jNaaj+aIEtmkJyksXiVDxxXQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-athena@3.1116.0':
+    resolution: {integrity: sha512-hrnQnc3HNNQM+tEeBku31Jf2WDwH6Gs8vuX/tpbaoBK64wcNJ7tjY/ubfJuNHuNRPyTT/H5ZISwxRtclfML0Jw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-bedrock-runtime@3.1115.0':
@@ -3687,6 +3694,17 @@ snapshots:
       tslib: 2.8.1
 
   '@aws-sdk/client-apigatewayv2@3.1112.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/credential-provider-node': 3.972.81
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.33.3
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.3
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/client-athena@3.1116.0':
     dependencies:
       '@aws-sdk/core': 3.977.9
       '@aws-sdk/credential-provider-node': 3.972.81

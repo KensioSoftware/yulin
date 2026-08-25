@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
+import { SimAthena } from "../../athena/index.js";
 import { SimBedrock } from "../../bedrock/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimFirehose } from "../../firehose/index.js";
@@ -34,6 +35,17 @@ export class SimAwsSelfContainedServiceBuilder {
 
   constructor(properties: SimAwsSelfContainedServiceBuilderProperties) {
     this.accountServices = properties.accountServices;
+  }
+
+  /**
+   * Create simulated Athena for an Account Region scope.
+   *
+   * Workgroups and named queries are Region-scoped on real Athena, and nothing
+   * here reaches outside its own scope: no query runs, so no Bucket is written
+   * to and no Glue catalog is read.
+   */
+  createAthena(scope: SimAwsAccountRegionContainer): SimAthena {
+    return new SimAthena(this.scoped(scope));
   }
 
   /**

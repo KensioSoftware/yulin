@@ -37,6 +37,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     (scoped): SimSdkCommandRouter => scoped.apiGatewayV2().sdkCommandRouter(),
   ],
   [
+    "Athena",
+    (scoped): SimSdkCommandRouter => scoped.athena().sdkCommandRouter(),
+  ],
+  [
     "Bedrock Runtime",
     (scoped): SimSdkCommandRouter => scoped.bedrock().sdkCommandRouter(),
   ],

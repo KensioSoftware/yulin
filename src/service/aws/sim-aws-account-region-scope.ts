@@ -3,6 +3,7 @@ import type { AwsRegionName, SimAwsRegion } from "./sim-aws-region.js";
 import { Memo } from "../../util/memo/memo.js";
 import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
+import type { SimAthena } from "../athena/index.js";
 import type { SimBedrock } from "../bedrock/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimScheduler } from "../scheduler/index.js";
@@ -85,6 +86,13 @@ export class SimAwsAccountRegionContainer {
   /** Get simulated ACM for this account and region. */
   acm(): SimAcm {
     return this.memo.getOrCreate("acm", () => this.factory.createAcm(this));
+  }
+
+  /** Get simulated Athena for this account and region. */
+  athena(): SimAthena {
+    return this.memo.getOrCreate("athena", () =>
+      this.factory.createAthena(this),
+    );
   }
 
   /** Get simulated Bedrock for this account and region. */

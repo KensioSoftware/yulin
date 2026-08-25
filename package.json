@@ -48,6 +48,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./athena": {
+      "import": "./dist/service/athena/index.js",
+      "types": "./dist/service/athena/index.d.ts"
+    },
     "./apigateway": {
       "import": "./dist/service/apigateway/index.js",
       "types": "./dist/service/apigateway/index.d.ts"
@@ -218,6 +222,7 @@
     "@aws-sdk/client-acm": "^3.1101.0",
     "@aws-sdk/client-api-gateway": "^3.1112.0",
     "@aws-sdk/client-apigatewayv2": "^3.1101.0",
+    "@aws-sdk/client-athena": "^3.1115.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1115.0",
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",
