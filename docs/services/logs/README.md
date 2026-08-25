@@ -429,11 +429,26 @@ it was not. A path over the 256 characters CloudWatch Logs takes is refused too.
 ### Declaring delivery in a template
 
 The same three resources in a template, which is the whole of what a CDK construct for CloudFront
-logging synthesises. The source's `ResourceArn` is built around a `Ref` to the distribution the
-template declares, the way CDK builds it. A pinned distribution id fails the deploy (see
-[the rules above](#delivering-logs-from-another-service)).
+logging synthesises, alongside the distribution they are for. The source's `ResourceArn` is built
+around a `Ref` to that distribution, the way CDK builds it. A pinned distribution id fails the
+deploy (see [the rules above](#delivering-logs-from-another-service)).
 
 ```yaml
+SiteDistribution:
+  Type: AWS::CloudFront::Distribution
+  Properties:
+    DistributionConfig:
+      Enabled: true
+      Origins:
+        Items:
+          - Id: site-origin
+            DomainName: origin.example.com
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+      DefaultCacheBehavior:
+        TargetOriginId: site-origin
+        ViewerProtocolPolicy: redirect-to-https
+
 AccessLogsSource:
   Type: AWS::Logs::DeliverySource
   Properties:
