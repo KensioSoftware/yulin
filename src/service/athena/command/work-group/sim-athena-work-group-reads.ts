@@ -52,11 +52,12 @@ export class SimAthenaWorkGroupReads {
   ): commands.SimListWorkGroupsCommandOutput {
     this.authorizer.authorizeAnyWorkGroup("athena:ListWorkGroups", options);
 
-    const page = new SimAthenaPage(
-      this.workGroups.all.map(listedWorkGroup),
-      command.input.MaxResults,
-      command.input.NextToken,
-    );
+    const page = new SimAthenaPage({
+      listed: this.workGroups.all.map(listedWorkGroup),
+      maxResults: command.input.MaxResults,
+      nextToken: command.input.NextToken,
+      minimumResults: 1,
+    });
 
     return { $metadata: {}, WorkGroups: page.items, NextToken: page.nextToken };
   }

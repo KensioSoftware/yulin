@@ -89,13 +89,20 @@ export class SimAthenaResultConfiguration {
     return updated.isEmpty ? undefined : updated;
   }
 
+  /**
+   * What one field is left holding after an update.
+   *
+   * A removal flag clears the field, whatever else the update said about it.
+   * AWS documents each flag as setting its field to null, and real Athena
+   * refuses a request that both removes a field and replaces it.
+   */
   private kept<TField>(
     updated: TField | undefined,
     current: TField | undefined,
     removed: boolean | undefined,
   ): TField | undefined {
     if (removed === true) {
-      return updated;
+      return undefined;
     }
 
     return updated ?? current;

@@ -244,6 +244,20 @@ describe("simulated Athena workgroup refusals", () => {
     assertStringIncludes(error.message, "outside the range 1 to 50");
   });
 
+  it("refuses a workgroup listing asking for no rows", async () => {
+    // Given a listing asking for nothing. Athena's floor for this one is 1,
+    // unlike ListNamedQueries, which documents 0.
+    const simAws = new SimAws();
+
+    // When it is listed.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.athena().listWorkGroups({ input: { MaxResults: 0 } });
+    });
+
+    // Then it is refused.
+    assertStringIncludes(error.message, "outside the range 1 to 50");
+  });
+
   it("refuses a continuation token no listing here issued", async () => {
     // Given a workgroup to list, and a token from somewhere other than a
     // previous page.

@@ -10,6 +10,20 @@ const defaultItemsPerPage = 50;
  */
 const maximumItemsPerPage = 50;
 
+interface SimAthenaPageProperties<Item> {
+  readonly listed: readonly Item[];
+  readonly maxResults: number | undefined;
+  readonly nextToken: string | undefined;
+
+  /**
+   * The smallest `MaxResults` this listing takes.
+   *
+   * Athena documents a different floor per listing. `ListWorkGroups` starts at
+   * 1 and `ListNamedQueries` starts at 0, so the two cannot share one.
+   */
+  readonly minimumResults: number;
+}
+
 /**
  * One page of a listing, and the token that reaches the next one.
  */
@@ -17,36 +31,45 @@ export class SimAthenaPage<Item> {
   public readonly items: readonly Item[];
   public readonly nextToken: string | undefined;
 
-  constructor(
-    listed: readonly Item[],
-    maxResults: number | undefined,
-    nextToken: string | undefined,
-  ) {
-    const startIndex = SimAthenaPage.startIndex(nextToken, listed.length);
-    const nextIndex = startIndex + SimAthenaPage.pageSize(maxResults);
+  constructor(properties: SimAthenaPageProperties<Item>) {
+    const listed = properties.listed;
+    const startIndex = SimAthenaPage.startIndex(
+      properties.nextToken,
+      listed.length,
+    );
+    const pageSize = SimAthenaPage.pageSize(
+      properties.maxResults,
+      properties.minimumResults,
+    );
 
-    this.items = listed.slice(startIndex, nextIndex);
-    this.nextToken = SimAthenaPage.tokenFor(nextIndex, listed.length);
+    this.items = listed.slice(startIndex, startIndex + pageSize);
+    this.nextToken = SimAthenaPage.tokenFor(
+      startIndex + pageSize,
+      listed.length,
+      pageSize,
+    );
   }
 
   /**
    * Read the page size a request asked for, refusing one outside the range
    * AWS takes.
    */
-  private static pageSize(maxResults: number | undefined): number {
+  private static pageSize(
+    maxResults: number | undefined,
+    minimumResults: number,
+  ): number {
     if (maxResults === undefined) {
       return defaultItemsPerPage;
     }
 
     if (
       !Number.isSafeInteger(maxResults) ||
-      maxResults < 1 ||
+      maxResults < minimumResults ||
       maxResults > maximumItemsPerPage
     ) {
       throw new SimAthenaInvalidRequestException(
-        `MaxResults ${String(maxResults)} is outside the range 1 to ${String(
-          maximumItemsPerPage,
-        )}`,
+        `MaxResults ${String(maxResults)} is outside the range ` +
+          `${String(minimumResults)} to ${String(maximumItemsPerPage)}`,
       );
     }
 
@@ -83,11 +106,19 @@ export class SimAthenaPage<Item> {
     return startIndex;
   }
 
+  /**
+   * The token that reaches the page after this one, where there is one.
+   *
+   * A page of no items issues none. `MaxResults` of zero is a request for
+   * nothing, and a token back to the same offset would leave a caller paging
+   * for ever.
+   */
   private static tokenFor(
     nextIndex: number,
     listedCount: number,
+    pageSize: number,
   ): string | undefined {
-    if (nextIndex >= listedCount) {
+    if (pageSize === 0 || nextIndex >= listedCount) {
       return undefined;
     }
 

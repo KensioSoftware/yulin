@@ -187,16 +187,60 @@ describe("simulated Athena named queries", () => {
     );
   });
 
-  it("answers an empty batch with nothing", async () => {
+  it("refuses a batch naming no ids", async () => {
     // Given a batch request carrying no ids at all.
     const simAws = new SimAws();
 
     // When it is sent.
-    const batch = await simAws.athena().batchGetNamedQuery({ input: {} });
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.athena().batchGetNamedQuery({ input: {} });
+    });
 
-    // Then nothing comes back, and nothing fails.
-    assertArrayLength(batch.NamedQueries ?? [], 0);
-    assertArrayLength(batch.UnprocessedNamedQueryIds ?? [], 0);
+    // Then it is refused rather than answered with nothing, which would read
+    // as ids that matched no saved query.
+    assertStringIncludes(error.message, "NamedQueryIds is required");
+  });
+
+  it("refuses a batch naming more ids than Athena takes", async () => {
+    // Given a batch of fifty-one ids, one past what Athena allows.
+    const simAws = new SimAws();
+    const ids = Array.from({ length: 51 }, () => faker.string.uuid());
+
+    // When it is sent.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .athena()
+        .batchGetNamedQuery({ input: { NamedQueryIds: ids } });
+    });
+
+    // Then it is refused, naming the limit.
+    assertStringIncludes(error.message, "takes at most 50");
+  });
+
+  it("takes a page size of zero on a named query listing", async () => {
+    // Given a workgroup with a saved query in it, and a listing asking for no
+    // rows, which Athena's own range for this listing allows.
+    const simAws = new SimAws();
+    const workGroup = await aWorkGroup(simAws);
+
+    await simAws.athena().createNamedQuery({
+      input: {
+        Name: "pageviews",
+        Database: "rainlytics",
+        QueryString: pageviewsSql,
+        WorkGroup: workGroup,
+      },
+    });
+
+    // When it is listed.
+    const listed = await simAws
+      .athena()
+      .listNamedQueries({ input: { WorkGroup: workGroup, MaxResults: 0 } });
+
+    // Then nothing comes back, and no token comes with it, since a page of no
+    // items could never reach the next one.
+    assertArrayLength(listed.NamedQueryIds ?? [], 0);
+    assertUndefined(listed.NextToken);
   });
 
   it("forgets a deleted named query", async () => {

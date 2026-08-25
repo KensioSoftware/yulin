@@ -177,6 +177,34 @@ describe("AWS::Athena::WorkGroup", () => {
     assertUndefined(simAws.athena().findWorkGroup("rainlytics"));
   });
 
+  it("leaves no workgroup behind when the state fails the Resource", async () => {
+    // Given a template asking for a state Athena has no meaning for.
+    const simAws = new SimAws();
+
+    // When the template is deployed, then the deployment fails.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "rainlytics-stack",
+        template: {
+          Resources: {
+            Queries: {
+              Type: "AWS::Athena::WorkGroup",
+              Properties: { Name: "rainlytics", State: "PAUSED" },
+            },
+          },
+        },
+      });
+    });
+
+    // And nothing was created. CloudFormation fails a Resource without taking
+    // back what its creation already did, so a workgroup left standing here
+    // would refuse the next deploy as a name already taken.
+    assertStringIncludes(error.message, "ENABLED or DISABLED");
+    assertUndefined(simAws.athena().findWorkGroup("rainlytics"));
+
+    await simAws.backgroundTasksComplete();
+  });
+
   it("fails a workgroup Resource the simulation refuses", async () => {
     // Given two Resources asking for the same workgroup name, which a stack
     // written by hand does.

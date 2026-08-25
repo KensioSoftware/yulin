@@ -97,7 +97,8 @@ describe("simulated Athena workgroups", () => {
 
     // Then the workgroup is there, with no cutoff on it, and it is where a
     // request naming no workgroup lands.
-    assertIdentical(read.WorkGroup?.Name, "primary");
+    assertNonNullable(read.WorkGroup);
+    assertIdentical(read.WorkGroup.Name, "primary");
     assertUndefined(read.WorkGroup.Configuration?.BytesScannedCutoffPerQuery);
     assertIdentical(
       simAws.athena().namedQueries()[0]?.workGroupName,
@@ -190,6 +191,56 @@ describe("simulated Athena workgroups", () => {
       "888888888888",
     );
     assertIdentical(read.WorkGroup?.State, "DISABLED");
+  });
+
+  it("clears a field an update both removes and replaces", async () => {
+    // Given a workgroup with a results location, and an update that names a
+    // new one while also asking for the old one to go.
+    const simAws = new SimAws();
+    const name = workGroupName();
+
+    await simAws.athena().createWorkGroup({
+      input: {
+        Name: name,
+        Configuration: {
+          ResultConfiguration: {
+            OutputLocation: "s3://results/",
+            ExpectedBucketOwner: "888888888888",
+            EncryptionConfiguration: { EncryptionOption: "SSE_S3" },
+            AclConfiguration: { S3AclOption: "BUCKET_OWNER_FULL_CONTROL" },
+          },
+        },
+      },
+    });
+
+    // When the update sets every removal flag and a replacement alongside it.
+    await simAws.athena().updateWorkGroup({
+      input: {
+        WorkGroup: name,
+        ConfigurationUpdates: {
+          BytesScannedCutoffPerQuery: 5_000_000,
+          RemoveBytesScannedCutoffPerQuery: true,
+          ResultConfigurationUpdates: {
+            OutputLocation: "s3://somewhere-else/",
+            RemoveOutputLocation: true,
+            ExpectedBucketOwner: "999999999999",
+            RemoveExpectedBucketOwner: true,
+            EncryptionConfiguration: { EncryptionOption: "SSE_KMS" },
+            RemoveEncryptionConfiguration: true,
+            AclConfiguration: { S3AclOption: "BUCKET_OWNER_FULL_CONTROL" },
+            RemoveAclConfiguration: true,
+          },
+        },
+      },
+    });
+
+    // Then every field is gone. A removal flag sets its field to null on real
+    // Athena, whatever else the same update said about it.
+    const workGroup = simAws.athena().findWorkGroup(name);
+
+    assertNonNullable(workGroup);
+    assertUndefined(workGroup.bytesScannedCutoffPerQuery);
+    assertUndefined(workGroup.configuration.resultConfiguration);
   });
 
   it("drops a result configuration an update empties", async () => {

@@ -59,7 +59,7 @@ export class SimAthenaNamedQueryReads {
     return batchOfNamedQueries(
       this.namedQueries,
       this.authorizer,
-      command.input.NamedQueryIds ?? [],
+      command.input.NamedQueryIds,
       options,
     );
   }
@@ -81,13 +81,14 @@ export class SimAthenaNamedQueryReads {
     );
     this.workGroups.require(workGroupName);
 
-    const page = new SimAthenaPage(
-      this.namedQueries
+    const page = new SimAthenaPage({
+      listed: this.namedQueries
         .inWorkGroup(workGroupName)
         .map((namedQuery) => namedQuery.namedQueryId),
-      input.MaxResults,
-      input.NextToken,
-    );
+      maxResults: input.MaxResults,
+      nextToken: input.NextToken,
+      minimumResults: 0,
+    });
 
     return {
       $metadata: {},

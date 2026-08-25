@@ -2,7 +2,11 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimAthena } from "../../sim-athena.js";
-import type { SimAthenaWorkGroup } from "../../workgroup/sim-athena-work-group.js";
+import { workGroupStateFrom } from "../../command/work-group/sim-athena-work-group-input.js";
+import type {
+  SimAthenaWorkGroup,
+  SimAthenaWorkGroupState,
+} from "../../workgroup/sim-athena-work-group.js";
 import { simCfnAthenaResourceCreation } from "../sim-cfn-athena-resource-error.js";
 import { athenaWorkGroupResourceType } from "../sim-cfn-athena-resource-types.js";
 import { SimCfnAthenaWorkGroupProperties } from "./sim-cfn-athena-work-group-properties.js";
@@ -43,8 +47,16 @@ export class SimCfnAthenaWorkGroupCreator {
       athenaWorkGroupResourceType,
       resource.logicalId,
       async () => {
+        /*
+         * The state is read before the workgroup is made rather than after.
+         * CloudFormation fails a Resource without taking back what its
+         * creation already did, so a state this simulation will not take has
+         * to be refused while there is still nothing to leave behind.
+         */
+        const state = workGroupStateFrom(read.state());
+
         await this.athena.createWorkGroup({ input });
-        await this.applyState(String(input.Name), read.state());
+        await this.applyState(String(input.Name), state);
 
         const workGroup = this.athena.findWorkGroup(String(input.Name));
 
@@ -73,7 +85,7 @@ export class SimCfnAthenaWorkGroupCreator {
 
   private async applyState(
     name: string,
-    state: string | undefined,
+    state: SimAthenaWorkGroupState | undefined,
   ): Promise<void> {
     if (state === undefined) {
       return;
