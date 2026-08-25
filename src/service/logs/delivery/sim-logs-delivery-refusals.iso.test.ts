@@ -264,4 +264,101 @@ describe("simulated CloudWatch Logs delivery refusals", () => {
     assertIdentical(empty.name, "ValidationException");
     assertStringIncludes(empty.message, "takes at least one character");
   });
+  it("refuses a suffix path spelling out its own Hive keys", async () => {
+    // Given a source and an S3 destination.
+    const simAws = new SimAws();
+
+    await givenSource(simAws);
+
+    const deliveryDestinationArn = await givenDestination(
+      simAws,
+      "site-access-logs",
+      bucketArn,
+    );
+
+    // When a delivery asks for Hive compatible paths and writes the `key=`
+    // half of every segment itself. This is the layout a CloudFront analytics
+    // stack reaches for, and the one real AWS refused.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.logs().createDelivery(
+        new CreateDeliveryCommand({
+          deliverySourceName: sourceName,
+          deliveryDestinationArn,
+          s3DeliveryConfiguration: {
+            suffixPath:
+              "distributionid={distributionid}/year={yyyy}/month={MM}/day={dd}/hour={HH}",
+            enableHiveCompatiblePath: true,
+          },
+        }),
+      );
+    });
+
+    // Then it is refused here rather than on a real deploy. Delivery writes
+    // the key itself under the option, so naming it doubles it.
+    assertIdentical(error.name, "ValidationException");
+    assertStringIncludes(error.message, "distributionid={distributionid}");
+    assertStringIncludes(error.message, "enableHiveCompatiblePath");
+  });
+
+  it("takes the same partition keys spelled as bare variables", async () => {
+    // Given a source and an S3 destination.
+    const simAws = new SimAws();
+
+    await givenSource(simAws);
+
+    const deliveryDestinationArn = await givenDestination(
+      simAws,
+      "site-access-logs",
+      bucketArn,
+    );
+
+    // When the delivery leaves the `key=` half to delivery and asks for Hive
+    // compatible paths.
+    const created = await simAws.logs().createDelivery(
+      new CreateDeliveryCommand({
+        deliverySourceName: sourceName,
+        deliveryDestinationArn,
+        s3DeliveryConfiguration: {
+          suffixPath: "{distributionid}/{yyyy}/{MM}/{dd}/{HH}",
+          enableHiveCompatiblePath: true,
+        },
+      }),
+    );
+
+    // Then it is created, because this is what the option is for.
+    assertIdentical(
+      created.delivery?.s3DeliveryConfiguration?.suffixPath,
+      "{distributionid}/{yyyy}/{MM}/{dd}/{HH}",
+    );
+  });
+
+  it("leaves a hand-rolled key alone with Hive compatible paths off", async () => {
+    // Given a source and an S3 destination.
+    const simAws = new SimAws();
+
+    await givenSource(simAws);
+
+    const deliveryDestinationArn = await givenDestination(
+      simAws,
+      "site-access-logs",
+      bucketArn,
+    );
+
+    // When a delivery writes its own partition keys and asks for no Hive
+    // compatible paths, so nothing doubles them.
+    const created = await simAws.logs().createDelivery(
+      new CreateDeliveryCommand({
+        deliverySourceName: sourceName,
+        deliveryDestinationArn,
+        s3DeliveryConfiguration: { suffixPath: "dt={yyyy}-{MM}-{dd}" },
+      }),
+    );
+
+    // Then it is created. Whether real CloudWatch Logs takes an `=` with the
+    // option off is unverified, and the Limitations in the logs docs say so.
+    assertIdentical(
+      created.delivery?.s3DeliveryConfiguration?.suffixPath,
+      "dt={yyyy}-{MM}-{dd}",
+    );
+  });
 });
