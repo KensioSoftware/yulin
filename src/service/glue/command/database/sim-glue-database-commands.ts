@@ -125,9 +125,9 @@ export class SimGlueDatabaseCommands {
 
     const name = requiredSimGlueName("Name", command.input.Name);
 
-    this.#authorizer.authorizeDatabase(
-      "glue:DeleteDatabase",
+    this.#authorizer.authorizeDatabaseDeletion(
       name,
+      this.#tables.inDatabase(name).map((table) => table.name),
       options?.caller,
     );
 

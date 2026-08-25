@@ -2,9 +2,11 @@ import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateDatabaseCommand,
   CreateTableCommand,
+  DeleteDatabaseCommand,
   GetTableCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -21,10 +23,31 @@ const caller = {
   arn: `arn:aws:iam::${accountId}:role/ReportingRole`,
 };
 
-/**
- * A Role that may read one table and nothing else in the catalog.
- */
-async function reportingRole(simAws: SimAws): Promise<void> {
+const catalogArn = `arn:aws:glue:us-east-1:${accountId}:catalog`;
+const databaseArn = `arn:aws:glue:us-east-1:${accountId}:database/site_logs`;
+const tableArn = `arn:aws:glue:us-east-1:${accountId}:table/site_logs/access_logs`;
+
+/** A catalog holding one table, which is what the policies below name. */
+function catalogWithTable(simAws: SimAws): void {
+  const glue = simAws.glue();
+
+  glue.createDatabase(
+    new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+  );
+  glue.createTable(
+    new CreateTableCommand({
+      DatabaseName: "site_logs",
+      TableInput: { Name: "access_logs" },
+    }),
+  );
+}
+
+/** A Role allowed one action over the resources named. */
+async function roleAllowing(
+  simAws: SimAws,
+  action: string,
+  resource: readonly string[],
+): Promise<void> {
   await simAws.iam().createRole(
     new CreateRoleCommand({
       RoleName: "ReportingRole",
@@ -47,63 +70,99 @@ async function reportingRole(simAws: SimAws): Promise<void> {
       PolicyName: "ReadAccessLogs",
       PolicyDocument: JSON.stringify({
         Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Action: "glue:GetTable",
-            Resource: `arn:aws:glue:us-east-1:${accountId}:table/site_logs/access_logs`,
-          },
-        ],
+        Statement: [{ Effect: "Allow", Action: action, Resource: resource }],
       }),
     }),
   );
 }
 
 describe("SimGlue authorization", () => {
-  it("lets a caller read the table its policy names", async () => {
-    // Given a catalog holding a table, and a role allowed to read that table.
+  it("lets a caller whose policy names the table and its ancestors read it", async () => {
+    // Given a role allowed to read one table, over the catalog, the database
+    // and the table, which is what real Glue needs.
     const simAws = new SimAws({ defaultAccountId: accountId });
-    const glue = simAws.glue();
 
-    glue.createDatabase(
-      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
-    );
-    glue.createTable(
-      new CreateTableCommand({
-        DatabaseName: "site_logs",
-        TableInput: { Name: "access_logs" },
-      }),
-    );
-
-    await reportingRole(simAws);
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:GetTable", [
+      catalogArn,
+      databaseArn,
+      tableArn,
+    ]);
 
     // When the role reads that table.
-    const { Table } = glue.getTable(
-      new GetTableCommand({
-        DatabaseName: "site_logs",
-        Name: "access_logs",
-      }),
-      { caller },
-    );
+    const { Table } = simAws
+      .glue()
+      .getTable(
+        new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+        { caller },
+      );
 
     // Then it comes back.
     assertIdentical(Table.Name, "access_logs");
   });
 
-  it("refuses a caller whose policy leaves the action out", async () => {
-    // Given the same role, which may read a table and nothing else.
+  it("refuses a policy naming the table without its ancestors", async () => {
+    // Given a role allowed to read the table ARN alone. Real Glue denies this,
+    // because an operation on a Data Catalog resource needs permission on the
+    // resource and on every ancestor of it.
     const simAws = new SimAws({ defaultAccountId: accountId });
-    const glue = simAws.glue();
 
-    glue.createDatabase(
-      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
-    );
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:GetTable", [tableArn]);
 
-    await reportingRole(simAws);
+    // When the role reads that table.
+    const error = assertThrowsError(() => {
+      simAws.glue().getTable(
+        new GetTableCommand({
+          DatabaseName: "site_logs",
+          Name: "access_logs",
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is refused, naming the outermost resource the policy left out.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertStringIncludes(error.message, catalogArn);
+  });
+
+  it("refuses a policy naming the catalog without the database", async () => {
+    // Given a role allowed the action over the catalog alone.
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:GetTable", [catalogArn]);
+
+    // When the role reads a table.
+    const error = assertThrowsError(() => {
+      simAws.glue().getTable(
+        new GetTableCommand({
+          DatabaseName: "site_logs",
+          Name: "access_logs",
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is refused at the database, which is the next resource down.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertStringIncludes(error.message, databaseArn);
+  });
+
+  it("refuses a caller whose policy leaves the action out", async () => {
+    // Given a role that may read a table and nothing else.
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:GetTable", [
+      catalogArn,
+      databaseArn,
+      tableArn,
+    ]);
 
     // When it creates a table.
     const error = assertThrowsError(() => {
-      glue.createTable(
+      simAws.glue().createTable(
         new CreateTableCommand({
           DatabaseName: "site_logs",
           TableInput: { Name: "error_logs" },
@@ -117,35 +176,50 @@ describe("SimGlue authorization", () => {
     assertStringIncludes(error.message, "glue:CreateTable");
   });
 
-  it("refuses a caller reading a table outside its policy", async () => {
-    // Given a catalog holding a second table the role's policy leaves out.
+  it("refuses deleting a database the policy covers without its tables", async () => {
+    // Given a role allowed to delete the database and its ancestors, and
+    // nothing on the table inside it. A delete needs the children too.
     const simAws = new SimAws({ defaultAccountId: accountId });
-    const glue = simAws.glue();
 
-    glue.createDatabase(
-      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
-    );
-    glue.createTable(
-      new CreateTableCommand({
-        DatabaseName: "site_logs",
-        TableInput: { Name: "error_logs" },
-      }),
-    );
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:DeleteDatabase", [
+      catalogArn,
+      databaseArn,
+    ]);
 
-    await reportingRole(simAws);
-
-    // When the role reads that other table.
+    // When the role deletes the database.
     const error = assertThrowsError(() => {
-      glue.getTable(
-        new GetTableCommand({
-          DatabaseName: "site_logs",
-          Name: "error_logs",
-        }),
-        { caller },
-      );
+      simAws
+        .glue()
+        .deleteDatabase(new DeleteDatabaseCommand({ Name: "site_logs" }), {
+          caller,
+        });
     });
 
-    // Then it is refused, because a table ARN names the table.
+    // Then it is refused, naming the table that would have gone with it.
     assertInstanceOf(error, SimIamAccessDenied);
+    assertStringIncludes(error.message, tableArn);
+  });
+
+  it("deletes a database when the policy covers its tables too", async () => {
+    // Given the same role, with the table added to its policy.
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:DeleteDatabase", [
+      catalogArn,
+      databaseArn,
+      tableArn,
+    ]);
+
+    // When the role deletes the database.
+    simAws
+      .glue()
+      .deleteDatabase(new DeleteDatabaseCommand({ Name: "site_logs" }), {
+        caller,
+      });
+
+    // Then it goes, and takes its table with it.
+    assertArrayLength(simAws.glue().allDatabases(), 0);
   });
 });

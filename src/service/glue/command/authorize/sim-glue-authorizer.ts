@@ -2,12 +2,13 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simGlueCatalogArn } from "../../arn/sim-glue-arn.js";
+import { authorizeSimGlueResources } from "./sim-glue-authorize-resources.js";
 import {
-  simGlueCatalogArn,
-  simGlueDatabaseArn,
-  simGlueTableArn,
-} from "../../arn/sim-glue-arn.js";
+  simGlueDatabaseDeletionResources,
+  simGlueDatabaseResources,
+  simGlueTableResources,
+} from "../../arn/sim-glue-authorized-resources.js";
 
 interface SimGlueAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -17,18 +18,23 @@ interface SimGlueAuthorizerProperties {
 /**
  * Applies simulated IAM authorization to Glue requests.
  *
- * An operation on one database or table authorizes against that resource's own
- * ARN. Real Glue policies also name the catalog on most of these actions, and
- * a policy written that way still passes here, since a policy granting more
- * than the simulation checks is never the reason a request fails.
+ * Data Catalog resources are a hierarchy with the catalog at the root, and an
+ * operation on one needs permission on that resource and on every ancestor of
+ * it. Reading a table needs the table, the database and the catalog, and a
+ * policy naming only the table ARN is denied. Deleting a database also needs
+ * permission on every table in it.
+ *
+ * That rule is why each method authorizes a list. A policy written for real
+ * Glue already names the ancestors, and one that names only the leaf fails the
+ * same way in both places.
  */
 export class SimGlueAuthorizer {
   readonly #iam: SimIamInterServiceAuthZ;
-  readonly #accountRegionScope: SimAwsAccountRegionScope;
+  readonly #scope: SimAwsAccountRegionScope;
 
   constructor(properties: SimGlueAuthorizerProperties) {
     this.#iam = properties.iam;
-    this.#accountRegionScope = properties.accountRegionScope;
+    this.#scope = properties.accountRegionScope;
   }
 
   /**
@@ -45,14 +51,12 @@ export class SimGlueAuthorizer {
   ): SimAwsResolvedCaller {
     return this.#authorize(
       action,
-      simGlueDatabaseArn(this.#accountRegionScope, databaseName),
+      simGlueDatabaseResources(this.#scope, databaseName),
       caller,
     );
   }
 
-  /**
-   * Ensure the caller may perform an action on a table.
-   */
+  /** Ensure the caller may perform an action on a table. */
   authorizeTable(
     action: string,
     databaseName: string,
@@ -61,42 +65,46 @@ export class SimGlueAuthorizer {
   ): SimAwsResolvedCaller {
     return this.#authorize(
       action,
-      simGlueTableArn(this.#accountRegionScope, databaseName, tableName),
+      simGlueTableResources(this.#scope, databaseName, tableName),
+      caller,
+    );
+  }
+
+  /** Ensure the caller may delete a database holding these tables. */
+  authorizeDatabaseDeletion(
+    databaseName: string,
+    tableNames: readonly string[],
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return this.#authorize(
+      "glue:DeleteDatabase",
+      simGlueDatabaseDeletionResources(this.#scope, databaseName, tableNames),
       caller,
     );
   }
 
   /**
-   * Ensure the caller may perform an action that names no particular database.
+   * Ensure the caller may perform an action naming no particular database.
    *
-   * The resource is the catalog, which is what such a request reaches.
+   * The catalog has no ancestor, so it is the whole of the list.
    */
   authorizeCatalog(
     action: string,
     caller?: SimAwsCaller,
   ): SimAwsResolvedCaller {
-    return this.#authorize(
-      action,
-      simGlueCatalogArn(this.#accountRegionScope),
-      caller,
-    );
+    return this.#authorize(action, [simGlueCatalogArn(this.#scope)], caller);
   }
 
   #authorize(
     action: string,
-    resource: string,
+    resources: readonly string[],
     caller: SimAwsCaller | undefined,
   ): SimAwsResolvedCaller {
-    const decision = this.#iam.authorize({ action, resource, caller });
-
-    if (decision.isDenied) {
-      throw new SimIamAccessDenied({
-        principal: decision.caller.principal,
-        action,
-        resource,
-      });
-    }
-
-    return decision.caller;
+    return authorizeSimGlueResources({
+      iam: this.#iam,
+      action,
+      resources,
+      caller,
+    });
   }
 }

@@ -14,7 +14,8 @@ interface SimGlueDatabaseProperties {
  * A simulated Glue database, which is the grouping a table lives in.
  *
  * A database holds no data of its own. What it carries is a name, somewhere
- * for a table to belong, and the parameters a caller put on it.
+ * for a table to belong, and the parameters a caller put on it, copied on the
+ * way in so a caller reusing its input cannot change what is stored.
  */
 export class SimGlueDatabase {
   readonly name: string;
@@ -27,10 +28,10 @@ export class SimGlueDatabase {
 
   constructor(properties: SimGlueDatabaseProperties) {
     this.name = properties.name;
-    this.createTime = properties.createTime;
+    this.createTime = new Date(properties.createTime);
     this.description = properties.description;
     this.locationUri = properties.locationUri;
-    this.parameters = { ...properties.parameters };
+    this.parameters = structuredClone(properties.parameters) ?? {};
     this.#accountRegionScope = properties.accountRegionScope;
   }
 

@@ -29,12 +29,16 @@ const database: SimCfnTemplateValueRecord = {
 
 describe("AWS::Glue::Database properties", () => {
   it("names an unnamed database after the stack and the logical ID", async () => {
-    // Given a template declaring a database with no name of its own.
+    // Given a template whose DatabaseInput carries no name of its own, which
+    // real Glue allows since only DatabaseInput itself is required.
     const simAws = new SimAws();
 
     // When it is deployed.
     await deploy(simAws, {
-      LogDatabase: { Type: "AWS::Glue::Database", Properties: {} },
+      LogDatabase: {
+        Type: "AWS::Glue::Database",
+        Properties: { DatabaseInput: {} },
+      },
     });
 
     // Then the name is built from the stack and the logical ID, lowercased,
@@ -44,6 +48,26 @@ describe("AWS::Glue::Database properties", () => {
     );
 
     await simAws.backgroundTasksComplete();
+  });
+
+  it("refuses a database with no DatabaseInput", async () => {
+    // Given a template leaving out the property real Glue requires.
+    const simAws = new SimAws();
+
+    // When it is deployed.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "analytics-stack",
+        template: {
+          Resources: {
+            LogDatabase: { Type: "AWS::Glue::Database", Properties: {} },
+          },
+        },
+      });
+    });
+
+    // Then it is refused rather than deployed under a generated name.
+    assertStringIncludes(error.message, "DatabaseInput is required");
   });
 
   it("takes the name from a top-level DatabaseName", async () => {

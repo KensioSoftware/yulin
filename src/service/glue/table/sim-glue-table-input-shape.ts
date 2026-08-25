@@ -1,4 +1,4 @@
-import { SimGlueInvalidInputException } from "../error/sim-glue.error.js";
+import { requiredSimGlueName } from "../database/sim-glue-catalog-name.js";
 import type {
   SimGlueColumn,
   SimGlueSerDeInfo,
@@ -32,21 +32,19 @@ export interface SimGlueStorageDescriptorInput {
 }
 
 /**
- * Read a declared column list, refusing one without a name.
+ * Read a declared column list, refusing a name real Glue would refuse.
+ *
+ * A column name is held to the same rule as a database or table name, since
+ * the Data Catalog caps all three the same way.
  */
 export function requiredSimGlueColumns(
   label: string,
   columns: readonly SimGlueColumnInput[] | undefined,
 ): readonly SimGlueColumn[] | undefined {
-  return columns?.map((column, index) => {
-    if (column.Name === undefined || column.Name === "") {
-      throw new SimGlueInvalidInputException(
-        `${label}.${index}.Name is required`,
-      );
-    }
-
-    return { ...column, Name: column.Name };
-  });
+  return columns?.map((column, index) => ({
+    ...column,
+    Name: requiredSimGlueName(`${label}.${index}.Name`, column.Name),
+  }));
 }
 
 /**

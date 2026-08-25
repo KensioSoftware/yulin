@@ -41,9 +41,9 @@ Real AWS responses are that shape, and an assertion comparing a response against
 declared trips over keys nobody set otherwise.
 
 **Unknown properties are recorded, malformed ones are refused.** A property this simulation has no
-behaviour for is reported through `ignoreProperty` and the resource is created anyway, which is what
-#273 argues for. A property of the wrong type fails the deploy. A template declaring `TableInput` as
-a string is broken, and being ahead of the simulation is a different thing.
+behaviour for is reported through `ignoreProperty` and the resource is created anyway, which is the
+argument in issue #273. A property of the wrong type fails the deploy. A template declaring
+`TableInput` as a string is broken, and being ahead of the simulation is a different thing.
 
 **`Fn::GetAtt Id` on a table is refused.** CloudFormation documents the attribute and documents
 nothing about the value behind it. Answering with a plausible string would put a value in a template

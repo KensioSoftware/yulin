@@ -88,7 +88,7 @@ export class SimCfnGlueDatabaseProperties {
     const input = this.#properties["DatabaseInput"];
 
     if (input === undefined) {
-      return {};
+      throw this.#values.refuse("DatabaseInput is required");
     }
 
     return this.#values.record(input, "DatabaseInput");

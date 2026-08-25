@@ -4,6 +4,7 @@ import {
   DeleteDatabaseCommand,
   DeleteTableCommand,
   GetDatabasesCommand,
+  GetTableCommand,
   GetTablesCommand,
 } from "@aws-sdk/client-glue";
 import {
@@ -165,22 +166,62 @@ describe("SimGlue names and ARNs", () => {
     assertArrayLength(table.columns, 1);
   });
 
-  it("refuses a name longer than real Glue accepts", () => {
+  it("caps a name at 255 UTF-8 bytes rather than 255 characters", () => {
     // Given a catalog.
     const glue = new SimAws().glue();
 
-    // When a database is created with a 256 character name.
-    const error = assertThrowsError(() => {
+    // When a database is created at the limit, one byte over it, and once
+    // with 128 two-byte characters, which is 256 bytes in 128 characters.
+    glue.createDatabase(
+      new CreateDatabaseCommand({ DatabaseInput: { Name: "a".repeat(255) } }),
+    );
+
+    const tooLong = assertThrowsError(() => {
       glue.createDatabase(
         new CreateDatabaseCommand({
           DatabaseInput: { Name: "a".repeat(256) },
         }),
       );
     });
+    const tooManyBytes = assertThrowsError(() => {
+      glue.createDatabase(
+        new CreateDatabaseCommand({
+          DatabaseInput: { Name: "é".repeat(128) },
+        }),
+      );
+    });
 
-    // Then it is refused, as real Glue caps these names at 255.
+    // Then the byte count is what decides it, which is how the Data Catalog
+    // states the limit.
+    assertInstanceOf(tooLong, SimGlueInvalidInputException);
+    assertInstanceOf(tooManyBytes, SimGlueInvalidInputException);
+    assertStringIncludes(tooManyBytes.message, "255 UTF-8 bytes");
+  });
+
+  it("holds a column name to the same limit", () => {
+    // Given a database to put a table in.
+    const glue = new SimAws().glue();
+
+    glue.createDatabase(
+      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+    );
+
+    // When a column is declared with a name over the limit.
+    const error = assertThrowsError(() => {
+      glue.createTable(
+        new CreateTableCommand({
+          DatabaseName: "site_logs",
+          TableInput: {
+            Name: "access_logs",
+            StorageDescriptor: { Columns: [{ Name: "a".repeat(256) }] },
+          },
+        }),
+      );
+    });
+
+    // Then it is refused, since the Data Catalog caps all three the same way.
     assertInstanceOf(error, SimGlueInvalidInputException);
-    assertStringIncludes(error.message, "255");
+    assertStringIncludes(error.message, "Columns.0.Name");
   });
 
   it("refuses a column declared without a name", () => {
@@ -218,5 +259,83 @@ describe("SimGlue names and ARNs", () => {
     assertStringIncludes(partitionKeyError.message, "PartitionKeys.0.Name");
     assertInstanceOf(columnError, SimGlueInvalidInputException);
     assertStringIncludes(columnError.message, "Columns.0.Name");
+  });
+});
+
+describe("SimGlue catalog state", () => {
+  it("hands back a table detached from the one it holds", () => {
+    // Given a table with parameters and partition keys.
+    const glue = new SimAws().glue();
+
+    glue.createDatabase(
+      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+    );
+    glue.createTable(
+      new CreateTableCommand({
+        DatabaseName: "site_logs",
+        TableInput: {
+          Name: "access_logs",
+          PartitionKeys: [{ Name: "year", Type: "string" }],
+          StorageDescriptor: { Location: "s3://site-logs/" },
+          Parameters: { "projection.enabled": "true" },
+        },
+      }),
+    );
+
+    // When a caller mutates what GetTable answered with.
+    const first = glue.getTable(
+      new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+    );
+
+    (first.Table.Parameters as Record<string, string>)["projection.enabled"] =
+      "false";
+    (first.Table.StorageDescriptor as { Location?: string }).Location =
+      "s3://elsewhere/";
+
+    // Then the catalog is unchanged, since real Glue answers each request with
+    // its own object rather than a handle on the stored definition.
+    const second = glue.getTable(
+      new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+    );
+
+    assertIdentical(second.Table.Parameters["projection.enabled"], "true");
+    assertIdentical(
+      second.Table.StorageDescriptor?.Location,
+      "s3://site-logs/",
+    );
+  });
+
+  it("keeps a table declared with input the caller then reuses", () => {
+    // Given a TableInput a caller holds on to, which is the ordinary case when
+    // a helper builds one and creates two tables from it.
+    const glue = new SimAws().glue();
+    const columns = [{ Name: "status", Type: "int" }];
+    const parameters: Record<string, string> = { "projection.enabled": "true" };
+
+    glue.createDatabase(
+      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+    );
+    glue.createTable(
+      new CreateTableCommand({
+        DatabaseName: "site_logs",
+        TableInput: {
+          Name: "access_logs",
+          StorageDescriptor: { Columns: columns },
+          Parameters: parameters,
+        },
+      }),
+    );
+
+    // When the caller changes that input afterwards.
+    columns[0] = { Name: "status", Type: "string" };
+    parameters["projection.enabled"] = "false";
+
+    // Then the stored table keeps what it was created with.
+    const { Table } = glue.getTable(
+      new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+    );
+
+    assertIdentical(Table.StorageDescriptor?.Columns?.[0]?.Type, "int");
+    assertIdentical(Table.Parameters["projection.enabled"], "true");
   });
 });

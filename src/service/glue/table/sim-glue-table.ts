@@ -26,6 +26,10 @@ interface SimGlueTableProperties {
  * The parameters are the part callers most often care about here. Athena
  * partition projection lives entirely in them, so a table whose parameters
  * were dropped on the way in looks created while configuring nothing.
+ *
+ * Everything a caller declared is copied on the way in. A `TableInput` the
+ * caller goes on to reuse or mutate would otherwise keep changing the stored
+ * definition, which no Glue command could account for.
  */
 export class SimGlueTable {
   readonly name: string;
@@ -44,14 +48,14 @@ export class SimGlueTable {
   constructor(properties: SimGlueTableProperties) {
     this.name = properties.name;
     this.databaseName = properties.databaseName;
-    this.createTime = properties.createTime;
+    this.createTime = new Date(properties.createTime);
     this.description = properties.description;
     this.owner = properties.owner;
     this.retention = properties.retention;
     this.tableType = properties.tableType;
-    this.partitionKeys = [...(properties.partitionKeys ?? [])];
-    this.storageDescriptor = properties.storageDescriptor;
-    this.parameters = { ...properties.parameters };
+    this.partitionKeys = structuredClone(properties.partitionKeys ?? []);
+    this.storageDescriptor = structuredClone(properties.storageDescriptor);
+    this.parameters = structuredClone(properties.parameters) ?? {};
     this.#accountRegionScope = properties.accountRegionScope;
   }
 

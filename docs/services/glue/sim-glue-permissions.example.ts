@@ -2,12 +2,27 @@
  * A Role that may read one table and nothing else in the catalog.
  */
 
-import { GetTableCommand } from "@aws-sdk/client-glue";
+import {
+  CreateDatabaseCommand,
+  CreateTableCommand,
+  GetTableCommand,
+} from "@aws-sdk/client-glue";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 
 import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "111111111111" });
+const glue = simAws.glue();
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+);
+glue.createTable(
+  new CreateTableCommand({
+    DatabaseName: "site_logs",
+    TableInput: { Name: "access_logs" },
+  }),
+);
 
 await simAws.iam().createRole(
   new CreateRoleCommand({
@@ -35,22 +50,26 @@ await simAws.iam().putRolePolicy(
         {
           Effect: "Allow",
           Action: "glue:GetTable",
-          Resource:
+          Resource: [
+            "arn:aws:glue:us-east-1:111111111111:catalog",
+            "arn:aws:glue:us-east-1:111111111111:database/site_logs",
             "arn:aws:glue:us-east-1:111111111111:table/site_logs/access_logs",
+          ],
         },
       ],
     }),
   }),
 );
 
-simAws
-  .glue()
-  .getTable(
-    new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
-    {
-      caller: {
-        kind: "arn",
-        arn: "arn:aws:iam::111111111111:role/ReportingRole",
-      },
+const { Table } = glue.getTable(
+  new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+  {
+    caller: {
+      kind: "arn",
+      arn: "arn:aws:iam::111111111111:role/ReportingRole",
     },
-  );
+  },
+);
+
+// access_logs
+console.log(Table.Name);

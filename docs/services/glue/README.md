@@ -8,7 +8,7 @@ to, including the Athena partition projection its parameters configure.
 A table here is a definition. The data it describes stays in S3, unread, and the catalog answers
 with what it was told to hold.
 
-Glue specific types are imported from the `@kensio/yulin/glue` subpath.
+Glue-specific types are imported from the `@kensio/yulin/glue` subpath.
 
 ## Deploying a database and a table
 
@@ -138,21 +138,38 @@ console.log(TableList?.[0]?.Name);
 
 ## Permissions
 
-Every Command authorizes through simulated IAM. A database operation authorizes against the database
-ARN, a table operation against the table ARN, and an operation naming no database against the
-catalog ARN.
+Every Command authorizes through simulated IAM. Data Catalog resources are a hierarchy with the
+catalog at the root, and an operation on one needs permission on that resource and on every ancestor
+of it. Reading a table needs the table, the database and the catalog, and a policy naming only the
+table ARN is denied. Deleting a database needs permission on every table in it as well, since the
+tables go with it.
 
 ```typescript sim-glue-permissions
 /**
  * A Role that may read one table and nothing else in the catalog.
  */
 
-import { GetTableCommand } from "@aws-sdk/client-glue";
+import {
+  CreateDatabaseCommand,
+  CreateTableCommand,
+  GetTableCommand,
+} from "@aws-sdk/client-glue";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 
 import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "111111111111" });
+const glue = simAws.glue();
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+);
+glue.createTable(
+  new CreateTableCommand({
+    DatabaseName: "site_logs",
+    TableInput: { Name: "access_logs" },
+  }),
+);
 
 await simAws.iam().createRole(
   new CreateRoleCommand({
@@ -180,26 +197,32 @@ await simAws.iam().putRolePolicy(
         {
           Effect: "Allow",
           Action: "glue:GetTable",
-          Resource:
+          Resource: [
+            "arn:aws:glue:us-east-1:111111111111:catalog",
+            "arn:aws:glue:us-east-1:111111111111:database/site_logs",
             "arn:aws:glue:us-east-1:111111111111:table/site_logs/access_logs",
+          ],
         },
       ],
     }),
   }),
 );
 
-simAws
-  .glue()
-  .getTable(
-    new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
-    {
-      caller: {
-        kind: "arn",
-        arn: "arn:aws:iam::111111111111:role/ReportingRole",
-      },
+const { Table } = glue.getTable(
+  new GetTableCommand({ DatabaseName: "site_logs", Name: "access_logs" }),
+  {
+    caller: {
+      kind: "arn",
+      arn: "arn:aws:iam::111111111111:role/ReportingRole",
     },
-  );
+  },
+);
+
+// access_logs
+console.log(Table.Name);
 ```
+
+A policy listing only the table ARN is refused here, and refused by real Glue for the same reason.
 
 ## Available functionality
 
@@ -207,7 +230,7 @@ simAws
 - `CreateTable`, `GetTable`, `GetTables` and `DeleteTable`.
 - `AWS::Glue::Database` and `AWS::Glue::Table`, deployed and deleted with the stack.
 - `TableInput.Parameters`, `PartitionKeys` and `StorageDescriptor`, held and read back as declared.
-- IAM authorization on every Command.
+- IAM authorization on every Command, over the resource and its ancestors.
 
 ## Limitations
 
