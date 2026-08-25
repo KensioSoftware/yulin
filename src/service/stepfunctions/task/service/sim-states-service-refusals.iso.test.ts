@@ -24,11 +24,11 @@ describe("Step Functions service integration refusals", () => {
     // Given an SDK integration calling a service nothing here simulates.
     // When the state machine is created, the refusal names what it asked for.
     const refusal = refusalForResource(
-      "arn:aws:states:::aws-sdk:athena:startQueryExecution",
+      "arn:aws:states:::aws-sdk:textract:analyzeDocument",
     );
 
-    assertStringIncludes(refusal, "startQueryExecution");
-    assertStringIncludes(refusal, "athena");
+    assertStringIncludes(refusal, "analyzeDocument");
+    assertStringIncludes(refusal, "textract");
     assertStringIncludes(refusal, "dynamodb");
   });
 

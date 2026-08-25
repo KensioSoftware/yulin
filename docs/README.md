@@ -8,6 +8,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [ACM](https://yulinsim.dev/services/acm/ "Simulated ACM usage docs")
 - [API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway HTTP API usage docs")
 - [API Gateway REST APIs](https://yulinsim.dev/services/apigateway/ "Simulated API Gateway REST API usage docs")
+- [Athena](https://yulinsim.dev/services/athena/ "Simulated Amazon Athena usage docs")
 - [Bedrock](https://yulinsim.dev/services/bedrock/ "Simulated Amazon Bedrock usage docs")
 - [CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](https://yulinsim.dev/services/cloudfront/ "Simulated CloudFront usage docs")

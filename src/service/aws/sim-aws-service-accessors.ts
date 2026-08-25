@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimAthena } from "../athena/index.js";
 import type { SimBedrock } from "../bedrock/index.js";
 import type { SimApiGateway } from "../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
@@ -68,6 +69,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated API Gateway v2 in the default Account Region scope. */
   apiGatewayV2(): SimApiGatewayV2 {
     return this.defaultAccountRegionScope().apiGatewayV2();
+  }
+
+  /** Get simulated Athena in the default Account Region scope. */
+  athena(): SimAthena {
+    return this.defaultAccountRegionScope().athena();
   }
 
   /** Get simulated Bedrock in the default Account Region scope. */
