@@ -9,6 +9,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../template/value/sim-cfn-template-value.js";
+import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import { SimCfnResourcePropertyResolver } from "./resolve/property/sim-cfn-resource-property-resolver.js";
 import {
   type SimCfnResourceValueAdapter,
@@ -67,6 +68,14 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
       parameters,
       exports,
       accountRegionScope: this.accountRegionScope,
+      // The Resource pass needs these as well as the template-wide pass. An
+      // `Fn::Sub` naming a pseudo parameter beside a Ref to another Resource
+      // resolves in neither pass alone, because a value re-emitted for the
+      // next pass carries only the variables that pass was given.
+      pseudoParameters: new SimCfnPseudoParameters({
+        accountRegionScope: this.accountRegionScope,
+        stackName,
+      }),
       propertyIgnorer: this,
       resourceType: this.type,
     });
