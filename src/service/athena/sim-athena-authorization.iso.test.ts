@@ -3,6 +3,7 @@ import { faker } from "@faker-js/faker";
 import {
   assertArrayLength,
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -206,5 +207,104 @@ describe("simulated Athena authorization", () => {
 
     // Then the batch is denied rather than answering with the query.
     assertIdentical(error.name, "AccessDeniedException");
+  });
+
+  it("writes a query's results under the caller that ran it", async () => {
+    // Given a results Bucket, a workgroup pointing at it, and a role allowed
+    // to run queries but not to write to that Bucket.
+    const simAws = new SimAws();
+    const name = workGroupName();
+    const athena = simAws.region("eu-west-2").account().athena();
+
+    await simAws
+      .region("eu-west-2")
+      .account()
+      .s3()
+      .createBucket({ input: { Bucket: "locked-results" } });
+    await athena.createWorkGroup({
+      input: {
+        Name: name,
+        Configuration: {
+          ResultConfiguration: { OutputLocation: "s3://locked-results/q/" },
+        },
+      },
+    });
+
+    const arn = await aRoleAllowed(simAws, [
+      {
+        Effect: "Allow",
+        Action: "athena:*",
+        Resource: workGroupArn(simAws, name),
+      },
+    ]);
+
+    // When that role runs a query.
+    const started = await athena.startQueryExecution(
+      { input: { QueryString: "SELECT 1", WorkGroup: name } },
+      { caller: { kind: "arn", arn } },
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    // Then the query failed on the write. Athena writes a result set under
+    // the identity that asked for it rather than a role of its own, so a
+    // caller who cannot write to the Bucket cannot get results out of it.
+    const execution = await athena.getQueryExecution({
+      input: { QueryExecutionId: started.QueryExecutionId },
+    });
+
+    const status = execution.QueryExecution?.Status;
+
+    assertNonNullable(status);
+    assertIdentical(status.State, "FAILED");
+    assertStringIncludes(
+      String(status.StateChangeReason),
+      "could not be written",
+    );
+  });
+
+  it("writes results for a caller its policy allows the Bucket to", async () => {
+    // Given the same setup, with the role also allowed to write there.
+    const simAws = new SimAws();
+    const name = workGroupName();
+    const athena = simAws.region("eu-west-2").account().athena();
+
+    await simAws
+      .region("eu-west-2")
+      .account()
+      .s3()
+      .createBucket({ input: { Bucket: "open-results" } });
+    await athena.createWorkGroup({
+      input: {
+        Name: name,
+        Configuration: {
+          ResultConfiguration: { OutputLocation: "s3://open-results/q/" },
+        },
+      },
+    });
+
+    const arn = await aRoleAllowed(simAws, [
+      {
+        Effect: "Allow",
+        Action: "athena:*",
+        Resource: workGroupArn(simAws, name),
+      },
+      { Effect: "Allow", Action: "s3:PutObject", Resource: "*" },
+    ]);
+
+    // When that role runs a query.
+    const started = await athena.startQueryExecution(
+      { input: { QueryString: "SELECT 1", WorkGroup: name } },
+      { caller: { kind: "arn", arn } },
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    // Then it succeeded.
+    const execution = await athena.getQueryExecution({
+      input: { QueryExecutionId: started.QueryExecutionId },
+    });
+
+    assertIdentical(execution.QueryExecution?.Status?.State, "SUCCEEDED");
   });
 });

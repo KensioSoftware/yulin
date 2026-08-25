@@ -1,9 +1,13 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAthenaQueryExecutionStore } from "../execution/sim-athena-query-execution-store.js";
+import type { SimAthenaQueryRunner } from "../execution/sim-athena-query-runner.js";
 import type { SimAthenaNamedQueryStore } from "../named-query/sim-athena-named-query-store.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
 import { SimAthenaAuthorizer } from "./authorize/sim-athena-authorizer.js";
+import { SimAthenaExecutionReads } from "./execution/sim-athena-execution-reads.js";
+import { SimAthenaExecutionWrites } from "./execution/sim-athena-execution-writes.js";
 import { SimAthenaNamedQueryReads } from "./named-query/sim-athena-named-query-reads.js";
 import { SimAthenaNamedQueryWrites } from "./named-query/sim-athena-named-query-writes.js";
 import { SimAthenaWorkGroupReads } from "./work-group/sim-athena-work-group-reads.js";
@@ -12,6 +16,8 @@ import { SimAthenaWorkGroupWrites } from "./work-group/sim-athena-work-group-wri
 interface SimAthenaCommandsProperties {
   readonly workGroups: SimAthenaWorkGroupStore;
   readonly namedQueries: SimAthenaNamedQueryStore;
+  readonly executions: SimAthenaQueryExecutionStore;
+  readonly runner: SimAthenaQueryRunner;
   readonly iam: SimIamInterServiceAuthZ;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
@@ -31,6 +37,8 @@ export class SimAthenaCommands {
   public readonly workGroupWrites: SimAthenaWorkGroupWrites;
   public readonly namedQueryReads: SimAthenaNamedQueryReads;
   public readonly namedQueryWrites: SimAthenaNamedQueryWrites;
+  public readonly executionReads: SimAthenaExecutionReads;
+  public readonly executionWrites: SimAthenaExecutionWrites;
 
   constructor(properties: SimAthenaCommandsProperties) {
     const { workGroups, namedQueries } = properties;
@@ -58,6 +66,17 @@ export class SimAthenaCommands {
       namedQueries,
       workGroups,
       authorizer,
+    });
+    this.executionReads = new SimAthenaExecutionReads({
+      executions: properties.executions,
+      authorizer,
+    });
+    this.executionWrites = new SimAthenaExecutionWrites({
+      executions: properties.executions,
+      workGroups,
+      runner: properties.runner,
+      authorizer,
+      clock: properties.clock,
     });
   }
 }

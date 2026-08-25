@@ -55,6 +55,38 @@ export class SimAthenaSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "StartQueryExecutionCommand",
+        async (command, context): Promise<unknown> =>
+          await simAthena.startQueryExecution(
+            command as simAthenaCommands.SimStartQueryExecutionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetQueryExecutionCommand",
+        async (command, context): Promise<unknown> =>
+          await simAthena.getQueryExecution(
+            command as simAthenaCommands.SimGetQueryExecutionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetQueryResultsCommand",
+        async (command, context): Promise<unknown> =>
+          await simAthena.getQueryResults(
+            command as simAthenaCommands.SimGetQueryResultsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "StopQueryExecutionCommand",
+        async (command, context): Promise<unknown> =>
+          await simAthena.stopQueryExecution(
+            command as simAthenaCommands.SimStopQueryExecutionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "CreateNamedQueryCommand",
         async (command, context): Promise<unknown> =>
           await simAthena.createNamedQuery(

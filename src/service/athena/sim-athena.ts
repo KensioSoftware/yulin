@@ -1,78 +1,34 @@
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type * as simAthenaCommands from "./command/sim-athena-command.types.js";
-import { SimAthenaCommands } from "./command/sim-athena-commands.js";
 import type { SimAthenaRequestOptions } from "./command/sim-athena-request-options.js";
-import { SimAthenaNamedQueryStore } from "./named-query/sim-athena-named-query-store.js";
 import type { SimAthenaNamedQuery } from "./named-query/sim-athena-named-query.js";
 import { SimAthenaCfnResourceFactory } from "./cfn/sim-athena-cfn-resource-factory.js";
 import { SimAthenaSdkCommandRouter } from "./sdk/sim-athena-sdk-command-router.js";
-import { SimAthenaWorkGroup } from "./workgroup/sim-athena-work-group.js";
-import { primaryWorkGroupName } from "./workgroup/sim-athena-work-group-name.js";
-import { SimAthenaWorkGroupStore } from "./workgroup/sim-athena-work-group-store.js";
-
-interface SimAthenaProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-}
+import { SimAthenaExecutions } from "./sim-athena-executions.js";
+import type { SimAthenaWorkGroup } from "./workgroup/sim-athena-work-group.js";
 
 /**
  * Simulated Amazon Athena. Handles SDK commands. Emulates AWS behaviour and
  * state.
  *
- * Workgroups and named queries are what this models. A workgroup holds the
- * settings a query would run under, and a named query holds SQL under a name.
- * Nothing runs a query and nothing reads the SQL, so a named query here is the
- * text a caller saved and a workgroup is the configuration a stack set.
+ * Workgroups, named queries and query executions are what this models. A
+ * workgroup holds the settings a query runs under, a named query holds SQL
+ * under a name, and an execution is one run of a query.
  *
- * That is worth being plain about. A test can prove its stack configured the
- * bytes-scanned cutoff and its rollups were registered, and it cannot find out
- * whether the SQL is valid.
+ * No SQL is evaluated. A test declares what a query answers with through
+ * `results()`, and the simulation reads the query text only as a key to match
+ * that declaration on. So a test can prove its workgroup's bytes-scanned
+ * cutoff refuses a query, that results land where the workgroup says, and that
+ * a client polls the lifecycle correctly. Whether the SQL is valid stays out
+ * of reach.
  *
- * Both resources are scoped to an account and region, as they are on real
- * Athena. Every scope starts with the `primary` workgroup, which real Athena
- * makes with the account.
+ * Everything here is scoped to an account and region, as it is on real Athena.
+ * Every scope starts with the `primary` workgroup, which real Athena makes
+ * with the account.
  */
-export class SimAthena {
-  readonly #workGroups = new SimAthenaWorkGroupStore();
-  readonly #namedQueries = new SimAthenaNamedQueryStore();
-  readonly #commands: SimAthenaCommands;
-  readonly #background: BackgroundScheduler;
+export class SimAthena extends SimAthenaExecutions {
   readonly #sdkRouter = new SimAthenaSdkCommandRouter(this);
   readonly #cfnFactory = new SimAthenaCfnResourceFactory({ athena: this });
-
-  constructor(properties: SimAthenaProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
-    } = properties;
-
-    this.#background = background;
-    this.#workGroups.put(
-      new SimAthenaWorkGroup({
-        name: primaryWorkGroupName,
-        createdAt: background.now(),
-      }),
-    );
-    this.#commands = new SimAthenaCommands({
-      workGroups: this.#workGroups,
-      namedQueries: this.#namedQueries,
-      iam,
-      accountRegionScope,
-      clock: background,
-    });
-  }
 
   /**
    * Find a workgroup by name.
@@ -81,7 +37,7 @@ export class SimAthena {
    * going through a Command and its authorization.
    */
   findWorkGroup(name: string): SimAthenaWorkGroup | undefined {
-    return this.#workGroups.find(name);
+    return this.workGroupStore.find(name);
   }
 
   /**
@@ -92,7 +48,7 @@ export class SimAthena {
    * rollup was registered needs.
    */
   namedQueries(): readonly SimAthenaNamedQuery[] {
-    return this.#namedQueries.all;
+    return this.namedQueryStore.all;
   }
 
   /**
@@ -102,8 +58,8 @@ export class SimAthena {
     command: simAthenaCommands.SimCreateWorkGroupCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimCreateWorkGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.workGroupWrites.createWorkGroup(command, options);
+    await this.background.sequence();
+    return this.commands.workGroupWrites.createWorkGroup(command, options);
   }
 
   /**
@@ -113,8 +69,8 @@ export class SimAthena {
     command: simAthenaCommands.SimGetWorkGroupCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimGetWorkGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.workGroupReads.getWorkGroup(command, options);
+    await this.background.sequence();
+    return this.commands.workGroupReads.getWorkGroup(command, options);
   }
 
   /**
@@ -124,8 +80,8 @@ export class SimAthena {
     command: simAthenaCommands.SimUpdateWorkGroupCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimUpdateWorkGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.workGroupWrites.updateWorkGroup(command, options);
+    await this.background.sequence();
+    return this.commands.workGroupWrites.updateWorkGroup(command, options);
   }
 
   /**
@@ -135,8 +91,8 @@ export class SimAthena {
     command: simAthenaCommands.SimDeleteWorkGroupCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimDeleteWorkGroupCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.workGroupWrites.deleteWorkGroup(command, options);
+    await this.background.sequence();
+    return this.commands.workGroupWrites.deleteWorkGroup(command, options);
   }
 
   /**
@@ -146,8 +102,8 @@ export class SimAthena {
     command: simAthenaCommands.SimListWorkGroupsCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimListWorkGroupsCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.workGroupReads.listWorkGroups(command, options);
+    await this.background.sequence();
+    return this.commands.workGroupReads.listWorkGroups(command, options);
   }
 
   /**
@@ -157,8 +113,8 @@ export class SimAthena {
     command: simAthenaCommands.SimCreateNamedQueryCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimCreateNamedQueryCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.namedQueryWrites.createNamedQuery(command, options);
+    await this.background.sequence();
+    return this.commands.namedQueryWrites.createNamedQuery(command, options);
   }
 
   /**
@@ -168,8 +124,8 @@ export class SimAthena {
     command: simAthenaCommands.SimGetNamedQueryCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimGetNamedQueryCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.namedQueryReads.getNamedQuery(command, options);
+    await this.background.sequence();
+    return this.commands.namedQueryReads.getNamedQuery(command, options);
   }
 
   /**
@@ -179,8 +135,8 @@ export class SimAthena {
     command: simAthenaCommands.SimBatchGetNamedQueryCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimBatchGetNamedQueryCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.namedQueryReads.batchGetNamedQuery(command, options);
+    await this.background.sequence();
+    return this.commands.namedQueryReads.batchGetNamedQuery(command, options);
   }
 
   /**
@@ -190,8 +146,8 @@ export class SimAthena {
     command: simAthenaCommands.SimListNamedQueriesCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimListNamedQueriesCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.namedQueryReads.listNamedQueries(command, options);
+    await this.background.sequence();
+    return this.commands.namedQueryReads.listNamedQueries(command, options);
   }
 
   /**
@@ -201,8 +157,8 @@ export class SimAthena {
     command: simAthenaCommands.SimDeleteNamedQueryCommand,
     options?: SimAthenaRequestOptions,
   ): Promise<simAthenaCommands.SimDeleteNamedQueryCommandOutput> {
-    await this.#background.sequence();
-    return this.#commands.namedQueryWrites.deleteNamedQuery(command, options);
+    await this.background.sequence();
+    return this.commands.namedQueryWrites.deleteNamedQuery(command, options);
   }
 
   /**

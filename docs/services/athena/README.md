@@ -3,10 +3,11 @@
 Yulin includes a simulated Amazon Athena for tests and local development. It holds workgroups and
 named queries, and hands both back through the SDK.
 
-No SQL is evaluated. A workgroup here carries the settings a query would run under, and a named
-query carries the text somebody saved. Everything stops there. A test can prove its stack
-configured the bytes-scanned cutoff and registered its rollups. Whether the SQL is valid stays out
-of reach. The [Limitations](#limitations) at the end say what that leaves out.
+No SQL is evaluated. A test declares what a query answers with, and the simulation reads the query
+text only as a key to match that declaration on. So a test can prove its bytes-scanned cutoff
+refuses a query, that results land where the workgroup says, and that a client polls the lifecycle
+correctly. Whether the SQL is valid stays out of reach. The [Limitations](#limitations) at the end
+say what that leaves out.
 
 Athena-specific types are imported from the `@kensio/yulin/athena` subpath.
 
@@ -119,6 +120,130 @@ console.log(listed.NamedQueryIds?.length);
 A named query naming a workgroup the stack never made fails its Resource. Registering it would
 leave it unreachable, because a listing finds a named query through its workgroup.
 
+## Running a query
+
+`StartQueryExecution` queues a query and answers with an id. The execution reaches `RUNNING` and
+then `SUCCEEDED` or `FAILED` on the simulator's background work. A client polling
+`GetQueryExecution` sees each state on the way through.
+
+```typescript sim-athena-query-execution
+/**
+ * Declaring what a query answers, running it, and reading the rows back.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+const sql = "SELECT cs_uri_stem, count(*) FROM access_logs GROUP BY 1";
+
+simAws
+  .athena()
+  .results()
+  .onQuery(sql, {
+    columns: ["cs_uri_stem", "views"],
+    rows: [["/", "4213"]],
+    bytesScanned: 2_000_000,
+  });
+
+const started = await simAws
+  .athena()
+  .startQueryExecution({
+    input: { QueryString: sql, WorkGroup: "rainlytics" },
+  });
+
+await simAws.backgroundTasksComplete();
+
+const results = await simAws.athena().getQueryResults({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// "4213". The first row holds the column names, as it does on real Athena.
+console.log(results.ResultSet?.Rows?.[1]?.Data?.[1]?.VarCharValue);
+```
+
+A rule for an exact query wins, then a rule for a workgroup, then the default. `onWorkGroup` covers
+every query a stack's rollups run, and `byDefault` covers everything else. Matching is exact, and
+the SQL is never parsed, so two queries differing only in whitespace are two different keys.
+
+`failsWith` fails a query instead of answering it. Nothing here reads SQL, so a query that should
+fail cannot be discovered on its own. Saying so is what makes a client's failure handling
+reachable.
+
+## The bytes scanned cutoff
+
+A query whose declared bytes scanned passes the workgroup's `BytesScannedCutoffPerQuery` reaches
+`FAILED`. This is the one guardrail this simulation enforces for real.
+
+```typescript sim-athena-bytes-scanned-cutoff
+/**
+ * A workgroup's cost guardrail refusing a query that scans too much.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      BytesScannedCutoffPerQuery: 10_000_000,
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+const unpartitioned = "SELECT * FROM rainlytics.access_logs";
+
+simAws
+  .athena()
+  .results()
+  .onQuery(unpartitioned, { rows: [["4213"]], bytesScanned: 40_000_000 });
+
+const started = await simAws.athena().startQueryExecution({
+  input: { QueryString: unpartitioned, WorkGroup: "rainlytics" },
+});
+
+await simAws.backgroundTasksComplete();
+
+const execution = await simAws.athena().getQueryExecution({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// "FAILED", with a StateChangeReason naming the limit and what was scanned.
+console.log(execution.QueryExecution?.Status?.State);
+```
+
+`GetQueryExecution` reports the bytes scanned in `Statistics` whichever way the query ended. A
+caller costing a mistake can still read it.
+
+## Where results go
+
+Results are written to the output location as a CSV object named for the execution,
+`<prefix>/<QueryExecutionId>.csv`. `GetQueryExecution` reports the object itself, not the prefix
+it sits under.
+
+A workgroup with `EnforceWorkGroupConfiguration` set sends results to its own location whatever the
+request asked for. Without it, a request naming a `ResultConfiguration.OutputLocation` wins and a
+request naming none falls back to the workgroup's. A query with neither is refused before it is
+queued.
+
+The write goes through simulated S3 as the caller that started the query, since Athena writes a
+result under the identity that asked for it. A caller who cannot write to the Bucket gets a `FAILED`
+execution saying so.
+
 ## Reading a workgroup back
 
 `GetWorkGroup`, `ListWorkGroups`, `CreateWorkGroup`, `UpdateWorkGroup` and `DeleteWorkGroup` all
@@ -147,7 +272,7 @@ console.log(
 );
 ```
 
-`UpdateWorkGroup` merges rather than replaces, as real Athena does. A field the update leaves out
+`UpdateWorkGroup` merges field by field, as real Athena does. A field the update leaves out
 keeps what the workgroup already had, and clearing one takes its own removal flag:
 `RemoveBytesScannedCutoffPerQuery`, or `RemoveOutputLocation` and its siblings inside
 `ResultConfigurationUpdates`.
@@ -171,6 +296,10 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 ## Available functionality
 
+- Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
+- `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
+- `BytesScannedCutoffPerQuery` enforced against what a declaration says a query scanned
+- Result sets written to the workgroup's output location as CSV, under the caller's own identity
 - Workgroups, scoped by account and region, with `primary` there from the start
 - `CreateWorkGroup`, `GetWorkGroup`, `UpdateWorkGroup`, `DeleteWorkGroup` and `ListWorkGroups`
 - Named queries, with `CreateNamedQuery`, `GetNamedQuery`, `BatchGetNamedQuery`, `ListNamedQueries`
@@ -184,21 +313,29 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 Current documented limitations:
 
-- The query execution API is absent. `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults`
-  and `StopQueryExecution` all refuse as unsupported Commands, along with every command around an
-  execution. Simulated Athena will therefore accept a query real Athena would reject, because the
-  SQL goes unread.
-- `BytesScannedCutoffPerQuery` is held and handed back, unmeasured. A test can prove the guardrail
-  was configured, and proving that it refuses a query has to wait.
-- Real Athena's own floor for that cutoff is 10MB. This simulation takes any whole number of bytes
-  from 1 up, so a test can put the guardrail where the query it is exercising needs it. A cutoff of
-  zero or a fraction is still refused.
+- No SQL is evaluated. Nothing parses, plans or runs a query, no Glue table or S3 object is read to
+  answer one, and every row comes from a declaration a test wrote. Simulated Athena will therefore
+  accept a query real Athena would reject.
+- What a query scanned comes from that same declaration. The cutoff is enforced for real against
+  that figure, which is a test's own statement about the query.
+- A query that exceeds the cutoff reaches `FAILED` here. AWS documents the per-query data usage
+  control as cancelling a query. A client matching on `CANCELLED` for this case would pass here
+  and miss it on real Athena.
+- `ListQueryExecutions`, `BatchGetQueryExecution` and `GetQueryRuntimeStatistics` are absent, along
+  with query result reuse, result encryption, `CREATE TABLE AS SELECT` and `INSERT INTO`.
+- Real Athena's own floor for the bytes scanned cutoff is 10MB. This simulation takes any whole
+  number of bytes from 1 up, putting the guardrail wherever the query a test is exercising needs
+  it. A cutoff of zero or a fraction is still refused.
 - `ResultConfiguration` is stored and returned in full, and `OutputLocation` is the only field that
   means anything. The encryption configuration, the ACL configuration and the expected bucket owner
   come back as they were set, and stay unapplied.
-- `EnforceWorkGroupConfiguration`, `PublishCloudWatchMetricsEnabled`, `RequesterPaysEnabled` and
-  `EngineVersion` are stored and returned unacted on. With the query gone, so is every effect they
-  would have had, from overriding a request to publishing a metric.
+- `EnforceWorkGroupConfiguration` decides the output location and nothing else. Real Athena's
+  override rules are per field and cover the encryption configuration, the expected bucket owner
+  and the ACL as well, and a request naming one of those has it taken whatever the workgroup says.
+- `PublishCloudWatchMetricsEnabled`, `RequesterPaysEnabled` and `EngineVersion` are stored and
+  returned unacted on. No metric is published, no requester is billed and no engine is chosen.
+- A query's `EngineExecutionTimeInMillis` is measured on the simulated clock. A query that ran
+  between two ticks of a frozen clock took no time at all.
 - A named query's SQL goes unparsed. Text an engine would reject is stored and handed back exactly
   as it was sent.
 - `AWS::Athena::DataCatalog`, `AWS::Athena::PreparedStatement` and
