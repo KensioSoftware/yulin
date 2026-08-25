@@ -18,6 +18,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [ECS](https://yulinsim.dev/services/ecs/ "Simulated ECS usage docs")
 - [Elastic Load Balancing](https://yulinsim.dev/services/elbv2/ "Simulated Application Load Balancer usage docs")
 - [EventBridge](https://yulinsim.dev/services/eventbridge/ "Simulated EventBridge usage docs")
+- [Glue](https://yulinsim.dev/services/glue/ "Simulated Glue Data Catalog usage docs")
 - [IAM](https://yulinsim.dev/services/iam/ "Simulated IAM usage docs")
 - [Kinesis Data Firehose](https://yulinsim.dev/services/firehose/ "Simulated Kinesis Data Firehose usage docs")
 - [Kinesis Data Streams](https://yulinsim.dev/services/kinesis/ "Simulated Kinesis Data Streams usage docs")

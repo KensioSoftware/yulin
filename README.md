@@ -30,6 +30,7 @@ npm i -D @kensio/yulin
 - [ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR docs")
 - [ECS](https://yulinsim.dev/services/ecs/ "Simulated ECS docs")
 - [EventBridge](https://yulinsim.dev/services/eventbridge/ "Simulated EventBridge docs")
+- [Glue](https://yulinsim.dev/services/glue/ "Simulated Glue Data Catalog docs")
 - [IAM](https://yulinsim.dev/services/iam/ "Simulated IAM docs")
 - [KMS](https://yulinsim.dev/services/kms/ "Simulated KMS docs")
 - [Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs")

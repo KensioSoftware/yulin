@@ -12,6 +12,7 @@ import { ecsValueAdapter } from "./ecs/sim-ecs-cfn-value-adapter.js";
 import { elbV2ValueAdapter } from "./elasticloadbalancingv2/sim-elbv2-cfn-value-adapter.js";
 import { eventBridgeValueAdapter } from "./events/sim-event-bridge-cfn-value-adapter.js";
 import { firehoseValueAdapter } from "./firehose/sim-firehose-cfn-value-adapter.js";
+import { glueValueAdapter } from "./glue/sim-glue-cfn-value-adapter.js";
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kinesisValueAdapter } from "./kinesis/sim-kinesis-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
@@ -59,6 +60,7 @@ export const simCfnServiceValueAdapters: readonly ((
   elbV2ValueAdapter,
   eventBridgeValueAdapter,
   firehoseValueAdapter,
+  glueValueAdapter,
   iamValueAdapter,
   kinesisValueAdapter,
   kmsValueAdapter,

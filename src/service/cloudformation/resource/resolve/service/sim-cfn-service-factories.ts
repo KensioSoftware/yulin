@@ -85,6 +85,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.elbV2().cfnResourceFactory(),
   ],
   [
+    "Glue",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.glue().cfnResourceFactory(),
+  ],
+  [
     "IAM",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.iam().cfnResourceFactory(),
