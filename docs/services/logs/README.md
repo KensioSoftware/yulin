@@ -315,6 +315,7 @@ where they land and in what form. A delivery joins one to the other.
  * Setting up CloudFront standard logging v2 delivery into a bucket.
  */
 
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import {
   CreateDeliveryCommand,
   DescribeDeliveriesCommand,
@@ -327,10 +328,38 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const logs = simAws.logs();
 
+const distribution = await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "site",
+      Comment: "Static site distribution",
+      Enabled: true,
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "site-origin",
+            DomainName: "origin.example.com",
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "https-only",
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "site-origin",
+        ViewerProtocolPolicy: "redirect-to-https",
+      },
+    },
+  }),
+);
+
 await logs.putDeliverySource(
   new PutDeliverySourceCommand({
     name: "site-access-logs",
-    resourceArn: "arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE",
+    resourceArn: `arn:aws:cloudfront::${simAws.defaultAccountId}:distribution/${distribution.Distribution?.Id}`,
     logType: "ACCESS_LOGS",
   }),
 );
@@ -370,9 +399,14 @@ console.log(
 The delivery destination has an ARN of its own, and `CreateDelivery` names that one. The bucket
 behind it keeps its own ARN, and the two are easy to mix up.
 
-The service a delivery source is for is read off the resource ARN. A caller never states it. Four
+The service a delivery source is for is read off the resource ARN. A caller never states it. These
 rules from real AWS are modelled here, each of them a deploy that looks fine until it runs:
 
+- **The distribution has to be there.** A CloudFront delivery source over a distribution the
+  simulated account never created fails with `ResourceNotFoundException`, and so does one whose ARN
+  names another account. Pin a real distribution id in a template and the deploy fails here the way
+  it would in an account. A `SimLogs` built on its own has no CloudFront to look in and keeps taking
+  any ARN, so a test about delivery alone needs no distribution.
 - **One delivery source per resource.** A second source over a distribution that already has one
   fails with `ConflictException`, carrying the message an account gives, "This ResourceId has
   already been used in another Delivery Source in this account".
@@ -395,14 +429,40 @@ it was not. A path over the 256 characters CloudWatch Logs takes is refused too.
 ### Declaring delivery in a template
 
 The same three resources in a template, which is the whole of what a CDK construct for CloudFront
-logging synthesises.
+logging synthesises, alongside the distribution they are for. The source's `ResourceArn` is built
+around a `Ref` to that distribution, the way CDK builds it. A pinned distribution id fails the
+deploy (see [the rules above](#delivering-logs-from-another-service)).
 
 ```yaml
+SiteDistribution:
+  Type: AWS::CloudFront::Distribution
+  Properties:
+    DistributionConfig:
+      Enabled: true
+      Origins:
+        Items:
+          - Id: site-origin
+            DomainName: origin.example.com
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+      DefaultCacheBehavior:
+        TargetOriginId: site-origin
+        ViewerProtocolPolicy: redirect-to-https
+
 AccessLogsSource:
   Type: AWS::Logs::DeliverySource
   Properties:
     Name: site-access-logs
-    ResourceArn: arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE
+    ResourceArn:
+      !Join [
+        "",
+        [
+          "arn:aws:cloudfront::",
+          !Ref "AWS::AccountId",
+          ":distribution/",
+          !Ref SiteDistribution,
+        ],
+      ]
     LogType: ACCESS_LOGS
 
 AccessLogsDestination:

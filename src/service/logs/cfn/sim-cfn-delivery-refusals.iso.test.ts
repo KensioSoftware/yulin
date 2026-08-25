@@ -8,8 +8,12 @@ import { describe, it } from "vitest";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import {
+  deliveryDistributionLogicalId,
+  deliveryDistributionResource,
+  deliveryDistributionResourceArn,
+} from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
 const bucketArn = "arn:aws:s3:::example-access-logs";
 const sourceName = "site-access-logs";
 
@@ -27,6 +31,7 @@ async function deploySource(
     stackName: "site-logging",
     template: {
       Resources: {
+        [deliveryDistributionLogicalId]: deliveryDistributionResource,
         AccessLogsSource: {
           Type: "AWS::Logs::DeliverySource",
           Properties: properties,
@@ -38,11 +43,39 @@ async function deploySource(
 
 const sourceProperties: SimCfnTemplateValueRecord = {
   Name: sourceName,
-  ResourceArn: distributionArn,
+  ResourceArn: deliveryDistributionResourceArn,
   LogType: "ACCESS_LOGS",
 };
 
 describe("AWS::Logs delivery Resource refusals", () => {
+  it("fails a stack whose delivery source names a distribution that is not there", async () => {
+    // Given a template pinning the distribution id of a real account, which
+    // is how a stack ends up naming one the simulation never created.
+    const error = await assertThrowsErrorAsync(async () => {
+      await new SimAws().cloudFormation().deployTemplate({
+        stackName: "site-logging",
+        template: {
+          Resources: {
+            AccessLogsSource: {
+              Type: "AWS::Logs::DeliverySource",
+              Properties: {
+                Name: sourceName,
+                ResourceArn:
+                  "arn:aws:cloudfront::888888888888:distribution/E37CHA90H2SDED",
+                LogType: "ACCESS_LOGS",
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then the deploy fails. The stack would otherwise go up clean against a
+    // distribution that delivers nothing.
+    assertStringIncludes(error.message, "AccessLogsSource");
+    assertStringIncludes(error.message, "names no CloudFront distribution");
+  });
+
   it("fails a stack that sets CloudFront logging up outside us-east-1", async () => {
     // Given the delivery Resources declared in a stack in the region the rest
     // of an application lives in, which is the mistake worth catching.
@@ -87,6 +120,7 @@ describe("AWS::Logs delivery Resource refusals", () => {
         stackName: "site-logging",
         template: {
           Resources: {
+            [deliveryDistributionLogicalId]: deliveryDistributionResource,
             AccessLogsSource: {
               Type: "AWS::Logs::DeliverySource",
               Properties: sourceProperties,
@@ -167,6 +201,7 @@ describe("AWS::Logs delivery Resource refusals", () => {
         stackName: "site-logging",
         template: {
           Resources: {
+            [deliveryDistributionLogicalId]: deliveryDistributionResource,
             AccessLogsSource: {
               Type: "AWS::Logs::DeliverySource",
               Properties: sourceProperties,
@@ -196,6 +231,7 @@ describe("AWS::Logs delivery Resource refusals", () => {
       stackName: "site-logging",
       template: {
         Resources: {
+          [deliveryDistributionLogicalId]: deliveryDistributionResource,
           AccessLogsSource: {
             Type: "AWS::Logs::DeliverySource",
             Properties: sourceProperties,

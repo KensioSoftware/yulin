@@ -2,6 +2,7 @@
  * Setting up CloudFront standard logging v2 delivery into a bucket.
  */
 
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import {
   CreateDeliveryCommand,
   DescribeDeliveriesCommand,
@@ -14,10 +15,38 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const logs = simAws.logs();
 
+const distribution = await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "site",
+      Comment: "Static site distribution",
+      Enabled: true,
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "site-origin",
+            DomainName: "origin.example.com",
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "https-only",
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "site-origin",
+        ViewerProtocolPolicy: "redirect-to-https",
+      },
+    },
+  }),
+);
+
 await logs.putDeliverySource(
   new PutDeliverySourceCommand({
     name: "site-access-logs",
-    resourceArn: "arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE",
+    resourceArn: `arn:aws:cloudfront::${simAws.defaultAccountId}:distribution/${distribution.Distribution?.Id}`,
     logType: "ACCESS_LOGS",
   }),
 );

@@ -19,6 +19,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
+import { simLogsDeliveryDistributionArn } from "../../../../../test/logs/delivery-distribution-fixture.js";
 
 const accountIdOneOnes = "111111111111";
 const logGroupName = "/aws/lambda/orders";
@@ -241,14 +242,23 @@ describe("CloudWatch Logs delivery IAM authorization", () => {
   });
 
   it("allows a delivery source a policy names", async () => {
-    // Given a Role allowed to put delivery sources.
+    // Given a Role allowed to put delivery sources, and a distribution for
+    // the source to be over.
     const simAws = await simAwsWithRole({
       Action: "logs:PutDeliverySource",
       Resource: `arn:aws:logs:us-east-1:${accountIdOneOnes}:delivery-source:*`,
     });
+    const resourceArn = await simLogsDeliveryDistributionArn(simAws);
 
     // When it puts a delivery source.
-    await simAws.logs().putDeliverySource(putSource, asRole);
+    await simAws.logs().putDeliverySource(
+      new PutDeliverySourceCommand({
+        name: "site-access-logs",
+        resourceArn,
+        logType: "ACCESS_LOGS",
+      }),
+      asRole,
+    );
 
     // Then the source is there, so the ARN the policy names is the one the
     // request authorizes against.

@@ -16,8 +16,8 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { simLogsDeliveryDistributionArn } from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
 const bucketArn = "arn:aws:s3:::example-access-logs";
 const sourceName = "site-access-logs";
 const destinationName = "site-access-logs";
@@ -30,7 +30,7 @@ async function givenSourceAndDestination(simAws: SimAws): Promise<string> {
   await simAws.logs().putDeliverySource(
     new PutDeliverySourceCommand({
       name: sourceName,
-      resourceArn: distributionArn,
+      resourceArn: await simLogsDeliveryDistributionArn(simAws),
       logType: "ACCESS_LOGS",
     }),
   );

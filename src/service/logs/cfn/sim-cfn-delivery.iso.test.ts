@@ -20,8 +20,12 @@ import type { CfnTemplateBodyRecord } from "../../cloudformation/template/sim-cf
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
+import {
+  deliveryDistributionLogicalId,
+  deliveryDistributionResource,
+  deliveryDistributionResourceArn,
+} from "../../../../test/logs/delivery-distribution-fixture.js";
 
-const distributionArn = "arn:aws:cloudfront::123456789012:distribution/E1EX";
 const bucketArn = "arn:aws:s3:::example-access-logs";
 const sourceName = "site-access-logs";
 const suffixPath = "{DistributionId}/{yyyy}/{MM}/{dd}/{HH}";
@@ -35,11 +39,12 @@ function loggingTemplate(
 ): CfnTemplateBodyRecord {
   return {
     Resources: {
+      [deliveryDistributionLogicalId]: deliveryDistributionResource,
       AccessLogsSource: {
         Type: "AWS::Logs::DeliverySource",
         Properties: {
           Name: sourceName,
-          ResourceArn: distributionArn,
+          ResourceArn: deliveryDistributionResourceArn,
           LogType: "ACCESS_LOGS",
         },
       },
@@ -205,6 +210,53 @@ describe("AWS::Logs delivery Resources", () => {
     assertArrayEquals(simAws.logs().allDeliverySources(), []);
     assertArrayEquals(simAws.logs().allDeliveryDestinations(), []);
     assertArrayEquals(simAws.logs().allDeliveries(), []);
+  });
+
+  it("takes a delivery source over a distribution another stack deployed", async () => {
+    // Given a stack holding the distribution and exporting its ARN, which is
+    // how an application splits its CDN from the analytics beside it.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.deployTemplate({
+      stackName: "site-cdn",
+      template: {
+        Resources: {
+          [deliveryDistributionLogicalId]: deliveryDistributionResource,
+        },
+        Outputs: {
+          DistributionArn: {
+            Value: deliveryDistributionResourceArn,
+            Export: { Name: "site-cdn:DistributionArn" },
+          },
+        },
+      },
+    });
+
+    // When a second stack puts a delivery source over the exported ARN.
+    const stack = await cloudFormation.deployTemplate({
+      stackName: "site-analytics",
+      template: {
+        Resources: {
+          AccessLogsSource: {
+            Type: "AWS::Logs::DeliverySource",
+            Properties: {
+              Name: sourceName,
+              ResourceArn: { "Fn::ImportValue": "site-cdn:DistributionArn" },
+              LogType: "ACCESS_LOGS",
+            },
+          },
+        },
+      },
+    });
+
+    // Then it deploys, because the distribution the ARN names is one the
+    // account holds however many stacks away it was created.
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(
+      simAws.logs().findDeliverySource(sourceName)?.service,
+      "cloudfront",
+    );
   });
 
   it("records the delivery Resource properties it does not act on", async () => {
