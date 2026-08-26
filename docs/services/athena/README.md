@@ -530,7 +530,7 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
 - Partition projection evaluated, covering `enum`, `integer`, `date` and `injected`
 - Bytes scanned measured from the objects under the prefixes a query reads
-- `BytesScannedCutoffPerQuery` enforced against what a declaration says a query scanned
+- `BytesScannedCutoffPerQuery` enforced against that measurement, or against a declared figure
 - Result sets written to the workgroup's output location as CSV, under the caller's own identity
 - Workgroups, scoped by account and region, with `primary` there from the start
 - `CreateWorkGroup`, `GetWorkGroup`, `UpdateWorkGroup`, `DeleteWorkGroup` and `ListWorkGroups`
