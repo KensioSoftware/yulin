@@ -2,7 +2,9 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaQueryResults } from "../result/sim-athena-query-results.js";
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
+import type { SimAthenaCatalog } from "../table/sim-athena-table-resolution.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
+import { simAthenaQueryRefusal } from "./sim-athena-query-refusal.js";
 import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
 import type { SimAthenaResultWriter } from "./sim-athena-result-writer.js";
 import { simAthenaWriteFailureReason } from "./sim-athena-write-failure.js";
@@ -12,6 +14,14 @@ interface SimAthenaQueryRunnerProperties {
   readonly workGroups: SimAthenaWorkGroupStore;
   readonly writer: SimAthenaResultWriter;
   readonly background: BackgroundScheduler;
+
+  /**
+   * The Data Catalog a query's table names are resolved against.
+   *
+   * A SimAthena built on its own has none, and every query then runs without
+   * its tables being looked for.
+   */
+  readonly catalog?: SimAthenaCatalog | undefined;
 }
 
 /**
@@ -31,12 +41,14 @@ export class SimAthenaQueryRunner {
   private readonly workGroups: SimAthenaWorkGroupStore;
   private readonly writer: SimAthenaResultWriter;
   private readonly background: BackgroundScheduler;
+  private readonly catalog: SimAthenaCatalog | undefined;
 
   constructor(properties: SimAthenaQueryRunnerProperties) {
     this.results = properties.results;
     this.workGroups = properties.workGroups;
     this.writer = properties.writer;
     this.background = properties.background;
+    this.catalog = properties.catalog;
   }
 
   /**
@@ -78,7 +90,12 @@ export class SimAthenaQueryRunner {
 
     execution.recordBytesScanned(result.bytesScanned);
 
-    const refusal = this.refusalFor(execution, result);
+    const refusal = simAthenaQueryRefusal({
+      execution,
+      result,
+      workGroups: this.workGroups,
+      catalog: this.catalog,
+    });
 
     if (refusal !== undefined) {
       execution.fail(refusal, this.background.now());
@@ -87,36 +104,6 @@ export class SimAthenaQueryRunner {
     }
 
     await this.write(execution, result, caller);
-  }
-
-  /**
-   * Why this query cannot answer, where something says it cannot.
-   *
-   * The cutoff is checked against what the declaration says the query
-   * scanned. That is the whole of the cost guardrail here, and it is the one
-   * thing this simulation can enforce for real without a query engine.
-   */
-  private refusalFor(
-    execution: SimAthenaQueryExecution,
-    result: SimAthenaResolvedResult,
-  ): string | undefined {
-    if (result.failsWith !== undefined) {
-      return result.failsWith;
-    }
-
-    const cutoff = this.workGroups.find(
-      execution.workGroupName,
-    )?.bytesScannedCutoffPerQuery;
-
-    if (cutoff === undefined || result.bytesScanned <= cutoff) {
-      return undefined;
-    }
-
-    return (
-      `Bytes scanned limit was exceeded. The query scanned ` +
-      `${String(result.bytesScanned)} bytes, and workgroup ` +
-      `${execution.workGroupName} allows ${String(cutoff)} per query.`
-    );
   }
 
   private async write(

@@ -42,10 +42,15 @@ export class SimAwsSelfContainedServiceBuilder {
    *
    * Workgroups, named queries and query executions are all Region-scoped on
    * real Athena. A query writes its result set into a Bucket through that same
-   * scope's simulated S3, which is the one service Athena reaches for.
+   * scope's simulated S3, and resolves the tables it names against that same
+   * scope's simulated Glue Data Catalog.
    */
   createAthena(scope: SimAwsAccountRegionContainer): SimAthena {
-    return new SimAthena({ ...this.scoped(scope), s3: scope.s3() });
+    return new SimAthena({
+      ...this.scoped(scope),
+      s3: scope.s3(),
+      glue: scope.glue(),
+    });
   }
 
   /**

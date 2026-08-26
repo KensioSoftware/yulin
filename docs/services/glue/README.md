@@ -8,6 +8,9 @@ to, including the Athena partition projection its parameters configure.
 A table here is a definition. The data it describes stays in S3, unread, and the catalog answers
 with what it was told to hold.
 
+Simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads this
+catalog. A query naming a table no database here holds fails the way real Athena fails it.
+
 Glue-specific types are imported from the `@kensio/yulin/glue` subpath.
 
 ## Deploying a database and a table
