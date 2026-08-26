@@ -55,9 +55,28 @@ The three left standing are all the simulation accepting something AWS refuses. 
 
 `node-sql-parser` 5.4.0, Apache-2.0. It carries an `athena` dialect and a `sqlify` that re-emits for SQLite, and both did the work here.
 
-The cost is the install. 88MB materialised in the pnpm store, of which 30 source map files are the bulk. The single-dialect entry point `node-sql-parser/build/athena.js` is 192KB, and importing it loads that one grammar. pnpm keeps one copy per store, shared across a machine's projects, and yulin is a devDependency in a user's project. It is annoying and it is not a blocker.
+The cost is the install. 88MB materialised in the pnpm store, of which 30 source map files are the bulk. That is more than three times the size of yulin itself, and most users will never run a query.
 
-The package is CommonJS. Yulin is `"type": "module"`, so it needs `import sqlParser from "node-sql-parser"` and a destructure. That works.
+So it goes in as an optional peer dependency, and the docs tell a user to add it when they want the engine.
+
+```json
+"peerDependencies": { "node-sql-parser": "^5.4.0" },
+"peerDependenciesMeta": { "node-sql-parser": { "optional": true } }
+```
+
+`optional-dependency.ts` proves the shape out. Installing a package that declares it leaves `node_modules` without the parser under both npm and pnpm, measured, and pnpm prints no missing-peer warning. Yulin keeps its own devDependency on the parser so its own tests can run the engine.
+
+The engine then loads through a dynamic `import()` on the first query, since the runner is already async. A user who turns the engine on without the package gets this.
+
+```
+Simulated Athena needs node-sql-parser to run a query. Add it to your project as a
+dev dependency, or leave the engine off and declare what each query answers with
+through results().
+```
+
+Loading is by specifier `node-sql-parser/build/athena`, which resolves under ESM and carries the one grammar at 192KB. The package is CommonJS, and the `Parser` comes off either the module namespace or its default export.
+
+The engine has to be opt-in. A project holding the parser for an unrelated reason would otherwise find simulated Athena answering queries differently from the version before it.
 
 `dt-sql-parser` was the alternative, with a real ANTLR Trino grammar at 20MB and an MIT licence. Its published build uses directory imports and fails to resolve under Node ESM by either `import` or `require`, so it is out until upstream fixes it.
 
@@ -77,7 +96,7 @@ That is the measurement the recommendation rests on. The hand-written engine #10
 
 ## Recommendation
 
-Take the dependency and build the engine.
+Take the dependency and build the engine, with the parser as an optional peer dependency nobody installs by default.
 
 The realism ceiling to document is that simulated Athena runs the query under SQLite, that it answers roughly nineteen queries in twenty of the shapes a test writes, that a query it cannot run falls back to the declared result, and that it accepts three classes of expression real Athena refuses. Every case where it answers a query differently was closable, and all three closures are verified here.
 
@@ -87,7 +106,8 @@ The escape hatch stays as #992 shipped it, and the execution reports which of th
 
 #1008 stands as filed, with these amendments worth making before it is picked up.
 
-- Import `node-sql-parser/build/athena`, which loads the one grammar.
+- The parser is an optional peer dependency, loaded by dynamic import from `node-sql-parser/build/athena`, and the engine is opt-in.
+- A missing parser raises the message above, naming what to install.
 - `PRAGMA case_sensitive_like = ON` and the `ASC NULLS LAST` rewrite both belong in the acceptance criteria. Each closes a case where a query answers differently.
 - Boolean rendering from the Glue column type belongs beside the type mapping criterion.
 - The three looser-than-AWS divergences belong in the docs page's Limitations list, named.

@@ -300,14 +300,10 @@
     "yaml": "^2.9.0"
   },
   "peerDependencies": {
-    "eslint": "^10.4.1",
-    "typescript-eslint": "^8.60.0"
+    "node-sql-parser": "^5.4.0"
   },
   "peerDependenciesMeta": {
-    "eslint": {
-      "optional": true
-    },
-    "typescript-eslint": {
+    "node-sql-parser": {
       "optional": true
     }
   }
