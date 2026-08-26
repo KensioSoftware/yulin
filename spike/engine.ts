@@ -13,9 +13,7 @@ import sqlParser from "node-sql-parser";
 
 const { Parser } = sqlParser;
 
-export interface EngineRow {
-  readonly [column: string]: unknown;
-}
+export type EngineRow = Readonly<Record<string, unknown>>;
 
 export interface LoadedTable {
   readonly databaseName: string;
@@ -31,7 +29,7 @@ export function sqliteAffinity(athenaType: string | undefined): string {
 
   if (/^(tinyint|smallint|int|integer|bigint)/.test(type)) return "INTEGER";
   if (/^(float|double|real|decimal)/.test(type)) return "REAL";
-  if (/^boolean/.test(type)) return "INTEGER";
+  if (type.startsWith("boolean")) return "INTEGER";
 
   return "TEXT";
 }
@@ -75,11 +73,9 @@ async function bodyText(body: unknown): Promise<string> {
   if (typeof body === "string") return body;
   if (body instanceof Uint8Array) return new TextDecoder().decode(body);
 
-  const chunks: Uint8Array[] = [];
-
-  for await (const chunk of body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk);
-  }
+  const chunks: Uint8Array[] = await Array.fromAsync(
+    body as AsyncIterable<Uint8Array>,
+  );
 
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
@@ -197,15 +193,15 @@ export function sqliteFor(tables: readonly LoadedTable[]): DatabaseSync {
 
 /** Trino functions shimmed onto SQLite. */
 export function installShims(database: DatabaseSync): void {
-  const scalar = (name: string, fn: (...args: any[]) => unknown) => {
+  const scalar = (name: string, fn: (...arguments_: any[]) => unknown) => {
     database.function(name, { varargs: true }, fn as any);
   };
 
   scalar("from_iso8601_timestamp", (value: string) => value);
-  scalar("from_iso8601_date", (value: string) => String(value).slice(0, 10));
+  scalar("from_iso8601_date", (value: string) => value.slice(0, 10));
   scalar("to_iso8601", (value: string) => value);
   scalar("date_trunc", (unit: string, value: string) => {
-    const text = String(value);
+    const text = value;
 
     if (unit === "year") return `${text.slice(0, 4)}-01-01`;
     if (unit === "month") return `${text.slice(0, 7)}-01`;
@@ -215,22 +211,25 @@ export function installShims(database: DatabaseSync): void {
     return text;
   });
   scalar("date_format", (value: string, format: string) => {
-    const text = String(value);
+    const text = value;
 
-    return String(format)
+    return format
       .replace("%Y", text.slice(0, 4))
       .replace("%m", text.slice(5, 7))
       .replace("%d", text.slice(8, 10));
   });
   scalar("from_unixtime", (seconds: number) =>
-    new Date(Number(seconds) * 1000).toISOString(),
+    new Date(seconds * 1000).toISOString(),
   );
   scalar("to_unixtime", (value: string) =>
-    Math.floor(new Date(String(value)).getTime() / 1000),
+    Math.floor(new Date(value).getTime() / 1000),
   );
   scalar("json_extract_scalar", (json: string, path: string) => {
-    const keys = String(path).replace(/^\$\.?/, "").split(".").filter(Boolean);
-    let current: unknown = JSON.parse(String(json));
+    const keys = path
+      .replace(/^\$\.?/, "")
+      .split(".")
+      .filter(Boolean);
+    let current: unknown = JSON.parse(json);
 
     for (const key of keys) {
       current = (current as Record<string, unknown>)?.[key];
@@ -240,26 +239,29 @@ export function installShims(database: DatabaseSync): void {
   });
   scalar("cardinality", (value: string) => {
     try {
-      return (JSON.parse(String(value)) as unknown[]).length;
+      return (JSON.parse(value) as unknown[]).length;
     } catch {
       return null;
     }
   });
   scalar("regexp_like", (value: string, pattern: string) =>
-    new RegExp(String(pattern)).test(String(value)) ? 1 : 0,
+    new RegExp(pattern).test(value) ? 1 : 0,
   );
-  scalar("split_part", (value: string, delimiter: string, index: number) =>
-    String(value).split(String(delimiter))[Number(index) - 1] ?? null,
+  scalar(
+    "split_part",
+    (value: string, delimiter: string, index: number) =>
+      value.split(delimiter)[index - 1] ?? null,
   );
-  scalar("strpos", (value: string, search: string) =>
-    String(value).indexOf(String(search)) + 1,
+  scalar(
+    "strpos",
+    (value: string, search: string) => value.indexOf(search) + 1,
   );
   scalar("element_at", (value: string, index: number) => {
     try {
-      const parsed = JSON.parse(String(value));
+      const parsed = JSON.parse(value);
 
       return Array.isArray(parsed)
-        ? (parsed[Number(index) - 1] ?? null)
+        ? (parsed[index - 1] ?? null)
         : (parsed[index] ?? null);
     } catch {
       return null;
@@ -270,8 +272,9 @@ export function installShims(database: DatabaseSync): void {
     start: () => JSON.stringify({ values: [], p: 0.5 }),
     step: (accumulator: string, value: unknown, percentile: number) => {
       const state = JSON.parse(accumulator) as { values: number[]; p: number };
-      if (value !== null && value !== undefined) state.values.push(Number(value));
-      if (percentile !== undefined) state.p = Number(percentile);
+      if (value !== null && value !== undefined)
+        state.values.push(Number(value));
+      if (percentile !== undefined) state.p = percentile;
 
       return JSON.stringify(state);
     },
@@ -315,7 +318,8 @@ export function rewriteAthenaSql(sql: string): string {
     .replaceAll(/\btry_cast\s*\(/gi, "CAST(")
     .replaceAll(
       /\bOFFSET\s+(\d+)\s+LIMIT\s+(\d+)/gi,
-      (_match, offset: string, limit: string) => `LIMIT ${limit} OFFSET ${offset}`,
+      (_match, offset: string, limit: string) =>
+        `LIMIT ${limit} OFFSET ${offset}`,
     );
 }
 
@@ -366,7 +370,7 @@ export function runAthenaSql(
     return {
       ok: true,
       sqlite,
-      rows: database.prepare(sqlite).all() as unknown as EngineRow[],
+      rows: database.prepare(sqlite).all(),
     };
   } catch (error) {
     return {

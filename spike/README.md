@@ -27,10 +27,10 @@ The corpus in `corpus.ts` holds the query shapes a Yulin user would write agains
 
 Two failures are left standing.
 
-| Construct | Stage | Why |
-| --- | --- | --- |
-| `UNNEST` | execute | Parses, and `sqlify` emits `CROSS JOIN UNNEST(...)` that SQLite rejects. A rewrite onto `json_each` would close it. |
-| `GROUPING SETS` | parse | The `athena` grammar refuses it. `ROLLUP` parses. |
+| Construct       | Stage   | Why                                                                                                                 |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| `UNNEST`        | execute | Parses, and `sqlify` emits `CROSS JOIN UNNEST(...)` that SQLite rejects. A rewrite onto `json_each` would close it. |
+| `GROUPING SETS` | parse   | The `athena` grammar refuses it. `ROLLUP` parses.                                                                   |
 
 Three more failed at first and three cheap rewrites closed them. `try_cast(x AS T)` became `CAST(x AS T)`, Trino's `OFFSET n LIMIT m` was reordered into SQLite's `LIMIT m OFFSET n`, and `approx_percentile` became an aggregate shim. `try_cast` is the one that changes meaning, and it changes it in the forgiving direction, since SQLite already answers with a value where a cast fails.
 
@@ -38,16 +38,16 @@ Three more failed at first and three cheap rewrites closed them. `try_cast(x AS 
 
 These are the ones worth care. A refusal is loud and a wrong answer is quiet. SQLite's column was measured by `divergence.ts`. The Athena column comes from the Trino documentation and was not executed, so each row is a claim to check before it reaches a docs page.
 
-| Case | SQLite | Athena | Verdict |
-| --- | --- | --- | --- |
-| `LIKE 'alpha'` against `'Alpha'` | matches | no match | **Fixed.** `PRAGMA case_sensitive_like = ON` closes it, verified. This was the most dangerous one, since a filter silently matching more rows passes a test and fails in production. |
-| `ORDER BY n ASC` with nulls | nulls first | nulls last | **Fixed by a rewrite.** Emitting `ASC NULLS LAST` closes it, verified. Descending already agrees. |
-| A boolean column or expression | `1` and `0` | `true` and `false` | **Fixed by formatting.** The Glue column type says which columns are boolean, and the result formatter renders them. |
-| `approx_percentile`, `approx_distinct` | shimmed exactly | approximate | **Left standing.** The simulation is more accurate than AWS. Harmless at fixture scale. |
-| `1 / 0` | `NULL` | query fails | **Left standing.** Simulated Athena accepts a query real Athena refuses, which is the looser-than-AWS divergence `CLAUDE.md` warns about. |
-| `CAST('abc' AS INTEGER)` | `0` | query fails | **Left standing.** Same shape. It is also what makes the `try_cast` rewrite roughly right. |
-| `1 \|\| 'x'` | `'1x'` | query fails | **Left standing.** Same shape. |
-| `5 / 2`, `round(0.5)`, `avg` of integers, `-7 % 3`, `length(NULL)` | agree | agree | No divergence found. |
+| Case                                                               | SQLite          | Athena             | Verdict                                                                                                                                                                              |
+| ------------------------------------------------------------------ | --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LIKE 'alpha'` against `'Alpha'`                                   | matches         | no match           | **Fixed.** `PRAGMA case_sensitive_like = ON` closes it, verified. This was the most dangerous one, since a filter silently matching more rows passes a test and fails in production. |
+| `ORDER BY n ASC` with nulls                                        | nulls first     | nulls last         | **Fixed by a rewrite.** Emitting `ASC NULLS LAST` closes it, verified. Descending already agrees.                                                                                    |
+| A boolean column or expression                                     | `1` and `0`     | `true` and `false` | **Fixed by formatting.** The Glue column type says which columns are boolean, and the result formatter renders them.                                                                 |
+| `approx_percentile`, `approx_distinct`                             | shimmed exactly | approximate        | **Left standing.** The simulation is more accurate than AWS. Harmless at fixture scale.                                                                                              |
+| `1 / 0`                                                            | `NULL`          | query fails        | **Left standing.** Simulated Athena accepts a query real Athena refuses, which is the looser-than-AWS divergence `CLAUDE.md` warns about.                                            |
+| `CAST('abc' AS INTEGER)`                                           | `0`             | query fails        | **Left standing.** Same shape. It is also what makes the `try_cast` rewrite roughly right.                                                                                           |
+| `1 \|\| 'x'`                                                       | `'1x'`          | query fails        | **Left standing.** Same shape.                                                                                                                                                       |
+| `5 / 2`, `round(0.5)`, `avg` of integers, `-7 % 3`, `length(NULL)` | agree           | agree              | No divergence found.                                                                                                                                                                 |
 
 The three left standing are all the simulation accepting something AWS refuses. None of them changes an answer a passing query gives.
 

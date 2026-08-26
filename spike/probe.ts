@@ -10,14 +10,27 @@ const probes: [string, string][] = [
   ["cast", `SELECT CAST(status AS VARCHAR) FROM t`],
   ["grouping-sets", `SELECT a, count(*) FROM t GROUP BY GROUPING SETS ((a))`],
   ["rollup", `SELECT a, count(*) FROM t GROUP BY ROLLUP (a)`],
-  ["unnest", `SELECT e.id, t.tag FROM app.events e CROSS JOIN UNNEST(tags) AS t(tag)`],
+  [
+    "unnest",
+    `SELECT e.id, t.tag FROM app.events e CROSS JOIN UNNEST(tags) AS t(tag)`,
+  ],
 ];
 
 for (const [label, sql] of probes) {
   try {
     const ast = parser.astify(sql, { database: "athena" });
-    console.log(label.padEnd(20), "parse OK ->", parser.sqlify(ast, { database: "sqlite" }).slice(0, 95));
+    console.log(
+      label.padEnd(20),
+      "parse OK ->",
+      parser.sqlify(ast, { database: "sqlite" }).slice(0, 95),
+    );
   } catch (error) {
-    console.log(label.padEnd(20), "parse FAIL", String((error as Error).message).replaceAll("\n", " ").slice(0, 55));
+    console.log(
+      label.padEnd(20),
+      "parse FAIL",
+      String((error as Error).message)
+        .replaceAll("\n", " ")
+        .slice(0, 55),
+    );
   }
 }

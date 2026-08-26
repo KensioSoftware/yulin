@@ -52,11 +52,26 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 const seeded = [
-  ["day=2026-08-01", { ts: "2026-08-01T10:00:00Z", url: "/", status: 200, bytes: 1200 }],
-  ["day=2026-08-01", { ts: "2026-08-01T10:05:00Z", url: "/pricing", status: 404, bytes: 310 }],
-  ["day=2026-08-01", { ts: "2026-08-01T11:00:00Z", url: "/pricing", status: 404, bytes: 305 }],
-  ["day=2026-08-02", { ts: "2026-08-02T09:00:00Z", url: "/", status: 500, bytes: 90 }],
-  ["day=2026-08-02", { ts: "2026-08-02T09:30:00Z", url: "/docs", status: 404, bytes: 280 }],
+  [
+    "day=2026-08-01",
+    { ts: "2026-08-01T10:00:00Z", url: "/", status: 200, bytes: 1200 },
+  ],
+  [
+    "day=2026-08-01",
+    { ts: "2026-08-01T10:05:00Z", url: "/pricing", status: 404, bytes: 310 },
+  ],
+  [
+    "day=2026-08-01",
+    { ts: "2026-08-01T11:00:00Z", url: "/pricing", status: 404, bytes: 305 },
+  ],
+  [
+    "day=2026-08-02",
+    { ts: "2026-08-02T09:00:00Z", url: "/", status: 500, bytes: 90 },
+  ],
+  [
+    "day=2026-08-02",
+    { ts: "2026-08-02T09:30:00Z", url: "/docs", status: 404, bytes: 280 },
+  ],
 ] as const;
 
 const byPartition = new Map<string, string[]>();
@@ -100,14 +115,18 @@ installShims(database);
 const outcome = runAthenaSql(database, sql);
 
 console.log("--- loaded from simulated S3");
-console.log(`${String(loaded.rows.length)} rows, ${String(loaded.bytesScanned)} bytes scanned`);
+console.log(
+  `${String(loaded.rows.length)} rows, ${String(loaded.bytesScanned)} bytes scanned`,
+);
 console.log("--- translated for SQLite");
 console.log(outcome.sqlite);
 console.log("--- engine rows");
 console.log(outcome.rows);
 
 if (!outcome.ok) {
-  throw new Error(`engine failed at ${String(outcome.stage)}: ${String(outcome.error)}`);
+  throw new Error(
+    `engine failed at ${String(outcome.stage)}: ${String(outcome.error)}`,
+  );
 }
 
 // Hand the computed rows to the real query lifecycle. The seam that would
@@ -125,9 +144,9 @@ simAws
     bytesScanned: loaded.bytesScanned,
   });
 
-const started = await simAws
-  .athena()
-  .startQueryExecution({ input: { QueryString: sql, WorkGroup: "rainlytics" } });
+const started = await simAws.athena().startQueryExecution({
+  input: { QueryString: sql, WorkGroup: "rainlytics" },
+});
 
 await simAws.backgroundTasksComplete();
 
@@ -140,7 +159,10 @@ const results = await simAws
 
 console.log("--- through the Athena lifecycle");
 console.log("state:", execution.QueryExecution?.Status?.State);
-console.log("scanned:", execution.QueryExecution?.Statistics?.DataScannedInBytes);
+console.log(
+  "scanned:",
+  execution.QueryExecution?.Statistics?.DataScannedInBytes,
+);
 console.log(
   "rows:",
   JSON.stringify(

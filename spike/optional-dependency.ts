@@ -12,13 +12,16 @@ export interface AthenaParser {
   tableList(sql: string, options: { database: string }): string[];
 }
 
+/**
+ *
+ */
 export class SimAthenaParserMissing extends Error {
   constructor(cause: unknown) {
     super(
       "Simulated Athena needs node-sql-parser to run a query. " +
         "Add it to your project as a dev dependency, or leave the engine off " +
         "and declare what each query answers with through results(). " +
-        `The import failed with ${String((cause as Error).message).split("\n")[0]}`,
+        `The import failed with ${String((cause as Error).message).split("\n", 1)[0]}`,
     );
     this.name = "SimAthenaParserMissing";
   }

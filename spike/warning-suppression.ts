@@ -9,7 +9,10 @@ const saved = process.listeners("warning");
 
 process.removeAllListeners("warning");
 process.on("warning", (warning) => {
-  if (warning.name === "ExperimentalWarning" && /SQLite/.test(warning.message)) {
+  if (
+    warning.name === "ExperimentalWarning" &&
+    /SQLite/.test(warning.message)
+  ) {
     return;
   }
 
