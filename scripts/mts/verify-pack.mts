@@ -42,6 +42,22 @@ const forbiddenTarballEntries = [
 ];
 
 /**
+ * What the tarball is allowed to weigh, unpacked and in files.
+ *
+ * Yulin gains about a megabyte and five hundred files a week, a simulated
+ * service at a time, so these are a ratchet rather than a fixed ceiling: raise
+ * them in the change that earns the growth. They sit far enough above the
+ * package to leave a couple of months of ordinary work alone, and close enough
+ * to catch a single change that alters what the build emits for every module.
+ *
+ * File count is the tighter of the two. Yulin is thousands of small modules
+ * rather than a few large ones, and a consumer feels that in how long an
+ * install takes to unpack far more than it feels the megabytes.
+ */
+const maximumUnpackedBytes = 20 * 1024 * 1024;
+const maximumFileCount = 12_000;
+
+/**
  * Exports a consumer imports by name, keyed by export subpath.
  *
  * A subpath resolving does not mean the export a consumer reaches for is in it,
@@ -74,7 +90,7 @@ async function main(): Promise<void> {
     const tarballPath = await pack(workDirectory);
 
     await assertTarballHygiene(tarballPath);
-    await reportTarballSize(tarballPath);
+    await assertTarballSize(tarballPath);
 
     const consumerDirectory = path.join(workDirectory, "consumer");
     await createConsumer(consumerDirectory, tarballPath, manifest);
@@ -159,20 +175,42 @@ async function assertTarballHygiene(tarballPath: string): Promise<void> {
 }
 
 /**
- * Reports what the tarball weighs, so a publish that suddenly ships far more
- * than the last one is visible before it goes out.
+ * Fails the verification when the tarball outgrows what the package is allowed
+ * to ship, and reports what it weighs either way.
+ *
+ * A publish that suddenly carries far more than the last one is worth seeing
+ * before it goes out, whether it came from a change to what the build emits or
+ * from a directory that should never have been packed.
  */
-async function reportTarballSize(tarballPath: string): Promise<void> {
+async function assertTarballSize(tarballPath: string): Promise<void> {
   const { size } = await stat(tarballPath);
   const { stdout } = await execa("tar", ["tzvf", tarballPath]);
 
-  const unpacked = stdout
-    .split("\n")
-    .reduce((total, entry) => total + entrySize(entry), 0);
+  const entries = stdout.split("\n");
+  const unpacked = entries.reduce(
+    (total, entry) => total + entrySize(entry),
+    0,
+  );
 
   console.log(
-    `Tarball is ${formatBytes(size)} packed, ${formatBytes(unpacked)} unpacked.`,
+    `Tarball is ${formatBytes(size)} packed, ${formatBytes(unpacked)} unpacked, in ${String(entries.length)} files.`,
   );
+
+  const breaches = [
+    unpacked > maximumUnpackedBytes
+      ? `unpacked size is ${formatBytes(unpacked)}, over the ${formatBytes(maximumUnpackedBytes)} limit`
+      : undefined,
+    entries.length > maximumFileCount
+      ? `file count is ${String(entries.length)}, over the ${String(maximumFileCount)} limit`
+      : undefined,
+  ].filter((breach) => breach !== undefined);
+
+  if (breaches.length > 0) {
+    throw new Error(
+      `Tarball is too large to publish:\n${breaches.join("\n")}\n` +
+        "Either stop shipping what it gained, or raise the limit in this script deliberately.",
+    );
+  }
 }
 
 /**
