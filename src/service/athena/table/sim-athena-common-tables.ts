@@ -5,7 +5,9 @@ import type { SimAthenaTableReference } from "./sim-athena-table-reference.js";
  * The names a `WITH` clause defines.
  *
  * A common table expression is written `name AS (`, and nothing else in a
- * statement this scanner reads puts a bracket straight after `AS`.
+ * statement this scanner reads puts a bracket straight after `AS`. Athena also
+ * lets one name its output columns, as `name (a, b) AS (`, so the name is not
+ * always the token before the `AS`.
  */
 export function simAthenaCommonTableNames(
   tokens: readonly SimAthenaSqlToken[],
@@ -23,7 +25,7 @@ export function simAthenaCommonTableNames(
       continue;
     }
 
-    const name = position === 0 ? undefined : tokens.at(position - 1);
+    const name = nameBefore(tokens, position);
 
     if (name?.kind === "word" || name?.kind === "quoted") {
       names.add(name.text.toLowerCase());
@@ -31,6 +33,58 @@ export function simAthenaCommonTableNames(
   }
 
   return names;
+}
+
+/**
+ * The name a common table expression declares, reading back from its `AS`.
+ *
+ * A closing bracket there is the end of an output column list, and the name
+ * sits in front of the bracket that opened it.
+ */
+function nameBefore(
+  tokens: readonly SimAthenaSqlToken[],
+  position: number,
+): SimAthenaSqlToken | undefined {
+  const previous = position === 0 ? undefined : tokens.at(position - 1);
+
+  if (previous?.kind !== "symbol" || previous.text !== ")") {
+    return previous;
+  }
+
+  const opening = openingBracket(tokens, position - 1);
+
+  return opening === undefined || opening === 0
+    ? undefined
+    : tokens.at(opening - 1);
+}
+
+/** Where the bracket closing at this position was opened. */
+function openingBracket(
+  tokens: readonly SimAthenaSqlToken[],
+  closedAt: number,
+): number | undefined {
+  let cursor = closedAt;
+  let depth = 0;
+
+  while (cursor >= 0) {
+    const token = tokens.at(cursor);
+
+    if (token?.kind === "symbol" && token.text === ")") {
+      depth += 1;
+    }
+
+    if (token?.kind === "symbol" && token.text === "(") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return cursor;
+      }
+    }
+
+    cursor -= 1;
+  }
+
+  return undefined;
 }
 
 /**

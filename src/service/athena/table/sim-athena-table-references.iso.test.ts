@@ -52,6 +52,20 @@ describe("reading the tables an Athena query names", () => {
     assertArrayEquals(names, ["rainlytics.access_logs"]);
   });
 
+  it("leaves out a WITH name that declares its own columns", () => {
+    // Given a common table expression naming its output columns, which Athena
+    // writes as `name (a, b) AS (`.
+    // When its table names are read.
+    const names = namesIn(
+      "WITH totals (id, spend) AS (SELECT customer_id, sum(total) " +
+        "FROM shop.orders GROUP BY 1) SELECT id FROM totals",
+    );
+
+    // Then only the catalog table is named. Reading `totals` as one would
+    // refuse a query real Athena runs.
+    assertArrayEquals(names, ["shop.orders"]);
+  });
+
   it("leaves an alias and a subquery out", () => {
     // Given a query aliasing a table and selecting from a subquery.
     // When its table names are read.

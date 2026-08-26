@@ -48,7 +48,12 @@ function isTableClause(
 }
 
 /**
+ * Whether a bracket opening after this token holds a subquery or a list.
  *
+ * A bracket opening straight after any other word is a function call, and a
+ * `FROM` inside one belongs to the function. `EXTRACT(hour FROM ts)` and
+ * `SUBSTRING(s FROM 2)` are the two that matter, and both would otherwise name
+ * a table.
  */
 export function simAthenaIsSubqueryOpener(
   previous: SimAthenaSqlToken | undefined,
