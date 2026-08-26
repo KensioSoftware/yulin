@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
+import type { SimGluePartitionStore } from "../../partition/sim-glue-partition-store.js";
 import type { SimGlueTableStore } from "../../table/sim-glue-table-store.js";
 import {
   requiredSimGlueColumns,
@@ -25,6 +26,7 @@ import { simGlueTableDetail } from "./sim-glue-table-detail.js";
 interface SimGlueTableCommandsProperties {
   readonly databases: SimGlueDatabaseStore;
   readonly tables: SimGlueTableStore;
+  readonly partitions: SimGluePartitionStore;
   readonly authorizer: SimGlueAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
@@ -36,6 +38,7 @@ interface SimGlueTableCommandsProperties {
 export class SimGlueTableCommands {
   readonly #databases: SimGlueDatabaseStore;
   readonly #tables: SimGlueTableStore;
+  readonly #partitions: SimGluePartitionStore;
   readonly #authorizer: SimGlueAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
   readonly #clock: SimClock;
@@ -43,6 +46,7 @@ export class SimGlueTableCommands {
   constructor(properties: SimGlueTableCommandsProperties) {
     this.#databases = properties.databases;
     this.#tables = properties.tables;
+    this.#partitions = properties.partitions;
     this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
     this.#clock = properties.clock;
@@ -157,7 +161,7 @@ export class SimGlueTableCommands {
   }
 
   /**
-   * Remove a table.
+   * Remove a table, and the partitions registered against it with it.
    */
   deleteTable(
     command: SimDeleteTableCommand,
@@ -180,6 +184,7 @@ export class SimGlueTableCommands {
 
     this.#tables.require(databaseName, name);
     this.#tables.delete(databaseName, name);
+    this.#partitions.deleteTable(databaseName, name);
 
     return { $metadata: {} };
   }

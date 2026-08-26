@@ -4,6 +4,11 @@ import type {
   SimGlueDatabaseStore,
 } from "../database/sim-glue-database-store.js";
 import type { SimGlueDatabase } from "../database/sim-glue-database.js";
+import type { SimGluePartition } from "../partition/sim-glue-partition.js";
+import type {
+  SimGluePartitionInput,
+  SimGluePartitionStore,
+} from "../partition/sim-glue-partition-store.js";
 import type {
   SimGlueTableInput,
   SimGlueTableStore,
@@ -13,6 +18,7 @@ import type { SimGlueTable } from "../table/sim-glue-table.js";
 interface SimGlueCatalogWriterProperties {
   readonly databases: SimGlueDatabaseStore;
   readonly tables: SimGlueTableStore;
+  readonly partitions: SimGluePartitionStore;
   readonly clock: SimClock;
 }
 
@@ -28,11 +34,13 @@ interface SimGlueCatalogWriterProperties {
 export class SimGlueCatalogWriter {
   readonly #databases: SimGlueDatabaseStore;
   readonly #tables: SimGlueTableStore;
+  readonly #partitions: SimGluePartitionStore;
   readonly #clock: SimClock;
 
   constructor(properties: SimGlueCatalogWriterProperties) {
     this.#databases = properties.databases;
     this.#tables = properties.tables;
+    this.#partitions = properties.partitions;
     this.#clock = properties.clock;
   }
 
@@ -41,10 +49,11 @@ export class SimGlueCatalogWriter {
     return this.#databases.create(name, this.#clock.now(), input);
   }
 
-  /** Remove a database, and the tables it holds with it. */
+  /** Remove a database, and the tables and partitions it holds with it. */
   deleteDatabase(name: string): void {
     this.#databases.delete(name);
     this.#tables.deleteDatabase(name);
+    this.#partitions.deleteDatabase(name);
   }
 
   /**
@@ -60,8 +69,37 @@ export class SimGlueCatalogWriter {
     return this.#tables.create(databaseName, name, this.#clock.now(), input);
   }
 
-  /** Remove a table. */
+  /** Remove a table, and the partitions registered against it with it. */
   deleteTable(databaseName: string, name: string): void {
     this.#tables.delete(databaseName, name);
+    this.#partitions.deleteTable(databaseName, name);
+  }
+
+  /**
+   * Register a partition against a table, refusing one whose table is absent.
+   *
+   * The values are taken as given. Nothing here checks them against the
+   * table's partition keys, since a Command does that while reading its input.
+   */
+  createPartition(
+    databaseName: string,
+    tableName: string,
+    values: readonly string[],
+    input: SimGluePartitionInput = {},
+  ): SimGluePartition {
+    this.#tables.require(databaseName, tableName);
+
+    return this.#partitions
+      .inTable(databaseName, tableName)
+      .create(values, this.#clock.now(), input);
+  }
+
+  /** Remove a partition. */
+  deletePartition(
+    databaseName: string,
+    tableName: string,
+    values: readonly string[],
+  ): void {
+    this.#partitions.inTable(databaseName, tableName).delete(values);
   }
 }

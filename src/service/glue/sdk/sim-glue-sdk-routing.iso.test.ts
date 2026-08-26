@@ -1,10 +1,16 @@
 import {
+  BatchCreatePartitionCommand,
+  BatchDeletePartitionCommand,
   CreateDatabaseCommand,
+  CreatePartitionCommand,
   CreateTableCommand,
   DeleteDatabaseCommand,
+  DeletePartitionCommand,
   DeleteTableCommand,
   GetDatabaseCommand,
   GetDatabasesCommand,
+  GetPartitionCommand,
+  GetPartitionsCommand,
   GetTableCommand,
   GetTablesCommand,
   GlueClient,
@@ -39,6 +45,12 @@ describe("SimGlueSdkCommandRouter", () => {
       "GetTableCommand",
       "GetTablesCommand",
       "DeleteTableCommand",
+      "CreatePartitionCommand",
+      "BatchCreatePartitionCommand",
+      "GetPartitionCommand",
+      "GetPartitionsCommand",
+      "DeletePartitionCommand",
+      "BatchDeletePartitionCommand",
     ]);
   });
 
@@ -152,5 +164,89 @@ describe("Glue SDK interception", () => {
     const remaining = await client.send(new GetDatabasesCommand({}));
 
     assertArrayLength(remaining.DatabaseList ?? [], 0);
+  });
+
+  it("registers and reads partitions through an intercepted client", async () => {
+    // Given an intercepted client holding a table partitioned by day.
+    using simSdk = new SimSdk();
+    simSdk.intercept(GlueClient);
+
+    const client = new GlueClient({ region: "eu-west-2" });
+
+    await client.send(
+      new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+    );
+    await client.send(
+      new CreateTableCommand({
+        DatabaseName: "site_logs",
+        TableInput: {
+          Name: "access_logs",
+          PartitionKeys: [{ Name: "day", Type: "string" }],
+        },
+      }),
+    );
+
+    // When ordinary SDK code registers three days, reads one back and removes
+    // two of them.
+    await client.send(
+      new BatchCreatePartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionInputList: [
+          { Values: ["2026-08-24"] },
+          { Values: ["2026-08-25"] },
+        ],
+      }),
+    );
+    await client.send(
+      new CreatePartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionInput: {
+          Values: ["2026-08-26"],
+          StorageDescriptor: { Location: "s3://site-logs/day=2026-08-26/" },
+        },
+      }),
+    );
+
+    const one = await client.send(
+      new GetPartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionValues: ["2026-08-26"],
+      }),
+    );
+
+    await client.send(
+      new DeletePartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionValues: ["2026-08-24"],
+      }),
+    );
+    await client.send(
+      new BatchDeletePartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionsToDelete: [{ Values: ["2026-08-25"] }],
+      }),
+    );
+
+    const left = await client.send(
+      new GetPartitionsCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+      }),
+    );
+
+    // Then each command reached the simulation.
+    assertIdentical(
+      one.Partition?.StorageDescriptor?.Location,
+      "s3://site-logs/day=2026-08-26/",
+    );
+    assertArrayEquals(
+      left.Partitions?.map((partition) => partition.Values?.[0]),
+      ["2026-08-26"],
+    );
   });
 });

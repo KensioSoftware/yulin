@@ -1,6 +1,7 @@
 # Simulated Glue
 
-The Glue Data Catalog, holding databases and the table definitions inside them.
+The Glue Data Catalog, holding databases, the table definitions inside them, and the partitions
+registered against those tables.
 
 Usage docs are at [docs/services/glue/](../../../docs/services/glue/README.md).
 
@@ -18,11 +19,14 @@ partition keys.
 
 ## Layout
 
-- `sim-glue.ts` is the facade. It holds the two stores, delegates each SDK Command to a command
+- `sim-glue.ts` is the facade. It holds the three stores, delegates each SDK Command to a command
   class, and hands out the SDK router and the CloudFormation factory.
 - `database/` and `table/` hold the stored shapes and their stores. Tables are keyed by database
   name and then by table name. A database's tables go with it when it is deleted, and two databases
   may each hold a table of the same name.
+- `partition/` follows that a level further down. `SimGluePartitionStore` is keyed by database name
+  and then table name, and each entry is a `SimGlueTablePartitions` holding one table's partitions
+  under their own values. A table's partitions go with it, and a database's go with the database.
 - `command/` is one directory per resource kind, holding the local structural command types, the
   handler class, and the detail mapper deciding what a `Get` reports.
 - `cfn/` reads `AWS::Glue::Database` and `AWS::Glue::Table` properties and creates from them.
@@ -51,11 +55,34 @@ id, the database name and the table name and says in its own comment that nothin
 against AWS. The format lives in that one function, so correcting it is that function and the test
 naming the value.
 
+**A partition is keyed by its values as JSON.** `simGluePartitionKey` runs the values through
+`JSON.stringify`. Joining them on a separator character gives one key for two different partitions
+whenever a value holds that character, and `["a", "b"]` then collides with `["a/b"]`.
+
+**A batch reports its refusals and keeps going.** `BatchCreatePartition` and `BatchDeletePartition`
+run each entry through the same path a single request takes, and collect the `SimGlueError` an entry
+raises into the `Errors` list. Any other error comes out of the batch. A fault in the simulation
+reported as a partition error would read as though the caller had asked for something invalid.
+
+**`Errors` is always there, empty when a batch had nothing to report.** The response mappers leave an
+absent field out, and this is the one exception. A caller checking a batch has one thing to check,
+and an optional empty list makes them reach through it first.
+
+**`GetPartitions` refuses an `Expression`.** Filtering is a separate issue. Ignoring the filter until
+it lands would answer with the partitions the caller asked to leave out, and the refusal names what
+is missing.
+
+**A partition authorizes against its table's ARN.** Partitions have no ARN of their own on real
+Glue, and a real policy grants `glue:CreatePartition` on the table. `SimGluePartitionRegistry`
+resolves the table first and every partition command goes through it.
+
 **A `CatalogId` naming another account is refused.** Creating the resource in this account's catalog
 would give a template that deploys and a catalog holding something the template never asked for.
 
 ## What is deliberately absent
 
-Crawlers, partition registration, table versions, column statistics, Lake Formation, connections,
-jobs, triggers, workflows and the Schema Registry. Every one of them needs something outside the
-catalog, and most need data read back. The Limitations list in the usage docs is the full account.
+Crawlers, partition updates, partition indexes, `BatchGetPartition`, table versions, column
+statistics, Lake Formation, connections, jobs, triggers, workflows and the Schema Registry. Every
+one of them needs something outside the catalog, or reads data back. Simulated Athena reads a
+table's projection parameters and none of its registered partitions, which is its own issue. The
+Limitations list in the usage docs is the full account.
