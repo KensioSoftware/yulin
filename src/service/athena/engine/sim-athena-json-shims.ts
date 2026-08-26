@@ -66,8 +66,9 @@ function extractedScalar(
 /**
  * One element of an array or one value of a map.
  *
- * Trino counts an array from one and reads a map by its key, and the JSON
- * behind either one says which of the two this is.
+ * Trino counts an array from one, counts back from the end for a negative
+ * index, and has no element at zero. It reads a map by its key instead, and the
+ * JSON behind either one says which of the two this is.
  */
 function elementAt(
   parsed: unknown,
@@ -79,7 +80,11 @@ function elementAt(
 
   const at = shimNumber(key);
 
-  return at === undefined ? null : scalarOf(parsed.at(at - 1));
+  if (at === undefined || at === 0) {
+    return null;
+  }
+
+  return scalarOf(parsed.at(at > 0 ? at - 1 : at));
 }
 
 function propertyOf(value: unknown, key: string): unknown {

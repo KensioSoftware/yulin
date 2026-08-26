@@ -720,6 +720,15 @@ Current documented limitations:
 - Three classes of expression the engine accepts are ones real Athena refuses. `1 / 0` answers
   null, `CAST('abc' AS INTEGER)` answers 0, and `1 || 'x'` answers `'1x'`. Each of them fails a
   real query.
+- `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
+  Athena answers null, which is the same forgiving direction as the cast above. Reading the
+  statement without the rewrite would turn the whole query down.
+- A `decimal` column is held as a double. A value carrying more than about fifteen significant
+  digits loses the ones past that, and a filter, a sum or a group on it can then answer
+  differently from Athena's exact arithmetic.
+- A declaration that fails the query wins from any tier, the engine included. `failsWith` is a
+  statement about the query rather than about its rows, so a workgroup rule or a default carrying
+  one fails every query it covers whether or not the engine could have answered.
 - Parquet and ORC are absent. A table declaring either falls back to its declared result, and so
   does a table declaring no SerDe at all.
 - A null in a result row reads as an empty string. Real Athena leaves the value out of the row.

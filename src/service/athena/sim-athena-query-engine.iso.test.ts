@@ -180,6 +180,8 @@ describe("running an Athena query for real", () => {
     );
 
     // Then each one answers.
-    assertObjectEquals(answered.rows, [["2026-08-01", "a", "4", "acme"]]);
+    assertObjectEquals(answered.rows, [
+      ["2026-08-01T00:00:00Z", "a", "4", "acme"],
+    ]);
   });
 });

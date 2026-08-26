@@ -6,20 +6,21 @@ import {
   simAthenaScalarShim,
 } from "./sim-athena-shim-registry.js";
 
+/** How much of an ISO-8601 timestamp each unit keeps. */
+const truncations: ReadonlyMap<string, number> = new Map([
+  ["year", 4],
+  ["month", 7],
+  ["day", 10],
+  ["hour", 13],
+  ["minute", 16],
+  ["second", 19],
+]);
+
 /**
- * How much of an ISO-8601 timestamp each unit keeps, and what has to be put
- * back to leave a timestamp rather than a fragment.
+ * The start of the year, laid out so that every digit of an ISO-8601 timestamp
+ * has the value truncating to it leaves behind.
  */
-const truncations: ReadonlyMap<string, { keep: number; pad: string }> = new Map(
-  [
-    ["year", { keep: 4, pad: "-01-01" }],
-    ["month", { keep: 7, pad: "-01" }],
-    ["day", { keep: 10, pad: "" }],
-    ["hour", { keep: 13, pad: ":00:00" }],
-    ["minute", { keep: 16, pad: ":00" }],
-    ["second", { keep: 19, pad: "" }],
-  ],
-);
+const startOfYear = "0000-01-01T00:00:00.000";
 
 /** The `date_format` patterns Trino shares with MySQL. */
 const formatFields: ReadonlyMap<string, [number, number]> = new Map([
@@ -38,6 +39,10 @@ const formatFields: ReadonlyMap<string, [number, number]> = new Map([
  * because SQLite has no date type of its own. Every one of these therefore
  * works on the string rather than on an instant, which is exact for the
  * ISO-8601 a table holds and does nothing useful for anything else.
+ *
+ * `date_trunc` zeroes the fields below the unit and keeps the separators the
+ * value was written with. A date comes back as a date and a timestamp comes
+ * back as a timestamp at the start of the unit, which is what Trino does.
  */
 export function simAthenaInstallDateShims(database: DatabaseSync): void {
   simAthenaScalarShim(
@@ -83,11 +88,23 @@ function truncated(
     return null;
   }
 
-  const truncation = truncations.get(unit?.toLowerCase() ?? "");
+  const keep = truncations.get(unit?.toLowerCase() ?? "");
 
-  return truncation === undefined
-    ? value
-    : `${value.slice(0, truncation.keep)}${truncation.pad}`;
+  if (keep === undefined || value.length <= keep) {
+    return value;
+  }
+
+  let truncatedValue = value.slice(0, keep);
+
+  for (let index = keep; index < value.length; index += 1) {
+    const character = value.charAt(index);
+
+    truncatedValue += /\d/u.test(character)
+      ? startOfYear.charAt(index) || "0"
+      : character;
+  }
+
+  return truncatedValue;
 }
 
 function formatted(

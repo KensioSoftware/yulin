@@ -6,18 +6,20 @@
  * `storage.location.template` looks like, and it is the only place a partition
  * column's value is written for a table nothing projects.
  *
- * A segment carrying a dot is left alone, so a file called `a=b.json` is a
- * file rather than a partition.
+ * Only the directories count. The last segment is the object's own name, and a
+ * file called `a=b.json` is a file. A directory is read whatever it holds, so a
+ * partition on `version=1.2` reads as `1.2`.
  */
 export function simAthenaHivePartitionValues(
   key: string,
 ): Readonly<Record<string, string>> {
   const values: Record<string, string> = {};
+  const directories = key.split("/").slice(0, -1);
 
-  for (const segment of key.split("/")) {
+  for (const segment of directories) {
     const equals = segment.indexOf("=");
 
-    if (equals > 0 && !segment.includes(".")) {
+    if (equals > 0) {
       values[segment.slice(0, equals)] = decodeSegment(
         segment.slice(equals + 1),
       );

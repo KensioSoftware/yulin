@@ -9,22 +9,36 @@ describe("Trino's date functions on SQLite", () => {
   it("truncates a timestamp to each unit it knows", async () => {
     // Given one timestamp.
     // When it is truncated to a year, a month, an hour and a minute.
-    // Then each answers with the text that unit leaves standing.
+    // Then the fields below the unit read zero and the ones above it stand.
     assertIdentical(
       await anAnsweredExpression(`date_trunc('year', '${noon}')`),
-      "2026-01-01",
+      "2026-01-01T00:00:00Z",
     );
     assertIdentical(
       await anAnsweredExpression(`date_trunc('MONTH', '${noon}')`),
-      "2026-08-01",
+      "2026-08-01T00:00:00Z",
     );
     assertIdentical(
       await anAnsweredExpression(`date_trunc('hour', '${noon}')`),
-      "2026-08-02T12:00:00",
+      "2026-08-02T12:00:00Z",
     );
     assertIdentical(
       await anAnsweredExpression(`date_trunc('minute', '${noon}')`),
-      "2026-08-02T12:34:00",
+      "2026-08-02T12:34:00Z",
+    );
+  });
+
+  it("keeps a date a date", async () => {
+    // Given a value written to the day.
+    // When it is truncated to a day and to a month.
+    // Then it stays written to the day, since there is nothing below to zero.
+    assertIdentical(
+      await anAnsweredExpression("date_trunc('day', '2026-08-02')"),
+      "2026-08-02",
+    );
+    assertIdentical(
+      await anAnsweredExpression("date_trunc('month', '2026-08-02')"),
+      "2026-08-01",
     );
   });
 

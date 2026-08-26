@@ -31,7 +31,8 @@ interface SimAthenaSqliteDatabaseRequest {
  * `rainlytics.access_logs` in the statement resolves with nothing renamed.
  * SQLite refuses to reach across attached schemas from a view, so a table the
  * query context lets a statement name unqualified is created twice rather than
- * aliased.
+ * aliased. A Glue database called `main` is already there, and creating it a
+ * second time would be the same table twice over.
  */
 export function simAthenaSqliteDatabase(
   request: SimAthenaSqliteDatabaseRequest,
@@ -60,7 +61,7 @@ export function simAthenaSqliteDatabase(
 
     simAthenaCreateTable(database, schema, loaded);
 
-    if (schema === request.sessionDatabase) {
+    if (schema !== mainSchema && schema === request.sessionDatabase) {
       simAthenaCreateTable(database, mainSchema, loaded);
     }
   }

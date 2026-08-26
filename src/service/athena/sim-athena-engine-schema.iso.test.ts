@@ -175,6 +175,9 @@ describe("the schema an Athena query runs against", () => {
     await aSeededJson(simulation.simAws, "stock/site=%zz/b.json", [
       { sku: "nut" },
     ]);
+    await aSeededJson(simulation.simAws, "stock/site=yard 2.1/c.json", [
+      { sku: "screw" },
+    ]);
     await simulation.simAws.athena().engine().enable();
 
     // When a query reads the partition column.
@@ -183,8 +186,9 @@ describe("the schema an Athena query runs against", () => {
       "SELECT site FROM rainlytics.stock ORDER BY sku",
     );
 
-    // Then the encoding comes off, and a value that is no encoding at all is
-    // left as it was written.
-    assertObjectEquals(answered.rows, [["north yard"], ["%zz"]]);
+    // Then the encoding comes off, a value that is no encoding at all is left
+    // as it was written, and a value carrying a dot is a partition rather than
+    // a file name.
+    assertObjectEquals(answered.rows, [["north yard"], ["%zz"], ["yard 2.1"]]);
   });
 });

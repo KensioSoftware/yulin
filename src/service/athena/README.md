@@ -160,7 +160,9 @@ that catch sits.
 ### The seam
 
 `sim-athena-query-answer.ts` is the chain. A declaration written against one exact query text wins,
-then the engine, then the declarations again for the workgroup tier and the default. That ordering
+then the engine, then the declarations again for the workgroup tier and the default. A declared
+`failsWith` is the exception and wins from any tier, because it is a statement about the query
+rather than about its rows. `simAthenaPlanQuery` reads it before anything is planned or measured. That ordering
 is what keeps every test written before the engine existed working, and what gives a test an escape
 hatch for one statement the engine gets wrong.
 

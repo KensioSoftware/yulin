@@ -60,7 +60,8 @@ describe("Trino's JSON and array functions on SQLite", () => {
   it("counts an array and reads an element of one", async () => {
     // Given an array column held as JSON text.
     // When it is counted and indexed.
-    // Then Trino's one-based indexing is what answers.
+    // Then Trino's indexing is what answers. It counts from one, counts back
+    // from the end for a negative index, and has no element at zero.
     assertIdentical(
       await anAnsweredExpression(`cardinality(json_extract(${document}, '$'))`),
       null,
@@ -115,7 +116,8 @@ describe("Trino's string functions on SQLite", () => {
   it("splits a value and finds a substring in one", async () => {
     // Given a path and a word inside it.
     // When each function reads it.
-    // Then both count from one, and both answer nothing off the end.
+    // Then both count from one. A field off either end answers nothing, and
+    // so does a field below the first.
     assertIdentical(
       await anAnsweredExpression("split_part('a/b/c', '/', 2)"),
       "b",

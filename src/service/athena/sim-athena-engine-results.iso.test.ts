@@ -86,6 +86,27 @@ describe("what a query the engine ran answers with", () => {
     assertObjectEquals(answered.rows, [["Alpha"], ["alpha"], [""]]);
   });
 
+  it("orders nulls last inside a window with a frame", async () => {
+    // Given a reading whose site is null.
+    const simulation = await aReadingSimulation();
+
+    // When a window function sorts on that column ascending and names a frame.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT site, sum(samples) OVER (ORDER BY site ASC " +
+        "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running " +
+        "FROM rainlytics.readings ORDER BY site",
+    );
+
+    // Then the null is last inside the window too. A frame follows the sort it
+    // is framing, and an ascending sort has to carry NULLS LAST past it.
+    assertObjectEquals(answered.rows, [
+      ["Alpha", "4"],
+      ["alpha", "11"],
+      ["", "13"],
+    ]);
+  });
+
   it("matches LIKE with regard to case, as Athena does", async () => {
     // Given two sites differing only in case.
     const simulation = await aReadingSimulation();

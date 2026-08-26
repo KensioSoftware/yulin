@@ -20,9 +20,12 @@ export function simAthenaSqlForParser(sql: string): string {
 /**
  * An ascending sort, and what can follow the item it sorts once the parser has
  * written the statement back out.
+ *
+ * A window's own `ORDER BY` is followed by its frame, so `ROWS`, `RANGE` and
+ * `GROUPS` belong here alongside the ones that end a statement's.
  */
 const ascendingSort =
-  /\bASC\b(?=\s*(?:,|\)|$|LIMIT\b|OFFSET\b|UNION\b|EXCEPT\b|INTERSECT\b))/gu;
+  /\bASC\b(?=\s*(?:,|\)|$|LIMIT\b|OFFSET\b|UNION\b|EXCEPT\b|INTERSECT\b|ROWS\b|RANGE\b|GROUPS\b))/gu;
 
 /**
  * The statement as SQLite will take it.

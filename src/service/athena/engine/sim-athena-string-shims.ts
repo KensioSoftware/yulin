@@ -36,6 +36,7 @@ function matches(
   }
 }
 
+/** Trino counts the fields from one, and has no field below that. */
 function splitPart(
   value: string | undefined,
   delimiter: string | undefined,
@@ -45,7 +46,7 @@ function splitPart(
     return null;
   }
 
-  return value.split(delimiter).at(index - 1) ?? null;
+  return index < 1 ? null : (value.split(delimiter)[index - 1] ?? null);
 }
 
 /** Trino counts the position of a substring from one, and zero for absent. */
