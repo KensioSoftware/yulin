@@ -5,8 +5,12 @@
     "outDir": "dist",
     "tsBuildInfoFile": "./tsconfig.build.tsbuildinfo",
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // The published package carries dist, the readme and the licence, so a map
+    // emitted here resolves to a src directory the tarball does not have. Both
+    // kinds of map were a third of the package and half its file count, and
+    // neither of them loaded anywhere.
+    "declarationMap": false,
+    "sourceMap": false,
     "noEmitOnError": true
   },
   "include": ["src/**/*", "typings/**/*.d.ts"],
