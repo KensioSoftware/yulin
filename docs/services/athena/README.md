@@ -336,6 +336,25 @@ Every ascending sort is emitted carrying `NULLS LAST`, because Trino orders null
 direction it sorts and SQLite orders them first ascending. Both were cases where a query answered
 differently while still succeeding, which is the failure that costs the most to find.
 
+### Flattening an array or a map
+
+`UNNEST` runs. An array or a map column is held as its JSON text, and SQLite reads that with
+`json_each`, so a statement flattening one returns a row per element the way Athena does.
+
+```sql
+SELECT e.id, t.tag
+FROM rainlytics.events e
+CROSS JOIN UNNEST(e.tags) AS t(tag)
+```
+
+An array gives one column per element and a map gives the key beside the value, as
+`UNNEST(e.attrs) AS t(attribute, value)`. `WITH ORDINALITY` adds the position, counted from one.
+The Glue schema is what says which of the two a column holds, and a column it calls anything else
+falls back rather than reading a scalar as a collection.
+
+One flattening per statement is what this covers, joined with `CROSS JOIN`. A second `UNNEST`, a
+`LEFT JOIN UNNEST`, a `SELECT *` beside one, and a position taken from a map all fall back.
+
 ## Tables a query names
 
 A query's `FROM` and `JOIN` clauses are read, and each table they name is looked for in the Glue
@@ -682,6 +701,7 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
 - A `SELECT` run for real over JSON lines and CSV objects in simulated S3, answered by SQLite
+- `UNNEST` over an array or a map column, with `WITH ORDINALITY` where a query wants the position
 - Declared results, matched on the query text, ahead of the engine for one statement and behind it
   for everything else
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
@@ -707,7 +727,14 @@ Current documented limitations:
   accept a query real Athena would reject.
 - With the engine on, the statement is read as Athena by `node-sql-parser`, written back out for
   SQLite and run there. Around one query in twenty is turned down at one of those two steps and
-  falls back to its declared result. `UNNEST` and `GROUPING SETS` are the two measured cases.
+  falls back to its declared result. `GROUPING SETS` is the measured case, which the parser's
+  Athena grammar refuses outright.
+- One `UNNEST` per statement is rewritten onto `json_each`, and it has to be a `CROSS JOIN`. A
+  statement carrying two, one under a `LEFT JOIN`, one whose alias names no columns, and one
+  selecting every column all fall back. So does `WITH ORDINALITY` over a map, since `json_each`
+  gives a map's keys rather than its positions.
+- `UNNEST` over a `ROW` or a struct array falls back. The element needs field access and the
+  flattened column is JSON text here.
 - The Trino function library reaches as far as `date_trunc`, `date_format`, `from_unixtime`,
   `to_unixtime`, `from_iso8601_timestamp`, `from_iso8601_date`, `to_iso8601`,
   `json_extract_scalar`, `cardinality`, `element_at`, `regexp_like`, `split_part`, `strpos`,

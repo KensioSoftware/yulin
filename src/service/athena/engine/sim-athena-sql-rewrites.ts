@@ -1,20 +1,44 @@
+/** What a statement asks for, once the parser's grammar has been worked around. */
+export interface SimAthenaParserSql {
+  readonly sql: string;
+
+  /** Whether an `UNNEST` asked for the position of each element. */
+  readonly ordinality: boolean;
+}
+
+/**
+ * `WITH ORDINALITY`, which the parser's Athena grammar refuses outright.
+ *
+ * Nothing else in Trino spells it, so taking it out of the statement and
+ * remembering that it was there is enough to get the rest of the `UNNEST`
+ * through the grammar.
+ */
+const withOrdinality = /\s+WITH\s+ORDINALITY\b/giu;
+
 /**
  * The statement as the parser's Athena grammar will take it.
  *
- * Both rewrites close a gap in that grammar rather than a gap in SQLite.
+ * The two rewrites close a gap in that grammar rather than a gap in SQLite.
  * `try_cast` becomes a plain cast, which changes meaning in the forgiving
  * direction, since SQLite already answers with a value where a cast fails
- * rather than failing the query. Trino writes `OFFSET` before `LIMIT` and
- * every other dialect writes it after.
+ * rather than failing the query. Trino writes `OFFSET` before `LIMIT` and every
+ * other dialect writes it after.
  */
-export function simAthenaSqlForParser(sql: string): string {
-  return sql
+export function simAthenaSqlForParser(sql: string): SimAthenaParserSql {
+  const rewritten = sql
     .replaceAll(/\btry_cast\s*\(/giu, "CAST(")
     .replaceAll(
       /\bOFFSET\s+(\d+)\s+LIMIT\s+(\d+)/giu,
       (_match, offset: string, limit: string) =>
         `LIMIT ${limit} OFFSET ${offset}`,
     );
+
+  const forParser = rewritten.replaceAll(withOrdinality, "");
+
+  return {
+    sql: forParser,
+    ordinality: forParser.length !== rewritten.length,
+  };
 }
 
 /**

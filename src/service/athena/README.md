@@ -207,6 +207,29 @@ back a tick later, because `process.emitWarning` defers delivery and restoring s
 it. A project that installed a warning listener of its own keeps it, along with every other warning
 it would have printed.
 
+### Flattening with UNNEST
+
+`sim-athena-unnest-rewrite.ts` turns one `UNNEST` into a `json_each`. The rewrite happens on the
+tree between `astify` and `sqlify`, because `sqlify` writes the `UNNEST` back out unchanged and
+SQLite has no such clause.
+
+Three things made this more than a substitution.
+
+The parser's Athena grammar refuses `WITH ORDINALITY` outright, so
+`sim-athena-sql-rewrites.ts` takes those two words out before parsing and reports that they were
+there. Nothing else in Trino spells them, which is what makes a plain text removal safe.
+
+The alias names columns that `json_each` calls something else. An array's element is its `value`, a
+map's entry is a `key` beside a `value`, and a position is `key + 1`, since `json_each` counts an
+array from zero and Athena counts from one. `sim-athena-unnest-columns.ts` points every reference
+at the right one and keeps the name the statement wrote, so the result set reports `tag` rather
+than `value`. Every match is collected before any of them is rewritten, because reading a position
+writes a `key` into the tree and a walk still running would find it.
+
+Only the Glue schema says whether a column holds an array or a map, so `sim-athena-unnest-source.ts`
+resolves the `FROM` aliases back to catalog tables to read the type. A column the schema calls
+anything else falls back. That keeps a scalar from being read as a collection.
+
 ### Reading the answer back
 
 `sim-athena-engine-result.ts` reads rows as arrays through `setReturnArrays`, since a statement is
