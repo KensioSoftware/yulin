@@ -82,7 +82,11 @@ export class SimAthenaQueryEngine {
       return undefined;
     }
 
-    const sql = simAthenaSqliteSql(parser, request.queryString);
+    const sql = simAthenaSqliteSql({
+      parser,
+      athenaSql: request.queryString,
+      tables: request.tables.map((planned) => planned.table),
+    });
 
     return sql === undefined
       ? undefined
