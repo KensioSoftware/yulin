@@ -20,8 +20,9 @@ export function simAthenaJsonDocument(text: string | undefined): unknown {
 /**
  * The value one `$.a.b` path reaches, or nothing where it reaches none.
  *
- * The path syntax read here is the dotted one Athena's own examples use. A
- * bracketed index and a filter expression both fall outside it.
+ * The path syntax read here is the dotted one Athena's own examples use, with
+ * a bracketed index into an array alongside it, as `$.tags[0]`. A filter
+ * expression falls outside it.
  */
 export function simAthenaJsonAt(
   json: string | undefined,
@@ -31,10 +32,7 @@ export function simAthenaJsonAt(
     return undefined;
   }
 
-  const keys = path
-    .replace(/^\$\.?/u, "")
-    .split(".")
-    .filter((key) => key.length > 0);
+  const keys = path.replace(/^\$\.?/u, "").match(/[^.[\]]+/gu) ?? [];
   let current = simAthenaJsonDocument(json);
 
   for (const key of keys) {
@@ -44,7 +42,13 @@ export function simAthenaJsonAt(
   return current;
 }
 
-/** One property of a JSON object, or nothing where it holds none. */
+/**
+ * One property of a JSON object, or one element of an array.
+ *
+ * An array carries its indexes as its own properties, so reading one by name
+ * is the same read either way. A JSON path counts an array from zero, unlike
+ * every Trino function that takes an index.
+ */
 export function simAthenaJsonProperty(value: unknown, key: string): unknown {
   if (
     typeof value !== "object" ||

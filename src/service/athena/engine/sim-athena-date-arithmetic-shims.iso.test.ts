@@ -114,6 +114,35 @@ describe("Trino's date arithmetic on SQLite", () => {
     );
   });
 
+  it("keeps the milliseconds a zone shift never moved", async () => {
+    // Given an instant written to the millisecond.
+    // When it is read in another zone.
+    // Then the milliseconds survive. The wall clock comes back to the second,
+    // and a zone shift moves whole minutes rather than fractions.
+    assertIdentical(
+      await anAnsweredExpression(
+        "at_timezone('2026-08-26T12:00:00.500Z', 'Asia/Tokyo')",
+      ),
+      "2026-08-26T21:00:00.500",
+    );
+  });
+
+  it("refuses a timestamp written finer than the millisecond", async () => {
+    // Given a value written to four fractional digits.
+    // When it is moved.
+    // Then the statement raises. An instant has no room for the fourth digit,
+    // and rendering the answer back would write a `Z` where that digit was.
+    await assertThrowsErrorAsync(async () =>
+      anAnsweredExpression("date_add('day', 0, '2026-08-02T12:00:00.1234')"),
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        "date_add('day', 0, '2026-08-02T12:00:00.123')",
+      ),
+      "2026-08-02T12:00:00.123",
+    );
+  });
+
   it("reads the clock the simulation is running on", async () => {
     // Given a simulation whose query started at a known instant.
     // When a statement asks for the date and the time.

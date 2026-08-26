@@ -42,6 +42,32 @@ describe("Trino's functions over a whole JSON document", () => {
     assertIdentical(await anAnsweredExpression("json_parse(NULL)"), null);
   });
 
+  it("reaches into an array by its index", async () => {
+    // Given a document holding an array of objects.
+    // When a path indexes into it.
+    // Then the bracketed index reads, counted from zero the way a JSON path
+    // counts. Reading it as a property name would answer null on a path a
+    // statement is likely to write.
+    assertIdentical(
+      await anAnsweredExpression(
+        `json_extract_scalar(${document}, '$.tags[1]')`,
+      ),
+      "b",
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        `json_extract_scalar('{"a":[{"b":"z"}]}', '$.a[0].b')`,
+      ),
+      "z",
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        `json_extract_scalar(${document}, '$.tags[9]')`,
+      ),
+      null,
+    );
+  });
+
   it("counts the entries at a path", async () => {
     // Given an array, an object and a scalar.
     // When each is sized.
@@ -106,6 +132,11 @@ describe("Trino's array functions on SQLite", () => {
       "1-true-2",
     );
     assertIdentical(await anAnsweredExpression("array_join('4', '-')"), null);
+    assertIdentical(
+      await anAnsweredExpression(`array_join('["a"]', '-', NULL)`),
+      null,
+      "an argument written as NULL is a null answer, not an absent argument",
+    );
   });
 
   it("takes a run out of an array, counted from one", async () => {

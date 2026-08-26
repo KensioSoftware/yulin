@@ -116,9 +116,10 @@ function inZone(
     timeZone: zone,
     hour12: false,
   });
+  // The wall clock comes back to the second, and the milliseconds the value
+  // arrived with go back on. A zone shift never moves them.
+  const wall = Date.parse(`${shifted.replace(" ", "T")}Z`);
+  const milliseconds = ((at.instant % 1000) + 1000) % 1000;
 
-  return simAthenaRenderLike(
-    Date.parse(`${shifted.replace(" ", "T")}Z`),
-    at.text.replace(/Z$/u, ""),
-  );
+  return simAthenaRenderLike(wall + milliseconds, at.text.replace(/Z$/u, ""));
 }

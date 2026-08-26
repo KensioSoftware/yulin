@@ -378,8 +378,13 @@ instant it froze, and the same test answers the same way on every machine. Athen
 instant the query started, which is what the execution records.
 
 A function that cannot answer faithfully raises rather than guessing, and the query falls back.
-`date_add` with a unit Trino does not name, `slice` starting at zero, and `array_join` over an array
-of objects all land there. A null answer would be a wrong answer wearing the shape of a right one.
+`date_add` with a unit Trino does not name, `slice` starting at zero, `array_join` over an array of
+objects, and `regexp_extract` naming a capture group the pattern has not got all land there. A null
+answer would be a wrong answer wearing the shape of a right one.
+
+A function answers null where any argument is null, the way Trino's do. An argument left out takes
+its default and an argument written as `NULL` does not, so `regexp_extract(url, 'a', NULL)` answers
+null where `regexp_extract(url, 'a')` reads the whole match.
 
 ## Tables a query names
 
@@ -778,8 +783,17 @@ Current documented limitations:
   text they cannot read. Trino fails the query.
 - `json_extract` answers with JSON, so a string comes back quoted. SQLite's own unwraps it, and a
   statement comparing the answer against a bare string matches on one and not the other.
-- A timestamp carrying a numeric UTC offset falls outside the date functions. A value written with
-  a `Z` or with no zone at all reads as UTC.
+- A timestamp carrying a numeric UTC offset falls outside the date functions, and so does one
+  written finer than the millisecond. A value written with a `Z` or with no zone at all reads as
+  UTC, and a value the date functions cannot read turns the query down.
+- A JSON number beyond about fifteen significant digits loses the digits past that, wherever the
+  engine reads JSON. An identifier of that size in a JSON lines object comes back rounded, and a
+  filter on it can then match the wrong row.
+- The `url_extract` family reads a URL the way a browser does, so a percent escape in the path, the
+  query or the fragment comes back still escaped and a parameter name is matched decoded. Trino
+  reads a URL the way Java does and decodes each of those.
+- `regexp_replace` takes Trino's own spelling for a named group and an escaped dollar, `${name}`
+  and `\$`. The rest of Java's replacement syntax is not translated.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
   written any other way gets whatever slicing that text comes to.
 - `approx_distinct` and `approx_percentile` are computed exactly. The simulation is more accurate

@@ -5,14 +5,17 @@
 /**
  * The ISO-8601 shapes a table's timestamp column is written in.
  *
- * A date, or a date and a time joined by a `T` or a space, with optional
- * fractional seconds and an optional `Z`. A value carrying a numeric UTC offset
- * is deliberately left out. Reading one would mean rendering the answer back
- * into that offset, and getting that wrong is a wrong answer rather than a
- * refusal.
+ * A date, or a date and a time joined by a `T` or a space, with up to three
+ * fractional digits and an optional `Z`.
+ *
+ * Two shapes are deliberately left out. A value carrying a numeric UTC offset
+ * would mean rendering the answer back into that offset, and a value written
+ * finer than the millisecond has no room in the instant an answer is rendered
+ * from. Refusing either is better than answering with a timestamp that has been
+ * quietly cut about.
  */
 const isoDate = /^\d{4}-\d{2}-\d{2}$/u;
-const isoDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z?$/u;
+const isoDateTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z?$/u;
 
 /**
  * A value with no zone on it reads as UTC.

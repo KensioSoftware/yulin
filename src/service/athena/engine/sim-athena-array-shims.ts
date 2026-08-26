@@ -3,6 +3,7 @@ import type { DatabaseSync, SQLOutputValue } from "node:sqlite";
 import { SimAthenaSetUpError } from "../error/sim-athena.error.js";
 import { simAthenaJsonDocument } from "./sim-athena-json-path.js";
 import {
+  isExplicitNull,
   shimNumber,
   shimText,
   simAthenaScalarShim,
@@ -23,8 +24,14 @@ export function simAthenaInstallArrayShims(database: DatabaseSync): void {
     contains(arrayOf(value), element),
   );
 
-  simAthenaScalarShim(database, "array_join", (value, delimiter, absent) =>
-    joined(arrayOf(value), shimText(delimiter), shimText(absent)),
+  simAthenaScalarShim(database, "array_join", (...values) =>
+    isExplicitNull(values, 2)
+      ? null
+      : joined(
+          arrayOf(values.at(0)),
+          shimText(values.at(1)),
+          shimText(values.at(2)),
+        ),
   );
 
   simAthenaScalarShim(database, "slice", (value, start, length) =>

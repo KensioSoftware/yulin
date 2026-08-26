@@ -24,6 +24,20 @@ export function simAthenaScalarShim(
   );
 }
 
+/**
+ * Whether an optional argument was written as an explicit `NULL`.
+ *
+ * A Trino function answers null when any argument is null, and a call that left
+ * the argument out gets the default instead. The two arrive here as the same
+ * value, and the count is what tells them apart.
+ */
+export function isExplicitNull(
+  values: readonly SQLOutputValue[],
+  index: number,
+): boolean {
+  return values.length > index && values.at(index) === null;
+}
+
 /** One argument as text, or nothing where it is null. */
 export function shimText(
   value: SQLOutputValue | undefined,

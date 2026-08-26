@@ -29,11 +29,9 @@ export function simAthenaInstallUrlShims(database: DatabaseSync): void {
     });
   }
 
-  simAthenaScalarShim(database, "url_extract_port", (value) => {
-    const port = parsedUrl(shimText(value))?.port;
-
-    return port === undefined || port === "" ? null : Number(port);
-  });
+  simAthenaScalarShim(database, "url_extract_port", (value) =>
+    writtenPort(shimText(value)),
+  );
 
   simAthenaScalarShim(database, "url_extract_parameter", (value, name) => {
     const wanted = shimText(name);
@@ -45,6 +43,26 @@ export function simAthenaInstallUrlShims(database: DatabaseSync): void {
 
     return url.searchParams.get(wanted);
   });
+}
+
+/** Everything between the scheme and the path, which is where a port is written. */
+const authority = /^[A-Za-z][\w+.-]*:\/\/[^/?#]*/u;
+
+/**
+ * The port one URL names, or nothing where it names none.
+ *
+ * Read off the text rather than off the parsed URL, because the parser drops a
+ * port that is the scheme's own default. Trino answers with the port a URL was
+ * written with, so `http://rain.example:80/a` is eighty rather than nothing.
+ */
+function writtenPort(value: string | undefined): number | null {
+  if (value === undefined || parsedUrl(value) === undefined) {
+    return null;
+  }
+
+  const written = /:(\d+)$/u.exec(authority.exec(value)?.[0] ?? "")?.[1];
+
+  return written === undefined ? null : Number(written);
 }
 
 function parsedUrl(value: string | undefined): URL | undefined {

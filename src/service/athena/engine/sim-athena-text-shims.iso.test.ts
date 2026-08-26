@@ -1,4 +1,4 @@
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertThrowsErrorAsync } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { anAnsweredExpression } from "./sim-athena-shim.fixture.js";
@@ -43,6 +43,66 @@ describe("Trino's regular expression functions on SQLite", () => {
     assertIdentical(
       await anAnsweredExpression(String.raw`regexp_replace('a1b2', '\d')`),
       "ab",
+    );
+  });
+
+  it("refuses a capture group the pattern has not got", async () => {
+    // Given a pattern with one group.
+    // When a group outside it is asked for.
+    // Then the statement raises, which leaves the declared result to answer.
+    // A negative index would otherwise count back from the end and answer.
+    await assertThrowsErrorAsync(async () =>
+      anAnsweredExpression("regexp_extract('abc', '(a)', 5)"),
+    );
+    await assertThrowsErrorAsync(async () =>
+      anAnsweredExpression("regexp_extract('abc', '(a)(b)', -1)"),
+    );
+    assertIdentical(
+      await anAnsweredExpression("regexp_extract('abc', '(a)(b)', 2)"),
+      "b",
+    );
+    assertIdentical(
+      await anAnsweredExpression("regexp_extract('xyz', '(a)', 1)"),
+      null,
+    );
+  });
+
+  it("writes a replacement the way Trino writes one", async () => {
+    // Given replacements naming a group by name and escaping a dollar.
+    // When each is used.
+    // Then Trino's Java spelling is what reads, since a statement written for
+    // Athena carries that one. JavaScript spells both differently and would
+    // leave them as literal text.
+    // Written by hand rather than as a template, because `${` is Trino's own
+    // spelling here and a template literal would read it as an interpolation.
+    const reference = `$\u{7B}first}`;
+    const named = `regexp_replace('abc', '(?<first>a)', '[${reference}]')`;
+    const dollar = String.raw`regexp_replace('abc', 'a', '\$')`;
+
+    assertIdentical(await anAnsweredExpression(named), "[a]bc");
+    assertIdentical(await anAnsweredExpression(dollar), "$bc");
+  });
+
+  it("tells an argument left out from one written as NULL", async () => {
+    // Given calls leaving the last argument out and calls writing it as NULL.
+    // When each runs.
+    // Then the absent one takes the default and the NULL answers null, the
+    // way every Trino function answers a null argument.
+    assertIdentical(
+      await anAnsweredExpression("regexp_extract('abc', 'a')"),
+      "a",
+    );
+    assertIdentical(
+      await anAnsweredExpression("regexp_extract('abc', 'a', NULL)"),
+      null,
+    );
+    assertIdentical(
+      await anAnsweredExpression("regexp_replace('abc', 'a')"),
+      "bc",
+    );
+    assertIdentical(
+      await anAnsweredExpression("regexp_replace('abc', 'a', NULL)"),
+      null,
     );
   });
 
@@ -120,6 +180,20 @@ describe("Trino's URL functions on SQLite", () => {
     assertIdentical(
       await anAnsweredExpression("url_extract_port('https://rain.example/a')"),
       null,
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        "url_extract_port('http://rain.example:80/a')",
+      ),
+      80,
+      "a port written out is a port, though it is the scheme's own default",
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        "url_extract_port('http://user:1234@rain.example/a')",
+      ),
+      null,
+      "the digits in a user's own credentials are no port",
     );
     assertIdentical(
       await anAnsweredExpression("url_extract_query('https://rain.example/a')"),
