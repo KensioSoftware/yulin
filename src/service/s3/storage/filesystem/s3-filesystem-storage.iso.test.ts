@@ -147,6 +147,7 @@ describe("Filesystem simulated S3 storage", () => {
 
   it.each([
     ["style.css", "text/css"],
+    ["data.csv", "text/csv"],
     ["font.eot", "application/vnd.ms-fontobject"],
     ["image.gif", "image/gif"],
     ["page.htm", "text/html"],
@@ -176,6 +177,28 @@ describe("Filesystem simulated S3 storage", () => {
 
     assertNonNullable(object);
     assertIdentical(object.metadata.values["content-type"], contentType);
+  });
+
+  // A CSV download is as much a web file as a `.txt` or an `.xml` one, and a
+  // site publishing one had it 404 in simulation and serve in the deployment.
+  it("serves a CSV file without the mount naming the extension", async () => {
+    // Given a CSV file sitting in a mounted directory
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "data.csv"], "a,b\n1,2\n");
+
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When the Object is read and the Bucket listed
+    const object = await storage.getObject("data.csv");
+    const objects = await storage.listObjects();
+
+    // Then the file is served, typed as the CSV it is, and listed
+    assertNonNullable(object);
+    assertIdentical(object.metadata.values["content-type"], "text/csv");
+    assertArrayLength(objects, 1);
+    assertIdentical(objects[0].key, "data.csv");
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {

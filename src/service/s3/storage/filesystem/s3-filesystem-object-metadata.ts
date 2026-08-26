@@ -37,6 +37,7 @@ function contentTypeForFilesystemS3ObjectKey(key: string): string | undefined {
 
 const contentTypesByExtension: ReadonlyMap<string, string> = new Map([
   [".css", "text/css"],
+  [".csv", "text/csv"],
   [".eot", "application/vnd.ms-fontobject"],
   [".gif", "image/gif"],
   [".html", "text/html"],

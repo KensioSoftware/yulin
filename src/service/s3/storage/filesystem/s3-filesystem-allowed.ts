@@ -57,6 +57,7 @@ export function normaliseExtension(extension: string): string {
  */
 export const defaultAllowedObjectFileExtensions = new Set([
   ".css",
+  ".csv",
   ".eot",
   ".gif",
   ".htm",
