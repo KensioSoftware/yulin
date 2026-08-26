@@ -91,6 +91,23 @@ entry per bracket level, and a subquery's own FROM then leaves the outer one sta
 `x AS (` is taken as a common table expression, since nothing else in a statement this scans puts a
 bracket straight after `AS`.
 
+`projection/` expands a table's partition projection into the S3 prefixes its partitions sit under.
+`sim-athena-projection-parameters.ts` reads the `projection.*` keys off the Glue table, and every
+partition key needs a type once projection is on, since Athena has no other way to know what a
+column's values are. `sim-athena-projection-values.ts` turns one column into its values, and
+`sim-athena-projection-location.ts` crosses those values into prefixes through
+`storage.location.template`, falling back to the Hive layout under the table's own location.
+
+Two decisions in there are worth knowing. A date bound is validated by writing it back out in its
+own format and comparing, because `Date.UTC` rolls a thirteenth month into the next January rather
+than refusing it. And a projection is capped at 20,000 partitions, which turns a runaway range into
+a named failure instead of a test that hangs.
+
+`sim-athena-partition-filters.ts` reads the `WHERE` clause for `column = 'value'` and
+`column IN (...)`. It reads nothing at all from a query carrying `OR`, since a value under one arm
+of an `OR` constrains nothing on its own. Failing to read a filter is always safe here, because it
+leaves every projected partition in.
+
 `sim-athena-table-resolution.ts` turns those names into a refusal. It skips a query against a
 catalog other than `awsdatacatalog`, and it skips everything while the Data Catalog holds no
 database at all. A simulation where nothing created a database is one where nothing asked for a

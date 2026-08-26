@@ -5,6 +5,7 @@ import {
   simAthenaTableReferenceText,
   type SimAthenaTableReference,
 } from "./sim-athena-table-reference.js";
+import type { SimAthenaPartitionedTable } from "../projection/sim-athena-table-partitions.js";
 import { simAthenaTableReferences } from "./sim-athena-table-references.js";
 
 /**
@@ -16,7 +17,19 @@ import { simAthenaTableReferences } from "./sim-athena-table-references.js";
  */
 export interface SimAthenaCatalog {
   allDatabases(): readonly unknown[];
-  findTable(databaseName: string, name: string): unknown;
+  findTable(
+    databaseName: string,
+    name: string,
+  ): SimAthenaPartitionedTable | undefined;
+}
+
+/** What resolving a query's tables came to. */
+export interface SimAthenaResolvedTables {
+  /** Why the query cannot run, where a table it names is absent. */
+  readonly refusal: string | undefined;
+
+  /** The catalog entries the query reads, for whatever comes next. */
+  readonly tables: readonly SimAthenaPartitionedTable[];
 }
 
 /** What one query is resolved against. */
@@ -27,8 +40,7 @@ export interface SimAthenaTableResolutionRequest {
 }
 
 /**
- * Why a query cannot run against this catalog, where a table it names is
- * absent.
+ * Resolve the tables a query names against this catalog.
  *
  * Resolution is skipped altogether for a query the scanner cannot follow, for
  * a statement that writes data, and for a catalog other than
@@ -40,45 +52,52 @@ export interface SimAthenaTableResolutionRequest {
  * declaration the way it was before this existed. Deploying the first database
  * is what turns resolution on.
  */
-export function simAthenaTableRefusal(
+export function simAthenaResolveTables(
   request: SimAthenaTableResolutionRequest,
   catalog: SimAthenaCatalog | undefined,
-): string | undefined {
+): SimAthenaResolvedTables {
   if (
     catalog === undefined ||
     catalog.allDatabases().length === 0 ||
     isFederated(request.catalog)
   ) {
-    return undefined;
+    return { refusal: undefined, tables: [] };
   }
 
   const read = simAthenaTableReferences(request.queryString);
 
   if (!read.readable) {
-    return undefined;
+    return { refusal: undefined, tables: [] };
   }
+
+  const tables: SimAthenaPartitionedTable[] = [];
 
   for (const reference of read.references) {
-    const refusal = refusalFor(reference, request, catalog);
-
-    if (refusal !== undefined) {
-      return refusal;
+    if (isFederated(reference.catalog) || isInformationSchema(reference)) {
+      continue;
     }
+
+    const database = reference.database ?? request.database;
+    const found =
+      database === undefined
+        ? undefined
+        : catalog.findTable(database, reference.name);
+
+    if (found === undefined) {
+      return { refusal: refusalFor(reference, request, database), tables: [] };
+    }
+
+    tables.push(found);
   }
 
-  return undefined;
+  return { refusal: undefined, tables };
 }
 
 function refusalFor(
   reference: SimAthenaTableReference,
   request: SimAthenaTableResolutionRequest,
-  catalog: SimAthenaCatalog,
-): string | undefined {
-  if (isFederated(reference.catalog) || isInformationSchema(reference)) {
-    return undefined;
-  }
-
-  const database = reference.database ?? request.database;
+  database: string | undefined,
+): string {
   const position = simAthenaSqlPosition(request.queryString, reference.index);
   const at = `line ${String(position.line)}:${String(position.column)}`;
 
@@ -87,10 +106,6 @@ function refusalFor(
       `SYNTAX_ERROR: ${at}: Schema must be specified when session schema ` +
       `is not set`
     );
-  }
-
-  if (catalog.findTable(database, reference.name) !== undefined) {
-    return undefined;
   }
 
   return (

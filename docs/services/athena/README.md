@@ -253,6 +253,80 @@ Nothing here plans the query. Reading the table names is a scan, and a statement
 it cannot follow runs the way it always did. That covers a statement writing data, a query against a
 federated catalog, and anything the scan gets lost in.
 
+## Partition projection
+
+A table configuring [partition projection](https://docs.aws.amazon.com/athena/latest/ug/partition-projection.html "AWS partition projection docs") has that configuration read when a query runs against it. The four projection types are `enum`, `integer`, `date` and `injected`, and all four are expanded into the partition values the table projects.
+
+Projection lives entirely in a Glue table's `Parameters`, which Glue accepts whatever they say. Athena is what reads them, so a mistake in one shows up as a failed query rather than a failed deploy. That is where it shows up here too.
+
+```typescript sim-athena-partition-projection
+/**
+ * A table whose projected date range names a month that does not exist.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+simAws.glue().createDatabase({
+  input: { DatabaseInput: { Name: "rainlytics" } },
+});
+simAws.glue().createTable({
+  input: {
+    DatabaseName: "rainlytics",
+    TableInput: {
+      Name: "access_logs",
+      PartitionKeys: [{ Name: "day", Type: "string" }],
+      StorageDescriptor: { Location: "s3://rainlytics-logs/cloudfront/" },
+      Parameters: {
+        "projection.enabled": "true",
+        "projection.day.type": "date",
+        "projection.day.format": "yyyy-MM-dd",
+        "projection.day.range": "2026-13-01,NOW",
+        // eslint-disable-next-line no-template-curly-in-string
+        "storage.location.template": "s3://rainlytics-logs/logs/${day}/",
+      },
+    },
+  },
+});
+
+const started = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString: "SELECT cs_uri_stem FROM rainlytics.access_logs",
+    WorkGroup: "rainlytics",
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const execution = await simAws.athena().getQueryExecution({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// "FAILED"
+console.log(execution.QueryExecution?.Status?.State);
+// INVALID_TABLE_PROPERTY, naming day and the bound it could not read
+console.log(execution.QueryExecution?.Status?.StateChangeReason);
+```
+
+A query fails where a partition key carries no `projection.<key>.type`, where a range fails to read, where an `integer` range carries `NOW`, where `storage.location.template` leaves out one of the projected keys, and where an `injected` column goes unconstrained.
+
+`NOW` is read against the simulated clock, along with an offset such as `NOW-3YEARS`. A test that froze time projects the same partitions on every run.
+
+The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read, and a query carrying `OR` anywhere is left unnarrowed. A filter left unread keeps every projected partition in. That is always the safe answer.
+
+A table with `projection.enabled` absent or false reads the location in its storage descriptor. A table with projection on and no `storage.location.template` gets the Hive layout under that same location, as `<location>/day=2026-08-25/`.
+
 ## The bytes scanned cutoff
 
 A query whose declared bytes scanned passes the workgroup's `BytesScannedCutoffPerQuery` reaches
@@ -378,6 +452,7 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
+- Partition projection evaluated, covering `enum`, `integer`, `date` and `injected`
 - `BytesScannedCutoffPerQuery` enforced against what a declaration says a query scanned
 - Result sets written to the workgroup's output location as CSV, under the caller's own identity
 - Workgroups, scoped by account and region, with `primary` there from the start
@@ -403,6 +478,18 @@ Current documented limitations:
   out of reach.
 - Table resolution starts once the Data Catalog holds a database. Every query in a simulation
   holding none is answered from its declaration.
+- Partition projection is expanded and checked, and the objects under the prefixes it comes to stay
+  unread. A projection naming partitions the bucket never held still passes.
+- A projected date's format understands `y`, `M`, `d`, `H`, `m` and `s`, which covers the patterns a
+  partition path is written in. The wider `SimpleDateFormat` grammar stays out of reach.
+- The `WHERE` clause is read for `column = 'value'` and `column IN ('a', 'b')` only, and a query
+  carrying `OR` anywhere is left unnarrowed. A partition narrowed less than real Athena would narrow
+  it costs a wider scan here, and the answer stays the same.
+- A table projecting more than 20,000 partitions fails the query. Real Athena has a limit of its own
+  and this one is the simulation's.
+- Partitions registered through the Glue Partitions API are absent, along with `MSCK REPAIR TABLE`
+  and `ALTER TABLE ADD PARTITION`. A table without projection reads its storage descriptor location
+  as the one prefix it has.
 - A query naming a catalog other than `awsdatacatalog` runs with its tables never looked for.
   Federated catalogs and `AWS::Athena::DataCatalog` fall outside this simulation.
 - What a query scanned comes from that same declaration. The cutoff is enforced for real against

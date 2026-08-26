@@ -9,7 +9,10 @@ A table here is a definition. The data it describes stays in S3, unread, and the
 with what it was told to hold.
 
 Simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads this
-catalog. A query naming a table no database here holds fails the way real Athena fails it.
+catalog. A query naming a table no database here holds fails the way real Athena fails it, and a
+table's partition projection is evaluated when a query runs against it. All four projection types
+are covered, `enum`, `integer`, `date` and `injected`, so a projection with a mistake in its
+parameters fails the query that reads it.
 
 Glue-specific types are imported from the `@kensio/yulin/glue` subpath.
 
