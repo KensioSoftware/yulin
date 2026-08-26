@@ -19,12 +19,21 @@ export class SimAthenaResolvedResult {
   public readonly columns: readonly SimAthenaDeclaredColumn[];
   public readonly rows: readonly (readonly string[])[];
   public readonly bytesScanned: number;
+
+  /**
+   * What the declaration said the query scanned, where it said anything.
+   *
+   * A query with none of its own is measured against the objects it reads.
+   * Telling a declared zero from an absent one is what makes that possible.
+   */
+  public readonly declaredBytesScanned: number | undefined;
   public readonly failsWith: string | undefined;
 
   constructor(declared: SimAthenaDeclaredResult) {
     this.rows = declared.rows ?? [];
     this.columns = resolvedColumns(declared, this.rows);
     this.bytesScanned = declared.bytesScanned ?? 0;
+    this.declaredBytesScanned = declared.bytesScanned;
     this.failsWith = declared.failsWith;
   }
 

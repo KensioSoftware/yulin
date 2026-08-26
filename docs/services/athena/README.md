@@ -327,10 +327,86 @@ The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN (
 
 A table with `projection.enabled` absent or false reads the location in its storage descriptor. A table with projection on and no `storage.location.template` gets the Hive layout under that same location, as `<location>/day=2026-08-25/`.
 
+## What a query scans
+
+A query's bytes scanned are measured from the objects it reads. The prefixes come from the table's
+partition projection, or from the location in its storage descriptor where a table projects nothing,
+and every object under each one counts.
+
+```typescript sim-athena-scanned-bytes
+/**
+ * A query measured against the objects a test seeded.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-logs" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+simAws.glue().createDatabase({
+  input: { DatabaseInput: { Name: "rainlytics" } },
+});
+simAws.glue().createTable({
+  input: {
+    DatabaseName: "rainlytics",
+    TableInput: {
+      Name: "access_logs",
+      StorageDescriptor: { Location: "s3://rainlytics-logs/logs/" },
+    },
+  },
+});
+
+await simAws.s3().putObject({
+  input: {
+    Bucket: "rainlytics-logs",
+    Key: "logs/part-0.json",
+    Body: "x".repeat(1200),
+  },
+});
+
+const started = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString: "SELECT cs_uri_stem FROM rainlytics.access_logs",
+    WorkGroup: "rainlytics",
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const execution = await simAws.athena().getQueryExecution({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// 1200
+console.log(execution.QueryExecution?.Statistics?.DataScannedInBytes);
+```
+
+A query filtering on a projected partition key reads only the prefixes that filter allows. A
+partitioned table then scans less than an unpartitioned one, and a test can prove it.
+
+The listing goes through simulated S3 under the caller that started the query, as Athena reads a
+table's data under the identity that asked for it. A caller who cannot read the Bucket fails the
+query, and the reason names it. A table pointing at a Bucket the simulation never made scans
+nothing. A table nobody put data behind is one nobody set up to measure.
+
+A declared `bytesScanned` wins where a test writes one down. That keeps a test able to drive the
+guardrail without seeding an object.
+
 ## The bytes scanned cutoff
 
-A query whose declared bytes scanned passes the workgroup's `BytesScannedCutoffPerQuery` reaches
-`FAILED`. This is the one guardrail this simulation enforces for real.
+A query whose bytes scanned pass the workgroup's `BytesScannedCutoffPerQuery` reaches `FAILED`. This
+is the one guardrail this simulation enforces for real, and it is enforced against what the objects
+under the query's prefixes come to.
 
 ```typescript sim-athena-bytes-scanned-cutoff
 /**
@@ -453,7 +529,8 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
 - Partition projection evaluated, covering `enum`, `integer`, `date` and `injected`
-- `BytesScannedCutoffPerQuery` enforced against what a declaration says a query scanned
+- Bytes scanned measured from the objects under the prefixes a query reads
+- `BytesScannedCutoffPerQuery` enforced against that measurement, or against a declared figure
 - Result sets written to the workgroup's output location as CSV, under the caller's own identity
 - Workgroups, scoped by account and region, with `primary` there from the start
 - `CreateWorkGroup`, `GetWorkGroup`, `UpdateWorkGroup`, `DeleteWorkGroup` and `ListWorkGroups`
@@ -478,8 +555,9 @@ Current documented limitations:
   out of reach.
 - Table resolution starts once the Data Catalog holds a database. Every query in a simulation
   holding none is answered from its declaration.
-- Partition projection is expanded and checked, and the objects under the prefixes it comes to stay
-  unread. A projection naming partitions the bucket never held still passes.
+- Partition projection is expanded and checked. The objects under the prefixes it comes to are
+  listed for their sizes and never opened. A projection naming partitions the Bucket never held
+  scans nothing and passes.
 - A projected date's format understands `y`, `M`, `d`, `H`, `m` and `s`, which covers the patterns a
   partition path is written in. The wider `SimpleDateFormat` grammar stays out of reach.
 - The `WHERE` clause is read for `column = 'value'` and `column IN ('a', 'b')` only, and a query
@@ -498,8 +576,11 @@ Current documented limitations:
   as the one prefix it has.
 - A query naming a catalog other than `awsdatacatalog` runs with its tables never looked for.
   Federated catalogs and `AWS::Athena::DataCatalog` fall outside this simulation.
-- What a query scanned comes from that same declaration. The cutoff is enforced for real against
-  that figure, which is a test's own statement about the query.
+- Bytes scanned are the total size of every object under the prefixes a query reads. Real Athena
+  reads only the columns a query asks for and counts compressed bytes, so it reports a smaller
+  figure for the same data in a columnar format. A cutoff test written here therefore fires on less
+  data than production would need.
+- A declared `bytesScanned` overrides the measurement entirely.
 - A query that exceeds the cutoff reaches `FAILED` here. AWS documents the per-query data usage
   control as cancelling a query. So a client matching on `FAILED` passes here and misses the
   cancellation in production, and one matching on `CANCELLED` fails here while being right in

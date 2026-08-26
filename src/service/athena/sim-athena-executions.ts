@@ -15,6 +15,7 @@ import { SimAthenaQueryExecutionStore } from "./execution/sim-athena-query-execu
 import type { SimAthenaQueryExecution } from "./execution/sim-athena-query-execution.js";
 import { SimAthenaNoResultDestination } from "./execution/sim-athena-no-result-destination.js";
 import { SimAthenaQueryRunner } from "./execution/sim-athena-query-runner.js";
+import type { SimAthenaScannedObjects } from "./execution/sim-athena-scanned-bytes.js";
 import {
   SimAthenaResultWriter,
   type SimAthenaResultDestination,
@@ -37,7 +38,7 @@ interface SimAthenaProperties {
    * A SimAthena built on its own has none, and a query that would write
    * results fails saying so. A Bucket only exists inside a SimAws.
    */
-  readonly s3?: SimAthenaResultDestination;
+  readonly s3?: SimAthenaResultDestination & Partial<SimAthenaScannedObjects>;
 
   /**
    * The Data Catalog a query's table names are resolved against.
@@ -46,6 +47,22 @@ interface SimAthenaProperties {
    * its tables being looked for. A catalog only exists inside a SimAws.
    */
   readonly glue?: SimAthenaCatalog;
+}
+
+/**
+ * Whether this destination can also list what a query reads.
+ *
+ * `SimS3` can. The no-op destination a standalone `SimAthena` gets cannot, and
+ * a query there scans whatever a declaration says it scanned.
+ */
+function scannedObjects(
+  s3:
+    | (SimAthenaResultDestination & Partial<SimAthenaScannedObjects>)
+    | undefined,
+): SimAthenaScannedObjects | undefined {
+  return s3?.listObjectsV2 === undefined
+    ? undefined
+    : (s3 as SimAthenaScannedObjects);
 }
 
 /**
@@ -89,6 +106,7 @@ export class SimAthenaExecutions {
       writer,
       background,
       catalog: properties.glue,
+      objects: scannedObjects(properties.s3),
     });
 
     this.background = background;
