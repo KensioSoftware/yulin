@@ -26,8 +26,24 @@ export const defaultAthenaCatalog = "awsdatacatalog";
 export const informationSchemaName = "information_schema";
 
 /**
+ * A catalog name as Athena reads one.
+ *
+ * Athena accepts mixed case in a query and lower cases the names when it
+ * executes it. A quoted identifier keeps its case through the tokeniser, since
+ * quoting matters for what a name may contain, and this is where that case
+ * stops counting.
+ *
+ * https://docs.aws.amazon.com/athena/latest/ug/tables-databases-columns-names.html
+ */
+export function simAthenaFoldedName(name: string): string {
+  return name.toLowerCase();
+}
+
+/**
  * How a reference reads back in an error, qualified the way Athena qualifies
  * one.
+ *
+ * Folded, because the name Athena went looking for is the folded one.
  */
 export function simAthenaTableReferenceText(
   reference: SimAthenaTableReference,
@@ -39,5 +55,5 @@ export function simAthenaTableReferenceText(
     reference.name,
   ];
 
-  return parts.join(".");
+  return simAthenaFoldedName(parts.join("."));
 }

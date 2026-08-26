@@ -106,6 +106,11 @@ entry per bracket level, and a subquery's own FROM then leaves the outer one sta
 `x AS (` is taken as a common table expression, since nothing else in a statement this scans puts a
 bracket straight after `AS`.
 
+`simAthenaFoldedName` folds the database and table names a query holds before the catalog is asked
+for them. Athena lower cases the names when it executes a query, and it does that to a quoted
+identifier as well. The tokeniser keeps a quoted identifier's case because quoting says what
+characters a name may hold, and resolution is where that case stops counting.
+
 `table/sim-athena-registered-partitions.ts` reads the partitions the Data Catalog holds against a
 table into those same prefixes, one per partition, each taken from the partition's own storage
 descriptor location. A partition with none falls back to the Hive layout under the table's location.

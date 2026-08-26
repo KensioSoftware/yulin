@@ -91,6 +91,46 @@ A broken projection fails that query.
 
 `Ref` answers with the database name and with the table name.
 
+## Names are folded to lower case
+
+A database name and a table name are both folded to lower case when they are stored. Real Glue folds
+them the same way, for compatibility with Apache Hive. A database created as `Rainlytics` is stored,
+reported and queried as `rainlytics`.
+
+```typescript sim-glue-name-folding
+/**
+ * A catalog name folded on its way in.
+ */
+
+import {
+  CreateDatabaseCommand,
+  GetDatabaseCommand,
+} from "@aws-sdk/client-glue";
+
+import { SimAws } from "@kensio/yulin";
+
+const glue = new SimAws().glue();
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "Rainlytics" } }),
+);
+
+const { Database } = glue.getDatabase(
+  new GetDatabaseCommand({ Name: "Rainlytics" }),
+);
+
+// rainlytics
+console.log(Database.Name);
+```
+
+Two names differing only by case are one name. A second `CreateDatabase` for `Rainlytics` after one
+for `rainlytics` is an `AlreadyExistsException`, and a `GetTable` finds the table under whichever
+spelling it is asked for.
+
+Column names keep the case they were given, including partition keys. Real Glue leaves those alone,
+and simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") folds a
+column name only when it runs a query.
+
 ## Reading the catalog back
 
 `GetDatabase`, `GetDatabases`, `GetTable` and `GetTables` answer through the SDK. A `SimGlue` also
@@ -407,6 +447,7 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 - `AWS::Glue::Database` and `AWS::Glue::Table`, deployed and deleted with the stack.
 - `TableInput.Parameters`, `PartitionKeys` and `StorageDescriptor`, held and read back as declared.
 - IAM authorization on every Command, over the resource and its ancestors.
+- Database and table names folded to lower case, as the Data Catalog folds them.
 
 ## Limitations
 
@@ -442,8 +483,12 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
   the attribute exists and documents nothing about its value, so a template asserting on it agrees
   with this simulation and may disagree with a real deploy. Confirming it takes one stack deployed
   to an account with `!GetAtt Table.Id` as an output.
-- **Names keep the case they were given.** Real Glue lowercases a database or table name for Hive
-  compatibility. A name that differs only by case is a different name here.
+- **A lookup finds a name under any spelling.** Real Glue documents the fold on the way in and asks
+  the caller to pass lower case on the way back out. `GetDatabase` and `GetTable` fold the name they
+  are given here, so a request naming `Rainlytics` reaches the database stored as `rainlytics`. This
+  is the one piece of the fold nothing has checked against AWS. A test relying on it agrees with
+  this simulation and may disagree with a real call, and passing the name in lower case avoids the
+  question.
 - **Cross-account catalogs are refused.** A `CatalogId` naming another account is refused, in a
   Command and in a template.
 - **Versions, statistics and Lake Formation are absent.** A table has no version history and no

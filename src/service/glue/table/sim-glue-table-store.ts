@@ -1,8 +1,9 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { simGlueFolded } from "../database/sim-glue-catalog-name.js";
 import {
-  SimGlueAlreadyExistsException,
-  SimGlueEntityNotFoundException,
-} from "../error/sim-glue.error.js";
+  refuseSimGlueNameInPlace,
+  requireSimGlueFound,
+} from "../error/sim-glue-catalog-refusal.js";
 import { SimGlueTable } from "./sim-glue-table.js";
 import type { SimGlueTableInput } from "./sim-glue-table-schema.js";
 
@@ -16,6 +17,10 @@ interface SimGlueTableStoreProperties {
  * Keyed by database name and then by table name, so a database's tables go
  * with it when it is deleted, and so two databases may hold a table of the
  * same name.
+ *
+ * Both names are folded to lower case, the way the Data Catalog folds one when
+ * it stores it. Two tables differing only by case are one table here, as they
+ * are on real Glue.
  */
 export class SimGlueTableStore {
   readonly #accountRegionScope: SimAwsAccountRegionScope;
@@ -29,16 +34,16 @@ export class SimGlueTableStore {
    * Make a table, refusing a name already taken in the same database.
    */
   create(
-    databaseName: string,
-    name: string,
+    declaredDatabase: string,
+    declaredName: string,
     createTime: Date,
     input: SimGlueTableInput = {},
   ): SimGlueTable {
+    const databaseName = simGlueFolded(declaredDatabase);
+    const name = simGlueFolded(declaredName);
     const inDatabase = this.#inDatabase(databaseName);
 
-    if (inDatabase.has(name)) {
-      throw new SimGlueAlreadyExistsException(`Table already exists: ${name}`);
-    }
+    refuseSimGlueNameInPlace(inDatabase.has(name), "Table", name);
 
     const table = new SimGlueTable({
       name,
@@ -53,39 +58,40 @@ export class SimGlueTableStore {
     return table;
   }
 
-  /** Find a table by database and name. */
+  /** Find a table by database and name, however either was spelled. */
   find(databaseName: string, name: string): SimGlueTable | undefined {
-    return this.#tables.get(databaseName)?.get(name);
+    return this.#found(databaseName)?.get(simGlueFolded(name));
   }
 
   /**
    * Get a table by database and name, refusing one that is absent.
    */
   require(databaseName: string, name: string): SimGlueTable {
-    const table = this.find(databaseName, name);
-
-    if (table === undefined) {
-      throw new SimGlueEntityNotFoundException(
-        `Table not found: ${databaseName}.${name}`,
-      );
-    }
-
-    return table;
+    return requireSimGlueFound(
+      this.find(databaseName, name),
+      "Table",
+      `${simGlueFolded(databaseName)}.${simGlueFolded(name)}`,
+    );
   }
 
   /** Every table in one database, in creation order. */
   inDatabase(databaseName: string): readonly SimGlueTable[] {
-    return this.#tables.get(databaseName)?.values().toArray() ?? [];
+    return this.#found(databaseName)?.values().toArray() ?? [];
   }
 
   /** Remove a table. */
   delete(databaseName: string, name: string): void {
-    this.#tables.get(databaseName)?.delete(name);
+    this.#found(databaseName)?.delete(simGlueFolded(name));
   }
 
   /** Remove every table in a database, as deleting the database does. */
   deleteDatabase(databaseName: string): void {
-    this.#tables.delete(databaseName);
+    this.#tables.delete(simGlueFolded(databaseName));
+  }
+
+  /** The tables of one database, however its name was spelled. */
+  #found(databaseName: string): Map<string, SimGlueTable> | undefined {
+    return this.#tables.get(simGlueFolded(databaseName));
   }
 
   #inDatabase(databaseName: string): Map<string, SimGlueTable> {

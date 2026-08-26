@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { simGlueFolded } from "../database/sim-glue-catalog-name.js";
 import { SimGlueTablePartitions } from "./sim-glue-table-partitions.js";
 
 interface SimGluePartitionStoreProperties {
@@ -14,6 +15,9 @@ interface SimGluePartitionStoreProperties {
  *
  * Each table's partitions are one object, which is what a partition command
  * works through once it has resolved the table it was given.
+ *
+ * Both names are folded to lower case, as they are in the table store, so a
+ * partition is reached under whatever spelling the table is asked for.
  */
 export class SimGluePartitionStore {
   readonly #accountRegionScope: SimAwsAccountRegionScope;
@@ -26,7 +30,13 @@ export class SimGluePartitionStore {
   /**
    * The partitions of one table, empty until something registers one.
    */
-  inTable(databaseName: string, tableName: string): SimGlueTablePartitions {
+  inTable(
+    declaredDatabase: string,
+    declaredTable: string,
+  ): SimGlueTablePartitions {
+    const databaseName = simGlueFolded(declaredDatabase);
+    const tableName = simGlueFolded(declaredTable);
+
     return mapEntry(
       this.#inDatabase(databaseName),
       tableName,
@@ -41,12 +51,14 @@ export class SimGluePartitionStore {
 
   /** Remove every partition of a table, as deleting the table does. */
   deleteTable(databaseName: string, tableName: string): void {
-    this.#tables.get(databaseName)?.delete(tableName);
+    this.#tables
+      .get(simGlueFolded(databaseName))
+      ?.delete(simGlueFolded(tableName));
   }
 
   /** Remove every partition in a database, as deleting the database does. */
   deleteDatabase(databaseName: string): void {
-    this.#tables.delete(databaseName);
+    this.#tables.delete(simGlueFolded(databaseName));
   }
 
   #inDatabase(databaseName: string): Map<string, SimGlueTablePartitions> {
