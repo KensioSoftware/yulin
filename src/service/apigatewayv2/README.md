@@ -316,7 +316,10 @@ fails the stack rather than deploying a template written two ways at once.
    what the method and path segments of the ARN hold, since neither is documented by AWS.
 4. `sim-http-api-integration-invocation.ts` invokes the integrated function and turns its result into
    the response. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
-   `SimPayload2Endpoint`, including what the route captured from the path.
+   `SimPayload2Endpoint`, including what the route captured from the path. `requestPath` on that
+   endpoint is what the event reports as `rawPath`, and it is where an API mapping's base path has
+   already come off: AWS documents `rawPath` as not carrying the mapping value, unlike a named
+   stage's own segment.
 5. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
    into an HTTP response. That machinery is shared with Lambda Function URLs, which speak the same
    format.

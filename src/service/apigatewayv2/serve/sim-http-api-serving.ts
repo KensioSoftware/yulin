@@ -19,6 +19,13 @@ export interface SimHttpApiServing {
   readonly api: SimHttpApi;
   readonly match: SimHttpApiMatch;
   readonly domainName: string;
+  /**
+   * The path the invocation event reports. It is the request path for the
+   * generated endpoint, and the request path without the API mapping's base
+   * path for a custom domain, which is what AWS documents `rawPath` as
+   * carrying.
+   */
+  readonly rawPath: string;
 }
 
 /**
@@ -114,7 +121,12 @@ export class SimHttpApiServingResolver {
 
     return {
       kind: "served",
-      serving: { api: httpApi, match, domainName: httpApi.hostname },
+      serving: {
+        api: httpApi,
+        match,
+        domainName: httpApi.hostname,
+        rawPath: path,
+      },
     };
   }
 
@@ -163,7 +175,12 @@ export class SimHttpApiServingResolver {
 
     return {
       kind: "served",
-      serving: { api: httpApi, match, domainName: domain.domainName },
+      serving: {
+        api: httpApi,
+        match,
+        domainName: domain.domainName,
+        rawPath: mapping.apiMappingKey.remainingPath(path),
+      },
     };
   }
 }

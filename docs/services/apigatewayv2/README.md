@@ -1790,10 +1790,14 @@ path. The generated endpoint still wants that segment.
 Where two mappings both match, the longest base path wins. A domain mapping both its root and
 `orders` serves `/orders/6` from the `orders` mapping and everything else from the root one.
 
-The base path stays in `rawPath` and in `requestContext.http.path`, the way a named stage's segment
-does. `requestContext.domainName` is the custom domain and `domainPrefix` is its first label, so a
-handler behind `api.example.com` reads `api` where one behind the generated endpoint reads the API
-id.
+The base path does not reach the handler. AWS documents `rawPath` in a payload format 2.0 event as
+not carrying the API mapping value, and points a handler that needs the whole path at payload format
+1.0 and its `path` field. A request to `/orders/pets/6` under the key `orders` reports `/pets/6`, and
+a request to `/orders` itself reports `/`. A named stage's own segment behaves the other way and is
+reported, so the two are not the same rule.
+
+`requestContext.domainName` is the custom domain and `domainPrefix` is its first label, so a handler
+behind `api.example.com` reads `api` where one behind the generated endpoint reads the API id.
 
 ```typescript sim-apigatewayv2-custom-domain
 /**
@@ -2560,13 +2564,15 @@ Current documented limitations:
 - The regional domain name AWS issues a custom domain, which is what a Route53 alias record points
   at, is outside the simulation. `DomainNameConfigurations` reports no `ApiGatewayDomainName` and no
   `HostedZoneId`, and only the custom domain's own hostname resolves.
-- A mapped base path stays in `rawPath` and in `requestContext.http.path`. That follows the named
-  stage behaviour, which AWS publishes through the `$context.path` access log variable. AWS publishes
-  nothing equivalent for a base path.
+- `requestContext.http.path` drops a mapped base path alongside `rawPath`. AWS documents the
+  `rawPath` half and shows the two fields carrying the same value, and publishes nothing about
+  `http.path` under an API mapping on its own.
 - `ApiMappingKey` is reported as an empty string for a mapping serving the root of its domain. What
   real API Gateway reports for that field is unestablished.
 - An API mapping and the API it names are in one Account and Region, as they are on AWS. A domain
-  name is unique across every simulated Account and Region.
+  name is unique across every simulated Account and Region, and across simulated Cognito's hosted
+  domains too, since a public hostname is unique across the whole of AWS rather than within one
+  service.
 - Deleting a domain name deletes its mappings without asking, as deleting an API does. Whether real
   API Gateway refuses either is unestablished.
 - No paging. `MaxResults` and `NextToken` are refused, never ignored, and every list command answers

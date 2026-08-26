@@ -9,6 +9,7 @@ import { SimElbV2Registry } from "../../elbv2/registry/sim-elbv2-registry.js";
 import { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
+import { SimAwsHostnameClaims } from "../../../serve/controller/host/sim-aws-hostname-claims.js";
 import {
   SimAwsAnyServiceHosts,
   type SimAwsServiceHosts,
@@ -43,7 +44,7 @@ export class SimAwsScopedServiceRegistries {
    * Account, and a request to one carries only a hostname, so this is also
    * where DNS resolution finds the pool a hosted request is for.
    */
-  public readonly cognitoDomains = new SimCognitoDomainRegistry();
+  public readonly cognitoDomains: SimCognitoDomainRegistry;
 
   /**
    * Indexes the repositories created in any Account and Region of one SimAws
@@ -74,7 +75,7 @@ export class SimAwsScopedServiceRegistries {
    * than within an Account, and a request to one carries only a hostname, so
    * this is also where DNS resolution finds the domain a request arrived at.
    */
-  public readonly httpApiDomains = new SimHttpApiDomainRegistry();
+  public readonly httpApiDomains: SimHttpApiDomainRegistry;
 
   /**
    * Indexes the REST API ids allocated in any Account and Region of one SimAws
@@ -108,8 +109,21 @@ export class SimAwsScopedServiceRegistries {
    * Where a hostname a resource claimed for itself is looked up, which is what
    * simulated DNS resolution asks after the built-in hostname shapes.
    */
-  public readonly serviceHosts: SimAwsServiceHosts = new SimAwsAnyServiceHosts([
-    this.cognitoDomains,
-    this.httpApiDomains,
-  ]);
+  public readonly serviceHosts: SimAwsServiceHosts;
+
+  /**
+   * The hostnames the domain registries have handed out. A public hostname is
+   * unique across the whole of AWS rather than within one service, so the two
+   * services that hand them out share this rather than each keeping its own.
+   */
+  private readonly hostnameClaims = new SimAwsHostnameClaims();
+
+  constructor() {
+    this.cognitoDomains = new SimCognitoDomainRegistry(this.hostnameClaims);
+    this.httpApiDomains = new SimHttpApiDomainRegistry(this.hostnameClaims);
+    this.serviceHosts = new SimAwsAnyServiceHosts([
+      this.cognitoDomains,
+      this.httpApiDomains,
+    ]);
+  }
 }

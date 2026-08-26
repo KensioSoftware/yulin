@@ -4,6 +4,10 @@ import {
   GetDomainNameCommand,
   GetDomainNamesCommand,
 } from "@aws-sdk/client-apigatewayv2";
+import {
+  CreateUserPoolCommand,
+  CreateUserPoolDomainCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
 import { assertIdentical } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -181,5 +185,56 @@ describe("Sim API Gateway v2 custom domain name commands", () => {
 
     // Then it is theirs, the way a released name is on real AWS
     assertIdentical(created.DomainName, "api.example.test");
+  });
+
+  it("refuses a hostname a Cognito hosted domain already answers on", async () => {
+    // Given a Cognito user pool with a custom domain
+    const simAws = new SimAws();
+    const { UserPool } = await simAws
+      .cognitoIdentityProvider()
+      .createUserPool(new CreateUserPoolCommand({ PoolName: "customers" }));
+    await simAws.cognitoIdentityProvider().createUserPoolDomain(
+      new CreateUserPoolDomainCommand({
+        UserPoolId: UserPool?.Id,
+        Domain: "auth.example.test",
+        CustomDomainConfig: { CertificateArn: certificateArn },
+      }),
+    );
+
+    // When API Gateway is asked for the same hostname
+    // Then it is refused, because a public hostname is unique across services
+    // as well as across Accounts, as it is on real AWS
+    await expect(
+      simAws
+        .apiGatewayV2()
+        .createDomainName(
+          new CreateDomainNameCommand({ DomainName: "auth.example.test" }),
+        ),
+    ).rejects.toThrow(SimApiGatewayV2BadRequest);
+  });
+
+  it("refuses a Cognito hosted domain on a hostname it already answers on", async () => {
+    // Given an API Gateway custom domain
+    const simAws = new SimAws();
+    await simAws
+      .apiGatewayV2()
+      .createDomainName(
+        new CreateDomainNameCommand({ DomainName: "auth.example.test" }),
+      );
+    const { UserPool } = await simAws
+      .cognitoIdentityProvider()
+      .createUserPool(new CreateUserPoolCommand({ PoolName: "customers" }));
+
+    // When Cognito is asked for the same hostname
+    // Then it is refused too, so neither service can take the other's name
+    await expect(
+      simAws.cognitoIdentityProvider().createUserPoolDomain(
+        new CreateUserPoolDomainCommand({
+          UserPoolId: UserPool?.Id,
+          Domain: "auth.example.test",
+          CustomDomainConfig: { CertificateArn: certificateArn },
+        }),
+      ),
+    ).rejects.toThrow(/already in use/u);
   });
 });

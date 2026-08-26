@@ -35,7 +35,8 @@ export interface SimPayload2Authorization {
 
 interface SimPayload2RequestContextInput {
   readonly request: Request;
-  readonly url: URL;
+  /** The path the event reports, which the builder has already settled. */
+  readonly rawPath: string;
   readonly endpoint: SimPayload2Endpoint;
   /** The simulated instant the request is stamped with. */
   readonly at: Date;
@@ -55,7 +56,7 @@ export class SimPayload2RequestContextBuilder {
    * Build the requestContext for one request.
    */
   build(input: SimPayload2RequestContextInput): SimPayload2RequestContext {
-    const { request, url, endpoint, at } = input;
+    const { request, rawPath, endpoint, at } = input;
     const iamCaller = this.iamCaller(input.authorization?.caller);
 
     const requestContext: SimPayload2RequestContext = {
@@ -67,7 +68,7 @@ export class SimPayload2RequestContextBuilder {
       domainPrefix: endpoint.domainPrefix,
       http: {
         method: request.method,
-        path: url.pathname,
+        path: rawPath,
         protocol: "HTTP/1.1",
         sourceIp: simAwsProxiedSourceIp,
         userAgent: request.headers.get("user-agent") ?? "",

@@ -88,11 +88,13 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
       localUrl(domainName, "/orders/pets/6"),
     );
 
-    // Then the base path is taken off before the routes see the path, and
-    // stays in rawPath, the way a named stage's segment does
+    // Then the base path is taken off before the routes see the path, and is
+    // gone from the event too: AWS documents rawPath as not carrying the API
+    // mapping value, and points a handler that needs it at payload format 1.0
     const event = (await response.json()) as SimPayload2Event;
     assertIdentical(event.routeKey, "GET /pets/{petId}");
-    assertIdentical(event.rawPath, "/orders/pets/6");
+    assertIdentical(event.rawPath, "/pets/6");
+    assertIdentical(event.requestContext.http.path, "/pets/6");
     expect(event.pathParameters).toStrictEqual({ petId: "6" });
   });
 
@@ -294,5 +296,26 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     expect(
       mappings.Items.map((mapping) => mapping.ApiMappingKey),
     ).toStrictEqual(["pets"]);
+  });
+
+  it("reports the root path for a request to the base path itself", async () => {
+    // Given an API mapped under a base path, routing the root
+    const simAws = new SimAws();
+    const api = await simHttpApiLambdaProxyFactory.make(
+      { handler: echoEvent, routeKeys: ["GET /"] },
+      simAws,
+    );
+    await mapDomainTo(simAws, api, "orders");
+
+    // When the base path itself is requested
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl(domainName, "/orders"),
+    );
+
+    // Then the event reports the root, since taking the base path off leaves
+    // no path at all
+    const event = (await response.json()) as SimPayload2Event;
+    assertIdentical(event.rawPath, "/");
+    assertIdentical(event.routeKey, "GET /");
   });
 });

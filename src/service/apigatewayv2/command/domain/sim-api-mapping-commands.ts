@@ -1,5 +1,4 @@
 import type { SimHttpApiStore } from "../../api/sim-http-api-store.js";
-import { makeSimApiMappingId } from "../../domain/sim-api-mapping-id.js";
 import { SimApiMappingKey } from "../../domain/sim-api-mapping-key.js";
 import { SimApiMapping } from "../../domain/sim-api-mapping.js";
 import { SimApiMappingRules } from "./sim-api-mapping-rules.js";
@@ -76,7 +75,7 @@ export class SimApiMappingCommands {
     this.rules.requireUnusedKey(domain, apiMappingKey);
 
     const mapping = new SimApiMapping({
-      apiMappingId: makeSimApiMappingId(),
+      apiMappingId: domain.apiMappings.allocateId(),
       apiMappingKey,
       apiId,
       stage,

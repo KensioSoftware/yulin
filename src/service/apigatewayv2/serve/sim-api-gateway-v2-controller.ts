@@ -107,6 +107,7 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       caller: serviceRequest.caller,
       iam: this.router.iamFor(api),
       domainName: serving.domainName,
+      rawPath: serving.rawPath,
     });
 
     if (!authorization.admitted) {
@@ -119,6 +120,7 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       request,
       authorization,
       domainName: serving.domainName,
+      rawPath: serving.rawPath,
     });
   }
 }

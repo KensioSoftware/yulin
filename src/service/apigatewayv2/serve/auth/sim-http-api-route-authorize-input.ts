@@ -21,6 +21,11 @@ export interface SimHttpApiRouteAuthorizeInput {
    */
   readonly domainName: string;
   /**
+   * The path the authorizer's own event reports, settled the same way the
+   * integration event's is.
+   */
+  readonly rawPath: string;
+  /**
    * The principal the serving boundary attributed the request to, from a
    * signature or from a named caller, and anonymous when it carried neither.
    */

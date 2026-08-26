@@ -1,4 +1,7 @@
-import type { SimApiMappingId } from "./sim-api-mapping-id.js";
+import {
+  makeSimApiMappingId,
+  type SimApiMappingId,
+} from "./sim-api-mapping-id.js";
 import type { SimApiMapping } from "./sim-api-mapping.js";
 
 /**
@@ -10,6 +13,20 @@ import type { SimApiMapping } from "./sim-api-mapping.js";
  */
 export class SimApiMappingStore {
   private readonly mappings = new Map<SimApiMappingId, SimApiMapping>();
+
+  /**
+   * Allocate a mapping id this domain is not already using.
+   */
+  allocateId(): SimApiMappingId {
+    let apiMappingId = makeSimApiMappingId();
+
+    while (this.mappings.has(apiMappingId)) {
+      /* v8 ignore next -- does not happen in practice */
+      apiMappingId = makeSimApiMappingId();
+    }
+
+    return apiMappingId;
+  }
 
   /**
    * Add a mapping to this domain.

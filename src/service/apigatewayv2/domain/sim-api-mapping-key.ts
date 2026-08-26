@@ -82,4 +82,28 @@ export class SimApiMappingKey {
   remainder(pathSegments: readonly string[]): readonly string[] {
     return pathSegments.slice(this.depth);
   }
+
+  /**
+   * The request path as the invocation event reports it, with this base path
+   * taken off the front.
+   *
+   * AWS documents `rawPath` in a payload format 2.0 event as not carrying the
+   * API mapping value, and points a handler that needs the whole path at
+   * format 1.0 and its `path` field. A base path is therefore unlike a named
+   * stage's segment, which the event does report.
+   *
+   * The path is sliced rather than rebuilt from the segments, so a trailing
+   * slash the client sent survives.
+   */
+  remainingPath(path: string): string {
+    if (this.depth === 0) {
+      return path;
+    }
+
+    // The base path plus the slash in front of it. A request to the base path
+    // itself leaves nothing, which is the root of what the mapping serves.
+    const remaining = path.slice(this.value.length + 1);
+
+    return remaining.length === 0 ? "/" : remaining;
+  }
 }

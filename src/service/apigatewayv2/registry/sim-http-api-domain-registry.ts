@@ -1,3 +1,4 @@
+import { SimAwsHostnameClaims } from "../../../serve/controller/host/sim-aws-hostname-claims.js";
 import type { SimAwsServiceHosts } from "../../../serve/controller/host/sim-aws-service-hosts.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import type { SimHttpApiDomainName } from "../domain/sim-http-api-domain-name.js";
@@ -18,6 +19,11 @@ import { SimApiGatewayV2BadRequest } from "../error/sim-api-gateway-v2.error.js"
  */
 export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
   private readonly domainsByHost = new Map<string, SimHttpApiDomainName>();
+  private readonly claims: SimAwsHostnameClaims;
+
+  constructor(claims: SimAwsHostnameClaims = new SimAwsHostnameClaims()) {
+    this.claims = claims;
+  }
 
   /**
    * Register a newly created domain, so requests to it resolve.
@@ -26,6 +32,7 @@ export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
     this.requireUnused(domain);
 
     this.domainsByHost.set(domain.hostname.toLowerCase(), domain);
+    this.claims.claim(domain.hostname);
   }
 
   /**
@@ -33,6 +40,7 @@ export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
    */
   deregister(domain: SimHttpApiDomainName): void {
     this.domainsByHost.delete(domain.hostname.toLowerCase());
+    this.claims.release(domain.hostname);
   }
 
   /**
@@ -64,14 +72,14 @@ export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
   }
 
   private requireUnused(domain: SimHttpApiDomainName): void {
-    if (!this.domainsByHost.has(domain.hostname.toLowerCase())) {
+    if (!this.claims.isClaimed(domain.hostname)) {
       return;
     }
 
     throw new SimApiGatewayV2BadRequest(
       `The domain name ${domain.domainName} already exists: a custom domain ` +
-        `name is unique across every simulated Account and Region, as it is ` +
-        `across the whole of real AWS`,
+        `name is unique across every simulated Account and Region and across ` +
+        `every simulated service, as it is across the whole of real AWS`,
     );
   }
 }
