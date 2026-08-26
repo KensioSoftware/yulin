@@ -34,7 +34,8 @@ export interface FixturePartitionedTable {
 }
 
 /**
- * Create a database and a table partitioned by the named keys.
+ * Create a database and a table partitioned by the named keys, all of them
+ * strings.
  *
  * The keys default to one `day`. That is the shape most of these tests want.
  * One value per partition means a list of two values is refused by count.
@@ -42,6 +43,25 @@ export interface FixturePartitionedTable {
 export function createFixturePartitionedTable(
   glue: SimGlue,
   partitionKeyNames: readonly string[] = ["day"],
+): FixturePartitionedTable {
+  return createFixtureTypedTable(
+    glue,
+    partitionKeyNames.map((Name) => ({ Name, Type: "string" })),
+  );
+}
+
+/**
+ * Create a database and a table partitioned by keys of the declared types.
+ *
+ * The type is what decides whether an expression compares a key numerically,
+ * so a test about that declares it here.
+ */
+export function createFixtureTypedTable(
+  glue: SimGlue,
+  partitionKeys: readonly {
+    readonly Name: string;
+    readonly Type?: string | undefined;
+  }[],
 ): FixturePartitionedTable {
   const databaseName = fixtureDatabaseName();
   const tableName = fixtureTableName();
@@ -52,10 +72,7 @@ export function createFixturePartitionedTable(
       DatabaseName: databaseName,
       TableInput: {
         Name: tableName,
-        PartitionKeys: partitionKeyNames.map((Name) => ({
-          Name,
-          Type: "string",
-        })),
+        PartitionKeys: partitionKeys,
         StorageDescriptor: { Location: `s3://${databaseName}/logs/` },
       },
     },

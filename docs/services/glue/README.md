@@ -187,6 +187,86 @@ one day twice is an `AlreadyExistsException`, since registration is not idempote
 Deleting a table removes the partitions registered against it, the way deleting a database removes
 its tables.
 
+## Filtering partitions
+
+`GetPartitions` takes an `Expression` and answers with the partitions it matches. A request carrying
+none reads them all.
+
+```typescript sim-glue-partition-expressions
+/**
+ * Reading back the partitions an expression matches.
+ */
+
+import {
+  BatchCreatePartitionCommand,
+  CreateDatabaseCommand,
+  CreateTableCommand,
+  GetPartitionsCommand,
+} from "@aws-sdk/client-glue";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const glue = simAws.glue();
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+);
+glue.createTable(
+  new CreateTableCommand({
+    DatabaseName: "site_logs",
+    TableInput: {
+      Name: "access_logs",
+      PartitionKeys: [
+        { Name: "day", Type: "string" },
+        { Name: "region", Type: "string" },
+      ],
+    },
+  }),
+);
+
+glue.batchCreatePartition(
+  new BatchCreatePartitionCommand({
+    DatabaseName: "site_logs",
+    TableName: "access_logs",
+    PartitionInputList: [
+      { Values: ["2026-07-31", "eu-west-2"] },
+      { Values: ["2026-08-01", "eu-west-2"] },
+      { Values: ["2026-08-02", "us-east-1"] },
+    ],
+  }),
+);
+
+const { Partitions } = glue.getPartitions(
+  new GetPartitionsCommand({
+    DatabaseName: "site_logs",
+    TableName: "access_logs",
+    Expression: "day >= '2026-08-01' AND region IN ('eu-west-2', 'us-east-1')",
+  }),
+);
+
+// [["2026-08-01","eu-west-2"],["2026-08-02","us-east-1"]]
+console.log(JSON.stringify(Partitions.map((partition) => partition.Values)));
+```
+
+A term names a partition key, an operator, and whatever the operator takes. The operators are `=`,
+`<>` and `!=`, `>`, `<`, `>=`, `<=`, `LIKE`, `IN` and `BETWEEN`, and `BETWEEN` takes both of its
+ends. `AND`, `OR` and `NOT` combine terms and brackets group them, with the precedence SQL gives
+them (`NOT` binds tightest, then `AND`, then `OR`). `NOT` also sits in front of `LIKE`, `IN` and
+`BETWEEN` to reverse that one term.
+
+Comparison follows the type the table declares for the key. `tinyint`, `smallint`, `int`, `integer`,
+`bigint`, `float`, `double` and `decimal` compare as numbers, so `10` sorts above `9` rather than
+below it. Every other declared type compares as text, which is the order a date written the ISO way
+already has. A key declared as a number is held to a numeric literal, and `hour = 'noon'` is refused
+rather than matching nothing.
+
+`LIKE` matches the value's text whatever type the key is declared with, since that is what `LIKE`
+does. `%` stands for any run of characters and `_` for exactly one.
+
+An expression naming a column the table does not partition by is refused, naming the column and the
+keys the table does have. So is one that cannot be read, and the message says where reading stopped.
+
 ## Intercepting a GlueClient
 
 An intercepted `GlueClient` reaches the simulated catalog, so code under test builds its own client
@@ -323,6 +403,7 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 - `CreateTable`, `GetTable`, `GetTables` and `DeleteTable`.
 - `CreatePartition`, `BatchCreatePartition`, `GetPartition`, `GetPartitions`, `DeletePartition` and
   `BatchDeletePartition`.
+- `GetPartitions` `Expression` filtering, over the SQL operators, `AND`, `OR`, `NOT` and brackets.
 - `AWS::Glue::Database` and `AWS::Glue::Table`, deployed and deleted with the stack.
 - `TableInput.Parameters`, `PartitionKeys` and `StorageDescriptor`, held and read back as declared.
 - IAM authorization on every Command, over the resource and its ancestors.
@@ -341,8 +422,12 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 - **Athena ignores a registered partition.** A query expands the table's projection parameters and
   reads nothing the partition commands wrote. Registering partitions changes what the catalog
   reports and leaves query planning alone.
-- **`GetPartitions` takes no `Expression`.** A filter is refused with `InvalidInputException`. An
-  ignored filter would answer with the partitions the caller asked to leave out.
+- **A `GetPartitions` `Expression` is the whole of the filtering.** `Segment` and parallel listing,
+  `ExcludeColumnSchema` and `TransactionId` are absent, and so are partition indexes, which change
+  which expressions real Glue will serve rather than what any of them mean.
+- **An expression compares a partition key against a literal.** That is the whole grammar.
+  Functions, arithmetic and comparing one column against another sit outside it, and a column name
+  is written unquoted.
 - **A partition keeps what it was registered with.** `UpdatePartition` and `BatchUpdatePartition`
   are absent, along with `BatchGetPartition` and partition indexes.
 - **`AWS::Glue::Partition` is absent.** Real CloudFormation has the resource type, and a template

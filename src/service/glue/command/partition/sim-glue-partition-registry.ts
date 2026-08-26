@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
+import { simGluePartitionExpressionFilter } from "../../expression/sim-glue-partition-expression.js";
 import type { SimGluePartition } from "../../partition/sim-glue-partition.js";
 import type { SimGluePartitionStore } from "../../partition/sim-glue-partition-store.js";
 import type { SimGlueTablePartitions } from "../../partition/sim-glue-table-partitions.js";
@@ -139,6 +140,31 @@ export class SimGluePartitionRegistry {
   /** Every partition of one table, in registration order. */
   inTable(table: SimGlueTable): readonly SimGluePartition[] {
     return this.#of(table).all;
+  }
+
+  /**
+   * Every partition of one table an `Expression` matches.
+   *
+   * The expression is read against the table, since which names are partition
+   * keys and how each one's values are ordered are properties of the table
+   * rather than of the expression.
+   */
+  matching(
+    table: SimGlueTable,
+    expression: string | undefined,
+  ): readonly SimGluePartition[] {
+    const partitions = this.inTable(table);
+
+    if (expression === undefined) {
+      return partitions;
+    }
+
+    const holds = simGluePartitionExpressionFilter(
+      expression,
+      table.partitionKeys,
+    );
+
+    return partitions.filter((partition) => holds(partition.values));
   }
 
   #of(table: SimGlueTable): SimGlueTablePartitions {

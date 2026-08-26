@@ -249,31 +249,6 @@ describe("SimGlue partitions", () => {
     assertInstanceOf(error, SimGlueEntityNotFoundException);
   });
 
-  it("refuses a GetPartitions Expression rather than ignoring it", () => {
-    // Given a table with two days registered.
-    const glue = new SimAws().glue();
-    const table = createFixturePartitionedTable(glue);
-
-    createFixturePartition(glue, table, ["2026-08-25"]);
-    createFixturePartition(glue, table, ["2026-08-26"]);
-
-    // When they are listed through a filter.
-    const error = assertThrowsError(() => {
-      glue.getPartitions(
-        new GetPartitionsCommand({
-          DatabaseName: table.databaseName,
-          TableName: table.tableName,
-          Expression: "day = '2026-08-26'",
-        }),
-      );
-    });
-
-    // Then it is refused. An ignored filter would answer with the partition
-    // the caller asked to leave out.
-    assertInstanceOf(error, SimGlueInvalidInputException);
-    assertStringIncludes(error.message, "Expression");
-  });
-
   it("removes a partition without touching the rest", () => {
     // Given two days registered.
     const glue = new SimAws().glue();
