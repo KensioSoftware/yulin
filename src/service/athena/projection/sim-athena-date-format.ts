@@ -1,4 +1,4 @@
-import { simAthenaDatePatternParts } from "./sim-athena-date-pattern.js";
+import { simAthenaDatePatternParts } from "./sim-athena-date-pattern-parts.js";
 
 /** Write one date out in a pattern. */
 export function simAthenaFormatDate(date: Date, pattern: string): string {

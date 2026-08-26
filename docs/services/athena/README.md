@@ -487,6 +487,12 @@ Current documented limitations:
   it costs a wider scan here, and the answer stays the same.
 - A table projecting more than 20,000 partitions fails the query. Real Athena has a limit of its own
   and this one is the simulation's.
+- An `enum` projection has the spaces around each of its values trimmed, so `a, b` is two values
+  rather than `a` and ` b`. Whether real Athena trims them is unverified.
+- An `integer` projection takes bounds inside JavaScript's safe integer range, and a bound beyond it
+  is refused. Athena's own range runs to the signed 64 bit limit.
+- `MILLISECONDS` is absent from the interval units, and a pattern carrying `S` is read as literal
+  text. A partition path written to the millisecond falls outside this.
 - Partitions registered through the Glue Partitions API are absent, along with `MSCK REPAIR TABLE`
   and `ALTER TABLE ADD PARTITION`. A table without projection reads its storage descriptor location
   as the one prefix it has.

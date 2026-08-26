@@ -1,4 +1,4 @@
-import { simAthenaDatePatternParts } from "./sim-athena-date-pattern.js";
+import { simAthenaDatePatternParts } from "./sim-athena-date-pattern-parts.js";
 import { simAthenaFormatDate } from "./sim-athena-date-format.js";
 
 /**
@@ -28,13 +28,13 @@ export function simAthenaParseDate(
       continue;
     }
 
-    const digits = text.slice(cursor, cursor + part.text.length);
+    const digits = numberAt(text, cursor, part.text.length);
 
-    if (!/^\d+$/.test(digits) || digits.length !== part.text.length) {
+    if (digits === undefined) {
       return undefined;
     }
 
-    fields[part.letter] = Number(digits);
+    fields[part.letter] = yearValue(part.letter, part.text.length, digits);
     cursor += digits.length;
   }
 
@@ -45,6 +45,50 @@ export function simAthenaParseDate(
   const date = dateOfFields(fields);
 
   return simAthenaFormatDate(date, pattern) === text ? date : undefined;
+}
+
+/**
+ * The digits one field takes, or nothing where they are absent.
+ *
+ * A pattern letter written once takes as many digits as are there, the way
+ * Java reads one. `yyyy-M-d` writes October the fifth as `2026-10-5`, and a
+ * reader taking one digit for `M` would stop in the middle of the month.
+ */
+function numberAt(
+  text: string,
+  start: number,
+  width: number,
+): string | undefined {
+  if (width > 1) {
+    const fixed = text.slice(start, start + width);
+
+    return /^\d+$/.test(fixed) && fixed.length === width ? fixed : undefined;
+  }
+
+  let end = start;
+
+  while (
+    end < text.length &&
+    text.charAt(end) >= "0" &&
+    text.charAt(end) <= "9"
+  ) {
+    end += 1;
+  }
+
+  return end === start ? undefined : text.slice(start, end);
+}
+
+/**
+ * What a year field's digits come to.
+ *
+ * A two-letter year is the 2000s here. Java slides an eighty year window
+ * around the current date, and pinning it to one century keeps a projected
+ * range from starting in 1926 because a table wrote `26`.
+ */
+function yearValue(letter: string, width: number, digits: string): number {
+  const value = Number(digits);
+
+  return letter === "y" && width === 2 ? 2000 + value : value;
 }
 
 function dateOfFields(fields: Readonly<Record<string, number>>): Date {

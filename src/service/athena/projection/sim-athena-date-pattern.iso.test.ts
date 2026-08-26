@@ -69,6 +69,60 @@ describe("reading and writing a projected date", () => {
     assertIdentical(moved("SECONDS"), "2026-08-26T09:07:06.000Z");
   });
 
+  it("clamps a month end and a leap day rather than overflowing", () => {
+    // Given the last day of a long month and a leap day.
+    // When each is moved by a month and by a year.
+    const endOfJanuary = simAthenaAddUnits(
+      new Date("2024-01-31T00:00:00.000Z"),
+      1,
+      "MONTHS",
+    );
+    const leapDay = simAthenaAddUnits(
+      new Date("2024-02-29T00:00:00.000Z"),
+      1,
+      "YEARS",
+    );
+
+    // Then each lands on the last day of the month it reaches. The native
+    // setter rolls both into the month after, and Athena moves dates through
+    // Java, which clamps.
+    assertIdentical(endOfJanuary.toISOString(), "2024-02-29T00:00:00.000Z");
+    assertIdentical(leapDay.toISOString(), "2025-02-28T00:00:00.000Z");
+  });
+
+  it("counts a week as seven days", () => {
+    // Given a table stepping its projection weekly.
+    // When an instant is moved by two weeks.
+    // Then it lands fourteen days on. No pattern letter writes a week, so a
+    // table asks for one through its interval unit.
+    assertIdentical(simAthenaDateUnit("WEEKS"), "WEEKS");
+    assertIdentical(
+      simAthenaAddUnits(instant, 2, "WEEKS").toISOString(),
+      "2026-09-09T09:07:05.000Z",
+    );
+  });
+
+  it("reads a field written once as however many digits are there", () => {
+    // Given a pattern whose month and day are written once each, which is how
+    // Java says to take as many digits as the value needs.
+    // When a date with a two digit month is read back.
+    const parsed = simAthenaParseDate("2026-10-5", "yyyy-M-d");
+
+    // Then both fields read. A reader taking one digit stops mid-month.
+    assertIdentical(parsed?.toISOString(), "2026-10-05T00:00:00.000Z");
+    assertIdentical(simAthenaFormatDate(instant, "yyyy-M-d"), "2026-8-26");
+  });
+
+  it("reads a two digit year as this century", () => {
+    // Given a year written with two digits.
+    // When it is read.
+    const parsed = simAthenaParseDate("26-01", "yy-MM");
+
+    // Then it lands in the 2000s. Handing 26 straight to the calendar gives
+    // 1926, and the round trip hides it because the year writes back as 26.
+    assertIdentical(parsed?.toISOString(), "2026-01-01T00:00:00.000Z");
+  });
+
   it("reads a date back out of the text a pattern wrote", () => {
     // Given text written in a pattern.
     // When it is read back.

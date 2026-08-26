@@ -29,8 +29,17 @@ export function simAthenaDateValues(
   }
 
   const [from, to] = simAthenaProjectionBounds(column);
-  const unit =
-    simAthenaDateUnit(column.intervalUnit) ?? simAthenaPatternUnit(pattern);
+  const declared = simAthenaDateUnit(column.intervalUnit);
+
+  if (declared === undefined && column.intervalUnit !== undefined) {
+    throw new SimAthenaProjectionError(
+      `Partition column ${column.name} counts its interval in ` +
+        `${column.intervalUnit}, and Athena counts years, months, weeks, ` +
+        `days, hours, minutes and seconds`,
+    );
+  }
+
+  const unit = declared ?? simAthenaPatternUnit(pattern);
 
   if (unit === undefined) {
     throw new SimAthenaProjectionError(

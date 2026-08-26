@@ -4,9 +4,13 @@ import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
  * The partition values a query's `WHERE` clause pins down.
  *
  * Only two shapes are read, `column = 'value'` and `column IN ('a', 'b')`, and
- * they are read wherever they appear. A query carrying `OR` anywhere is left
- * unfiltered, since a value under one arm of an `OR` constrains nothing on its
- * own and reading it as a constraint would drop partitions the query wants.
+ * they are read wherever they appear. A query carrying `OR` or `NOT` anywhere
+ * is left unfiltered. A value under one arm of an `OR` constrains nothing on
+ * its own, and a negated one names the partition the query does not want, so
+ * reading either as a constraint would answer from the wrong prefixes.
+ *
+ * Two constraints on one column are intersected, since a query carrying both
+ * wants the rows they agree on.
  *
  * Not reading a filter is always safe. It leaves every projected partition in,
  * which is the answer a query with no filter gets anyway.
@@ -33,7 +37,7 @@ export function simAthenaPartitionFilters(
   const tokens = simAthenaSqlTokens(sql);
   const byColumn = new Map<string, readonly string[]>();
 
-  if (tokens === undefined || tokens.some(isDisjunction)) {
+  if (tokens === undefined || tokens.some(isUnreadableTerm)) {
     return new SimAthenaPartitionFilters(byColumn);
   }
 
@@ -48,7 +52,7 @@ export function simAthenaPartitionFilters(
       const value = tokens.at(position + 2);
 
       if (value?.kind === "literal") {
-        byColumn.set(token.text.toLowerCase(), [value.text]);
+        narrow(byColumn, token.text, [value.text]);
       }
 
       continue;
@@ -58,7 +62,7 @@ export function simAthenaPartitionFilters(
       const values = literalList(tokens, position + 2);
 
       if (values !== undefined) {
-        byColumn.set(token.text.toLowerCase(), values);
+        narrow(byColumn, token.text, values);
       }
     }
   }
@@ -66,8 +70,33 @@ export function simAthenaPartitionFilters(
   return new SimAthenaPartitionFilters(byColumn);
 }
 
-function isDisjunction(token: { kind: string; text: string }): boolean {
-  return token.kind === "word" && token.text === "or";
+/**
+ * Add one constraint, keeping only what it and any earlier one agree on.
+ */
+function narrow(
+  byColumn: Map<string, readonly string[]>,
+  columnName: string,
+  values: readonly string[],
+): void {
+  const name = columnName.toLowerCase();
+  const already = byColumn.get(name);
+
+  if (already === undefined) {
+    byColumn.set(name, values);
+
+    return;
+  }
+
+  const wanted = new Set(values);
+
+  byColumn.set(
+    name,
+    already.filter((value) => wanted.has(value)),
+  );
+}
+
+function isUnreadableTerm(token: { kind: string; text: string }): boolean {
+  return token.kind === "word" && (token.text === "or" || token.text === "not");
 }
 
 /**

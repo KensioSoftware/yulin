@@ -148,6 +148,70 @@ describe("the values a projected partition column takes", () => {
     assertStringIncludes(error.message, "projection.day.format");
   });
 
+  it("refuses a range whose bounds are empty", () => {
+    // Given a range that is a comma and nothing else.
+    const column = aColumn({ type: "integer", range: "," });
+
+    // When its values are read.
+    // Then it is refused. Reading both bounds as zero projects one partition
+    // called 0 out of a configuration that says nothing.
+    const error = assertThrowsErrorLike(() =>
+      simAthenaProjectedValues(column, noon),
+    );
+    assertStringIncludes(error.message, "projection.day.range");
+  });
+
+  it("refuses an interval unit Athena does not count", () => {
+    // Given a date column counting its interval in fortnights.
+    const column = aColumn({
+      type: "date",
+      range: "2026-08-01,2026-08-26",
+      format: "yyyy-MM-dd",
+      intervalUnit: "FORTNIGHTS",
+    });
+
+    // When its values are read.
+    // Then it is refused. Falling back to the format's own unit would answer
+    // with a step nobody asked for.
+    const error = assertThrowsErrorLike(() =>
+      simAthenaProjectedValues(column, noon),
+    );
+    assertStringIncludes(error.message, "FORTNIGHTS");
+  });
+
+  it("refuses a bound with whitespace inside NOW", () => {
+    // Given a bound that reads as NOW only once its spaces are taken out.
+    const column = aColumn({
+      type: "date",
+      range: "2026-08-01,N OW",
+      format: "yyyy-MM-dd",
+    });
+
+    // When its values are read.
+    // Then it is refused, as the malformed bound it is.
+    const error = assertThrowsErrorLike(() =>
+      simAthenaProjectedValues(column, noon),
+    );
+    assertStringIncludes(error.message, "N OW");
+  });
+
+  it("steps a date column by weeks where its unit says so", () => {
+    // Given a column stepping a fortnight at a time.
+    const column = aColumn({
+      type: "date",
+      range: "2026-08-01,2026-08-26",
+      format: "yyyy-MM-dd",
+      interval: 2,
+      intervalUnit: "WEEKS",
+    });
+
+    // When its values are read.
+    const values = simAthenaProjectedValues(column, noon);
+
+    // Then each is fourteen days on from the last.
+    assertArrayEquals(values, ["2026-08-01", "2026-08-15"]);
+  });
+
   it("refuses a range that is not two bounds", () => {
     // Given a column whose range never got its second bound.
     const column = aColumn({ type: "integer", range: "1" });

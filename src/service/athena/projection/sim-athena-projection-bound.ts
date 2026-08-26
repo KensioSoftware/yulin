@@ -17,7 +17,8 @@ interface SimAthenaRelativeBound {
  * optional block is the shape a scanner warns about.
  */
 function relativeBound(bound: string): SimAthenaRelativeBound | undefined {
-  const text = bound.replaceAll(" ", "").toUpperCase();
+  // Trimmed rather than stripped, so `N O W` stays the malformed bound it is.
+  const text = bound.trim().toUpperCase();
 
   if (text === "NOW") {
     return { sign: undefined, amount: undefined, unitName: undefined };

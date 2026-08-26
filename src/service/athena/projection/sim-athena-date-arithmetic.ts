@@ -13,13 +13,19 @@ const unitMovers = new Map<
   [
     "YEARS",
     (date, amount): void => {
-      date.setUTCFullYear(date.getUTCFullYear() + amount);
+      moveMonths(date, amount * 12);
     },
   ],
   [
     "MONTHS",
     (date, amount): void => {
-      date.setUTCMonth(date.getUTCMonth() + amount);
+      moveMonths(date, amount);
+    },
+  ],
+  [
+    "WEEKS",
+    (date, amount): void => {
+      date.setUTCDate(date.getUTCDate() + amount * 7);
     },
   ],
   [
@@ -47,6 +53,27 @@ const unitMovers = new Map<
     },
   ],
 ]);
+
+/**
+ * Move a date by whole months, clamping the day rather than overflowing.
+ *
+ * The native setter rolls 31 January plus one month into 2 or 3 March. Java
+ * clamps it to the last day of February, and Athena projects dates through
+ * Java, so a table projecting month ends needs the clamp.
+ */
+function moveMonths(date: Date, months: number): void {
+  const day = date.getUTCDate();
+
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  date.setUTCDate(Math.min(day, lastDayOfMonth(date)));
+}
+
+function lastDayOfMonth(date: Date): number {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+}
 
 /** Move a date on by a whole number of one unit, in UTC. */
 export function simAthenaAddUnits(

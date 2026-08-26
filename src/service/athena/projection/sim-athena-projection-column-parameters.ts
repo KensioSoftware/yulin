@@ -16,7 +16,7 @@ export function simAthenaProjectionColumnOf(
   name: string,
   parameters: Readonly<Record<string, string>>,
 ): SimAthenaProjectionColumn {
-  const declared = read(parameters, name, "type")?.toLowerCase();
+  const declared = read(parameters, name, "type")?.trim().toLowerCase();
 
   if (declared === undefined) {
     throw new SimAthenaProjectionError(
