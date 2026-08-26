@@ -283,6 +283,7 @@
     "eslint-plugin-unicorn": "^72.0.0",
     "execa": "^10.0.0",
     "fta-cli": "^3.0.0",
+    "node-sql-parser": "^5.4.0",
     "oxfmt": "^0.64.0",
     "oxlint": "^1.77.0",
     "oxlint-tsgolint": "^7.0.2001",
