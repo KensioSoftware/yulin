@@ -11,6 +11,15 @@ import {
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
 import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
 
+/** What planning one query came to. */
+export interface SimAthenaQueryPlan {
+  /** Why the query cannot run, where something says it cannot. */
+  readonly refusal: string | undefined;
+
+  /** The S3 prefixes the query reads, for measuring what it scans. */
+  readonly prefixes: readonly string[];
+}
+
 interface SimAthenaQueryRefusalProperties {
   readonly execution: SimAthenaQueryExecution;
   readonly result: SimAthenaResolvedResult;
@@ -22,22 +31,22 @@ interface SimAthenaQueryRefusalProperties {
 }
 
 /**
- * Why a query cannot answer, where something says it cannot.
+ * Plan one query, the way Athena plans one before it runs.
  *
- * Four things can refuse one, and they are asked in the order real Athena
- * would reach them. A declaration saying the query fails wins, because that is
- * a test's own statement about the query. Then the tables it names are looked
- * for in the Data Catalog, and each one's partition projection is expanded,
- * both of which Athena does while planning. The cutoff is last, against what
- * the declaration says the query scanned.
+ * A declaration saying the query fails wins, because that is a test's own
+ * statement about the query. Then the tables it names are looked for in the
+ * Data Catalog and each one's partition projection is expanded, which is what
+ * produces the prefixes the query reads.
+ *
+ * The cutoff is checked after this, against what those prefixes hold.
  */
-export function simAthenaQueryRefusal(
+export function simAthenaPlanQuery(
   properties: SimAthenaQueryRefusalProperties,
-): string | undefined {
+): SimAthenaQueryPlan {
   const { execution, result } = properties;
 
   if (result.failsWith !== undefined) {
-    return result.failsWith;
+    return { refusal: result.failsWith, prefixes: [] };
   }
 
   const resolved = simAthenaResolveTables(
@@ -50,65 +59,68 @@ export function simAthenaQueryRefusal(
   );
 
   if (resolved.refusal !== undefined) {
-    return resolved.refusal;
+    return { refusal: resolved.refusal, prefixes: [] };
   }
 
-  return (
-    projectionRefusal(properties, resolved.tables) ?? cutoffRefusal(properties)
-  );
+  return partitionsOf(properties, resolved.tables);
 }
 
 /**
- * Why a table's partition projection cannot be read.
+ * The prefixes every table a query names comes to.
  *
- * Glue accepts any parameters it is given, so a projection with a mistake in
- * it is found here, when a query first asks what partitions the table has.
+ * Glue accepts any projection parameters it is given, so a projection with a
+ * mistake in it is found here, when a query first asks what partitions the
+ * table has.
  */
-function projectionRefusal(
+function partitionsOf(
   properties: SimAthenaQueryRefusalProperties,
   tables: readonly SimAthenaPartitionedTable[],
-): string | undefined {
+): SimAthenaQueryPlan {
+  const prefixes: string[] = [];
+
   for (const table of tables) {
     try {
-      simAthenaTablePartitions({
-        table,
-        queryString: properties.execution.queryString,
-        now: properties.now,
-      });
+      prefixes.push(
+        ...simAthenaTablePartitions({
+          table,
+          queryString: properties.execution.queryString,
+          now: properties.now,
+        }),
+      );
     } catch (error) {
       if (error instanceof SimAthenaProjectionError) {
-        return error.message;
+        return { refusal: error.message, prefixes: [] };
       }
 
       throw error;
     }
   }
 
-  return undefined;
+  return { refusal: undefined, prefixes };
 }
 
 /**
- * The cost guardrail, checked against what the declaration says the query
- * scanned.
+ * The cost guardrail, checked against what the query scanned.
  *
- * That is the whole of it, and the one thing this simulation can enforce for
- * real without a query engine.
+ * The figure comes from the objects under the prefixes the query reads, or
+ * from a declaration where a test wrote one down.
  */
-function cutoffRefusal(
-  properties: SimAthenaQueryRefusalProperties,
+export function simAthenaCutoffRefusal(
+  execution: SimAthenaQueryExecution,
+  bytesScanned: number,
+  workGroups: SimAthenaWorkGroupStore,
 ): string | undefined {
-  const { execution, result } = properties;
-  const cutoff = properties.workGroups.find(
+  const cutoff = workGroups.find(
     execution.workGroupName,
   )?.bytesScannedCutoffPerQuery;
 
-  if (cutoff === undefined || result.bytesScanned <= cutoff) {
+  if (cutoff === undefined || bytesScanned <= cutoff) {
     return undefined;
   }
 
   return (
     `Bytes scanned limit was exceeded. The query scanned ` +
-    `${String(result.bytesScanned)} bytes, and workgroup ` +
+    `${String(bytesScanned)} bytes, and workgroup ` +
     `${execution.workGroupName} allows ${String(cutoff)} per query.`
   );
 }

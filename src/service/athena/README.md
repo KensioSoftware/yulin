@@ -74,9 +74,19 @@ text as the leading key and workgroup name as the trailing one, which puts the s
 the way Bedrock puts prompt before model. `SimAthenaResolvedResult` fills in what a declaration left
 out, and it is the only place that knows how.
 
-The cutoff is checked in the runner against what the declaration says the query scanned. That is the
-whole of the cost guardrail, and the one thing this simulation can enforce for real without an
-engine.
+`sim-athena-scanned-bytes.ts` measures what a query reads. It lists every prefix the plan came to
+through simulated S3, sums the object sizes, and counts a key reached twice once. An absent Bucket
+scans nothing. Every other listing failure raises, and that is how a caller refused by IAM fails the
+query.
+
+That split is the point of the file. A table whose Bucket is absent from the simulation is ordinary
+in a test, and refusing it would fail every query written before anything was measured. A caller
+refused permission on the data is the behaviour the measurement exists to expose.
+
+The cutoff is checked in the runner against that figure, or against a declaration where a test wrote
+one down. `SimAthenaResolvedResult.declaredBytesScanned` is what tells a declared zero from an
+absent one. That is the whole of the cost guardrail, and the one thing this simulation can enforce
+for real without an engine.
 
 `table/` reads the tables a query names. `sim-athena-sql-tokens.ts` tokenises and stops there, and
 `sim-athena-table-references.ts` walks those tokens looking only at what follows `FROM`, `JOIN` and a

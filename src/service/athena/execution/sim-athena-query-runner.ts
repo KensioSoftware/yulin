@@ -4,25 +4,12 @@ import type { SimAthenaQueryResults } from "../result/sim-athena-query-results.j
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
 import type { SimAthenaCatalog } from "../table/sim-athena-table-resolution.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
-import { simAthenaQueryRefusal } from "./sim-athena-query-refusal.js";
+import { simAthenaQueryOutcome } from "./sim-athena-query-outcome.js";
+import type { SimAthenaQueryRunnerProperties } from "./sim-athena-query-runner-properties.js";
+import type { SimAthenaScannedObjects } from "./sim-athena-scanned-bytes.js";
 import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
 import type { SimAthenaResultWriter } from "./sim-athena-result-writer.js";
 import { simAthenaWriteFailureReason } from "./sim-athena-write-failure.js";
-
-interface SimAthenaQueryRunnerProperties {
-  readonly results: SimAthenaQueryResults;
-  readonly workGroups: SimAthenaWorkGroupStore;
-  readonly writer: SimAthenaResultWriter;
-  readonly background: BackgroundScheduler;
-
-  /**
-   * The Data Catalog a query's table names are resolved against.
-   *
-   * A SimAthena built on its own has none, and every query then runs without
-   * its tables being looked for.
-   */
-  readonly catalog?: SimAthenaCatalog | undefined;
-}
 
 /**
  * Moves a query execution through its states on the background scheduler.
@@ -42,6 +29,7 @@ export class SimAthenaQueryRunner {
   private readonly writer: SimAthenaResultWriter;
   private readonly background: BackgroundScheduler;
   private readonly catalog: SimAthenaCatalog | undefined;
+  private readonly objects: SimAthenaScannedObjects | undefined;
 
   constructor(properties: SimAthenaQueryRunnerProperties) {
     this.results = properties.results;
@@ -49,6 +37,7 @@ export class SimAthenaQueryRunner {
     this.writer = properties.writer;
     this.background = properties.background;
     this.catalog = properties.catalog;
+    this.objects = properties.objects;
   }
 
   /**
@@ -88,18 +77,20 @@ export class SimAthenaQueryRunner {
       workGroupName: execution.workGroupName,
     });
 
-    execution.recordBytesScanned(result.bytesScanned);
-
-    const refusal = simAthenaQueryRefusal({
+    const outcome = await simAthenaQueryOutcome({
       execution,
       result,
       workGroups: this.workGroups,
       catalog: this.catalog,
+      objects: this.objects,
+      caller,
       now: this.background.now(),
     });
 
-    if (refusal !== undefined) {
-      execution.fail(refusal, this.background.now());
+    execution.recordBytesScanned(outcome.bytesScanned);
+
+    if (outcome.refusal !== undefined) {
+      execution.fail(outcome.refusal, this.background.now());
 
       return;
     }
