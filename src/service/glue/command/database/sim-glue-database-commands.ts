@@ -2,6 +2,7 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
+import type { SimGluePartitionStore } from "../../partition/sim-glue-partition-store.js";
 import type { SimGlueTableStore } from "../../table/sim-glue-table-store.js";
 import type { SimGlueAuthorizer } from "../authorize/sim-glue-authorizer.js";
 import { requireSimGlueCatalogId } from "../sim-glue-catalog-id.js";
@@ -21,6 +22,7 @@ import { simGlueDatabaseDetail } from "./sim-glue-database-detail.js";
 interface SimGlueDatabaseCommandsProperties {
   readonly databases: SimGlueDatabaseStore;
   readonly tables: SimGlueTableStore;
+  readonly partitions: SimGluePartitionStore;
   readonly authorizer: SimGlueAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
@@ -32,6 +34,7 @@ interface SimGlueDatabaseCommandsProperties {
 export class SimGlueDatabaseCommands {
   readonly #databases: SimGlueDatabaseStore;
   readonly #tables: SimGlueTableStore;
+  readonly #partitions: SimGluePartitionStore;
   readonly #authorizer: SimGlueAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
   readonly #clock: SimClock;
@@ -39,6 +42,7 @@ export class SimGlueDatabaseCommands {
   constructor(properties: SimGlueDatabaseCommandsProperties) {
     this.#databases = properties.databases;
     this.#tables = properties.tables;
+    this.#partitions = properties.partitions;
     this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
     this.#clock = properties.clock;
@@ -115,7 +119,7 @@ export class SimGlueDatabaseCommands {
   }
 
   /**
-   * Remove a database, and the tables it holds with it.
+   * Remove a database, and the tables it holds and their partitions with it.
    */
   deleteDatabase(
     command: SimDeleteDatabaseCommand,
@@ -134,6 +138,7 @@ export class SimGlueDatabaseCommands {
     this.#databases.require(name);
     this.#databases.delete(name);
     this.#tables.deleteDatabase(name);
+    this.#partitions.deleteDatabase(name);
 
     return { $metadata: {} };
   }

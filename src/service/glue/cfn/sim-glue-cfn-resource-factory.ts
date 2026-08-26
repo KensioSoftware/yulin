@@ -18,9 +18,10 @@ interface SimGlueCfnResourceFactoryProperties {
 /**
  * CloudFormation Resource factory for simulated Glue resources.
  *
- * A database and a table are the two Data Catalog types a stack declares. A
- * crawler is left out: it fills a catalog by reading objects, and nothing here
- * reads one.
+ * A database and a table are the two Data Catalog types created from a
+ * template here. A crawler is left out, since it fills a catalog by reading
+ * objects and nothing here reads one. `AWS::Glue::Partition` is left out too,
+ * and a template declaring either is recorded as a skipped Resource.
  */
 export class SimGlueCfnResourceFactory implements SimCfnServiceResourceFactory {
   readonly #databaseCreator: SimCfnGlueDatabaseCreator;

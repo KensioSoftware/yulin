@@ -1,4 +1,5 @@
 import {
+  assertArrayEquals,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -112,21 +113,27 @@ describe("SimGlueCfnResourceFactory", () => {
             Type: "AWS::Glue::Crawler",
             Properties: { Name: "site-logs", Role: "crawler" },
           },
+          LogPartition: {
+            Type: "AWS::Glue::Partition",
+            Properties: {
+              DatabaseName: "site_logs",
+              TableName: "access_logs",
+              PartitionInput: { Values: ["2026-08-26"] },
+            },
+          },
         },
       },
     });
 
     await stack.waitForDeployComplete();
 
-    // Then the crawler is recorded as skipped and the stack completes anyway,
-    // which is the behaviour argued for in #273. The database is there.
+    // Then both are recorded as skipped and the stack completes anyway, which
+    // is the behaviour argued for in #273. The database is there.
     assertIdentical(stack.status, "CREATE_COMPLETE");
-    assertArrayLength(stack.skippedResources, 1);
-
-    const [skipped] = stack.skippedResources;
-
-    assertNonNullable(skipped);
-    assertIdentical(skipped.type, "AWS::Glue::Crawler");
+    assertArrayEquals(
+      stack.skippedResources.map((skipped) => skipped.type),
+      ["AWS::Glue::Crawler", "AWS::Glue::Partition"],
+    );
     assertNonNullable(simAws.glue().findDatabase("site_logs"));
 
     await simAws.backgroundTasksComplete();

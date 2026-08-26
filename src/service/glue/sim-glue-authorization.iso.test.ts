@@ -1,8 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateDatabaseCommand,
+  CreatePartitionCommand,
   CreateTableCommand,
   DeleteDatabaseCommand,
+  GetPartitionsCommand,
   GetTableCommand,
 } from "@aws-sdk/client-glue";
 import {
@@ -37,7 +39,10 @@ function catalogWithTable(simAws: SimAws): void {
   glue.createTable(
     new CreateTableCommand({
       DatabaseName: "site_logs",
-      TableInput: { Name: "access_logs" },
+      TableInput: {
+        Name: "access_logs",
+        PartitionKeys: [{ Name: "day", Type: "string" }],
+      },
     }),
   );
 }
@@ -221,5 +226,58 @@ describe("SimGlue authorization", () => {
 
     // Then it goes, and takes its table with it.
     assertArrayLength(simAws.glue().allDatabases(), 0);
+  });
+
+  it("lets a partition command through on the table's own ARN", async () => {
+    // Given a role allowed to register partitions over the catalog, the
+    // database and the table. A partition has no ARN of its own, so the table
+    // is what a real Glue policy grants this on.
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:CreatePartition", [
+      catalogArn,
+      databaseArn,
+      tableArn,
+    ]);
+
+    // When the role registers a partition.
+    simAws.glue().createPartition(
+      new CreatePartitionCommand({
+        DatabaseName: "site_logs",
+        TableName: "access_logs",
+        PartitionInput: { Values: ["2026-08-26"] },
+      }),
+      { caller },
+    );
+
+    // Then it is registered.
+    assertArrayLength(
+      simAws.glue().partitionsInTable("site_logs", "access_logs"),
+      1,
+    );
+  });
+
+  it("refuses a partition command whose policy leaves the catalog out", async () => {
+    // Given a role allowed to list partitions on the table ARN alone.
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    catalogWithTable(simAws);
+    await roleAllowing(simAws, "glue:GetPartitions", [tableArn]);
+
+    // When the role lists the table's partitions.
+    const error = assertThrowsError(() => {
+      simAws.glue().getPartitions(
+        new GetPartitionsCommand({
+          DatabaseName: "site_logs",
+          TableName: "access_logs",
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is refused at the catalog, as a table read is.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertStringIncludes(error.message, catalogArn);
   });
 });

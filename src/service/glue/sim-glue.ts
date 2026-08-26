@@ -14,12 +14,17 @@ import { SimGlueAuthorizer } from "./command/authorize/sim-glue-authorizer.js";
 import { SimGlueDatabaseCommands } from "./command/database/sim-glue-database-commands.js";
 import type * as simGlueCommands from "./command/database/database.command.js";
 import type * as simGlueTableCommands from "./command/table/table.command.js";
+import type * as simGluePartitionCommands from "./command/partition/partition.command.js";
 import { SimGlueTableCommands } from "./command/table/sim-glue-table-commands.js";
+import { SimGluePartitionCommands } from "./command/partition/sim-glue-partition-commands.js";
+import { SimGluePartitionRegistry } from "./command/partition/sim-glue-partition-registry.js";
 import type { SimGlueRequestOptions } from "./command/sim-glue-request-options.js";
 import { SimGlueDatabaseStore } from "./database/sim-glue-database-store.js";
 import type { SimGlueDatabase } from "./database/sim-glue-database.js";
 import { SimGlueCfnResourceFactory } from "./cfn/sim-glue-cfn-resource-factory.js";
 import { SimGlueSdkCommandRouter } from "./sdk/sim-glue-sdk-command-router.js";
+import { SimGluePartitionStore } from "./partition/sim-glue-partition-store.js";
+import type { SimGluePartition } from "./partition/sim-glue-partition.js";
 import { SimGlueTableStore } from "./table/sim-glue-table-store.js";
 import { SimGlueCatalogWriter } from "./write/sim-glue-catalog-writer.js";
 import type { SimGlueTable } from "./table/sim-glue-table.js";
@@ -46,8 +51,10 @@ export interface SimGlueProperties {
 export class SimGlue {
   readonly #databases: SimGlueDatabaseStore;
   readonly #tables: SimGlueTableStore;
+  readonly #partitions: SimGluePartitionStore;
   readonly #databaseCommands: SimGlueDatabaseCommands;
   readonly #tableCommands: SimGlueTableCommands;
+  readonly #partitionCommands: SimGluePartitionCommands;
   readonly #catalogWriter: SimGlueCatalogWriter;
 
   readonly #sdkRouter = new SimGlueSdkCommandRouter(this);
@@ -64,10 +71,12 @@ export class SimGlue {
 
     this.#databases = new SimGlueDatabaseStore({ accountRegionScope });
     this.#tables = new SimGlueTableStore({ accountRegionScope });
+    this.#partitions = new SimGluePartitionStore({ accountRegionScope });
 
     const collaborators = {
       databases: this.#databases,
       tables: this.#tables,
+      partitions: this.#partitions,
       authorizer,
       accountRegionScope,
       clock: background,
@@ -75,9 +84,13 @@ export class SimGlue {
 
     this.#databaseCommands = new SimGlueDatabaseCommands(collaborators);
     this.#tableCommands = new SimGlueTableCommands(collaborators);
+    this.#partitionCommands = new SimGluePartitionCommands({
+      registry: new SimGluePartitionRegistry(collaborators),
+    });
     this.#catalogWriter = new SimGlueCatalogWriter({
       databases: this.#databases,
       tables: this.#tables,
+      partitions: this.#partitions,
       clock: background,
     });
     this.#cfnFactory = new SimGlueCfnResourceFactory({
@@ -119,6 +132,26 @@ export class SimGlue {
   /** Every table in one database, in creation order. */
   tablesInDatabase(databaseName: string): readonly SimGlueTable[] {
     return this.#tables.inDatabase(databaseName);
+  }
+
+  /**
+   * Find a partition by its table and its values, without going through a
+   * Command.
+   */
+  findPartition(
+    databaseName: string,
+    tableName: string,
+    values: readonly string[],
+  ): SimGluePartition | undefined {
+    return this.#partitions.inTable(databaseName, tableName).find(values);
+  }
+
+  /** Every partition registered against one table, in registration order. */
+  partitionsInTable(
+    databaseName: string,
+    tableName: string,
+  ): readonly SimGluePartition[] {
+    return this.#partitions.inTable(databaseName, tableName).all;
   }
 
   /** Make a database. */
@@ -177,12 +210,60 @@ export class SimGlue {
     return this.#tableCommands.getTables(command, options);
   }
 
-  /** Remove a table. */
+  /** Remove a table, and the partitions registered against it with it. */
   deleteTable(
     command: simGlueTableCommands.SimDeleteTableCommand,
     options?: SimGlueRequestOptions,
   ): simGlueTableCommands.SimDeleteTableCommandOutput {
     return this.#tableCommands.deleteTable(command, options);
+  }
+
+  /** Register one partition against a table. */
+  createPartition(
+    command: simGluePartitionCommands.SimCreatePartitionCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimCreatePartitionCommandOutput {
+    return this.#partitionCommands.createPartition(command, options);
+  }
+
+  /** Register several partitions at once. */
+  batchCreatePartition(
+    command: simGluePartitionCommands.SimBatchCreatePartitionCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimBatchCreatePartitionCommandOutput {
+    return this.#partitionCommands.batchCreatePartition(command, options);
+  }
+
+  /** Read one partition back by its values. */
+  getPartition(
+    command: simGluePartitionCommands.SimGetPartitionCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimGetPartitionCommandOutput {
+    return this.#partitionCommands.getPartition(command, options);
+  }
+
+  /** Read every partition registered against one table. */
+  getPartitions(
+    command: simGluePartitionCommands.SimGetPartitionsCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimGetPartitionsCommandOutput {
+    return this.#partitionCommands.getPartitions(command, options);
+  }
+
+  /** Remove one partition. */
+  deletePartition(
+    command: simGluePartitionCommands.SimDeletePartitionCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimDeletePartitionCommandOutput {
+    return this.#partitionCommands.deletePartition(command, options);
+  }
+
+  /** Remove several partitions at once. */
+  batchDeletePartition(
+    command: simGluePartitionCommands.SimBatchDeletePartitionCommand,
+    options?: SimGlueRequestOptions,
+  ): simGluePartitionCommands.SimBatchDeletePartitionCommandOutput {
+    return this.#partitionCommands.batchDeletePartition(command, options);
   }
 
   /** Route an intercepted SDK Command to this simulated Glue. */

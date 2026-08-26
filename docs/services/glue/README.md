@@ -1,9 +1,10 @@
 # Simulated Glue
 
-Yulin includes a simulated Glue Data Catalog for tests and local development. It holds databases and
-tables, deploys them from `AWS::Glue::Database` and `AWS::Glue::Table`, and hands them back through
-`GetDatabase` and `GetTable`. A test can assert that a stack declared the table definition it meant
-to, including the Athena partition projection its parameters configure.
+Yulin includes a simulated Glue Data Catalog for tests and local development. It holds databases,
+tables and the partitions registered against them, deploys databases and tables from
+`AWS::Glue::Database` and `AWS::Glue::Table`, and hands them back through `GetDatabase` and
+`GetTable`. A test can assert that a stack declared the table definition it meant to, including the
+Athena partition projection its parameters configure.
 
 A table here is a definition. The data it describes stays in S3, unread, and the catalog answers
 with what it was told to hold.
@@ -93,12 +94,98 @@ A broken projection fails that query.
 ## Reading the catalog back
 
 `GetDatabase`, `GetDatabases`, `GetTable` and `GetTables` answer through the SDK. A `SimGlue` also
-carries `findDatabase`, `findTable`, `allDatabases` and `tablesInDatabase`, which read the same
-state without going through a Command or its authorization.
+carries `findDatabase`, `findTable`, `allDatabases`, `tablesInDatabase`, `findPartition` and
+`partitionsInTable`. Those read the same state without going through a Command or its
+authorization.
 
 The storage descriptor keeps its columns in the order they were declared, and the partition keys
 keep theirs. The two stay apart, the way real Glue keeps them. A partition key repeated among the
 storage descriptor's columns gives a table Athena refuses to query.
+
+## Registering partitions
+
+A crawler, `MSCK REPAIR TABLE` or `ALTER TABLE ADD PARTITION` fills a real catalog's partition list.
+Here the six partition commands do it. A partition is keyed by its values in the order the table's
+`PartitionKeys` declares them, and carries a storage descriptor saying where its own data sits.
+
+```typescript sim-glue-partitions
+/**
+ * Registering two days of partitions against a table, then listing them.
+ */
+
+import {
+  BatchCreatePartitionCommand,
+  CreateDatabaseCommand,
+  CreateTableCommand,
+  GetPartitionsCommand,
+} from "@aws-sdk/client-glue";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const glue = simAws.glue();
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "site_logs" } }),
+);
+glue.createTable(
+  new CreateTableCommand({
+    DatabaseName: "site_logs",
+    TableInput: {
+      Name: "access_logs",
+      PartitionKeys: [{ Name: "day", Type: "string" }],
+      StorageDescriptor: { Location: "s3://site-logs/cloudfront/" },
+    },
+  }),
+);
+
+const { Errors } = glue.batchCreatePartition(
+  new BatchCreatePartitionCommand({
+    DatabaseName: "site_logs",
+    TableName: "access_logs",
+    PartitionInputList: [
+      {
+        Values: ["2026-08-25"],
+        StorageDescriptor: {
+          Location: "s3://site-logs/cloudfront/day=2026-08-25/",
+        },
+      },
+      {
+        Values: ["2026-08-26"],
+        StorageDescriptor: {
+          Location: "s3://site-logs/cloudfront/day=2026-08-26/",
+        },
+      },
+    ],
+  }),
+);
+
+const { Partitions } = glue.getPartitions(
+  new GetPartitionsCommand({
+    DatabaseName: "site_logs",
+    TableName: "access_logs",
+  }),
+);
+
+// 0
+console.log(Errors.length);
+// s3://site-logs/cloudfront/day=2026-08-26/
+console.log(Partitions[1]?.StorageDescriptor?.Location);
+```
+
+`CreatePartition` registers one partition and `BatchCreatePartition` registers a list of them.
+`GetPartition` reads one back by its values, and `GetPartitions` answers with a table's partitions in
+registration order. `DeletePartition` and `BatchDeletePartition` remove them.
+
+A batch reports what it could not do in `Errors` and carries on with the rest, the way real Glue
+does. Each entry there carries the values it was given and an `ErrorCode` naming the refusal, so a
+job re-run over a week of days learns which days were already registered and registers the others.
+
+Values are positional. A `Values` list of a different length from the table's `PartitionKeys` lines
+up with the wrong keys, and is refused with `InvalidInputException` naming both counts. Registering
+one day twice is an `AlreadyExistsException`, since registration is not idempotent on real Glue.
+Deleting a table removes the partitions registered against it, the way deleting a database removes
+its tables.
 
 ## Intercepting a GlueClient
 
@@ -234,6 +321,8 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 
 - `CreateDatabase`, `GetDatabase`, `GetDatabases` and `DeleteDatabase`.
 - `CreateTable`, `GetTable`, `GetTables` and `DeleteTable`.
+- `CreatePartition`, `BatchCreatePartition`, `GetPartition`, `GetPartitions`, `DeletePartition` and
+  `BatchDeletePartition`.
 - `AWS::Glue::Database` and `AWS::Glue::Table`, deployed and deleted with the stack.
 - `TableInput.Parameters`, `PartitionKeys` and `StorageDescriptor`, held and read back as declared.
 - IAM authorization on every Command, over the resource and its ancestors.
@@ -249,8 +338,16 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 - **`AWS::Glue::Crawler` is absent.** A crawler fills a catalog by reading objects, and every object
   stays unread here. A template declaring one deploys, with the crawler recorded on the stack's
   `skippedResources`.
-- **Partitions are described by projection alone.** `CreatePartition`, `GetPartitions` and
-  `BatchCreatePartition` have no counterpart here.
+- **Athena ignores a registered partition.** A query expands the table's projection parameters and
+  reads nothing the partition commands wrote. Registering partitions changes what the catalog
+  reports and leaves query planning alone.
+- **`GetPartitions` takes no `Expression`.** A filter is refused with `InvalidInputException`. An
+  ignored filter would answer with the partitions the caller asked to leave out.
+- **A partition keeps what it was registered with.** `UpdatePartition` and `BatchUpdatePartition`
+  are absent, along with `BatchGetPartition` and partition indexes.
+- **`AWS::Glue::Partition` is absent.** Real CloudFormation has the resource type, and a template
+  declaring one deploys here with the partition recorded on the stack's `skippedResources`. A stack
+  that needs its partitions registered does it through the SDK once the deploy finishes.
 - **A table keeps the definition it was created with.** `UpdateTable` and `UpdateDatabase` are
   absent, and `GetTable` reports the creation time as the update time.
 - **`Fn::GetAtt Id` on a table answers with a guess.** It resolves to the catalog id, the database
@@ -267,7 +364,7 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
   column statistics, and IAM is the whole of the permission model.
 - **Iceberg and other open table formats are recorded, never built.** `OpenTableFormatInput` is
   reported as ignored and the table is created as an ordinary one.
-- **Listings come back whole.** `GetDatabases` and `GetTables` answer with everything in creation
-  order. `MaxResults` and `NextToken` are absent.
+- **Listings come back whole.** `GetDatabases`, `GetTables` and `GetPartitions` answer with
+  everything in creation order. `MaxResults` and `NextToken` are absent.
 - **Connections, jobs, triggers, workflows and the Schema Registry are absent.** The Data Catalog is
   the whole of the simulated surface.
