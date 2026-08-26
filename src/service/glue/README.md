@@ -29,6 +29,9 @@ partition keys.
   under their own values. A table's partitions go with it, and a database's go with the database.
 - `command/` is one directory per resource kind, holding the local structural command types, the
   handler class, and the detail mapper deciding what a `Get` reports.
+- `expression/` reads a `GetPartitions` `Expression`. A tokeniser, a cursor over the tokens, a
+  recursive descent parser and one small module per kind of term, following the DynamoDB key
+  condition parser in `src/service/dynamodb/expression/key-condition/`.
 - `cfn/` reads `AWS::Glue::Database` and `AWS::Glue::Table` properties and creates from them.
   `AWS::Glue::Crawler` and `AWS::Glue::Partition` are real resource types with no creator here. A
   template declaring either records that Resource as skipped.
@@ -70,9 +73,20 @@ reported as a partition error would read as though the caller had asked for some
 leave an absent field out, and this is the one exception. A caller checking a batch has one thing to
 check, and an optional empty list makes them reach through it first.
 
-**`GetPartitions` refuses an `Expression`.** Filtering is a separate issue. Ignoring the filter until
-it lands would answer with the partitions the caller asked to leave out, and the refusal names what
-is missing.
+**An expression is read into a predicate rather than an object tree.** Once a term has been read,
+the only thing left for it to do is answer for one partition's values. `SimGluePartitionFilter` is a
+function taking those values, and `AND`, `OR` and `NOT` are functions over the ones underneath them.
+Everything a refusal could catch is caught while the expression is read.
+
+**An expression is read against the table it filters.** Which names are partition keys, where each
+one's value sits in the positional list, and how that value is ordered are all properties of the
+table. Reading the expression without it would leave an unknown column matching nothing. That is a
+test passing here on a filter real Glue refuses.
+
+**A stored value with no place in the order matches nothing.** A key declared as a number can hold a
+partition registered with `noon`, since registering one takes the values it is given. The comparison
+answers false for that partition and the request still answers. Failing the whole read would make
+one bad registration hide every good one.
 
 **A partition authorizes against its table's ARN.** Partitions have no ARN of their own on real
 Glue, and a real policy grants `glue:CreatePartition` on the table. `SimGluePartitionRegistry`
@@ -86,5 +100,5 @@ would give a template that deploys and a catalog holding something the template 
 Crawlers, partition updates, partition indexes, `BatchGetPartition`, table versions, column
 statistics, Lake Formation, connections, jobs, triggers, workflows and the Schema Registry. Every
 one of them needs something outside the catalog, or reads data back. Simulated Athena reads a
-table's projection parameters and none of its registered partitions, which is its own issue. The
+table's projection parameters and none of its registered partitions. That gap is its own issue. The
 Limitations list in the usage docs is the full account.

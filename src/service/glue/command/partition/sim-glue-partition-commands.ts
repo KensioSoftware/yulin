@@ -1,4 +1,3 @@
-import { SimGlueInvalidInputException } from "../../error/sim-glue.error.js";
 import type { SimGlueRequestOptions } from "../sim-glue-request-options.js";
 import { simGluePartitionDetail } from "./sim-glue-partition-detail.js";
 import { simGluePartitionBatchErrors } from "./sim-glue-partition-batch.js";
@@ -109,7 +108,9 @@ export class SimGluePartitionCommands {
   }
 
   /**
-   * Read every partition of one table, in registration order.
+   * Read the partitions of one table, in registration order.
+   *
+   * An `Expression` filters them. A request carrying none reads them all.
    */
   getPartitions(
     command: SimGetPartitionsCommand,
@@ -121,16 +122,10 @@ export class SimGluePartitionCommands {
       options,
     );
 
-    if (command.input.Expression !== undefined) {
-      throw new SimGlueInvalidInputException(
-        "GetPartitions Expression is not simulated, so it is refused rather " +
-          "than ignored. An ignored filter answers with the partitions the " +
-          "caller asked to leave out.",
-      );
-    }
-
     return {
-      Partitions: this.#registry.inTable(table).map(simGluePartitionDetail),
+      Partitions: this.#registry
+        .matching(table, command.input.Expression)
+        .map(simGluePartitionDetail),
       $metadata: {},
     };
   }
