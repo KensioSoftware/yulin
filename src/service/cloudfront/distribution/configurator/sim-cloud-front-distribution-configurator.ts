@@ -1,4 +1,7 @@
-import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.command.js";
+import type {
+  SimCloudFrontDistributionConfig,
+  SimCloudFrontOriginConfig,
+} from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 import type { SimCloudFrontOriginConfigurator } from "./sim-cloud-front-origin-configurator.js";
 import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavior-configurator.js";
@@ -9,6 +12,10 @@ import {
   type SimCfDistributionWebAcl,
   simCfWebAclArn,
 } from "../../web-acl/sim-cf-distribution-web-acl.js";
+import {
+  findSimCfRedundantOrigins,
+  warnSimCfRedundantOrigins,
+} from "../../origin/sim-cf-redundant-origins.js";
 
 /**
  * Applies top-level Distribution configuration to a sim CloudFront Distribution.
@@ -72,10 +79,10 @@ export class SimCloudFrontDistributionConfigurator {
       distribution.addAlternateDomainName(alias);
     }
 
-    const originItems = distributionConfig.Origins?.Items ?? [];
-    for (const origin of originItems) {
-      this.originConfigurator.configure(distribution, origin);
-    }
+    this.configureOrigins(
+      distribution,
+      distributionConfig.Origins?.Items ?? [],
+    );
 
     this.behaviorConfigurator.configureDefaultCacheBehavior(
       distribution,
@@ -99,6 +106,31 @@ export class SimCloudFrontDistributionConfigurator {
     for (const customErrorResponse of customErrorItems) {
       this.customErrorConfigurator.configure(distribution, customErrorResponse);
     }
+  }
+
+  /**
+   * Configure every Origin the config declares, saying so where it declares
+   * one of them twice.
+   *
+   * A repeat is recorded on the Distribution and warned about. CloudFront
+   * takes such a config, and this simulation has no account behaviour to hold
+   * it to. The reading comes after the Origins are configured, by which point
+   * each one is known to have the Id and the domain name a repeat is reported
+   * by.
+   */
+  private configureOrigins(
+    distribution: SimCloudFrontDistribution,
+    originItems: readonly SimCloudFrontOriginConfig[],
+  ): void {
+    for (const origin of originItems) {
+      this.originConfigurator.configure(distribution, origin);
+    }
+
+    distribution.redundantOrigins = findSimCfRedundantOrigins(originItems);
+    warnSimCfRedundantOrigins(
+      distribution.distributionId,
+      distribution.redundantOrigins,
+    );
   }
 
   /**
