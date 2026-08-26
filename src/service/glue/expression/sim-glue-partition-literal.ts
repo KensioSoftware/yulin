@@ -1,3 +1,4 @@
+import { simGlueDecimal, type SimGlueDecimal } from "./sim-glue-decimal.js";
 import { simGlueExpressionError } from "./sim-glue-expression-error.js";
 import type { SimGlueExpressionToken } from "./sim-glue-expression-token.js";
 import type { SimGluePartitionColumn } from "./sim-glue-partition-columns.js";
@@ -10,7 +11,7 @@ import type { SimGluePartitionColumn } from "./sim-glue-partition-columns.js";
  */
 export interface SimGluePartitionLiteral {
   readonly text: string;
-  readonly numeric: number;
+  readonly decimal: SimGlueDecimal | undefined;
 }
 
 /**
@@ -32,23 +33,14 @@ export function simGluePartitionLiteral(
     );
   }
 
-  const numeric = simGlueNumericValue(token.text);
+  const decimal = simGlueDecimal(token.text);
 
-  if (column.comparison === "number" && Number.isNaN(numeric)) {
+  if (decimal === undefined && column.comparison === "number") {
     throw simGlueExpressionError(
       `${column.name} is declared as a number, and '${token.text}' is not one`,
       where,
     );
   }
 
-  return { text: token.text, numeric };
-}
-
-/**
- * What a stored partition value reads as when its key is a number.
- *
- * An empty value is not a number, which `Number` alone reads as zero.
- */
-export function simGlueNumericValue(text: string): number {
-  return text.trim() === "" ? NaN : Number(text);
+  return { text: token.text, decimal };
 }

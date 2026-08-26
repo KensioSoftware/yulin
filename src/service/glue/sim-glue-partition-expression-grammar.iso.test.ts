@@ -189,6 +189,98 @@ describe("SimGlue partition expression literals", () => {
   });
 });
 
+describe("SimGlue partition expression numbers", () => {
+  it("tells apart two numbers a double would round together", () => {
+    // Given a table partitioned by a bigint, holding two values a step apart
+    // above the point where a double stops counting in ones.
+    const glue = new SimAws().glue();
+    const table = createFixtureTypedTable(glue, [
+      { Name: "id", Type: "bigint" },
+    ]);
+
+    createFixturePartition(glue, table, ["9007199254740992"]);
+    createFixturePartition(glue, table, ["9007199254740993"]);
+
+    // When one of them is asked for.
+    const listed = matching(glue, table, "id = 9007199254740993");
+
+    // Then only that one comes back. Read through a double both values are
+    // the same number, and this would answer with two partitions.
+    assertArrayEquals(listed, ["9007199254740993"]);
+  });
+
+  it("keeps a decimal exact past what a double holds", () => {
+    // Given a table partitioned by a decimal, holding two values that differ
+    // beyond a double's precision.
+    const glue = new SimAws().glue();
+    const table = createFixtureTypedTable(glue, [
+      { Name: "amount", Type: "decimal(38,18)" },
+    ]);
+
+    createFixturePartition(glue, table, ["1.000000000000000001"]);
+    createFixturePartition(glue, table, ["1.000000000000000002"]);
+
+    // When the larger one is asked for.
+    const listed = matching(glue, table, "amount > 1.000000000000000001");
+
+    // Then the two are told apart.
+    assertArrayEquals(listed, ["1.000000000000000002"]);
+  });
+
+  it("reads trailing zeros and a signed zero as the same number", () => {
+    // Given a table partitioned by a decimal holding zero and a padded value.
+    const glue = new SimAws().glue();
+    const table = createFixtureTypedTable(glue, [
+      { Name: "amount", Type: "decimal(10,2)" },
+    ]);
+
+    createFixturePartition(glue, table, ["-0"]);
+    createFixturePartition(glue, table, ["1.50"]);
+
+    // When each is asked for by an equal value written differently.
+    const zero = matching(glue, table, "amount = 0");
+    const padded = matching(glue, table, "amount = 1.5");
+
+    // Then the digits it was written with do not change the number it is.
+    assertArrayEquals(zero, ["-0"]);
+    assertArrayEquals(padded, ["1.50"]);
+  });
+});
+
+describe("SimGlue partition LIKE matching", () => {
+  it("matches a pattern whose wildcard has to give a character back", () => {
+    // Given values a greedy first attempt at the pattern would miss.
+    const glue = new SimAws().glue();
+    const table = createFixturePartitionedTable(glue, ["host"]);
+
+    createFixturePartition(glue, table, ["aab"]);
+    createFixturePartition(glue, table, ["aba"]);
+
+    // When a pattern ends in a literal the wildcard first swallows.
+    const listed = matching(glue, table, "host LIKE '%ab'");
+
+    // Then the wildcard gives the characters back until the rest matches.
+    assertArrayEquals(listed, ["aab"]);
+  });
+
+  it("answers a pattern that alternates wildcards and literals", () => {
+    // Given a long value that misses the pattern only at its last character.
+    // Matching this by building a regular expression from the pattern takes
+    // time doubling with each wildcard, and this test would never finish.
+    const glue = new SimAws().glue();
+    const table = createFixturePartitionedTable(glue, ["host"]);
+
+    createFixturePartition(glue, table, ["a".repeat(64)]);
+
+    // When a pattern alternates wildcards with literals and then asks for a
+    // character the value never holds.
+    const listed = matching(glue, table, `host LIKE '${"%a".repeat(20)}b'`);
+
+    // Then it answers, and answers with nothing.
+    assertArrayEquals(listed, []);
+  });
+});
+
 describe("SimGlue partition expression grammar refusals", () => {
   it("refuses a BETWEEN missing its AND", () => {
     // Given a table partitioned by day.

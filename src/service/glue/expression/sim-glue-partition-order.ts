@@ -1,8 +1,6 @@
 import type { SimGluePartitionColumn } from "./sim-glue-partition-columns.js";
-import {
-  simGlueNumericValue,
-  type SimGluePartitionLiteral,
-} from "./sim-glue-partition-literal.js";
+import { simGlueCompareDecimals, simGlueDecimal } from "./sim-glue-decimal.js";
+import type { SimGluePartitionLiteral } from "./sim-glue-partition-literal.js";
 
 /**
  * What one operator asks of the order between a stored value and a literal.
@@ -66,7 +64,11 @@ export function simGluePartitionOrder(
     return stored < literal.text ? -1 : stored > literal.text ? 1 : 0;
   }
 
-  const value = simGlueNumericValue(stored);
+  const value = simGlueDecimal(stored);
 
-  return Number.isNaN(value) ? undefined : value - literal.numeric;
+  if (value === undefined || literal.decimal === undefined) {
+    return undefined;
+  }
+
+  return simGlueCompareDecimals(value, literal.decimal);
 }
