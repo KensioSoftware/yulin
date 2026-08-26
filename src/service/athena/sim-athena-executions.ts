@@ -21,6 +21,7 @@ import {
 } from "./execution/sim-athena-result-writer.js";
 import { SimAthenaNamedQueryStore } from "./named-query/sim-athena-named-query-store.js";
 import { SimAthenaQueryResults } from "./result/sim-athena-query-results.js";
+import type { SimAthenaCatalog } from "./table/sim-athena-table-resolution.js";
 import { SimAthenaWorkGroup } from "./workgroup/sim-athena-work-group.js";
 import { primaryWorkGroupName } from "./workgroup/sim-athena-work-group-name.js";
 import { SimAthenaWorkGroupStore } from "./workgroup/sim-athena-work-group-store.js";
@@ -37,6 +38,14 @@ interface SimAthenaProperties {
    * results fails saying so. A Bucket only exists inside a SimAws.
    */
   readonly s3?: SimAthenaResultDestination;
+
+  /**
+   * The Data Catalog a query's table names are resolved against.
+   *
+   * A SimAthena built on its own has none, and every query then runs without
+   * its tables being looked for. A catalog only exists inside a SimAws.
+   */
+  readonly glue?: SimAthenaCatalog;
 }
 
 /**
@@ -79,6 +88,7 @@ export class SimAthenaExecutions {
       workGroups: this.workGroupStore,
       writer,
       background,
+      catalog: properties.glue,
     });
 
     this.background = background;

@@ -1,8 +1,8 @@
 # Simulated Athena implementation
 
 This directory contains the simulated Athena implementation. Workgroups and named queries are
-deployable from a template and readable through the SDK, and a query runs through its states without
-anything reading the SQL.
+deployable from a template and readable through the SDK, and a query runs through its states with
+one part of its SQL read.
 
 The guiding decision is that no query is evaluated. Athena's own value is in the query engine, and a
 query engine over Parquet and JSON objects in S3 is a different order of magnitude from the rest of
@@ -11,9 +11,10 @@ on the query text. Simulated Bedrock answers a prompt the same way and simulated
 an image the same way, all three through `SimDeclaredResultRules`.
 
 What that leaves is worth having. The lifecycle a client polls is real, the bytes-scanned cutoff
-refuses a query for real, and a result set really is written to the workgroup's output location. The
-divergence to be honest about is that simulated Athena accepts a query real Athena would reject.
-`docs/services/athena/README.md` says so in its Limitations list.
+refuses a query for real, the tables a query names are looked for in the Data Catalog, and a result
+set really is written to the workgroup's output location. The divergence to be honest about is that
+simulated Athena accepts a query real Athena would reject. `docs/services/athena/README.md` says so
+in its Limitations list.
 
 ## Entry points
 
@@ -30,9 +31,9 @@ needs the shape a response comes back in. Each rule a write applies then sits in
 beside the handler, `sim-athena-work-group-creation.ts`, `-update.ts` and `-deletion.ts`. A create,
 an update and a delete share only the workgroup they name.
 
-The service is self-contained, and `SimAwsSelfContainedServiceBuilder` builds it for that reason.
-Writing to a Bucket and reading a catalog both belong to a running query. That is where the other
-services would come in.
+The service is self-contained, and `SimAwsSelfContainedServiceBuilder` builds it for that reason. It
+holds the same scope's simulated S3 to write a result into, and the same scope's simulated Glue to
+resolve a table name against. Both are services in the scope Athena already belongs to.
 
 ## The primary workgroup
 
@@ -76,6 +77,24 @@ out, and it is the only place that knows how.
 The cutoff is checked in the runner against what the declaration says the query scanned. That is the
 whole of the cost guardrail, and the one thing this simulation can enforce for real without an
 engine.
+
+`table/` reads the tables a query names. `sim-athena-sql-tokens.ts` tokenises and stops there, and
+`sim-athena-table-references.ts` walks those tokens looking only at what follows `FROM`, `JOIN` and a
+comma inside a FROM clause. Everything it does is conservative. A statement it cannot follow is
+reported unreadable and nothing is resolved for one, because refusing a query real Athena would run
+costs more than the check returns.
+
+Three things in that scanner are there for a reason a reader would otherwise undo. Parentheses carry
+a flag saying whether the word before them was a function name. That keeps `EXTRACT(hour FROM ts)`
+from naming a table called `ts`. The depths currently inside a FROM clause are held as a set, one
+entry per bracket level, and a subquery's own FROM then leaves the outer one standing. A name written
+`x AS (` is taken as a common table expression, since nothing else in a statement this scans puts a
+bracket straight after `AS`.
+
+`sim-athena-table-resolution.ts` turns those names into a refusal. It skips a query against a
+catalog other than `awsdatacatalog`, and it skips everything while the Data Catalog holds no
+database at all. A simulation where nothing created a database is one where nothing asked for a
+table to be looked for, and every test written before this existed stays working because of it.
 
 `SimAthenaResultWriter` writes the CSV through simulated S3 under the caller that started the query,
 because Athena writes a result under the identity that asked for it. Simulated Firehose does the

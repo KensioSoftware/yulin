@@ -9,6 +9,10 @@ refuses a query, that results land where the workgroup says, and that a client p
 correctly. Whether the SQL is valid stays out of reach. The [Limitations](#limitations) at the end
 say what that leaves out.
 
+One part of the SQL is read. The tables a query names are looked for in the simulated
+[Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), and a query
+naming one that is absent fails the way real Athena fails it.
+
 Athena-specific types are imported from the `@kensio/yulin/athena` subpath.
 
 ## Workgroups from a template
@@ -178,6 +182,77 @@ the SQL is never parsed, so two queries differing only in whitespace are two dif
 fail cannot be discovered on its own. Saying so is what makes a client's failure handling
 reachable.
 
+## Tables a query names
+
+A query's `FROM` and `JOIN` clauses are read, and each table they name is looked for in the Glue
+Data Catalog for the same account and region. A query naming a table the catalog has no entry for
+reaches `FAILED`, carrying Athena's own reason.
+
+That catches a stack whose table never deployed, a database renamed on one side only, and a typo.
+Each of them answers a declared result otherwise, and the test written to catch it passes.
+
+```typescript sim-athena-table-resolution
+/**
+ * A query naming a table the Data Catalog has never heard of.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+simAws
+  .glue()
+  .createDatabase({ input: { DatabaseInput: { Name: "rainlytics" } } });
+simAws.glue().createTable({
+  input: {
+    DatabaseName: "rainlytics",
+    TableInput: { Name: "access_logs" },
+  },
+});
+
+const started = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString: "SELECT cs_uri_stem FROM rainlytics.acess_logs",
+    WorkGroup: "rainlytics",
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const execution = await simAws.athena().getQueryExecution({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// "FAILED"
+console.log(execution.QueryExecution?.Status?.State);
+// names awsdatacatalog.rainlytics.acess_logs
+console.log(execution.QueryExecution?.Status?.StateChangeReason);
+```
+
+An unqualified name resolves against `QueryExecutionContext.Database`. A query naming neither fails
+saying a schema has to be specified, as Athena does.
+
+Resolution starts once the catalog holds a database. A simulation where nothing created one answers
+every query from its declaration. That is how simulated Athena behaved before this existed.
+
+A name a `WITH` clause defined is left alone, and so are a table alias, a subquery and whatever
+`UNNEST` produces. `information_schema` resolves without a catalog entry, because Athena serves that
+schema itself.
+
+Nothing here plans the query. Reading the table names is a scan, and a statement
+it cannot follow runs the way it always did. That covers a statement writing data, a query against a
+federated catalog, and anything the scan gets lost in.
+
 ## The bytes scanned cutoff
 
 A query whose declared bytes scanned passes the workgroup's `BytesScannedCutoffPerQuery` reaches
@@ -302,6 +377,7 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 - Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
+- Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
 - `BytesScannedCutoffPerQuery` enforced against what a declaration says a query scanned
 - Result sets written to the workgroup's output location as CSV, under the caller's own identity
 - Workgroups, scoped by account and region, with `primary` there from the start
@@ -317,9 +393,18 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 Current documented limitations:
 
-- No SQL is evaluated. Nothing parses, plans or runs a query, no Glue table or S3 object is read to
-  answer one, and every row comes from a declaration a test wrote. Simulated Athena will therefore
-  accept a query real Athena would reject.
+- No SQL is evaluated. Nothing plans or runs a query, no S3 object is read to answer one, and every
+  row comes from a declaration a test wrote. Simulated Athena will therefore accept a query real
+  Athena would reject.
+- The table names in `FROM` and `JOIN` are the one part of a query that is read, and they are found
+  by a scan. A statement the scan cannot follow runs with its tables never
+  looked for, which covers `CREATE TABLE AS SELECT`, `INSERT INTO`, `MSCK REPAIR TABLE`, `SHOW` and
+  `DESCRIBE`. Only the table is resolved. Columns, types and everything else a planner checks stay
+  out of reach.
+- Table resolution starts once the Data Catalog holds a database. Every query in a simulation
+  holding none is answered from its declaration.
+- A query naming a catalog other than `awsdatacatalog` runs with its tables never looked for.
+  Federated catalogs and `AWS::Athena::DataCatalog` fall outside this simulation.
 - What a query scanned comes from that same declaration. The cutoff is enforced for real against
   that figure, which is a test's own statement about the query.
 - A query that exceeds the cutoff reaches `FAILED` here. AWS documents the per-query data usage
@@ -348,9 +433,9 @@ Current documented limitations:
 - `AWS::Athena::DataCatalog`, `AWS::Athena::PreparedStatement` and
   `AWS::Athena::CapacityReservation` fall outside this simulation. A template declaring one is
   recorded on the stack's `skippedResources` and the rest of the stack deploys.
-- A named query's `Database` is a string simulated Athena leaves unresolved. Yulin does simulate the
-  [Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), and a saved
-  query naming a database that catalog has never heard of is stored all the same.
+- A named query's `Database` is a string simulated Athena leaves unresolved. A saved query naming a
+  database the Data Catalog has never heard of is stored all the same. Resolution happens when a
+  query runs rather than when one is saved.
 - Workgroup tags, prepared statements, capacity reservations, query result reuse and Athena for
   Spark are all absent.
 - A `WorkGroupConfiguration` setting this simulation has no answer for, such as `ExecutionRole`,
