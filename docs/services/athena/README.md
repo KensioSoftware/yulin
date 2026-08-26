@@ -529,13 +529,95 @@ A query fails where a partition key carries no `projection.<key>.type`, where a 
 
 The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read, and a query carrying `OR` anywhere is left unnarrowed. A filter left unread keeps every projected partition in. That is always the safe answer.
 
-A table with `projection.enabled` absent or false reads the location in its storage descriptor. A table with projection on and no `storage.location.template` gets the Hive layout under that same location, as `<location>/day=2026-08-25/`.
+A table with projection on and no `storage.location.template` gets the Hive layout under its own location, as `<location>/day=2026-08-25/`.
+
+## Registered partitions
+
+A table that registers its partitions rather than projecting them is read from the catalog. A query against one reads a prefix per registered partition, taken from that partition's own storage descriptor location, and the `WHERE` clause narrows them the way it narrows projected ones.
+
+```typescript sim-athena-registered-partitions
+/**
+ * A query over a table whose partitions the catalog holds.
+ */
+
+import {
+  CreateDatabaseCommand,
+  CreatePartitionCommand,
+  CreateTableCommand,
+} from "@aws-sdk/client-glue";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const glue = simAws.glue();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-logs" } });
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+
+glue.createDatabase(
+  new CreateDatabaseCommand({ DatabaseInput: { Name: "rainlytics" } }),
+);
+glue.createTable(
+  new CreateTableCommand({
+    DatabaseName: "rainlytics",
+    TableInput: {
+      Name: "access_logs",
+      PartitionKeys: [{ Name: "day", Type: "string" }],
+      StorageDescriptor: { Location: "s3://rainlytics-logs/logs/" },
+    },
+  }),
+);
+
+for (const day of ["2026-08-25", "2026-08-26"]) {
+  glue.createPartition(
+    new CreatePartitionCommand({
+      DatabaseName: "rainlytics",
+      TableName: "access_logs",
+      PartitionInput: {
+        Values: [day],
+        StorageDescriptor: { Location: `s3://rainlytics-logs/logs/${day}/` },
+      },
+    }),
+  );
+
+  await simAws.s3().putObject({
+    input: {
+      Bucket: "rainlytics-logs",
+      Key: `logs/${day}/part-0.json`,
+      Body: "x".repeat(1000),
+    },
+  });
+}
+
+const { QueryExecutionId } = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString:
+      "SELECT url FROM rainlytics.access_logs WHERE day = '2026-08-26'",
+    ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const execution = await simAws
+  .athena()
+  .getQueryExecution({ input: { QueryExecutionId } });
+
+// 1000
+console.log(execution.QueryExecution?.Statistics?.DataScannedInBytes);
+```
+
+A partition registered with no location of its own falls back to the Hive layout under the table's location, as `<location>/day=2026-08-26/`. A partition registered somewhere else entirely is read there, which is something a table location alone could never reach.
+
+Projection wins where a table carries both. Real Athena stops reading the catalog's partitions once `projection.enabled` is true, and that is the whole reason for turning it on.
+
+A table with neither reads the location in its storage descriptor, and the query reads everything under it.
 
 ## What a query scans
 
 A query's bytes scanned are measured from the objects it reads. The prefixes come from the table's
-partition projection, or from the location in its storage descriptor where a table projects nothing,
-and every object under each one counts.
+partition projection, from the partitions the catalog holds against it, or from the location in its
+storage descriptor where a table has neither. Every object under each one counts.
 
 ```typescript sim-athena-scanned-bytes
 /**
@@ -595,8 +677,9 @@ const execution = await simAws.athena().getQueryExecution({
 console.log(execution.QueryExecution?.Statistics?.DataScannedInBytes);
 ```
 
-A query filtering on a projected partition key reads only the prefixes that filter allows. A
-partitioned table then scans less than an unpartitioned one, and a test can prove it.
+A query filtering on a partition key reads only the prefixes that filter allows, whether the
+partitions were projected or registered. A partitioned table then scans less than an unpartitioned
+one, and a test can prove it.
 
 The listing goes through simulated S3 under the caller that started the query, as Athena reads a
 table's data under the identity that asked for it. A caller who cannot read the Bucket fails the
@@ -844,9 +927,14 @@ Current documented limitations:
   is refused. Athena's own range runs to the signed 64 bit limit.
 - `MILLISECONDS` is absent from the interval units, and a pattern carrying `S` is read as literal
   text. A partition path written to the millisecond falls outside this.
-- Partitions registered through the Glue Partitions API are absent, along with `MSCK REPAIR TABLE`
-  and `ALTER TABLE ADD PARTITION`. A table without projection reads its storage descriptor location
-  as the one prefix it has.
+- Partitions registered through the Glue Partitions API are read. Registering one from Athena is
+  absent, so `MSCK REPAIR TABLE` and `ALTER TABLE ADD PARTITION` register nothing and a test that
+  wants partitions puts them in the catalog through Glue.
+- A registered partition's own columns are ignored. The table's schema is what every partition is
+  read with, so a table whose schema changed part way through its life reads the newer columns for
+  the older partitions too.
+- A partition registered with no location, against a table with none either, is read as having
+  nowhere to look and contributes no prefix.
 - A query naming a catalog other than `awsdatacatalog` runs with its tables never looked for.
   Federated catalogs and `AWS::Athena::DataCatalog` fall outside this simulation.
 - Bytes scanned are the total size of every object under the prefixes a query reads. Real Athena

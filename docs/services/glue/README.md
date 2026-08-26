@@ -419,9 +419,10 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 - **`AWS::Glue::Crawler` is absent.** A crawler fills a catalog by reading objects, and every object
   stays unread here. A template declaring one deploys, with the crawler recorded on the stack's
   `skippedResources`.
-- **Athena ignores a registered partition.** A query expands the table's projection parameters and
-  reads nothing the partition commands wrote. Registering partitions changes what the catalog
-  reports and leaves query planning alone.
+- **A registered partition is read by Athena, and a projected one wins over it.** Simulated
+  [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads a table's
+  registered partitions when a query runs, unless `projection.enabled` is true. Real Athena stops
+  reading the catalog's partitions once projection is on.
 - **A `GetPartitions` `Expression` is the whole of the filtering.** `Segment` and parallel listing,
   `ExcludeColumnSchema` and `TransactionId` are absent, and so are partition indexes, which change
   which expressions real Glue will serve rather than what any of them mean.

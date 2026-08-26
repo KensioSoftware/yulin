@@ -3,6 +3,9 @@ import { faker } from "@faker-js/faker";
 import type { SimAws } from "../aws/sim-aws.js";
 import { SimAws as SimAwsClass } from "../aws/sim-aws.js";
 
+/** The one key every partitioned table in these fixtures declares. */
+export const dayKey = ["day"];
+
 /** A table projecting one prefix per day across three days. */
 export const projectedDays = {
   "projection.enabled": "true",
@@ -19,6 +22,7 @@ export const projectedDays = {
 export async function aScannedSimulation(
   parameters: Record<string, string> = {},
   cutoff?: number,
+  partitionKeyNames: readonly string[] = [],
 ): Promise<{ simAws: SimAws; workGroup: string }> {
   const simAws = new SimAwsClass();
   const workGroup = `analytics-${faker.string.uuid()}`;
@@ -43,10 +47,10 @@ export async function aScannedSimulation(
       DatabaseName: "rainlytics",
       TableInput: {
         Name: "access_logs",
-        PartitionKeys:
-          Object.keys(parameters).length === 0
-            ? []
-            : [{ Name: "day", Type: "string" }],
+        PartitionKeys: partitionKeyNames.map((Name) => ({
+          Name,
+          Type: "string",
+        })),
         StorageDescriptor: { Location: "s3://rainlytics-logs/logs/" },
         Parameters: parameters,
       },

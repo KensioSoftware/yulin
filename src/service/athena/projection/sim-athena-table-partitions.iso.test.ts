@@ -6,6 +6,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import type { SimAthenaCatalogPartition } from "../table/sim-athena-registered-partitions.js";
 import {
   simAthenaTablePartitions,
   type SimAthenaPartitionedTable,
@@ -28,15 +29,28 @@ function aTable(
 function partitionsOf(
   table: SimAthenaPartitionedTable,
   queryString = "SELECT * FROM rainlytics.access_logs",
+  registered: readonly SimAthenaCatalogPartition[] = [],
 ): readonly string[] {
-  return simAthenaTablePartitions({ table, queryString, now: noon }).map(
-    (partition) => partition.prefix,
-  );
+  return simAthenaTablePartitions({
+    table,
+    registered,
+    queryString,
+    now: noon,
+  }).map((partition) => partition.prefix);
+}
+
+/** One partition the catalog holds, as a test writes it down. */
+function aPartition(
+  values: readonly string[],
+  Location: string,
+): SimAthenaCatalogPartition {
+  return { values, storageDescriptor: { Location } };
 }
 
 describe("the S3 prefixes a query reads for one table", () => {
-  it("reads the table's own location where projection is off", () => {
-    // Given a table with no projection configured.
+  it("reads the table's own location where it has neither", () => {
+    // Given a table with no projection configured and nothing registered
+    // against it.
     const table = aTable({}, ["day"]);
 
     // When its partitions are read.
@@ -44,6 +58,31 @@ describe("the S3 prefixes a query reads for one table", () => {
 
     // Then the table's location is the whole of it.
     assertArrayEquals(prefixes, ["s3://rainlytics-logs/cloudfront/"]);
+  });
+
+  it("reads the projected partitions where a table carries both", () => {
+    // Given a table projecting one day, with a different day registered
+    // against it.
+    const table = aTable(
+      {
+        "projection.enabled": "true",
+        "projection.day.type": "date",
+        "projection.day.format": "yyyy-MM-dd",
+        "projection.day.range": "2026-08-26,2026-08-26",
+      },
+      ["day"],
+    );
+
+    // When its partitions are read.
+    const prefixes = partitionsOf(table, undefined, [
+      aPartition(["2020-01-01"], "s3://rainlytics-logs/day=2020-01-01/"),
+    ]);
+
+    // Then the projection wins. Real Athena stops reading the catalog's
+    // partitions once projection is on, which is the point of turning it on.
+    assertArrayEquals(prefixes, [
+      "s3://rainlytics-logs/cloudfront/day=2026-08-26/",
+    ]);
   });
 
   it("fills the location template with each projected value", () => {

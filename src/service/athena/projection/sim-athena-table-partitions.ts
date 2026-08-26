@@ -1,5 +1,12 @@
 import { simAthenaPartitionFilters } from "../table/sim-athena-partition-filters.js";
-import type { SimAthenaProjectionColumn } from "./sim-athena-projection-column.js";
+import {
+  simAthenaRegisteredPartitions,
+  type SimAthenaCatalogPartition,
+} from "../table/sim-athena-registered-partitions.js";
+import type {
+  SimAthenaProjection,
+  SimAthenaProjectionColumn,
+} from "./sim-athena-projection-column.js";
 import { SimAthenaProjectionError } from "./sim-athena-projection-error.js";
 import {
   simAthenaProjectedPartitions,
@@ -20,6 +27,10 @@ export interface SimAthenaPartitionedTable extends SimAthenaProjectedTable {
 
 interface SimAthenaTablePartitionsRequest {
   readonly table: SimAthenaPartitionedTable;
+
+  /** What the catalog holds against this table, where anything does. */
+  readonly registered: readonly SimAthenaCatalogPartition[];
+
   readonly queryString: string;
   readonly now: Date;
 }
@@ -27,14 +38,16 @@ interface SimAthenaTablePartitionsRequest {
 /**
  * The partitions one query reads for one table.
  *
- * A table with projection off reads its own location and nothing else, since
- * the partitions it holds were registered rather than projected and simulated
- * Glue has no commands for registering one. Nothing then says what its
- * partition columns read, so that partition carries no values.
+ * Projection comes first. Real Athena stops reading the catalog's partitions
+ * once `projection.enabled` is true, which is the whole reason for turning it
+ * on. Every projected column is expanded and the query's own `WHERE` clause
+ * narrows what is left.
  *
- * With projection on, every column is expanded and the query's own `WHERE`
- * clause narrows what is left. A filter naming no projected column leaves
- * every partition in, which is what a query scanning the whole table does.
+ * A table with partitions registered against it reads those instead, one
+ * prefix per partition, narrowed by the same filters.
+ *
+ * A table with neither reads its own location and nothing else. Nothing then
+ * says what its partition columns read, so that partition carries no values.
  */
 export function simAthenaTablePartitions(
   request: SimAthenaTablePartitionsRequest,
@@ -42,12 +55,30 @@ export function simAthenaTablePartitions(
   const projection = simAthenaProjectionOf(request.table);
   const location = request.table.storageDescriptor?.Location;
 
-  if (!projection.enabled) {
-    return location === undefined
-      ? []
-      : [{ prefix: location, values: new Map() }];
+  if (projection.enabled) {
+    return projectedPartitions(request, projection, location);
   }
 
+  if (request.registered.length > 0) {
+    return simAthenaRegisteredPartitions({
+      partitionKeys: request.table.partitionKeys,
+      registered: request.registered,
+      tableLocation: location,
+      queryString: request.queryString,
+    });
+  }
+
+  return location === undefined
+    ? []
+    : [{ prefix: location, values: new Map() }];
+}
+
+/** The partitions a table's projection comes to for this query. */
+function projectedPartitions(
+  request: SimAthenaTablePartitionsRequest,
+  projection: SimAthenaProjection,
+  location: string | undefined,
+): readonly SimAthenaTablePartition[] {
   const filters = simAthenaPartitionFilters(request.queryString);
   const values = new Map<string, readonly string[]>();
 
