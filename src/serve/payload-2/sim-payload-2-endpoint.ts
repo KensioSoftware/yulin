@@ -14,6 +14,13 @@ export interface SimPayload2Endpoint {
   readonly domainName: string;
   /** The leading label of the endpoint hostname. */
   readonly domainPrefix: string;
+  /**
+   * The path the event reports, when the endpoint serves the request under
+   * something the event leaves out. An API mapping's base path comes off
+   * here. Absent for an endpoint serving the request path whole, which is
+   * every endpoint but a custom domain with a base path.
+   */
+  readonly requestPath?: string | undefined;
   /** The route this request matched, such as `$default` or `GET /orders`. */
   readonly routeKey: string;
   /** The stage that served the request. */
@@ -22,4 +29,18 @@ export interface SimPayload2Endpoint {
   readonly pathParameters?: Record<string, string> | undefined;
   /** The stage's variables, if it has any. */
   readonly stageVariables?: Record<string, string> | undefined;
+}
+
+/**
+ * The path an event reports for one request to an endpoint.
+ *
+ * It is the path the client asked for, unless the endpoint serves the request
+ * under something the event leaves out. A custom domain's API mapping base
+ * path is the one thing that does.
+ */
+export function simPayload2ReportedPath(
+  endpoint: SimPayload2Endpoint,
+  url: URL,
+): string {
+  return endpoint.requestPath ?? url.pathname;
 }

@@ -33,6 +33,12 @@ export function simAwsServiceSigningName(
       // plane that created the API.
       return "execute-api";
     }
+    case "apiGatewayDomain": {
+      // A custom domain serves the same APIs the generated endpoint does, and
+      // an AWS_IAM route reached through one is signed for execute-api just
+      // the same. The hostname is the only thing that differs.
+      return "execute-api";
+    }
     case "elbV2": {
       // Nothing signs a request to a load balancer: what it serves is an
       // ordinary application rather than an AWS API. The name is here so the

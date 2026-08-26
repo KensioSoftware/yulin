@@ -4,16 +4,16 @@ import {
   simAwsProxiedTraceId,
 } from "../http/sim-aws-proxied-connection.js";
 import { SimProxyBodyEncoding } from "../proxy/sim-proxy-body-encoding.js";
-import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
+import {
+  type SimPayload2Endpoint,
+  simPayload2ReportedPath,
+} from "./sim-payload-2-endpoint.js";
 import type { SimPayload2Event } from "./sim-payload-2-event.type.js";
 import {
   type SimPayload2Authorization,
   SimPayload2RequestContextBuilder,
 } from "./sim-payload-2-request-context.js";
-import {
-  simPayload2QueryStringParameters,
-  SimPayload2RequestParts,
-} from "./sim-payload-2-request-parts.js";
+import { SimPayload2RequestParts } from "./sim-payload-2-request-parts.js";
 
 interface SimPayload2EventBuilderProperties {
   /**
@@ -59,6 +59,7 @@ export class SimPayload2EventBuilder {
     authorization?: SimPayload2Authorization,
   ): Promise<SimPayload2Event> {
     const url = new URL(request.url);
+    const rawPath = simPayload2ReportedPath(endpoint, url);
     const bytes = new Uint8Array(await request.arrayBuffer());
     const contentType = request.headers.get("content-type");
     const at = this.clock.now();
@@ -66,7 +67,7 @@ export class SimPayload2EventBuilder {
     const event: SimPayload2Event = {
       version: "2.0",
       routeKey: endpoint.routeKey,
-      rawPath: url.pathname,
+      rawPath,
       rawQueryString: url.search.replace(/^\?/, ""),
       headers: this.requestParts.headers({
         request,
@@ -76,7 +77,7 @@ export class SimPayload2EventBuilder {
       }),
       requestContext: this.requestContext.build({
         request,
-        url,
+        rawPath,
         endpoint,
         at,
         ...(authorization !== undefined && { authorization }),
@@ -85,32 +86,11 @@ export class SimPayload2EventBuilder {
         bytes.length > 0 && !this.bodyEncoding.isText(contentType),
     };
 
-    this.addRequestFields(event, request, url);
+    this.requestParts.addTo(event, request, url);
     this.addRouteFields(event, endpoint);
     this.addBody(event, bytes, contentType);
 
     return event;
-  }
-
-  /**
-   * Add the fields read off the request itself, when the request has them.
-   */
-  private addRequestFields(
-    event: SimPayload2Event,
-    request: Request,
-    url: URL,
-  ): void {
-    const cookies = this.requestParts.cookies(request);
-    if (cookies.length > 0) {
-      event.cookies = cookies;
-    }
-
-    const queryStringParameters = simPayload2QueryStringParameters(
-      url.searchParams,
-    );
-    if (Object.keys(queryStringParameters).length > 0) {
-      event.queryStringParameters = queryStringParameters;
-    }
   }
 
   /**

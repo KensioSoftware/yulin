@@ -3,6 +3,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimHttpApiJwtIssuerKeys } from "../../api/authorizer/sim-http-api-jwt-issuer-keys.js";
 import { SimHttpApi } from "../../api/sim-http-api.js";
 import type { SimHttpApiStore } from "../../api/sim-http-api-store.js";
+import type { SimHttpApiDomainStore } from "../../domain/sim-http-api-domain-store.js";
 import type { SimHttpApiRegistry } from "../../registry/sim-http-api-registry.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
@@ -27,6 +28,7 @@ const acceptedCreateApiOptions = [
 
 interface SimHttpApiCommandsProperties {
   readonly apis: SimHttpApiStore;
+  readonly domains: SimHttpApiDomainStore;
   readonly registry: SimHttpApiRegistry;
   readonly access: SimHttpApiAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -39,6 +41,7 @@ interface SimHttpApiCommandsProperties {
  */
 export class SimHttpApiCommands {
   private readonly apis: SimHttpApiStore;
+  private readonly domains: SimHttpApiDomainStore;
   private readonly registry: SimHttpApiRegistry;
   private readonly access: SimHttpApiAccess;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -47,6 +50,7 @@ export class SimHttpApiCommands {
 
   constructor(properties: SimHttpApiCommandsProperties) {
     this.apis = properties.apis;
+    this.domains = properties.domains;
     this.registry = properties.registry;
     this.access = properties.access;
     this.accountRegionScope = properties.accountRegionScope;
@@ -134,6 +138,11 @@ export class SimHttpApiCommands {
    *
    * The API's routes, integrations and stages go with it, because they belong
    * to it, and its id stops resolving, because nothing serves it any more.
+   *
+   * Any API mapping pointing at it goes too. A mapping outliving its API would
+   * leave a custom domain serving a base path that answers nothing, and real
+   * API Gateway deletes the mappings with the API rather than refusing to
+   * delete an API that is mapped.
    */
   deleteApi(
     command: SimDeleteApiCommand,
@@ -151,6 +160,7 @@ export class SimHttpApiCommands {
 
     this.apis.remove(api.apiId);
     this.registry.deregisterApi(api.apiId);
+    this.domains.removeMappingsForApi(api.apiId);
 
     return { $metadata: {} };
   }

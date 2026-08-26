@@ -23,6 +23,10 @@ interface SimHttpApiIntegrationInvocationInput {
   readonly request: Request;
   /** What the route's authorization knows about the caller. */
   readonly authorization: SimHttpApiAdmitted;
+  /** The AWS-shaped hostname the request arrived on. */
+  readonly domainName: string;
+  /** The path the invocation event reports, which the resolver settled. */
+  readonly rawPath: string;
 }
 
 /**
@@ -51,7 +55,7 @@ export class SimHttpApiIntegrationInvocation {
    * Invoke the integration for one authorized request.
    */
   async invoke(input: SimHttpApiIntegrationInvocationInput): Promise<Response> {
-    const { api, match, request, authorization } = input;
+    const { match, request, authorization } = input;
     const target = this.router.targetFor(match.integration);
 
     if (target === undefined || this.mayNotInvoke(input, target)) {
@@ -64,7 +68,7 @@ export class SimHttpApiIntegrationInvocation {
     try {
       const event = await this.eventBuilder.build(
         request,
-        simHttpApiEndpoint(api, match),
+        simHttpApiEndpoint(input),
         {
           jwt: authorization.jwt,
           caller: authorization.caller,

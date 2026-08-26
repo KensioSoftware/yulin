@@ -1,3 +1,4 @@
+import { SimAwsHostnameClaims } from "../../../serve/controller/host/sim-aws-hostname-claims.js";
 import type { SimAwsServiceHosts } from "../../../serve/controller/host/sim-aws-service-hosts.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
@@ -21,6 +22,11 @@ import { simCognitoUserPoolRegionName } from "../user-pool/sim-cognito-user-pool
 export class SimCognitoDomainRegistry implements SimAwsServiceHosts {
   private readonly domainsByName = new Map<string, SimCognitoUserPoolDomain>();
   private readonly domainsByHost = new Map<string, SimCognitoUserPoolDomain>();
+  private readonly claims: SimAwsHostnameClaims;
+
+  constructor(claims: SimAwsHostnameClaims = new SimAwsHostnameClaims()) {
+    this.claims = claims;
+  }
 
   /**
    * Register a newly created domain, so requests to it resolve.
@@ -36,6 +42,7 @@ export class SimCognitoDomainRegistry implements SimAwsServiceHosts {
 
     for (const hostname of domain.hostnames) {
       this.domainsByHost.set(hostname.toLowerCase(), domain);
+      this.claims.claim(hostname);
     }
   }
 
@@ -47,6 +54,7 @@ export class SimCognitoDomainRegistry implements SimAwsServiceHosts {
 
     for (const hostname of domain.hostnames) {
       this.domainsByHost.delete(hostname.toLowerCase());
+      this.claims.release(hostname);
     }
   }
 
@@ -92,14 +100,14 @@ export class SimCognitoDomainRegistry implements SimAwsServiceHosts {
 
   private requireUnused(domain: SimCognitoUserPoolDomain): void {
     const taken = domain.hostnames.some((hostname) =>
-      this.domainsByHost.has(hostname.toLowerCase()),
+      this.claims.isClaimed(hostname),
     );
 
     if (taken || this.domainsByName.has(domain.value)) {
       throw new SimCognitoInvalidParameterException(
-        `Domain '${domain.value}' is already in use: a user pool domain is ` +
-          `unique across every simulated Account and Region, as it is across ` +
-          `the whole of real AWS`,
+        `Domain '${domain.value}' is already in use: a hosted domain is ` +
+          `unique across every simulated Account, Region and service, as it ` +
+          `is across the whole of real AWS`,
       );
     }
   }

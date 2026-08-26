@@ -76,6 +76,21 @@ export {
 export { SimHttpApiRoutePath } from "./api/route/path/sim-http-api-route-path.js";
 export { SimHttpApiRouteRank } from "./api/route/sim-http-api-route-rank.js";
 export {
+  simApiMappingSelectionExpression,
+  SimHttpApiDomainName,
+  type SimHttpApiDomainNameConfiguration,
+  type SimHttpApiDomainNameView,
+} from "./domain/sim-http-api-domain-name.js";
+export {
+  SimApiMapping,
+  type SimApiMappingView,
+} from "./domain/sim-api-mapping.js";
+export {
+  type SimApiMappingId,
+  makeSimApiMappingId,
+} from "./domain/sim-api-mapping-id.js";
+export { SimApiMappingKey } from "./domain/sim-api-mapping-key.js";
+export {
   simHttpApiDefaultStageName,
   SimHttpApiStage,
   type SimHttpApiStageView,

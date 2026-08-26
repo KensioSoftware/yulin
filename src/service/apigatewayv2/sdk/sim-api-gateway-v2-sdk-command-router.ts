@@ -16,6 +16,18 @@ import type {
   SimGetAuthorizersCommand,
 } from "../command/authorizer/authorizer.command.js";
 import type {
+  SimCreateApiMappingCommand,
+  SimDeleteApiMappingCommand,
+  SimGetApiMappingCommand,
+  SimGetApiMappingsCommand,
+} from "../command/domain/api-mapping.command.js";
+import type {
+  SimCreateDomainNameCommand,
+  SimDeleteDomainNameCommand,
+  SimGetDomainNameCommand,
+  SimGetDomainNamesCommand,
+} from "../command/domain/domain.command.js";
+import type {
   SimCreateIntegrationCommand,
   SimDeleteIntegrationCommand,
   SimGetIntegrationsCommand,
@@ -77,6 +89,70 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.deleteApi(
             command as SimDeleteApiCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateDomainNameCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.createDomainName(
+            command as SimCreateDomainNameCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetDomainNameCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.getDomainName(
+            command as SimGetDomainNameCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetDomainNamesCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.getDomainNames(
+            command as SimGetDomainNamesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteDomainNameCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteDomainName(
+            command as SimDeleteDomainNameCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateApiMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.createApiMapping(
+            command as SimCreateApiMappingCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetApiMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.getApiMapping(
+            command as SimGetApiMappingCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetApiMappingsCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.getApiMappings(
+            command as SimGetApiMappingsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteApiMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteApiMapping(
+            command as SimDeleteApiMappingCommand,
             simSdkCallerOptions(context),
           ),
       ],

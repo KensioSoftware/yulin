@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * The error responses an HTTP API endpoint returns itself, before or instead
  * of an integration producing one.
@@ -33,9 +35,9 @@ export class SimApiGatewayV2ErrorResponse {
   }
 
   /**
-   * The API's generated endpoint is switched off, the route asks for a scope
-   * the accepted token does not claim, or IAM denied the caller
-   * `execute-api:Invoke` on the `AWS_IAM` route being called.
+   * The route asks for a scope the accepted token does not claim, or IAM
+   * denied the caller `execute-api:Invoke` on the `AWS_IAM` route being
+   * called.
    *
    * AWS publishes neither the status nor the body for any of these, so both
    * are what the endpoint was observed to answer rather than something
@@ -43,6 +45,22 @@ export class SimApiGatewayV2ErrorResponse {
    */
   forbidden(): Response {
     return this.jsonResponse(403, "Forbidden");
+  }
+
+  /**
+   * The request carried a `Host` the API neither generated nor has mapped.
+   *
+   * This is the same status and body as any other 403, and it carries the two
+   * headers that tell it apart from CloudFront's own refusal to reach an
+   * origin: API Gateway answers with `x-amzn-errortype` and `x-amzn-requestid`,
+   * while CloudFront answers with `apigw-requestid`. Both were observed
+   * against real AWS rather than published.
+   */
+  forbiddenHost(): Response {
+    return this.jsonResponse(403, "Forbidden", {
+      "x-amzn-errortype": "ForbiddenException",
+      "x-amzn-requestid": randomUUID(),
+    });
   }
 
   /**

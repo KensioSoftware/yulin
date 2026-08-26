@@ -21,14 +21,25 @@ export interface SimHttpApiMatch {
   readonly stage: SimHttpApiStage;
   readonly pathParameters: SimHttpApiPathParameters;
   /**
-   * The request path the stage left for the routes, with the stage segment and
-   * the leading slash taken off: `/dev/pets/6` served from stage `dev` is
-   * `pets/6`, and a request to the root is the empty string.
+   * The request path left for the routes, with the leading slash and whatever
+   * came before them taken off: `/dev/pets/6` served from stage `dev` is
+   * `pets/6`, and a request to the root is the empty string. On a custom
+   * domain it is the base path of the API mapping that comes off instead.
    *
    * This is the form an `execute-api` ARN names a request by, which is what
    * an `AWS_IAM` route is authorized against.
    */
   readonly pathAfterStage: string;
+}
+
+/**
+ * One request to a stage that has already been picked, and the path segments
+ * left for that stage's routes to compete for.
+ */
+export interface SimHttpApiStageRequest {
+  readonly stage: SimHttpApiStage;
+  readonly method: string;
+  readonly segments: readonly string[];
 }
 
 /**
@@ -67,11 +78,30 @@ export class SimHttpApiMatcher {
       return undefined;
     }
 
+    return this.matchInStage(stores, {
+      stage: stage.stage,
+      method: request.method,
+      segments: stage.segments,
+    });
+  }
+
+  /**
+   * Find what serves one request to a stage that has already been decided.
+   *
+   * A request reaching an API through a custom domain arrives this way: the
+   * API mapping names the stage, and the base path rather than a stage name is
+   * what has been taken off the front of the path. Route selection is the same
+   * either way, which is why it is here rather than repeated.
+   */
+  matchInStage(
+    stores: SimHttpApiStores,
+    request: SimHttpApiStageRequest,
+  ): SimHttpApiMatch | undefined {
     const selected = this.routeSelector.select(
       stores.routes.list(),
       new SimHttpApiRouteRequest({
         method: request.method,
-        segments: stage.segments,
+        segments: request.segments,
       }),
     );
 
@@ -89,9 +119,9 @@ export class SimHttpApiMatcher {
     return {
       route: selected.route,
       integration,
-      stage: stage.stage,
+      stage: request.stage,
       pathParameters: selected.pathParameters,
-      pathAfterStage: stage.segments.join("/"),
+      pathAfterStage: request.segments.join("/"),
     };
   }
 }

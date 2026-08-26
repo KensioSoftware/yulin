@@ -85,6 +85,10 @@ export class SimAwsRegisteredServiceBuilder {
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
       registry: this.registries.httpApi,
+      // A custom domain name is unique across the simulation, and a request to
+      // one carries only its hostname, so the domains are registered where
+      // resolution can find them.
+      domainRegistry: this.registries.httpApiDomains,
       jwtIssuerKeys: simAwsHttpApiJwtIssuerKeys(this.registries),
     });
   }

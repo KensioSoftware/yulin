@@ -15,6 +15,17 @@ export interface SimHttpApiRouteAuthorizeInput {
   readonly match: SimHttpApiMatch;
   readonly request: Request;
   /**
+   * The AWS-shaped hostname the request arrived on, which is the endpoint API
+   * Gateway generated or a custom domain mapped to the API. A `REQUEST`
+   * authorizer's event names it, the way an integration's event does.
+   */
+  readonly domainName: string;
+  /**
+   * The path the authorizer's own event reports, settled the same way the
+   * integration event's is.
+   */
+  readonly rawPath: string;
+  /**
    * The principal the serving boundary attributed the request to, from a
    * signature or from a named caller, and anonymous when it carried neither.
    */
