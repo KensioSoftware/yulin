@@ -1,9 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { simAthenaInstallAggregateShims } from "./sim-athena-aggregate-shims.js";
-import { simAthenaInstallDateShims } from "./sim-athena-date-shims.js";
-import { simAthenaInstallJsonShims } from "./sim-athena-json-shims.js";
-import { simAthenaInstallStringShims } from "./sim-athena-string-shims.js";
+import { simAthenaInstallShims } from "./sim-athena-shims.js";
 import type { SimAthenaSqliteModule } from "./sim-athena-sqlite-module.js";
 import { simAthenaCreateTable } from "./sim-athena-sqlite-tables.js";
 import type { SimAthenaLoadedTable } from "./sim-athena-table-rows.js";
@@ -22,6 +19,14 @@ interface SimAthenaSqliteDatabaseRequest {
    * tables in it are created in SQLite's own `main` schema as well.
    */
   readonly sessionDatabase: string | undefined;
+
+  /**
+   * When the query started, which `current_timestamp` answers with.
+   *
+   * The simulator's clock rather than the host's, so a test that froze time
+   * gets the instant it froze.
+   */
+  readonly startedAt: Date;
 }
 
 /**
@@ -44,10 +49,7 @@ export function simAthenaSqliteDatabase(
   // a passing test and a wrong answer.
   database.exec("PRAGMA case_sensitive_like = ON");
 
-  simAthenaInstallDateShims(database);
-  simAthenaInstallJsonShims(database);
-  simAthenaInstallStringShims(database);
-  simAthenaInstallAggregateShims(database);
+  simAthenaInstallShims(database, request.startedAt);
 
   const attached = new Set<string>([mainSchema]);
 

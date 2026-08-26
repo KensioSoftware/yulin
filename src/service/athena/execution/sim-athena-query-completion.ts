@@ -57,6 +57,7 @@ export async function simAthenaCompleteQuery(
     tables: outcome.tables,
     objects: runner.tableObjects,
     caller,
+    startedAt: execution.submittedAt,
   });
 
   try {

@@ -355,6 +355,32 @@ falls back rather than reading a scalar as a collection.
 One flattening per statement is what this covers, joined with `CROSS JOIN`. A second `UNNEST`, a
 `LEFT JOIN UNNEST`, a `SELECT *` beside one, and a position taken from a map all fall back.
 
+### The functions a statement can call
+
+SQLite carries a much smaller function library than Trino, and the engine fills the gap for the ones
+a test reaches for. SQLite refuses a function absent from this list, and the query then falls back to
+its declared result.
+
+| Family        | Functions                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date and time | `current_date`, `current_timestamp`, `date_add`, `date_diff`, `date_trunc`, `date_format`, `at_timezone`, `from_unixtime`, `to_unixtime`, `from_iso8601_timestamp`, `from_iso8601_date`, `to_iso8601` |
+| JSON          | `json_extract`, `json_extract_scalar`, `json_parse`, `json_size`                                                                                                                                      |
+| Array and map | `array_agg`, `cardinality`, `contains`, `element_at`, `array_join`, `slice`                                                                                                                           |
+| String        | `regexp_like`, `regexp_extract`, `regexp_replace`, `split_part`, `strpos`                                                                                                                             |
+| URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`                                              |
+| Approximate   | `approx_distinct`, `approx_percentile`                                                                                                                                                                |
+
+`substr` and `format` are SQLite's own. Both count from one and take the same `%s` and `%d` a
+statement writes, so shadowing either would replace something that works.
+
+`current_date` and `current_timestamp` read the simulator's clock. A test that froze time gets the
+instant it froze, and the same test answers the same way on every machine. Athena reads both at the
+instant the query started, which is what the execution records.
+
+A function that cannot answer faithfully raises rather than guessing, and the query falls back.
+`date_add` with a unit Trino does not name, `slice` starting at zero, and `array_join` over an array
+of objects all land there. A null answer would be a wrong answer wearing the shape of a right one.
+
 ## Tables a query names
 
 A query's `FROM` and `JOIN` clauses are read, and each table they name is looked for in the Glue
@@ -702,6 +728,8 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
 - A `SELECT` run for real over JSON lines and CSV objects in simulated S3, answered by SQLite
 - `UNNEST` over an array or a map column, with `WITH ORDINALITY` where a query wants the position
+- Trino's date, JSON, array, string and URL functions, with `current_timestamp` reading the
+  simulated clock
 - Declared results, matched on the query text, ahead of the engine for one statement and behind it
   for everything else
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
@@ -735,11 +763,23 @@ Current documented limitations:
   gives a map's keys rather than its positions.
 - `UNNEST` over a `ROW` or a struct array falls back. The element needs field access and the
   flattened column is JSON text here.
-- The Trino function library reaches as far as `date_trunc`, `date_format`, `from_unixtime`,
-  `to_unixtime`, `from_iso8601_timestamp`, `from_iso8601_date`, `to_iso8601`,
-  `json_extract_scalar`, `cardinality`, `element_at`, `regexp_like`, `split_part`, `strpos`,
-  `approx_distinct` and `approx_percentile`. A query reaching for anything else Trino has and
-  SQLite lacks falls back.
+- The Trino function library reaches as far as the table under
+  [the functions a statement can call](#the-functions-a-statement-can-call). A query reaching for
+  anything else Trino has and SQLite lacks falls back.
+- `filter` and the other functions taking a lambda are absent, and deliberately unshimmed. SQLite
+  reads `->` as its own JSON operator. A name registered for one of them would leave the lambda to
+  be read as that operator and answer something, where an absent name fails and falls back.
+- `date_add` and `date_diff` count a calendar month by whether moving the first instant reached the
+  second. That is how `java.time` counts and so how Trino does. The thirty-first of January to the
+  twenty-eighth of February is a whole month.
+- `at_timezone` answers with the wall clock of the zone and no zone on it, since a timestamp here
+  carries none. Trino answers with a timestamp carrying the zone.
+- `json_parse`, `regexp_extract`, `regexp_replace` and the `url_extract` family answer null over
+  text they cannot read. Trino fails the query.
+- `json_extract` answers with JSON, so a string comes back quoted. SQLite's own unwraps it, and a
+  statement comparing the answer against a bare string matches on one and not the other.
+- A timestamp carrying a numeric UTC offset falls outside the date functions. A value written with
+  a `Z` or with no zone at all reads as UTC.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
   written any other way gets whatever slicing that text comes to.
 - `approx_distinct` and `approx_percentile` are computed exactly. The simulation is more accurate

@@ -19,6 +19,7 @@ export interface SimAthenaEngineRun {
   readonly tables: readonly SimAthenaPlannedTable[];
   readonly sessionDatabase: string | undefined;
   readonly caller: SimAwsCaller | undefined;
+  readonly startedAt: Date;
   readonly sql: string;
 }
 
@@ -45,6 +46,7 @@ export async function simAthenaEngineRun(
       sqlite: run.sqlite,
       loaded,
       sessionDatabase: run.sessionDatabase,
+      startedAt: run.startedAt,
     });
 
     try {

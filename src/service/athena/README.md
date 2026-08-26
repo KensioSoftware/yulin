@@ -207,6 +207,38 @@ back a tick later, because `process.emitWarning` defers delivery and restoring s
 it. A project that installed a warning listener of its own keeps it, along with every other warning
 it would have printed.
 
+### The function library
+
+`sim-athena-shims.ts` installs every Trino function the engine carries, one file per family. The
+list grows as a query in a real test reaches for something absent from it, rather than by working
+through the Trino reference.
+
+Three rules shape what goes in.
+
+**A shim that cannot answer faithfully raises.** A thrown error reaches `simAthenaEngineRun`, which
+turns the query down and lets the declared result answer. A null would be a wrong answer wearing
+the shape of a right one, and that is the failure this engine can least afford. `date_add` with an
+unknown unit, `slice` starting at zero and `array_join` over objects all take that route.
+
+**A function SQLite already gets right is left alone.** `substr` and `format` both count from one
+and take the same format specifiers, and registering a name shadows the built-in, so a shim there
+would replace something that works. `json_extract` is the other way round: SQLite's unwraps a
+string where Trino answers with JSON, so that one is shadowed on purpose.
+
+**A function taking a lambda is left absent on purpose.** `filter` and its neighbours emit a `->`
+that SQLite reads as its own JSON operator. Registering the name would leave the lambda to be read
+as that operator and answer something. Leaving it absent makes SQLite refuse the statement, which
+is a refusal rather than a wrong answer.
+
+`sim-athena-timestamp-text.ts` is what keeps a timestamp's shape. A value arrives as text and has
+to leave as text written the same way, so an instant is rendered back through the value it came
+from. A value carrying a numeric UTC offset is refused for the same reason. Rendering
+the answer back into that offset is easy to get wrong and hard to notice.
+
+`sim-athena-clock-shims.ts` takes the execution's `submittedAt`, which is threaded from
+`SimAthenaQueryRunner` through the answer chain to the database. `current_timestamp` reading the
+host clock would make a frozen-clock test answer differently on every run.
+
 ### Flattening with UNNEST
 
 `sim-athena-unnest-rewrite.ts` turns one `UNNEST` into a `json_each`. The rewrite happens on the
