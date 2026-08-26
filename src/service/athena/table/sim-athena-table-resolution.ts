@@ -2,6 +2,7 @@ import { simAthenaSqlPosition } from "./sim-athena-sql-tokens.js";
 import {
   defaultAthenaCatalog,
   informationSchemaName,
+  simAthenaFoldedName,
   simAthenaTableReferenceText,
   type SimAthenaTableReference,
 } from "./sim-athena-table-reference.js";
@@ -82,11 +83,13 @@ export function simAthenaResolveTables(
       continue;
     }
 
-    const database = reference.database ?? request.database;
+    const declared = reference.database ?? request.database;
+    const database =
+      declared === undefined ? undefined : simAthenaFoldedName(declared);
     const found =
       database === undefined
         ? undefined
-        : catalog.findTable(database, reference.name);
+        : catalog.findTable(database, simAthenaFoldedName(reference.name));
 
     if (found === undefined) {
       return { refusal: refusalFor(reference, request, database), tables: [] };

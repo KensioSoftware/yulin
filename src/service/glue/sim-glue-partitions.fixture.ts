@@ -15,14 +15,23 @@ import type { SimGlue } from "./sim-glue.js";
  * file. The colocated tests cover SDK-shaped input.
  */
 
-/** A table name nothing else in the run will use. */
+/**
+ * A table name nothing else in the run will use.
+ *
+ * Lower case, because that is the only spelling the Data Catalog stores. A
+ * mixed case name is folded on the way in and would not read back as written.
+ */
 export function fixtureTableName(): string {
-  return `access_logs_${faker.string.alphanumeric(8)}`;
+  return `access_logs_${fixtureSuffix()}`;
 }
 
 /** A database name nothing else in the run will use. */
 export function fixtureDatabaseName(): string {
-  return `site_logs_${faker.string.alphanumeric(8)}`;
+  return `site_logs_${fixtureSuffix()}`;
+}
+
+function fixtureSuffix(): string {
+  return faker.string.alphanumeric({ length: 8, casing: "lower" });
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
+import { foldedSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
 import type { SimGluePartitionStore } from "../../partition/sim-glue-partition-store.js";
 import type { SimGlueTableStore } from "../../table/sim-glue-table-store.js";
@@ -64,12 +64,12 @@ export class SimGlueTableCommands {
   ): SimCreateTableCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const databaseName = requiredSimGlueName(
+    const databaseName = foldedSimGlueName(
       "DatabaseName",
       command.input.DatabaseName,
     );
     const input = command.input.TableInput ?? {};
-    const name = requiredSimGlueName(
+    const name = foldedSimGlueName(
       "TableInput.Name",
       input.Name ?? command.input.Name,
     );
@@ -111,11 +111,11 @@ export class SimGlueTableCommands {
   ): SimGetTableCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const databaseName = requiredSimGlueName(
+    const databaseName = foldedSimGlueName(
       "DatabaseName",
       command.input.DatabaseName,
     );
-    const name = requiredSimGlueName("Name", command.input.Name);
+    const name = foldedSimGlueName("Name", command.input.Name);
 
     this.#authorizer.authorizeTable(
       "glue:GetTable",
@@ -141,7 +141,7 @@ export class SimGlueTableCommands {
   ): SimGetTablesCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const databaseName = requiredSimGlueName(
+    const databaseName = foldedSimGlueName(
       "DatabaseName",
       command.input.DatabaseName,
     );
@@ -169,11 +169,11 @@ export class SimGlueTableCommands {
   ): SimDeleteTableCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const databaseName = requiredSimGlueName(
+    const databaseName = foldedSimGlueName(
       "DatabaseName",
       command.input.DatabaseName,
     );
-    const name = requiredSimGlueName("Name", command.input.Name);
+    const name = foldedSimGlueName("Name", command.input.Name);
 
     this.#authorizer.authorizeTable(
       "glue:DeleteTable",
