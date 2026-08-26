@@ -6,6 +6,7 @@ import {
   type SimAthenaTableReference,
 } from "./sim-athena-table-reference.js";
 import type { SimAthenaCatalogTable } from "./sim-athena-catalog-table.js";
+import type { SimAthenaCatalogPartition } from "./sim-athena-registered-partitions.js";
 import { simAthenaTableReferences } from "./sim-athena-table-references.js";
 
 /**
@@ -21,6 +22,10 @@ export interface SimAthenaCatalog {
     databaseName: string,
     name: string,
   ): SimAthenaCatalogTable | undefined;
+  partitionsInTable(
+    databaseName: string,
+    name: string,
+  ): readonly SimAthenaCatalogPartition[];
 }
 
 /** What resolving a query's tables came to. */

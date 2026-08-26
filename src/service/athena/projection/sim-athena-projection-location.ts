@@ -50,7 +50,7 @@ export function simAthenaProjectedPartitions(
   }
 
   return combinations(projection, values).map((combination) => ({
-    prefix: withTrailingSlash(fill(template, combination)),
+    prefix: simAthenaLocationPrefix(fill(template, combination)),
     values: combination,
   }));
 }
@@ -67,15 +67,38 @@ function hivePartitions(
     );
   }
 
-  const base = withTrailingSlash(tableLocation);
+  return combinations(projection, values).map((combination) => ({
+    prefix: simAthenaHivePrefix(tableLocation, combination),
+    values: combination,
+  }));
+}
 
-  return combinations(projection, values).map((combination) => {
-    const segments = projection.columns.map(
-      (column) => `${column.name}=${combination.get(column.name) ?? ""}`,
-    );
+/**
+ * Where a partition of these values sits under a table's own location.
+ *
+ * This is the Hive layout, one `name=value` segment per partition column in
+ * the order the table declares them. Athena falls back to it for a partition
+ * that says nothing about where its own data is.
+ */
+export function simAthenaHivePrefix(
+  location: string,
+  values: ReadonlyMap<string, string>,
+): string {
+  const segments = values
+    .entries()
+    .map(([name, value]) => `${name}=${value}`)
+    .toArray();
 
-    return { prefix: `${base}${segments.join("/")}/`, values: combination };
-  });
+  return `${simAthenaLocationPrefix(location)}${segments.join("/")}/`;
+}
+
+/**
+ * A location as a prefix, which always ends in a slash.
+ *
+ * Without one, a prefix of `day=1` also reaches everything under `day=10`.
+ */
+export function simAthenaLocationPrefix(location: string): string {
+  return location.endsWith("/") ? location : `${location}/`;
 }
 
 function placeholder(name: string): string {
@@ -95,10 +118,6 @@ function fill(
   }
 
   return filled;
-}
-
-function withTrailingSlash(location: string): string {
-  return location.endsWith("/") ? location : `${location}/`;
 }
 
 /**

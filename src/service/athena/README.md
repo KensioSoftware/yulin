@@ -106,6 +106,12 @@ entry per bracket level, and a subquery's own FROM then leaves the outer one sta
 `x AS (` is taken as a common table expression, since nothing else in a statement this scans puts a
 bracket straight after `AS`.
 
+`table/sim-athena-registered-partitions.ts` reads the partitions the Data Catalog holds against a
+table into those same prefixes, one per partition, each taken from the partition's own storage
+descriptor location. A partition with none falls back to the Hive layout under the table's location.
+`simAthenaTablePartitions` decides between the two. Projection wins where a table carries both, the
+way real Athena stops reading the catalog's partitions once `projection.enabled` is true.
+
 `projection/` expands a table's partition projection into the S3 prefixes its partitions sit under.
 `sim-athena-projection-parameters.ts` reads the `projection.*` keys off the Glue table, and every
 partition key needs a type once projection is on, since Athena has no other way to know what a

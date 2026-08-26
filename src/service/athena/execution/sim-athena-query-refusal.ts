@@ -1,20 +1,16 @@
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
-import { SimAthenaProjectionError } from "../projection/sim-athena-projection-error.js";
-import type { SimAthenaTablePartition } from "../projection/sim-athena-projection-location.js";
-import { simAthenaTablePartitions } from "../projection/sim-athena-table-partitions.js";
-import type { SimAthenaCatalogTable } from "../table/sim-athena-catalog-table.js";
 import {
   simAthenaResolveTables,
   type SimAthenaCatalog,
 } from "../table/sim-athena-table-resolution.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
+import {
+  simAthenaPlannedPartitions,
+  type SimAthenaPlannedTable,
+} from "./sim-athena-planned-partitions.js";
 import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
 
-/** One table a query reads, with the partitions of it the query reaches. */
-export interface SimAthenaPlannedTable {
-  readonly table: SimAthenaCatalogTable;
-  readonly partitions: readonly SimAthenaTablePartition[];
-}
+export type { SimAthenaPlannedTable } from "./sim-athena-planned-partitions.js";
 
 /** What planning one query came to. */
 export interface SimAthenaQueryPlan {
@@ -70,47 +66,23 @@ export function simAthenaPlanQuery(
     return { refusal: resolved.refusal, prefixes: [], tables: [] };
   }
 
-  return partitionsOf(properties, resolved.tables);
-}
+  const read = simAthenaPlannedPartitions({
+    tables: resolved.tables,
+    catalog: properties.catalog,
+    queryString: execution.queryString,
+    now: properties.now,
+  });
 
-/**
- * The prefixes every table a query names comes to.
- *
- * Glue accepts any projection parameters it is given, so a projection with a
- * mistake in it is found here, when a query first asks what partitions the
- * table has.
- */
-function partitionsOf(
-  properties: SimAthenaQueryRefusalProperties,
-  tables: readonly SimAthenaCatalogTable[],
-): SimAthenaQueryPlan {
-  const planned: SimAthenaPlannedTable[] = [];
-
-  for (const table of tables) {
-    try {
-      planned.push({
-        table,
-        partitions: simAthenaTablePartitions({
-          table,
-          queryString: properties.execution.queryString,
-          now: properties.now,
-        }),
-      });
-    } catch (error) {
-      if (error instanceof SimAthenaProjectionError) {
-        return { refusal: error.message, prefixes: [], tables: [] };
-      }
-
-      throw error;
-    }
+  if (read.refusal !== undefined) {
+    return { refusal: read.refusal, prefixes: [], tables: [] };
   }
 
   return {
     refusal: undefined,
-    prefixes: planned.flatMap((one) =>
+    prefixes: read.planned.flatMap((one) =>
       one.partitions.map((partition) => partition.prefix),
     ),
-    tables: planned,
+    tables: read.planned,
   };
 }
 

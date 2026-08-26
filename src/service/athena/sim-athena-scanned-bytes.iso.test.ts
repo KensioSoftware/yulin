@@ -2,9 +2,11 @@ import { assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { aRanQuery } from "./sim-athena-ran-query.fixture.js";
+import { aRegisteredPartition } from "./sim-athena-registered-partition.fixture.js";
 import {
   aScannedSimulation,
   aSeededObject,
+  dayKey,
   projectedDays,
 } from "./sim-athena-scanned-bytes.fixture.js";
 
@@ -30,7 +32,11 @@ describe("measuring what an Athena query scans", () => {
 
   it("counts only the partitions a filter allows", async () => {
     // Given a table projecting three days, each holding an object.
-    const { simAws, workGroup } = await aScannedSimulation(projectedDays);
+    const { simAws, workGroup } = await aScannedSimulation(
+      projectedDays,
+      undefined,
+      dayKey,
+    );
 
     await aSeededObject(simAws, "logs/2026-08-24/part-0.json", 100);
     await aSeededObject(simAws, "logs/2026-08-25/part-0.json", 200);
@@ -54,6 +60,84 @@ describe("measuring what an Athena query scans", () => {
     // three. This is what partitioning a table is for.
     assertIdentical(oneDay.scanned, 200);
     assertIdentical(everyDay.scanned, 700);
+  });
+
+  it("counts only the registered partitions a filter allows", async () => {
+    // Given a table partitioned by day with nothing projected, holding three
+    // days registered against it and an object in each.
+    const { simAws, workGroup } = await aScannedSimulation(
+      {},
+      undefined,
+      dayKey,
+    );
+
+    for (const day of ["2026-08-24", "2026-08-25", "2026-08-26"]) {
+      aRegisteredPartition(
+        simAws,
+        "access_logs",
+        [day],
+        `s3://rainlytics-logs/logs/${day}/`,
+      );
+    }
+
+    await aSeededObject(simAws, "logs/2026-08-24/part-0.json", 100);
+    await aSeededObject(simAws, "logs/2026-08-25/part-0.json", 200);
+    await aSeededObject(simAws, "logs/2026-08-26/part-0.json", 400);
+
+    // When a query naming one day runs, and one naming none of them.
+    const oneDay = await aRanQuery(
+      simAws,
+      workGroup,
+      "SELECT url FROM rainlytics.access_logs WHERE day = '2026-08-25'",
+    );
+    const everyDay = await aRanQuery(
+      simAws,
+      workGroup,
+      "SELECT url FROM rainlytics.access_logs",
+    );
+
+    // Then the filtered query reads one partition. Before the catalog's
+    // partitions were read, both of these reported the whole table.
+    assertIdentical(oneDay.scanned, 200);
+    assertIdentical(everyDay.scanned, 700);
+  });
+
+  it("counts a registered partition sitting outside the table's location", async () => {
+    // Given a table with one day registered somewhere else entirely, which a
+    // catalog allows and a table location alone could never reach.
+    const { simAws, workGroup } = await aScannedSimulation(
+      {},
+      undefined,
+      dayKey,
+    );
+
+    await simAws.s3().createBucket({ input: { Bucket: "rainlytics-archive" } });
+    aRegisteredPartition(
+      simAws,
+      "access_logs",
+      ["2026-08-24"],
+      "s3://rainlytics-archive/old/2026-08-24/",
+    );
+
+    await simAws.s3().putObject({
+      input: {
+        Bucket: "rainlytics-archive",
+        Key: "old/2026-08-24/part-0.json",
+        Body: "x".repeat(500),
+      },
+    });
+    await aSeededObject(simAws, "logs/2026-08-25/part-0.json", 200);
+
+    // When a query runs against the table.
+    const ran = await aRanQuery(
+      simAws,
+      workGroup,
+      "SELECT url FROM rainlytics.access_logs",
+    );
+
+    // Then it reads the archived partition and nothing under the table's own
+    // location, since no partition registered points there.
+    assertIdentical(ran.scanned, 500);
   });
 
   it("scans nothing where the table points at a Bucket nobody made", async () => {
