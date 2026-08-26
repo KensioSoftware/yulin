@@ -1,5 +1,6 @@
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimCloudFrontOrigin } from "../origin/sim-cloudfront-origin.js";
+import type { SimCfRedundantOrigin } from "../origin/sim-cf-redundant-origins.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 import type { SimCloudFrontCustomErrorResponse } from "../custom-error/sim-cloudfront-custom-error-response.js";
 import { faker } from "@faker-js/faker";
@@ -45,6 +46,7 @@ export class SimCloudFrontDistribution {
   #enabled: boolean;
   #defaultRootObject: string | undefined;
   #webAclArn: string | undefined;
+  #redundantOrigins: readonly SimCfRedundantOrigin[] = [];
   private readonly alternateDomainNames = new Set<string>();
 
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
@@ -120,6 +122,25 @@ export class SimCloudFrontDistribution {
   }
 
   /**
+   * The Origins of this sim Distribution that repeat another of its Origins.
+   *
+   * Each one is an Origin the config declared twice under two Ids. Both are
+   * served the same way here, whichever Behavior points at them. A test can
+   * assert this list is empty to say the Distribution declares each of its
+   * Origins once.
+   */
+  get redundantOrigins(): readonly SimCfRedundantOrigin[] {
+    return this.#redundantOrigins;
+  }
+
+  /**
+   * Record the Origins of this sim Distribution that repeat another of them.
+   */
+  set redundantOrigins(redundantOrigins: readonly SimCfRedundantOrigin[]) {
+    this.#redundantOrigins = redundantOrigins;
+  }
+
+  /**
    * Move the sim Distribution into Deployed status.
    */
   completeDeployment(): Promise<void> {
@@ -144,6 +165,7 @@ export class SimCloudFrontDistribution {
     this.#status = "Deploying";
     this.#defaultRootObject = undefined;
     this.#webAclArn = undefined;
+    this.#redundantOrigins = [];
     this.behaviors.length = 0;
     this.customErrorResponses.length = 0;
     this.alternateDomainNames.clear();

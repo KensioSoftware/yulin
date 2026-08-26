@@ -732,6 +732,103 @@ An S3 Origin takes the headers and reaches nothing with them. Sim CloudFront rea
 `GetObject` and builds no HTTP request for a header to travel on, and real S3 ignores a header it
 has no use for.
 
+## An Origin declared twice
+
+Two Origins over one domain name are ordinary. They differ by `OriginPath`, by their custom headers
+or by how CloudFront connects, and a Behavior points at whichever one it wants.
+
+Two Origins that match in every property but the `Id` are one Origin written twice. Copying a
+Behavior and its Origin together, then editing the path pattern, leaves exactly that behind. Sim
+CloudFront keys an Origin by `Id`, as CloudFront does, and serves both Behaviors alike. An account
+has been seen to serve them differently, refusing every request on the second Behavior at the
+Origin. Why it did that is unconfirmed.
+
+The Distribution records each repeat as it is created or updated, and warns about it on the console.
+Each entry in `redundantOrigins` names the Origin, the earlier Origin it repeats and the domain both
+of them name. A test can assert the list is empty.
+
+```typescript sim-cloudfront-redundant-origins
+/**
+ * Catching an Origin a Distribution declares twice.
+ */
+
+import {
+  CreateDistributionCommand,
+  type Origin,
+} from "@aws-sdk/client-cloudfront";
+
+import { SimAws } from "@kensio/yulin";
+
+const simCloudFront = new SimAws().cloudFront();
+
+// The two Behaviors below were written by copying one of them, so the second
+// Origin says everything the first one says.
+const apiOrigin = (originId: string): Origin => ({
+  Id: originId,
+  DomainName: "api.example.test",
+  CustomOriginConfig: {
+    HTTPPort: 80,
+    HTTPSPort: 443,
+    OriginProtocolPolicy: "https-only",
+  },
+  CustomHeaders: {
+    Quantity: 1,
+    Items: [
+      {
+        HeaderName: "x-origin-secret",
+        HeaderValue: "5d6e2b0c6f564c1e9d5b2f1a5b8c9d70",
+      },
+    ],
+  },
+});
+
+const creation = await simCloudFront.createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "user-site",
+      Comment: "User API CDN",
+      Enabled: true,
+      Origins: {
+        Quantity: 2,
+        Items: [apiOrigin("live-origin"), apiOrigin("preview-origin")],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "live-origin",
+        ViewerProtocolPolicy: "allow-all",
+      },
+      CacheBehaviors: {
+        Quantity: 1,
+        Items: [
+          {
+            PathPattern: "/preview/*",
+            TargetOriginId: "preview-origin",
+            ViewerProtocolPolicy: "allow-all",
+          },
+        ],
+      },
+    },
+  }),
+);
+
+const distribution = simCloudFront.getSimDistributionById(
+  creation.Distribution!.Id!,
+);
+
+// [
+//   {
+//     originId: "preview-origin",
+//     repeatsOriginId: "live-origin",
+//     domainName: "api.example.test",
+//   },
+// ]
+console.log(distribution?.redundantOrigins);
+```
+
+Sameness is every property the config declares apart from the `Id`, and not only the properties the
+simulation reads. An Origin differing by a connection setting sim CloudFront ignores is left alone.
+A property written as an empty string counts as one left out, and custom headers count by name and
+value however they were ordered or cased.
+
 ## Viewer certificates
 
 A Distribution with alternate domain names needs an ACM certificate, and CloudFront accepts only
