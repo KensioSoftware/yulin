@@ -9,7 +9,10 @@ A table here is a definition. The data it describes stays in S3, unread, and the
 with what it was told to hold.
 
 Simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads this
-catalog. A query naming a table no database here holds fails the way real Athena fails it.
+catalog. A query naming a table no database here holds fails the way real Athena fails it, and a
+table's partition projection is evaluated when a query runs against it. All four projection types
+are covered, `enum`, `integer`, `date` and `injected`. A projection with a mistake in its parameters
+fails the query that reads it.
 
 Glue-specific types are imported from the `@kensio/yulin/glue` subpath.
 
@@ -82,8 +85,8 @@ console.log(Table.Parameters["projection.enabled"]);
 
 Partition projection lives entirely in `TableInput.Parameters`. Those parameters are read into the
 table, and never recorded as ignored. A table whose parameters were dropped on the way in deploys
-green while projecting none of them, and a broken projection then passes the test written to catch
-it.
+green while projecting none of them. Simulated Athena reads those same parameters when a query runs.
+A broken projection fails that query.
 
 `Ref` answers with the database name and with the table name.
 
@@ -237,9 +240,12 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
 
 ## Limitations
 
-- **Partition projection is held, never evaluated.** The parameters read back as they were declared,
-  and no partition follows from a value range.
-- **No query reads a table.** SQL goes unparsed, no S3 prefix is listed, and no object is opened.
+- **Partition projection is held here and evaluated by Athena.** The catalog stores the parameters
+  as they were declared and materializes no partition from them. Simulated
+  [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") expands them when a
+  query runs, which is where a broken projection is refused.
+- **The catalog reads no query and no object.** SQL reaches Athena rather than the catalog, no S3
+  prefix is listed here, and no object is opened.
 - **`AWS::Glue::Crawler` is absent.** A crawler fills a catalog by reading objects, and every object
   stays unread here. A template declaring one deploys, with the crawler recorded on the stack's
   `skippedResources`.

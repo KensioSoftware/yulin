@@ -1,6 +1,11 @@
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
+import { SimAthenaProjectionError } from "../projection/sim-athena-projection-error.js";
 import {
-  simAthenaTableRefusal,
+  simAthenaTablePartitions,
+  type SimAthenaPartitionedTable,
+} from "../projection/sim-athena-table-partitions.js";
+import {
+  simAthenaResolveTables,
   type SimAthenaCatalog,
 } from "../table/sim-athena-table-resolution.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
@@ -11,17 +16,20 @@ interface SimAthenaQueryRefusalProperties {
   readonly result: SimAthenaResolvedResult;
   readonly workGroups: SimAthenaWorkGroupStore;
   readonly catalog: SimAthenaCatalog | undefined;
+
+  /** What the simulated clock reads, for a projection bound written `NOW`. */
+  readonly now: Date;
 }
 
 /**
  * Why a query cannot answer, where something says it cannot.
  *
- * Three things can refuse one, and they are asked in the order real Athena
+ * Four things can refuse one, and they are asked in the order real Athena
  * would reach them. A declaration saying the query fails wins, because that is
  * a test's own statement about the query. Then the tables it names are looked
- * for in the Data Catalog, the way Athena resolves them before running
- * anything. The cutoff is last, against what the declaration says the query
- * scanned.
+ * for in the Data Catalog, and each one's partition projection is expanded,
+ * both of which Athena does while planning. The cutoff is last, against what
+ * the declaration says the query scanned.
  */
 export function simAthenaQueryRefusal(
   properties: SimAthenaQueryRefusalProperties,
@@ -32,7 +40,7 @@ export function simAthenaQueryRefusal(
     return result.failsWith;
   }
 
-  const absentTable = simAthenaTableRefusal(
+  const resolved = simAthenaResolveTables(
     {
       queryString: execution.queryString,
       database: execution.database,
@@ -41,7 +49,42 @@ export function simAthenaQueryRefusal(
     properties.catalog,
   );
 
-  return absentTable ?? cutoffRefusal(properties);
+  if (resolved.refusal !== undefined) {
+    return resolved.refusal;
+  }
+
+  return (
+    projectionRefusal(properties, resolved.tables) ?? cutoffRefusal(properties)
+  );
+}
+
+/**
+ * Why a table's partition projection cannot be read.
+ *
+ * Glue accepts any parameters it is given, so a projection with a mistake in
+ * it is found here, when a query first asks what partitions the table has.
+ */
+function projectionRefusal(
+  properties: SimAthenaQueryRefusalProperties,
+  tables: readonly SimAthenaPartitionedTable[],
+): string | undefined {
+  for (const table of tables) {
+    try {
+      simAthenaTablePartitions({
+        table,
+        queryString: properties.execution.queryString,
+        now: properties.now,
+      });
+    } catch (error) {
+      if (error instanceof SimAthenaProjectionError) {
+        return error.message;
+      }
+
+      throw error;
+    }
+  }
+
+  return undefined;
 }
 
 /**

@@ -95,6 +95,7 @@ export class SimAthenaQueryRunner {
       result,
       workGroups: this.workGroups,
       catalog: this.catalog,
+      now: this.background.now(),
     });
 
     if (refusal !== undefined) {
