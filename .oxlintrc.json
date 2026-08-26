@@ -55,7 +55,11 @@
     // Terraform fixture sources. The JavaScript under test/terraform is
     // Lambda handler content a Terraform module packages, not code this
     // project builds or ships.
-    "test/terraform/"
+    "test/terraform/",
+    // Throwaway spike sources. The code under spike/ measures whether a
+    // feature is worth building and is deleted once the answer is written up,
+    // so it is held to no standard this project ships.
+    "spike/"
   ],
 
   // Only the native plugins whose rules are named below. Oxlint's `unicorn`
