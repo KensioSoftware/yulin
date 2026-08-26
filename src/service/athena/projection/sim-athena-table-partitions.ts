@@ -1,7 +1,10 @@
 import { simAthenaPartitionFilters } from "../table/sim-athena-partition-filters.js";
 import type { SimAthenaProjectionColumn } from "./sim-athena-projection-column.js";
 import { SimAthenaProjectionError } from "./sim-athena-projection-error.js";
-import { simAthenaProjectedPrefixes } from "./sim-athena-projection-location.js";
+import {
+  simAthenaProjectedPartitions,
+  type SimAthenaTablePartition,
+} from "./sim-athena-projection-location.js";
 import {
   simAthenaProjectionOf,
   type SimAthenaProjectedTable,
@@ -22,11 +25,12 @@ interface SimAthenaTablePartitionsRequest {
 }
 
 /**
- * The S3 prefixes one query reads for one table.
+ * The partitions one query reads for one table.
  *
  * A table with projection off reads its own location and nothing else, since
  * the partitions it holds were registered rather than projected and simulated
- * Glue has no commands for registering one.
+ * Glue has no commands for registering one. Nothing then says what its
+ * partition columns read, so that partition carries no values.
  *
  * With projection on, every column is expanded and the query's own `WHERE`
  * clause narrows what is left. A filter naming no projected column leaves
@@ -34,12 +38,14 @@ interface SimAthenaTablePartitionsRequest {
  */
 export function simAthenaTablePartitions(
   request: SimAthenaTablePartitionsRequest,
-): readonly string[] {
+): readonly SimAthenaTablePartition[] {
   const projection = simAthenaProjectionOf(request.table);
   const location = request.table.storageDescriptor?.Location;
 
   if (!projection.enabled) {
-    return location === undefined ? [] : [location];
+    return location === undefined
+      ? []
+      : [{ prefix: location, values: new Map() }];
   }
 
   const filters = simAthenaPartitionFilters(request.queryString);
@@ -52,7 +58,7 @@ export function simAthenaTablePartitions(
     );
   }
 
-  return simAthenaProjectedPrefixes(projection, values, location);
+  return simAthenaProjectedPartitions(projection, values, location);
 }
 
 /**

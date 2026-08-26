@@ -1,10 +1,8 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
 import { simAthenaScanFailureReason } from "./sim-athena-scan-failure.js";
-import {
-  simAthenaScannedBytes,
-  type SimAthenaScannedObjects,
-} from "./sim-athena-scanned-bytes.js";
+import type { SimAthenaScannedObjects } from "./sim-athena-scanned-objects.js";
+import { simAthenaScannedBytes } from "./sim-athena-scanned-bytes.js";
 
 interface SimAthenaQueryScanRequest {
   readonly prefixes: readonly string[];

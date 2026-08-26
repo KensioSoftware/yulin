@@ -29,7 +29,9 @@ function partitionsOf(
   table: SimAthenaPartitionedTable,
   queryString = "SELECT * FROM rainlytics.access_logs",
 ): readonly string[] {
-  return simAthenaTablePartitions({ table, queryString, now: noon });
+  return simAthenaTablePartitions({ table, queryString, now: noon }).map(
+    (partition) => partition.prefix,
+  );
 }
 
 describe("the S3 prefixes a query reads for one table", () => {

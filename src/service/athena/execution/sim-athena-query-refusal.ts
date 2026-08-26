@@ -1,15 +1,20 @@
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
 import { SimAthenaProjectionError } from "../projection/sim-athena-projection-error.js";
-import {
-  simAthenaTablePartitions,
-  type SimAthenaPartitionedTable,
-} from "../projection/sim-athena-table-partitions.js";
+import type { SimAthenaTablePartition } from "../projection/sim-athena-projection-location.js";
+import { simAthenaTablePartitions } from "../projection/sim-athena-table-partitions.js";
+import type { SimAthenaCatalogTable } from "../table/sim-athena-catalog-table.js";
 import {
   simAthenaResolveTables,
   type SimAthenaCatalog,
 } from "../table/sim-athena-table-resolution.js";
 import type { SimAthenaWorkGroupStore } from "../workgroup/sim-athena-work-group-store.js";
 import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
+
+/** One table a query reads, with the partitions of it the query reaches. */
+export interface SimAthenaPlannedTable {
+  readonly table: SimAthenaCatalogTable;
+  readonly partitions: readonly SimAthenaTablePartition[];
+}
 
 /** What planning one query came to. */
 export interface SimAthenaQueryPlan {
@@ -18,6 +23,9 @@ export interface SimAthenaQueryPlan {
 
   /** The S3 prefixes the query reads, for measuring what it scans. */
   readonly prefixes: readonly string[];
+
+  /** The tables the query reads, for the engine to load rows out of. */
+  readonly tables: readonly SimAthenaPlannedTable[];
 }
 
 interface SimAthenaQueryRefusalProperties {
@@ -46,7 +54,7 @@ export function simAthenaPlanQuery(
   const { execution, result } = properties;
 
   if (result.failsWith !== undefined) {
-    return { refusal: result.failsWith, prefixes: [] };
+    return { refusal: result.failsWith, prefixes: [], tables: [] };
   }
 
   const resolved = simAthenaResolveTables(
@@ -59,7 +67,7 @@ export function simAthenaPlanQuery(
   );
 
   if (resolved.refusal !== undefined) {
-    return { refusal: resolved.refusal, prefixes: [] };
+    return { refusal: resolved.refusal, prefixes: [], tables: [] };
   }
 
   return partitionsOf(properties, resolved.tables);
@@ -74,29 +82,36 @@ export function simAthenaPlanQuery(
  */
 function partitionsOf(
   properties: SimAthenaQueryRefusalProperties,
-  tables: readonly SimAthenaPartitionedTable[],
+  tables: readonly SimAthenaCatalogTable[],
 ): SimAthenaQueryPlan {
-  const prefixes: string[] = [];
+  const planned: SimAthenaPlannedTable[] = [];
 
   for (const table of tables) {
     try {
-      prefixes.push(
-        ...simAthenaTablePartitions({
+      planned.push({
+        table,
+        partitions: simAthenaTablePartitions({
           table,
           queryString: properties.execution.queryString,
           now: properties.now,
         }),
-      );
+      });
     } catch (error) {
       if (error instanceof SimAthenaProjectionError) {
-        return { refusal: error.message, prefixes: [] };
+        return { refusal: error.message, prefixes: [], tables: [] };
       }
 
       throw error;
     }
   }
 
-  return { refusal: undefined, prefixes };
+  return {
+    refusal: undefined,
+    prefixes: planned.flatMap((one) =>
+      one.partitions.map((partition) => partition.prefix),
+    ),
+    tables: planned,
+  };
 }
 
 /**

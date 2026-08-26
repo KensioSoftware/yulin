@@ -43,3 +43,14 @@ export class SimAthenaAccessDeniedException extends SimAthenaError {
     super(message, { httpStatusCode: 403 });
   }
 }
+
+/**
+ * Simulated Athena refusing to do something the simulation was not set up for.
+ *
+ * This is the simulator talking rather than AWS. Nothing real Athena does
+ * raises it, and no SDK caller sees it: it reaches whoever configured the
+ * simulation, at the point they configured it.
+ */
+export class SimAthenaSetUpError extends SimAthenaError {
+  public override readonly name = "SimAthenaSetUpError";
+}

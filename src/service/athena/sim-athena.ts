@@ -15,12 +15,14 @@ import type { SimAthenaWorkGroup } from "./workgroup/sim-athena-work-group.js";
  * workgroup holds the settings a query runs under, a named query holds SQL
  * under a name, and an execution is one run of a query.
  *
- * No SQL is evaluated. A test declares what a query answers with through
- * `results()`, and the simulation reads the query text only as a key to match
- * that declaration on. So a test can prove its workgroup's bytes-scanned
- * cutoff refuses a query, that results land where the workgroup says, and that
- * a client polls the lifecycle correctly. Whether the SQL is valid stays out
- * of reach.
+ * A query is answered one of two ways. A test declares what it answers with
+ * through `results()` and the simulation matches that declaration on the query
+ * text, or the query engine runs the SQL over the objects a test seeded into
+ * simulated S3. The engine is off until `engine().enable()` turns it on.
+ *
+ * Either way the lifecycle around the query is real. A test can prove its
+ * workgroup's bytes-scanned cutoff refuses a query, that results land where
+ * the workgroup says, and that a client polls the lifecycle correctly.
  *
  * Everything here is scoped to an account and region, as it is on real Athena.
  * Every scope starts with the `primary` workgroup, which real Athena makes

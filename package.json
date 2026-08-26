@@ -283,6 +283,7 @@
     "eslint-plugin-unicorn": "^72.0.0",
     "execa": "^10.0.0",
     "fta-cli": "^3.0.0",
+    "node-sql-parser": "^5.4.0",
     "oxfmt": "^0.64.0",
     "oxlint": "^1.77.0",
     "oxlint-tsgolint": "^7.0.2001",
@@ -300,10 +301,14 @@
   },
   "peerDependencies": {
     "eslint": "^10.4.1",
+    "node-sql-parser": "^5.4.0",
     "typescript-eslint": "^8.60.0"
   },
   "peerDependenciesMeta": {
     "eslint": {
+      "optional": true
+    },
+    "node-sql-parser": {
       "optional": true
     },
     "typescript-eslint": {
