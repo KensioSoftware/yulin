@@ -1038,6 +1038,12 @@ A Function returning that response untouched leaves all three cookies on their w
 Function writing `multiValue` sends one header per value in it, and CloudFront ignores `value` while
 both are there. Writing `value` on its own sends a single header.
 
+A Function reads the query string as the viewer spelled it. `?q=%E5%AE%B6` arrives as
+`event.request.querystring.q.value === "%E5%AE%B6"`, `?q=a+b` keeps its plus, and a percent-encoded
+parameter name stays encoded. Whatever a Function leaves in `querystring` goes on to the Origin as
+it stands. A Function returning the request untouched forwards the query byte for byte, and one
+writing a value of its own encodes it (the same job it has on AWS).
+
 ```typescript sim-cloudfront-function
 /**
  * Simulated CloudFront Functions.

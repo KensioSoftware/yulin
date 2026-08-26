@@ -1,4 +1,5 @@
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
+import { fromCffValue, toCffValue } from "./sim-cff-value.js";
 
 /**
  * Converts request metadata between Fetch API and CloudFront Function shapes.
@@ -11,7 +12,7 @@ export class SimCffRequestMetadataAdapter {
     const cffHeaders = Object.create(null) as CloudFrontFunction.Headers;
 
     for (const [name, values] of this.headerValuesByName(headers)) {
-      const cffValue = this.toCffValue(values);
+      const cffValue = toCffValue(values);
       if (cffValue !== undefined) {
         // oxlint-disable-next-line security/detect-object-injection
         cffHeaders[name] = cffValue;
@@ -31,7 +32,7 @@ export class SimCffRequestMetadataAdapter {
     const nativeHeaders = new Headers();
 
     for (const [name, valueOrMultiValue] of Object.entries(headers)) {
-      for (const value of this.fromCffValue(valueOrMultiValue)) {
+      for (const value of fromCffValue(valueOrMultiValue)) {
         nativeHeaders.append(name, value);
       }
     }
@@ -45,38 +46,43 @@ export class SimCffRequestMetadataAdapter {
   }
 
   /**
-   * Convert Node URL search params to CFF QueryString.
+   * Convert a URL query string to CFF QueryString.
+   *
+   * CloudFront hands a Function the names and values the viewer sent.
+   * `?q=%E5%AE%B6` arrives percent-encoded, and `?q=a+b` keeps its plus.
+   * Decoding here would show a Function a spelling production never produces,
+   * and leave anything it writes out double-encoded.
    */
-  toCffQueryString(
-    searchParameters: URLSearchParams,
-  ): CloudFrontFunction.QueryString {
-    const queryString = Object.create(null) as CloudFrontFunction.QueryString;
+  toCffQueryString(search: string): CloudFrontFunction.QueryString {
+    const querystring = Object.create(null) as CloudFrontFunction.QueryString;
 
-    const searchParameterKeys = new Set(searchParameters.keys());
-    for (const key of searchParameterKeys) {
-      const cffValue = this.toCffValue(searchParameters.getAll(key));
+    for (const [name, values] of this.rawValuesByName(search)) {
+      const cffValue = toCffValue(values);
       if (cffValue !== undefined) {
         // oxlint-disable-next-line security/detect-object-injection
-        queryString[key] = cffValue;
+        querystring[name] = cffValue;
       }
     }
 
-    return queryString;
+    return querystring;
   }
 
   /**
-   * Convert CFF QueryString to Node URL search params.
+   * Convert CFF QueryString to a URL query string.
+   *
+   * Whatever a Function leaves behind goes to the Origin as it stands.
+   * Encoding is the Function's business, the same as on CloudFront.
    */
   fromCffQueryString(querystring: CloudFrontFunction.QueryString): string {
-    const searchParameters = new URLSearchParams();
+    const pairs: string[] = [];
 
-    for (const [key, valueOrMultiValue] of Object.entries(querystring)) {
-      for (const value of this.fromCffValue(valueOrMultiValue)) {
-        searchParameters.append(key, value);
+    for (const [name, valueOrMultiValue] of Object.entries(querystring)) {
+      for (const value of fromCffValue(valueOrMultiValue)) {
+        pairs.push(`${name}=${value}`);
       }
     }
 
-    return searchParameters.toString();
+    return pairs.join("&");
   }
 
   /**
@@ -107,6 +113,33 @@ export class SimCffRequestMetadataAdapter {
   }
 
   /**
+   * Group query string values under their name, both left as sent.
+   *
+   * A name repeated across pairs collects its values in the order they
+   * appeared, and a Function reads those as `multiValue`. A pair with no `=`
+   * is a name with an empty value.
+   */
+  private rawValuesByName(search: string): Map<string, string[]> {
+    const valuesByName = new Map<string, string[]>();
+
+    for (const pair of search.replace(/^\?/u, "").split("&")) {
+      if (pair === "") {
+        continue;
+      }
+
+      const separator = pair.indexOf("=");
+      const name = separator === -1 ? pair : pair.slice(0, separator);
+      const value = separator === -1 ? "" : pair.slice(separator + 1);
+
+      const values = valuesByName.get(name) ?? [];
+      values.push(value);
+      valuesByName.set(name, values);
+    }
+
+    return valuesByName;
+  }
+
+  /**
    * Group header values under their lowercased name.
    *
    * A `Set-Cookie` header repeated on a response is the case this exists for.
@@ -124,47 +157,6 @@ export class SimCffRequestMetadataAdapter {
     }
 
     return valuesByName;
-  }
-
-  /**
-   * Present values in the shape CloudFront gives a repeated name.
-   *
-   * A single value is `value` alone. Repeated values keep the first in `value`
-   * and all of them in `multiValue`. That is what a Function reads for a header
-   * or a query parameter appearing more than once.
-   */
-  private toCffValue(
-    values: readonly string[],
-  ): CloudFrontFunction.Value | CloudFrontFunction.MultiValue | undefined {
-    const [first] = values;
-    if (first === undefined) {
-      return undefined;
-    }
-
-    if (values.length === 1) {
-      return { value: first };
-    }
-
-    return {
-      value: first,
-      multiValue: values.map((value) => ({ value })),
-    };
-  }
-
-  /**
-   * Read back the values a Function left under one name.
-   *
-   * A Function that means to send several values sets `multiValue`, and
-   * CloudFront sends those in place of `value`.
-   */
-  private fromCffValue(
-    valueOrMultiValue: CloudFrontFunction.Value | CloudFrontFunction.MultiValue,
-  ): string[] {
-    if ("multiValue" in valueOrMultiValue) {
-      return valueOrMultiValue.multiValue.map(({ value }) => value);
-    }
-
-    return [valueOrMultiValue.value];
   }
 
   private fromCffCookies(
