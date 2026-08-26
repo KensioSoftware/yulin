@@ -2,7 +2,13 @@
 
 Throwaway. Nothing here is shaped for production, and the branch it sits on is meant to be deleted once the follow-up issues are filed.
 
-Run it with `pnpm tsx spike/end-to-end.ts`, `pnpm tsx spike/corpus-run.ts` and `pnpm tsx spike/divergence.ts`.
+The parser is not a dependency of this repository, so add it before running any of this.
+
+```bash
+pnpm add -D node-sql-parser
+```
+
+Then run `pnpm tsx spike/end-to-end.ts`, `pnpm tsx spike/corpus-run.ts`, `pnpm tsx spike/divergence.ts` and `pnpm tsx spike/optional-dependency.ts`.
 
 ## What ran
 
@@ -57,14 +63,16 @@ The three left standing are all the simulation accepting something AWS refuses. 
 
 The cost is the install. 88MB materialised in the pnpm store, of which 30 source map files are the bulk. That is more than three times the size of yulin itself, and most users will never run a query.
 
-So it goes in as an optional peer dependency, and the docs tell a user to add it when they want the engine.
+So it goes in as an optional peer dependency, and the docs tell a user to add it when they want the engine. Yulin already declares `eslint` and `typescript-eslint` that way, so the shape is established here.
 
 ```json
 "peerDependencies": { "node-sql-parser": "^5.4.0" },
 "peerDependenciesMeta": { "node-sql-parser": { "optional": true } }
 ```
 
-`optional-dependency.ts` proves the shape out. Installing a package that declares it leaves `node_modules` without the parser under both npm and pnpm, measured, and pnpm prints no missing-peer warning. Yulin keeps its own devDependency on the parser so its own tests can run the engine.
+`optional-dependency.ts` proves the shape out. Installing a package that declares it leaves `node_modules` without the parser under both npm and pnpm, measured, and pnpm prints no missing-peer warning. Yulin keeps its own devDependency on the parser alongside, so its tests can run the engine.
+
+The declaration lands with #1008 rather than with this spike, because nothing under `src/` imports the parser yet. `scripts/mts/verify-pack.mts` installs every declared peer into a throwaway consumer to exercise the subpaths that need one, so a peer for a package the tarball never imports is a claim the package cannot back.
 
 The engine then loads through a dynamic `import()` on the first query, since the runner is already async. A user who turns the engine on without the package gets this.
 
