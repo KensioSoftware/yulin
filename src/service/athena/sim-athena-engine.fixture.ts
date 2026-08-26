@@ -1,5 +1,6 @@
 import { faker } from "@faker-js/faker";
 
+import type { SimClock } from "../../util/clock/sim-clock.js";
 import type { SimGlueColumn } from "../glue/table/sim-glue-table-schema.js";
 import { SimAws } from "../aws/sim-aws.js";
 
@@ -36,8 +37,10 @@ export interface SimAthenaEngineTableInput {
  * The engine is left off. A test that wants it turns it on, which is what a
  * reader of that test needs to see.
  */
-export async function anEngineSimulation(): Promise<SimAthenaEngineSimulation> {
-  const simAws = new SimAws();
+export async function anEngineSimulation(
+  clock?: SimClock,
+): Promise<SimAthenaEngineSimulation> {
+  const simAws = new SimAws(clock === undefined ? {} : { clock });
   const workGroup = `analytics-${faker.string.uuid()}`;
 
   await simAws.s3().createBucket({ input: { Bucket: logsBucket } });

@@ -1,6 +1,9 @@
 import { simAthenaSqliteDatabase } from "./sim-athena-sqlite-database.js";
 import { simAthenaSqliteModule } from "./sim-athena-sqlite-module.js";
 
+/** The instant every query in these fixtures is taken to have started at. */
+export const shimStartedAt = new Date("2026-08-26T17:31:00.000Z");
+
 /**
  * What one expression comes to on the database the engine builds.
  *
@@ -15,6 +18,7 @@ export async function anAnsweredExpression(
     sqlite,
     loaded: [],
     sessionDatabase: undefined,
+    startedAt: shimStartedAt,
   });
 
   try {

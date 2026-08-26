@@ -6,34 +6,21 @@ import {
   simAthenaScalarShim,
 } from "./sim-athena-shim-registry.js";
 
-/** Trino's string functions. */
+/**
+ * Trino's string functions.
+ *
+ * `substr` and `format` are deliberately absent. SQLite carries both, counts
+ * from one the way Trino does, and takes the same `%s` and `%d` a statement
+ * writes, so registering a name for either would replace something that works
+ * with something that works less well.
+ */
 export function simAthenaInstallStringShims(database: DatabaseSync): void {
-  simAthenaScalarShim(database, "regexp_like", (value, pattern) =>
-    matches(shimText(value), shimText(pattern)),
-  );
   simAthenaScalarShim(database, "split_part", (value, delimiter, index) =>
     splitPart(shimText(value), shimText(delimiter), shimNumber(index)),
   );
   simAthenaScalarShim(database, "strpos", (value, search) =>
     position(shimText(value), shimText(search)),
   );
-}
-
-function matches(
-  value: string | undefined,
-  pattern: string | undefined,
-): number | null {
-  if (value === undefined || pattern === undefined) {
-    return null;
-  }
-
-  try {
-    // The pattern is the query's own, which is the whole point of the function.
-    // oxlint-disable-next-line security/detect-non-literal-regexp
-    return new RegExp(pattern, "u").test(value) ? 1 : 0;
-  } catch {
-    return null;
-  }
 }
 
 /** Trino counts the fields from one, and has no field below that. */

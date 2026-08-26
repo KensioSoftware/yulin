@@ -20,6 +20,9 @@ export interface SimAthenaEngineRequest {
   readonly sessionDatabase: string | undefined;
   readonly objects: SimAthenaTableObjects | undefined;
   readonly caller: SimAwsCaller | undefined;
+
+  /** When the query started, which `current_timestamp` answers with. */
+  readonly startedAt: Date;
 }
 
 /**

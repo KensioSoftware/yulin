@@ -26,6 +26,9 @@ interface SimAthenaQueryAnswerRequest {
   readonly tables: readonly SimAthenaPlannedTable[];
   readonly objects: SimAthenaTableObjects | undefined;
   readonly caller: SimAwsCaller | undefined;
+
+  /** When the query started, which `current_timestamp` answers with. */
+  readonly startedAt: Date;
 }
 
 /**
@@ -56,6 +59,7 @@ export async function simAthenaQueryAnswer(
     sessionDatabase: request.sessionDatabase,
     objects: request.objects,
     caller: request.caller,
+    startedAt: request.startedAt,
   });
 
   return computed === undefined
