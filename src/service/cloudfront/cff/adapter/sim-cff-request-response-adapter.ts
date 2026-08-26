@@ -19,7 +19,7 @@ export class SimCffRequestResponseAdapter {
       method: request.method,
       uri: url.pathname,
       headers: this.viewerCffHeaders(request),
-      querystring: this.metadataAdapter.toCffQueryString(url.searchParams),
+      querystring: this.metadataAdapter.toCffQueryString(url.search),
       cookies: this.metadataAdapter.toCffCookies(request.headers),
     };
   }
