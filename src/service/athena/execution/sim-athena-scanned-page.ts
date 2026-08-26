@@ -1,5 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
-import type { SimAthenaScannedObjects } from "./sim-athena-scanned-bytes.js";
+import type { SimAthenaScannedObjects } from "./sim-athena-scanned-objects.js";
 import type { SimAthenaScannedLocation } from "./sim-athena-scanned-location.js";
 
 /**

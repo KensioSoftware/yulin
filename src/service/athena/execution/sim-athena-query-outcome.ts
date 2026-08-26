@@ -6,9 +6,10 @@ import type { SimAthenaQueryExecution } from "./sim-athena-query-execution.js";
 import {
   simAthenaCutoffRefusal,
   simAthenaPlanQuery,
+  type SimAthenaPlannedTable,
 } from "./sim-athena-query-refusal.js";
 import { simAthenaQueryScan } from "./sim-athena-query-scan.js";
-import type { SimAthenaScannedObjects } from "./sim-athena-scanned-bytes.js";
+import type { SimAthenaScannedObjects } from "./sim-athena-scanned-objects.js";
 
 interface SimAthenaQueryOutcomeRequest {
   readonly execution: SimAthenaQueryExecution;
@@ -24,6 +25,9 @@ interface SimAthenaQueryOutcomeRequest {
 export interface SimAthenaQueryOutcome {
   readonly refusal: string | undefined;
   readonly bytesScanned: number;
+
+  /** The tables the query reads, for whatever goes on to answer it. */
+  readonly tables: readonly SimAthenaPlannedTable[];
 }
 
 /**
@@ -41,7 +45,7 @@ export async function simAthenaQueryOutcome(
   const plan = simAthenaPlanQuery(request);
 
   if (plan.refusal !== undefined) {
-    return { refusal: plan.refusal, bytesScanned: declared };
+    return { refusal: plan.refusal, bytesScanned: declared, tables: [] };
   }
 
   const scanned = await simAthenaQueryScan({
@@ -52,7 +56,7 @@ export async function simAthenaQueryOutcome(
   });
 
   if (typeof scanned === "string") {
-    return { refusal: scanned, bytesScanned: declared };
+    return { refusal: scanned, bytesScanned: declared, tables: plan.tables };
   }
 
   return {
@@ -62,5 +66,6 @@ export async function simAthenaQueryOutcome(
       request.workGroups,
     ),
     bytesScanned: scanned,
+    tables: plan.tables,
   };
 }

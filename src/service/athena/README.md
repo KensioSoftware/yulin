@@ -1,20 +1,25 @@
 # Simulated Athena implementation
 
 This directory contains the simulated Athena implementation. Workgroups and named queries are
-deployable from a template and readable through the SDK, and a query runs through its states with
-one part of its SQL read.
+deployable from a template and readable through the SDK, and a query runs through its states over
+data a test seeded into simulated S3.
 
-The guiding decision is that no query is evaluated. Athena's own value is in the query engine, and a
-query engine over Parquet and JSON objects in S3 is a different order of magnitude from the rest of
-this. A test declares what a query answers with instead, and the simulation matches that declaration
-on the query text. Simulated Bedrock answers a prompt the same way and simulated Rekognition answers
-an image the same way, all three through `SimDeclaredResultRules`.
+A query is answered one of two ways. A test declares what it answers with and the simulation matches
+that declaration on the query text, the way simulated Bedrock answers a prompt and simulated
+Rekognition answers an image, all three through `SimDeclaredResultRules`. Or the query engine reads
+the objects a test seeded into simulated S3 and answers the statement under SQLite.
 
-What that leaves is worth having. The lifecycle a client polls is real, the bytes-scanned cutoff
-refuses a query for real, the tables a query names are looked for in the Data Catalog, and a result
-set really is written to the workgroup's output location. The divergence to be honest about is that
-simulated Athena accepts a query real Athena would reject. `docs/services/athena/README.md` says so
-in its Limitations list.
+The engine was the second answer to a question this service originally settled the other way.
+Writing a query engine over Parquet and JSON objects in S3 was sized at four to seven thousand lines
+and ruled out. Handing the SQL to `node-sql-parser` and the rows to `node:sqlite` came to a tenth of
+that, and it answers roughly nineteen queries in twenty of the shapes a test writes. The spike that
+measured it is on `#1004`.
+
+What the declarations give is still worth having on its own. The lifecycle a client polls is real,
+the bytes-scanned cutoff refuses a query for real, the tables a query names are looked for in the
+Data Catalog, and a result set really is written to the workgroup's output location. The divergence
+to be honest about is that simulated Athena accepts a query real Athena would reject.
+`docs/services/athena/README.md` says so in its Limitations list.
 
 ## Entry points
 
@@ -85,8 +90,8 @@ refused permission on the data is the behaviour the measurement exists to expose
 
 The cutoff is checked in the runner against that figure, or against a declaration where a test wrote
 one down. `SimAthenaResolvedResult.declaredBytesScanned` is what tells a declared zero from an
-absent one. That is the whole of the cost guardrail, and the one thing this simulation can enforce
-for real without an engine.
+absent one. That is the whole of the cost guardrail, and it is enforced whether or not the
+engine answers the query.
 
 `table/` reads the tables a query names. `sim-athena-sql-tokens.ts` tokenises and stops there, and
 `sim-athena-table-references.ts` walks those tokens looking only at what follows `FROM`, `JOIN` and a
@@ -127,6 +132,93 @@ table to be looked for, and every test written before this existed stays working
 because Athena writes a result under the identity that asked for it. Simulated Firehose does the
 same shape of thing under its delivery stream's role. A write that fails leaves the execution
 `FAILED` rather than raising at a caller who was answered long ago and has gone away to poll.
+
+## The query engine
+
+`engine/` holds it. `SimAthenaQueryEngine` is the whole of the public surface. A query it cannot run is turned down,
+and the declared result answers instead.
+
+Three decisions shape the rest of the directory.
+
+**It is opt-in.** A project holding `node-sql-parser` for a reason of its own would otherwise find
+simulated Athena answering differently from the version before it. `enable()` loads the parser there and then. A project without
+the package finds out at the line that asked for the engine.
+
+**The parser is an optional peer dependency.** It materialises 88MB in the pnpm store, and most
+users will never run a query. `sim-athena-parser-module.ts` loads it by a deep path,
+`node-sql-parser/build/athena.js`, which pulls one grammar at 192KB out of the twenty published. The
+specifier is held in a variable so that building this repository never turns the dependency into a
+required one, and a failure to resolve it is reported as something to go and add.
+`scripts/mts/verify-pack.mts` installs every declared peer into a throwaway consumer. The
+`package.json` entries had to land in the same change as the import.
+
+**Everything that can fail, turns the query down.** A statement the Athena grammar refuses, a table
+in a format there is no reader for, an object the caller cannot open and a statement SQLite will not
+run all end with no result and the declared result answering. `sim-athena-engine-run.ts` is where
+that catch sits.
+
+### The seam
+
+`sim-athena-query-answer.ts` is the chain. A declaration written against one exact query text wins,
+then the engine, then the declarations again for the workgroup tier and the default. A declared
+`failsWith` is the exception and wins from any tier, because it is a statement about the query
+rather than about its rows. `simAthenaPlanQuery` reads it before anything is planned or measured. That ordering
+is what keeps every test written before the engine existed working, and what gives a test an escape
+hatch for one statement the engine gets wrong.
+
+`SimDeclaredResultRules` had to learn to report a miss for it. `resultFor` always answered by
+falling back to the default, and `declaredFor` answers with `undefined` where every tier missed.
+Asking it for the leading key alone is what isolates the exact-query tier.
+
+`SimAthenaQueryExecution.answeredBy` records which of the two answered. Real Athena has no such
+field. It is a simulator accessor, read off `queryExecutions()`.
+
+### Reading the data
+
+`sim-athena-record-reader.ts` picks a reader off the SerDe class name in the table's storage
+descriptor. A table declaring Parquet lands in the same place as a table whose SerDe is absent.
+Guessing would answer a Parquet query with nonsense.
+
+`sim-athena-delimited-records.ts` reads a character at a time. A quoted CSV field carries both the
+delimiter and the line ending often enough to matter. An empty field reads as null, along with
+Hive's `\N`. Delimited text cannot tell an empty string from an absent value, and a numeric column
+is better served by the null than by text SQLite cannot convert.
+
+Partition values travel with the prefix. `simAthenaTablePartitions` used to answer with prefixes and
+now answers with a prefix and the values that produced it, because a `storage.location.template` can put a
+partition value nowhere in the key path. Reading the values back off the key would lose them for
+exactly the tables a template exists to serve. A table with no projection falls
+back to the Hive style `key=value` segments of the object's own key.
+
+### The database
+
+`sim-athena-sqlite-database.ts` builds one in-memory database per query. Each Glue database is
+attached as a SQLite schema of the same name, and `rainlytics.access_logs` in the statement resolves
+as it stands. SQLite refuses to reach across attached schemas from a view. A table the query context
+lets a statement name unqualified is created twice.
+
+Two settings keep an answer the same as Athena's, and both were found by measurement. `PRAGMA case_sensitive_like = ON` closes a filter that quietly takes in rows Athena
+excludes. Emitting `ASC NULLS LAST` closes a sort that comes back in a different order. Each of them
+was a query that succeeded and answered differently, which is the worst failure available here.
+
+`node:sqlite` prints an `ExperimentalWarning` on the first import under Node 24.
+`sim-athena-sqlite-module.ts` swaps the process warning listeners around that import and puts them
+back a tick later, because `process.emitWarning` defers delivery and restoring synchronously misses
+it. A project that installed a warning listener of its own keeps it, along with every other warning
+it would have printed.
+
+### Reading the answer back
+
+`sim-athena-engine-result.ts` reads rows as arrays through `setReturnArrays`, since a statement is
+free to answer with two columns of one name and an object would keep one of them.
+
+`sim-athena-result-columns.ts` types them. SQLite reports the origin table and column for anything
+traced back to a table, and that is what makes a boolean read as `true` and `false`. A computed
+column has no origin. Its type is read off the first value the column answered with.
+
+An expression nobody named is called `_col0` upward, the way Athena calls one. SQLite names it after
+the expression text instead, and a name that could not have been written as an identifier is how
+that is told apart from an alias a statement chose.
 
 ## The CloudFormation layer
 

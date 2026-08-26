@@ -13,9 +13,11 @@ export interface SimAthenaDeclaredColumn {
 /**
  * What a test says one query answers with.
  *
- * Nothing here is derived from the SQL. The simulation reads a query only as a
- * key to match a declaration on, so the rows, the columns and the bytes
- * scanned are all a test's own statement about what the query did.
+ * A declaration is matched on the query text, and the rows, the columns and
+ * the bytes scanned are all a test's own statement about what the query did. A
+ * declaration written against one exact query wins over the query engine, and
+ * one written against a workgroup or the default answers whatever the engine
+ * turned down.
  */
 export interface SimAthenaDeclaredResult {
   /**
@@ -40,9 +42,9 @@ export interface SimAthenaDeclaredResult {
   /**
    * Fail the query with this reason rather than answering it.
    *
-   * Nothing here reads SQL, so a query that should fail cannot be discovered.
-   * A test says so instead, which is what makes a client's failure handling
-   * reachable.
+   * A declared failure wins over the engine, whichever tier declared it. That
+   * is what makes a client's failure handling reachable for a query the engine
+   * would otherwise answer.
    */
   readonly failsWith?: string | undefined;
 }

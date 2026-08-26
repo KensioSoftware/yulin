@@ -5,7 +5,7 @@ import {
   simAthenaTableReferenceText,
   type SimAthenaTableReference,
 } from "./sim-athena-table-reference.js";
-import type { SimAthenaPartitionedTable } from "../projection/sim-athena-table-partitions.js";
+import type { SimAthenaCatalogTable } from "./sim-athena-catalog-table.js";
 import { simAthenaTableReferences } from "./sim-athena-table-references.js";
 
 /**
@@ -20,7 +20,7 @@ export interface SimAthenaCatalog {
   findTable(
     databaseName: string,
     name: string,
-  ): SimAthenaPartitionedTable | undefined;
+  ): SimAthenaCatalogTable | undefined;
 }
 
 /** What resolving a query's tables came to. */
@@ -29,7 +29,7 @@ export interface SimAthenaResolvedTables {
   readonly refusal: string | undefined;
 
   /** The catalog entries the query reads, for whatever comes next. */
-  readonly tables: readonly SimAthenaPartitionedTable[];
+  readonly tables: readonly SimAthenaCatalogTable[];
 }
 
 /** What one query is resolved against. */
@@ -70,7 +70,7 @@ export function simAthenaResolveTables(
     return { refusal: undefined, tables: [] };
   }
 
-  const tables: SimAthenaPartitionedTable[] = [];
+  const tables: SimAthenaCatalogTable[] = [];
 
   for (const reference of read.references) {
     if (isFederated(reference.catalog) || isInformationSchema(reference)) {

@@ -8,22 +8,36 @@ import {
 export type SimAthenaProjectedValues = ReadonlyMap<string, readonly string[]>;
 
 /**
- * The S3 prefixes a table's projected partitions sit under.
+ * One partition of a table: where its objects sit, and what its partition
+ * columns read for every row under that prefix.
+ *
+ * The values travel with the prefix because nothing in an object says which
+ * partition it belongs to. A Hive layout writes them into the key and a
+ * `storage.location.template` need not, so reading them back off a key would
+ * lose them for exactly the tables a template exists to serve.
+ */
+export interface SimAthenaTablePartition {
+  readonly prefix: string;
+  readonly values: ReadonlyMap<string, string>;
+}
+
+/**
+ * The partitions a table's projection comes to.
  *
  * A `storage.location.template` says where each one goes and has to name every
  * projected column, since a template leaving one out sends two partitions to
  * the same prefix. A table with no template gets the Hive layout under its own
  * location, which is what Athena falls back to.
  */
-export function simAthenaProjectedPrefixes(
+export function simAthenaProjectedPartitions(
   projection: SimAthenaProjection,
   values: SimAthenaProjectedValues,
   tableLocation: string | undefined,
-): readonly string[] {
+): readonly SimAthenaTablePartition[] {
   const template = projection.locationTemplate;
 
   if (template === undefined) {
-    return hivePrefixes(projection, values, tableLocation);
+    return hivePartitions(projection, values, tableLocation);
   }
 
   for (const column of projection.columns) {
@@ -35,16 +49,17 @@ export function simAthenaProjectedPrefixes(
     }
   }
 
-  return combinations(projection, values).map((combination) =>
-    withTrailingSlash(fill(template, combination)),
-  );
+  return combinations(projection, values).map((combination) => ({
+    prefix: withTrailingSlash(fill(template, combination)),
+    values: combination,
+  }));
 }
 
-function hivePrefixes(
+function hivePartitions(
   projection: SimAthenaProjection,
   values: SimAthenaProjectedValues,
   tableLocation: string | undefined,
-): readonly string[] {
+): readonly SimAthenaTablePartition[] {
   if (tableLocation === undefined) {
     throw new SimAthenaProjectionError(
       `Partition projection is enabled and the table has neither a ` +
@@ -59,7 +74,7 @@ function hivePrefixes(
       (column) => `${column.name}=${combination.get(column.name) ?? ""}`,
     );
 
-    return `${base}${segments.join("/")}/`;
+    return { prefix: `${base}${segments.join("/")}/`, values: combination };
   });
 }
 

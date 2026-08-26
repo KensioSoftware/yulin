@@ -64,14 +64,28 @@ export class SimDeclaredResultRules<TResult> {
    * The result for one request.
    */
   resultFor(keys: SimDeclaredResultKeys): TResult {
+    return this.declaredFor(keys) ?? this.defaultResult;
+  }
+
+  /**
+   * The result a rule declared for one request, where a rule matched it.
+   *
+   * The default is left out, so a caller can tell a request nobody wrote a
+   * rule for from one that matched. A service chaining declarations with
+   * something that computes an answer needs that distinction, and simulated
+   * Athena runs its query engine on the miss.
+   *
+   * A request carrying only the key of the tier it is asking about answers
+   * from that tier alone.
+   */
+  declaredFor(keys: SimDeclaredResultKeys): TResult | undefined {
     return (
-      this.declaredFor(this.byLeadingKey, keys.leading) ??
-      this.declaredFor(this.byTrailingKey, keys.trailing) ??
-      this.defaultResult
+      this.matched(this.byLeadingKey, keys.leading) ??
+      this.matched(this.byTrailingKey, keys.trailing)
     );
   }
 
-  private declaredFor(
+  private matched(
     rules: ReadonlyMap<string, TResult>,
     key: string | undefined,
   ): TResult | undefined {

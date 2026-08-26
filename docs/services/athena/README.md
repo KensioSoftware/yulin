@@ -3,15 +3,18 @@
 Yulin includes a simulated Amazon Athena for tests and local development. It holds workgroups and
 named queries, and hands both back through the SDK.
 
-No SQL is evaluated. A test declares what a query answers with, and the simulation reads the query
-text only as a key to match that declaration on. So a test can prove its bytes-scanned cutoff
-refuses a query, that results land where the workgroup says, and that a client polls the lifecycle
-correctly. Whether the SQL is valid stays out of reach. The [Limitations](#limitations) at the end
-say what that leaves out.
+A query is answered one of two ways. A test declares what it answers with, and the simulation
+matches that declaration on the query text. Or the
+[query engine](#running-a-query-for-real) runs the SQL for real over the objects a test seeded into
+simulated S3. The engine is off until a test turns it on, and it needs one package added to the
+project.
 
-One part of the SQL is read. The tables a query names are looked for in the simulated
+Either way the lifecycle around the query is real. A test can prove its bytes-scanned cutoff
+refuses a query, that results land where the workgroup says, and that a client polls the lifecycle
+correctly. The tables a query names are looked for in the simulated
 [Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), and a query
-naming one that is absent fails the way real Athena fails it.
+naming one that is absent fails the way real Athena fails it. The
+[Limitations](#limitations) at the end say what this leaves out.
 
 Athena-specific types are imported from the `@kensio/yulin/athena` subpath.
 
@@ -175,12 +178,163 @@ console.log(results.ResultSet?.Rows?.[1]?.Data?.[1]?.VarCharValue);
 ```
 
 A rule for an exact query wins, then a rule for a workgroup, then the default. `onWorkGroup` covers
-every query a stack's rollups run, and `byDefault` covers everything else. Matching is exact, and
-the SQL is never parsed, so two queries differing only in whitespace are two different keys.
+every query a stack's rollups run, and `byDefault` covers everything else. Matching is exact, on the
+query text as it was sent, so two queries differing only in whitespace are two different keys.
+
+The query engine sits between the two tiers. A rule for an exact query is ahead of it and the
+workgroup rule and the default are behind it.
 
 `failsWith` fails a query instead of answering it. Nothing here reads SQL, so a query that should
 fail cannot be discovered on its own. Saying so is what makes a client's failure handling
 reachable.
+
+## Running a query for real
+
+The query engine answers a `SELECT` from the objects a test seeded into simulated S3. It reads the
+table's schema out of the Glue Data Catalog, decodes each object with the SerDe the table declares,
+loads the rows into an in-memory SQLite database, and answers the statement from them. Roughly
+nineteen queries in twenty of the shapes a test writes run this way.
+
+The engine is off until a test turns it on, and it needs `node-sql-parser` in the project. The
+parser is an optional peer dependency, so a project that never runs a query never installs it.
+
+```bash
+pnpm add -D node-sql-parser
+```
+
+`engine().enable()` turns the engine on and loads the parser. It raises where the package is absent,
+naming what to add.
+
+```typescript sim-athena-query-engine
+/**
+ * A query answered from the objects a test seeded, rather than from a
+ * declaration.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-logs" } });
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+simAws.glue().createDatabase({
+  input: { DatabaseInput: { Name: "rainlytics" } },
+});
+simAws.glue().createTable({
+  input: {
+    DatabaseName: "rainlytics",
+    TableInput: {
+      Name: "access_logs",
+      PartitionKeys: [{ Name: "day", Type: "string" }],
+      StorageDescriptor: {
+        Columns: [
+          { Name: "url", Type: "string" },
+          { Name: "status", Type: "int" },
+          { Name: "bytes", Type: "bigint" },
+        ],
+        Location: "s3://rainlytics-logs/cloudfront/",
+        SerdeInfo: {
+          SerializationLibrary: "org.openx.data.jsonserde.JsonSerDe",
+        },
+      },
+    },
+  },
+});
+
+await simAws.s3().putObject({
+  input: {
+    Bucket: "rainlytics-logs",
+    Key: "cloudfront/day=2026-08-01/part-0.json",
+    Body: [
+      '{"url":"/","status":200,"bytes":1200}',
+      '{"url":"/pricing","status":404,"bytes":310}',
+      '{"url":"/pricing","status":404,"bytes":305}',
+    ].join("\n"),
+  },
+});
+
+// node-sql-parser has to be in the project for this line to work.
+await simAws.athena().engine().enable();
+
+const started = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString:
+      "SELECT url, count(*) AS hits, sum(bytes) AS total " +
+      "FROM rainlytics.access_logs WHERE status >= 400 AND day = '2026-08-01' " +
+      "GROUP BY url ORDER BY hits DESC",
+    WorkGroup: "rainlytics",
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const results = await simAws.athena().getQueryResults({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// ["/pricing", "2", "615"], computed from the objects.
+console.log(
+  results.ResultSet?.Rows?.[1]?.Data?.map((cell) => cell.VarCharValue),
+);
+
+// "engine", which is how a test proves the rows came from the data.
+console.log(simAws.athena().queryExecutions()[0]?.answeredBy);
+```
+
+A declaration written against one exact query text still wins. That is the escape hatch for a
+statement the engine gets wrong, and it is why `results()` is unchanged. Everything the engine turns
+down falls back to the declarations, where a workgroup rule or the default answers it. `answeredBy`
+on the execution says which of the two answered, and a test that wants the engine can assert on it.
+
+The engine turns a query down where the parser refuses the statement, where SQLite refuses to run
+it, where a table declares a format it has no reader for, and where an object it needs cannot be
+opened. Every one of those ends the same way, with the declared result answering.
+
+### The objects it reads
+
+The SerDe class name in the table's storage descriptor says how its objects are decoded.
+
+- `org.openx.data.jsonserde.JsonSerDe`, `org.apache.hive.hcatalog.data.JsonSerDe` and
+  `org.apache.hadoop.hive.serde2.JsonSerDe` read JSON lines, one record per line.
+- `org.apache.hadoop.hive.serde2.OpenCSVSerde` reads comma separated text with `"` around a field
+  that needs it.
+- `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` reads the delimiter `field.delim` names,
+  which defaults to the control character Hive uses.
+
+`separatorChar`, `quoteChar` and `escapeChar` in the SerDe's parameters override those defaults, and
+`skip.header.line.count` on the table drops the first lines of every object. An empty field reads as
+null, along with Hive's `\N`. A boolean column reads `true`, `false`, `1` and `0`, and any other
+text in one reads as null.
+
+A nested object or array is kept as its JSON text, and `json_extract_scalar`, `cardinality` and
+`element_at` reach into it.
+
+A partition column's value comes from the partition the object sits in. A table projecting its
+partitions takes it from the projection, and a table laid out Hive style under its own location
+takes it from the `key=value` segments of the object's key. Either way the column reads on every
+row, though no object holds it.
+
+### What it answers with
+
+Column types come from the Glue schema, written the way Athena writes them, so Hive's `string`
+reports as `varchar` and its `int` as `integer`. A boolean column reads as `true` and `false`. A
+computed column has no schema entry behind it, and its type is read off the first value that is not
+null.
+
+Two rewrites keep an answer the same as Athena's. `PRAGMA case_sensitive_like` is set on the
+database, because SQLite matches `LIKE` without regard to case for ASCII and Athena matches it with.
+Every ascending sort is emitted carrying `NULLS LAST`, because Trino orders nulls last whichever
+direction it sorts and SQLite orders them first ascending. Both were cases where a query answered
+differently while still succeeding, which is the failure that costs the most to find.
 
 ## Tables a query names
 
@@ -527,6 +681,9 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 - Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
+- A `SELECT` run for real over JSON lines and CSV objects in simulated S3, answered by SQLite
+- Declared results, matched on the query text, ahead of the engine for one statement and behind it
+  for everything else
 - Table names in `FROM` and `JOIN` resolved against the simulated Glue Data Catalog
 - Partition projection evaluated, covering `enum`, `integer`, `date` and `injected`
 - Bytes scanned measured from the objects under the prefixes a query reads
@@ -545,9 +702,44 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 
 Current documented limitations:
 
-- No SQL is evaluated. Nothing plans or runs a query, no S3 object is read to answer one, and every
-  row comes from a declaration a test wrote. Simulated Athena will therefore accept a query real
-  Athena would reject.
+- With the engine off, no SQL is evaluated. Nothing plans or runs a query, no S3 object is read to
+  answer one, and every row comes from a declaration a test wrote. Simulated Athena will therefore
+  accept a query real Athena would reject.
+- With the engine on, the statement is read as Athena by `node-sql-parser`, written back out for
+  SQLite and run there. Around one query in twenty is turned down at one of those two steps and
+  falls back to its declared result. `UNNEST` and `GROUPING SETS` are the two measured cases.
+- The Trino function library reaches as far as `date_trunc`, `date_format`, `from_unixtime`,
+  `to_unixtime`, `from_iso8601_timestamp`, `from_iso8601_date`, `to_iso8601`,
+  `json_extract_scalar`, `cardinality`, `element_at`, `regexp_like`, `split_part`, `strpos`,
+  `approx_distinct` and `approx_percentile`. A query reaching for anything else Trino has and
+  SQLite lacks falls back.
+- The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
+  written any other way gets whatever slicing that text comes to.
+- `approx_distinct` and `approx_percentile` are computed exactly. The simulation is more accurate
+  than AWS here, and at the scale a test seeds the difference cannot show.
+- Three classes of expression the engine accepts are ones real Athena refuses. `1 / 0` answers
+  null, `CAST('abc' AS INTEGER)` answers 0, and `1 || 'x'` answers `'1x'`. Each of them fails a
+  real query.
+- `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
+  Athena answers null, which is the same forgiving direction as the cast above. Reading the
+  statement without the rewrite would turn the whole query down.
+- A `decimal` column is held as a double. A value carrying more than about fifteen significant
+  digits loses the ones past that, and a filter, a sum or a group on it can then answer
+  differently from Athena's exact arithmetic.
+- A declaration that fails the query wins from any tier, the engine included. `failsWith` is a
+  statement about the query rather than about its rows, so a workgroup rule or a default carrying
+  one fails every query it covers whether or not the engine could have answered.
+- Parquet and ORC are absent. A table declaring either falls back to its declared result, and so
+  does a table declaring no SerDe at all.
+- A null in a result row reads as an empty string. Real Athena leaves the value out of the row.
+- A computed boolean reads as `1` and `0`. The Glue column type is what makes a boolean column read
+  as `true` and `false`, and an expression has no column type behind it.
+- An expression nobody named is called `_col0` upward, as Athena calls one. An alias that needed
+  quotes around it is renamed the same way.
+- The engine reads every object under the prefixes a query reaches and holds the rows in memory.
+  That suits the fixture-sized data a test seeds and nothing larger.
+- A caller who can list a Bucket and cannot read its objects gets the declared result. A listing
+  refused by IAM fails the query, and that is what the bytes scanned measurement exposes.
 - The table names in `FROM` and `JOIN` are the one part of a query that is read, and they are found
   by a scan. A statement the scan cannot follow runs with its tables never
   looked for, which covers `CREATE TABLE AS SELECT`, `INSERT INTO`, `MSCK REPAIR TABLE`, `SHOW` and
@@ -588,7 +780,8 @@ Current documented limitations:
 - `GetQueryResults` pages up to 1000 rows, as Athena does. The listings of workgroups and named
   queries stop at 50, which is their own documented maximum.
 - `ListQueryExecutions`, `BatchGetQueryExecution` and `GetQueryRuntimeStatistics` are absent, along
-  with query result reuse, result encryption, `CREATE TABLE AS SELECT` and `INSERT INTO`.
+  with query result reuse, result encryption, `CREATE TABLE AS SELECT` and `INSERT INTO`. A
+  statement that writes data runs with its tables never looked for and answers from a declaration.
 - Real Athena's own floor for the bytes scanned cutoff is 10MB. This simulation takes any whole
   number of bytes from 1 up, putting the guardrail wherever the query a test is exercising needs
   it. A cutoff of zero or a fraction is still refused.

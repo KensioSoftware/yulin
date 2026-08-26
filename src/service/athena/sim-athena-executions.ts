@@ -11,11 +11,16 @@ import {
 import type * as simAthenaCommands from "./command/sim-athena-command.types.js";
 import { SimAthenaCommands } from "./command/sim-athena-commands.js";
 import type { SimAthenaRequestOptions } from "./command/sim-athena-request-options.js";
+import { SimAthenaQueryEngine } from "./engine/sim-athena-query-engine.js";
+import {
+  simAthenaTableObjects,
+  type SimAthenaTableObjects,
+} from "./engine/sim-athena-table-objects.js";
 import { SimAthenaQueryExecutionStore } from "./execution/sim-athena-query-execution-store.js";
 import type { SimAthenaQueryExecution } from "./execution/sim-athena-query-execution.js";
 import { SimAthenaNoResultDestination } from "./execution/sim-athena-no-result-destination.js";
 import { SimAthenaQueryRunner } from "./execution/sim-athena-query-runner.js";
-import type { SimAthenaScannedObjects } from "./execution/sim-athena-scanned-bytes.js";
+import type { SimAthenaScannedObjects } from "./execution/sim-athena-scanned-objects.js";
 import {
   SimAthenaResultWriter,
   type SimAthenaResultDestination,
@@ -38,7 +43,7 @@ interface SimAthenaProperties {
    * A SimAthena built on its own has none, and a query that would write
    * results fails saying so. A Bucket only exists inside a SimAws.
    */
-  readonly s3?: SimAthenaResultDestination & Partial<SimAthenaScannedObjects>;
+  readonly s3?: SimAthenaResultDestination & Partial<SimAthenaTableObjects>;
 
   /**
    * The Data Catalog a query's table names are resolved against.
@@ -56,9 +61,7 @@ interface SimAthenaProperties {
  * a query there scans whatever a declaration says it scanned.
  */
 function scannedObjects(
-  s3:
-    | (SimAthenaResultDestination & Partial<SimAthenaScannedObjects>)
-    | undefined,
+  s3: (SimAthenaResultDestination & Partial<SimAthenaTableObjects>) | undefined,
 ): SimAthenaScannedObjects | undefined {
   return s3?.listObjectsV2 === undefined
     ? undefined
@@ -69,14 +72,13 @@ function scannedObjects(
  * Simulated Amazon Athena. Handles SDK commands. Emulates AWS behaviour and
  * state.
  *
- * Workgroups and named queries are what this models. A workgroup holds the
- * settings a query would run under, and a named query holds SQL under a name.
- * Nothing runs a query and nothing reads the SQL, so a named query here is the
- * text a caller saved and a workgroup is the configuration a stack set.
+ * Workgroups, named queries and query executions are what this models. A
+ * workgroup holds the settings a query runs under, a named query holds SQL
+ * under a name, and an execution is one run of a query.
  *
- * That is worth being plain about. A test can prove its stack configured the
- * bytes-scanned cutoff and its rollups were registered, and it cannot find out
- * whether the SQL is valid.
+ * A named query's SQL is stored and handed back exactly as it was sent. A
+ * running query is answered either from a declaration or by the query engine,
+ * and `engine()` is what turns the engine on.
  *
  * Both resources are scoped to an account and region, as they are on real
  * Athena. Every scope starts with the `primary` workgroup, which real Athena
@@ -89,6 +91,7 @@ export class SimAthenaExecutions {
   protected readonly background: BackgroundScheduler;
   readonly #executions = new SimAthenaQueryExecutionStore();
   readonly #results = new SimAthenaQueryResults();
+  readonly #engine = new SimAthenaQueryEngine();
 
   constructor(properties: SimAthenaProperties = {}) {
     const {
@@ -102,11 +105,13 @@ export class SimAthenaExecutions {
     });
     const runner = new SimAthenaQueryRunner({
       results: this.#results,
+      engine: this.#engine,
       workGroups: this.workGroupStore,
       writer,
       background,
       catalog: properties.glue,
       objects: scannedObjects(properties.s3),
+      tableObjects: simAthenaTableObjects(properties.s3),
     });
 
     this.background = background;
@@ -130,12 +135,23 @@ export class SimAthenaExecutions {
   /**
    * The results this scope answers queries with.
    *
-   * The simulator's own accessor rather than an Athena operation. No SQL is
-   * evaluated here, so a test says what a query answers with and the
-   * simulation matches on the query text.
+   * The simulator's own accessor rather than an Athena operation. A
+   * declaration written against one exact query text wins over the engine, and
+   * the broader tiers answer whatever the engine turned down.
    */
   results(): SimAthenaQueryResults {
     return this.#results;
+  }
+
+  /**
+   * The query engine this scope runs queries with.
+   *
+   * The simulator's own accessor rather than an Athena operation. It is off
+   * until a test turns it on, and every query is answered from a declaration
+   * until then.
+   */
+  engine(): SimAthenaQueryEngine {
+    return this.#engine;
   }
 
   /**

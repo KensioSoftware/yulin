@@ -71,6 +71,19 @@ export class SimAthenaQueryResults {
       trailing: request.workGroupName,
     });
   }
+
+  /**
+   * The result declared for this exact query text, where a test wrote one.
+   *
+   * The workgroup tier and the default are left out, so this reports a miss
+   * rather than falling back. Nothing else can tell a query somebody wrote a
+   * rule for from one nobody did, and that is what puts a declaration for one
+   * statement ahead of the query engine while leaving the broader tiers
+   * behind it.
+   */
+  declaredForQuery(queryString: string): SimAthenaResolvedResult | undefined {
+    return this.#rules.declaredFor({ leading: queryString });
+  }
 }
 
 function requiredRuleKey(key: string, described: string): string {

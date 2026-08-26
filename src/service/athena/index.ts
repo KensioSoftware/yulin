@@ -26,6 +26,17 @@ export {
 export { SimAthenaWorkGroupStore } from "./workgroup/sim-athena-work-group-store.js";
 export { SimAthenaNamedQuery } from "./named-query/sim-athena-named-query.js";
 export { SimAthenaQueryExecution } from "./execution/sim-athena-query-execution.js";
+export { SimAthenaQueryEngine } from "./engine/sim-athena-query-engine.js";
+export type {
+  SimAthenaAnswerSource,
+  SimAthenaQueryAnswer,
+} from "./result/sim-athena-query-answer.js";
+export type {
+  SimAthenaCatalogColumn,
+  SimAthenaCatalogSerDe,
+  SimAthenaCatalogStorage,
+  SimAthenaCatalogTable,
+} from "./table/sim-athena-catalog-table.js";
 export { SimAthenaQueryExecutionStore } from "./execution/sim-athena-query-execution-store.js";
 export {
   isSettledQueryState,
@@ -51,4 +62,5 @@ export {
   SimAthenaError,
   type SimAthenaErrorMetadata,
   SimAthenaInvalidRequestException,
+  SimAthenaSetUpError,
 } from "./error/sim-athena.error.js";

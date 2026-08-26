@@ -1,3 +1,4 @@
+import type { SimAthenaAnswerSource } from "../result/sim-athena-query-answer.js";
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
 import type { SimAthenaQueryState } from "./sim-athena-query-state.js";
 import { SimAthenaQueryStatus } from "./sim-athena-query-status.js";
@@ -19,8 +20,8 @@ interface SimAthenaQueryExecutionProperties {
  * mutably and moved through its states by `SimAthenaQueryRunner`. Everything
  * else in simulated Athena is replaced rather than mutated.
  *
- * The result it settles with is a declaration, matched on the query text. No
- * SQL is read to produce it.
+ * The result it settles with comes either from the query engine or from a
+ * declaration matched on the query text, and `answeredBy` says which.
  */
 export class SimAthenaQueryExecution {
   public readonly queryExecutionId: string;
@@ -34,6 +35,7 @@ export class SimAthenaQueryExecution {
   readonly #status = new SimAthenaQueryStatus();
   #bytesScanned = 0;
   #result: SimAthenaResolvedResult | undefined;
+  #answeredBy: SimAthenaAnswerSource | undefined;
 
   constructor(properties: SimAthenaQueryExecutionProperties) {
     this.queryExecutionId = properties.queryExecutionId;
@@ -72,6 +74,16 @@ export class SimAthenaQueryExecution {
     return this.#result;
   }
 
+  /**
+   * Whether the query engine or a declaration answered this query.
+   *
+   * A test that turned the engine on reads this to prove it got the engine,
+   * since rows a declaration happens to agree with look the same either way.
+   */
+  get answeredBy(): SimAthenaAnswerSource | undefined {
+    return this.#answeredBy;
+  }
+
   /** Whether this query has finished. */
   get isSettled(): boolean {
     return this.#status.isSettled;
@@ -87,11 +99,18 @@ export class SimAthenaQueryExecution {
     this.#bytesScanned = bytesScanned;
   }
 
-  /** Finish the query with the rows it answered. */
-  succeed(result: SimAthenaResolvedResult, completedAt: Date): void {
-    if (this.#status.settle("SUCCEEDED", undefined, completedAt)) {
-      this.#result = result;
+  /** Finish the query with the rows it answered, and what answered it. */
+  succeed(
+    result: SimAthenaResolvedResult,
+    answeredBy: SimAthenaAnswerSource,
+    completedAt: Date,
+  ): void {
+    if (!this.#status.settle("SUCCEEDED", undefined, completedAt)) {
+      return;
     }
+
+    this.#result = result;
+    this.#answeredBy = answeredBy;
   }
 
   /** Finish the query without an answer, saying why. */
