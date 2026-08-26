@@ -1,5 +1,6 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import { SimRestApiRegistry } from "../../apigateway/registry/sim-rest-api-registry.js";
+import { SimHttpApiDomainRegistry } from "../../apigatewayv2/registry/sim-http-api-domain-registry.js";
 import { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
@@ -8,6 +9,10 @@ import { SimElbV2Registry } from "../../elbv2/registry/sim-elbv2-registry.js";
 import { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
+import {
+  SimAwsAnyServiceHosts,
+  type SimAwsServiceHosts,
+} from "../../../serve/controller/host/sim-aws-service-hosts.js";
 
 /**
  * The registries one simulation's scoped services share between them.
@@ -64,6 +69,14 @@ export class SimAwsScopedServiceRegistries {
   public readonly httpApi = new SimHttpApiRegistry();
 
   /**
+   * Indexes the custom domain names created in any Account and Region of one
+   * SimAws instance. A domain name is unique across the whole of AWS rather
+   * than within an Account, and a request to one carries only a hostname, so
+   * this is also where DNS resolution finds the domain a request arrived at.
+   */
+  public readonly httpApiDomains = new SimHttpApiDomainRegistry();
+
+  /**
    * Indexes the REST API ids allocated in any Account and Region of one SimAws
    * instance, the way `httpApi` does for HTTP APIs. The two services issue
    * endpoints under the same `execute-api` host, and a served request carries
@@ -90,4 +103,13 @@ export class SimAwsScopedServiceRegistries {
    * cross-region uniqueness and lookup behaviour of S3 Bucket names.
    */
   public readonly s3 = new SimS3GlobalRegistry();
+
+  /**
+   * Where a hostname a resource claimed for itself is looked up, which is what
+   * simulated DNS resolution asks after the built-in hostname shapes.
+   */
+  public readonly serviceHosts: SimAwsServiceHosts = new SimAwsAnyServiceHosts([
+    this.cognitoDomains,
+    this.httpApiDomains,
+  ]);
 }

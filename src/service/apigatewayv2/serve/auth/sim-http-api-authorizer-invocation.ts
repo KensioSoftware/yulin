@@ -74,7 +74,7 @@ export class SimHttpApiAuthorizerInvocation {
     try {
       const event = await this.eventBuilder.build({
         request,
-        endpoint: simHttpApiEndpoint(api, match),
+        endpoint: simHttpApiEndpoint(api, match, input.domainName),
         routeArn,
         identitySource,
       });

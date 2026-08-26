@@ -1767,9 +1767,161 @@ these.
 ## Turning the generated endpoint off
 
 `DisableExecuteApiEndpoint: true` stops the generated endpoint serving. That is how an API reachable
-only through a custom domain is configured. A request to it is answered with a 403 and
-`{"message":"Forbidden"}`. AWS publishes neither the status nor the body for that case, so both are
-what a disabled endpoint was observed to answer.
+only through a custom domain is configured. It takes the generated hostname out of the set of
+hostnames the API answers on, and a request to it gets the same 403 any unserved `Host` gets (see
+[Which hostnames an API answers on](#which-hostnames-an-api-answers-on)). AWS publishes neither the
+status nor the body for that case, so both are what a disabled endpoint was observed to answer.
+
+## Serving an API on a custom domain name
+
+`CreateDomainNameCommand` creates a domain that answers on a hostname the project owns.
+`CreateApiMappingCommand` points a base path of that domain at one API and one of its stages. A
+domain with no mapping answers 404 to everything.
+
+An empty `ApiMappingKey` maps the root of the domain. Every request reaching the domain goes to that
+API, with the path as the client sent it. A non-empty key is one or more path segments (`orders`,
+`orders/v1`), and those segments come off the front of the path before route selection sees it. A
+request to `/orders/pets/6` under the key `orders` matches the route `GET /pets/{petId}`.
+
+The mapping names the stage. A request through a custom domain never goes through stage selection,
+so an API whose only stage is `dev` is served at the root of its domain with no `dev` segment in the
+path. The generated endpoint still wants that segment.
+
+Where two mappings both match, the longest base path wins. A domain mapping both its root and
+`orders` serves `/orders/6` from the `orders` mapping and everything else from the root one.
+
+The base path stays in `rawPath` and in `requestContext.http.path`, the way a named stage's segment
+does. `requestContext.domainName` is the custom domain and `domainPrefix` is its first label, so a
+handler behind `api.example.com` reads `api` where one behind the generated endpoint reads the API
+id.
+
+```typescript sim-apigatewayv2-custom-domain
+/**
+ * Serving a simulated HTTP API on a custom domain name and API mapping.
+ */
+
+import {
+  CreateApiCommand,
+  CreateApiMappingCommand,
+  CreateDomainNameCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pets",
+    Role: "arn:aws:iam::111111111111:role/PetsRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          rawPath: event.rawPath,
+          routeKey: event.routeKey,
+          stage: event.requestContext.stage,
+          domainName: event.requestContext.domainName,
+        }),
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "pets", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /pets/{petId}",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "dev", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "pets",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+await apiGateway.createDomainName(
+  new CreateDomainNameCommand({ DomainName: "api.example.test" }),
+);
+
+await apiGateway.createApiMapping(
+  new CreateApiMappingCommand({
+    DomainName: "api.example.test",
+    ApiId,
+    Stage: "dev",
+    ApiMappingKey: "orders",
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(
+  srv.localUrl("https://api.example.test/orders/pets/6"),
+);
+
+console.log(await response.json());
+
+await srv.close();
+```
+
+### Which hostnames an API answers on
+
+An API answers on the endpoint API Gateway generated for it and on the domains mapped to it. A
+request carrying any other `Host` gets a 403 and `{"message":"Forbidden"}`, before the route's
+authorizer runs.
+
+That refusal is what a CloudFront behaviour whose cache key holds `host` produces on real AWS.
+Everything in a cache key is forwarded to the origin, and the API is then handed the viewer's
+hostname. The 403 carries `x-amzn-errortype: ForbiddenException` and `x-amzn-requestid`. CloudFront's
+own refusal to reach an origin carries `apigw-requestid` instead, and those two headers are how the
+pair were told apart against real AWS. Simulated CloudFront always sends the Origin's own domain
+(see the [CloudFront limitations](https://yulinsim.dev/services/cloudfront/#limitations)), so
+reaching this refusal here means calling the API on a hostname of your own. A Route53 CNAME pointing
+at the generated endpoint does it.
+
+### Deleting a domain name and its mappings
+
+`DeleteDomainNameCommand` takes the domain and its mappings away, and its hostname stops resolving.
+The APIs it mapped carry on serving their generated endpoints.
+
+`DeleteApiCommand` takes the mappings pointing at the deleted API with it. A base path that used to
+reach it answers 404, and the domain keeps whatever else it maps.
 
 ## Importing an OpenAPI definition
 
@@ -2268,6 +2420,14 @@ the simulation without being given one. See the
 - An integration URI or `AuthorizerUri` ending in a published version number or an alias name, read
   at each request so a route follows its alias, with the invoke permission decided against the
   qualified resource
+- `CreateDomainName`, `GetDomainName`, `GetDomainNames` and `DeleteDomainName`, with the domain
+  answering on its own hostname through `serveSimAws` and the name unique across every simulated
+  Account and Region
+- `CreateApiMapping`, `GetApiMapping`, `GetApiMappings` and `DeleteApiMapping`, serving an API at the
+  root of a domain or under a base path, with the longest matching base path winning and the
+  mappings of a deleted API going with it
+- A 403 with `x-amzn-errortype: ForbiddenException` for a request carrying a `Host` the API neither
+  generated nor has mapped
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
   one JWT or Lambda `REQUEST` authorizer per security scheme an operation names
@@ -2392,8 +2552,23 @@ Current documented limitations:
   by `CreateIntegration`. A permission on the function is the only way to admit the invocation.
 - No `Update*` commands. A route, integration or stage is changed by deleting it and creating it
   again. `DeleteApi` deletes everything under the API, as it does on AWS.
-- Custom domain names and API mappings are outside the simulation. They change what `rawPath` holds,
-  so an API reached through one behaves differently on AWS from what is served here.
+- A domain name's `DomainNameConfigurations` are recorded and never applied. A simulated request
+  arrives over plain HTTP on localhost, so a certificate and a TLS security policy have nothing to
+  decide, and the record is where a test checks the domain got the certificate its stack meant to
+  give it. `EndpointType: "EDGE"` is refused, since an edge-optimized custom domain is a REST API
+  feature. `MutualTlsAuthentication` and `Tags` are refused by name.
+- The regional domain name AWS issues a custom domain, which is what a Route53 alias record points
+  at, is outside the simulation. `DomainNameConfigurations` reports no `ApiGatewayDomainName` and no
+  `HostedZoneId`, and only the custom domain's own hostname resolves.
+- A mapped base path stays in `rawPath` and in `requestContext.http.path`. That follows the named
+  stage behaviour, which AWS publishes through the `$context.path` access log variable. AWS publishes
+  nothing equivalent for a base path.
+- `ApiMappingKey` is reported as an empty string for a mapping serving the root of its domain. What
+  real API Gateway reports for that field is unestablished.
+- An API mapping and the API it names are in one Account and Region, as they are on AWS. A domain
+  name is unique across every simulated Account and Region.
+- Deleting a domain name deletes its mappings without asking, as deleting an API does. Whether real
+  API Gateway refuses either is unestablished.
 - No paging. `MaxResults` and `NextToken` are refused, never ignored, and every list command answers
   in full.
 - `CorsConfiguration` and `Tags` are refused, as is the `RouteKey`/`Target` quick-create shorthand on

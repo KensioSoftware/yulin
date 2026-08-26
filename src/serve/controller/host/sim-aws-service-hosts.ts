@@ -28,3 +28,35 @@ export class SimAwsNoServiceHosts implements SimAwsServiceHosts {
     return;
   }
 }
+
+/**
+ * The hostnames claimed by any of several holders, asked in turn.
+ *
+ * More than one simulated service hands out hostnames of its own choosing: a
+ * Cognito user pool domain and an API Gateway custom domain are both names the
+ * project picked rather than names AWS generated. Resolution asks one thing
+ * about a hostname, so the holders are gathered here rather than each being
+ * threaded separately through it.
+ */
+export class SimAwsAnyServiceHosts implements SimAwsServiceHosts {
+  private readonly holders: readonly SimAwsServiceHosts[];
+
+  constructor(holders: readonly SimAwsServiceHosts[]) {
+    this.holders = holders;
+  }
+
+  /**
+   * The first target any holder claims for a hostname.
+   */
+  targetForHost(hostname: string): SimAwsServiceTarget | undefined {
+    for (const holder of this.holders) {
+      const target = holder.targetForHost(hostname);
+
+      if (target !== undefined) {
+        return target;
+      }
+    }
+
+    return undefined;
+  }
+}

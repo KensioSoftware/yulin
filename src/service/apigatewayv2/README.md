@@ -37,6 +37,20 @@ construction.
 The API also carries the `SimHttpApiJwtIssuerKeys` port its authorizers verify against, for the same
 reason: a served request finds the API and nothing else.
 
+A custom domain name is the one thing under this service that the API does not own.
+`domain/sim-http-api-domain-name.ts` holds it, and owns its API mappings for the reason the API owns
+its routes. A mapping is addressed by domain on real AWS and none of them outlives the domain.
+
+```text
+SimHttpApiDomainName
+└── SimApiMappingStore        API mappings, keyed by allocated id
+    └── SimApiMapping         a base path, an API id and a stage
+        └── SimApiMappingKey  the base path, as segments
+```
+
+The domain and the APIs it maps live in one Account and Region, as they do on AWS, which is why a
+mapping names an API id and nothing more.
+
 Deleting one of them is `DeleteRoute`, `DeleteIntegration` or `DeleteStage`, each taking its own
 resource out of the store holding it. `SimHttpApi.assertIntegrationDeletable` is the one rule
 crossing two of those stores: an integration a route still targets is refused, as it is on real AWS,
@@ -46,6 +60,10 @@ so it lives on the API rather than in the command that asks.
 
 `api/sim-http-api-match.ts` is the entry point: the stage first, then the route, then the integration
 behind that route.
+
+`SimHttpApiMatcher.matchInStage` is the entry point for a request whose stage is already settled.
+That is how a request through a custom domain arrives. The API mapping names the stage, and its base
+path is what comes off the front of the path. Route selection is the same either way.
 
 The stage goes first because a named stage is a path segment the routes know nothing about, so
 `/dev/pets/6` served from stage `dev` reaches route selection as the path `/pets/6`.
@@ -154,6 +172,12 @@ API id and the region in its hostname, but not the Account, so the registry maps
 Account that owns it. Ids are allocated there, which is what makes them unique across every Account
 and Region of one simulated AWS.
 
+`registry/sim-http-api-domain-registry.ts` is the same hop for custom domains, and it does one more
+job. A request to a custom domain carries a hostname and nothing saying it is an API Gateway
+hostname at all, so the registry implements `SimAwsServiceHosts` and answers simulated DNS about the
+names it holds. `SimCognitoDomainRegistry` does the same for a user pool domain, and
+`SimAwsAnyServiceHosts` asks the two in turn.
+
 ## Command handling
 
 `command/` holds one directory per resource area, each with the structural command types
@@ -231,7 +255,13 @@ fails the stack rather than deploying a template written two ways at once.
 
 `serve/` turns a localhost HTTP request into a Lambda invocation:
 
-1. `sim-api-gateway-v2-router.ts` finds the API from the request hostname, through the registry, and
+1. `sim-http-api-serving.ts` settles what serves the request, and the service target says which of
+   the two ways in it came by. An `executeApi` target is the endpoint API Gateway generated. The
+   request hostname has to be that endpoint's own, and any other `Host` gets a 403 before a route is
+   looked at, which is also what `DisableExecuteApiEndpoint` produces. An `apiGatewayDomain` target
+   is a custom domain, where the request path picks the API mapping and the mapping names the API
+   and the stage. `sim-api-gateway-v2-router.ts` is the lookup under both: the API from the
+   registry, the domain from the domain registry, and
    the integrated function from the integration's ARN. The function is looked up in the Account and
    Region its own ARN names, which need not be the API's, and the router hands back that Account's
    IAM alongside the function. A version or alias qualifier on the ARN is resolved here, once per
@@ -370,6 +400,11 @@ simulation exists to avoid:
 - a stage name that is neither `$default` nor something a URL path segment could hold, and a stage
   without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
   real AWS
+- a `DomainNameConfigurations` entry with an `EndpointType` other than `REGIONAL`, and a
+  `MutualTlsAuthentication`, since an edge-optimized domain is a REST API feature and nothing here
+  speaks TLS
+- an `ApiMappingKey` with a leading or trailing slash, or an empty segment inside it, since trimming
+  one would serve a base path the command was never given
 - `MaxResults`/`NextToken`, since every list command answers in full
 - an OpenAPI document that is not 3.0.x, and every member of one this simulation cannot apply, each
   refused with the JSON pointer of the member rather than dropped

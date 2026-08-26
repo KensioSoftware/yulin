@@ -31,6 +31,34 @@ export type {
   SimHttpApiJwtConfigurationInput,
 } from "./authorizer/authorizer.command.js";
 export type {
+  SimCreateDomainNameCommand,
+  SimCreateDomainNameCommandInput,
+  SimCreateDomainNameCommandOutput,
+  SimDeleteDomainNameCommand,
+  SimDeleteDomainNameCommandInput,
+  SimDeleteDomainNameCommandOutput,
+  SimGetDomainNameCommand,
+  SimGetDomainNameCommandInput,
+  SimGetDomainNameCommandOutput,
+  SimGetDomainNamesCommand,
+  SimGetDomainNamesCommandInput,
+  SimGetDomainNamesCommandOutput,
+} from "./domain/domain.command.js";
+export type {
+  SimCreateApiMappingCommand,
+  SimCreateApiMappingCommandInput,
+  SimCreateApiMappingCommandOutput,
+  SimDeleteApiMappingCommand,
+  SimDeleteApiMappingCommandInput,
+  SimDeleteApiMappingCommandOutput,
+  SimGetApiMappingCommand,
+  SimGetApiMappingCommandInput,
+  SimGetApiMappingCommandOutput,
+  SimGetApiMappingsCommand,
+  SimGetApiMappingsCommandInput,
+  SimGetApiMappingsCommandOutput,
+} from "./domain/api-mapping.command.js";
+export type {
   SimCreateIntegrationCommand,
   SimCreateIntegrationCommandInput,
   SimCreateIntegrationCommandOutput,

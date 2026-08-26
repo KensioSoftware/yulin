@@ -14,7 +14,10 @@ export const executeApiHostLabel = "execute-api";
  */
 export const executeApiDomain = "amazonaws.com";
 
-interface SimHttpApiHostProperties {
+/**
+ * What an API's endpoint hostname is built from.
+ */
+export interface SimHttpApiHostParts {
   readonly apiId: string;
   readonly regionName: string;
 }
@@ -22,7 +25,7 @@ interface SimHttpApiHostProperties {
 /**
  * Build the real AWS endpoint hostname for an API.
  */
-export function simHttpApiHost(properties: SimHttpApiHostProperties): string {
+export function simHttpApiHost(properties: SimHttpApiHostParts): string {
   return `${simHttpApiLogicalHost(properties)}.${executeApiDomain}`;
 }
 
@@ -33,8 +36,6 @@ export function simHttpApiHost(properties: SimHttpApiHostProperties): string {
  * This is the form Yulin serves on localhost, where the `.amazonaws.com` tail
  * is replaced by the local suffix, in the same way S3 endpoint hostnames are.
  */
-export function simHttpApiLogicalHost(
-  properties: SimHttpApiHostProperties,
-): string {
+export function simHttpApiLogicalHost(properties: SimHttpApiHostParts): string {
   return `${properties.apiId}.${executeApiHostLabel}.${properties.regionName}`;
 }

@@ -8,6 +8,7 @@ import {
   SimApiGatewayV2Commands,
   type SimApiGatewayV2Properties,
 } from "./sim-api-gateway-v2-commands.js";
+import { SimApiGatewayV2CustomDomains } from "./sim-api-gateway-v2-custom-domains.js";
 
 /**
  * Simulated API Gateway v2. Handles SDK commands. Emulates AWS behaviour and
@@ -20,16 +21,19 @@ import {
  *
  * An API owns its own routes, integrations and stages, because every one of
  * them is addressed by ApiId on real AWS and none of them outlives the API.
+ *
+ * The custom domain name and API mapping operations are on
+ * `SimApiGatewayV2CustomDomains`, which this extends, so a caller reaches all
+ * of them on one service object.
  */
-export class SimApiGatewayV2 {
-  private readonly commands: SimApiGatewayV2Commands;
+export class SimApiGatewayV2 extends SimApiGatewayV2CustomDomains {
   private readonly sdkRouter = new SimApiGatewayV2SdkCommandRouter(this);
   private readonly cfnFactory = new SimApiGatewayV2CfnResourceFactory({
     apiGatewayV2: this,
   });
 
   constructor(properties: SimApiGatewayV2Properties = {}) {
-    this.commands = new SimApiGatewayV2Commands(properties);
+    super({ commands: new SimApiGatewayV2Commands(properties) });
   }
 
   /**

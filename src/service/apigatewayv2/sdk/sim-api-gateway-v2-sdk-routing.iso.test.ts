@@ -1,18 +1,26 @@
 import {
   ApiGatewayV2Client,
   CreateApiCommand,
+  CreateApiMappingCommand,
   CreateAuthorizerCommand,
   CreateIntegrationCommand,
   CreateRouteCommand,
+  CreateDomainNameCommand,
   CreateStageCommand,
   DeleteApiCommand,
+  DeleteApiMappingCommand,
   DeleteAuthorizerCommand,
+  DeleteDomainNameCommand,
   DeleteIntegrationCommand,
   DeleteRouteCommand,
   DeleteStageCommand,
   GetApiCommand,
   GetApisCommand,
+  GetApiMappingCommand,
+  GetApiMappingsCommand,
   GetAuthorizersCommand,
+  GetDomainNameCommand,
+  GetDomainNamesCommand,
   GetIntegrationsCommand,
   GetRoutesCommand,
   GetStagesCommand,
@@ -132,6 +140,78 @@ describe("Intercepting an ApiGatewayV2 SDK client", () => {
 
     await client.send(new DeleteApiCommand({ ApiId: apiId }));
     const remaining = await client.send(new GetApisCommand({}));
+    expect(remaining.Items).toStrictEqual([]);
+  });
+
+  it("routes the custom domain name and API mapping Commands", async () => {
+    // Given a real SDK client intercepted into a simulated AWS, with an API
+    // to map
+    const simAws = new SimAws();
+    using simSdk = new SimSdk({ simAws });
+    const client = new ApiGatewayV2Client({ region: "eu-west-2" });
+    simSdk.intercept(client);
+    const created = await client.send(
+      new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+    );
+    await client.send(
+      new CreateStageCommand({
+        ApiId: created.ApiId,
+        StageName: "$default",
+        AutoDeploy: true,
+      }),
+    );
+
+    // When a domain name and a mapping are built through the client
+    const domain = await client.send(
+      new CreateDomainNameCommand({ DomainName: "api.example.test" }),
+    );
+    const mapping = await client.send(
+      new CreateApiMappingCommand({
+        DomainName: "api.example.test",
+        ApiId: created.ApiId,
+        Stage: "$default",
+        ApiMappingKey: "orders",
+      }),
+    );
+
+    // Then the simulation answered, and reading them back finds what was
+    // built
+    assertIdentical(domain.DomainName, "api.example.test");
+    const domains = await client.send(new GetDomainNamesCommand({}));
+    expect(domains.Items?.map((one) => one.DomainName)).toStrictEqual([
+      "api.example.test",
+    ]);
+    const fetchedDomain = await client.send(
+      new GetDomainNameCommand({ DomainName: "api.example.test" }),
+    );
+    assertIdentical(
+      fetchedDomain.ApiMappingSelectionExpression,
+      "$request.basepath",
+    );
+    const fetchedMapping = await client.send(
+      new GetApiMappingCommand({
+        DomainName: "api.example.test",
+        ApiMappingId: mapping.ApiMappingId,
+      }),
+    );
+    assertIdentical(fetchedMapping.ApiMappingKey, "orders");
+
+    // And deleting through the client takes them away again
+    await client.send(
+      new DeleteApiMappingCommand({
+        DomainName: "api.example.test",
+        ApiMappingId: mapping.ApiMappingId,
+      }),
+    );
+    const mappings = await client.send(
+      new GetApiMappingsCommand({ DomainName: "api.example.test" }),
+    );
+    expect(mappings.Items).toStrictEqual([]);
+
+    await client.send(
+      new DeleteDomainNameCommand({ DomainName: "api.example.test" }),
+    );
+    const remaining = await client.send(new GetDomainNamesCommand({}));
     expect(remaining.Items).toStrictEqual([]);
   });
 

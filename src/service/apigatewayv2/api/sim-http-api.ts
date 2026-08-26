@@ -5,10 +5,11 @@ import { SimHttpApiIntegrationStore } from "./integration/sim-http-api-integrati
 import { SimHttpApiRouteStore } from "./route/sim-http-api-route-store.js";
 import { SimHttpApiStageStore } from "./stage/sim-http-api-stage-store.js";
 import { SimApiGatewayV2BadRequest } from "../error/sim-api-gateway-v2.error.js";
-import { simHttpApiHost } from "./sim-http-api-host.js";
+import { simHttpApiHost, simHttpApiLogicalHost } from "./sim-http-api-host.js";
 import {
   type SimHttpApiMatch,
   SimHttpApiMatcher,
+  type SimHttpApiStageRequest,
 } from "./sim-http-api-match.js";
 import type { SimHttpApiId } from "./sim-http-api-id.js";
 import type { SimHttpApiRequest } from "./sim-http-api-request.js";
@@ -86,6 +87,17 @@ export class SimHttpApi {
   }
 
   /**
+   * The generated endpoint's hostname without the AWS domain, which is the
+   * form a request arriving at the simulator carries.
+   */
+  get logicalHostname(): string {
+    return simHttpApiLogicalHost({
+      apiId: this.apiId,
+      regionName: this.accountRegionScope.regionName,
+    });
+  }
+
+  /**
    * The generated endpoint for this API, which is what `ApiEndpoint` reports.
    *
    * It has no trailing slash, as real API Gateway returns it, so appending a
@@ -100,6 +112,14 @@ export class SimHttpApi {
    */
   match(request: SimHttpApiRequest): SimHttpApiMatch | undefined {
     return this.matcher.match(this, request);
+  }
+
+  /**
+   * Find what should handle one request whose stage an API mapping already
+   * named, which is how a request through a custom domain arrives.
+   */
+  matchInStage(request: SimHttpApiStageRequest): SimHttpApiMatch | undefined {
+    return this.matcher.matchInStage(this, request);
   }
 
   /**

@@ -23,6 +23,8 @@ interface SimHttpApiIntegrationInvocationInput {
   readonly request: Request;
   /** What the route's authorization knows about the caller. */
   readonly authorization: SimHttpApiAdmitted;
+  /** The AWS-shaped hostname the request arrived on. */
+  readonly domainName: string;
 }
 
 /**
@@ -64,7 +66,7 @@ export class SimHttpApiIntegrationInvocation {
     try {
       const event = await this.eventBuilder.build(
         request,
-        simHttpApiEndpoint(api, match),
+        simHttpApiEndpoint(api, match, input.domainName),
         {
           jwt: authorization.jwt,
           caller: authorization.caller,
