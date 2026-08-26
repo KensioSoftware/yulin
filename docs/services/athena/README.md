@@ -347,7 +347,7 @@ FROM rainlytics.events e
 CROSS JOIN UNNEST(e.tags) AS t(tag)
 ```
 
-An array gives one column per element and a map gives the key beside the value, as
+An array flattens to one column and a map flattens to two, the key beside the value, as
 `UNNEST(e.attrs) AS t(attribute, value)`. `WITH ORDINALITY` adds the position, counted from one.
 The Glue schema is what says which of the two a column holds, and a column it calls anything else
 falls back rather than reading a scalar as a collection.
