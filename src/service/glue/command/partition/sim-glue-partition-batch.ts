@@ -1,4 +1,7 @@
-import { SimGlueError } from "../../error/sim-glue.error.js";
+import {
+  SimGlueError,
+  SimGlueInvalidInputException,
+} from "../../error/sim-glue.error.js";
 import type { SimGluePartitionError } from "./partition.command.js";
 
 /** What every entry of a partition batch names its partition with. */
@@ -16,6 +19,10 @@ interface SimGluePartitionBatchEntry {
  * Only a Glue refusal is collected. Anything else is a fault in the simulation
  * rather than something the caller asked for, and a batch that swallowed it
  * would answer as though the entry had merely been rejected.
+ *
+ * The list itself is a required request member on real Glue. An empty one is
+ * within its stated bounds and does nothing. Leaving it out altogether is a
+ * malformed request.
  */
 export function simGluePartitionBatchErrors<
   T extends SimGluePartitionBatchEntry,
@@ -24,10 +31,13 @@ export function simGluePartitionBatchErrors<
   entries: readonly T[] | undefined,
   handle: (entry: T, entryLabel: string) => void,
 ): readonly SimGluePartitionError[] {
-  const errors: SimGluePartitionError[] = [];
-  const entered = entries ?? [];
+  if (entries === undefined) {
+    throw new SimGlueInvalidInputException(`${label} is required`);
+  }
 
-  for (const [index, entry] of entered.entries()) {
+  const errors: SimGluePartitionError[] = [];
+
+  for (const [index, entry] of entries.entries()) {
     try {
       handle(entry, `${label}.${index}`);
     } catch (error) {

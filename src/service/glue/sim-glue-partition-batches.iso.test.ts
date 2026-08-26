@@ -7,12 +7,15 @@ import {
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
+  assertInstanceOf,
   assertObjectEquals,
   assertStringIncludes,
+  assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../aws/sim-aws.js";
+import { SimGlueInvalidInputException } from "./error/sim-glue.error.js";
 import {
   createFixturePartition,
   createFixturePartitionedTable,
@@ -169,17 +172,18 @@ describe("SimGlue partition batches", () => {
     );
   });
 
-  it("answers a batch naming no entries with nothing to report", () => {
+  it("answers an empty batch with nothing to report", () => {
     // Given a table partitioned by day.
     const glue = new SimAws().glue();
     const table = createFixturePartitionedTable(glue);
 
-    // When a batch carries no list at all.
+    // When a batch carries an empty list, which is within the bounds real
+    // Glue states for it.
     const { Errors } = glue.batchCreatePartition(
       new BatchCreatePartitionCommand({
         DatabaseName: table.databaseName,
         TableName: table.tableName,
-        PartitionInputList: undefined,
+        PartitionInputList: [],
       }),
     );
 
@@ -189,6 +193,28 @@ describe("SimGlue partition batches", () => {
       glue.partitionsInTable(table.databaseName, table.tableName),
       0,
     );
+  });
+
+  it("refuses a batch leaving its list out altogether", () => {
+    // Given a table partitioned by day.
+    const glue = new SimAws().glue();
+    const table = createFixturePartitionedTable(glue);
+
+    // When a batch names no list at all.
+    const error = assertThrowsError(() => {
+      glue.batchDeletePartition(
+        new BatchDeletePartitionCommand({
+          DatabaseName: table.databaseName,
+          TableName: table.tableName,
+          PartitionsToDelete: undefined,
+        }),
+      );
+    });
+
+    // Then it is refused. The list is a required request member on real Glue,
+    // and an absent one is a malformed request rather than an empty batch.
+    assertInstanceOf(error, SimGlueInvalidInputException);
+    assertStringIncludes(error.message, "PartitionsToDelete is required");
   });
 
   it("reports a batch entry naming no values at all", () => {

@@ -345,9 +345,9 @@ A policy listing only the table ARN is refused here, and refused by real Glue fo
   ignored filter would answer with the partitions the caller asked to leave out.
 - **A partition keeps what it was registered with.** `UpdatePartition` and `BatchUpdatePartition`
   are absent, along with `BatchGetPartition` and partition indexes.
-- **No template property registers a partition.** `AWS::Glue::Partition` is not a CloudFormation
-  resource type on real AWS either. A stack registers its partitions through the SDK after the
-  deploy.
+- **`AWS::Glue::Partition` is absent.** Real CloudFormation has the resource type, and a template
+  declaring one deploys here with the partition recorded on the stack's `skippedResources`. A stack
+  that needs its partitions registered does it through the SDK once the deploy finishes.
 - **A table keeps the definition it was created with.** `UpdateTable` and `UpdateDatabase` are
   absent, and `GetTable` reports the creation time as the update time.
 - **`Fn::GetAtt Id` on a table answers with a guess.** It resolves to the catalog id, the database

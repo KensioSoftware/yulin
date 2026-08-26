@@ -30,6 +30,8 @@ partition keys.
 - `command/` is one directory per resource kind, holding the local structural command types, the
   handler class, and the detail mapper deciding what a `Get` reports.
 - `cfn/` reads `AWS::Glue::Database` and `AWS::Glue::Table` properties and creates from them.
+  `AWS::Glue::Crawler` and `AWS::Glue::Partition` are real resource types with no creator here. A
+  template declaring either records that Resource as skipped.
 - `write/sim-glue-catalog-writer.ts` is how CloudFormation writes to the catalog. A deploy happens
   as CloudFormation, and never as the caller a later request carries, so a Resource creator goes
   through here and skips the IAM authorization an SDK Command applies. The store refusals still
@@ -64,9 +66,9 @@ run each entry through the same path a single request takes, and collect the `Si
 raises into the `Errors` list. Any other error comes out of the batch. A fault in the simulation
 reported as a partition error would read as though the caller had asked for something invalid.
 
-**`Errors` is always there, empty when a batch had nothing to report.** The response mappers leave an
-absent field out, and this is the one exception. A caller checking a batch has one thing to check,
-and an optional empty list makes them reach through it first.
+**`Errors` is always there, and empty when a batch had everything to do.** The response mappers
+leave an absent field out, and this is the one exception. A caller checking a batch has one thing to
+check, and an optional empty list makes them reach through it first.
 
 **`GetPartitions` refuses an `Expression`.** Filtering is a separate issue. Ignoring the filter until
 it lands would answer with the partitions the caller asked to leave out, and the refusal names what
