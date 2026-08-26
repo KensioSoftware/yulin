@@ -92,6 +92,18 @@ one bad registration hide every good one.
 Glue, and a real policy grants `glue:CreatePartition` on the table. `SimGluePartitionRegistry`
 resolves the table first and every partition command goes through it.
 
+**A database and a table name are folded to lower case.** Real Glue documents the same thing for
+both. `DatabaseInput.Name` and `TableInput.Name` each say the name is folded to lowercase when it is
+stored, for compatibility with Apache Hive. `foldedSimGlueName` is what every command reads a
+catalog name through, and the stores fold again on the way to a key so the CloudFormation writer and
+the simulator's own accessors agree with it. Column names go through `requiredSimGlueName` instead
+and keep their case, since real Glue leaves those alone.
+
+**A lookup folds the name it is given, which AWS does not document.** Real Glue states the fold for
+storing and says only that a `GetDatabase` name should be lower case. Folding the lookup is the
+forgiving reading, and it is the second guess in this service after `Fn::GetAtt Id`. The usage docs
+say so. Storing a name that is already lower case makes the question go away.
+
 **A `CatalogId` naming another account is refused.** Creating the resource in this account's catalog
 would give a template that deploys and a catalog holding something the template never asked for.
 

@@ -1,6 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
+import { foldedSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
 import { simGluePartitionExpressionFilter } from "../../expression/sim-glue-partition-expression.js";
 import type { SimGluePartition } from "../../partition/sim-glue-partition.js";
@@ -72,11 +72,8 @@ export class SimGluePartitionRegistry {
   ): SimGlueTable {
     requireSimGlueCatalogId(this.#accountRegionScope, input.CatalogId);
 
-    const databaseName = requiredSimGlueName(
-      "DatabaseName",
-      input.DatabaseName,
-    );
-    const tableName = requiredSimGlueName("TableName", input.TableName);
+    const databaseName = foldedSimGlueName("DatabaseName", input.DatabaseName);
+    const tableName = foldedSimGlueName("TableName", input.TableName);
 
     this.#authorizer.authorizeTable(
       action,

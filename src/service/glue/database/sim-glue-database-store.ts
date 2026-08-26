@@ -1,8 +1,9 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import {
-  SimGlueAlreadyExistsException,
-  SimGlueEntityNotFoundException,
-} from "../error/sim-glue.error.js";
+  refuseSimGlueNameInPlace,
+  requireSimGlueFound,
+} from "../error/sim-glue-catalog-refusal.js";
+import { simGlueFolded } from "./sim-glue-catalog-name.js";
 import { SimGlueDatabase } from "./sim-glue-database.js";
 
 interface SimGlueDatabaseStoreProperties {
@@ -20,7 +21,8 @@ export interface SimGlueDatabaseInput {
  * The databases of one simulated Glue catalog.
  *
  * Keyed by name, which is the whole of a database's identity within one
- * account and region.
+ * account and region. Every name is folded to lower case on the way in and on
+ * the way to a lookup, the way the Data Catalog folds one when it stores it.
  */
 export class SimGlueDatabaseStore {
   readonly #accountRegionScope: SimAwsAccountRegionScope;
@@ -39,15 +41,13 @@ export class SimGlueDatabaseStore {
    * Make a database, refusing a name that is taken.
    */
   create(
-    name: string,
+    declared: string,
     createTime: Date,
     input: SimGlueDatabaseInput = {},
   ): SimGlueDatabase {
-    if (this.#databases.has(name)) {
-      throw new SimGlueAlreadyExistsException(
-        `Database already exists: ${name}`,
-      );
-    }
+    const name = simGlueFolded(declared);
+
+    refuseSimGlueNameInPlace(this.#databases.has(name), "Database", name);
 
     const database = new SimGlueDatabase({
       name,
@@ -61,26 +61,24 @@ export class SimGlueDatabaseStore {
     return database;
   }
 
-  /** Find a database by name. */
+  /** Find a database by name, however it was spelled. */
   find(name: string): SimGlueDatabase | undefined {
-    return this.#databases.get(name);
+    return this.#databases.get(simGlueFolded(name));
   }
 
   /**
    * Get a database by name, refusing one that is absent.
    */
   require(name: string): SimGlueDatabase {
-    const database = this.find(name);
-
-    if (database === undefined) {
-      throw new SimGlueEntityNotFoundException(`Database not found: ${name}`);
-    }
-
-    return database;
+    return requireSimGlueFound(
+      this.find(name),
+      "Database",
+      simGlueFolded(name),
+    );
   }
 
   /** Remove a database. */
   delete(name: string): void {
-    this.#databases.delete(name);
+    this.#databases.delete(simGlueFolded(name));
   }
 }

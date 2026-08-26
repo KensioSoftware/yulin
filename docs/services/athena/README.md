@@ -531,6 +531,14 @@ The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN (
 
 A table with projection on and no `storage.location.template` gets the Hive layout under its own location, as `<location>/day=2026-08-25/`.
 
+## Names are folded to lower case
+
+Athena accepts mixed case in a query and lower cases the names when it executes it. A query naming `Rainlytics.Access_Logs` resolves against the table the catalog holds as `rainlytics.access_logs`, and so does one naming `"Rainlytics"."Access_Logs"`. Quoting an identifier says what characters it may hold rather than what case it keeps.
+
+The database in a query's execution context folds the same way, and a refusal names the table the way Athena went looking for it. Simulated [Glue](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs") folds a database and a table name when it stores one, so both ends of the lookup agree.
+
+Column names are left alone here. Real Athena folds those too, and nothing in this simulation resolves a column by name.
+
 ## Registered partitions
 
 A table that registers its partitions rather than projecting them is read from the catalog. A query against one reads a prefix per registered partition, taken from that partition's own storage descriptor location, and the `WHERE` clause narrows them the way it narrows projected ones.

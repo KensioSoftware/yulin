@@ -1,6 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import { requiredSimGlueName } from "../../database/sim-glue-catalog-name.js";
+import { foldedSimGlueName } from "../../database/sim-glue-catalog-name.js";
 import type { SimGlueDatabaseStore } from "../../database/sim-glue-database-store.js";
 import type { SimGluePartitionStore } from "../../partition/sim-glue-partition-store.js";
 import type { SimGlueTableStore } from "../../table/sim-glue-table-store.js";
@@ -61,7 +61,7 @@ export class SimGlueDatabaseCommands {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
     const input = command.input.DatabaseInput ?? {};
-    const name = requiredSimGlueName("DatabaseInput.Name", input.Name);
+    const name = foldedSimGlueName("DatabaseInput.Name", input.Name);
 
     this.#authorizer.authorizeDatabase(
       "glue:CreateDatabase",
@@ -87,7 +87,7 @@ export class SimGlueDatabaseCommands {
   ): SimGetDatabaseCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const name = requiredSimGlueName("Name", command.input.Name);
+    const name = foldedSimGlueName("Name", command.input.Name);
 
     this.#authorizer.authorizeDatabase(
       "glue:GetDatabase",
@@ -127,7 +127,7 @@ export class SimGlueDatabaseCommands {
   ): SimDeleteDatabaseCommandOutput {
     requireSimGlueCatalogId(this.#accountRegionScope, command.input.CatalogId);
 
-    const name = requiredSimGlueName("Name", command.input.Name);
+    const name = foldedSimGlueName("Name", command.input.Name);
 
     this.#authorizer.authorizeDatabaseDeletion(
       name,
