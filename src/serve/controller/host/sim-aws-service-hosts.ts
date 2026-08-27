@@ -37,6 +37,10 @@ export class SimAwsNoServiceHosts implements SimAwsServiceHosts {
  * project picked rather than names AWS generated. Resolution asks one thing
  * about a hostname, so the holders are gathered here rather than each being
  * threaded separately through it.
+ *
+ * Resolution asks twice. A hosted-zone record outranks some claims and leaves
+ * others alone, and which of these a holder is gathered into is what says when
+ * the hostnames it holds are answered for.
  */
 export class SimAwsAnyServiceHosts implements SimAwsServiceHosts {
   private readonly holders: readonly SimAwsServiceHosts[];

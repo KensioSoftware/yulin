@@ -31,10 +31,10 @@ export class SimHttpApiDomainNameCfn implements SimCfnResourceValueAdapter {
    * AWS::ApiGatewayV2::DomainName publishes RegionalDomainName,
    * RegionalHostedZoneId and DomainNameArn.
    *
-   * `RegionalDomainName` is the hostname the domain answers on, so a
-   * CloudFront Origin or a Route53 alias built on it reaches the domain. Real
-   * API Gateway answers with a separate `d-<id>.execute-api.<region>` name and
-   * expects DNS to point the custom domain at it.
+   * `RegionalDomainName` is the `d-<id>.execute-api.<region>` endpoint API
+   * Gateway issued the domain, which is the published address a CloudFront
+   * Origin reaches directly and a Route53 alias points the custom domain name
+   * at.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
     if (attributeName === "RegionalDomainName") {

@@ -1,4 +1,5 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
+import { readSimHttpApiDomainEndpointHost } from "../../apigatewayv2/domain/sim-http-api-domain-endpoint.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { readSimElbV2LoadBalancerHost } from "../../elbv2/load-balancer/sim-elbv2-load-balancer-host.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
@@ -45,8 +46,36 @@ export class SimRoute53ServiceTargetResolver {
       this.s3Targets.resolve(logicalName) ??
       this.cloudFrontServiceTarget(logicalName) ??
       this.loadBalancerServiceTarget(logicalName) ??
+      this.apiGatewayDomainServiceTarget(logicalName) ??
       this.regionalTargets.resolve(logicalName)
     );
+  }
+
+  /**
+   * Resolve the regional endpoint hostname of an API Gateway custom domain:
+   *
+   *   d-<id>.execute-api.<region>.amazonaws.com
+   *
+   * This is read ahead of the endpoints below, because a domain endpoint and
+   * the endpoint of an API have the same shape and only the `d-` prefix tells
+   * them apart. The whole hostname is the resource name, since the domain
+   * registry answers about both of the names a domain has and the custom
+   * domain name is a hostname too.
+   */
+  private apiGatewayDomainServiceTarget(
+    logicalName: string,
+  ): SimAwsServiceTarget | undefined {
+    const endpoint = readSimHttpApiDomainEndpointHost(logicalName);
+
+    if (endpoint === undefined) {
+      return undefined;
+    }
+
+    return {
+      service: "apiGatewayDomain",
+      resourceName: endpoint.logicalHost,
+      regionName: endpoint.regionName as AwsRegionName,
+    };
   }
 
   /**

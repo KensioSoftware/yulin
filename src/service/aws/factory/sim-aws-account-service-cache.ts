@@ -34,6 +34,7 @@ interface SimAwsAccountServiceCacheProperties {
   readonly route53Registry: SimRoute53Registry;
   readonly kmsRegistry: SimKmsRegistry;
   readonly serviceHosts: SimAwsServiceHosts;
+  readonly shadowableServiceHosts: SimAwsServiceHosts;
   readonly iamRegistry: SimIamRegistry;
   readonly accessKeyRegistry: SimIamAccessKeyRegistry;
 }
@@ -69,6 +70,7 @@ export class SimAwsAccountServiceCache {
   private readonly route53Registry: SimRoute53Registry;
   private readonly kmsRegistry: SimKmsRegistry;
   private readonly serviceHosts: SimAwsServiceHosts;
+  private readonly shadowableServiceHosts: SimAwsServiceHosts;
 
   /**
    * Shared memo for account-scoped service instances.
@@ -89,6 +91,7 @@ export class SimAwsAccountServiceCache {
     this.route53Registry = properties.route53Registry;
     this.kmsRegistry = properties.kmsRegistry;
     this.serviceHosts = properties.serviceHosts;
+    this.shadowableServiceHosts = properties.shadowableServiceHosts;
   }
 
   /**
@@ -182,6 +185,7 @@ export class SimAwsAccountServiceCache {
           background: this.background,
           route53Registry: this.route53Registry,
           serviceHosts: this.serviceHosts,
+          shadowableServiceHosts: this.shadowableServiceHosts,
           // A DNSSEC key-signing key names a KMS key by ARN, in whichever
           // Region holds it, so Route53 resolves it through the registry.
           kmsKeys: this.kmsRegistry,

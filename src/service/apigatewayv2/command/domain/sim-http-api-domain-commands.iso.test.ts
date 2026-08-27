@@ -8,11 +8,12 @@ import {
   CreateUserPoolCommand,
   CreateUserPoolDomainCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { simAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { simHttpApiRegionalHostedZoneId } from "../../domain/sim-http-api-domain-name.js";
 import {
   SimApiGatewayV2BadRequest,
   SimApiGatewayV2NotFound,
@@ -37,12 +38,18 @@ describe("Sim API Gateway v2 custom domain name commands", () => {
     );
 
     // Then it reports the domain API Gateway would have made, selecting its
-    // API mapping on the request base path
+    // API mapping on the request base path, and the regional endpoint it was
+    // issued alongside the name the project owns
     assertIdentical(created.DomainName, "api.example.test");
     assertIdentical(created.ApiMappingSelectionExpression, "$request.basepath");
-    expect(created.DomainNameConfigurations).toStrictEqual([
-      { CertificateArn: certificateArn, EndpointType: "REGIONAL" },
-    ]);
+    const [configuration] = created.DomainNameConfigurations;
+    assertNonNullable(configuration);
+    assertIdentical(configuration.CertificateArn, certificateArn);
+    assertIdentical(configuration.EndpointType, "REGIONAL");
+    assertIdentical(configuration.HostedZoneId, simHttpApiRegionalHostedZoneId);
+    expect(configuration.ApiGatewayDomainName).toMatch(
+      /^d-[a-z0-9]{10}\.execute-api\.us-east-1\.amazonaws\.com$/u,
+    );
   });
 
   it("reads a domain name back and lists the domains of the scope", async () => {
@@ -69,9 +76,17 @@ describe("Sim API Gateway v2 custom domain name commands", () => {
       .apiGatewayV2()
       .getDomainNames(new GetDomainNamesCommand({}));
 
-    // Then both are there, with no configuration for one created without any
+    // Then both are there, and one created without a configuration still
+    // reports the endpoint API Gateway issued it
     assertIdentical(fetched.DomainName, "api.example.test");
-    expect(fetched.DomainNameConfigurations).toStrictEqual([]);
+    expect(fetched.DomainNameConfigurations).toStrictEqual([
+      {
+        ApiGatewayDomainName: simAws
+          .apiGatewayV2()
+          .findDomainName("api.example.test")?.regionalDomainName,
+        HostedZoneId: simHttpApiRegionalHostedZoneId,
+      },
+    ]);
     expect(listed.Items.map((domain) => domain.DomainName)).toStrictEqual([
       "api.example.test",
       "www.example.test",

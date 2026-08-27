@@ -23,6 +23,12 @@ interface SimRoute53ResolverProperties {
    * such as a Cognito user pool custom domain.
    */
   readonly serviceHosts?: SimAwsServiceHosts | undefined;
+
+  /**
+   * Where a hostname a hosted-zone record outranks is looked up, which is a
+   * claim answering only where no record names the hostname.
+   */
+  readonly shadowableServiceHosts?: SimAwsServiceHosts | undefined;
 }
 
 /**
@@ -33,12 +39,15 @@ export class SimRoute53Resolver {
   private readonly serviceTargetResolver =
     new SimRoute53ServiceTargetResolver();
   private readonly serviceHosts: SimAwsServiceHosts;
+  private readonly shadowableServiceHosts: SimAwsServiceHosts;
 
   constructor(properties: SimRoute53ResolverProperties) {
     this.recordFinder = new SimRoute53HostedZoneRecordFinder(
       properties.hostedZones,
     );
     this.serviceHosts = properties.serviceHosts ?? new SimAwsNoServiceHosts();
+    this.shadowableServiceHosts =
+      properties.shadowableServiceHosts ?? new SimAwsNoServiceHosts();
   }
 
   /**
@@ -50,7 +59,9 @@ export class SimRoute53Resolver {
    *    logical Route53 name.
    * 2. Check whether that name already points at a built-in simulated service.
    * 3. If not, follow CNAME or alias records to the next hostname.
-   * 4. Stop when a service target is found, a chain breaks, a cycle appears, or
+   * 4. Where no record names it, answer with a hostname a resource claimed for
+   *    itself, such as an API Gateway custom domain.
+   * 5. Stop when a service target is found, a chain breaks, a cycle appears, or
    *    the maximum CNAME depth is reached.
    *
    * The suffix is optional because the simulated DNS server answers for logical
@@ -97,7 +108,10 @@ export class SimRoute53Resolver {
       const nextRecord = this.findNextResolutionRecord(logicalName);
       const nextTarget = nextRecord?.values[0];
       if (nextTarget === undefined || nextTarget.length === 0) {
-        return undefined;
+        // An API Gateway custom domain is reached through a record on AWS, so
+        // the record decides where the name goes and the claim answers only
+        // where no record names it.
+        return this.shadowableServiceHosts.targetForHost(logicalName);
       }
 
       localName = simRoute53LocalName(nextTarget);

@@ -175,8 +175,17 @@ and Region of one simulated AWS.
 `registry/sim-http-api-domain-registry.ts` is the same hop for custom domains, and it does one more
 job. A request to a custom domain carries a hostname and nothing saying it is an API Gateway
 hostname at all, so the registry implements `SimAwsServiceHosts` and answers simulated DNS about the
-names it holds. `SimCognitoDomainRegistry` does the same for a user pool domain, and
-`SimAwsAnyServiceHosts` asks the two in turn.
+names it holds. `SimCognitoDomainRegistry` does the same for a user pool domain, and the two are
+asked at different points of resolution. A hosted-zone record for a custom domain name outranks the
+API Gateway claim, the way the custom domain name is reached through a record on AWS, and
+`SimAwsScopedServiceRegistries` says which claims a record outranks by which of the two
+`SimAwsAnyServiceHosts` it gathers them into.
+
+A domain holds two hostnames, and the registry indexes both. One is the name the domain was created
+with. The other is the `d-<id>.execute-api.<region>` endpoint API Gateway issued it, built by
+`domain/sim-http-api-domain-endpoint.ts` and read back there by `SimRoute53ServiceTargetResolver`.
+That endpoint has the shape of an API's own endpoint (the `d-` prefix is what separates them), and
+the resolver reads it ahead of that one.
 
 ## Command handling
 
