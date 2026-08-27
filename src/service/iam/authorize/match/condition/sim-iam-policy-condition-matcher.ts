@@ -13,9 +13,8 @@ import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-pars
  * comparison, and set semantics.
  *
  * An unsupported operator fails closed by making the condition non-matching. A
- * context key the request carries no value for is left to the operator: a
- * positive one has nothing to compare and matches nothing, while a negated one
- * matches, as AWS documents.
+ * context key the request carries no value for is left to the operator, which
+ * answers for itself whether an absent key matches it.
  */
 export class SimIamPolicyConditionMatcher {
   private readonly conditionContext: ReadonlyMap<string, SimIamConditionValue>;

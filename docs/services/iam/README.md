@@ -296,10 +296,11 @@ const decision = simIam.authorize({
 console.log(decision.isAllowed);
 ```
 
-A positive operator naming a context key the request supplies no value for fails to match, leaving
-the request implicitly denied unless another statement allows it. A negated operator matches an
-absent key, as AWS documents. With no value in the request there is none for the policy value to
-equal.
+An unqualified positive operator naming a context key the request supplies no value for fails to
+match, leaving the request implicitly denied unless another statement allows it. Its negated form
+matches instead, as AWS documents. With no value in the request there is none for the policy value
+to equal. A `ForAnyValue:` operator answers false for an absent key whatever it wraps, because no
+request value is there to satisfy it.
 
 ## Users and access keys
 
@@ -1108,6 +1109,8 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   CloudFormation teardown clears a User's policies before deleting it
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request
+- A positive `ForAllValues:` condition fails to match a request carrying no value for the key, and
+  fails to match an empty value set. AWS matches both, and the negated form here matches both
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
   with the credential scope date, but is never compared to a clock. A client stamping real time can
   therefore reach a simulation keeping a different one. Session expiry _is_ enforced, against

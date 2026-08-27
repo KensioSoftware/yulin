@@ -91,7 +91,7 @@ describe("sim IAM ForAnyValue negated condition operators", () => {
     assertTrue(decision.isImplicitDeny);
   });
 
-  it("matches a request carrying no value for the key", () => {
+  it("does not match a request carrying no value for the key", () => {
     // Given the same grant
     // When the request supplies no tag-key context at all
     const decision = decide({
@@ -100,8 +100,9 @@ describe("sim IAM ForAnyValue negated condition operators", () => {
       },
     });
 
-    // Then the negated operator matches an absent key, as AWS documents
-    assertTrue(decision.isAllowed);
+    // Then `ForAnyValue` answers false for an absent key whatever it wraps,
+    // as AWS documents, leaving the negation nothing to apply to
+    assertTrue(decision.isImplicitDeny);
   });
 
   it("matches when one request value falls outside every policy pattern", () => {

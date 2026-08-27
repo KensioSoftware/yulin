@@ -1,4 +1,5 @@
 import {
+  assertArrayEquals,
   assertArrayLength,
   assertTrue,
   assertUndefined,
@@ -29,11 +30,27 @@ describe("sim IAM condition operator parsing", () => {
       ])
       .map((keyword) => parser.parse(keyword));
 
-    // Then each yields an operator, and each of those matches a request
-    // carrying no value for the key
+    // Then each yields an operator
     assertArrayLength(operators, negatedKeywords.length * 3);
-    assertTrue(
-      operators.every((operator) => operator?.matchesAbsentKey === true),
+    assertTrue(operators.every((operator) => operator !== undefined));
+  });
+
+  it("matches an absent context key everywhere but the ForAnyValue forms", () => {
+    // Given the same keywords
+    const parser = new SimIamConditionOperatorParser();
+
+    // When each form is asked whether an absent context key matches it
+    const matchesAbsentKey = negatedKeywords.flatMap((keyword) => [
+      parser.parse(keyword)?.matchesAbsentKey,
+      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey,
+      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey,
+    ]);
+
+    // Then only the `ForAnyValue` forms answer false, because no request value
+    // is there to satisfy them
+    assertArrayEquals(
+      matchesAbsentKey,
+      negatedKeywords.flatMap(() => [true, true, false]),
     );
   });
 

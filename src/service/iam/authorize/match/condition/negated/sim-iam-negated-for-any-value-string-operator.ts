@@ -8,11 +8,12 @@ import { simIamStringValues } from "../string/sim-iam-string-values.js";
  * `ForAnyValue:StringNotEquals`.
  *
  * One request value differing from every policy value is enough. A request
- * supplying no values at all satisfies nothing, so an empty set does not
- * match, while an absent key does.
+ * supplying no such value satisfies nothing, which covers both an empty value
+ * set and a key the request omits. The `ForAnyValue` qualifier settles the
+ * absent key here, ahead of the rule that a negated operator matches one.
  */
 export class SimIamNegatedForAnyValueStringOperator implements SimIamConditionOperator {
-  readonly matchesAbsentKey = true;
+  readonly matchesAbsentKey = false;
 
   constructor(private readonly comparison: SimIamStringComparison) {}
 
