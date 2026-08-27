@@ -97,6 +97,17 @@ export async function aSeededObject(
     .putObject({ input: { Bucket: logsBucket, Key: key, Body: body } });
 }
 
+/** Put one object of raw bytes under the logs Bucket. */
+export async function aSeededBytes(
+  simAws: SimAws,
+  key: string,
+  body: Uint8Array,
+): Promise<void> {
+  await simAws
+    .s3()
+    .putObject({ input: { Bucket: logsBucket, Key: key, Body: body } });
+}
+
 /** Put one object of JSON lines under the logs Bucket. */
 export async function aSeededJson(
   simAws: SimAws,
