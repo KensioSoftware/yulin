@@ -190,6 +190,12 @@ field. It is a simulator accessor, read off `queryExecutions()`.
 descriptor. A table declaring Parquet lands in the same place as a table whose SerDe is absent.
 Guessing would answer a Parquet query with nonsense.
 
+`sim-athena-json-records.ts` lays the OpenX SerDe's `mapping.<column>` parameters over each record
+before a column is looked up. A CloudFront access log table is what needs them. Its records are
+keyed `cs(Referer)` and `timestamp(ms)`, and an Athena column name holds letters, digits and
+underscores. Only the OpenX class name takes the mappings. `case.insensitive` says whether a mapped
+key matches a record's key as written or with the case folded.
+
 `sim-athena-delimited-records.ts` reads a character at a time. A quoted CSV field carries both the
 delimiter and the line ending often enough to matter. An empty field reads as null, along with
 Hive's `\N`. Delimited text cannot tell an empty string from an absent value, and a numeric column

@@ -4,18 +4,28 @@ import {
   type SimAthenaDelimitedFormat,
 } from "./sim-athena-delimited-records.js";
 import type { SimAthenaEngineRow } from "./sim-athena-engine-row.js";
+import {
+  simAthenaJsonRows,
+  type SimAthenaJsonFormat,
+} from "./sim-athena-json-records.js";
 
 /** One object's bytes, read into the rows it holds. */
 export type SimAthenaRecordReader = (
   text: string,
 ) => readonly SimAthenaEngineRow[];
 
+/** The SerDe class name that takes `mapping.<column>` parameters. */
+const openXSerDe = "org.openx.data.jsonserde.jsonserde";
+
 /** The SerDe class names that mean JSON lines. */
 const jsonSerDes = new Set([
-  "org.openx.data.jsonserde.jsonserde",
+  openXSerDe,
   "org.apache.hive.hcatalog.data.jsonserde",
   "org.apache.hadoop.hive.serde2.jsonserde",
 ]);
+
+/** What a `mapping.<column>` parameter is named with. */
+const mappingPrefix = "mapping.";
 
 /** What one delimited SerDe reads before its parameters are applied. */
 interface SimAthenaSerDeDefaults {
@@ -63,7 +73,9 @@ export function simAthenaRecordReader(
   }
 
   if (jsonSerDes.has(library)) {
-    return jsonRows;
+    const format = jsonFormat(table, library);
+
+    return (text) => simAthenaJsonRows(text, format);
   }
 
   const defaults = delimitedSerDes.get(library);
@@ -79,16 +91,32 @@ export function simAthenaRecordReader(
 }
 
 /**
- * JSON lines, one record per line.
+ * How one table's JSON records reach its columns.
  *
- * A nested object or array is kept as its JSON text, which is what makes
- * `json_extract_scalar` and `cardinality` reach into it.
+ * Only the OpenX SerDe takes the mappings. The Hive JSON SerDes have no
+ * `mapping` property, and a table declaring one against them reads by its
+ * column names on real Athena the same as here.
  */
-function jsonRows(text: string): readonly SimAthenaEngineRow[] {
-  return text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as SimAthenaEngineRow);
+function jsonFormat(
+  table: SimAthenaCatalogTable,
+  library: string,
+): SimAthenaJsonFormat {
+  const parameters =
+    library === openXSerDe
+      ? (table.storageDescriptor?.SerdeInfo?.Parameters ?? {})
+      : {};
+  const mappings = new Map<string, string>();
+
+  for (const [name, key] of Object.entries(parameters)) {
+    if (name.toLowerCase().startsWith(mappingPrefix)) {
+      mappings.set(name.slice(mappingPrefix.length), key);
+    }
+  }
+
+  return {
+    mappings,
+    caseInsensitive: parameters["case.insensitive"]?.toLowerCase() !== "false",
+  };
 }
 
 function delimitedFormat(

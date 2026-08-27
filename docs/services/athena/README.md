@@ -318,6 +318,13 @@ text in one reads as null.
 A nested object or array is kept as its JSON text, and `json_extract_scalar`, `cardinality` and
 `element_at` reach into it.
 
+A `mapping.<column>` parameter on the OpenX JSON SerDe reads that column from the key it names. A
+CloudFront access log table needs it, since a record arrives keyed by `cs(Referer)` and no Athena
+column can be called that. The key matches a record's key of any case until the table sets
+`case.insensitive` to `FALSE`, and after that it matches as written. A mapped column reads null
+where the record holds no such key, including where the record holds a key of the column's own
+name. The Hive JSON SerDes have no `mapping` property, and their columns read by name.
+
 A partition column's value comes from the partition the object sits in. A table projecting its
 partitions takes it from the projection, and a table laid out Hive style under its own location
 takes it from the `key=value` segments of the object's key. Either way the column reads on every
