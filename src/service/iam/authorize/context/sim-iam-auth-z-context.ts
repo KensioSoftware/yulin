@@ -12,7 +12,8 @@ export type SimIamAuthZPolicySourceType =
   | "resource"
   | "trust"
   | "permissions-boundary"
-  | "session";
+  | "session"
+  | "service-control";
 
 export interface SimIamAuthZPolicySource {
   readonly sourceType: SimIamAuthZPolicySourceType;
@@ -49,6 +50,15 @@ export interface SimIamAuthZContext {
    * Resource policies are not gathered from IAM's managed policy store.
    */
   readonly resourcePolicies: readonly SimIamAuthZPolicySource[];
+
+  /**
+   * Service control policies in force for the caller's Account.
+   *
+   * These filter what the Account's principals may do and grant nothing, so
+   * they are kept apart from the two sides that can allow a request. An empty
+   * list means the caller's Account is subject to none.
+   */
+  readonly serviceControlPolicies: readonly SimIamAuthZPolicySource[];
 
   /**
    * How an Allow from each policy side combines into the final decision.

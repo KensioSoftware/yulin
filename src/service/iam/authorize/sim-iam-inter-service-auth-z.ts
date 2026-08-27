@@ -17,6 +17,15 @@ export interface SimIamAuthorizationDecision {
   readonly caller: SimAwsResolvedCaller;
   readonly isAllowed: boolean;
   readonly isDenied: boolean;
+
+  /**
+   * How an AccessDenied error should explain this denial, where the action and
+   * the resource leave something out.
+   *
+   * A service control policy denial is the case this exists for. Absent for a
+   * denial an identity or resource policy accounts for on its own.
+   */
+  readonly denialReason?: string | undefined;
 }
 
 /**
@@ -68,6 +77,7 @@ export class SimIamAllowAllAuth implements SimIamInterServiceAuthZ {
       caller,
       isAllowed: true,
       isDenied: false,
+      denialReason: undefined,
     };
   }
 }

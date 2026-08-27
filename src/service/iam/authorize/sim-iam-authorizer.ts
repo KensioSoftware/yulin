@@ -13,6 +13,7 @@ import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamAccountResolver } from "../registry/sim-iam-account-resolver.js";
 import type { SimIamAuthZPolicySource } from "./context/sim-iam-auth-z-context.js";
 import type { SimIamAccountIdentityPolicies } from "./identity/sim-iam-account-identity-policies.js";
+import type { SimIamServiceControlPolicyResolver } from "./scp/sim-iam-scp-resolver.js";
 
 interface SimIamAuthorizerProperties {
   readonly accountId: SimAwsAccountId;
@@ -21,6 +22,7 @@ interface SimIamAuthorizerProperties {
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
   readonly iamResolver?: SimIamAccountResolver | undefined;
+  readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 }
 
 /**
@@ -42,6 +44,7 @@ export class SimIamAuthorizer implements SimIamAccountIdentityPolicies {
       users: properties.users,
       credentialIdentityResolver: properties.credentialIdentityResolver,
       iamResolver: properties.iamResolver,
+      scpResolver: properties.scpResolver,
     });
   }
 

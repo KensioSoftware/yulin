@@ -11,6 +11,7 @@ import type {
 export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
   identityPolicies: [],
   resourcePolicies: [],
+  serviceControlPolicies: [],
   allowRequirement: new SimIamEitherSideAllowRequirement(),
   action: "s3:GetObject",
   resource: "arn:aws:s3:::test-bucket/test-key",

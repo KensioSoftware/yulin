@@ -16,6 +16,7 @@ import type { SimRoute53Registry } from "../../route53/registry/sim-route53-regi
 import type { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimIam } from "../../iam/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import type { SimIamServiceControlPolicyResolver } from "../../iam/authorize/scp/sim-iam-scp-resolver.js";
 import {
   SimIamAccountAccessKeyIndex,
   type SimIamAccessKeyRegistry,
@@ -37,6 +38,7 @@ interface SimAwsAccountServiceCacheProperties {
   readonly shadowableServiceHosts: SimAwsServiceHosts;
   readonly iamRegistry: SimIamRegistry;
   readonly accessKeyRegistry: SimIamAccessKeyRegistry;
+  readonly scpResolver: SimIamServiceControlPolicyResolver;
 }
 
 /**
@@ -67,6 +69,7 @@ export class SimAwsAccountServiceCache {
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly iamRegistry: SimIamRegistry;
   private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
+  private readonly scpResolver: SimIamServiceControlPolicyResolver;
   private readonly route53Registry: SimRoute53Registry;
   private readonly kmsRegistry: SimKmsRegistry;
   private readonly serviceHosts: SimAwsServiceHosts;
@@ -87,6 +90,7 @@ export class SimAwsAccountServiceCache {
     this.acmRegistry = properties.acmRegistry;
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.iamRegistry = properties.iamRegistry;
+    this.scpResolver = properties.scpResolver;
     this.accessKeyRegistry = properties.accessKeyRegistry;
     this.route53Registry = properties.route53Registry;
     this.kmsRegistry = properties.kmsRegistry;
@@ -153,6 +157,9 @@ export class SimAwsAccountServiceCache {
           // A cross-Account request is decided in both Accounts, so this IAM
           // needs to be able to reach the IAM of the caller's own Account.
           iamResolver: this.iamRegistry,
+          // What the Account's organization allows it to do is decided outside
+          // the Account, so IAM asks simulated Organizations about it.
+          scpResolver: this.scpResolver,
           // Access keys are indexed simulation-wide as they are issued, so a
           // signed request naming only a key id can be traced to this Account.
           credentialRegistry: new SimIamCredentialRegistry({

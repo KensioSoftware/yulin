@@ -59,6 +59,7 @@ export class SimS3MultipartAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: SimS3MultipartAuthorizer.action,
         resource,
       });

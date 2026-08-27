@@ -11,6 +11,7 @@ import type { SimIamAuthorizationInput } from "./context/sim-iam-auth-z-context-
 import type { SimIamAuthZPolicySource } from "./context/sim-iam-auth-z-context.js";
 import type { SimIamAccountIdentityPolicies } from "./identity/sim-iam-account-identity-policies.js";
 import type { SimIamPolicyDecision } from "./sim-iam-decision.js";
+import type { SimIamServiceControlPolicyResolver } from "./scp/sim-iam-scp-resolver.js";
 
 interface SimIamAccountAuthZProperties {
   readonly accountId: SimAwsAccountId;
@@ -27,6 +28,14 @@ interface SimIamAccountAuthZProperties {
    * standalone SimIam has no simulation around it and so no resolver.
    */
   readonly iamResolver?: SimIamAccountResolver | undefined;
+
+  /**
+   * Resolves the service control policies in force for an Account.
+   *
+   * A simulation with an organization in it supplies this. A standalone SimIam
+   * has none, and its Accounts sit outside any organization.
+   */
+  readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 }
 
 /**
@@ -75,6 +84,7 @@ export class SimIamAccountAuthZ implements SimIamAccountIdentityPolicies {
       users: this.properties.users,
       credentialIdentityResolver: this.properties.credentialIdentityResolver,
       iamResolver: this.properties.iamResolver,
+      scpResolver: this.properties.scpResolver,
     });
   }
 }

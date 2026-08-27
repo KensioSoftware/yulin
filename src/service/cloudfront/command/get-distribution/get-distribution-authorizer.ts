@@ -44,6 +44,7 @@ export class GetDistributionAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: GetDistributionAuthorizer.action,
         resource,
       });

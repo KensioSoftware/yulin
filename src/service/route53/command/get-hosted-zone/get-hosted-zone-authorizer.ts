@@ -42,6 +42,7 @@ export class GetHostedZoneAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: GetHostedZoneAuthorizer.action,
         resource: hostedZoneArn,
       });

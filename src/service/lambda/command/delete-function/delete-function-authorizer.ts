@@ -34,6 +34,7 @@ export class DeleteFunctionAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: DeleteFunctionAuthorizer.action,
         resource: functionArn,
       });

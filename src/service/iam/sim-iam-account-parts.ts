@@ -21,6 +21,7 @@ import {
 } from "./credential/user/sim-iam-user-credential-generator.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import type { SimIamAccountResolver } from "./registry/sim-iam-account-resolver.js";
+import type { SimIamServiceControlPolicyResolver } from "./authorize/scp/sim-iam-scp-resolver.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
 
@@ -39,6 +40,15 @@ export interface SimIamProperties {
    * simulation around it and so leaves this out.
    */
   readonly iamResolver?: SimIamAccountResolver;
+
+  /**
+   * Resolves the service control policies in force for this Account.
+   *
+   * Simulated Organizations supplies this when a SimAws builds IAM. A
+   * standalone SimIam has no organization around it, which is the same as an
+   * Account belonging to none.
+   */
+  readonly scpResolver?: SimIamServiceControlPolicyResolver;
 }
 
 /**
@@ -94,6 +104,7 @@ export class SimIamAccountParts {
       users: this.users,
       credentialIdentityResolver: credentialRegistry,
       iamResolver: properties.iamResolver,
+      scpResolver: properties.scpResolver,
     });
   }
 

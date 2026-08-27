@@ -30,6 +30,8 @@ import type {
   SimAwsResolvedCaller,
 } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
+import { SimIamAuthZScpSourceBuilder } from "./sim-iam-auth-z-scp-source-builder.js";
+import type { SimIamServiceControlPolicyResolver } from "../scp/sim-iam-scp-resolver.js";
 
 export interface SimIamResourcePolicyInput {
   readonly document: SimIamPolicyDocument;
@@ -114,6 +116,12 @@ interface SimIamAuthZContextBuilderProperties {
    * of a cross-Account request.
    */
   readonly iamResolver?: SimIamAccountResolver | undefined;
+
+  /**
+   * Resolves the service control policies in force for an Account. A
+   * standalone SimIam has no organization around it and leaves this out.
+   */
+  readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 }
 
 /**
@@ -137,16 +145,21 @@ interface SimIamAuthZContextBuilderProperties {
  * They are passed through the authorization input rather than loaded from the
  * IAM role or managed-policy stores.
  *
- * Permissions boundaries, session policies, SCPs, and role trust-policy
- * assume-role semantics are not part of this context assembly path yet. Add
- * those concerns through separate policy-source builders so this class stays
- * focused on composing the authorization request.
+ * Service control policies come from the organization the caller's Account
+ * belongs to, read by SimIamAuthZScpSourceBuilder. They filter and grant
+ * nothing, so they travel apart from the sides that can allow a request.
+ *
+ * Permissions boundaries, session policies, and role trust-policy assume-role
+ * semantics are not part of this context assembly path yet. Add those concerns
+ * through separate policy-source builders so this class stays focused on
+ * composing the authorization request.
  */
 export class SimIamAuthZContextBuilder {
   private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
   private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
   private readonly callerAccountResolver: SimIamCallerAccountResolver;
   private readonly allowRequirement = new SimIamAuthZAllowRequirement();
+  private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
@@ -161,6 +174,10 @@ export class SimIamAuthZContextBuilder {
     this.callerAccountResolver = new SimIamCallerAccountResolver({
       accountId: properties.accountId,
       iamResolver: properties.iamResolver,
+    });
+    this.scpSourceBuilder = new SimIamAuthZScpSourceBuilder({
+      accountId: properties.accountId,
+      scpResolver: properties.scpResolver,
     });
   }
 
@@ -179,6 +196,7 @@ export class SimIamAuthZContextBuilder {
         ...callerAccount.identityPolicies,
       ],
       resourcePolicies: this.resourcePolicySources(input),
+      serviceControlPolicies: this.scpSourceBuilder.build(callerContext.caller),
       allowRequirement: this.allowRequirement.resolve(
         callerAccount,
         input.requiresResourcePolicyAllow,

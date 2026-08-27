@@ -88,6 +88,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: "s3:CreateBucket",
         resource,
       });
