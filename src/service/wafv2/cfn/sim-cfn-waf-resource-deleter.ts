@@ -14,6 +14,7 @@ import {
   wafWebAclAssociationResourceTypeName,
   wafWebAclResourceTypeName,
 } from "./sim-cfn-waf-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * Deletes the simulated WAFv2 resources a CloudFormation Stack created.
@@ -36,6 +37,7 @@ export class SimCfnWafResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const creators = this.#creators;
 
@@ -44,6 +46,7 @@ export class SimCfnWafResourceDeleter {
         await creators.webAcl.delete(
           resource,
           created<SimWafWebAcl>(resource, "web ACL"),
+          options,
         );
         return;
       }
@@ -51,6 +54,7 @@ export class SimCfnWafResourceDeleter {
         await creators.association.delete(
           resource,
           created<SimWafCfnWebAclAssociation>(resource, "web ACL association"),
+          options,
         );
         return;
       }
@@ -58,6 +62,7 @@ export class SimCfnWafResourceDeleter {
         await creators.ipSet.delete(
           resource,
           created<SimWafIpSet>(resource, "IP set"),
+          options,
         );
         return;
       }
@@ -65,6 +70,7 @@ export class SimCfnWafResourceDeleter {
         await creators.regexPatternSet.delete(
           resource,
           created<SimWafRegexPatternSet>(resource, "regex pattern set"),
+          options,
         );
         return;
       }

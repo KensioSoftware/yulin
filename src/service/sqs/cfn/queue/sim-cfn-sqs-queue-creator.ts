@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimSqs } from "../../sim-sqs.js";
 import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 import { SimCfnSqsQueueProperties } from "./sim-cfn-sqs-queue-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSqsQueueCreatorProperties {
   readonly sqs: SimSqs;
@@ -30,6 +31,7 @@ export class SimCfnSqsQueueCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSqsQueue> {
     const queueProperties = new SimCfnSqsQueueProperties({
       resource,
@@ -37,9 +39,10 @@ export class SimCfnSqsQueueCreator {
     });
     const name = queueProperties.name();
 
-    await this.sqs.createQueue({
-      input: { QueueName: name, Attributes: queueProperties.attributes() },
-    });
+    await this.sqs.createQueue(
+      { input: { QueueName: name, Attributes: queueProperties.attributes() } },
+      options,
+    );
 
     const queue = this.sqs.findQueue(name);
     assertDefined(queue, `sim SQS queue ${name} after CloudFormation creation`);

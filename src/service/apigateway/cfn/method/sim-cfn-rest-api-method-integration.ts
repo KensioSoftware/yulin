@@ -3,6 +3,7 @@ import type {
   SimCfnRestApiMethodAddress,
   SimCfnRestApiMethodProperties,
 } from "./sim-cfn-rest-api-method-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRestApiMethodIntegrationProperties {
   readonly apiGateway: SimApiGateway;
@@ -30,15 +31,16 @@ export class SimCfnRestApiMethodIntegration {
   async put(
     methodProperties: SimCfnRestApiMethodProperties,
     address: SimCfnRestApiMethodAddress,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     try {
       const input = methodProperties.putIntegrationInput();
 
       if (input !== undefined) {
-        await this.apiGateway.putIntegration({ input });
+        await this.apiGateway.putIntegration({ input }, options);
       }
     } catch (error) {
-      await this.apiGateway.deleteMethod({ input: address });
+      await this.apiGateway.deleteMethod({ input: address }, options);
 
       throw error;
     }

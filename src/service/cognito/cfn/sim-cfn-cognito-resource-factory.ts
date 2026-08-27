@@ -2,7 +2,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provider.js";
 import { SimCfnCognitoClientCreator } from "./client/sim-cfn-cognito-client-creator.js";
 import { SimCfnCognitoDomainCreator } from "./domain/sim-cfn-cognito-domain-creator.js";
@@ -50,22 +52,23 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "UserPool": {
-        return await this.userPoolCreator.create(resource, properties);
+        return await this.userPoolCreator.create(resource, properties, options);
       }
       case "UserPoolClient": {
-        return await this.clientCreator.create(resource, properties);
+        return await this.clientCreator.create(resource, properties, options);
       }
       case "UserPoolGroup": {
-        return await this.groupCreator.create(resource, properties);
+        return await this.groupCreator.create(resource, properties, options);
       }
       case "UserPoolDomain": {
-        return await this.domainCreator.create(resource, properties);
+        return await this.domainCreator.create(resource, properties, options);
       }
       case "UserPoolIdentityProvider": {
-        return await this.idpCreator.create(resource, properties);
+        return await this.idpCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -81,7 +84,12 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

@@ -5,6 +5,7 @@ import type { SimElbV2Listener } from "../../listener/sim-elbv2-listener.js";
 import type { SimElbV2 } from "../../sim-elbv2.js";
 import type { SimElbV2Stores } from "../../sim-elbv2-stores.js";
 import { SimCfnElbV2ListenerProperties } from "./sim-cfn-elbv2-listener-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnElbV2ListenerCreatorProperties {
   readonly elbV2: SimElbV2;
@@ -36,6 +37,7 @@ export class SimCfnElbV2ListenerCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimElbV2Listener> {
     const declared = new SimCfnElbV2ListenerProperties({
       resource,
@@ -45,7 +47,7 @@ export class SimCfnElbV2ListenerCreator {
 
     declared.recordIgnoredProperties();
 
-    const created = await this.elbV2.createListener({ input });
+    const created = await this.elbV2.createListener({ input }, options);
     const listenerArn = created.Listeners?.[0]?.ListenerArn;
 
     assertDefined(
@@ -63,9 +65,13 @@ export class SimCfnElbV2ListenerCreator {
    *
    * Its rules come down with it, as they do on real ELB.
    */
-  async delete(listener: SimElbV2Listener): Promise<void> {
-    await this.elbV2.deleteListener({
-      input: { ListenerArn: listener.arn },
-    });
+  async delete(
+    listener: SimElbV2Listener,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.elbV2.deleteListener(
+      { input: { ListenerArn: listener.arn } },
+      options,
+    );
   }
 }

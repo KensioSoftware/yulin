@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimHttpApiDomainName } from "../../domain/sim-http-api-domain-name.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import { SimCfnHttpApiDomainProperties } from "./sim-cfn-http-api-domain-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiDomainCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -31,15 +32,17 @@ export class SimCfnHttpApiDomainCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiDomainName> {
     const domainProperties = new SimCfnHttpApiDomainProperties({
       resource,
       properties,
     });
 
-    const created = await this.apiGatewayV2.createDomainName({
-      input: domainProperties.createDomainNameInput(),
-    });
+    const created = await this.apiGatewayV2.createDomainName(
+      { input: domainProperties.createDomainNameInput() },
+      options,
+    );
 
     const domain = this.apiGatewayV2.findDomainName(created.DomainName);
     assertDefined(

@@ -1,4 +1,5 @@
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimEventBridge } from "../sim-event-bridge.js";
 import { SimCfnEventBusProperties } from "./bus/sim-cfn-event-bus-properties.js";
@@ -30,14 +31,15 @@ export class SimCfnEventBridgeResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "EventBus": {
-        await this.deleteBus(resource, properties);
+        await this.deleteBus(resource, properties, options);
         return;
       }
       case "Rule": {
-        await this.deleteRule(resource, properties);
+        await this.deleteRule(resource, properties, options);
         return;
       }
       default: {
@@ -56,13 +58,14 @@ export class SimCfnEventBridgeResourceDeleter {
   private async deleteBus(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const name = new SimCfnEventBusProperties({
       resource,
       properties,
     }).name();
 
-    await this.eventBridge.deleteEventBus({ input: { Name: name } });
+    await this.eventBridge.deleteEventBus({ input: { Name: name } }, options);
   }
 
   /**
@@ -71,17 +74,21 @@ export class SimCfnEventBridgeResourceDeleter {
   private async deleteRule(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const ruleProperties = new SimCfnEventRuleProperties({
       resource,
       properties,
     });
 
-    await this.eventBridge.deleteRule({
-      input: {
-        Name: ruleProperties.name(),
-        EventBusName: ruleProperties.busName(),
+    await this.eventBridge.deleteRule(
+      {
+        input: {
+          Name: ruleProperties.name(),
+          EventBusName: ruleProperties.busName(),
+        },
       },
-    });
+      options,
+    );
   }
 }

@@ -1,9 +1,11 @@
-import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import { simCfnEcsCreatedResource } from "./sim-cfn-ecs-created-resource.js";
 import type { SimEcsCluster } from "../cluster/sim-ecs-cluster.js";
 import type { SimEcsService } from "../service/sim-ecs-service.js";
 import type { SimEcsTaskDefinition } from "../task-definition/sim-ecs-task-definition.js";
@@ -47,20 +49,22 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "Cluster": {
-        return await this.clusterCreator.create(resource, properties);
+        return await this.clusterCreator.create(resource, properties, options);
       }
       case "TaskDefinition": {
         return await this.taskDefinitionCreator.create(
           resource,
           properties,
           context.bindings,
+          options,
         );
       }
       case "Service": {
-        return await this.serviceCreator.create(resource, properties);
+        return await this.serviceCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -76,11 +80,15 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Cluster": {
         await this.clusterCreator.delete(
           simCfnEcsCreatedResource<SimEcsCluster>(resource, "cluster"),
+          options,
         );
 
         return;
@@ -91,6 +99,7 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
             resource,
             "task definition",
           ),
+          options,
         );
 
         return;
@@ -98,6 +107,7 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
       case "Service": {
         await this.serviceCreator.delete(
           simCfnEcsCreatedResource<SimEcsService>(resource, "service"),
+          options,
         );
 
         return;
@@ -110,21 +120,4 @@ export class SimEcsCfnResourceFactory implements SimCfnServiceResourceFactory {
       }
     }
   }
-}
-
-/**
- * The simulated resource a Resource created, which a teardown reaches it by.
- */
-function simCfnEcsCreatedResource<T extends object>(
-  resource: SimCfnResource,
-  described: string,
-): T {
-  const created = resource.simResource as T | undefined;
-
-  assertDefined(
-    created,
-    `sim ECS ${described} for CloudFormation Resource ${resource.logicalId}`,
-  );
-
-  return created;
 }

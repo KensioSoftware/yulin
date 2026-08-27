@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamUser } from "../../user/sim-iam-user.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamUserDeleterProperties {
   readonly iam: SimIam;
@@ -28,7 +29,10 @@ export class SimCfnIamUserDeleter {
   /**
    * Delete the User a CloudFormation Resource created.
    */
-  async delete(resource: SimCfnResource): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const user = resource.simResource as SimIamUser | undefined;
     assertDefined(
       user,
@@ -38,6 +42,6 @@ export class SimCfnIamUserDeleter {
     user.attachedPolicyArns.clear();
     user.inlinePolicies.clear();
 
-    await this.iam.deleteUser({ input: { UserName: user.userName } });
+    await this.iam.deleteUser({ input: { UserName: user.userName } }, options);
   }
 }

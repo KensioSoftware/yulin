@@ -7,6 +7,7 @@ import type { SimApiGateway } from "../../sim-api-gateway.js";
 import type { SimCfnRestApiImports } from "../sim-cfn-rest-api-imports.js";
 import { SimCfnRestApiImportProperties } from "./sim-cfn-rest-api-import-properties.js";
 import { SimCfnRestApiProperties } from "./sim-cfn-rest-api-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRestApiCreatorProperties {
   readonly apiGateway: SimApiGateway;
@@ -36,13 +37,19 @@ export class SimCfnRestApiCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRestApi> {
     const apiProperties = new SimCfnRestApiProperties({
       resource,
       properties,
     });
 
-    const created = await this.created(resource, properties, apiProperties);
+    const created = await this.created(
+      resource,
+      properties,
+      apiProperties,
+      options,
+    );
 
     if (apiProperties.imported()) {
       this.imports.record(created.id, resource.logicalId);
@@ -64,18 +71,19 @@ export class SimCfnRestApiCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
     apiProperties: SimCfnRestApiProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<SimRestApiView> {
-    if (apiProperties.imported()) {
-      return await this.apiGateway.importRestApi({
-        input: new SimCfnRestApiImportProperties({
-          resource,
-          properties,
-        }).importRestApiInput(),
-      });
+    if (!apiProperties.imported()) {
+      const input = apiProperties.createRestApiInput();
+
+      return await this.apiGateway.createRestApi({ input }, options);
     }
 
-    return await this.apiGateway.createRestApi({
-      input: apiProperties.createRestApiInput(),
-    });
+    const input = new SimCfnRestApiImportProperties({
+      resource,
+      properties,
+    }).importRestApiInput();
+
+    return await this.apiGateway.importRestApi({ input }, options);
   }
 }

@@ -6,6 +6,7 @@ import type { SimEventBridge } from "../../sim-event-bridge.js";
 import { simCfnEventBridgeResourceCreation } from "../sim-cfn-event-bridge-resource-error.js";
 import { eventBusResourceType } from "../sim-cfn-event-bridge-resource-types.js";
 import { SimCfnEventBusProperties } from "./sim-cfn-event-bus-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnEventBusCreatorProperties {
   readonly eventBridge: SimEventBridge;
@@ -32,6 +33,7 @@ export class SimCfnEventBusCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimEventBus> {
     const busProperties = new SimCfnEventBusProperties({
       resource,
@@ -47,9 +49,10 @@ export class SimCfnEventBusCreator {
       eventBusResourceType,
       resource.logicalId,
       async () => {
-        await this.eventBridge.createEventBus({
-          input: { Name: name, Description: description },
-        });
+        await this.eventBridge.createEventBus(
+          { input: { Name: name, Description: description } },
+          options,
+        );
 
         const bus = this.eventBridge.findEventBus(name);
 

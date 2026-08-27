@@ -7,6 +7,7 @@ import { simCfnPersonalizeCreated } from "./sim-cfn-personalize-created.js";
 import { SimCfnPersonalizeProperties } from "./sim-cfn-personalize-properties.js";
 import { simCfnPersonalizeResourceCreation } from "./sim-cfn-personalize-resource-error.js";
 import { personalizeDatasetResourceType } from "./sim-cfn-personalize-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const readProperties = new Set([
   "Name",
@@ -49,6 +50,7 @@ export class SimCfnPersonalizeDatasetCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimPersonalizeDataset> {
     const read = new SimCfnPersonalizeProperties({
       resourceType: personalizeDatasetResourceType,
@@ -70,7 +72,10 @@ export class SimCfnPersonalizeDatasetCreator {
       personalizeDatasetResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#personalize.createDataset({ input });
+        const created = await this.#personalize.createDataset(
+          { input },
+          options,
+        );
 
         return simCfnPersonalizeCreated(
           this.#resources.datasets,
@@ -82,9 +87,13 @@ export class SimCfnPersonalizeDatasetCreator {
   }
 
   /** Delete a dataset an AWS::Personalize::Dataset Resource made. */
-  async delete(dataset: SimPersonalizeDataset): Promise<void> {
-    await this.#personalize.deleteDataset({
-      input: { datasetArn: dataset.arn },
-    });
+  async delete(
+    dataset: SimPersonalizeDataset,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#personalize.deleteDataset(
+      { input: { datasetArn: dataset.arn } },
+      options,
+    );
   }
 }

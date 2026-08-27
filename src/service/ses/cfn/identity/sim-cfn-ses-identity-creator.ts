@@ -6,6 +6,7 @@ import type { SimSesV2 } from "../../sim-ses-v2.js";
 import { simCfnSesResourceCreation } from "../sim-cfn-ses-resource-error.js";
 import { sesEmailIdentityResourceType } from "../sim-cfn-ses-resource-types.js";
 import { SimCfnSesIdentityProperties } from "./sim-cfn-ses-identity-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSesIdentityCreatorProperties {
   readonly ses: SimSesV2;
@@ -43,6 +44,7 @@ export class SimCfnSesIdentityCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSesIdentity> {
     const identityProperties = new SimCfnSesIdentityProperties({
       resource,
@@ -58,9 +60,10 @@ export class SimCfnSesIdentityCreator {
       sesEmailIdentityResourceType,
       resource.logicalId,
       async () => {
-        await this.#ses.createEmailIdentity({
-          input: { EmailIdentity: emailIdentity },
-        });
+        await this.#ses.createEmailIdentity(
+          { input: { EmailIdentity: emailIdentity } },
+          options,
+        );
 
         const identity = this.#ses.findIdentity(emailIdentity);
 
@@ -79,9 +82,13 @@ export class SimCfnSesIdentityCreator {
   /**
    * Delete an identity created from an AWS::SES::EmailIdentity Resource.
    */
-  async delete(identity: SimSesIdentity): Promise<void> {
-    await this.#ses.deleteEmailIdentity({
-      input: { EmailIdentity: identity.emailIdentity },
-    });
+  async delete(
+    identity: SimSesIdentity,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#ses.deleteEmailIdentity(
+      { input: { EmailIdentity: identity.emailIdentity } },
+      options,
+    );
   }
 }

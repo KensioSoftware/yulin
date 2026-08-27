@@ -6,6 +6,7 @@ import type { SimSesV2 } from "../../sim-ses-v2.js";
 import { simCfnSesResourceCreation } from "../sim-cfn-ses-resource-error.js";
 import { sesConfigurationSetResourceType } from "../sim-cfn-ses-resource-types.js";
 import { SimCfnSesConfigurationSetProperties } from "./sim-cfn-ses-configuration-set-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSesConfigurationSetCreatorProperties {
   readonly ses: SimSesV2;
@@ -32,6 +33,7 @@ export class SimCfnSesConfigurationSetCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSesConfigurationSet> {
     const setProperties = new SimCfnSesConfigurationSetProperties({
       resource,
@@ -45,7 +47,7 @@ export class SimCfnSesConfigurationSetCreator {
       sesConfigurationSetResourceType,
       resource.logicalId,
       async () => {
-        await this.#ses.createConfigurationSet({ input });
+        await this.#ses.createConfigurationSet({ input }, options);
 
         const name = input.ConfigurationSetName;
 
@@ -70,9 +72,15 @@ export class SimCfnSesConfigurationSetCreator {
    * Delete a configuration set created from an AWS::SES::ConfigurationSet
    * Resource.
    */
-  async delete(configurationSet: SimSesConfigurationSet): Promise<void> {
-    await this.#ses.deleteConfigurationSet({
-      input: { ConfigurationSetName: configurationSet.configurationSetName },
-    });
+  async delete(
+    configurationSet: SimSesConfigurationSet,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#ses.deleteConfigurationSet(
+      {
+        input: { ConfigurationSetName: configurationSet.configurationSetName },
+      },
+      options,
+    );
   }
 }

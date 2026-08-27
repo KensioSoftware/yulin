@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCloudFrontKeyValueStore } from "../../key-value-store/sim-cf-key-value-store.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
 import { SimCfnCfKeyValueStoreConfigReader } from "./sim-cfn-cf-kvs-config.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCfKeyValueStoreCreatorProperties {
   readonly cloudFront: SimCloudFront;
@@ -30,18 +31,22 @@ export class SimCfnCfKeyValueStoreCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCloudFrontKeyValueStore> {
     const config = new SimCfnCfKeyValueStoreConfigReader({
       resource,
       properties,
     }).read();
 
-    const created = await this.cloudFront.keyValueStores().createKeyValueStore({
-      input: {
-        Name: config.name,
-        ...(config.comment !== undefined && { Comment: config.comment }),
+    const created = await this.cloudFront.keyValueStores().createKeyValueStore(
+      {
+        input: {
+          Name: config.name,
+          ...(config.comment !== undefined && { Comment: config.comment }),
+        },
       },
-    });
+      options,
+    );
 
     const store = this.cloudFront
       .keyValueStores()
@@ -63,7 +68,10 @@ export class SimCfnCfKeyValueStoreCreator {
    * anything written to it since will have moved the one creation returned.
    * Tearing a Stack down is not the place to make a caller thread that through.
    */
-  async delete(resource: SimCfnResource): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const store = resource.simResource as
       | SimCloudFrontKeyValueStore
       | undefined;
@@ -72,8 +80,11 @@ export class SimCfnCfKeyValueStoreCreator {
       return;
     }
 
-    await this.cloudFront.keyValueStores().deleteKeyValueStore({
-      input: { Name: store.name, IfMatch: store.resourceETag },
-    });
+    await this.cloudFront
+      .keyValueStores()
+      .deleteKeyValueStore(
+        { input: { Name: store.name, IfMatch: store.resourceETag } },
+        options,
+      );
   }
 }

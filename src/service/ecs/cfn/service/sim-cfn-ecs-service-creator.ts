@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimEcsService } from "../../service/sim-ecs-service.js";
 import type { SimEcs } from "../../sim-ecs.js";
 import { SimCfnEcsServiceProperties } from "./sim-cfn-ecs-service-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnEcsServiceCreatorProperties {
   readonly ecs: SimEcs;
@@ -36,6 +37,7 @@ export class SimCfnEcsServiceCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimEcsService> {
     const serviceProperties = new SimCfnEcsServiceProperties({
       resource,
@@ -45,7 +47,7 @@ export class SimCfnEcsServiceCreator {
 
     serviceProperties.recordIgnoredProperties();
 
-    const created = await this.ecs.createService({ input });
+    const created = await this.ecs.createService({ input }, options);
     const serviceArn = created.service?.serviceArn;
 
     assertDefined(
@@ -65,13 +67,19 @@ export class SimCfnEcsServiceCreator {
    * same thing: the tasks stop, and the service is left `INACTIVE` rather than
    * removed, so something holding its ARN can still find out what became of it.
    */
-  async delete(service: SimEcsService): Promise<void> {
-    await this.ecs.deleteService({
-      input: {
-        cluster: service.clusterName,
-        service: service.serviceName,
-        force: true,
+  async delete(
+    service: SimEcsService,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.ecs.deleteService(
+      {
+        input: {
+          cluster: service.clusterName,
+          service: service.serviceName,
+          force: true,
+        },
       },
-    });
+      options,
+    );
   }
 }

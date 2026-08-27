@@ -3,21 +3,20 @@ import type { SimCloudFront } from "../sim-cloudfront.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
 import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
 import { SimCfnCfOriginAccessControlCreator } from "./origin-access-control/sim-cfn-cf-oac-creator.js";
 import { SimCfnCfKeyValueStoreCreator } from "./key-value-store/sim-cfn-cf-kvs-creator.js";
-import type { SimCloudFrontFunction } from "../cff/sim-cloudfront-function.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
 
 /**
  * CloudFormation Resource factory for simulated CloudFront resources.
  */
 export class SimCloudFrontCloudFormationResourceFactory implements SimCfnServiceResourceFactory {
-  private readonly cloudFront: SimCloudFront;
   private readonly distroCreator: SimCfnCfDistroCreator;
   private readonly functionCreator: SimCfnCffCreator;
   private readonly distroDeleter: SimCfnCfDistroDeleter;
@@ -26,7 +25,6 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly keyValueStoreCreator: SimCfnCfKeyValueStoreCreator;
 
   constructor(cloudFront: SimCloudFront) {
-    this.cloudFront = cloudFront;
     this.distroCreator = new SimCfnCfDistroCreator({ cloudFront });
     this.functionCreator = new SimCfnCffCreator({ cloudFront });
     this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
@@ -64,7 +62,11 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
         return this.originAccessControlCreator.create(resource, properties);
       }
       case "KeyValueStore": {
-        return await this.keyValueStoreCreator.create(resource, properties);
+        return await this.keyValueStoreCreator.create(
+          resource,
+          properties,
+          simCfnResourceCallerOptions(context.caller),
+        );
       }
       default: {
         throw new Error(
@@ -81,14 +83,17 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Distribution": {
-        await this.distroDeleter.delete(resource);
+        await this.distroDeleter.delete(resource, options);
         return;
       }
       case "Function": {
-        await this.deleteFunction(resource);
+        await this.functionCreator.delete(resource, options);
         return;
       }
       case "ResponseHeadersPolicy": {
@@ -100,7 +105,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
         return;
       }
       case "KeyValueStore": {
-        await this.keyValueStoreCreator.delete(resource);
+        await this.keyValueStoreCreator.delete(resource, options);
         return;
       }
       default: {
@@ -109,19 +114,5 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
         );
       }
     }
-  }
-
-  private async deleteFunction(resource: SimCfnResource): Promise<void> {
-    const cloudFrontFunction = resource.simResource as
-      | SimCloudFrontFunction
-      | undefined;
-    assertDefined(
-      cloudFrontFunction,
-      `sim CloudFront Function for CloudFormation Resource ${resource.logicalId}`,
-    );
-
-    await this.cloudFront.deleteFunction({
-      input: { Name: cloudFrontFunction.name },
-    });
   }
 }

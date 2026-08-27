@@ -8,12 +8,25 @@ import {
   SimCdkAssetPublications,
 } from "./sim-cdk-asset-publications.js";
 import { readSimCdkAssetBytes } from "./sim-cdk-asset-bytes.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 
 interface SimCdkAssetsPublisherProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stackName?: string | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+
+  /**
+   * The principal the deployment runs as, which the staging Bucket is created
+   * and written to as. A real `cdk deploy` publishes assets before
+   * CloudFormation sees the template, and it publishes them as somebody; a
+   * deployment that names a caller is what says who.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -75,14 +88,19 @@ export class SimCdkAssetsPublisher {
     }
 
     const s3 = this.stagingS3();
-    await this.ensureBucket(s3, publication.bucketName);
-    await s3.putObject({
-      input: {
-        Bucket: publication.bucketName,
-        Key: publication.objectKey,
-        Body: assetBytes,
+    const options = simCfnResourceCallerOptions(this.properties.caller);
+
+    await this.ensureBucket(s3, publication.bucketName, options);
+    await s3.putObject(
+      {
+        input: {
+          Bucket: publication.bucketName,
+          Key: publication.objectKey,
+          Body: assetBytes,
+        },
       },
-    });
+      options,
+    );
   }
 
   /**
@@ -96,13 +114,17 @@ export class SimCdkAssetsPublisher {
    * wanted, whoever created it. Anything else, such as the name already being
    * taken in another scope, is a real failure and is reported.
    */
-  private async ensureBucket(s3: SimS3, bucketName: string): Promise<void> {
+  private async ensureBucket(
+    s3: SimS3,
+    bucketName: string,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     if (s3.getSimBucketByName(bucketName) !== undefined) {
       return;
     }
 
     try {
-      await s3.createBucket({ input: { Bucket: bucketName } });
+      await s3.createBucket({ input: { Bucket: bucketName } }, options);
     } catch (error) {
       if (s3.getSimBucketByName(bucketName) === undefined) {
         throw error;

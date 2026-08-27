@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import { SimCfnDynamoDbTableProperties } from "./sim-cfn-dynamodb-table-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnDynamoDbTableCreatorProperties {
   readonly dynamoDb: SimDynamoDb;
@@ -31,6 +32,7 @@ export class SimCfnDynamoDbTableCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimDynamoDbTable> {
     const tableProperties = new SimCfnDynamoDbTableProperties({
       resource,
@@ -40,23 +42,27 @@ export class SimCfnDynamoDbTableCreator {
 
     const name = tableProperties.name();
 
-    await this.dynamoDb.createTable({
-      input: {
-        TableName: name,
-        KeySchema: tableProperties.keySchema(),
-        AttributeDefinitions: tableProperties.attributeDefinitions(),
-        BillingMode: tableProperties.billingMode(),
-        ProvisionedThroughput: tableProperties.provisionedThroughput(),
-        GlobalSecondaryIndexes: tableProperties.globalSecondaryIndexes(),
-        LocalSecondaryIndexes: tableProperties.localSecondaryIndexes(),
-        TableClass: tableProperties.tableClass(),
-        DeletionProtectionEnabled: tableProperties.deletionProtectionEnabled(),
-        StreamSpecification: tableProperties.streamSpecification(),
-        Tags: tableProperties.tags(),
+    await this.dynamoDb.createTable(
+      {
+        input: {
+          TableName: name,
+          KeySchema: tableProperties.keySchema(),
+          AttributeDefinitions: tableProperties.attributeDefinitions(),
+          BillingMode: tableProperties.billingMode(),
+          ProvisionedThroughput: tableProperties.provisionedThroughput(),
+          GlobalSecondaryIndexes: tableProperties.globalSecondaryIndexes(),
+          LocalSecondaryIndexes: tableProperties.localSecondaryIndexes(),
+          TableClass: tableProperties.tableClass(),
+          DeletionProtectionEnabled:
+            tableProperties.deletionProtectionEnabled(),
+          StreamSpecification: tableProperties.streamSpecification(),
+          Tags: tableProperties.tags(),
+        },
       },
-    });
+      options,
+    );
 
-    await this.applyTimeToLive(name, tableProperties);
+    await this.applyTimeToLive(name, tableProperties, options);
 
     const table = this.dynamoDb.findTable(name);
     assertDefined(
@@ -82,6 +88,7 @@ export class SimCfnDynamoDbTableCreator {
   private async applyTimeToLive(
     name: string,
     tableProperties: SimCfnDynamoDbTableProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const specification = tableProperties.timeToLiveSpecification();
 
@@ -89,8 +96,9 @@ export class SimCfnDynamoDbTableCreator {
       return;
     }
 
-    await this.dynamoDb.updateTimeToLive({
-      input: { TableName: name, TimeToLiveSpecification: specification },
-    });
+    await this.dynamoDb.updateTimeToLive(
+      { input: { TableName: name, TimeToLiveSpecification: specification } },
+      options,
+    );
   }
 }

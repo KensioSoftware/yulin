@@ -333,7 +333,7 @@ describe("AWS::CloudWatch::Alarm", () => {
       factory.create("Dashboard", {} as never, {} as never),
     );
     const deleted = await assertThrowsErrorAsync(async () =>
-      factory.delete("Dashboard", {} as never),
+      factory.delete("Dashboard", {} as never, {} as never),
     );
 
     // Then both are reported as unsupported, which the Stack records as a skip

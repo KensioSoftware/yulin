@@ -8,6 +8,7 @@ import type { SimCfnElbV2ListenerCreator } from "./listener/sim-cfn-elbv2-listen
 import type { SimCfnElbV2LoadBalancerCreator } from "./load-balancer/sim-cfn-elbv2-load-balancer-creator.js";
 import type { SimCfnElbV2ListenerRuleCreator } from "./rule/sim-cfn-elbv2-listener-rule-creator.js";
 import type { SimCfnElbV2TargetGroupCreator } from "./target-group/sim-cfn-elbv2-target-group-creator.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimElbV2CfnResourceDeleterProperties {
   readonly loadBalancers: SimCfnElbV2LoadBalancerCreator;
@@ -47,11 +48,13 @@ export class SimElbV2CfnResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "LoadBalancer": {
         await this.loadBalancers.delete(
           simCfnElbV2Created<SimElbV2LoadBalancer>(resource, "load balancer"),
+          options,
         );
 
         return;
@@ -59,6 +62,7 @@ export class SimElbV2CfnResourceDeleter {
       case "TargetGroup": {
         await this.targetGroups.delete(
           simCfnElbV2Created<SimElbV2TargetGroup>(resource, "target group"),
+          options,
         );
 
         return;
@@ -66,6 +70,7 @@ export class SimElbV2CfnResourceDeleter {
       case "Listener": {
         await this.listeners.delete(
           simCfnElbV2Created<SimElbV2Listener>(resource, "listener"),
+          options,
         );
 
         return;
@@ -73,6 +78,7 @@ export class SimElbV2CfnResourceDeleter {
       case "ListenerRule": {
         await this.rules.delete(
           simCfnElbV2Created<SimElbV2ListenerRule>(resource, "rule"),
+          options,
         );
 
         return;

@@ -1,5 +1,6 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
@@ -24,6 +25,12 @@ interface SimCfnStackResourceOperationsProperties {
   readonly stackName: SimCloudFormationStackName;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal the Stack's Resource work is authorized as. An omitted
+   * caller leaves each service to decide the request as the Account root.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -45,28 +52,45 @@ export class SimCfnStackResourceOperations {
   private readonly stackName: SimCloudFormationStackName;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
   private cdkOutContext: SimCdkOutContext | undefined;
+  private caller: SimAwsCaller | undefined;
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {
-    const { simAws, accountRegionScope, stackName, cdkOutContext, bindings } =
-      properties;
+    const {
+      simAws,
+      accountRegionScope,
+      stackName,
+      cdkOutContext,
+      bindings,
+      caller,
+    } = properties;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
     this.stackName = stackName;
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
+    this.caller = caller;
   }
 
   /**
-   * Read Resources from a different CDK cloud assembly from now on.
+   * Take on what an update brings with it, for this and every later operation.
    *
    * A synthesis writes the template and the assets manifest beside it together,
    * so a Stack updated from a re-synthesized template needs the manifest that
    * came with it. Keeping the one the Stack was deployed from would look up the
    * asset a replaced Resource names in a manifest written before it existed.
+   *
+   * An update naming a caller runs as that one, and the Stack is torn down as
+   * it afterwards. An update that names none keeps the deployment's caller, so
+   * a Stack updated from a plain template path goes on running as whoever
+   * deployed it.
    */
-  useCdkOutContext(cdkOutContext: SimCdkOutContext): void {
-    this.cdkOutContext = cdkOutContext;
+  useUpdate(properties: {
+    readonly cdkOutContext?: SimCdkOutContext | undefined;
+    readonly caller?: SimAwsCaller | undefined;
+  }): void {
+    this.cdkOutContext = properties.cdkOutContext ?? this.cdkOutContext;
+    this.caller = properties.caller ?? this.caller;
   }
 
   /**
@@ -132,6 +156,7 @@ export class SimCfnStackResourceOperations {
       accountRegionScope: this.accountRegionScope,
       stackName: this.stackName,
       cdkOutContext: this.cdkOutContext,
+      caller: this.caller,
     }).publish();
   }
 
@@ -144,6 +169,7 @@ export class SimCfnStackResourceOperations {
       stackName: this.stackName,
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
+      caller: this.caller,
     });
   }
 
@@ -154,6 +180,7 @@ export class SimCfnStackResourceOperations {
       simAws: this.simAws,
       resources,
       stackName: this.stackName,
+      caller: this.caller,
     });
   }
 }

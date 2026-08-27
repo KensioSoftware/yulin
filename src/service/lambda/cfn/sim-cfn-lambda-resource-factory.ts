@@ -1,7 +1,9 @@
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimLambda } from "../sim-lambda.js";
 import { SimCfnLambdaAliasCreator } from "./alias/sim-cfn-lambda-alias-creator.js";
@@ -49,49 +51,47 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Function": {
         return await this.functionCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
           context.bindings,
+          options,
         );
       }
       case "Url": {
-        return await this.urlCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.urlCreator.create(resource, properties, options);
       }
       case "EventSourceMapping": {
         return await this.eventSourceMappingCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "EventInvokeConfig": {
         return await this.eventInvokeConfigCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "Permission": {
         return await this.permissionCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "Version": {
-        return await this.versionCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.versionCreator.create(resource, properties, options);
       }
       case "Alias": {
-        return await this.aliasCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.aliasCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -107,7 +107,12 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

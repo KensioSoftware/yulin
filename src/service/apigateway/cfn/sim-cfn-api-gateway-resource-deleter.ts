@@ -4,6 +4,7 @@ import type { SimRestApi } from "../api/sim-rest-api.js";
 import type { SimApiGateway } from "../sim-api-gateway.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimCfnRestApiPartDeleter } from "./sim-cfn-rest-api-part-deleter.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnApiGatewayResourceDeleterProperties {
   readonly apiGateway: SimApiGateway;
@@ -39,9 +40,15 @@ export class SimCfnApiGatewayResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (resourceTypeName !== "RestApi") {
-      await this.partDeleter.delete(resourceTypeName, resource, properties);
+      await this.partDeleter.delete(
+        resourceTypeName,
+        resource,
+        properties,
+        options,
+      );
 
       return;
     }
@@ -52,8 +59,9 @@ export class SimCfnApiGatewayResourceDeleter {
       `sim REST API for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.apiGateway.deleteRestApi({
-      input: { restApiId: restApi.apiId },
-    });
+    await this.apiGateway.deleteRestApi(
+      { input: { restApiId: restApi.apiId } },
+      options,
+    );
   }
 }

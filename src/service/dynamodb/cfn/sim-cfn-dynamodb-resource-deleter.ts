@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimDynamoDb } from "../sim-dynamodb.js";
 import type { SimDynamoDbTable } from "../table/sim-dynamodb-table.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnDynamoDbResourceDeleterProperties {
   readonly dynamoDb: SimDynamoDb;
@@ -28,6 +29,7 @@ export class SimCfnDynamoDbResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (resourceTypeName !== "Table" && resourceTypeName !== "GlobalTable") {
       throw new Error(
@@ -41,8 +43,9 @@ export class SimCfnDynamoDbResourceDeleter {
       `sim DynamoDB table for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.dynamoDb.deleteTable({
-      input: { TableName: table.tableName },
-    });
+    await this.dynamoDb.deleteTable(
+      { input: { TableName: table.tableName } },
+      options,
+    );
   }
 }

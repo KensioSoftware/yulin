@@ -3,6 +3,7 @@ import type { SimRoute53HostedZone } from "../../../route53/hosted-zone/sim-rout
 import type { SimRoute53HostedZoneId } from "../../../route53/command/create-hosted-zone/sim-route53-zone-id.js";
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
 import type { SimAcmDomainValidation } from "../../certificate/sim-acm-domain-validation.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const validationRecordTtl = 300;
 
@@ -30,10 +31,15 @@ export class SimCfnAcmValidationRecords {
   async publish(
     certificate: SimAcmCertificate,
     hostedZoneIdsByDomain: ReadonlyMap<string, string>,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     for (const domainValidation of certificate.domainValidationOptions) {
       // oxlint-disable-next-line no-await-in-loop -- one hosted zone at a time
-      await this.publishRecord(domainValidation, hostedZoneIdsByDomain);
+      await this.publishRecord(
+        domainValidation,
+        hostedZoneIdsByDomain,
+        options,
+      );
     }
   }
 
@@ -48,6 +54,7 @@ export class SimCfnAcmValidationRecords {
   private async publishRecord(
     domainValidation: SimAcmDomainValidation,
     hostedZoneIdsByDomain: ReadonlyMap<string, string>,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const resourceRecord = domainValidation.resourceRecord;
     const hostedZoneIdValue = hostedZoneIdsByDomain.get(
@@ -64,24 +71,27 @@ export class SimCfnAcmValidationRecords {
       return;
     }
 
-    await this.route53.changeResourceRecordSets({
-      input: {
-        HostedZoneId: hostedZone.id,
-        ChangeBatch: {
-          Changes: [
-            {
-              Action: "UPSERT",
-              ResourceRecordSet: {
-                Name: resourceRecord.name,
-                Type: resourceRecord.type,
-                TTL: validationRecordTtl,
-                ResourceRecords: [{ Value: resourceRecord.value }],
+    await this.route53.changeResourceRecordSets(
+      {
+        input: {
+          HostedZoneId: hostedZone.id,
+          ChangeBatch: {
+            Changes: [
+              {
+                Action: "UPSERT",
+                ResourceRecordSet: {
+                  Name: resourceRecord.name,
+                  Type: resourceRecord.type,
+                  TTL: validationRecordTtl,
+                  ResourceRecords: [{ Value: resourceRecord.value }],
+                },
               },
-            },
-          ],
+            ],
+          },
         },
       },
-    });
+      options,
+    );
 
     // The record mutation is scheduled, so wait for the zone to hold it before
     // the certificate is checked against DNS.

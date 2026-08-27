@@ -7,6 +7,7 @@ import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
 import { simCfnWafEvaluatableRules } from "./sim-cfn-waf-evaluatable-rules.js";
 import { SimCfnWafWebAclConfig } from "./sim-cfn-waf-web-acl-config.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnWafWebAclCreatorProperties {
   readonly wafV2: SimWafV2;
@@ -43,6 +44,7 @@ export class SimCfnWafWebAclCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimWafWebAcl> {
     const input = new SimCfnWafWebAclConfig({
       resource,
@@ -57,9 +59,10 @@ export class SimCfnWafWebAclCreator {
       wafWebAclResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#wafV2.createWebAcl({
-          input: deployable,
-        });
+        const created = await this.#wafV2.createWebAcl(
+          { input: deployable },
+          options,
+        );
         const arn = created.Summary?.ARN;
 
         assertDefined(
@@ -89,19 +92,26 @@ export class SimCfnWafWebAclCreator {
    * it holds. A template that associates without naming it keeps that refusal,
    * which says which resources are still pointing at the ACL.
    */
-  async delete(resource: SimCfnResource, webAcl: SimWafWebAcl): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    webAcl: SimWafWebAcl,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     await simCfnWafResourceCommand(
       wafWebAclResourceType,
       resource.logicalId,
       async () =>
-        await this.#wafV2.deleteWebAcl({
-          input: {
-            Name: webAcl.name,
-            Scope: webAcl.scope,
-            Id: webAcl.id,
-            LockToken: webAcl.lockToken,
+        await this.#wafV2.deleteWebAcl(
+          {
+            input: {
+              Name: webAcl.name,
+              Scope: webAcl.scope,
+              Id: webAcl.id,
+              LockToken: webAcl.lockToken,
+            },
           },
-        }),
+          options,
+        ),
     );
   }
 }

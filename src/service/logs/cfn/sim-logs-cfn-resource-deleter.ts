@@ -9,6 +9,7 @@ import type { SimCfnDeliveryDestinationCreator } from "./delivery/sim-cfn-delive
 import type { SimCfnDeliverySourceCreator } from "./delivery/sim-cfn-delivery-source-creator.js";
 import type { SimCfnLogGroupCreator } from "./group/sim-cfn-log-group-creator.js";
 import { unsupportedSimLogsResourceType } from "./sim-logs-cfn-unsupported-resource.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimLogsCfnResourceDeleterProperties {
   readonly logGroups: SimCfnLogGroupCreator;
@@ -36,6 +37,7 @@ export class SimLogsCfnResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "LogGroup": {
@@ -46,6 +48,7 @@ export class SimLogsCfnResourceDeleter {
       case "DeliverySource": {
         await this.#creators.deliverySources.delete(
           created<SimLogsDeliverySource>(resource),
+          options,
         );
 
         return;
@@ -53,6 +56,7 @@ export class SimLogsCfnResourceDeleter {
       case "DeliveryDestination": {
         await this.#creators.deliveryDestinations.delete(
           created<SimLogsDeliveryDestination>(resource),
+          options,
         );
 
         return;
@@ -60,6 +64,7 @@ export class SimLogsCfnResourceDeleter {
       case "Delivery": {
         await this.#creators.deliveries.delete(
           created<SimLogsDelivery>(resource),
+          options,
         );
 
         return;

@@ -2,7 +2,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSsm } from "../sim-ssm.js";
 import { SimCfnSsmParameterCreator } from "./parameter/sim-cfn-ssm-parameter-creator.js";
 import type { SimSsmParameter } from "../parameter/sim-ssm-parameter.js";
@@ -43,6 +45,7 @@ export class SimSsmCfnResourceFactory implements SimCfnServiceResourceFactory {
         return await this.parameterCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          simCfnResourceCallerOptions(context.caller),
         );
       }
       default: {
@@ -59,6 +62,7 @@ export class SimSsmCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
     if (resourceTypeName !== "Parameter") {
       throw new Error(
@@ -72,6 +76,9 @@ export class SimSsmCfnResourceFactory implements SimCfnServiceResourceFactory {
       `sim SSM Parameter for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.ssm.deleteParameter({ input: { Name: parameter.name.value } });
+    await this.ssm.deleteParameter(
+      { input: { Name: parameter.name.value } },
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import type { SimS3 } from "../../sim-s3.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnS3BucketPolicyCreatorProperties {
   readonly simS3: SimS3;
@@ -35,16 +36,20 @@ export class SimCfnS3BucketPolicyCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimS3Bucket> {
     const bucketName = this.bucketNameForResource(resource, properties);
     const policyDocument = this.policyDocumentForResource(resource, properties);
 
-    await this.simS3.putBucketPolicy({
-      input: {
-        Bucket: bucketName,
-        Policy: jsonStringify(policyDocument),
+    await this.simS3.putBucketPolicy(
+      {
+        input: {
+          Bucket: bucketName,
+          Policy: jsonStringify(policyDocument),
+        },
       },
-    });
+      options,
+    );
 
     const bucket = this.simS3.getSimBucketByName(bucketName);
     assertDefined(

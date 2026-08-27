@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimSsmParameter } from "../../parameter/sim-ssm-parameter.js";
 import type { SimSsm } from "../../sim-ssm.js";
 import { SimCfnSsmParameterProperties } from "./sim-cfn-ssm-parameter-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSsmParameterCreatorProperties {
   readonly ssm: SimSsm;
@@ -36,6 +37,7 @@ export class SimCfnSsmParameterCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSsmParameter> {
     const parameterProperties = new SimCfnSsmParameterProperties({
       resource,
@@ -43,19 +45,22 @@ export class SimCfnSsmParameterCreator {
     });
     const name = parameterProperties.name();
 
-    await this.ssm.putParameter({
-      input: {
-        Name: name,
-        Type: parameterProperties.type(),
-        Value: parameterProperties.value(),
-        Description: parameterProperties.description(),
-        Tier: parameterProperties.tier(),
-        AllowedPattern: parameterProperties.allowedPattern(),
-        DataType: parameterProperties.dataType(),
-        Policies: parameterProperties.policies(),
-        Tags: parameterProperties.tags(),
+    await this.ssm.putParameter(
+      {
+        input: {
+          Name: name,
+          Type: parameterProperties.type(),
+          Value: parameterProperties.value(),
+          Description: parameterProperties.description(),
+          Tier: parameterProperties.tier(),
+          AllowedPattern: parameterProperties.allowedPattern(),
+          DataType: parameterProperties.dataType(),
+          Policies: parameterProperties.policies(),
+          Tags: parameterProperties.tags(),
+        },
       },
-    });
+      options,
+    );
 
     const parameter = this.ssm.findParameter(name);
     assertDefined(

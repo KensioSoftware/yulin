@@ -2,6 +2,7 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimWafV2 } from "../sim-wafv2.js";
 import {
@@ -16,6 +17,7 @@ import {
   wafWebAclAssociationResourceTypeName,
   wafWebAclResourceTypeName,
 } from "./sim-cfn-waf-resource-types.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimWafCfnResourceFactoryProperties {
   readonly wafV2: SimWafV2;
@@ -56,19 +58,24 @@ export class SimWafCfnResourceFactory implements SimCfnServiceResourceFactory {
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
     const creators = this.#creators;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case wafWebAclResourceTypeName: {
-        return await creators.webAcl.create(resource, properties);
+        return await creators.webAcl.create(resource, properties, options);
       }
       case wafWebAclAssociationResourceTypeName: {
-        return await creators.association.create(resource, properties);
+        return await creators.association.create(resource, properties, options);
       }
       case wafIpSetResourceTypeName: {
-        return await creators.ipSet.create(resource, properties);
+        return await creators.ipSet.create(resource, properties, options);
       }
       case wafRegexPatternSetResourceTypeName: {
-        return await creators.regexPatternSet.create(resource, properties);
+        return await creators.regexPatternSet.create(
+          resource,
+          properties,
+          options,
+        );
       }
       default: {
         throw unsupportedSimWafResourceType(resourceTypeName, "");
@@ -82,7 +89,12 @@ export class SimWafCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.#deleter.delete(resourceTypeName, resource);
+    await this.#deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

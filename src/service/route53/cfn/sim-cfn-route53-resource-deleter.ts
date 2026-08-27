@@ -2,14 +2,15 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimRoute53 } from "../sim-route53.js";
 import type { SimRoute53HostedZone } from "../hosted-zone/sim-route53-hosted-zone.js";
-import { SimCfnRoute53RecordSetBuilder } from "./record-set/build/sim-cfn-r53-record-set-builder.js";
-import { SimCfnRoute53RecordSetHostedZoneResolver } from "./record-set/resolve/sim-cfn-r53-rec-set-zone-resolver.js";
+import type { SimCfnRoute53RecordSetApplicator } from "./record-set/apply/sim-cfn-r53-record-set-applicator.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCfnRoute53KskCreator } from "./dnssec/sim-cfn-r53-ksk-creator.js";
 import type { SimCfnRoute53ZoneSigningCreator } from "./dnssec/sim-cfn-r53-zone-signing-creator.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRoute53ResourceDeleterProperties {
   readonly route53: SimRoute53;
+  readonly recordSetCreator: SimCfnRoute53RecordSetApplicator;
   readonly keySigningKeyCreator: SimCfnRoute53KskCreator;
   readonly zoneSigningCreator: SimCfnRoute53ZoneSigningCreator;
 }
@@ -30,17 +31,15 @@ interface SimCfnRoute53ResourceDeleterProperties {
  */
 export class SimCfnRoute53ResourceDeleter {
   private readonly route53: SimRoute53;
+  private readonly recordSetCreator: SimCfnRoute53RecordSetApplicator;
   private readonly keySigningKeyCreator: SimCfnRoute53KskCreator;
   private readonly zoneSigningCreator: SimCfnRoute53ZoneSigningCreator;
-  private readonly hostedZoneResolver: SimCfnRoute53RecordSetHostedZoneResolver;
 
   constructor(properties: SimCfnRoute53ResourceDeleterProperties) {
     this.route53 = properties.route53;
+    this.recordSetCreator = properties.recordSetCreator;
     this.keySigningKeyCreator = properties.keySigningKeyCreator;
     this.zoneSigningCreator = properties.zoneSigningCreator;
-    this.hostedZoneResolver = new SimCfnRoute53RecordSetHostedZoneResolver({
-      route53: this.route53,
-    });
   }
 
   /**
@@ -50,22 +49,23 @@ export class SimCfnRoute53ResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "HostedZone": {
-        await this.deleteHostedZone(resource);
+        await this.deleteHostedZone(resource, options);
         return;
       }
       case "RecordSet": {
-        await this.deleteRecordSet(resource, properties);
+        await this.recordSetCreator.delete(resource, properties, options);
         return;
       }
       case "KeySigningKey": {
-        await this.keySigningKeyCreator.delete(resource, properties);
+        await this.keySigningKeyCreator.delete(resource, properties, options);
         return;
       }
       case "DNSSEC": {
-        await this.zoneSigningCreator.delete(resource, properties);
+        await this.zoneSigningCreator.delete(resource, properties, options);
         return;
       }
       default: {
@@ -76,40 +76,19 @@ export class SimCfnRoute53ResourceDeleter {
     }
   }
 
-  private async deleteHostedZone(resource: SimCfnResource): Promise<void> {
+  private async deleteHostedZone(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const hostedZone = resource.simResource as SimRoute53HostedZone | undefined;
     assertDefined(
       hostedZone,
       `sim Route53 Hosted Zone for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.route53.deleteHostedZone({ input: { Id: hostedZone.id } });
-  }
-
-  private async deleteRecordSet(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): Promise<void> {
-    const hostedZoneId = this.hostedZoneResolver.hostedZoneId(
-      resource,
-      properties,
+    await this.route53.deleteHostedZone(
+      { input: { Id: hostedZone.id } },
+      options,
     );
-    const recordSet = new SimCfnRoute53RecordSetBuilder(
-      resource,
-      properties,
-    ).build();
-
-    await this.route53.changeResourceRecordSets({
-      input: {
-        HostedZoneId: hostedZoneId,
-        ChangeBatch: {
-          Changes: [{ Action: "DELETE", ResourceRecordSet: recordSet }],
-        },
-      },
-    });
-
-    await this.route53.hostedZones
-      .get(hostedZoneId)
-      ?.waitForSynchronizationComplete();
   }
 }

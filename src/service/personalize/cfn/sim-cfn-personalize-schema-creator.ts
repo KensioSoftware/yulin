@@ -7,6 +7,7 @@ import { simCfnPersonalizeCreated } from "./sim-cfn-personalize-created.js";
 import { SimCfnPersonalizeProperties } from "./sim-cfn-personalize-properties.js";
 import { simCfnPersonalizeResourceCreation } from "./sim-cfn-personalize-resource-error.js";
 import { personalizeSchemaResourceType } from "./sim-cfn-personalize-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const readProperties = new Set(["Name", "Schema", "Domain"]);
 
@@ -35,6 +36,7 @@ export class SimCfnPersonalizeSchemaCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimPersonalizeSchema> {
     const read = new SimCfnPersonalizeProperties({
       resourceType: personalizeSchemaResourceType,
@@ -54,7 +56,10 @@ export class SimCfnPersonalizeSchemaCreator {
       personalizeSchemaResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#personalize.createSchema({ input });
+        const created = await this.#personalize.createSchema(
+          { input },
+          options,
+        );
 
         return simCfnPersonalizeCreated(
           this.#resources.schemas,
@@ -66,7 +71,13 @@ export class SimCfnPersonalizeSchemaCreator {
   }
 
   /** Delete a schema an AWS::Personalize::Schema Resource made. */
-  async delete(schema: SimPersonalizeSchema): Promise<void> {
-    await this.#personalize.deleteSchema({ input: { schemaArn: schema.arn } });
+  async delete(
+    schema: SimPersonalizeSchema,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#personalize.deleteSchema(
+      { input: { schemaArn: schema.arn } },
+      options,
+    );
   }
 }

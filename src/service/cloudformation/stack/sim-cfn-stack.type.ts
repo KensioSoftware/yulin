@@ -1,4 +1,5 @@
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -32,6 +33,12 @@ export interface SimCfnStackUpdateProperties {
    * describes the assembly the previous template came from.
    */
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+
+  /**
+   * The principal to apply the new template as, for an update that names one.
+   * The Stack goes on using it, as it does the cloud assembly.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 export interface SimCloudFormationStackProperties {
@@ -42,6 +49,13 @@ export interface SimCloudFormationStackProperties {
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal this Stack's Resources are created, updated and deleted as.
+   * An omitted caller is the Account root, as it is everywhere else in the
+   * simulation.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 
   /**
    * The export names published in the Account and Region this Stack deploys

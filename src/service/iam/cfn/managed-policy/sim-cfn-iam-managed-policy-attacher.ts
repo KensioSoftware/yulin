@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamRoleName } from "../../role/sim-iam-role.js";
 import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamManagedPolicyAttacherProperties {
   readonly iam: SimIam;
@@ -62,12 +63,14 @@ export class SimCfnIamManagedPolicyAttacher {
   async attach(
     policyArn: SimArn,
     roleNames: readonly SimIamRoleName[],
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await Promise.all(
       roleNames.map(async (roleName) =>
-        this.iam.attachRolePolicy({
-          input: { RoleName: roleName, PolicyArn: policyArn },
-        }),
+        this.iam.attachRolePolicy(
+          { input: { RoleName: roleName, PolicyArn: policyArn } },
+          options,
+        ),
       ),
     );
   }

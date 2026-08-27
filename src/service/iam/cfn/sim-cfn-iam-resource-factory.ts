@@ -10,6 +10,7 @@ import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
 import { SimCfnIamUserCreator } from "./user/sim-cfn-iam-user-creator.js";
 import { SimCfnIamResourceDeleter } from "./sim-cfn-iam-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * CloudFormation Resource factory for simulated IAM resources.
@@ -37,31 +38,26 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "ManagedPolicy": {
         return await this.managedPolicyCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "Policy": {
-        await this.policyCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        await this.policyCreator.create(resource, properties, options);
         return;
       }
       case "Role": {
-        return await this.roleCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.roleCreator.create(resource, properties, options);
       }
       case "User": {
-        return await this.userCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.userCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -83,6 +79,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

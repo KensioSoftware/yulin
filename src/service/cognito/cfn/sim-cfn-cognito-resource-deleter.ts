@@ -6,6 +6,7 @@ import type { SimCognitoGroup } from "../user-pool/group/sim-cognito-group.js";
 import type { SimCognitoUserPoolDomain } from "../user-pool/domain/sim-cognito-user-pool-domain.js";
 import type { SimCognitoUserPoolIdentityProvider } from "../user-pool/idp/sim-cognito-user-pool-identity-provider.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoResourceDeleterProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -68,9 +69,10 @@ export class SimCfnCognitoResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const deletion =
-      this.deletions().get(resourceTypeName) ??
+      this.deletions(options).get(resourceTypeName) ??
       SimCfnCognitoResourceDeleter.unsupported(resourceTypeName);
 
     await deletion(resource);
@@ -79,58 +81,62 @@ export class SimCfnCognitoResourceDeleter {
   /**
    * What deletes each Resource type this service deploys.
    */
-  private deletions(): ReadonlyMap<
-    string,
-    (resource: SimCfnResource) => Promise<void>
-  > {
+  private deletions(
+    options: SimCfnResourceCallerOptions,
+  ): ReadonlyMap<string, (resource: SimCfnResource) => Promise<void>> {
     return new Map([
       [
         "UserPool",
         async (resource: SimCfnResource) => {
-          await this.deleteUserPool(resource);
+          await this.deleteUserPool(resource, options);
         },
       ],
       [
         "UserPoolClient",
         async (resource: SimCfnResource) => {
-          await this.deleteClient(resource);
+          await this.deleteClient(resource, options);
         },
       ],
       [
         "UserPoolGroup",
         async (resource: SimCfnResource) => {
-          await this.deleteGroup(resource);
+          await this.deleteGroup(resource, options);
         },
       ],
       [
         "UserPoolDomain",
         async (resource: SimCfnResource) => {
-          await this.deleteDomain(resource);
+          await this.deleteDomain(resource, options);
         },
       ],
       [
         "UserPoolIdentityProvider",
         async (resource: SimCfnResource) => {
-          await this.deleteIdentityProvider(resource);
+          await this.deleteIdentityProvider(resource, options);
         },
       ],
     ]);
   }
 
-  private async deleteDomain(resource: SimCfnResource): Promise<void> {
+  private async deleteDomain(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const domain =
       SimCfnCognitoResourceDeleter.created<SimCognitoUserPoolDomain>(
         resource,
         "domain",
       );
 
-    await this.cognito.deleteUserPoolDomain({
-      input: { UserPoolId: domain.userPoolId, Domain: domain.value },
-    });
+    await this.cognito.deleteUserPoolDomain(
+      { input: { UserPoolId: domain.userPoolId, Domain: domain.value } },
+      options,
+    );
   }
 
   private async deleteIdentityProvider(
     resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const provider =
       SimCfnCognitoResourceDeleter.created<SimCognitoUserPoolIdentityProvider>(
@@ -138,43 +144,60 @@ export class SimCfnCognitoResourceDeleter {
         "identity provider",
       );
 
-    await this.cognito.deleteIdentityProvider({
-      input: {
-        UserPoolId: provider.userPoolId,
-        ProviderName: provider.name,
+    await this.cognito.deleteIdentityProvider(
+      {
+        input: {
+          UserPoolId: provider.userPoolId,
+          ProviderName: provider.name,
+        },
       },
-    });
+      options,
+    );
   }
 
-  private async deleteUserPool(resource: SimCfnResource): Promise<void> {
+  private async deleteUserPool(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const userPool = SimCfnCognitoResourceDeleter.created<SimCognitoUserPool>(
       resource,
       "user pool",
     );
 
-    await this.cognito.deleteUserPool({ input: { UserPoolId: userPool.id } });
+    await this.cognito.deleteUserPool(
+      { input: { UserPoolId: userPool.id } },
+      options,
+    );
   }
 
-  private async deleteClient(resource: SimCfnResource): Promise<void> {
+  private async deleteClient(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const client =
       SimCfnCognitoResourceDeleter.created<SimCognitoUserPoolClient>(
         resource,
         "app client",
       );
 
-    await this.cognito.deleteUserPoolClient({
-      input: { UserPoolId: client.userPoolId, ClientId: client.id },
-    });
+    await this.cognito.deleteUserPoolClient(
+      { input: { UserPoolId: client.userPoolId, ClientId: client.id } },
+      options,
+    );
   }
 
-  private async deleteGroup(resource: SimCfnResource): Promise<void> {
+  private async deleteGroup(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const group = SimCfnCognitoResourceDeleter.created<SimCognitoGroup>(
       resource,
       "group",
     );
 
-    await this.cognito.deleteGroup({
-      input: { UserPoolId: group.userPoolId, GroupName: group.name },
-    });
+    await this.cognito.deleteGroup(
+      { input: { UserPoolId: group.userPoolId, GroupName: group.name } },
+      options,
+    );
   }
 }

@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimSecretsManagerSecret } from "../../secret/sim-secrets-manager-secret.js";
 import type { SimSecretsManager } from "../../sim-secrets-manager.js";
 import { SimCfnSecretsManagerSecretProperties } from "./sim-cfn-secrets-manager-secret-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSecretsManagerSecretCreatorProperties {
   readonly secretsManager: SimSecretsManager;
@@ -29,21 +30,25 @@ export class SimCfnSecretsManagerSecretCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSecretsManagerSecret> {
     const secretProperties = new SimCfnSecretsManagerSecretProperties({
       resource,
       properties,
     });
 
-    const created = await this.secretsManager.createSecret({
-      input: {
-        Name: secretProperties.name(),
-        Description: secretProperties.description(),
-        KmsKeyId: secretProperties.kmsKeyId(),
-        SecretString: secretProperties.secretString(),
-        Tags: secretProperties.tags(),
+    const created = await this.secretsManager.createSecret(
+      {
+        input: {
+          Name: secretProperties.name(),
+          Description: secretProperties.description(),
+          KmsKeyId: secretProperties.kmsKeyId(),
+          SecretString: secretProperties.secretString(),
+          Tags: secretProperties.tags(),
+        },
       },
-    });
+      options,
+    );
 
     assertDefined(
       created.ARN,

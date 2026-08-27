@@ -1385,6 +1385,87 @@ handed an empty one. Naming the Stacks in the order they have to go in is what p
 there in time, since two Stacks passing a plain string between them declare no dependency for the
 manifest to carry.
 
+## The principal a deployment runs as
+
+Each resource is created through the command an SDK caller would reach, and that command
+authorizes. A deployment that names no principal is decided as the account root, which is what IAM
+falls back to everywhere else in the simulation. `caller` says otherwise.
+
+```typescript sim-cloudformation-deployment-caller
+/**
+ * Deploying a template as the principal a real deployment would run as.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reports-stack",
+  template: {
+    Resources: {
+      ReportsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "reports-bucket" },
+      },
+    },
+  },
+  caller: {
+    kind: "arn",
+    arn: "arn:aws:iam::123456789012:role/cdk-deploy-role",
+  },
+});
+
+console.log(stack.getResource("ReportsBucket")?.status); // "CREATE_COMPLETE"
+```
+
+`deployTemplateFile(...)` takes the same option. Every resource the stack creates is authorized as
+that principal, and so is every resource its teardown deletes. An update applied through
+`updateTemplateFile(...)` runs as it too, unless the update names a principal of its own.
+
+The named principal has to be allowed what the template asks for. IAM allows the account root by
+default and allows a role only what its policies say, so a role with no S3 permission leaves the
+bucket above `CREATE_FAILED` with the role's ARN in the message.
+
+### One caller for an assembly, and one per Stack
+
+`deployCdkOut(...)` takes a caller for every Stack in the assembly. A Stack deployed by a different
+role names its own in `stackOptions`, beside its parameters and its bindings.
+
+```typescript sim-cloudformation-cdk-out-caller
+/**
+ * A caller for the whole cloud assembly, and one for a single Stack.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultRegionName: "eu-west-2",
+});
+
+const stacks = await simAws.cloudFormation().deployCdkOut({
+  directoryPath: "cdk.out",
+  caller: {
+    kind: "arn",
+    arn: "arn:aws:iam::123456789012:role/cdk-deploy-role",
+  },
+  stackOptions: {
+    PipelineStack: {
+      caller: {
+        kind: "arn",
+        arn: "arn:aws:iam::123456789012:role/pipeline-deploy-role",
+      },
+    },
+  },
+});
+
+console.log(stacks.get("PipelineStack")?.stackName);
+```
+
+A staged CDK asset is published under the same principal, before CloudFormation reads the template
+that points at it.
+
 ## Editing a synthesized template before deploying it
 
 Sometimes a synthesized template needs a change before Yulin will deploy it, such as dropping a

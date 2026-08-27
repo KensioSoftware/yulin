@@ -7,6 +7,10 @@ import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimCfnAcmCertificatePropertyReader } from "../property/sim-cfn-acm-cert-properties.js";
 import { SimCfnAcmCertificateValidation } from "../validation/sim-cfn-acm-cert-validation.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnAcmCertificateCreatorProperties {
   readonly acm: SimAcm;
@@ -38,7 +42,12 @@ export class SimCfnAcmCertificateCreator {
       properties: context.resolvedProperties ?? resource.properties,
     });
 
-    const certificate = await this.requestCertificate(resource, properties);
+    const options = simCfnResourceCallerOptions(context.caller);
+    const certificate = await this.requestCertificate(
+      resource,
+      properties,
+      options,
+    );
 
     // Creating the Resource is not complete until the certificate is issued,
     // so anything depending on it is created afterwards, as in real
@@ -52,6 +61,7 @@ export class SimCfnAcmCertificateCreator {
       resource,
       certificate,
       properties.domainValidationHostedZoneIds(),
+      options,
     );
 
     return certificate;
@@ -60,16 +70,20 @@ export class SimCfnAcmCertificateCreator {
   private async requestCertificate(
     resource: SimCfnResource,
     properties: SimCfnAcmCertificatePropertyReader,
+    options: SimCfnResourceCallerOptions,
   ): Promise<SimAcmCertificate> {
-    const requestCertificateOutput = await this.acm.requestCertificate({
-      input: {
-        DomainName: properties.domainName(),
-        SubjectAlternativeNames: properties.subjectAlternativeNames(),
-        ValidationMethod: properties.validationMethod(),
-        DomainValidationOptions: properties.domainValidationOptions(),
-        Tags: properties.tags(),
+    const requestCertificateOutput = await this.acm.requestCertificate(
+      {
+        input: {
+          DomainName: properties.domainName(),
+          SubjectAlternativeNames: properties.subjectAlternativeNames(),
+          ValidationMethod: properties.validationMethod(),
+          DomainValidationOptions: properties.domainValidationOptions(),
+          Tags: properties.tags(),
+        },
       },
-    });
+      options,
+    );
 
     const certificateArn = requestCertificateOutput.CertificateArn;
     assertDefined(

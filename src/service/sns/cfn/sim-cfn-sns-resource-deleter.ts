@@ -4,11 +4,12 @@ import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/va
 import type { SimSns } from "../sim-sns.js";
 import type { SimSnsSubscription } from "../subscription/sim-sns-subscription.js";
 import type { SimSnsTopic } from "../topic/sim-sns-topic.js";
-import { simSnsPolicyAttributeName } from "../topic/sim-sns-topic-attribute-names.js";
-import { simCfnSnsPolicyTopicArns } from "./topic-policy/sim-cfn-sns-topic-policy-properties.js";
+import type { SimCfnSnsTopicPolicyCreator } from "./topic-policy/sim-cfn-sns-topic-policy-creator.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSnsResourceDeleterProperties {
   readonly sns: SimSns;
+  readonly topicPolicyCreator: SimCfnSnsTopicPolicyCreator;
 }
 
 /**
@@ -26,9 +27,11 @@ interface SimCfnSnsResourceDeleterProperties {
  */
 export class SimCfnSnsResourceDeleter {
   private readonly sns: SimSns;
+  private readonly topicPolicyCreator: SimCfnSnsTopicPolicyCreator;
 
   constructor(properties: SimCfnSnsResourceDeleterProperties) {
     this.sns = properties.sns;
+    this.topicPolicyCreator = properties.topicPolicyCreator;
   }
 
   /**
@@ -38,18 +41,19 @@ export class SimCfnSnsResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "Topic": {
-        await this.deleteTopic(resource);
+        await this.deleteTopic(resource, options);
         return;
       }
       case "Subscription": {
-        await this.unsubscribe(resource);
+        await this.unsubscribe(resource, options);
         return;
       }
       case "TopicPolicy": {
-        await this.clearTopicPolicy(resource, properties);
+        await this.topicPolicyCreator.delete(resource, properties, options);
         return;
       }
       default: {
@@ -60,50 +64,35 @@ export class SimCfnSnsResourceDeleter {
     }
   }
 
-  private async deleteTopic(resource: SimCfnResource): Promise<void> {
+  private async deleteTopic(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const topic = resource.simResource as SimSnsTopic | undefined;
     assertDefined(
       topic,
       `sim SNS topic for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.sns.deleteTopic({ input: { TopicArn: topic.arn.value } });
+    await this.sns.deleteTopic(
+      { input: { TopicArn: topic.arn.value } },
+      options,
+    );
   }
 
-  private async unsubscribe(resource: SimCfnResource): Promise<void> {
+  private async unsubscribe(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const subscription = resource.simResource as SimSnsSubscription | undefined;
     assertDefined(
       subscription,
       `sim SNS subscription for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.sns.unsubscribe({
-      input: { SubscriptionArn: subscription.arn.value },
-    });
-  }
-
-  /**
-   * Take the policy back off every topic the Resource named.
-   *
-   * The Resource points at only the first of them, so the topics are read from
-   * the template the same way creation read them.
-   */
-  private async clearTopicPolicy(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): Promise<void> {
-    const topicArns = simCfnSnsPolicyTopicArns(resource.logicalId, properties);
-
-    await Promise.all(
-      topicArns.map(async (topicArn) =>
-        this.sns.setTopicAttributes({
-          input: {
-            TopicArn: topicArn,
-            AttributeName: simSnsPolicyAttributeName,
-            AttributeValue: "",
-          },
-        }),
-      ),
+    await this.sns.unsubscribe(
+      { input: { SubscriptionArn: subscription.arn.value } },
+      options,
     );
   }
 }

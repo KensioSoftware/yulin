@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLambdaEventSourceMapping } from "../../event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaEventSourceMappingProperties } from "./sim-cfn-lambda-event-source-mapping-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaEventSourceMappingCreatorProperties {
   readonly lambda: SimLambda;
@@ -31,13 +32,17 @@ export class SimCfnLambdaEventSourceMappingCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaEventSourceMapping> {
-    const created = await this.lambda.createEventSourceMapping({
-      input: new SimCfnLambdaEventSourceMappingProperties({
-        resource,
-        properties,
-      }).createInput(),
-    });
+    const created = await this.lambda.createEventSourceMapping(
+      {
+        input: new SimCfnLambdaEventSourceMappingProperties({
+          resource,
+          properties,
+        }).createInput(),
+      },
+      options,
+    );
 
     const mapping = this.lambda.getSimEventSourceMapping(created.UUID);
 

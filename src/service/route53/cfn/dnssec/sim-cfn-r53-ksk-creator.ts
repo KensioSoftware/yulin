@@ -8,6 +8,7 @@ import type { SimRoute53 } from "../../sim-route53.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { normalizeSimRoute53HostedZoneId } from "../../command/create-hosted-zone/sim-route53-zone-id.js";
 import { simCfnRoute53String } from "./sim-cfn-r53-dnssec-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const resourceType = "AWS::Route53::KeySigningKey";
 
@@ -35,6 +36,7 @@ export class SimCfnRoute53KskCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRoute53KeySigningKey> {
     const hostedZoneId = this.string(
       resource,
@@ -43,19 +45,22 @@ export class SimCfnRoute53KskCreator {
     );
     const name = this.string(resource, properties["Name"], "Name");
 
-    await this.route53.createKeySigningKey({
-      input: {
-        CallerReference: resource.logicalId,
-        HostedZoneId: hostedZoneId,
-        KeyManagementServiceArn: this.string(
-          resource,
-          properties["KeyManagementServiceArn"],
-          "KeyManagementServiceArn",
-        ),
-        Name: name,
-        Status: this.string(resource, properties["Status"], "Status"),
+    await this.route53.createKeySigningKey(
+      {
+        input: {
+          CallerReference: resource.logicalId,
+          HostedZoneId: hostedZoneId,
+          KeyManagementServiceArn: this.string(
+            resource,
+            properties["KeyManagementServiceArn"],
+            "KeyManagementServiceArn",
+          ),
+          Name: name,
+          Status: this.string(resource, properties["Status"], "Status"),
+        },
       },
-    });
+      options,
+    );
 
     const keySigningKey = this.route53.hostedZones
       .get(normalizeSimRoute53HostedZoneId(hostedZoneId))
@@ -80,6 +85,7 @@ export class SimCfnRoute53KskCreator {
   async delete(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const input = {
       HostedZoneId: this.string(
@@ -90,8 +96,8 @@ export class SimCfnRoute53KskCreator {
       Name: this.string(resource, properties["Name"], "Name"),
     };
 
-    await this.route53.deactivateKeySigningKey({ input });
-    await this.route53.deleteKeySigningKey({ input });
+    await this.route53.deactivateKeySigningKey({ input }, options);
+    await this.route53.deleteKeySigningKey({ input }, options);
   }
 
   private string(

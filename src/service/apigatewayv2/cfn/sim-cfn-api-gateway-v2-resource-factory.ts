@@ -14,16 +14,8 @@ import { SimCfnHttpApiImports } from "./sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiStageCreator } from "./stage/sim-cfn-http-api-stage-creator.js";
 import { SimCfnApiGatewayV2ResourceDeleter } from "./sim-cfn-api-gateway-v2-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
-
-/**
- * The Resource types belonging to a WebSocket API, which is the half of API
- * Gateway v2 this simulation does not model at all.
- */
-const webSocketResourceTypeNames = new Set([
-  "Model",
-  "RouteResponse",
-  "IntegrationResponse",
-]);
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import { simCfnApiGatewayV2UnsupportedReason } from "./sim-cfn-api-gateway-v2-unsupported.js";
 
 interface SimApiGatewayV2CfnResourceFactoryProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -77,34 +69,35 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
-    const properties = context.resolvedProperties ?? resource.properties;
+    const values = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "Api": {
-        return await this.apiCreator.create(resource, properties);
+        return await this.apiCreator.create(resource, values, options);
       }
       case "Authorizer": {
-        return await this.authorizerCreator.create(resource, properties);
+        return await this.authorizerCreator.create(resource, values, options);
       }
       case "Integration": {
-        return await this.integrationCreator.create(resource, properties);
+        return await this.integrationCreator.create(resource, values, options);
       }
       case "Route": {
-        return await this.routeCreator.create(resource, properties);
+        return await this.routeCreator.create(resource, values, options);
       }
       case "Stage": {
-        return await this.stageCreator.create(resource, properties);
+        return await this.stageCreator.create(resource, values, options);
       }
       case "DomainName": {
-        return await this.domainCreator.create(resource, properties);
+        return await this.domainCreator.create(resource, values, options);
       }
       case "ApiMapping": {
-        return await this.mappingCreator.create(resource, properties);
+        return await this.mappingCreator.create(resource, values, options);
       }
       default: {
         throw new Error(
           `Unsupported sim API Gateway v2 CloudFormation Resource ` +
-            `${resourceTypeName}${this.unsupportedReason(resourceTypeName)}`,
+            `${resourceTypeName}${simCfnApiGatewayV2UnsupportedReason(resourceTypeName)}`,
         );
       }
     }
@@ -123,18 +116,7 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
-  }
-
-  /**
-   * Say why a Resource type is unsupported when there is more to say than that
-   * nothing creates it yet.
-   */
-  private unsupportedReason(resourceTypeName: string): string {
-    if (webSocketResourceTypeNames.has(resourceTypeName)) {
-      return ", which belongs to a WebSocket API and is not simulated";
-    }
-
-    return "";
   }
 }

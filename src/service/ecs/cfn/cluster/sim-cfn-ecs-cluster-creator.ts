@@ -3,6 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimEcsCluster } from "../../cluster/sim-ecs-cluster.js";
 import type { SimEcs } from "../../sim-ecs.js";
 import { SimCfnEcsClusterProperties } from "./sim-cfn-ecs-cluster-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnEcsClusterCreatorProperties {
   readonly ecs: SimEcs;
@@ -29,6 +30,7 @@ export class SimCfnEcsClusterCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimEcsCluster> {
     const clusterProperties = new SimCfnEcsClusterProperties({
       resource,
@@ -38,7 +40,7 @@ export class SimCfnEcsClusterCreator {
 
     clusterProperties.recordIgnoredProperties();
 
-    await this.ecs.createCluster({ input });
+    await this.ecs.createCluster({ input }, options);
 
     return this.ecs.cluster(clusterProperties.clusterName());
   }
@@ -50,9 +52,13 @@ export class SimCfnEcsClusterCreator {
    * `DeleteCluster` does, so something still holding its ARN can find out what
    * became of it after the stack has gone.
    */
-  async delete(cluster: SimEcsCluster): Promise<void> {
-    await this.ecs.deleteCluster({
-      input: { cluster: cluster.clusterName },
-    });
+  async delete(
+    cluster: SimEcsCluster,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.ecs.deleteCluster(
+      { input: { cluster: cluster.clusterName } },
+      options,
+    );
   }
 }

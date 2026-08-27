@@ -2,7 +2,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimLogs } from "../sim-logs.js";
 import { SimCfnDeliveryCreator } from "./delivery/sim-cfn-delivery-creator.js";
 import { SimCfnDeliveryDestinationCreator } from "./delivery/sim-cfn-delivery-destination-creator.js";
@@ -59,19 +61,24 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const values = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "LogGroup": {
         return this.#logGroups.create(resource, values);
       }
       case "DeliverySource": {
-        return await this.#deliverySources.create(resource, values);
+        return await this.#deliverySources.create(resource, values, options);
       }
       case "DeliveryDestination": {
-        return await this.#deliveryDestinations.create(resource, values);
+        return await this.#deliveryDestinations.create(
+          resource,
+          values,
+          options,
+        );
       }
       case "Delivery": {
-        return await this.#deliveries.create(resource, values);
+        return await this.#deliveries.create(resource, values, options);
       }
       default: {
         throw unsupportedSimLogsResourceType(resourceTypeName, "");
@@ -86,7 +93,12 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.#deleter.delete(resourceTypeName, resource);
+    await this.#deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

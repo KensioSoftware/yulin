@@ -10,6 +10,7 @@ import {
   simCfnLambdaCreateFunctionInput,
   SimCfnLambdaFunctionPropertiesParser,
 } from "./sim-cfn-lambda-function-properties-parser.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaFunctionCreatorProperties {
   readonly lambda: SimLambda;
@@ -41,6 +42,7 @@ export class SimCfnLambdaFunctionCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
     bindings?: readonly SimCfnBinding[],
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaFunction> {
     const functionProperties = this.propertiesParser.parse(
       resource,
@@ -62,13 +64,13 @@ export class SimCfnLambdaFunctionCreator {
       throw skipError;
     }
 
+    const input = simCfnLambdaCreateFunctionInput(
+      functionProperties,
+      codeInput.code,
+    );
+
     try {
-      await this.lambda.createFunction({
-        input: simCfnLambdaCreateFunctionInput(
-          functionProperties,
-          codeInput.code,
-        ),
-      });
+      await this.lambda.createFunction({ input }, options);
     } catch (error) {
       const assetsSkipError = this.skips.fromCreateFailure(
         resource,

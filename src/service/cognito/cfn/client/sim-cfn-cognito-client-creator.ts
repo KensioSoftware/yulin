@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import { SimCfnCognitoClientProperties } from "./sim-cfn-cognito-client-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoClientCreatorProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -30,15 +31,17 @@ export class SimCfnCognitoClientCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCognitoUserPoolClient> {
     const clientProperties = new SimCfnCognitoClientProperties({
       resource,
       properties,
     });
 
-    const created = await this.cognito.createUserPoolClient({
-      input: clientProperties.createUserPoolClientInput(),
-    });
+    const created = await this.cognito.createUserPoolClient(
+      { input: clientProperties.createUserPoolClientInput() },
+      options,
+    );
 
     const clientId = created.UserPoolClient?.ClientId;
     assertDefined(

@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimLambdaEventInvokeConfig } from "../../function/event-invoke/sim-lambda-event-invoke-config.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { simCfnLambdaCreatedResource } from "../sim-cfn-lambda-created-resource.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * Take an AWS::Lambda::EventInvokeConfig off the function it was written on,
@@ -15,6 +16,7 @@ import { simCfnLambdaCreatedResource } from "../sim-cfn-lambda-created-resource.
 export async function simCfnLambdaRemoveEventInvokeConfig(
   lambda: SimLambda,
   resource: SimCfnResource,
+  options?: SimCfnResourceCallerOptions,
 ): Promise<void> {
   const { functionName, qualifier } =
     simCfnLambdaCreatedResource<SimLambdaEventInvokeConfig>(
@@ -26,7 +28,8 @@ export async function simCfnLambdaRemoveEventInvokeConfig(
     return;
   }
 
-  await lambda.deleteFunctionEventInvokeConfig({
-    input: { FunctionName: functionName, Qualifier: qualifier },
-  });
+  await lambda.deleteFunctionEventInvokeConfig(
+    { input: { FunctionName: functionName, Qualifier: qualifier } },
+    options,
+  );
 }

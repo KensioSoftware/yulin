@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimHttpApiStage } from "../../api/stage/sim-http-api-stage.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import { SimCfnHttpApiStageProperties } from "./sim-cfn-http-api-stage-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiStageCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -30,6 +31,7 @@ export class SimCfnHttpApiStageCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiStage> {
     const stageProperties = new SimCfnHttpApiStageProperties({
       resource,
@@ -37,9 +39,10 @@ export class SimCfnHttpApiStageCreator {
     });
     const apiId = stageProperties.apiId();
 
-    const created = await this.apiGatewayV2.createStage({
-      input: stageProperties.createStageInput(),
-    });
+    const created = await this.apiGatewayV2.createStage(
+      { input: stageProperties.createStageInput() },
+      options,
+    );
 
     const stage = this.apiGatewayV2
       .findApi(apiId)

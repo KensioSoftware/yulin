@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimLogsDeliverySource } from "../../delivery/sim-logs-delivery-source.js";
 import type { SimLogs } from "../../sim-logs.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliverySourceUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
 
@@ -34,6 +35,7 @@ export class SimCfnDeliverySourceCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLogsDeliverySource> {
     const reader = new SimCfnDeliveryProperties({
       resource,
@@ -46,13 +48,16 @@ export class SimCfnDeliverySourceCreator {
 
     reader.recordIgnoredProperties();
 
-    await this.#logs.putDeliverySource({
-      input: {
-        name,
-        resourceArn: reader.requiredString("ResourceArn"),
-        logType: reader.requiredString("LogType"),
+    await this.#logs.putDeliverySource(
+      {
+        input: {
+          name,
+          resourceArn: reader.requiredString("ResourceArn"),
+          logType: reader.requiredString("LogType"),
+        },
       },
-    });
+      options,
+    );
 
     const source = this.#logs.findDeliverySource(name);
 
@@ -67,7 +72,13 @@ export class SimCfnDeliverySourceCreator {
   /**
    * Delete a delivery source created from a CloudFormation Resource.
    */
-  async delete(source: SimLogsDeliverySource): Promise<void> {
-    await this.#logs.deleteDeliverySource({ input: { name: source.name } });
+  async delete(
+    source: SimLogsDeliverySource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#logs.deleteDeliverySource(
+      { input: { name: source.name } },
+      options,
+    );
   }
 }

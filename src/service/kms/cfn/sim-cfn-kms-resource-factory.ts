@@ -7,6 +7,8 @@ import type { SimKms } from "../sim-kms.js";
 import { SimCfnKmsAliasCreator } from "./alias/sim-cfn-kms-alias-creator.js";
 import { SimCfnKmsKeyCreator } from "./key/sim-cfn-kms-key-creator.js";
 import { SimCfnKmsResourceDeleter } from "./sim-cfn-kms-resource-deleter.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 
 interface SimKmsCfnResourceFactoryProperties {
   readonly kms: SimKms;
@@ -38,13 +40,14 @@ export class SimKmsCfnResourceFactory implements SimCfnServiceResourceFactory {
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "Key": {
-        return await this.keyCreator.create(resource, properties);
+        return await this.keyCreator.create(resource, properties, options);
       }
       case "Alias": {
-        return await this.aliasCreator.create(resource, properties);
+        return await this.aliasCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -60,7 +63,12 @@ export class SimKmsCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

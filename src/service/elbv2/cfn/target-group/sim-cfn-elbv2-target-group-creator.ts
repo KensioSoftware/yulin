@@ -5,6 +5,7 @@ import type { SimElbV2Stores } from "../../sim-elbv2-stores.js";
 import type { SimElbV2TargetGroup } from "../../target-group/sim-elbv2-target-group.js";
 import type { SimElbV2TargetDescription } from "../../target-group/sim-elbv2-target.js";
 import { SimCfnElbV2TargetGroupProperties } from "./sim-cfn-elbv2-target-group-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnElbV2TargetGroupCreatorProperties {
   readonly elbV2: SimElbV2;
@@ -35,6 +36,7 @@ export class SimCfnElbV2TargetGroupCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimElbV2TargetGroup> {
     const declared = new SimCfnElbV2TargetGroupProperties({
       resource,
@@ -44,11 +46,11 @@ export class SimCfnElbV2TargetGroupCreator {
 
     declared.recordIgnoredProperties();
 
-    await this.elbV2.createTargetGroup({ input });
+    await this.elbV2.createTargetGroup({ input }, options);
 
     const targetGroup = this.stores.targetGroups.requireByName(declared.name());
 
-    await this.registerTargets(targetGroup, declared.targets());
+    await this.registerTargets(targetGroup, declared.targets(), options);
 
     return targetGroup;
   }
@@ -60,10 +62,14 @@ export class SimCfnElbV2TargetGroupCreator {
    * a group comes down after the listeners naming it, which the teardown order
    * arranges.
    */
-  async delete(targetGroup: SimElbV2TargetGroup): Promise<void> {
-    await this.elbV2.deleteTargetGroup({
-      input: { TargetGroupArn: targetGroup.arn },
-    });
+  async delete(
+    targetGroup: SimElbV2TargetGroup,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.elbV2.deleteTargetGroup(
+      { input: { TargetGroupArn: targetGroup.arn } },
+      options,
+    );
   }
 
   /**
@@ -72,13 +78,15 @@ export class SimCfnElbV2TargetGroupCreator {
   private async registerTargets(
     targetGroup: SimElbV2TargetGroup,
     targets: readonly SimElbV2TargetDescription[] | undefined,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (targets === undefined || targets.length === 0) {
       return;
     }
 
-    await this.elbV2.registerTargets({
-      input: { TargetGroupArn: targetGroup.arn, Targets: targets },
-    });
+    await this.elbV2.registerTargets(
+      { input: { TargetGroupArn: targetGroup.arn, Targets: targets } },
+      options,
+    );
   }
 }

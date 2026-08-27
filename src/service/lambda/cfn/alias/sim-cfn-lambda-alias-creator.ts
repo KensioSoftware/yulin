@@ -5,6 +5,7 @@ import type { SimLambdaFunctionAlias } from "../../function/version/sim-lambda-f
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaAliasCreatorProperties {
   readonly lambda: SimLambda;
@@ -36,6 +37,7 @@ export class SimCfnLambdaAliasCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaFunctionAlias> {
     const functionName = simCfnLambdaTargetFunctionName(
       this.propertyParser.requiredString(
@@ -50,22 +52,25 @@ export class SimCfnLambdaAliasCreator {
       "Name",
     );
 
-    await this.lambda.createAlias({
-      input: {
-        FunctionName: functionName,
-        Name: name,
-        FunctionVersion: this.propertyParser.requiredString(
-          resource,
-          properties["FunctionVersion"],
-          "FunctionVersion",
-        ),
-        Description: this.propertyParser.optionalString(
-          resource,
-          properties["Description"],
-          "Description",
-        ),
+    await this.lambda.createAlias(
+      {
+        input: {
+          FunctionName: functionName,
+          Name: name,
+          FunctionVersion: this.propertyParser.requiredString(
+            resource,
+            properties["FunctionVersion"],
+            "FunctionVersion",
+          ),
+          Description: this.propertyParser.optionalString(
+            resource,
+            properties["Description"],
+            "Description",
+          ),
+        },
       },
-    });
+      options,
+    );
 
     const alias = this.lambda.getSimFunctionAlias(functionName, name);
     assertDefined(

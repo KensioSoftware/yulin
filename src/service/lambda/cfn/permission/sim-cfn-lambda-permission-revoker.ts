@@ -3,6 +3,7 @@ import type { SimLambda } from "../../sim-lambda.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import { simCfnLambdaCreatedResource } from "../sim-cfn-lambda-created-resource.js";
 import { simCfnLambdaTargetFunction } from "../function/sim-cfn-lambda-target-function.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * Take an AWS::Lambda::Permission back off what it was granted on.
@@ -15,6 +16,7 @@ import { simCfnLambdaTargetFunction } from "../function/sim-cfn-lambda-target-fu
 export async function simCfnLambdaRevokePermission(
   lambda: SimLambda,
   resource: SimCfnResource,
+  options?: SimCfnResourceCallerOptions,
 ): Promise<void> {
   const permission = simCfnLambdaCreatedResource<SimLambdaPermission>(
     resource,
@@ -24,11 +26,14 @@ export async function simCfnLambdaRevokePermission(
     permission.resourceArn,
   );
 
-  await lambda.removePermission({
-    input: {
-      FunctionName: functionName,
-      Qualifier: qualifier,
-      StatementId: permission.statementId,
+  await lambda.removePermission(
+    {
+      input: {
+        FunctionName: functionName,
+        Qualifier: qualifier,
+        StatementId: permission.statementId,
+      },
     },
-  });
+    options,
+  );
 }

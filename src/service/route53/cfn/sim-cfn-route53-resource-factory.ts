@@ -10,6 +10,7 @@ import { SimCfnRoute53KskCreator } from "./dnssec/sim-cfn-r53-ksk-creator.js";
 import { SimCfnRoute53ZoneSigningCreator } from "./dnssec/sim-cfn-r53-zone-signing-creator.js";
 import { SimCfnRoute53ResourceDeleter } from "./sim-cfn-route53-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimRoute53CloudFormationResourceFactoryProperties {
   readonly route53?: SimRoute53 | undefined;
@@ -36,6 +37,7 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
     this.zoneSigningCreator = new SimCfnRoute53ZoneSigningCreator({ route53 });
     this.deleter = new SimCfnRoute53ResourceDeleter({
       route53,
+      recordSetCreator: this.recordSetCreator,
       keySigningKeyCreator: this.keySigningKeyCreator,
       zoneSigningCreator: this.zoneSigningCreator,
     });
@@ -49,29 +51,36 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "HostedZone": {
         return await this.hostedZoneCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "RecordSet": {
         return await this.recordSetCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "KeySigningKey": {
         return await this.keySigningKeyCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       case "DNSSEC": {
         return await this.zoneSigningCreator.create(
           resource,
-          context.resolvedProperties ?? resource.properties,
+          properties,
+          options,
         );
       }
       default: {
@@ -94,6 +103,7 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

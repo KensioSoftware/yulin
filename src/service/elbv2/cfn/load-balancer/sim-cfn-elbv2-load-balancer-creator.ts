@@ -4,6 +4,7 @@ import type { SimElbV2LoadBalancer } from "../../load-balancer/sim-elbv2-load-ba
 import type { SimElbV2 } from "../../sim-elbv2.js";
 import type { SimElbV2Stores } from "../../sim-elbv2-stores.js";
 import { SimCfnElbV2LoadBalancerProperties } from "./sim-cfn-elbv2-load-balancer-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnElbV2LoadBalancerCreatorProperties {
   readonly elbV2: SimElbV2;
@@ -34,6 +35,7 @@ export class SimCfnElbV2LoadBalancerCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimElbV2LoadBalancer> {
     const declared = new SimCfnElbV2LoadBalancerProperties({
       resource,
@@ -43,7 +45,7 @@ export class SimCfnElbV2LoadBalancerCreator {
 
     declared.recordIgnoredProperties();
 
-    await this.elbV2.createLoadBalancer({ input });
+    await this.elbV2.createLoadBalancer({ input }, options);
 
     return this.stores.loadBalancers.requireByName(declared.name());
   }
@@ -55,9 +57,13 @@ export class SimCfnElbV2LoadBalancerCreator {
    * teardown has already deleted them itself, since each of them names the
    * load balancer, so what this removes is usually the load balancer alone.
    */
-  async delete(loadBalancer: SimElbV2LoadBalancer): Promise<void> {
-    await this.elbV2.deleteLoadBalancer({
-      input: { LoadBalancerArn: loadBalancer.arn },
-    });
+  async delete(
+    loadBalancer: SimElbV2LoadBalancer,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.elbV2.deleteLoadBalancer(
+      { input: { LoadBalancerArn: loadBalancer.arn } },
+      options,
+    );
   }
 }

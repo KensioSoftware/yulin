@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 import type { SimS3 } from "../sim-s3.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnS3ResourceDeleterProperties {
   readonly simS3: SimS3;
@@ -30,19 +31,22 @@ export class SimCfnS3ResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "Bucket": {
-        await this.simS3.deleteBucket({
-          input: { Bucket: this.bucketName(resource) },
-        });
+        await this.simS3.deleteBucket(
+          { input: { Bucket: this.bucketName(resource) } },
+          options,
+        );
 
         return;
       }
       case "BucketPolicy": {
-        await this.simS3.deleteBucketPolicy({
-          input: { Bucket: this.bucketName(resource) },
-        });
+        await this.simS3.deleteBucketPolicy(
+          { input: { Bucket: this.bucketName(resource) } },
+          options,
+        );
 
         return;
       }

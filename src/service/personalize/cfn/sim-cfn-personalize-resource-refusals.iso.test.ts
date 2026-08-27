@@ -146,7 +146,11 @@ describe("simulated Personalize CloudFormation refusals", () => {
       await simAws
         .personalize()
         .cfnResourceFactory()
-        .delete("MetricAttribution", deployedResourceObject(resource));
+        .delete(
+          "MetricAttribution",
+          deployedResourceObject(resource),
+          {} as never,
+        );
     });
 
     assertStringIncludes(

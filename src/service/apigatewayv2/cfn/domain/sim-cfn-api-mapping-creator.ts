@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimApiMapping } from "../../domain/sim-api-mapping.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import { SimCfnApiMappingProperties } from "./sim-cfn-api-mapping-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnApiMappingCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -25,6 +26,7 @@ export class SimCfnApiMappingCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimApiMapping> {
     const mappingProperties = new SimCfnApiMappingProperties({
       resource,
@@ -32,9 +34,10 @@ export class SimCfnApiMappingCreator {
     });
     const domainName = mappingProperties.domainName();
 
-    const created = await this.apiGatewayV2.createApiMapping({
-      input: mappingProperties.createApiMappingInput(),
-    });
+    const created = await this.apiGatewayV2.createApiMapping(
+      { input: mappingProperties.createApiMappingInput() },
+      options,
+    );
 
     const mapping = this.apiGatewayV2
       .findDomainName(domainName)

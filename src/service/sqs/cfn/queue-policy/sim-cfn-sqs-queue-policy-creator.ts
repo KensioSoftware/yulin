@@ -6,6 +6,7 @@ import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 import { simSqsQueuePolicyAttributeName } from "../../queue/sim-sqs-queue-attribute-specs.js";
 import { SimSqsQueueUrl } from "../../queue/sim-sqs-queue-url.js";
 import type { SimSqs } from "../../sim-sqs.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSqsQueuePolicyCreatorProperties {
   readonly sqs: SimSqs;
@@ -37,6 +38,7 @@ export class SimCfnSqsQueuePolicyCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSqsQueue> {
     const queueUrls = this.queueUrlsForResource(resource, properties);
     const policy = jsonStringify(
@@ -44,7 +46,9 @@ export class SimCfnSqsQueuePolicyCreator {
     );
 
     const queues = await Promise.all(
-      queueUrls.map(async (queueUrl) => this.policyApplied(queueUrl, policy)),
+      queueUrls.map(async (queueUrl) =>
+        this.policyApplied(queueUrl, policy, options),
+      ),
     );
 
     const first = queues[0];
@@ -62,13 +66,17 @@ export class SimCfnSqsQueuePolicyCreator {
   private async policyApplied(
     queueUrl: string,
     policy: string,
+    options: SimCfnResourceCallerOptions,
   ): Promise<SimSqsQueue> {
-    await this.sqs.setQueueAttributes({
-      input: {
-        QueueUrl: queueUrl,
-        Attributes: { [simSqsQueuePolicyAttributeName]: policy },
+    await this.sqs.setQueueAttributes(
+      {
+        input: {
+          QueueUrl: queueUrl,
+          Attributes: { [simSqsQueuePolicyAttributeName]: policy },
+        },
       },
-    });
+      options,
+    );
 
     const parts = SimSqsQueueUrl.parse(queueUrl);
     assertDefined(parts, `queue URL ${queueUrl} SetQueueAttributes accepted`);

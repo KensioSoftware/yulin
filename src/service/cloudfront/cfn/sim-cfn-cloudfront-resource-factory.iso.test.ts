@@ -195,7 +195,7 @@ describe("SimCloudFrontCloudFormationResourceFactory", () => {
 
     // And when the Resource is deleted, sim CloudFront forgets it.
     resource.markCreateComplete(policy);
-    await factory.delete("ResponseHeadersPolicy", resource);
+    await factory.delete("ResponseHeadersPolicy", resource, {} as never);
 
     assertUndefined(cloudFront.getResponseHeadersPolicyById(policy.id));
   });
@@ -212,6 +212,7 @@ describe("SimCloudFrontCloudFormationResourceFactory", () => {
     await factory.delete(
       "ResponseHeadersPolicy",
       new SimCfnResource({ logicalId: "CacheHeaders" }),
+      {} as never,
     );
   });
 

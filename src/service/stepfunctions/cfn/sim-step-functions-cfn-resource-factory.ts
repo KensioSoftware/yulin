@@ -9,6 +9,7 @@ import type {
 import { SimCfnStateMachineCreator } from "./state-machine/sim-cfn-state-machine-creator.js";
 import { SimCfnStepFunctionsResourceDeleter } from "./sim-cfn-step-functions-resource-deleter.js";
 import { stateMachineResourceTypeName } from "./sim-cfn-step-functions-resource-types.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimStepFunctionsCfnResourceFactoryProperties {
   readonly stepFunctions: SimStepFunctions;
@@ -58,6 +59,7 @@ export class SimStepFunctionsCfnResourceFactory implements SimCfnServiceResource
     return await this.#stateMachineCreator.create(
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 
@@ -68,8 +70,12 @@ export class SimStepFunctionsCfnResourceFactory implements SimCfnServiceResource
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
-    _context: SimCloudFormationResourceDeleteContext,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.#deleter.delete(resourceTypeName, resource);
+    await this.#deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

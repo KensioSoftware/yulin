@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimRestApiAuthorizer } from "../../api/authorizer/sim-rest-api-authorizer.js";
 import type { SimApiGateway } from "../../sim-api-gateway.js";
 import { SimCfnRestApiAuthorizerProperties } from "./sim-cfn-rest-api-authorizer-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRestApiAuthorizerCreatorProperties {
   readonly apiGateway: SimApiGateway;
@@ -30,15 +31,17 @@ export class SimCfnRestApiAuthorizerCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRestApiAuthorizer> {
     const authorizerProperties = new SimCfnRestApiAuthorizerProperties({
       resource,
       properties,
     });
 
-    const created = await this.apiGateway.createAuthorizer({
-      input: authorizerProperties.createAuthorizerInput(),
-    });
+    const created = await this.apiGateway.createAuthorizer(
+      { input: authorizerProperties.createAuthorizerInput() },
+      options,
+    );
 
     const authorizer = this.apiGateway
       .findRestApi(authorizerProperties.restApiId())

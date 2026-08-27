@@ -8,6 +8,7 @@ import { SimCfnSqsQueueCreator } from "./queue/sim-cfn-sqs-queue-creator.js";
 import { SimCfnSqsQueuePolicyCreator } from "./queue-policy/sim-cfn-sqs-queue-policy-creator.js";
 import { SimCfnSqsResourceDeleter } from "./sim-cfn-sqs-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimSqsCfnResourceFactoryProperties {
   readonly sqs: SimSqs;
@@ -41,17 +42,21 @@ export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Queue": {
         return await this.queueCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          options,
         );
       }
       case "QueuePolicy": {
         return await this.queuePolicyCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          options,
         );
       }
       default: {
@@ -74,6 +79,7 @@ export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

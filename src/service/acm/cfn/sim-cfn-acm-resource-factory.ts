@@ -1,7 +1,9 @@
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimAcm } from "../sim-acm.js";
 import { SimCfnAcmCertificateCreator } from "./certificate/sim-cfn-acm-cert-creator.js";
@@ -56,6 +58,7 @@ export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
     if (resourceTypeName !== "Certificate") {
       throw new Error(
@@ -69,8 +72,9 @@ export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
       `sim ACM certificate for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.acm.deleteCertificate({
-      input: { CertificateArn: certificate.certificateArn },
-    });
+    await this.acm.deleteCertificate(
+      { input: { CertificateArn: certificate.certificateArn } },
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

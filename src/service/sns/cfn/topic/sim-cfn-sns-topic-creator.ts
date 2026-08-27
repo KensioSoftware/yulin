@@ -2,6 +2,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSns } from "../../sim-sns.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import { simCfnSnsResourceCreation } from "../sim-cfn-sns-resource-error.js";
 import { snsTopicResourceType } from "../sim-cfn-sns-resource-types.js";
@@ -33,6 +34,7 @@ export class SimCfnSnsTopicCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSnsTopic> {
     const topicProperties = new SimCfnSnsTopicProperties({
       resource,
@@ -46,9 +48,10 @@ export class SimCfnSnsTopicCreator {
       snsTopicResourceType,
       resource.logicalId,
       async () => {
-        await this.sns.createTopic({
-          input: { Name: name, Attributes: attributes },
-        });
+        await this.sns.createTopic(
+          { input: { Name: name, Attributes: attributes } },
+          options,
+        );
 
         const topic = this.sns.findTopic(name);
         assertDefined(
@@ -56,7 +59,7 @@ export class SimCfnSnsTopicCreator {
           `sim SNS topic ${name} after CloudFormation creation`,
         );
 
-        await this.subscribeInline(topic, inline);
+        await this.subscribeInline(topic, inline, options);
 
         return topic;
       },
@@ -74,16 +77,20 @@ export class SimCfnSnsTopicCreator {
   private async subscribeInline(
     topic: SimSnsTopic,
     subscriptions: readonly SimCfnSnsInlineSubscription[],
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     for (const subscription of subscriptions) {
       // oxlint-disable-next-line no-await-in-loop -- one entry at a time, so a refused entry leaves the earlier ones subscribed
-      await this.sns.subscribe({
-        input: {
-          TopicArn: topic.arn.value,
-          Protocol: subscription.protocol,
-          Endpoint: subscription.endpoint,
+      await this.sns.subscribe(
+        {
+          input: {
+            TopicArn: topic.arn.value,
+            Protocol: subscription.protocol,
+            Endpoint: subscription.endpoint,
+          },
         },
-      });
+        options,
+      );
     }
   }
 }

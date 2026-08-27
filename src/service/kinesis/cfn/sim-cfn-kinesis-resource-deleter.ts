@@ -2,6 +2,7 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimKinesis } from "../sim-kinesis.js";
 import type { SimKinesisStream } from "../stream/sim-kinesis-stream.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnKinesisResourceDeleterProperties {
   readonly kinesis: SimKinesis;
@@ -23,6 +24,7 @@ export class SimCfnKinesisResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (resourceTypeName !== "Stream") {
       throw new Error(
@@ -36,6 +38,9 @@ export class SimCfnKinesisResourceDeleter {
       `sim Kinesis stream for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.kinesis.deleteStream({ input: { StreamARN: stream.arn } });
+    await this.kinesis.deleteStream(
+      { input: { StreamARN: stream.arn } },
+      options,
+    );
   }
 }

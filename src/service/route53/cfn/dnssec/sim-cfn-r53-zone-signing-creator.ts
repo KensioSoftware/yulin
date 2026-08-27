@@ -5,6 +5,7 @@ import { normalizeSimRoute53HostedZoneId } from "../../command/create-hosted-zon
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import type { SimRoute53 } from "../../sim-route53.js";
 import { simCfnRoute53String } from "./sim-cfn-r53-dnssec-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const resourceType = "AWS::Route53::DNSSEC";
 
@@ -33,12 +34,14 @@ export class SimCfnRoute53ZoneSigningCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRoute53HostedZone> {
     const hostedZoneId = this.hostedZoneId(resource, properties);
 
-    await this.route53.enableHostedZoneDnssec({
-      input: { HostedZoneId: hostedZoneId },
-    });
+    await this.route53.enableHostedZoneDnssec(
+      { input: { HostedZoneId: hostedZoneId } },
+      options,
+    );
 
     const hostedZone = this.route53.hostedZones.get(
       normalizeSimRoute53HostedZoneId(hostedZoneId),
@@ -57,10 +60,12 @@ export class SimCfnRoute53ZoneSigningCreator {
   async delete(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
-    await this.route53.disableHostedZoneDnssec({
-      input: { HostedZoneId: this.hostedZoneId(resource, properties) },
-    });
+    await this.route53.disableHostedZoneDnssec(
+      { input: { HostedZoneId: this.hostedZoneId(resource, properties) } },
+      options,
+    );
   }
 
   private hostedZoneId(

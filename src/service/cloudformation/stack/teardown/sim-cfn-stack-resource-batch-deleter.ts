@@ -1,9 +1,11 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
 interface SimCfnStackResourceBatchDeleterProperties {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -19,10 +21,12 @@ interface SimCfnStackResourceBatchDeleterProperties {
 export class SimCfnStackResourceBatchDeleter {
   private readonly simAws: SimAws;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
+  private readonly caller: SimAwsCaller | undefined;
 
   constructor(properties: SimCfnStackResourceBatchDeleterProperties) {
     this.simAws = properties.simAws;
     this.resources = properties.resources;
+    this.caller = properties.caller;
   }
 
   /**
@@ -36,6 +40,7 @@ export class SimCfnStackResourceBatchDeleter {
         await resource.delete({
           simAws: this.simAws,
           resources: this.resources,
+          caller: this.caller,
         });
       }),
     );

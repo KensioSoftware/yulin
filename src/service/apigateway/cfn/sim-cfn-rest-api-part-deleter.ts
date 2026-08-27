@@ -1,12 +1,14 @@
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
-import type {
-  SimCfnTemplateValue,
-  SimCfnTemplateValueRecord,
-} from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimRestApiAuthorizer } from "../api/authorizer/sim-rest-api-authorizer.js";
 import type { SimRestApiResource } from "../api/resource/sim-rest-api-resource.js";
 import type { SimRestApiStage } from "../api/stage/sim-rest-api-stage.js";
 import type { SimApiGateway } from "../sim-api-gateway.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import {
+  simCfnRestApiPart,
+  simCfnRestApiPartProperty,
+} from "./sim-cfn-rest-api-part-values.js";
 
 interface SimCfnRestApiPartDeleterProperties {
   readonly apiGateway: SimApiGateway;
@@ -41,53 +43,62 @@ export class SimCfnRestApiPartDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
-    const restApiId = this.restApiId(resource, properties);
+    const restApiId = simCfnRestApiPartProperty(
+      resource,
+      properties["RestApiId"],
+      "RestApiId",
+    );
 
     switch (resourceTypeName) {
       case "Resource": {
-        const { resourceId } = this.part<SimRestApiResource>(resource);
+        const { resourceId } = simCfnRestApiPart<SimRestApiResource>(resource);
 
-        await this.apiGateway.deleteResource({
-          input: { restApiId, resourceId },
-        });
+        await this.apiGateway.deleteResource(
+          { input: { restApiId, resourceId } },
+          options,
+        );
 
         return;
       }
       case "Authorizer": {
-        const { authorizerId } = this.part<SimRestApiAuthorizer>(resource);
+        const { authorizerId } =
+          simCfnRestApiPart<SimRestApiAuthorizer>(resource);
 
-        await this.apiGateway.deleteAuthorizer({
-          input: { restApiId, authorizerId },
-        });
+        await this.apiGateway.deleteAuthorizer(
+          { input: { restApiId, authorizerId } },
+          options,
+        );
 
         return;
       }
       case "Method": {
-        await this.apiGateway.deleteMethod({
-          input: {
-            restApiId,
-            resourceId: this.property(
-              resource,
-              properties["ResourceId"],
-              "ResourceId",
-            ),
-            httpMethod: this.property(
-              resource,
-              properties["HttpMethod"],
-              "HttpMethod",
-            ),
-          },
-        });
+        const resourceId = simCfnRestApiPartProperty(
+          resource,
+          properties["ResourceId"],
+          "ResourceId",
+        );
+        const httpMethod = simCfnRestApiPartProperty(
+          resource,
+          properties["HttpMethod"],
+          "HttpMethod",
+        );
+
+        await this.apiGateway.deleteMethod(
+          { input: { restApiId, resourceId, httpMethod } },
+          options,
+        );
 
         return;
       }
       case "Stage": {
-        const { stageName } = this.part<SimRestApiStage>(resource);
+        const { stageName } = simCfnRestApiPart<SimRestApiStage>(resource);
 
-        await this.apiGateway.deleteStage({
-          input: { restApiId, stageName },
-        });
+        await this.apiGateway.deleteStage(
+          { input: { restApiId, stageName } },
+          options,
+        );
 
         return;
       }
@@ -98,43 +109,5 @@ export class SimCfnRestApiPartDeleter {
         );
       }
     }
-  }
-
-  /**
-   * The simulated object created for this Resource.
-   */
-  private part<T extends object>(resource: SimCfnResource): T {
-    const part = resource.simResource as T | undefined;
-
-    /* v8 ignore if -- a Resource that was never created is not deleted */
-    if (part === undefined) {
-      throw new TypeError(
-        `sim REST API part for CloudFormation Resource ${resource.logicalId} is missing`,
-      );
-    }
-
-    return part;
-  }
-
-  private restApiId(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): string {
-    return this.property(resource, properties["RestApiId"], "RestApiId");
-  }
-
-  private property(
-    resource: SimCfnResource,
-    value: SimCfnTemplateValue | undefined,
-    name: string,
-  ): string {
-    /* v8 ignore if -- creation refused the Resource without this string */
-    if (typeof value !== "string") {
-      throw new TypeError(
-        `AWS::ApiGateway Resource ${resource.logicalId} requires a ${name} string to delete`,
-      );
-    }
-
-    return value;
   }
 }

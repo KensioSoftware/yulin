@@ -6,6 +6,7 @@ import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafRegexPatternSetResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafRegexPatternSetConfig } from "./sim-cfn-waf-regex-set-config.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnWafRegexPatternSetCreatorProperties {
   readonly wafV2: SimWafV2;
@@ -32,6 +33,7 @@ export class SimCfnWafRegexPatternSetCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimWafRegexPatternSet> {
     const input = new SimCfnWafRegexPatternSetConfig({
       resource,
@@ -42,7 +44,10 @@ export class SimCfnWafRegexPatternSetCreator {
       wafRegexPatternSetResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#wafV2.createRegexPatternSet({ input });
+        const created = await this.#wafV2.createRegexPatternSet(
+          { input },
+          options,
+        );
         const arn = created.Summary?.ARN;
 
         assertDefined(
@@ -70,19 +75,23 @@ export class SimCfnWafRegexPatternSetCreator {
   async delete(
     resource: SimCfnResource,
     patternSet: SimWafRegexPatternSet,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await simCfnWafResourceCommand(
       wafRegexPatternSetResourceType,
       resource.logicalId,
       async () =>
-        await this.#wafV2.deleteRegexPatternSet({
-          input: {
-            Name: patternSet.name,
-            Scope: patternSet.scope,
-            Id: patternSet.id,
-            LockToken: patternSet.lockToken,
+        await this.#wafV2.deleteRegexPatternSet(
+          {
+            input: {
+              Name: patternSet.name,
+              Scope: patternSet.scope,
+              Id: patternSet.id,
+              LockToken: patternSet.lockToken,
+            },
           },
-        }),
+          options,
+        ),
     );
   }
 }

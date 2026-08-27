@@ -1,12 +1,14 @@
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimCfnS3BucketCreator } from "./bucket/sim-cfn-s3-bucket-creator.js";
 import { SimCfnS3BucketPolicyCreator } from "./bucket-policy/sim-cfn-s3-bucket-policy-creator.js";
 import { SimCfnS3ResourceDeleter } from "./sim-cfn-s3-resource-deleter.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * CloudFormation Resource factory for simulated S3 resources.
@@ -30,17 +32,21 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Bucket": {
         return await this.bucketCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          options,
         );
       }
       case "BucketPolicy": {
         return await this.bucketPolicyCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          options,
         );
       }
       default: {
@@ -57,7 +63,12 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

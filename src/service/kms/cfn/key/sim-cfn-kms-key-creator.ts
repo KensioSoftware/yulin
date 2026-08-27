@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimKmsKey } from "../../key/sim-kms-key.js";
 import type { SimKms } from "../../sim-kms.js";
 import { SimCfnKmsKeyProperties } from "./sim-cfn-kms-key-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnKmsKeyCreatorProperties {
   readonly kms: SimKms;
@@ -30,18 +31,22 @@ export class SimCfnKmsKeyCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimKmsKey> {
     const keyProperties = new SimCfnKmsKeyProperties({ resource, properties });
 
-    const created = await this.kms.createKey({
-      input: {
-        Description: keyProperties.description(),
-        Policy: keyProperties.policy(),
-        KeySpec: keyProperties.keySpec(),
-        KeyUsage: keyProperties.keyUsage(),
-        Origin: keyProperties.origin(),
+    const created = await this.kms.createKey(
+      {
+        input: {
+          Description: keyProperties.description(),
+          Policy: keyProperties.policy(),
+          KeySpec: keyProperties.keySpec(),
+          KeyUsage: keyProperties.keyUsage(),
+          Origin: keyProperties.origin(),
+        },
       },
-    });
+      options,
+    );
 
     const keyId = created.KeyMetadata?.KeyId;
     assertDefined(

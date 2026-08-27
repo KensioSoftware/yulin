@@ -6,6 +6,7 @@ import {
   type SimCdkOutContext,
 } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { simWatch } from "../../../watch/sim-watch-runtime.js";
 import type { SimCfnTemplateFileWatchOptions } from "../watch/sim-cfn-template-watch.type.js";
 import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
@@ -21,6 +22,16 @@ export interface SimCloudFormationDeployTemplateFileProperties {
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal the deployment runs as.
+   *
+   * Every Resource is created, updated and deleted through the command an SDK
+   * caller would reach, and this is who those commands are authorized as. Left
+   * out, they are decided as the Account root, which is what a service control
+   * policy denying an Account's root principal then denies.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 
   /**
    * Adapt the parsed template before it is deployed, and again every time a
@@ -57,6 +68,7 @@ export interface SimCfnLoadedTemplateFile {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+  readonly caller?: SimAwsCaller | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
@@ -73,7 +85,7 @@ export class SimCfnTemplateFileLoader {
     properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnLoadedTemplateFile> {
     const deployment = simCfnTemplateFileDeployment(properties);
-    const { templatePath, parameters, bindings } = deployment;
+    const { templatePath, parameters, bindings, caller } = deployment;
     const stackName =
       deployment.stackName ?? stackNameFromTemplatePath(templatePath);
 
@@ -95,6 +107,7 @@ export class SimCfnTemplateFileLoader {
       template,
       parameters,
       bindings,
+      caller,
       cdkOutContext,
     };
   }

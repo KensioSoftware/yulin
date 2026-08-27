@@ -1,5 +1,6 @@
 import type { SimCdkAssemblyStack } from "../cdk/sim-cdk-assembly-manifest.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transform.js";
@@ -31,6 +32,14 @@ export type SimCfnCdkOutTemplateTransform = (
 export interface SimCfnCdkOutStackOptions {
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal this Stack is deployed as, where the assembly's own caller
+   * is not the right one for it. A pipeline Stack deployed by one role and an
+   * application Stack deployed by another is what this is for.
+   */
+  readonly caller?: SimAwsCaller | undefined;
+
   readonly transform?: SimCfnCdkOutTemplateTransform | undefined;
 }
 
@@ -73,9 +82,9 @@ export function cdkOutBoundTransform(
 /**
  * Refuse options keyed against a Stack that is not being deployed.
  *
- * A renamed Stack would otherwise take its bindings and its transform with it
- * without saying anything, and the deployment that lost them looks like one
- * that never had them.
+ * A renamed Stack would otherwise take its bindings, its caller and its
+ * transform with it without saying anything, and the deployment that lost them
+ * looks like one that never had them.
  */
 export function assertCdkOutOptionsAreDeployed(
   optionsByName: SimCfnCdkOutStackOptionsByName | undefined,
@@ -90,11 +99,7 @@ export function assertCdkOutOptionsAreDeployed(
 
   if (unmatched.length > 0) {
     throw new Error(
-      `Options were given for ${unmatched.join(", ")}, which no Stack being deployed is named. The Stacks being deployed are ${stackNames(deploying)}.`,
+      `Options were given for ${unmatched.join(", ")}, which no Stack being deployed is named. The Stacks being deployed are ${deploying.map((stack) => stack.stackName).join(", ")}.`,
     );
   }
-}
-
-function stackNames(stacks: readonly SimCdkAssemblyStack[]): string {
-  return stacks.map((stack) => stack.stackName).join(", ");
 }

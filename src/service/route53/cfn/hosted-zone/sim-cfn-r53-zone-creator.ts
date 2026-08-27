@@ -4,6 +4,7 @@ import { assertIsSimRoute53HostedZoneId } from "../../command/create-hosted-zone
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import type { SimRoute53 } from "../../sim-route53.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRoute53HostedZoneCreatorProperties {
   readonly route53: SimRoute53;
@@ -25,6 +26,7 @@ export class SimCfnRoute53HostedZoneCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRoute53HostedZone> {
     const name = properties["Name"];
 
@@ -57,13 +59,16 @@ export class SimCfnRoute53HostedZoneCreator {
             ),
           };
 
-    const hostedZoneCreation = await this.route53.createHostedZone({
-      input: {
-        Name: name,
-        CallerReference: resource.logicalId,
-        HostedZoneConfig: route53HostedZoneConfig,
+    const hostedZoneCreation = await this.route53.createHostedZone(
+      {
+        input: {
+          Name: name,
+          CallerReference: resource.logicalId,
+          HostedZoneConfig: route53HostedZoneConfig,
+        },
       },
-    });
+      options,
+    );
 
     const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
