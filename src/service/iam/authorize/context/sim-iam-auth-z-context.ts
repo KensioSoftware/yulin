@@ -37,15 +37,28 @@ export type SimIamAuthZResourcePolicySource = Omit<
 };
 
 /**
+ * The service control policies attached at one level above the caller's
+ * Account, which is the root, an organizational unit, or the Account itself.
+ *
+ * Each level has to allow the action on its own. A level allowing nothing
+ * denies the request whatever another level allows, which is why the sources
+ * stay grouped rather than being read as one list.
+ */
+export interface SimIamAuthZServiceControlPolicyLevel {
+  readonly nodeName: string;
+  readonly sources: readonly SimIamAuthZPolicySource[];
+}
+
+/**
  * The service control policies in force for an authorization request.
  *
- * `applies` is a separate fact from how many sources there are. An Account
- * inside an organization that holds no policy allows nothing, while an Account
- * outside every organization is unrestricted, and both carry no sources.
+ * `applies` is a separate fact from how many levels there are. An Account
+ * inside an organization holding no policy allows nothing, while an Account
+ * outside every organization is unrestricted, and both can carry no levels.
  */
 export interface SimIamAuthZServiceControlPolicies {
   readonly applies: boolean;
-  readonly sources: readonly SimIamAuthZPolicySource[];
+  readonly levels: readonly SimIamAuthZServiceControlPolicyLevel[];
 }
 
 export interface SimIamAuthZContext {
