@@ -230,6 +230,86 @@ describe("Trino's URL functions on SQLite", () => {
   });
 });
 
+describe("Trino's URL escaping functions on SQLite", () => {
+  it("escapes a value the way a form parameter is escaped", async () => {
+    // Given values carrying reserved characters, a space and a plus.
+    // When each is escaped.
+    // Then a space is written as `+` and a plus as `%2B`, and only `-`, `_`,
+    // `.` and `*` come through unescaped. These are Trino's own vectors.
+    assertIdentical(
+      await anAnsweredExpression("url_encode('http://test?a=b&c=d')"),
+      "http%3A%2F%2Ftest%3Fa%3Db%26c%3Dd",
+    );
+    assertIdentical(
+      await anAnsweredExpression("url_encode('~@:.-*_+ \u{2603}')"),
+      "%7E%40%3A.-*_%2B+%E2%98%83",
+    );
+    assertIdentical(
+      await anAnsweredExpression("url_encode('!''()~')"),
+      "%21%27%28%29%7E",
+      "the five characters encodeURIComponent keeps and Guava's escaper escapes",
+    );
+    assertIdentical(
+      await anAnsweredExpression("url_encode('\u{29E3D}')"),
+      "%F0%A9%B8%BD",
+      "a character outside the basic plane is written as its UTF-8 bytes",
+    );
+    assertIdentical(await anAnsweredExpression("url_encode('test')"), "test");
+  });
+
+  it("reads a value back out of its escapes", async () => {
+    // Given the escaped forms above.
+    // When each is read back.
+    // Then `+` comes back as a space and `%2B` as a plus, which is what
+    // `URLDecoder.decode` does over UTF-8.
+    assertIdentical(
+      await anAnsweredExpression(
+        "url_decode('http%3A%2F%2Ftest%3Fa%3Db%26c%3Dd')",
+      ),
+      "http://test?a=b&c=d",
+    );
+    assertIdentical(
+      await anAnsweredExpression("url_decode('%7E%40%3A.-*_%2B+%E2%98%83')"),
+      "~@:.-*_+ \u{2603}",
+    );
+    assertIdentical(
+      await anAnsweredExpression(
+        "url_decode('http%3A%2F%2F%E3%83%86%E3%82%B9%E3%83%88')",
+      ),
+      "http://\u{30C6}\u{30B9}\u{30C8}",
+    );
+    assertIdentical(await anAnsweredExpression("url_decode('test')"), "test");
+  });
+
+  it("reads a doubly escaped access log field in two passes", async () => {
+    // Given a search a reader typed as `caf\u00E9`, which the browser sends as
+    // `caf%C3%A9` and a CloudFront access log then escapes a second time.
+    // When the field is read back once and then twice.
+    // Then one pass leaves the browser's own escapes standing, and the second
+    // reaches the text the reader typed.
+    assertIdentical(
+      await anAnsweredExpression("url_decode('q=caf%25C3%25A9')"),
+      "q=caf%C3%A9",
+    );
+    assertIdentical(
+      await anAnsweredExpression("url_decode(url_decode('q=caf%25C3%25A9'))"),
+      "q=caf\u{E9}",
+    );
+  });
+
+  it("answers null over text it cannot read back", async () => {
+    // Given an escape naming no byte, and escapes naming bytes that are no
+    // UTF-8.
+    // When each is read back.
+    // Then the answer is null rather than a failed query. Trino raises over
+    // the first and writes a replacement character for the second.
+    assertIdentical(await anAnsweredExpression("url_decode('%zz')"), null);
+    assertIdentical(await anAnsweredExpression("url_decode('%C3%28')"), null);
+    assertIdentical(await anAnsweredExpression("url_decode(NULL)"), null);
+    assertIdentical(await anAnsweredExpression("url_encode(NULL)"), null);
+  });
+});
+
 describe("the string functions SQLite already carries", () => {
   it("counts from one, as Trino does", async () => {
     // Given a value and a format string.

@@ -14,8 +14,8 @@ const parts: ReadonlyMap<string, (url: URL) => string | null> = new Map([
 /**
  * Trino's URL functions, which a query over access logs reaches for.
  *
- * Trino fails a query over text that is no URL and these answer null, the same
- * forgiving direction the rest of the engine takes.
+ * Trino fails a query over text that is no URL and the extract functions
+ * answer null, the same forgiving direction the rest of the engine takes.
  *
  * Trino answers with an empty string for a part the URL leaves out, apart from
  * the port, which has no empty form and answers null.
@@ -43,6 +43,63 @@ export function simAthenaInstallUrlShims(database: DatabaseSync): void {
 
     return url.searchParams.get(wanted);
   });
+
+  simAthenaScalarShim(database, "url_decode", (value) =>
+    decoded(shimText(value)),
+  );
+
+  simAthenaScalarShim(database, "url_encode", (value) =>
+    encoded(shimText(value)),
+  );
+}
+
+/**
+ * One value with its escapes read back, the way `url_decode` reads them.
+ *
+ * Trino runs `URLDecoder.decode` over UTF-8, which reads `+` as a space and
+ * `%2B` as a plus. Replacing the plus before decoding is what keeps the two
+ * apart.
+ *
+ * Trino raises over an escape that names no byte, and writes a replacement
+ * character where the bytes it names are no UTF-8. `decodeURIComponent` throws
+ * over both, and this answers null for both, the same forgiving direction the
+ * rest of the file takes.
+ */
+function decoded(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(value.replaceAll("+", " "));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One value escaped for a query string, the way `url_encode` escapes it.
+ *
+ * Trino runs Guava's form-parameter escaper, which keeps `-`, `_`, `.` and `*`
+ * alone and writes a space as `+`. `encodeURIComponent` keeps five characters
+ * beyond those four, and each of those is escaped here.
+ *
+ * No escape written here carries a character a later pass looks for, and a
+ * space is the only character `encodeURIComponent` writes as `%20`, since a
+ * percent in the value has already become `%25` by then.
+ */
+function encoded(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  return encodeURIComponent(value)
+    .replaceAll("!", "%21")
+    .replaceAll("'", "%27")
+    .replaceAll("(", "%28")
+    .replaceAll(")", "%29")
+    .replaceAll("~", "%7E")
+    .replaceAll("%20", "+");
 }
 
 /** Everything between the scheme and the path, which is where a port is written. */
