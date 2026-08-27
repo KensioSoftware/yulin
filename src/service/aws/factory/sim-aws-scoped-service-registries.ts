@@ -112,6 +112,14 @@ export class SimAwsScopedServiceRegistries {
   public readonly serviceHosts: SimAwsServiceHosts;
 
   /**
+   * Where a hostname a hosted-zone record outranks is looked up. An API
+   * Gateway custom domain name is reached through a record on AWS, so a record
+   * for one decides where the name goes and the domain answers where no record
+   * names it.
+   */
+  public readonly shadowableServiceHosts: SimAwsServiceHosts;
+
+  /**
    * The hostnames the domain registries have handed out. A public hostname is
    * unique across the whole of AWS rather than within one service, so the two
    * services that hand them out share this rather than each keeping its own.
@@ -121,8 +129,8 @@ export class SimAwsScopedServiceRegistries {
   constructor() {
     this.cognitoDomains = new SimCognitoDomainRegistry(this.hostnameClaims);
     this.httpApiDomains = new SimHttpApiDomainRegistry(this.hostnameClaims);
-    this.serviceHosts = new SimAwsAnyServiceHosts([
-      this.cognitoDomains,
+    this.serviceHosts = new SimAwsAnyServiceHosts([this.cognitoDomains]);
+    this.shadowableServiceHosts = new SimAwsAnyServiceHosts([
       this.httpApiDomains,
     ]);
   }

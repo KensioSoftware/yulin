@@ -141,8 +141,10 @@ export class SimAwsServiceFactory {
       kmsRegistry: this.registries.kms,
       // A Cognito hosted domain and an API Gateway custom domain each answer
       // on a hostname of their own, so DNS resolution asks the registries
-      // holding those domains about it.
+      // holding those domains about it. A record outranks the API Gateway one,
+      // as it does on AWS, which is what keeps the two apart here.
       serviceHosts: this.registries.serviceHosts,
+      shadowableServiceHosts: this.registries.shadowableServiceHosts,
       iamRegistry: this.iamRegistry,
       accessKeyRegistry: this.requestAuth.accessKeyRegistry,
     });

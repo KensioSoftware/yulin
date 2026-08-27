@@ -1904,6 +1904,20 @@ console.log(await response.json());
 await srv.close();
 ```
 
+### The two names a domain has
+
+API Gateway gives the domain a regional endpoint of its own alongside the name it was created with.
+`DomainNameConfigurations[0].ApiGatewayDomainName` reports it, in the shape
+`d-<id>.execute-api.<region>.amazonaws.com`, and the domain answers there too. That is the published
+address. A CloudFront Origin points at it directly, and a Route53 record points the custom domain
+name at it.
+
+A record for the custom domain name decides where that name goes, as it does on AWS. A distribution
+serving `www.example.com` through an alias record keeps it after an API is given `www.example.com` as
+a custom domain, and requests to the domain's regional endpoint carry on reaching the API. Where a
+simulated hosted zone holds no record for the custom domain name, the name reaches the domain. That
+is how a test that creates only a domain reaches it.
+
 ### Which hostnames an API answers on
 
 An API answers on the endpoint API Gateway generated for it and on the domains mapped to it. A
@@ -1918,6 +1932,10 @@ pair were told apart against real AWS. Simulated CloudFront always sends the Ori
 (see the [CloudFront limitations](https://yulinsim.dev/services/cloudfront/#limitations)), so
 reaching this refusal here means calling the API on a hostname of your own. A Route53 CNAME pointing
 at the generated endpoint does it.
+
+A custom domain of that hostname makes no difference to it. The record still decides where the name
+goes, and a record pointing at the generated endpoint sends the request to an API answering on its
+own hostname. Point the record at the domain's regional endpoint to reach the mappings behind it.
 
 ### Deleting a domain name and its mappings
 
@@ -2380,16 +2398,15 @@ needs its stage to exist, and CDK gives it an explicit `DependsOn` for that, bec
 property carries the stage's name rather than a `Ref` CloudFormation could take an order from. A
 hand-written template wanting the same order writes that `DependsOn` itself.
 
-`Fn::GetAtt: ["Domain", "RegionalDomainName"]` answers with the hostname the domain serves, so a
-CloudFront Origin or a Route53 alias record built on it reaches the API behind the domain. That is
+`Fn::GetAtt: ["Domain", "RegionalDomainName"]` answers with the `d-<id>.execute-api.<region>.amazonaws.com`
+endpoint API Gateway issued the domain (see [The two names a domain has](#the-two-names-a-domain-has)).
+A CloudFront Origin or a Route53 alias record built on it reaches the API behind the domain. That is
 the stack shape a cache policy keying on `host` needs, since the generated endpoint refuses a
 forwarded viewer hostname (see [Which hostnames an API answers on](#which-hostnames-an-api-answers-on)).
 
-Real API Gateway issues a separate `d-<id>.execute-api.<region>.amazonaws.com` name here and expects
-DNS to point the custom domain at it. Answering with that name would leave the Origin pointing at a
-hostname simulated DNS reads as a generated API endpoint, resolving to no API at all.
 `RegionalHostedZoneId` answers with one fixed value for every Region, the way a load balancer's
-`CanonicalHostedZoneID` does.
+`CanonicalHostedZoneID` does. Nothing resolves through it, and an alias record reaches the domain by
+the endpoint name it points at.
 
 ## Authorization
 
@@ -2582,10 +2599,11 @@ Current documented limitations:
   decide, and the record is where a test checks the domain got the certificate its stack meant to
   give it. `EndpointType: "EDGE"` is refused, since an edge-optimized custom domain is a REST API
   feature. `MutualTlsAuthentication` and `Tags` are refused by name.
-- The regional domain name AWS issues a custom domain is the domain's own hostname here.
-  `Fn::GetAtt RegionalDomainName` answers with it, and `RegionalHostedZoneId` answers with one fixed
-  value for every Region. `DomainNameConfigurations` reports no `ApiGatewayDomainName` and no
-  `HostedZoneId`, and only the custom domain's own hostname resolves.
+- A domain's `RegionalHostedZoneId` is one fixed value for every Region, where AWS publishes a
+  different id per Region. Resolution ignores it.
+- A domain created without a `DomainNameConfigurations` entry is reported with one holding only the
+  endpoint it was issued. Real API Gateway needs a certificate for a regional domain, so it always
+  has an entry to report that in.
 - `AWS::ApiGatewayV2::DomainName` records `RoutingMode`, `MutualTlsAuthentication` and `Tags` rather
   than applying them, and records the `DomainNameConfigurations` members it does not read. Routing
   rules are a second way to reach an API that nothing here models, and a simulated request carries no

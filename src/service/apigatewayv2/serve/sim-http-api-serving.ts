@@ -144,7 +144,9 @@ export class SimHttpApiServingResolver {
   ): SimHttpApiResolution {
     const domain = this.domains.route(target);
 
-    /* v8 ignore if -- a domain target only resolves from a registered domain */
+    // A regional endpoint hostname is recognised by its shape, as a generated
+    // API endpoint is, so one naming no domain arrives here and is answered
+    // the way a path no mapping claims is.
     if (domain === undefined) {
       return notFound;
     }

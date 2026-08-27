@@ -16,6 +16,11 @@ import { SimApiGatewayV2BadRequest } from "../error/sim-api-gateway-v2.error.js"
  * and nothing saying it is an API Gateway hostname at all. That makes this the
  * answer to which simulated service a hostname belongs to, which is what
  * `SimAwsServiceHosts` asks.
+ *
+ * Simulated DNS asks a hosted-zone record about a custom domain name first,
+ * the way the custom domain name reaches the domain through a record on AWS.
+ * This answers where no record names the hostname. That is how a test that
+ * creates only a domain reaches it.
  */
 export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
   private readonly domainsByHost = new Map<string, SimHttpApiDomainName>();
@@ -31,7 +36,12 @@ export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
   register(domain: SimHttpApiDomainName): void {
     this.requireUnused(domain);
 
-    this.domainsByHost.set(domain.hostname.toLowerCase(), domain);
+    for (const hostname of domain.hostnames) {
+      this.domainsByHost.set(hostname.toLowerCase(), domain);
+    }
+
+    // Only the custom domain name is claimed. The regional endpoint is a name
+    // API Gateway made up, and takes no hostname away from another service.
     this.claims.claim(domain.hostname);
   }
 
@@ -39,12 +49,16 @@ export class SimHttpApiDomainRegistry implements SimAwsServiceHosts {
    * Forget a deleted domain, so its hostname stops resolving.
    */
   deregister(domain: SimHttpApiDomainName): void {
-    this.domainsByHost.delete(domain.hostname.toLowerCase());
+    for (const hostname of domain.hostnames) {
+      this.domainsByHost.delete(hostname.toLowerCase());
+    }
+
     this.claims.release(domain.hostname);
   }
 
   /**
-   * Find the domain a request's hostname reaches.
+   * Find the domain a request's hostname reaches, by either of the two names
+   * the domain answers on.
    */
   findByHost(hostname: string): SimHttpApiDomainName | undefined {
     return this.domainsByHost.get(hostname.toLowerCase());

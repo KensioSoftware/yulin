@@ -143,10 +143,14 @@ describe("HTTP API custom domain CloudFormation Resources", () => {
     const hostedZoneId = stack.outputs.get("RegionalHostedZoneId")?.value;
     const mappingRef = stack.outputs.get("MappingRef")?.value;
 
-    // Then Ref is the domain name, the regional name is the hostname the
-    // domain answers on, and the mapping's Ref is the id it was allocated
+    // Then Ref is the domain name, the regional name is the endpoint API
+    // Gateway issued the domain, and the mapping's Ref is the id it was
+    // allocated
     assertIdentical(domainRef, domainName);
-    assertIdentical(regionalDomainName, domainName);
+    assertTypeString(regionalDomainName);
+    expect(regionalDomainName).toMatch(
+      /^d-[a-z0-9]{10}\.execute-api\.eu-west-2\.amazonaws\.com$/u,
+    );
     assertIdentical(hostedZoneId, simHttpApiRegionalHostedZoneId);
     assertTypeString(mappingRef);
     expect(mappingRef).toMatch(/^[a-z0-9]{6}$/u);

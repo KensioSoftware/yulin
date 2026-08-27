@@ -41,6 +41,13 @@ interface SimRoute53Properties {
   readonly serviceHosts?: SimAwsServiceHosts | undefined;
 
   /**
+   * Where a hostname a hosted-zone record outranks is looked up, such as an
+   * API Gateway custom domain, which is reached through a record on AWS. A
+   * claim there answers only where no record names the hostname.
+   */
+  readonly shadowableServiceHosts?: SimAwsServiceHosts | undefined;
+
+  /**
    * Where a KMS key ARN is looked up. A DNSSEC key-signing key is built on a
    * customer managed key, and Route53 checks that key before it takes one.
    */
@@ -75,6 +82,7 @@ export class SimRoute53 {
     this.resolver = new SimRoute53Resolver({
       hostedZones: route53Registry.hostedZones,
       serviceHosts: properties.serviceHosts,
+      shadowableServiceHosts: properties.shadowableServiceHosts,
     });
     this.commands = new SimRoute53Commands({
       hostedZones: this.hostedZones,

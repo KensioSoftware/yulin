@@ -6,7 +6,11 @@ import {
   DeleteStageCommand,
   GetApiMappingsCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayLength,
+  assertIdentical,
+  assertNonNullable,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -317,5 +321,42 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     const event = (await response.json()) as SimPayload2Event;
     assertIdentical(event.rawPath, "/");
     assertIdentical(event.routeKey, "GET /");
+  });
+  it("serves the mappings at the endpoint API Gateway issued the domain", async () => {
+    // Given an API mapped to the root of a custom domain
+    const simAws = new SimAws();
+    const api = await simHttpApiLambdaProxyFactory.make(
+      { handler: echoEvent, routeKeys: ["GET /pets/{petId}"] },
+      simAws,
+    );
+    await mapDomainTo(simAws, api);
+    const domain = simAws.apiGatewayV2().findDomainName(domainName);
+    assertNonNullable(domain);
+
+    // When a request arrives at the domain's regional endpoint instead, which
+    // is what a CloudFront Origin built on `RegionalDomainName` reaches
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl(domain.regionalDomainName, "/pets/6"),
+    );
+
+    // Then the same mappings serve it, and the event names the custom domain
+    const event = (await response.json()) as SimPayload2Event;
+    assertIdentical(event.routeKey, "GET /pets/{petId}");
+    assertIdentical(event.rawPath, "/pets/6");
+    assertIdentical(event.requestContext.domainName, domainName);
+  });
+
+  it("answers 404 at a domain endpoint no domain was issued", async () => {
+    // Given a simulation holding no custom domain
+    const simAws = new SimAws();
+
+    // When a request arrives at a domain endpoint hostname anyway
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl("d-abcdefghij.execute-api.us-east-1.amazonaws.com", "/pets"),
+    );
+
+    // Then nothing serves it, the way a path no mapping claims is answered
+    assertIdentical(response.status, 404);
+    expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 });

@@ -341,6 +341,13 @@ If the incoming hostname is already a built-in simulated service hostname, the r
 target directly. Otherwise, it looks for a `CNAME` record matching the logical name and follows the
 target.
 
+A hostname a resource claimed for itself is asked about in one of two places, and `SimRoute53Resolver`
+takes one `SimAwsServiceHosts` for each. `serviceHosts` is asked after the built-in shapes and
+before any record. A Cognito hosted domain answers there. `shadowableServiceHosts` is asked where no
+record names the hostname, and an API Gateway custom domain answers there. An alias record for a
+hostname therefore still decides where the name goes after an HTTP API is given that hostname as a
+custom domain.
+
 CNAME resolution is bounded:
 
 - the resolver tracks visited names to stop cycles immediately

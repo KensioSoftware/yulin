@@ -957,11 +957,14 @@ their shape, and the value to point a record at is whatever the service reported
 | `<bucket>.s3.<region>`                   | the S3 REST endpoint                                                     |
 | `<url-id>.lambda-url.<region>`           | a [Lambda](https://yulinsim.dev/services/lambda/) Function URL           |
 | `<api-id>.execute-api.<region>`          | an [API Gateway](https://yulinsim.dev/services/apigatewayv2/) HTTP API   |
+| `d-<id>.execute-api.<region>`            | an API Gateway custom domain                                             |
 | `cognito-idp.<region>`                   | the [Cognito](https://yulinsim.dev/services/cognito/) user pool endpoint |
 
 The hostnames the AWS SDK talks to are written without their `.amazonaws.com` or `.on.aws` tail,
 the same rewriting Yulin applies to an SDK endpoint. A load balancer's name keeps its whole domain,
-since it goes unrewritten. `DNSName` is what a record points at and what a client asks for.
+since it goes unrewritten. `DNSName` is what a record points at and what a client asks for. A custom
+domain's regional endpoint is read either way, so a record can point at `RegionalDomainName` as API
+Gateway answered it.
 
 A name pointing at a load balancer resolves to it. A request to that name reaches the load balancer's
 listeners and rules, and a `host-header` condition on a rule sees the name the request was made to,
@@ -1059,6 +1062,16 @@ try {
 A request served under the suffix reaches the listener on port 80, since the port such a request
 carries is the local server's and never one a client chose. See
 [Simulated Elastic Load Balancing](https://yulinsim.dev/services/elbv2/) for what happens once the request is there.
+
+### A hostname a resource claimed for itself
+
+An API Gateway custom domain answers on the hostname it was created with, and a record for that
+hostname takes it back. The record decides where the name goes, as it does on AWS, where the custom
+domain name is reached only through one. A custom domain no record names resolves to the domain.
+
+A Cognito hosted domain answers on its hostname whatever records exist. Real Cognito puts a
+CloudFront distribution in front of a custom domain and expects a record pointing at that
+distribution, and the distribution name it reports resolves to no simulated service here.
 
 ## DNSSEC
 
