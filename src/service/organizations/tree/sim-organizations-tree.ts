@@ -48,10 +48,8 @@ export class SimOrganizationsTree {
    */
   createOrganizationalUnit(
     name: string,
-    parent?: SimOrganizationsOrganizationalUnit,
+    parentId: SimOrganizationsNodeId = this.root.id,
   ): SimOrganizationsOrganizationalUnit {
-    const parentId = parent === undefined ? this.root.id : parent.id;
-
     this.requireKnown(parentId);
 
     const unit = new SimOrganizationsOrganizationalUnit(
@@ -71,10 +69,8 @@ export class SimOrganizationsTree {
    */
   placeAccount(
     accountId: SimAwsAccountId,
-    parent?: SimOrganizationsOrganizationalUnit,
+    parentId: SimOrganizationsNodeId = this.root.id,
   ): void {
-    const parentId = parent === undefined ? this.root.id : parent.id;
-
     this.requireKnown(parentId);
 
     this.accountParents.set(accountId, parentId);
@@ -85,6 +81,25 @@ export class SimOrganizationsTree {
    */
   removeAccount(accountId: SimAwsAccountId): void {
     this.accountParents.delete(accountId);
+  }
+
+  /**
+   * Take an organizational unit out of the organization.
+   *
+   * Whatever still sits under it moves up to its parent, which is the only
+   * answer that leaves every Account on a path back to the root. AWS refuses
+   * to delete a unit that still holds anything, and a Stack tears down in
+   * reverse dependency order, so nothing should still be there.
+   */
+  removeOrganizationalUnit(unitId: SimOrganizationsNodeId): void {
+    const unit = this.organizationalUnits.get(unitId);
+
+    if (unit === undefined) {
+      return;
+    }
+
+    this.organizationalUnits.delete(unitId);
+    this.reparent(unitId, unit.parentId);
   }
 
   /**
@@ -130,6 +145,32 @@ export class SimOrganizationsTree {
     }
 
     return this.organizationalUnits.get(nodeId)?.name ?? String(nodeId);
+  }
+
+  /**
+   * Move everything under one node up to another.
+   */
+  private reparent(
+    fromId: SimOrganizationsNodeId,
+    toId: SimOrganizationsNodeId,
+  ): void {
+    for (const [accountId, parentId] of this.accountParents) {
+      if (parentId === fromId) {
+        this.accountParents.set(accountId, toId);
+      }
+    }
+
+    const orphaned = this.organizationalUnits
+      .values()
+      .filter((unit) => unit.parentId === fromId)
+      .toArray();
+
+    for (const unit of orphaned) {
+      this.organizationalUnits.set(
+        unit.id,
+        new SimOrganizationsOrganizationalUnit(unit.id, unit.name, toId),
+      );
+    }
   }
 
   /**

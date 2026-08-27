@@ -1,11 +1,12 @@
 import { simAwsAccountId } from "../aws/sim-aws-account.js";
 import { SimOrganizationsEffectivePolicies } from "./policy/sim-organizations-effective-policies.js";
 import { SimOrganizationsScpStore } from "./policy/sim-organizations-scp-store.js";
-import type {
-  SimOrganizationsNodeId,
-  SimOrganizationsOrganizationalUnit,
-  SimOrganizationsRoot,
-  SimOrganizationsTarget,
+import {
+  isSimOrganizationsUnitId,
+  type SimOrganizationsNodeId,
+  type SimOrganizationsOrganizationalUnit,
+  type SimOrganizationsRoot,
+  type SimOrganizationsTarget,
 } from "./tree/sim-organizations-node.js";
 import { SimOrganizationsTree } from "./tree/sim-organizations-tree.js";
 
@@ -38,20 +39,17 @@ export abstract class SimOrganizationsStructure {
    */
   createOrganizationalUnit(
     name: string,
-    parent?: SimOrganizationsOrganizationalUnit,
+    parent?: SimOrganizationsTarget,
   ): SimOrganizationsOrganizationalUnit {
-    return this.tree.createOrganizationalUnit(name, parent);
+    return this.tree.createOrganizationalUnit(name, this.parentIdOf(parent));
   }
 
   /**
    * Put an Account in the organization, under an organizational unit or under
    * the root.
    */
-  moveAccount(
-    accountId: string,
-    parent?: SimOrganizationsOrganizationalUnit,
-  ): void {
-    this.tree.placeAccount(simAwsAccountId(accountId), parent);
+  moveAccount(accountId: string, parent?: SimOrganizationsTarget): void {
+    this.tree.placeAccount(simAwsAccountId(accountId), this.parentIdOf(parent));
   }
 
   /**
@@ -80,20 +78,48 @@ export abstract class SimOrganizationsStructure {
   }
 
   /**
+   * Take an organizational unit out of the organization.
+   *
+   * Anything still under it moves up to its parent, so every Account keeps a
+   * path back to the root.
+   */
+  removeOrganizationalUnit(target: SimOrganizationsTarget): void {
+    this.tree.removeOrganizationalUnit(this.nodeIdOf(target));
+  }
+
+  /**
    * The node a target names.
    *
-   * An Account is named by its id and needs no place in the organization yet,
-   * because attaching a policy to one is what puts it there. A root or
-   * organizational unit has to be this organization's own, so a handle from
-   * another one is refused rather than attached to and never read.
+   * An Account is named by its twelve-digit id and needs no place in the
+   * organization yet, because attaching a policy to one is what puts it there.
+   * A root or organizational unit, whether given as a handle or as the `r-` or
+   * `ou-` id a template carries, has to be this organization's own. One from
+   * another organization is refused rather than attached to and never read.
    */
   protected nodeIdOf(target: SimOrganizationsTarget): SimOrganizationsNodeId {
-    if (typeof target === "string") {
+    if (typeof target !== "string") {
+      this.tree.requireNode(target.id);
+
+      return target.id;
+    }
+
+    if (!isSimOrganizationsUnitId(target)) {
       return simAwsAccountId(target);
     }
 
-    this.tree.requireNode(target.id);
+    const nodeId = target as SimOrganizationsNodeId;
 
-    return target.id;
+    this.tree.requireNode(nodeId);
+
+    return nodeId;
+  }
+
+  /**
+   * The node something sits under, defaulting to the root.
+   */
+  private parentIdOf(
+    parent: SimOrganizationsTarget | undefined,
+  ): SimOrganizationsNodeId | undefined {
+    return parent === undefined ? undefined : this.nodeIdOf(parent);
   }
 }
