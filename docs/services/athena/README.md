@@ -902,6 +902,10 @@ Current documented limitations:
   A `url_decode` written after it reads the escapes a second time.
 - `regexp_replace` takes Trino's own spelling for a named group and an escaped dollar, `${name}`
   and `\$`. The rest of Java's replacement syntax is not translated.
+- A pattern runs under JavaScript's `RegExp` rather than under Joni. `(?i)`, `(?m)` and `(?s)` at
+  the head of a pattern are lifted onto the expression and apply to the whole of it, and the scoped
+  `(?i:...)` runs as written. `(?x)` and a flag group written anywhere but the head turn the pattern
+  down, since JavaScript can turn no flag on part way through one.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
   written any other way gets whatever slicing that text comes to.
 - `approx_distinct` and `approx_percentile` are computed exactly. The simulation is more accurate

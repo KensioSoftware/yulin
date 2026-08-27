@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { SimAthenaSetUpError } from "../error/sim-athena.error.js";
+import { simAthenaLiftedPattern } from "./sim-athena-regexp-flags.js";
 import {
   isExplicitNull,
   shimNumber,
@@ -133,10 +134,12 @@ function expressionFor(
     return undefined;
   }
 
+  const lifted = simAthenaLiftedPattern(pattern, flags);
+
   try {
     // The pattern is the query's own, which is the whole point of the function.
     // oxlint-disable-next-line security/detect-non-literal-regexp
-    return new RegExp(pattern, flags);
+    return new RegExp(lifted.pattern, lifted.flags);
   } catch {
     return undefined;
   }
