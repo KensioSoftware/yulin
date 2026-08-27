@@ -883,8 +883,9 @@ Current documented limitations:
   twenty-eighth of February is a whole month.
 - `at_timezone` answers with the wall clock of the zone and no zone on it, since a timestamp here
   carries none. Trino answers with a timestamp carrying the zone.
-- `json_parse`, `regexp_extract`, `regexp_replace` and the `url_extract` family answer null over
-  text they cannot read. Trino fails the query.
+- `json_parse`, `regexp_extract` and `regexp_replace` answer null over text they cannot read. Trino
+  fails the query. The `url_extract` family answers null too, and there Trino answers null as well,
+  since each of those functions is declared never to fail.
 - `json_extract` answers with JSON, so a string comes back quoted. SQLite's own unwraps it, and a
   statement comparing the answer against a bare string matches on one and not the other.
 - A timestamp carrying a numeric UTC offset falls outside the date functions, and so does one
@@ -893,9 +894,12 @@ Current documented limitations:
 - A JSON number beyond about fifteen significant digits loses the digits past that, wherever the
   engine reads JSON. An identifier of that size in a JSON lines object comes back rounded, and a
   filter on it can then match the wrong row.
-- The `url_extract` family reads a URL the way a browser does, so a percent escape in the path, the
-  query or the fragment comes back still escaped and a parameter name is matched decoded. Trino
-  reads a URL the way Java does and decodes each of those.
+- The `url_extract` family splits a URI reference the way RFC 3986 writes it, so a reference with no
+  scheme reads, as `/reports/august?tenant=acme`. That is the shape a CloudFront log holds, since it
+  carries the path and the query in columns of their own. Text carrying a character RFC 2396 leaves
+  out, or a percent naming no byte, answers null.
+- A percent escape in the path, the query or the fragment comes back still escaped, and a parameter
+  name is matched decoded. Trino reads a URL the way Java does and decodes each of those.
 - `url_decode` answers null over text it cannot read back. Trino raises over an escape that names
   no byte, such as `%zz`, and writes a replacement character where the escapes name bytes that are
   no UTF-8, such as `%C3%28`. `url_extract_parameter` decodes its own answer, the way Trino's does.
