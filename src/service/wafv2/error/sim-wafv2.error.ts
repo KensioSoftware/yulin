@@ -124,6 +124,21 @@ export class SimWafAssociatedItemException extends SimWafError {
 }
 
 /**
+ * Simulated WAFv2 ValidationException error.
+ *
+ * WAFv2 checks the length and shape of a few members before the request
+ * reaches the rest of the API, and reports every failure in one message. A
+ * description of `""` fails two of those checks at once.
+ */
+export class SimWafValidationException extends SimWafError {
+  public override readonly name = "ValidationException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * A match declared against this simulation that it cannot answer with.
  *
  * The four `CrossSiteScripting_*` rules of the core rule set detect nothing

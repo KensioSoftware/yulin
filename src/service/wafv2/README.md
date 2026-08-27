@@ -34,6 +34,12 @@ token from an earlier read fails here the way it fails on AWS.
 scope, and a read takes the name and the id together, because a name can have belonged to more than
 one resource over time.
 
+`command/sim-wafv2-input.ts` holds the input checks the three types share. `Description` is the one
+with two constraints, a length and a pattern, and WAFv2 reports both failures of an empty string in
+one `ValidationException`. All six writes that take a description go through
+`checkedSimWafDescription`. An empty description reaches AWS from code that reads a resource and
+writes every field back, and taking it here would leave that failure for the account.
+
 `command/sim-wafv2-resource-lookup.ts` covers the reads, updates and deletes of all three types with
 one function. Authorizing happens before the lookup. That keeps a denial and a missing resource
 apart. A caller with no permission for a web ACL learns only about the permission.

@@ -4,7 +4,11 @@ import type { SimWafResourceStore } from "../../resource/sim-waf-resource-store.
 import { requiredSimWafScope } from "../../scope/sim-waf-scope.js";
 import type { SimWafAuthorizer } from "../authorize/sim-wafv2-authorizer.js";
 import { SimWafPage } from "../sim-wafv2-page.js";
-import { refuseSimWafTags, requiredSimWafName } from "../sim-wafv2-input.js";
+import {
+  checkedSimWafDescription,
+  refuseSimWafTags,
+  requiredSimWafName,
+} from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { requireSimWafResource } from "../sim-wafv2-resource-lookup.js";
 import type {
@@ -62,7 +66,7 @@ export class SimWafRegexPatternSetCommands {
         this.#accountRegionScope.regionName,
       ),
       accountRegionScope: this.#accountRegionScope,
-      description: input.Description,
+      description: checkedSimWafDescription(input.Description),
       regularExpressions: input.RegularExpressionList ?? [],
     });
 
@@ -118,6 +122,7 @@ export class SimWafRegexPatternSetCommands {
     options?: SimWafRequestOptions,
   ): SimUpdateRegexPatternSetCommandOutput {
     const { input } = command;
+    const description = checkedSimWafDescription(input.Description);
     const patternSet = this.require(
       input,
       "wafv2:UpdateRegexPatternSet",
@@ -126,7 +131,7 @@ export class SimWafRegexPatternSetCommands {
 
     patternSet.replaceExpressions({
       regularExpressions: input.RegularExpressionList ?? [],
-      description: input.Description,
+      description,
       lockToken: input.LockToken,
     });
 
