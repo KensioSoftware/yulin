@@ -1183,6 +1183,31 @@ take the token from the last read, and a write made against a stale one is refus
 `CreateWebACL` reports the first token in its summary, and `GetWebACL` reports the current one.
 `UpdateWebACL` answers with `NextLockToken` for the write after it.
 
+## Descriptions
+
+A web ACL, an IP set and a regex pattern set each take an optional `Description`. WAFv2 holds it to
+between 1 and 256 characters, and to a pattern of word characters, spaces and `+=:#@/-,.` with
+neither end a space. The shortest description it matches is three characters long.
+
+Both checks run on `CreateWebACL`, `UpdateWebACL`, `CreateIPSet`, `UpdateIPSet`,
+`CreateRegexPatternSet` and `UpdateRegexPatternSet`. A description outside either one is refused
+with `ValidationException`, naming every constraint it failed the way AWS names them. A write that
+leaves `Description` out is taken, and the resource keeps no description.
+
+The empty string is the case worth knowing about. Code that reads a web ACL, replaces the rules and
+writes every other field back hands the description straight through, because `UpdateWebACL` clears
+whatever a write leaves out. AWS answers `Description: ""` for some web ACLs nobody has described,
+and refuses the write that gives it back:
+
+```text
+ValidationException: 2 validation errors detected:
+Value '' at 'description' failed to satisfy constraint: Member must have length greater than or equal to 1;
+Value '' at 'description' failed to satisfy constraint: Member must satisfy regular expression pattern: ^[\w+=:#@/\-,\.][\w+=:#@/\-,\.\s]+[\w+=:#@/\-,\.]$
+```
+
+Yulin leaves the field undefined for a web ACL nobody has described, and that difference stands. It
+is observed from one ACL and AWS documents nothing about it.
+
 ## Permissions
 
 Every command goes through simulated IAM. An operation on one resource authorizes against that

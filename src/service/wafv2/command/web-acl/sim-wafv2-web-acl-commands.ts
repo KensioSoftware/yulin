@@ -10,7 +10,10 @@ import type { SimWafWebAclConfiguration } from "../../web-acl/sim-waf-web-acl-co
 import { SimWafWebAcl } from "../../web-acl/sim-waf-web-acl.js";
 import type { SimWafAuthorizer } from "../authorize/sim-wafv2-authorizer.js";
 import { SimWafPage } from "../sim-wafv2-page.js";
-import { requiredSimWafName } from "../sim-wafv2-input.js";
+import {
+  checkedSimWafDescription,
+  requiredSimWafName,
+} from "../sim-wafv2-input.js";
 import {
   requireSimWafResource,
   type SimWafResourceInput,
@@ -84,12 +87,13 @@ export class SimWafWebAclCommands {
 
     refuseUnsimulatedSimWafWebAclInput(input, "CreateWebACL");
 
+    const configuration = configurationOf(input);
     const webAcl = new SimWafWebAcl({
       name,
       scope,
       accountRegionScope: this.#accountRegionScope,
-      description: input.Description,
-      configuration: configurationOf(input),
+      description: configuration.description,
+      configuration,
       regexPatternSets: this.#regexPatternSets,
       managedRules: this.#managedRules,
       clock: this.#clock,
@@ -131,9 +135,10 @@ export class SimWafWebAclCommands {
 
     refuseUnsimulatedSimWafWebAclInput(input, "UpdateWebACL");
 
+    const configuration = configurationOf(input);
     const webAcl = this.require(input, "wafv2:UpdateWebACL", options);
 
-    webAcl.reconfigure(configurationOf(input), input.LockToken);
+    webAcl.reconfigure(configuration, input.LockToken);
 
     return { $metadata: {}, NextLockToken: webAcl.lockToken };
   }
@@ -226,6 +231,6 @@ function configurationOf(
     rules: input.Rules,
     customResponseBodies: input.CustomResponseBodies,
     visibilityConfig: input.VisibilityConfig,
-    description: input.Description,
+    description: checkedSimWafDescription(input.Description),
   };
 }

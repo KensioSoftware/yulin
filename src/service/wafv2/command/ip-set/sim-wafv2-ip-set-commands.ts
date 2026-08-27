@@ -7,7 +7,11 @@ import type { SimWafResourceStore } from "../../resource/sim-waf-resource-store.
 import { requiredSimWafScope } from "../../scope/sim-waf-scope.js";
 import type { SimWafAuthorizer } from "../authorize/sim-wafv2-authorizer.js";
 import { SimWafPage } from "../sim-wafv2-page.js";
-import { refuseSimWafTags, requiredSimWafName } from "../sim-wafv2-input.js";
+import {
+  checkedSimWafDescription,
+  refuseSimWafTags,
+  requiredSimWafName,
+} from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { requireSimWafResource } from "../sim-wafv2-resource-lookup.js";
 import type {
@@ -65,7 +69,7 @@ export class SimWafIpSetCommands {
         this.#accountRegionScope.regionName,
       ),
       accountRegionScope: this.#accountRegionScope,
-      description: input.Description,
+      description: checkedSimWafDescription(input.Description),
       ipAddressVersion: requiredSimWafIpAddressVersion(input.IPAddressVersion),
       addresses: input.Addresses ?? [],
     });
@@ -110,11 +114,12 @@ export class SimWafIpSetCommands {
     options?: SimWafRequestOptions,
   ): SimUpdateIpSetCommandOutput {
     const { input } = command;
+    const description = checkedSimWafDescription(input.Description);
     const ipSet = this.require(input, "wafv2:UpdateIPSet", options);
 
     ipSet.replaceAddresses({
       addresses: input.Addresses ?? [],
-      description: input.Description,
+      description,
       lockToken: input.LockToken,
     });
 
