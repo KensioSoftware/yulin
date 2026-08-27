@@ -896,9 +896,10 @@ Current documented limitations:
 - The `url_extract` family reads a URL the way a browser does, so a percent escape in the path, the
   query or the fragment comes back still escaped and a parameter name is matched decoded. Trino
   reads a URL the way Java does and decodes each of those.
-- `url_decode` answers null over an escape that names no byte, such as `%zz`. Trino raises and the
-  query fails. `url_extract_parameter` decodes its own answer, the way Trino's does, so a
-  `url_decode` written after it would read the escapes a second time.
+- `url_decode` answers null over text it cannot read back. Trino raises over an escape that names
+  no byte, such as `%zz`, and writes a replacement character where the escapes name bytes that are
+  no UTF-8, such as `%C3%28`. `url_extract_parameter` decodes its own answer, the way Trino's does.
+  A `url_decode` written after it reads the escapes a second time.
 - `regexp_replace` takes Trino's own spelling for a named group and an escaped dollar, `${name}`
   and `\$`. The rest of Java's replacement syntax is not translated.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column

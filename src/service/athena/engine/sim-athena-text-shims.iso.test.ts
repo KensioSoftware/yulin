@@ -297,11 +297,14 @@ describe("Trino's URL escaping functions on SQLite", () => {
     );
   });
 
-  it("answers null over an escape that names no byte", async () => {
-    // Given text carrying an escape nobody could read.
-    // When it is read back.
-    // Then the answer is null rather than a failed query. Trino raises.
+  it("answers null over text it cannot read back", async () => {
+    // Given an escape naming no byte, and escapes naming bytes that are no
+    // UTF-8.
+    // When each is read back.
+    // Then the answer is null rather than a failed query. Trino raises over
+    // the first and writes a replacement character for the second.
     assertIdentical(await anAnsweredExpression("url_decode('%zz')"), null);
+    assertIdentical(await anAnsweredExpression("url_decode('%C3%28')"), null);
     assertIdentical(await anAnsweredExpression("url_decode(NULL)"), null);
     assertIdentical(await anAnsweredExpression("url_encode(NULL)"), null);
   });

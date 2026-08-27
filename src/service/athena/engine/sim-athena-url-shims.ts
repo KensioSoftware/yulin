@@ -60,8 +60,10 @@ export function simAthenaInstallUrlShims(database: DatabaseSync): void {
  * `%2B` as a plus. Replacing the plus before decoding is what keeps the two
  * apart.
  *
- * Trino raises over an escape it cannot read, such as `%zz`, and this answers
- * null, the same forgiving direction the rest of the file takes.
+ * Trino raises over an escape that names no byte, and writes a replacement
+ * character where the bytes it names are no UTF-8. `decodeURIComponent` throws
+ * over both, and this answers null for both, the same forgiving direction the
+ * rest of the file takes.
  */
 function decoded(value: string | undefined): string | null {
   if (value === undefined) {
