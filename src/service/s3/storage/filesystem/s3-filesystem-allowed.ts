@@ -70,6 +70,7 @@ export const defaultAllowedObjectFileExtensions = new Set([
   ".map",
   ".mjs",
   ".otf",
+  ".pdf",
   ".png",
   ".svg",
   ".ttc",

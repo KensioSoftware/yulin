@@ -158,6 +158,7 @@ describe("Filesystem simulated S3 storage", () => {
     ["module.mjs", "text/javascript"],
     ["data.json", "application/json"],
     ["bundle.map", "application/json"],
+    ["guide.pdf", "application/pdf"],
     ["image.png", "image/png"],
     ["font.otf", "font/otf"],
     ["image.svg", "image/svg+xml"],
@@ -199,6 +200,29 @@ describe("Filesystem simulated S3 storage", () => {
     assertIdentical(object.metadata.values["content-type"], "text/csv");
     assertArrayLength(objects, 1);
     assertIdentical(objects[0].key, "data.csv");
+  });
+
+  // A PDF download is a web file in the same sense as a `.csv` or a `.txt`
+  // one, and a site publishing one had it 404 in simulation and serve in the
+  // deployment.
+  it("serves a PDF file without the mount naming the extension", async () => {
+    // Given a PDF file sitting in a mounted directory
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "guide.pdf"], "%PDF-1.7\n");
+
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When the Object is read and the Bucket listed
+    const object = await storage.getObject("guide.pdf");
+    const objects = await storage.listObjects();
+
+    // Then the file is served, typed as the PDF it is, and listed
+    assertNonNullable(object);
+    assertIdentical(object.metadata.values["content-type"], "application/pdf");
+    assertArrayLength(objects, 1);
+    assertIdentical(objects[0].key, "guide.pdf");
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {
