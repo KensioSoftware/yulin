@@ -1424,8 +1424,8 @@ that principal, and so is every resource its teardown deletes. An update applied
 `updateTemplateFile(...)` runs as it too, unless the update names a principal of its own.
 
 The named principal has to be allowed what the template asks for. IAM allows the account root by
-default and allows a role only what its policies say, so a role with no S3 permission leaves the
-bucket above `CREATE_FAILED` with the role's ARN in the message.
+default and allows a role only what its policies say. A role with no S3 permission leaves the bucket
+above `CREATE_FAILED`, with the role's ARN in the message.
 
 ### One caller for an assembly, and one per Stack
 
