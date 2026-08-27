@@ -1090,7 +1090,8 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 
 - Groups are absent. An `AWS::IAM::User` naming one fails, and an `AWS::IAM::Policy` naming one
   fails too
-- Permissions boundaries, session policies, and service control policies are not evaluated
+- Permissions boundaries and session policies are not evaluated. Service control policies are, and
+  are attached through [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
 - Managed Policies have a single version, and the policy version commands are absent
 - `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
   `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and

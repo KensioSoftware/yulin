@@ -38,6 +38,7 @@ export class GetFunctionAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: GetFunctionAuthorizer.action,
         resource: functionArn,
       });

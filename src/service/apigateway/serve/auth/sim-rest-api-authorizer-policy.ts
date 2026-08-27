@@ -57,6 +57,9 @@ export class SimRestApiAuthorizerPolicy {
         },
       ],
       resourcePolicies: [],
+      // An authorizer's policy document is evaluated on its own. No Account
+      // boundary is being crossed here, so no service control policy applies.
+      serviceControlPolicies: { applies: false, sources: [] },
       allowRequirement: new SimIamEitherSideAllowRequirement(),
       action: simExecuteApiInvokeAction,
       resource: methodArn,

@@ -26,6 +26,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [KMS](https://yulinsim.dev/services/kms/ "Simulated KMS usage docs")
 - [Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda usage docs")
 - [CloudWatch Logs](https://yulinsim.dev/services/logs/ "Simulated CloudWatch Logs usage docs")
+- [Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
 - [Personalize](https://yulinsim.dev/services/personalize/ "Simulated Amazon Personalize usage docs")
 - [Rekognition](https://yulinsim.dev/services/rekognition/ "Simulated Rekognition usage docs")
 - [Route53](https://yulinsim.dev/services/route53/ "Simulated Route53 usage docs")

@@ -27,6 +27,15 @@ export interface SimIamAccessDeniedInput {
   readonly principal: SimAwsPrincipal;
   readonly action: string;
   readonly resource: string;
+
+  /**
+   * What else the message should say about why the request was denied.
+   *
+   * AWS names the source of a denial when it is something beyond the caller's
+   * own permissions, such as a service control policy. A denial the caller's
+   * identity and resource policies account for adds nothing here.
+   */
+  readonly reason?: string | undefined;
 }
 
 /**
@@ -50,8 +59,10 @@ export class SimIamAccessDenied extends SimIamError {
     const iamCallerIdentifier = new SimIamCallerIdentifier();
     const callerIdentifier = iamCallerIdentifier.format(input.principal);
 
+    const reason = input.reason === undefined ? "" : ` ${input.reason}`;
+
     super(
-      `User: ${callerIdentifier} is not authorized to perform: ${input.action} on resource: ${input.resource}`,
+      `User: ${callerIdentifier} is not authorized to perform: ${input.action} on resource: ${input.resource}${reason}`,
       { httpStatusCode: 403 },
     );
 

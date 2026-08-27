@@ -59,6 +59,7 @@ export class PutObjectAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: PutObjectAuthorizer.action,
         resource,
       });

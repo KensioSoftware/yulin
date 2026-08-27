@@ -25,6 +25,7 @@ import type { SimScheduler } from "../../scheduler/index.js";
 import type { SimElbV2 } from "../../elbv2/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import { SimOrganizations } from "../../organizations/index.js";
 import type { SimFirehose } from "../../firehose/index.js";
 import type { SimGlue } from "../../glue/index.js";
 import type { SimKinesis } from "../../kinesis/index.js";
@@ -89,6 +90,15 @@ export class SimAwsServiceFactory {
   public readonly iamRegistry = new SimIamRegistry();
 
   /**
+   * Simulated AWS Organizations for this simulation.
+   *
+   * An organization spans Accounts, so one belongs to the simulation rather
+   * than to any scope in it. Sim IAM reads the service control policies it
+   * holds when it decides a request.
+   */
+  public readonly organizations = new SimOrganizations();
+
+  /**
    * Shared request authentication collaborators for this simulation.
    * @internal
    */
@@ -147,6 +157,7 @@ export class SimAwsServiceFactory {
       shadowableServiceHosts: this.registries.shadowableServiceHosts,
       iamRegistry: this.iamRegistry,
       accessKeyRegistry: this.requestAuth.accessKeyRegistry,
+      scpResolver: this.organizations,
     });
     this.accountRegionServices = new SimAwsAccountRegionServiceBuilder({
       simAws: properties.simAws,

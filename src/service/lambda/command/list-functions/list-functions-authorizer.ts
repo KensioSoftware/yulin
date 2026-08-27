@@ -43,6 +43,7 @@ export class ListFunctionsAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: ListFunctionsAuthorizer.action,
         resource: ListFunctionsAuthorizer.resource,
       });

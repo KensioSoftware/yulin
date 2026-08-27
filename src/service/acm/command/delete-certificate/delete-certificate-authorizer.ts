@@ -38,6 +38,7 @@ export class DeleteCertificateAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: DeleteCertificateAuthorizer.action,
         resource: certificateArn,
       });

@@ -142,6 +142,10 @@
     },
     "./oxlint/cffjs2.oxlintrc.json": "./dist/config/oxlint/cffjs2.oxlintrc.json",
     "./package.json": "./package.json",
+    "./organizations": {
+      "import": "./dist/service/organizations/index.js",
+      "types": "./dist/service/organizations/index.d.ts"
+    },
     "./personalize": {
       "import": "./dist/service/personalize/index.js",
       "types": "./dist/service/personalize/index.d.ts"

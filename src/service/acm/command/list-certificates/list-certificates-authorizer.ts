@@ -43,6 +43,7 @@ export class ListCertificatesAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action: ListCertificatesAuthorizer.action,
         resource: ListCertificatesAuthorizer.resource,
       });

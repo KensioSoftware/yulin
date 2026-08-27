@@ -61,6 +61,7 @@ export class SimKinesisAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action,
         resource,
       });

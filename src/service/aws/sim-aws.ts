@@ -17,6 +17,7 @@ import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import { SimAwsServiceAccessors } from "./sim-aws-service-accessors.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
+import type { SimOrganizations } from "../organizations/index.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
 import type { SimClockControl } from "../../util/clock/sim-clock-control.js";
@@ -91,6 +92,26 @@ export class SimAws extends SimAwsServiceAccessors {
       requestAuth: this.serviceFactory.requestAuth,
       clock: background,
     });
+  }
+
+  /**
+   * Get simulated AWS Organizations for this simulated AWS environment.
+   *
+   * An organization spans Accounts, so this one belongs to the whole
+   * simulation and is reached here rather than from an Account scope. The
+   * service control policies attached through it filter what the Accounts in
+   * this simulation may do, whether a request arrives through a CloudFormation
+   * deployment, an intercepted SDK client, or a service call in a handler.
+   *
+   * ```typescript
+   * simAws.organizations().attachServiceControlPolicy("123456789012", {
+   *   Version: "2012-10-17",
+   *   Statement: { Effect: "Deny", Action: "s3:CreateBucket", Resource: "*" },
+   * });
+   * ```
+   */
+  organizations(): SimOrganizations {
+    return this.serviceFactory.organizations;
   }
 
   /**

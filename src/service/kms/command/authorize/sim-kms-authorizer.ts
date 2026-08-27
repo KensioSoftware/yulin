@@ -62,6 +62,7 @@ export class SimKmsAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action,
         resource: key.arn,
       });
@@ -85,6 +86,7 @@ export class SimKmsAuthorizer {
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
+        reason: decision.denialReason,
         action,
         resource,
       });

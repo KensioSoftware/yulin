@@ -12,7 +12,8 @@ export type SimIamAuthZPolicySourceType =
   | "resource"
   | "trust"
   | "permissions-boundary"
-  | "session";
+  | "session"
+  | "service-control";
 
 export interface SimIamAuthZPolicySource {
   readonly sourceType: SimIamAuthZPolicySourceType;
@@ -35,6 +36,18 @@ export type SimIamAuthZResourcePolicySource = Omit<
   >;
 };
 
+/**
+ * The service control policies in force for an authorization request.
+ *
+ * `applies` is a separate fact from how many sources there are. An Account
+ * inside an organization that holds no policy allows nothing, while an Account
+ * outside every organization is unrestricted, and both carry no sources.
+ */
+export interface SimIamAuthZServiceControlPolicies {
+  readonly applies: boolean;
+  readonly sources: readonly SimIamAuthZPolicySource[];
+}
+
 export interface SimIamAuthZContext {
   /**
    * Identity-based policies that grant permissions to the principal.
@@ -49,6 +62,14 @@ export interface SimIamAuthZContext {
    * Resource policies are not gathered from IAM's managed policy store.
    */
   readonly resourcePolicies: readonly SimIamAuthZPolicySource[];
+
+  /**
+   * Service control policies in force for the caller's Account.
+   *
+   * These filter what the Account's principals may do and grant nothing, so
+   * they are kept apart from the two sides that can allow a request.
+   */
+  readonly serviceControlPolicies: SimIamAuthZServiceControlPolicies;
 
   /**
    * How an Allow from each policy side combines into the final decision.
