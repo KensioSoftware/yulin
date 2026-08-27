@@ -540,7 +540,7 @@ A query fails where a partition key carries no `projection.<key>.type`, where a 
 
 `NOW` is read against the simulated clock, along with an offset such as `NOW-3YEARS`. A test that froze time projects the same partitions on every run.
 
-The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read, and a query carrying `OR` anywhere is left unnarrowed. A filter left unread keeps every projected partition in. That is always the safe answer.
+The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read, and a query carrying `OR` anywhere is left unnarrowed. A `NOT` leaves the columns it reaches unnarrowed and the rest alone. A query pruning on the day and filtering bots out of what is left goes on pruning on the day. A filter left unread keeps every projected partition in. That is always the safe answer.
 
 A table with projection on and no `storage.location.template` gets the Hive layout under its own location, as `<location>/day=2026-08-25/`.
 
@@ -944,6 +944,8 @@ Current documented limitations:
 - The `WHERE` clause is read for `column = 'value'` and `column IN ('a', 'b')` only, and a query
   carrying `OR` anywhere is left unnarrowed. A partition narrowed less than real Athena would narrow
   it costs a wider scan here, and the answer stays the same.
+- How far a `NOT` reaches is read without parsing. A column it could not really have reached is left
+  unnarrowed as well, which costs that same wider scan.
 - A table projecting more than 20,000 partitions fails the query. Real Athena has a limit of its own
   and this one is the simulation's.
 - An `enum` projection has the spaces around each of its values trimmed, so `a, b` is two values

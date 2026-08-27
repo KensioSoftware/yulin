@@ -207,6 +207,57 @@ describe("the S3 prefixes a query reads for one table", () => {
     assertArrayLength(prefixes, 3);
   });
 
+  it("keeps the filter where a NOT applies to another column", () => {
+    // Given a table projecting three days, and the shape a rollup over access
+    // logs takes: prune on the partition key, then filter bots out of what is
+    // left.
+    const table = aTable(
+      {
+        "projection.enabled": "true",
+        "projection.day.type": "date",
+        "projection.day.format": "yyyy-MM-dd",
+        "projection.day.range": "2026-08-24,2026-08-26",
+        "storage.location.template": `s3://rainlytics-logs/logs/\${day}/`,
+      },
+      ["day"],
+    );
+
+    // When its partitions are read.
+    const prefixes = partitionsOf(
+      table,
+      "SELECT uri, count(*) FROM t WHERE day IN ('2026-08-25') " +
+        "AND NOT regexp_like(lower(agent), 'bot|crawl') " +
+        "GROUP BY day ORDER BY 2 DESC",
+    );
+
+    // Then the day goes on pruning. The negation says nothing about the day,
+    // and the `GROUP BY` naming the same column is outside the NOT's reach.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("stops reading a NOT at the bracket it was written in", () => {
+    // Given a table projecting three days.
+    const table = aTable(
+      {
+        "projection.enabled": "true",
+        "projection.day.type": "date",
+        "projection.day.format": "yyyy-MM-dd",
+        "projection.day.range": "2026-08-24,2026-08-26",
+        "storage.location.template": `s3://rainlytics-logs/logs/\${day}/`,
+      },
+      ["day"],
+    );
+
+    // When a query negating another column inside brackets reads them.
+    const prefixes = partitionsOf(
+      table,
+      "SELECT * FROM t WHERE (status = 200 AND NOT bot) AND day = '2026-08-25'",
+    );
+
+    // Then the day outside those brackets is still pinned down.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
   it("keeps what two filters on one column agree on", () => {
     // Given a table projecting three days, and a query constraining the same
     // column twice.

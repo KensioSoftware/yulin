@@ -1,13 +1,17 @@
+import { simAthenaNegatedColumns } from "./sim-athena-negated-columns.js";
 import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
 
 /**
  * The partition values a query's `WHERE` clause pins down.
  *
  * Only two shapes are read, `column = 'value'` and `column IN ('a', 'b')`, and
- * they are read wherever they appear. A query carrying `OR` or `NOT` anywhere
- * is left unfiltered. A value under one arm of an `OR` constrains nothing on
- * its own, and a negated one names the partition the query does not want, so
- * reading either as a constraint would answer from the wrong prefixes.
+ * they are read wherever they appear. A query carrying `OR` anywhere is left
+ * unfiltered, since a value under one arm constrains nothing on its own.
+ *
+ * A `NOT` leaves the columns it reaches unconstrained and the rest alone. A
+ * negated value names the partition the query does not want, and reading it as
+ * a constraint would answer from the wrong prefixes. A negation on any other
+ * column leaves the partition constraints as true as they were.
  *
  * Two constraints on one column are intersected, since a query carrying both
  * wants the rows they agree on.
@@ -67,6 +71,10 @@ export function simAthenaPartitionFilters(
     }
   }
 
+  for (const name of simAthenaNegatedColumns(tokens)) {
+    byColumn.delete(name);
+  }
+
   return new SimAthenaPartitionFilters(byColumn);
 }
 
@@ -96,7 +104,7 @@ function narrow(
 }
 
 function isUnreadableTerm(token: { kind: string; text: string }): boolean {
-  return token.kind === "word" && (token.text === "or" || token.text === "not");
+  return token.kind === "word" && token.text === "or";
 }
 
 /**
