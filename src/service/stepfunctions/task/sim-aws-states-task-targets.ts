@@ -47,11 +47,11 @@ export class SimAwsStatesTaskTargets implements SimStatesTaskTargets {
   async invoke(invocation: SimStatesTaskInvocation): Promise<JSONValue> {
     const { stateName, target } = invocation;
     const role = simStatesExecutionRoleTarget(invocation.roleArn, stateName);
-    const iam = this.#simAws
-      .accountRegionScope(role.accountId, this.#accountRegionScope.regionName)
-      .iam();
-
-    const caller = await assumeSimStatesExecutionRole(role, iam);
+    const roleScope = this.#simAws.accountRegionScope(
+      role.accountId,
+      this.#accountRegionScope.regionName,
+    );
+    const caller = await assumeSimStatesExecutionRole(role, roleScope);
 
     return await target.run({
       stateName,

@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../aws/arn.js";
+import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import type {
   SimAwsCaller,
@@ -31,6 +32,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 import { SimIamAuthZScpSourceBuilder } from "./sim-iam-auth-z-scp-source-builder.js";
+import { SimIamDerivedConditions } from "./sim-iam-derived-conditions.js";
 import type { SimIamServiceControlPolicyResolver } from "../scp/sim-iam-scp-resolver.js";
 
 export interface SimIamResourcePolicyInput {
@@ -49,6 +51,18 @@ export interface SimIamResourcePolicyInput {
 export interface SimIamAuthorizationInput {
   readonly action: string;
   readonly resource: string;
+
+  /**
+   * The Region the request was made in, which sim IAM derives
+   * `aws:RequestedRegion` from.
+   *
+   * A simulated service supplies its own Region. A request reaching one
+   * through its command handlers therefore carries it, with the caller saying
+   * nothing. IAM itself belongs to an Account and has no Region to fall back
+   * on. A request arriving without one leaves the key out of the condition
+   * context, and a statement conditioned on it matches nothing.
+   */
+  readonly region?: AwsRegionName | undefined;
 
   /**
    * Condition values known by the service handling the simulated request, such
@@ -159,6 +173,7 @@ export class SimIamAuthZContextBuilder {
   private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
   private readonly callerAccountResolver: SimIamCallerAccountResolver;
   private readonly allowRequirement = new SimIamAuthZAllowRequirement();
+  private readonly derivedConditions = new SimIamDerivedConditions();
   private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
@@ -239,8 +254,8 @@ export class SimIamAuthZContextBuilder {
   }
 
   /**
-   * Combine service-provided condition values with global values that IAM can
-   * derive from the resolved caller.
+   * Combine service-provided condition values with the global values IAM
+   * derives itself.
    *
    * A service supplies values it knows from the request, and values it can
    * only work out once the caller is resolved. IAM's own values are applied
@@ -253,28 +268,8 @@ export class SimIamAuthZContextBuilder {
     return {
       ...input.conditionContext,
       ...input.callerConditions?.conditionValuesFor(caller),
-      ...this.callerDerivedConditions(caller),
+      ...this.derivedConditions.of({ caller, region: input.region }),
     };
-  }
-
-  /**
-   * The condition values IAM derives from the caller itself.
-   *
-   * AWS:PrincipalArn identifies the IAM identity whose policies apply; for
-   * temporary Role credentials this is the underlying Role ARN, rather than
-   * the STS assumed-role session ARN retained as the effective caller for
-   * diagnostics.
-   */
-  private callerDerivedConditions(
-    caller: SimAwsResolvedCaller,
-  ): Readonly<Record<string, SimIamConditionValue>> {
-    const principalArn = caller.identityPolicyArn ?? caller.arn;
-
-    if (principalArn === undefined) {
-      return {};
-    }
-
-    return { "aws:PrincipalArn": principalArn };
   }
 
   /**

@@ -10,7 +10,7 @@ import type { SimDynamoDbStream } from "./stream/sim-dynamodb-stream.js";
 import { SimDynamoDbStreams } from "./sim-dynamodb-streams.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimDynamoDatabaseSdkCommandRouter } from "./sdk/sim-dynamodb-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import { SimDynamoDbCfnResourceFactory } from "./cfn/sim-cfn-dynamodb-resource-factory.js";
@@ -43,9 +43,10 @@ export class SimDynamoDb {
   constructor(properties: SimDynamoDbProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.background = background;
     this.commands = new SimDynamoDbCommandHandlers({

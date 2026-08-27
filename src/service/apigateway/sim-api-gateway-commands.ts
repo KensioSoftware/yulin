@@ -4,10 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import {
   SimRestApiNoUserPools,
   type SimRestApiUserPools,
@@ -75,12 +73,13 @@ export class SimApiGatewayCommands {
   constructor(properties: SimApiGatewayProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       registry = new SimRestApiRegistry(),
       userPools = new SimRestApiNoUserPools(),
       webAcls = new SimWafNoProtection(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const access = new SimRestApiAccess({
       apis: this.apis,

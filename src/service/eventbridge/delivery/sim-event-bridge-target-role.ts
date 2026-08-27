@@ -1,5 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
-import type { SimIam } from "../../iam/sim-iam.js";
+import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import {
   assumeSimServiceRole,
   type SimServiceRoleRefusals,
@@ -51,13 +51,13 @@ const refusals: SimServiceRoleRefusals = {
  */
 export async function assumeEventBridgeTargetRole(
   target: SimEventBridgeTargetRole,
-  iam: SimIam,
+  scope: SimAwsAccountRegionContainer,
 ): Promise<SimAwsCaller> {
   return await assumeSimServiceRole({
     target,
     servicePrincipal: simEventBridgeServicePrincipal,
     sessionName,
-    iam,
+    scope,
     refusals,
   });
 }

@@ -9,6 +9,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role-session-creator.js";
 import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
@@ -19,6 +20,12 @@ import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-aut
 
 interface AssumeRoleCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
+
+  /**
+   * The Region this STS is in, which is the Region its requests are made in.
+   */
+  readonly regionName: AwsRegionName;
+
   readonly iamResolver: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
 }
@@ -46,6 +53,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   constructor(properties: AssumeRoleCommandHandlerProperties) {
     const {
       sourceAccountId,
+      regionName,
       iamResolver,
       background = new BackgroundTasks(),
     } = properties;
@@ -55,6 +63,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,
       iamResolver,
+      regionName,
     });
     this.sessionCreator = new SimStsAssumeRoleSessionCreator({
       iamResolver,

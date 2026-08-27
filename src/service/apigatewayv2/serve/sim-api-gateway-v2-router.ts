@@ -8,6 +8,7 @@ import type { SimHttpApi } from "../api/sim-http-api.js";
 import type { SimHttpApiRegistry } from "../registry/sim-http-api-registry.js";
 import type { SimHttpApiFunctionTarget } from "./sim-http-api-function-target.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimApiGatewayV2RouterProperties {
   readonly simAws?: SimAws;
@@ -66,7 +67,9 @@ export class SimApiGatewayV2Router {
   iamFor(api: SimHttpApi): SimIamInterServiceAuthZ {
     const { accountId, regionName } = api.accountRegionScope;
 
-    return this.simAws.accountRegionScope(accountId, regionName).iam();
+    return simScopeIamAuthZ(
+      this.simAws.accountRegionScope(accountId, regionName),
+    );
   }
 
   /**
@@ -108,6 +111,8 @@ export class SimApiGatewayV2Router {
       .lambda()
       .getSimFunctionTarget(lambdaUri.functionName, lambdaUri.qualifier);
 
-    return target === undefined ? undefined : { ...target, iam: scope.iam() };
+    return target === undefined
+      ? undefined
+      : { ...target, iam: simScopeIamAuthZ(scope) };
   }
 }

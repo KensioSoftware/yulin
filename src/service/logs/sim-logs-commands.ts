@@ -4,10 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimLogsAuthorizer } from "./command/authorize/sim-logs-authorizer.js";
 import { SimLogsDeliveryCommands } from "./command/delivery/sim-logs-delivery-commands.js";
 import { SimLogsDeliveryDestinationCommands } from "./command/delivery/sim-logs-delivery-destination-commands.js";
@@ -85,11 +83,12 @@ export class SimLogsCommands {
   constructor(properties: SimLogsProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       subscriptionDestinations = new SimLogsNoSubscriptionDestinations(),
       deliverySourceResources = new SimLogsUncheckedDeliverySourceResources(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const authorizer = new SimLogsAuthorizer({ iam, accountRegionScope });
     const groups = new SimLogsLogGroupStore({ accountRegionScope });

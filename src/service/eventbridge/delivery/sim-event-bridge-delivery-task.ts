@@ -40,7 +40,7 @@ export class SimEventBridgeDeliveryTask {
       role.accountId,
       arn.regionName,
     );
-    const caller = await assumeEventBridgeTargetRole(role, roleScope.iam());
+    const caller = await assumeEventBridgeTargetRole(role, roleScope);
 
     await new SimEcsTargetRun({
       scope: this.simAws.accountRegionScope(arn.accountId, arn.regionName),

@@ -1,7 +1,7 @@
 import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 import { SimEcsUnreachableConsumerQueues } from "./service/consume/sim-ecs-consumer-queues.js";
 import { SimEcsUnreachableTargetGroups } from "./service/load-balancer/sim-ecs-target-groups.js";
@@ -90,13 +90,14 @@ export class SimEcsCommands {
   constructor(properties: SimEcsCommandsProperties) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       runAsOwner,
       secretStores = new SimEcsUnreachableSecretStores(),
       consumerQueues = new SimEcsUnreachableConsumerQueues(),
       targetGroups = new SimEcsUnreachableTargetGroups(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const contexts = new SimEcsCommandContexts({
       accountRegionScope,

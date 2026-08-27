@@ -26,10 +26,8 @@ import type {
   SimListCollectionsCommand,
   SimListCollectionsCommandOutput,
 } from "./command/collection/collection.command.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimRekognitionAuthorizer } from "./command/authorize/sim-rekognition-authorizer.js";
 import type {
   SimDetectFacesCommand,
@@ -89,10 +87,11 @@ export class SimRekognition {
   constructor(properties: SimRekognitionProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       images = new SimRekognitionUnreachableImageObjects(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
     const authorizer = new SimRekognitionAuthorizer({ iam });
 
     this.collectionStore = new SimRekognitionCollections({

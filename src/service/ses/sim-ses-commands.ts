@@ -5,10 +5,8 @@ import {
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimSesAccount } from "./account/sim-ses-account.js";
 import { SimSesAccountCommands } from "./command/account/sim-ses-account-commands.js";
 import { SimSesAuthorizer } from "./command/authorize/sim-ses-authorizer.js";
@@ -71,10 +69,11 @@ export class SimSesCommands {
   constructor(properties: SimSesV2Properties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       messageLog = new SimAwsMessageLog(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const authorizer = new SimSesAuthorizer({ iam, accountRegionScope });
     const identities = new SimSesIdentityStore({ accountRegionScope });

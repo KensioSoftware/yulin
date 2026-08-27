@@ -10,6 +10,7 @@ import {
   simEventBridgeDeliverySource,
   simEventBridgeServicePrincipal,
 } from "./sim-event-bridge-delivery.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimEventBridgeDeliveryTopicProperties {
   readonly scope: SimAwsAccountRegionContainer;
@@ -46,7 +47,7 @@ export class SimEventBridgeDeliveryTopic {
     }
 
     const decision = new SimSnsServicePublishAuthorizer({
-      iam: this.scope.iam(),
+      iam: simScopeIamAuthZ(this.scope),
     }).authorize({
       topic,
       servicePrincipal: simEventBridgeServicePrincipal,

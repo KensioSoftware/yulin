@@ -1,6 +1,7 @@
 import type { JSONString } from "../../../util/type-guard/json.js";
 import { jsonParse } from "../../../util/type-guard/json.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import type {
@@ -17,6 +18,13 @@ interface AssumeRoleTrustPolicyAuthorizationInput {
   readonly roleArn: string;
   readonly role: AssumeRoleTargetRole;
   readonly targetIam: SimIam;
+
+  /**
+   * The Region the assume request was made in, which the trust policy and the
+   * target Account's service control policies can be conditioned on.
+   */
+  readonly region?: AwsRegionName | undefined;
+
   readonly caller: SimAwsPrincipal;
   readonly conditionContext?:
     | Readonly<Record<string, SimIamConditionValue>>
@@ -71,6 +79,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
     const decision = input.targetIam.authorize({
       action: "sts:AssumeRole",
       resource: input.roleArn,
+      region: input.region,
       caller: input.caller,
       conditionContext: input.conditionContext,
       resourcePolicies: [

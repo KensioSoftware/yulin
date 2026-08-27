@@ -4,10 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimCloudWatchAlarmActions } from "./alarm/action/sim-cloudwatch-alarm-actions.js";
 import {
   SimCloudWatchNoAlarmTargets,
@@ -61,10 +59,11 @@ export class SimCloudWatchCommands {
   constructor(properties: SimCloudWatchProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       alarmTargets = new SimCloudWatchNoAlarmTargets(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const authorizer = new SimCloudWatchAuthorizer({ iam, accountRegionScope });
     const metrics = new SimCloudWatchMetricStore();

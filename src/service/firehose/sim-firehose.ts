@@ -5,10 +5,8 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import type * as simFirehoseCommands from "./command/sim-firehose-command.types.js";
 import { SimFirehoseCommands } from "./command/sim-firehose-commands.js";
 import type { SimFirehoseRequestOptions } from "./command/sim-firehose-request-options.js";
@@ -78,10 +76,11 @@ export class SimFirehose {
   constructor(properties: SimFirehoseProperties) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       kinesis = new SimFirehoseNoRecordSource(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.background = background;
     this.commands = new SimFirehoseCommands({

@@ -3,6 +3,7 @@ import type {
   SimAwsPrincipal,
 } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
 import type { SimIamConditionValue } from "../../iam/policy/sim-iam-policy.js";
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
@@ -13,6 +14,9 @@ import { AssumeRoleTargetRoleAuthorizer } from "./assume-role-target-auth-z.js";
 interface AssumeRoleAuthorizationCoordinatorProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
+
+  /** The Region the STS request was made in. */
+  readonly regionName: AwsRegionName;
 }
 
 interface AssumeRoleAuthorizationInput {
@@ -47,13 +51,10 @@ export class AssumeRoleAuthorizationCoordinator {
 
   constructor(properties: AssumeRoleAuthorizationCoordinatorProperties) {
     this.sourceAccountId = properties.sourceAccountId;
-    this.sourcePrincipalAuthorizer = new AssumeRoleSourcePrincipalAuthorizer({
-      sourceAccountId: properties.sourceAccountId,
-      iamResolver: properties.iamResolver,
-    });
-    this.targetRoleAuthorizer = new AssumeRoleTargetRoleAuthorizer({
-      iamResolver: properties.iamResolver,
-    });
+    this.sourcePrincipalAuthorizer = new AssumeRoleSourcePrincipalAuthorizer(
+      properties,
+    );
+    this.targetRoleAuthorizer = new AssumeRoleTargetRoleAuthorizer(properties);
   }
 
   /**

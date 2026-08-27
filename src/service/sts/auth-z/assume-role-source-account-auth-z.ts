@@ -1,5 +1,6 @@
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "../../aws/caller/sim-aws-account-root-principal.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
@@ -7,6 +8,11 @@ import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 interface AssumeRoleSourceAccountAuthorizerProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
+
+  /**
+   * The Region the STS request was made in.
+   */
+  readonly regionName: AwsRegionName;
 }
 
 export interface AssumeRoleSourceAuthorizationInput {
@@ -38,10 +44,12 @@ export interface AssumeRoleSourceAuthorizationInput {
 export class AssumeRoleSourcePrincipalAuthorizer {
   private readonly sourceAccountId: SimAwsAccountId;
   private readonly iamResolver: SimIamAccountResolver;
+  private readonly regionName: AwsRegionName;
 
   constructor(properties: AssumeRoleSourceAccountAuthorizerProperties) {
     this.sourceAccountId = properties.sourceAccountId;
     this.iamResolver = properties.iamResolver;
+    this.regionName = properties.regionName;
   }
 
   /**
@@ -59,6 +67,7 @@ export class AssumeRoleSourcePrincipalAuthorizer {
     const decision = sourceIam.authorize({
       action: "sts:AssumeRole",
       resource: input.roleArn,
+      region: this.regionName,
       caller: callerPrincipal,
     });
 
