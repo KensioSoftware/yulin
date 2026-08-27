@@ -276,9 +276,10 @@ account, in the order they were evaluated, including `FullAWSAccess` where it is
 `serviceControlPolicySetFor(accountId).levels` keeps the policies grouped by the node they hang on,
 root first. That grouping is what sim IAM evaluates.
 
-The flattened list is empty in two cases that behave differently. An account that was never named
-sits outside the organization and stays unrestricted. An account left holding no policy is denied
-everything.
+The flattened list is empty in three cases that behave differently. An account that was never named
+sits outside the organization and stays unrestricted. The management account is exempt and equally
+unrestricted. An account left holding no policy is denied everything. `applies` separates the last
+of those from the other two.
 `serviceControlPolicySetFor(accountId).applies` tells the two apart, and so does
 `decision.serviceControlPolicy.isApplied`.
 
@@ -292,7 +293,8 @@ Simulated Organizations supports:
 - `setManagementAccount`, exempting the Account AWS exempts
 - `attachServiceControlPolicy`, attaching a policy document to the root, a unit, or an Account
 - `detachFullAwsAccess`, turning a node's policies into an allow list
-- `detachServiceControlPolicies`, taking every policy back off a node
+- `detachServiceControlPolicies`, taking every policy back off one node and leaving the rest alone
+- `removeAccount`, taking an Account out of the organization
 - `serviceControlPoliciesFor`, reading the policies in force for an Account
 - `serviceControlPolicySetFor`, reading those policies along with whether any apply
 - The AWS-managed `FullAWSAccess` policy, attached by default as it is in AWS

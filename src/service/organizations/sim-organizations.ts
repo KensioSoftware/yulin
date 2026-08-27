@@ -73,15 +73,13 @@ export class SimOrganizations
   /**
    * Remove every service control policy attached to a node.
    *
-   * An Account is then decided by its identity and resource policies alone,
-   * along with whatever the levels above it still say.
+   * Only that node is cleared. An Account sitting in an organizational unit
+   * goes on inheriting what the levels above it say, as it does in AWS, where
+   * detaching a policy from an account leaves the account where it is. Take an
+   * Account out of the organization with `removeAccount`.
    */
   detachServiceControlPolicies(target: SimOrganizationsTarget): void {
     this.scpStore.detachAll(this.nodeIdOf(target));
-
-    if (typeof target === "string") {
-      this.removeAccount(simAwsAccountId(target));
-    }
   }
 
   /**

@@ -95,6 +95,17 @@ export class SimOrganizationsTree {
   }
 
   /**
+   * Refuse a root or organizational unit this organization never created.
+   *
+   * A handle from another simulated organization would otherwise be attached
+   * to and then never read, because no Account here has it on its path. A
+   * policy that silently applies to nothing is worse than a refusal.
+   */
+  requireNode(nodeId: SimOrganizationsNodeId): void {
+    this.requireKnown(nodeId);
+  }
+
+  /**
    * The nodes a request against an Account is filtered by, root first.
    *
    * The Account itself is the last of them, because a policy attached to an

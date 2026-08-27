@@ -225,6 +225,66 @@ describe("Simulated Organizations policy inheritance", () => {
     assertTrue(decision.serviceControlPolicy.isApplied);
   });
 
+  it("keeps inheriting after the Account's own policies are detached", () => {
+    // Given an Account in a unit that denies Bucket creation, with a policy of
+    // its own as well.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    const organizations = simAws.organizations();
+    const workloads = organizations.createOrganizationalUnit("Workloads");
+
+    organizations.moveAccount(accountId, workloads);
+    organizations.attachServiceControlPolicy(workloads, {
+      Version: "2012-10-17",
+      Statement: { Effect: "Deny", Action: "s3:CreateBucket", Resource: "*" },
+    });
+    organizations.attachServiceControlPolicy(accountId, allowOnly("s3:*"));
+
+    // When the Account's own policies are taken off it.
+    organizations.detachServiceControlPolicies(accountId);
+
+    // Then it stays where it sits and the unit above it still denies, the way
+    // detaching a policy in AWS leaves an account in its unit.
+    const decision = simAws
+      .account(accountId)
+      .iam()
+      .authorize({
+        action: "s3:CreateBucket",
+        resource: `arn:aws:s3:::${accountId}-reports`,
+      });
+
+    assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);
+  });
+
+  it("stops filtering an Account taken out of the organization", () => {
+    // Given an Account in a unit that denies Bucket creation.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    const organizations = simAws.organizations();
+    const workloads = organizations.createOrganizationalUnit("Workloads");
+
+    organizations.moveAccount(accountId, workloads);
+    organizations.attachServiceControlPolicy(workloads, {
+      Version: "2012-10-17",
+      Statement: { Effect: "Deny", Action: "s3:CreateBucket", Resource: "*" },
+    });
+
+    // When the Account leaves the organization.
+    organizations.removeAccount(accountId);
+
+    // Then nothing above it reaches it any more.
+    const decision = simAws
+      .account(accountId)
+      .iam()
+      .authorize({
+        action: "s3:CreateBucket",
+        resource: `arn:aws:s3:::${accountId}-reports`,
+      });
+
+    assertTrue(decision.isAllowed);
+    assertFalse(decision.serviceControlPolicy.isApplied);
+  });
+
   it("gives no path for an Account outside the tree", () => {
     // Given an organization holding no Accounts.
     const tree = new SimOrganizationsTree();
@@ -242,6 +302,24 @@ describe("Simulated Organizations policy inheritance", () => {
     assertStringStartsWith(organizations.root().id, "r-");
     assertStringStartsWith(workloads.id, "ou-");
     assertIdentical(workloads.parentId, organizations.root().id);
+  });
+
+  it("refuses a policy attached to another organization's unit", () => {
+    // Given a unit belonging to a different simulated organization.
+    const other = new SimAws()
+      .organizations()
+      .createOrganizationalUnit("Other");
+    const simAws = new SimAws();
+
+    // When a policy is attached to it here.
+    const error = assertThrowsError(() => {
+      simAws
+        .organizations()
+        .attachServiceControlPolicy(other, allowOnly("s3:*"));
+    });
+
+    // Then it is refused, rather than attached where no Account would read it.
+    assertInstanceOf(error, SimOrganizationsUnknownNode);
   });
 
   it("refuses an organizational unit from another organization", () => {

@@ -1,7 +1,4 @@
-import {
-  simAwsAccountId,
-  type SimAwsAccountId,
-} from "../aws/sim-aws-account.js";
+import { simAwsAccountId } from "../aws/sim-aws-account.js";
 import { SimOrganizationsEffectivePolicies } from "./policy/sim-organizations-effective-policies.js";
 import { SimOrganizationsScpStore } from "./policy/sim-organizations-scp-store.js";
 import type {
@@ -73,18 +70,29 @@ export abstract class SimOrganizationsStructure {
 
   /**
    * Take an Account out of the organization.
+   *
+   * Nothing then filters its requests, whatever is attached above where it
+   * sat. This is how an Account leaves an organization, and it is a different
+   * thing from taking the policies off it.
    */
-  protected removeAccount(accountId: SimAwsAccountId): void {
-    this.tree.removeAccount(accountId);
+  removeAccount(accountId: string): void {
+    this.tree.removeAccount(simAwsAccountId(accountId));
   }
 
   /**
    * The node a target names.
+   *
+   * An Account is named by its id and needs no place in the organization yet,
+   * because attaching a policy to one is what puts it there. A root or
+   * organizational unit has to be this organization's own, so a handle from
+   * another one is refused rather than attached to and never read.
    */
   protected nodeIdOf(target: SimOrganizationsTarget): SimOrganizationsNodeId {
     if (typeof target === "string") {
       return simAwsAccountId(target);
     }
+
+    this.tree.requireNode(target.id);
 
     return target.id;
   }
