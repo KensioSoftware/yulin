@@ -380,7 +380,7 @@ its declared result.
 | JSON          | `json_extract`, `json_extract_scalar`, `json_parse`, `json_size`                                                                                                                                      |
 | Array and map | `array_agg`, `cardinality`, `contains`, `element_at`, `array_join`, `slice`                                                                                                                           |
 | String        | `regexp_like`, `regexp_extract`, `regexp_replace`, `split_part`, `strpos`                                                                                                                             |
-| URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`                                              |
+| URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`, `url_decode`, `url_encode`                  |
 | Approximate   | `approx_distinct`, `approx_percentile`                                                                                                                                                                |
 
 `substr` and `format` are SQLite's own. Both count from one and take the same `%s` and `%d` a
@@ -896,6 +896,9 @@ Current documented limitations:
 - The `url_extract` family reads a URL the way a browser does, so a percent escape in the path, the
   query or the fragment comes back still escaped and a parameter name is matched decoded. Trino
   reads a URL the way Java does and decodes each of those.
+- `url_decode` answers null over an escape that names no byte, such as `%zz`. Trino raises and the
+  query fails. `url_extract_parameter` decodes its own answer, the way Trino's does, so a
+  `url_decode` written after it would read the escapes a second time.
 - `regexp_replace` takes Trino's own spelling for a named group and an escaped dollar, `${name}`
   and `\$`. The rest of Java's replacement syntax is not translated.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
