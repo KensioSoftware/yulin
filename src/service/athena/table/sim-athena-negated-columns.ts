@@ -7,6 +7,13 @@ import type { SimAthenaSqlToken } from "./sim-athena-sql-tokens.js";
  * a `NOT` is left unconstrained. A query filtering bots out of a day's logs
  * negates nothing about the day, and reading how far each `NOT` reaches is
  * what tells the two apart.
+ *
+ * An infix `NOT`, as in `day NOT IN ('a')`, is read as reaching nothing. Its
+ * own column keeps whatever else the statement constrains it to, and that is
+ * always a superset of what Athena reads, since `day = 'a' AND day NOT IN (x)`
+ * can only ever narrow. The query applies the exclusion itself once the rows
+ * are in. Naming the column here would drop its filter and widen the scan to
+ * every partition.
  */
 export function simAthenaNegatedColumns(
   tokens: readonly SimAthenaSqlToken[],

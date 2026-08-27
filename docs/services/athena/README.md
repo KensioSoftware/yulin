@@ -946,6 +946,9 @@ Current documented limitations:
   it costs a wider scan here, and the answer stays the same.
 - How far a `NOT` reaches is read without parsing. A column it could not really have reached is left
   unnarrowed as well, which costs that same wider scan.
+- An infix `NOT`, as in `day NOT IN ('a')`, leaves its own column narrowed by whatever else the
+  `WHERE` says. That is always a superset of the partitions Athena reads, and the query applies the
+  exclusion itself.
 - A table projecting more than 20,000 partitions fails the query. Real Athena has a limit of its own
   and this one is the simulation's.
 - An `enum` projection has the spaces around each of its values trimmed, so `a, b` is two values
