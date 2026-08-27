@@ -4,6 +4,7 @@ import type { SimIamPolicyStatementMatcher } from "../match/sim-iam-policy-state
 import type {
   SimIamAuthZPolicySource,
   SimIamAuthZServiceControlPolicies,
+  SimIamAuthZServiceControlPolicyLevel,
 } from "../context/sim-iam-auth-z-context.js";
 import { SimIamPolicyDecisionValue } from "../sim-iam-decision-value.js";
 
@@ -19,10 +20,15 @@ interface SimIamScpGateProperties {
  * An SCP is a filter on the permissions an Account's principals can be given.
  * It grants nothing, so this runs as a gate in front of the identity and
  * resource policy evaluation instead of contributing Allows to it. The rules
- * are the two AWS applies at the Account boundary:
+ * are the ones AWS applies at the Account boundary:
  *
- * - a matching Deny in any attached policy ends the request;
- * - the attached policies have to produce a matching Allow between them.
+ * - a matching Deny at any level ends the request;
+ * - every level between the root and the Account has to produce a matching
+ *   Allow of its own.
+ *
+ * The second rule is what makes the levels worth keeping apart. A root
+ * allowing S3 and an organizational unit allowing DynamoDB leave an Account
+ * beneath them able to do neither, because each level is asked separately.
  *
  * An Account outside any organization's reach is unrestricted, and this gate
  * stands open for it. An Account inside one that holds no policy is a
@@ -32,12 +38,17 @@ export class SimIamScpGate {
   private readonly applies: boolean;
   private readonly denyStatementRecords: SimIamPolicyDocumentStatement[] = [];
   private readonly allowStatementRecords: SimIamPolicyDocumentStatement[] = [];
+  private readonly unallowedLevelNames: string[] = [];
 
   constructor(properties: SimIamScpGateProperties) {
     this.applies = properties.serviceControlPolicies.applies;
 
-    for (const policy of properties.serviceControlPolicies.sources) {
-      this.evaluate(policy, properties);
+    for (const level of properties.serviceControlPolicies.levels) {
+      this.evaluateLevel(level, properties);
+    }
+
+    if (this.applies && properties.serviceControlPolicies.levels.length === 0) {
+      this.unallowedLevelNames.push("the organization");
     }
   }
 
@@ -56,7 +67,7 @@ export class SimIamScpGate {
   }
 
   /**
-   * Whether the attached policies left the request unallowed.
+   * Whether a level left the request unallowed.
    *
    * A Deny is reported by `isExplicitDeny` and leaves this false, so the two
    * name different denials and a reader can tell them apart.
@@ -65,7 +76,7 @@ export class SimIamScpGate {
     return (
       this.applies &&
       !this.isExplicitDeny &&
-      this.allowStatementRecords.length === 0
+      this.unallowedLevelNames.length > 0
     );
   }
 
@@ -100,10 +111,20 @@ export class SimIamScpGate {
   }
 
   /**
-   * Matching Allow statements from the attached policies.
+   * Matching Allow statements from the attached policies, across every level.
    */
   get allowStatements(): readonly SimIamPolicyDocumentStatement[] {
     return this.allowStatementRecords;
+  }
+
+  /**
+   * The levels that allowed nothing matching the request, root first.
+   *
+   * This is what a test reads to find which node in the organization is in the
+   * way, which is the part of an SCP denial AWS makes hardest to work out.
+   */
+  get unallowedLevels(): readonly string[] {
+    return this.unallowedLevelNames;
   }
 
   /**
@@ -126,13 +147,33 @@ export class SimIamScpGate {
   }
 
   /**
-   * Record the matching statements of one attached policy.
+   * Record what one level of the organization said.
    */
-  private evaluate(
-    policy: SimIamAuthZPolicySource,
+  private evaluateLevel(
+    level: SimIamAuthZServiceControlPolicyLevel,
     properties: SimIamScpGateProperties,
   ): void {
+    let allowed = false;
+
+    for (const policy of level.sources) {
+      allowed = this.evaluatePolicy(policy, properties) || allowed;
+    }
+
+    if (!allowed) {
+      this.unallowedLevelNames.push(level.nodeName);
+    }
+  }
+
+  /**
+   * Record the matching statements of one attached policy, and say whether it
+   * allowed the request.
+   */
+  private evaluatePolicy(
+    policy: SimIamAuthZPolicySource,
+    properties: SimIamScpGateProperties,
+  ): boolean {
     const parsedPolicy = properties.policyDocumentParser.parse(policy.document);
+    let allowed = false;
 
     for (const statement of parsedPolicy.statements) {
       if (!properties.statementMatcher.matches(policy, statement).matched) {
@@ -145,6 +186,9 @@ export class SimIamScpGate {
       }
 
       this.allowStatementRecords.push(statement.source);
+      allowed = true;
     }
+
+    return allowed;
   }
 }

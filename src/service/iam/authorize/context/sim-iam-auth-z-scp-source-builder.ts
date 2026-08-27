@@ -31,7 +31,7 @@ export class SimIamAuthZScpSourceBuilder {
    */
   private static readonly unrestricted: SimIamAuthZServiceControlPolicies = {
     applies: false,
-    sources: [],
+    levels: [],
   };
 
   private readonly accountId: SimAwsAccountId;
@@ -62,10 +62,13 @@ export class SimIamAuthZScpSourceBuilder {
 
     return {
       applies: set.applies,
-      sources: set.policies.map((policy) => ({
-        sourceType: "service-control" as const,
-        document: policy.document,
-        policyName: policy.policyName,
+      levels: set.levels.map((level) => ({
+        nodeName: level.nodeName,
+        sources: level.policies.map((policy) => ({
+          sourceType: "service-control" as const,
+          document: policy.document,
+          policyName: policy.policyName,
+        })),
       })),
     };
   }

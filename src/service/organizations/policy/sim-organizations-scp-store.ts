@@ -1,17 +1,14 @@
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimIamServiceControlPolicy } from "../../iam/authorize/scp/sim-iam-scp-resolver.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
-import type {
-  SimIamServiceControlPolicy,
-  SimIamServiceControlPolicySet,
-} from "../../iam/authorize/scp/sim-iam-scp-resolver.js";
+import type { SimOrganizationsNodeId } from "../tree/sim-organizations-node.js";
 
 /**
  * The AWS-managed policy attached to every organization node by default.
  *
  * Turning service control policies on in an organization leaves every
  * account's permissions as they were, because this policy comes with them. A
- * simulated Account gets the same treatment, so attaching one Deny statement
- * denies that one action and leaves the rest of the Account working.
+ * simulated node gets the same treatment, so attaching one Deny statement
+ * denies that one action and leaves the rest working.
  */
 export const SIM_ORGANIZATIONS_FULL_AWS_ACCESS: SimIamServiceControlPolicy = {
   policyName: "FullAWSAccess",
@@ -21,96 +18,95 @@ export const SIM_ORGANIZATIONS_FULL_AWS_ACCESS: SimIamServiceControlPolicy = {
   },
 };
 
-interface SimOrganizationsAccountPolicies {
+interface SimOrganizationsNodePolicies {
   readonly attached: SimIamServiceControlPolicy[];
   fullAwsAccess: boolean;
 }
 
 /**
- * The service control policies attached to each simulated Account.
+ * The service control policies attached to each node of an organization.
  *
- * An Account absent from the store is outside the organization's reach and is
- * decided by IAM alone. An Account present in it carries FullAWSAccess along
- * with whatever was attached, until a test detaches FullAWSAccess to write an
- * allow list instead of a deny list.
+ * A node holds FullAWSAccess along with whatever was attached to it, until a
+ * test detaches FullAWSAccess to write an allow list at that node. A node
+ * nothing was attached to still holds FullAWSAccess, so an organizational unit
+ * a test never mentions allows everything through it.
  */
 export class SimOrganizationsScpStore {
-  private readonly byAccountId = new Map<
-    SimAwsAccountId,
-    SimOrganizationsAccountPolicies
+  private readonly byNodeId = new Map<
+    SimOrganizationsNodeId,
+    SimOrganizationsNodePolicies
   >();
 
   /**
-   * Attach a service control policy to an Account.
+   * Attach a service control policy to a node.
    */
   attach(
-    accountId: SimAwsAccountId,
+    nodeId: SimOrganizationsNodeId,
     document: SimIamPolicyDocument,
     policyName?: string,
   ): void {
-    this.accountPolicies(accountId).attached.push({ document, policyName });
+    this.nodePolicies(nodeId).attached.push({ document, policyName });
   }
 
   /**
-   * Take the AWS-managed FullAWSAccess policy off an Account.
+   * Take the AWS-managed FullAWSAccess policy off a node.
    *
-   * What remains has to allow an action for the Account to be allowed it,
-   * which is how an organization is turned into an allow list.
+   * What remains at that node has to allow an action for a request through it
+   * to go ahead, which is how a level is turned into an allow list.
    */
-  detachFullAwsAccess(accountId: SimAwsAccountId): void {
-    this.accountPolicies(accountId).fullAwsAccess = false;
+  detachFullAwsAccess(nodeId: SimOrganizationsNodeId): void {
+    this.nodePolicies(nodeId).fullAwsAccess = false;
   }
 
   /**
-   * Remove every service control policy from an Account, FullAWSAccess
-   * included, putting it back outside the organization's reach.
+   * Put a node back to holding FullAWSAccess and nothing else.
    */
-  detachAll(accountId: SimAwsAccountId): void {
-    this.byAccountId.delete(accountId);
+  detachAll(nodeId: SimOrganizationsNodeId): void {
+    this.byNodeId.delete(nodeId);
   }
 
   /**
-   * The policies in force for an Account, FullAWSAccess first.
-   *
-   * An Account nothing was ever attached to is outside the organization and
-   * gets a set that does not apply. An Account left holding no policies, which
-   * detaching FullAWSAccess on its own produces, gets one that applies and is
-   * empty. Nothing then allows it anything, which is what AWS does to an
-   * account whose every policy has been taken off it.
+   * The policies in force at one node, FullAWSAccess first.
    */
-  policySetFor(accountId: SimAwsAccountId): SimIamServiceControlPolicySet {
-    const account = this.byAccountId.get(accountId);
+  policiesAt(
+    nodeId: SimOrganizationsNodeId,
+  ): readonly SimIamServiceControlPolicy[] {
+    const node = this.byNodeId.get(nodeId);
 
-    if (account === undefined) {
-      return { applies: false, policies: [] };
+    if (node === undefined) {
+      return [SIM_ORGANIZATIONS_FULL_AWS_ACCESS];
     }
 
-    return {
-      applies: true,
-      policies: account.fullAwsAccess
-        ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...account.attached]
-        : [...account.attached],
-    };
+    return node.fullAwsAccess
+      ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...node.attached]
+      : [...node.attached];
   }
 
   /**
-   * The record for an Account, created on first use.
+   * Whether anything has been attached to or detached from a node.
    */
-  private accountPolicies(
-    accountId: SimAwsAccountId,
-  ): SimOrganizationsAccountPolicies {
-    const existing = this.byAccountId.get(accountId);
+  holds(nodeId: SimOrganizationsNodeId): boolean {
+    return this.byNodeId.has(nodeId);
+  }
+
+  /**
+   * The record for a node, created on first use.
+   */
+  private nodePolicies(
+    nodeId: SimOrganizationsNodeId,
+  ): SimOrganizationsNodePolicies {
+    const existing = this.byNodeId.get(nodeId);
 
     if (existing !== undefined) {
       return existing;
     }
 
-    const created: SimOrganizationsAccountPolicies = {
+    const created: SimOrganizationsNodePolicies = {
       attached: [],
       fullAwsAccess: true,
     };
 
-    this.byAccountId.set(accountId, created);
+    this.byNodeId.set(nodeId, created);
 
     return created;
   }

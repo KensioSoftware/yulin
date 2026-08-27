@@ -13,17 +13,29 @@ export interface SimIamServiceControlPolicy {
 }
 
 /**
+ * The policies attached at one level of the organization above an Account.
+ *
+ * AWS requires an Allow at every level between the root and the Account, so
+ * which level a policy came from decides the request rather than decorating
+ * it. The name is what a denial calls the level.
+ */
+export interface SimIamServiceControlPolicyLevel {
+  readonly nodeName: string;
+  readonly policies: readonly SimIamServiceControlPolicy[];
+}
+
+/**
  * The service control policies in force for one Account.
  *
- * Whether any apply is a separate fact from how many there are. An Account
- * whose only attached policy has been detached is still inside the
+ * Whether any apply is a separate fact from how many levels there are. An
+ * Account whose every policy has been detached is still inside the
  * organization, and nothing allowing an action there denies it. An Account
- * outside every organization is unrestricted. Both hold no policies, so the
- * list alone cannot tell them apart.
+ * outside every organization is unrestricted. Both can hold no policy, so the
+ * levels alone cannot tell them apart.
  */
 export interface SimIamServiceControlPolicySet {
   readonly applies: boolean;
-  readonly policies: readonly SimIamServiceControlPolicy[];
+  readonly levels: readonly SimIamServiceControlPolicyLevel[];
 }
 
 /**
