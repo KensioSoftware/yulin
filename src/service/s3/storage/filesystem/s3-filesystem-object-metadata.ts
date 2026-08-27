@@ -49,6 +49,7 @@ const contentTypesByExtension: ReadonlyMap<string, string> = new Map([
   [".mjs", "text/javascript"],
   [".json", "application/json"],
   [".map", "application/json"],
+  [".pdf", "application/pdf"],
   [".png", "image/png"],
   [".otf", "font/otf"],
   [".svg", "image/svg+xml"],

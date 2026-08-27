@@ -2701,8 +2701,8 @@ called `DeleteObject` would be a poor default. Leave a Bucket on the default in-
 when a test needs deletion to work.
 
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
-file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.csv`, `.xml`, and
-common font and image formats. A served file whose extension falls outside that set gets
+file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.csv`, `.pdf`,
+`.xml`, and common font and image formats. A served file whose extension falls outside that set gets
 `binary/octet-stream`, as S3 reports for an Object whose type it was never told. That only comes up
 for an extension a mount named itself, below. No other file is served at all, with or without a
 type.

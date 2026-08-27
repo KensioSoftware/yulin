@@ -39,7 +39,7 @@ export interface SimS3MountFilesystemOptions {
    * the web's own types, and nothing else — so that pointing a Bucket at a
    * directory cannot be talked into reading whatever else is in it. A site
    * serving a data file of its own needs its extension named here: a pinyin
-   * dictionary's `.freq`, a `.wasm` module, a `.pdf`.
+   * dictionary's `.freq`, a `.wasm` module, a `.parquet` table.
    *
    * Added to the list rather than replacing it, and a leading dot is optional.
    */
