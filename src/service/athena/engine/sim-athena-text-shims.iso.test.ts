@@ -210,7 +210,9 @@ describe("Trino's URL functions on SQLite", () => {
   it("answers null over text that is no URL", async () => {
     // Given text nobody could read as a URL.
     // When its host is read.
-    // Then the answer is null rather than a failed query. Trino fails.
+    // Then the answer is null, which is Trino's answer too. Each of the
+    // extract functions is declared never to fail and answers null off a URI
+    // that would not parse.
     assertIdentical(
       await anAnsweredExpression("url_extract_host('rain dot example')"),
       null,
