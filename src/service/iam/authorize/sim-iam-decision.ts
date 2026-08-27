@@ -51,7 +51,7 @@ export class SimIamPolicyDecision {
       statementMatcher,
     });
     this.scpGate = new SimIamScpGate({
-      policies: request.serviceControlPolicies,
+      serviceControlPolicies: request.serviceControlPolicies,
       policyDocumentParser,
       statementMatcher,
     });
@@ -144,9 +144,15 @@ export class SimIamPolicyDecision {
    * to say than the action and the resource.
    *
    * A service turns a denied decision into an error and passes this through,
-   * so an SCP denial reads the way it does in a real account.
+   * so an SCP denial reads the way it does in a real account. A matching Deny
+   * in an identity or resource policy is what `value` reports first, and it
+   * needs nothing added to the message, so it leaves this absent.
    */
   get denialReason(): string | undefined {
+    if (this.policies.isExplicitDeny) {
+      return undefined;
+    }
+
     return this.scpGate.denialReason(this.request.action);
   }
 

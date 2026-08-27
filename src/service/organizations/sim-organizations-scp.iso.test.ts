@@ -142,6 +142,72 @@ describe("Simulated Organizations service control policies", () => {
     );
   });
 
+  it("denies everything for an Account left holding no policy", () => {
+    // Given an Account inside the organization whose every policy has been
+    // taken off it.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    simAws.organizations().detachFullAwsAccess(accountId);
+
+    // When the Account root, which holds unrestricted access, asks for
+    // anything at all.
+    const decision = simAws
+      .account(accountId)
+      .iam()
+      .authorize({
+        action: "s3:GetObject",
+        resource: `arn:aws:s3:::${accountId}-reports/summary.csv`,
+      });
+
+    // Then nothing allows it, which is what AWS does to an account whose
+    // policies have all been detached.
+    assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
+    assertTrue(decision.serviceControlPolicy.isApplied);
+    assertTrue(decision.serviceControlPolicy.isDenied);
+    assertArrayLength(
+      simAws.organizations().serviceControlPoliciesFor(accountId),
+      0,
+    );
+  });
+
+  it("blames the identity policy, not the organization, for an explicit Deny", () => {
+    // Given an Account whose organization allows nothing, and a resource
+    // policy that explicitly denies the same action.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    simAws.organizations().detachFullAwsAccess(accountId);
+
+    // When a request matches both.
+    const decision = simAws
+      .account(accountId)
+      .iam()
+      .authorize({
+        action: "s3:GetObject",
+        resource: `arn:aws:s3:::${accountId}-reports/summary.csv`,
+        resourcePolicies: [
+          {
+            document: {
+              Version: "2012-10-17",
+              Statement: {
+                Effect: "Deny",
+                Principal: "*",
+                Action: "s3:GetObject",
+                Resource: "*",
+              },
+            },
+          },
+        ],
+      });
+
+    // Then the explicit Deny is what decided it, and the message says nothing
+    // about a service control policy.
+    assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);
+    assertArrayLength(decision.explicitDenyStatements, 1);
+    assertUndefined(decision.denialReason);
+  });
+
   it("decides an Account with nothing attached as it did before", () => {
     // Given a simulation with an organization holding no policy for this
     // Account.

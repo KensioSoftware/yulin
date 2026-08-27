@@ -2,7 +2,7 @@ import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import { isSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamServiceControlPolicyResolver } from "../scp/sim-iam-scp-resolver.js";
-import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
+import type { SimIamAuthZServiceControlPolicies } from "./sim-iam-auth-z-context.js";
 
 interface SimIamAuthZScpSourceBuilderProperties {
   /**
@@ -26,6 +26,14 @@ interface SimIamAuthZScpSourceBuilderProperties {
  * anonymous request, belongs to no Account and is subject to no SCP.
  */
 export class SimIamAuthZScpSourceBuilder {
+  /**
+   * What a caller no organization reaches is subject to.
+   */
+  private static readonly unrestricted: SimIamAuthZServiceControlPolicies = {
+    applies: false,
+    sources: [],
+  };
+
   private readonly accountId: SimAwsAccountId;
   private readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 
@@ -35,26 +43,31 @@ export class SimIamAuthZScpSourceBuilder {
   }
 
   /**
-   * The service control policy sources in force for a resolved caller.
+   * The service control policies in force for a resolved caller.
    */
-  build(caller: SimAwsResolvedCaller): readonly SimIamAuthZPolicySource[] {
+  build(caller: SimAwsResolvedCaller): SimIamAuthZServiceControlPolicies {
     const scpResolver = this.scpResolver;
 
     if (scpResolver === undefined) {
-      return [];
+      return SimIamAuthZScpSourceBuilder.unrestricted;
     }
 
     const accountId = this.callerAccountId(caller);
 
     if (accountId === undefined) {
-      return [];
+      return SimIamAuthZScpSourceBuilder.unrestricted;
     }
 
-    return scpResolver.serviceControlPoliciesFor(accountId).map((policy) => ({
-      sourceType: "service-control" as const,
-      document: policy.document,
-      policyName: policy.policyName,
-    }));
+    const set = scpResolver.serviceControlPolicySetFor(accountId);
+
+    return {
+      applies: set.applies,
+      sources: set.policies.map((policy) => ({
+        sourceType: "service-control" as const,
+        document: policy.document,
+        policyName: policy.policyName,
+      })),
+    };
   }
 
   /**

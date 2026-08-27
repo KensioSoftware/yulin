@@ -1,6 +1,9 @@
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
-import type { SimIamServiceControlPolicy } from "../../iam/authorize/scp/sim-iam-scp-resolver.js";
+import type {
+  SimIamServiceControlPolicy,
+  SimIamServiceControlPolicySet,
+} from "../../iam/authorize/scp/sim-iam-scp-resolver.js";
 
 /**
  * The AWS-managed policy attached to every organization node by default.
@@ -68,19 +71,26 @@ export class SimOrganizationsScpStore {
 
   /**
    * The policies in force for an Account, FullAWSAccess first.
+   *
+   * An Account nothing was ever attached to is outside the organization and
+   * gets a set that does not apply. An Account left holding no policies, which
+   * detaching FullAWSAccess on its own produces, gets one that applies and is
+   * empty. Nothing then allows it anything, which is what AWS does to an
+   * account whose every policy has been taken off it.
    */
-  policiesFor(
-    accountId: SimAwsAccountId,
-  ): readonly SimIamServiceControlPolicy[] {
+  policySetFor(accountId: SimAwsAccountId): SimIamServiceControlPolicySet {
     const account = this.byAccountId.get(accountId);
 
     if (account === undefined) {
-      return [];
+      return { applies: false, policies: [] };
     }
 
-    return account.fullAwsAccess
-      ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...account.attached]
-      : [...account.attached];
+    return {
+      applies: true,
+      policies: account.fullAwsAccess
+        ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...account.attached]
+        : [...account.attached],
+    };
   }
 
   /**

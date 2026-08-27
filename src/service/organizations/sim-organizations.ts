@@ -6,6 +6,7 @@ import type { SimIamPolicyDocument } from "../iam/policy/sim-iam-policy.js";
 import type {
   SimIamServiceControlPolicy,
   SimIamServiceControlPolicyResolver,
+  SimIamServiceControlPolicySet,
 } from "../iam/authorize/scp/sim-iam-scp-resolver.js";
 import { SimOrganizationsScpStore } from "./policy/sim-organizations-scp-store.js";
 
@@ -80,11 +81,28 @@ export class SimOrganizations implements SimIamServiceControlPolicyResolver {
    * The service control policies in force for an Account.
    *
    * This is what sim IAM evaluates, in the order it evaluates them, so a test
-   * tracking down a denial can read the same list the decision did.
+   * tracking down a denial can read the same list the decision did. An empty
+   * list means either that the Account is outside the organization or that
+   * every policy has been taken off it, which
+   * `serviceControlPolicySetFor(...).applies` tells apart.
    */
   serviceControlPoliciesFor(
     accountId: SimAwsAccountId | string,
   ): readonly SimIamServiceControlPolicy[] {
-    return this.scpStore.policiesFor(simAwsAccountId(accountId));
+    return this.serviceControlPolicySetFor(simAwsAccountId(accountId)).policies;
+  }
+
+  /**
+   * The policies in force for an Account, along with whether the Account is
+   * inside this organization at all.
+   *
+   * Sim IAM reads this rather than the list, because an Account left holding
+   * no policies is denied everything while an Account outside the organization
+   * is unrestricted.
+   */
+  serviceControlPolicySetFor(
+    accountId: SimAwsAccountId | string,
+  ): SimIamServiceControlPolicySet {
+    return this.scpStore.policySetFor(simAwsAccountId(accountId));
   }
 }

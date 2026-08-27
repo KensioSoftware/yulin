@@ -1,11 +1,14 @@
 import type { SimIamPolicyDocumentStatement } from "../../policy/sim-iam-policy.js";
 import type { SimIamPolicyDocumentParser } from "../../policy/parse/sim-iam-document-parser.js";
 import type { SimIamPolicyStatementMatcher } from "../match/sim-iam-policy-statement-matcher.js";
-import type { SimIamAuthZPolicySource } from "../context/sim-iam-auth-z-context.js";
-import { SimIamPolicyDecisionValue } from "../sim-iam-decision.js";
+import type {
+  SimIamAuthZPolicySource,
+  SimIamAuthZServiceControlPolicies,
+} from "../context/sim-iam-auth-z-context.js";
+import { SimIamPolicyDecisionValue } from "../sim-iam-decision-value.js";
 
 interface SimIamScpGateProperties {
-  readonly policies: readonly SimIamAuthZPolicySource[];
+  readonly serviceControlPolicies: SimIamAuthZServiceControlPolicies;
   readonly policyDocumentParser: SimIamPolicyDocumentParser;
   readonly statementMatcher: SimIamPolicyStatementMatcher;
 }
@@ -21,8 +24,9 @@ interface SimIamScpGateProperties {
  * - a matching Deny in any attached policy ends the request;
  * - the attached policies have to produce a matching Allow between them.
  *
- * An Account with nothing attached is outside any organization's reach, and
- * this gate stands open for it.
+ * An Account outside any organization's reach is unrestricted, and this gate
+ * stands open for it. An Account inside one that holds no policy is a
+ * different case: nothing allows it anything, so the gate is shut.
  */
 export class SimIamScpGate {
   private readonly applies: boolean;
@@ -30,9 +34,9 @@ export class SimIamScpGate {
   private readonly allowStatementRecords: SimIamPolicyDocumentStatement[] = [];
 
   constructor(properties: SimIamScpGateProperties) {
-    this.applies = properties.policies.length > 0;
+    this.applies = properties.serviceControlPolicies.applies;
 
-    for (const policy of properties.policies) {
+    for (const policy of properties.serviceControlPolicies.sources) {
       this.evaluate(policy, properties);
     }
   }

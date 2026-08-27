@@ -45,8 +45,8 @@ console.log(decision.serviceControlPolicy.denyStatements[0]?.Sid); // "DenyBucke
 The account also gets AWS's own `FullAWSAccess` policy, as it would in a real organization. One
 `Deny` statement therefore denies that one action and leaves the rest of the account working.
 
-An account nothing is attached to is outside the organization's reach, and its identity and
-resource policies decide its requests as they did before.
+An account with no policy attached to it stays outside the organization's reach, and its identity
+and resource policies decide its requests as they did before.
 
 ## Catch a deployment the policy denies
 
@@ -133,6 +133,9 @@ console.log(decision.denialReason);
 An account root holds unrestricted access in sim IAM, and this denies it anyway. That is what an
 SCP does in AWS, and it is why an allow list is worth writing in a test at all.
 
+Detaching `FullAWSAccess` on its own leaves the account holding no policy, and every action is then
+denied. AWS behaves the same way, and warns about it.
+
 ## Reading a denial
 
 An authorization decision reports the organization's verdict apart from the identity and resource
@@ -153,6 +156,12 @@ simulated service passes it through to the error it throws.
 `simAws.organizations().serviceControlPoliciesFor(accountId)` returns the policies in force for an
 account, in the order they were evaluated, including `FullAWSAccess` where it is still attached.
 
+That list is empty in two cases that behave differently. An account that was never attached to sits
+outside the organization and stays unrestricted. An account left holding no policy is denied
+everything.
+`serviceControlPolicySetFor(accountId).applies` tells the two apart, and so does
+`decision.serviceControlPolicy.isApplied`.
+
 ## Available functionality
 
 Simulated Organizations supports:
@@ -161,6 +170,7 @@ Simulated Organizations supports:
 - `detachFullAwsAccess`, turning an Account's policies into an allow list
 - `detachServiceControlPolicies`, putting an Account back outside the organization's reach
 - `serviceControlPoliciesFor`, reading the policies in force for an Account
+- `serviceControlPolicySetFor`, reading those policies along with whether any apply
 - The AWS-managed `FullAWSAccess` policy, attached by default as it is in AWS
 - Evaluation ahead of identity and resource policies, for every principal in the Account including
   its root
