@@ -253,6 +253,89 @@ SCP does in AWS, and it is why an allow list is worth writing in a test at all.
 Detaching `FullAWSAccess` on its own leaves the account holding no policy, and every action is then
 denied. AWS behaves the same way, and warns about it.
 
+## Deploy an organization from CloudFormation
+
+A template's `AWS::Organizations::*` resources build the organization they describe, so a stack
+already managing the org chart is the same one a test deploys.
+
+```typescript sim-organizations-cloudformation
+/**
+ * Building an organization from a CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "org-stack",
+  template: {
+    Resources: {
+      Organization: { Type: "AWS::Organizations::Organization" },
+      Workloads: {
+        Type: "AWS::Organizations::OrganizationalUnit",
+        Properties: {
+          Name: "Workloads",
+          ParentId: { "Fn::GetAtt": ["Organization", "RootId"] },
+        },
+      },
+      DenyBucketCreation: {
+        Type: "AWS::Organizations::Policy",
+        Properties: {
+          Name: "DenyBucketCreation",
+          Type: "SERVICE_CONTROL_POLICY",
+          TargetIds: [{ Ref: "Workloads" }],
+          Content: {
+            Version: "2012-10-17",
+            Statement: [
+              { Effect: "Deny", Action: "s3:CreateBucket", Resource: "*" },
+            ],
+          },
+        },
+      },
+    },
+    Outputs: { WorkloadsId: { Value: { Ref: "Workloads" } } },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+simAws.organizations().moveAccount("123456789012", stack.output("WorkloadsId"));
+
+const decision = simAws.account("123456789012").iam().authorize({
+  action: "s3:CreateBucket",
+  resource: "arn:aws:s3:::reports-bucket",
+});
+
+console.log(decision.value); // "ExplicitDeny"
+```
+
+`Content` takes the policy document inline or as JSON text. `TargetIds` takes a list or a single
+value, and each entry names the root, a unit, or an Account. A policy reaches every target it names
+or none of them. A target this organization has never heard of fails the resource before anything is
+attached.
+
+A simulated environment has one organization from the start, so
+`AWS::Organizations::Organization` records the one already there rather than making another. It is
+worth declaring for `RootId`, which is what a unit hangs off.
+
+`AWS::Organizations::Account` creates an Account with an id nobody chose, as AWS does. Read that id
+back with `Ref` or `Fn::GetAtt AccountId`.
+
+These are the properties read from each resource:
+
+| Resource                                 | Read                                   | Recorded and skipped  |
+| ---------------------------------------- | -------------------------------------- | --------------------- |
+| `AWS::Organizations::Organization`       | `FeatureSet`                           | `FeatureSet`          |
+| `AWS::Organizations::OrganizationalUnit` | `Name`, `ParentId`                     | `Tags`                |
+| `AWS::Organizations::Account`            | `AccountName`, `Email`, `ParentIds`    | `Tags`, `RoleName`    |
+| `AWS::Organizations::Policy`             | `Name`, `Type`, `Content`, `TargetIds` | `Tags`, `Description` |
+
+Tearing the stack down takes its own policies off the nodes they were attached to, removes the
+units, and takes any Account the stack created back out of the organization. A node holding
+policies from more than one stack keeps the others. A unit that still holds something when it goes
+hands what it holds to its parent, so every Account keeps a path to the root.
+
 ## Reading a denial
 
 An authorization decision reports the organization's verdict apart from the identity and resource
@@ -291,7 +374,10 @@ Simulated Organizations supports:
 - `moveAccount`, putting an Account under a unit or under the root
 - `root`, the node above every Account in the organization
 - `setManagementAccount`, exempting the Account AWS exempts
-- `attachServiceControlPolicy`, attaching a policy document to the root, a unit, or an Account
+- `attachServiceControlPolicy`, attaching a policy document to the root, a unit, or an Account, and
+  answering with the id that takes it off again
+- `detachServiceControlPolicy`, taking one policy off a node and leaving the rest
+- `accountIds`, reading which Accounts the organization holds
 - `detachFullAwsAccess`, turning a node's policies into an allow list
 - `detachServiceControlPolicies`, taking every policy back off one node and leaving the rest alone
 - `removeAccount`, taking an Account out of the organization
@@ -307,6 +393,8 @@ Simulated Organizations supports:
   operators, and their `ForAnyValue:` and `ForAllValues:` set forms
 - `AccessDenied` messages naming the service control policy, as AWS words them
 - Denial reporting through `decision.serviceControlPolicy`, naming the levels that allowed nothing
+- The `AWS::Organizations::Organization`, `::OrganizationalUnit`, `::Account` and `::Policy`
+  CloudFormation resources, with `Ref` and `Fn::GetAtt`, and teardown
 
 ## Limitations
 

@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionContainer } from "../../../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnServiceResourceFactory } from "../../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
+import { SimOrganizationsCfnResourceFactory } from "../../../../organizations/cfn/sim-organizations-cfn-resource-factory.js";
 
 /**
  * How one simulated service hands over its CloudFormation Resource factory,
@@ -53,6 +54,13 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
   [
     "CloudFormation",
     (): SimCfnServiceResourceFactory => new SimCfnCfnResourceFactory(),
+  ],
+  // An organization spans Accounts, so this factory reads the one on the
+  // creation context rather than the Account and Region scope it deploys into.
+  [
+    "Organizations",
+    (): SimCfnServiceResourceFactory =>
+      new SimOrganizationsCfnResourceFactory(),
   ],
   [
     "CloudFront",

@@ -41,6 +41,13 @@ export function makeSimOrganizationsOrganizationalUnitId(
 }
 
 /**
+ * Generate an AWS-shaped service control policy id.
+ */
+export function makeSimOrganizationsPolicyId(): string {
+  return `p-${faker.string.alphanumeric({ length: 8, casing: "lower" })}`;
+}
+
+/**
  * An organizational unit in a simulated organization.
  *
  * This is the handle a test holds on to. Pass it where a policy is attached or
@@ -64,10 +71,22 @@ export class SimOrganizationsRoot {
 }
 
 /**
- * Somewhere a policy can be attached, given either as a handle or as the
- * Account id of an Account.
+ * Somewhere a policy can be attached, given as a handle or as an id.
+ *
+ * An id is what a CloudFormation template carries, since a `Ref` to a unit
+ * resolves to the id AWS gave it rather than to anything holding a reference.
  */
 export type SimOrganizationsTarget =
   | SimOrganizationsRoot
   | SimOrganizationsOrganizationalUnit
   | string;
+
+/**
+ * Whether an id names the root or an organizational unit.
+ *
+ * AWS ids carry their own kind in a prefix, and an Account id is twelve
+ * digits, so nothing here has to guess which of the two a string is.
+ */
+export function isSimOrganizationsUnitId(value: string): boolean {
+  return value.startsWith("r-") || value.startsWith("ou-");
+}
