@@ -1,12 +1,12 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
-import type { SimOrganizationsNodeId } from "../tree/sim-organizations-node.js";
+import {
+  makeSimOrganizationsPolicyId,
+  type SimOrganizationsNodeId,
+} from "../tree/sim-organizations-node.js";
 import { SimCfnOrganizationsPolicy } from "./sim-cfn-organizations-record.js";
-import { SimCfnOrganizationsProperties } from "./sim-cfn-organizations-properties.js";
-
-const SERVICE_CONTROL_POLICY = "SERVICE_CONTROL_POLICY";
+import { SimCfnOrganizationsPolicyInput } from "./sim-cfn-organizations-policy-input.js";
 
 /**
  * Attaches service control policies from `AWS::Organizations::Policy`
@@ -31,48 +31,31 @@ export class SimCfnOrganizationsPolicyCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): SimCfnOrganizationsPolicy {
-    const values = new SimCfnOrganizationsProperties(
-      resource,
-      "AWS::Organizations::Policy",
-    );
-    const policyType = values.requiredString(properties["Type"], "Type");
+    const input = new SimCfnOrganizationsPolicyInput(resource, properties);
+    const organizations = this.#simAws.organizations();
 
-    if (policyType !== SERVICE_CONTROL_POLICY) {
-      throw new Error(
-        `Unsupported sim Organizations CloudFormation Resource Policy of ` +
-          `type ${policyType}`,
-      );
-    }
+    // Every target is resolved before any of them is attached to. Refusing one
+    // partway through would leave the earlier targets holding a policy no
+    // teardown knows about.
+    organizations.requireTargets(input.targetIds);
 
-    values.ignore(
-      properties["Tags"],
-      "Tags",
-      "Simulated Organizations reads no policy tags",
-    );
-    values.ignore(
-      properties["Description"],
-      "Description",
-      "A policy description decides nothing",
-    );
+    // An id of its own, rather than one derived from the logical id. Two
+    // Stacks can each declare a Policy called the same thing, and a shared id
+    // would let one Stack's teardown take the other's policy off.
+    const policyId = makeSimOrganizationsPolicyId();
 
-    const name = values.requiredString(properties["Name"], "Name");
-    const document = values.documentValue(
-      properties["Content"],
-      "Content",
-    ) as SimIamPolicyDocument;
-    const targetIds = values.stringList(properties["TargetIds"]);
-
-    for (const targetId of targetIds) {
-      this.#simAws
-        .organizations()
-        .attachServiceControlPolicy(targetId, document, { policyName: name });
+    for (const targetId of input.targetIds) {
+      organizations.attachServiceControlPolicy(targetId, input.document, {
+        policyName: input.name,
+        policyId,
+      });
     }
 
     return new SimCfnOrganizationsPolicy(
-      `p-${resource.logicalId.toLowerCase()}`,
-      name,
-      policyType,
-      targetIds as readonly SimOrganizationsNodeId[],
+      policyId,
+      input.name,
+      input.policyType,
+      input.targetIds as readonly SimOrganizationsNodeId[],
     );
   }
 }

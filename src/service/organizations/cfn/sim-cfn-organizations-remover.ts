@@ -29,7 +29,7 @@ export class SimCfnOrganizationsRemover {
 
     if (simResource instanceof SimCfnOrganizationsPolicy) {
       for (const targetId of simResource.targetIds) {
-        organizations.detachServiceControlPolicies(targetId);
+        organizations.detachServiceControlPolicy(targetId, simResource.id);
       }
 
       return;

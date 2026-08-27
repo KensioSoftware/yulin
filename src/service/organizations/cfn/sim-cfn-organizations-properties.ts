@@ -58,19 +58,25 @@ export class SimCfnOrganizationsProperties {
   /**
    * A property holding an IAM policy document, given inline or as JSON text.
    */
-  documentValue(value: SimCfnTemplateValue | undefined, name: string): unknown {
-    if (typeof value !== "string") {
-      return value;
-    }
+  documentValue(
+    value: SimCfnTemplateValue | undefined,
+    name: string,
+  ): Readonly<Record<string, unknown>> {
+    const document =
+      typeof value === "string" ? this.#parse(value, name) : value;
 
-    try {
-      return JSON.parse(value) as unknown;
-    } catch {
+    if (
+      typeof document !== "object" ||
+      document === null ||
+      Array.isArray(document)
+    ) {
       throw new Error(
-        `${this.#resourceType} ${this.#resource.logicalId} ${name} is not ` +
-          `valid JSON`,
+        `${this.#resourceType} ${this.#resource.logicalId} requires ${name} ` +
+          `to be a policy document`,
       );
     }
+
+    return document as Readonly<Record<string, unknown>>;
   }
 
   /**
@@ -83,6 +89,20 @@ export class SimCfnOrganizationsProperties {
   ): void {
     if (value !== undefined) {
       this.#resource.ignoreProperty(name, reason);
+    }
+  }
+
+  /**
+   * Read a document a template gave as JSON text.
+   */
+  #parse(value: string, name: string): unknown {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      throw new Error(
+        `${this.#resourceType} ${this.#resource.logicalId} ${name} is not ` +
+          `valid JSON`,
+      );
     }
   }
 }

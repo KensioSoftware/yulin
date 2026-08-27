@@ -103,6 +103,13 @@ export class SimOrganizationsTree {
   }
 
   /**
+   * Every Account in the organization.
+   */
+  accountIds(): readonly SimAwsAccountId[] {
+    return this.accountParents.keys().toArray();
+  }
+
+  /**
    * Whether this Account is in the organization.
    */
   holds(accountId: SimAwsAccountId): boolean {
@@ -118,6 +125,13 @@ export class SimOrganizationsTree {
    */
   requireNode(nodeId: SimOrganizationsNodeId): void {
     this.requireKnown(nodeId);
+  }
+
+  /**
+   * Whether this organization has a root or unit under an id.
+   */
+  hasNode(nodeId: SimOrganizationsNodeId): boolean {
+    return nodeId === this.root.id || this.organizationalUnits.has(nodeId);
   }
 
   /**

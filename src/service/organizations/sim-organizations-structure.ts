@@ -67,6 +67,16 @@ export abstract class SimOrganizationsStructure {
   }
 
   /**
+   * Every Account this organization holds.
+   *
+   * A test tracking down where a denial came from reads this to see which
+   * Accounts the organization is filtering at all.
+   */
+  accountIds(): readonly string[] {
+    return this.tree.accountIds();
+  }
+
+  /**
    * Take an Account out of the organization.
    *
    * Nothing then filters its requests, whatever is attached above where it
@@ -84,7 +94,11 @@ export abstract class SimOrganizationsStructure {
    * path back to the root.
    */
   removeOrganizationalUnit(target: SimOrganizationsTarget): void {
-    this.tree.removeOrganizationalUnit(this.nodeIdOf(target));
+    const nodeId = this.knownNodeIdOf(target);
+
+    if (nodeId !== undefined) {
+      this.tree.removeOrganizationalUnit(nodeId);
+    }
   }
 
   /**
@@ -112,6 +126,43 @@ export abstract class SimOrganizationsStructure {
     this.tree.requireNode(nodeId);
 
     return nodeId;
+  }
+
+  /**
+   * Refuse the whole set unless every target names a node this organization
+   * has.
+   *
+   * Attaching one policy to several nodes is one act, so it either reaches all
+   * of them or none. Failing partway would leave a policy attached where
+   * nothing knows to take it off.
+   */
+  requireTargets(targets: readonly SimOrganizationsTarget[]): void {
+    for (const target of targets) {
+      this.nodeIdOf(target);
+    }
+  }
+
+  /**
+   * The node a target names, or nothing where this organization has no such
+   * node.
+   *
+   * Taking something off a node that has already gone is what a Stack teardown
+   * asks for when a unit came down before the policy pointing at it. There is
+   * nothing to take off, and refusing would fail a teardown over work already
+   * done.
+   */
+  protected knownNodeIdOf(
+    target: SimOrganizationsTarget,
+  ): SimOrganizationsNodeId | undefined {
+    if (typeof target === "string" && !isSimOrganizationsUnitId(target)) {
+      return simAwsAccountId(target);
+    }
+
+    const nodeId = (
+      typeof target === "string" ? target : target.id
+    ) as SimOrganizationsNodeId;
+
+    return this.tree.hasNode(nodeId) ? nodeId : undefined;
   }
 
   /**

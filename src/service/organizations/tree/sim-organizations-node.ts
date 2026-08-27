@@ -41,6 +41,13 @@ export function makeSimOrganizationsOrganizationalUnitId(
 }
 
 /**
+ * Generate an AWS-shaped service control policy id.
+ */
+export function makeSimOrganizationsPolicyId(): string {
+  return `p-${faker.string.alphanumeric({ length: 8, casing: "lower" })}`;
+}
+
+/**
  * An organizational unit in a simulated organization.
  *
  * This is the handle a test holds on to. Pass it where a policy is attached or

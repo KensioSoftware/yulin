@@ -18,8 +18,13 @@ export const SIM_ORGANIZATIONS_FULL_AWS_ACCESS: SimIamServiceControlPolicy = {
   },
 };
 
+interface SimOrganizationsAttachedPolicy {
+  readonly policyId: string;
+  readonly policy: SimIamServiceControlPolicy;
+}
+
 interface SimOrganizationsNodePolicies {
-  readonly attached: SimIamServiceControlPolicy[];
+  readonly attached: SimOrganizationsAttachedPolicy[];
   fullAwsAccess: boolean;
 }
 
@@ -38,14 +43,43 @@ export class SimOrganizationsScpStore {
   >();
 
   /**
-   * Attach a service control policy to a node.
+   * Attach a service control policy to a node under an id of its own.
+   *
+   * The id is what takes the policy off again. One policy attached to several
+   * nodes carries the same id at each of them, the way an AWS policy attached
+   * to several targets is one policy.
    */
   attach(
     nodeId: SimOrganizationsNodeId,
+    policyId: string,
     document: SimIamPolicyDocument,
     policyName?: string,
   ): void {
-    this.nodePolicies(nodeId).attached.push({ document, policyName });
+    this.nodePolicies(nodeId).attached.push({
+      policyId,
+      policy: { document, policyName },
+    });
+  }
+
+  /**
+   * Take one service control policy off a node, leaving the rest.
+   *
+   * A node can hold policies from more than one source, so taking the wrong
+   * ones off would change what an Account may do behind the caller's back.
+   */
+  detach(nodeId: SimOrganizationsNodeId, policyId: string): void {
+    const node = this.byNodeId.get(nodeId);
+
+    if (node === undefined) {
+      return;
+    }
+
+    const remaining = node.attached.filter(
+      (attached) => attached.policyId !== policyId,
+    );
+
+    node.attached.length = 0;
+    node.attached.push(...remaining);
   }
 
   /**
@@ -77,9 +111,11 @@ export class SimOrganizationsScpStore {
       return [SIM_ORGANIZATIONS_FULL_AWS_ACCESS];
     }
 
+    const attached = node.attached.map((entry) => entry.policy);
+
     return node.fullAwsAccess
-      ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...node.attached]
-      : [...node.attached];
+      ? [SIM_ORGANIZATIONS_FULL_AWS_ACCESS, ...attached]
+      : attached;
   }
 
   /**

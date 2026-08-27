@@ -9,7 +9,10 @@ import type {
   SimIamServiceControlPolicySet,
 } from "../iam/authorize/scp/sim-iam-scp-resolver.js";
 import { SimOrganizationsStructure } from "./sim-organizations-structure.js";
-import type { SimOrganizationsTarget } from "./tree/sim-organizations-node.js";
+import {
+  makeSimOrganizationsPolicyId,
+  type SimOrganizationsTarget,
+} from "./tree/sim-organizations-node.js";
 
 /**
  * Options for one attached service control policy.
@@ -19,6 +22,14 @@ export interface SimOrganizationsAttachOptions {
    * What to call the policy in a denial. Defaults to `ServiceControlPolicy`.
    */
   readonly policyName?: string | undefined;
+
+  /**
+   * The id to attach the policy under, for taking it off again later.
+   *
+   * One policy attached to several nodes takes the same id at each of them.
+   * Defaults to an id of this attachment's own.
+   */
+  readonly policyId?: string | undefined;
 }
 
 /**
@@ -53,10 +64,32 @@ export class SimOrganizations
     target: SimOrganizationsTarget,
     document: SimIamPolicyDocument,
     options: SimOrganizationsAttachOptions = {},
-  ): void {
+  ): string {
     const policyName = options.policyName ?? "ServiceControlPolicy";
+    const policyId = options.policyId ?? makeSimOrganizationsPolicyId();
 
-    this.scpStore.attach(this.nodeIdOf(target), document, policyName);
+    this.scpStore.attach(this.nodeIdOf(target), policyId, document, policyName);
+
+    return policyId;
+  }
+
+  /**
+   * Take one service control policy off a node, leaving whatever else is
+   * attached there.
+   *
+   * This is what a CloudFormation teardown uses, because a node can hold
+   * policies from more than one Stack and clearing it would take another
+   * Stack's guardrail away.
+   */
+  detachServiceControlPolicy(
+    target: SimOrganizationsTarget,
+    policyId: string,
+  ): void {
+    const nodeId = this.knownNodeIdOf(target);
+
+    if (nodeId !== undefined) {
+      this.scpStore.detach(nodeId, policyId);
+    }
   }
 
   /**
@@ -77,9 +110,17 @@ export class SimOrganizations
    * goes on inheriting what the levels above it say, as it does in AWS, where
    * detaching a policy from an account leaves the account where it is. Take an
    * Account out of the organization with `removeAccount`.
+   *
+   * A node that has already gone leaves nothing to take off, so this does
+   * nothing rather than refusing. A Stack teardown reaches that case whenever
+   * a unit came down before the policy pointing at it.
    */
   detachServiceControlPolicies(target: SimOrganizationsTarget): void {
-    this.scpStore.detachAll(this.nodeIdOf(target));
+    const nodeId = this.knownNodeIdOf(target);
+
+    if (nodeId !== undefined) {
+      this.scpStore.detachAll(nodeId);
+    }
   }
 
   /**

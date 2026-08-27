@@ -43,16 +43,23 @@ export class SimCfnOrganizationsAccountCreator {
       "Simulated Organizations creates no cross-account access Role",
     );
 
+    // Everything the Resource needs is read before the organization changes.
+    // A property that fails after the Account was placed would leave it in the
+    // organization with no record for a teardown to take it out again.
+    const accountName = values.requiredString(
+      properties["AccountName"],
+      "AccountName",
+    );
+    const email = values.requiredString(properties["Email"], "Email");
+    const parentId = values.stringList(properties["ParentIds"])[0];
     const accountId = makeSimAwsAccountId();
 
-    this.#simAws
-      .organizations()
-      .moveAccount(accountId, values.stringList(properties["ParentIds"])[0]);
+    this.#simAws.organizations().moveAccount(accountId, parentId);
 
     return new SimCfnOrganizationsAccount(
       accountId,
-      values.requiredString(properties["AccountName"], "AccountName"),
-      values.requiredString(properties["Email"], "Email"),
+      accountName,
+      email,
       this.#simAws.now(),
     );
   }

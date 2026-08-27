@@ -311,7 +311,9 @@ console.log(decision.value); // "ExplicitDeny"
 ```
 
 `Content` takes the policy document inline or as JSON text. `TargetIds` takes a list or a single
-value, and each entry names the root, a unit, or an Account.
+value, and each entry names the root, a unit, or an Account. A policy reaches every target it names
+or none of them. A target this organization has never heard of fails the resource before anything is
+attached.
 
 A simulated environment has one organization from the start, so
 `AWS::Organizations::Organization` records the one already there rather than making another. It is
@@ -329,9 +331,10 @@ These are the properties read from each resource:
 | `AWS::Organizations::Account`            | `AccountName`, `Email`, `ParentIds`    | `Tags`, `RoleName`    |
 | `AWS::Organizations::Policy`             | `Name`, `Type`, `Content`, `TargetIds` | `Tags`, `Description` |
 
-Tearing the stack down takes the policies off the nodes they were attached to, removes the units,
-and takes any Account the stack created back out of the organization. A unit that still holds
-something when it goes hands what it holds to its parent, so every Account keeps a path to the root.
+Tearing the stack down takes its own policies off the nodes they were attached to, removes the
+units, and takes any Account the stack created back out of the organization. A node holding
+policies from more than one stack keeps the others. A unit that still holds something when it goes
+hands what it holds to its parent, so every Account keeps a path to the root.
 
 ## Reading a denial
 
@@ -371,7 +374,10 @@ Simulated Organizations supports:
 - `moveAccount`, putting an Account under a unit or under the root
 - `root`, the node above every Account in the organization
 - `setManagementAccount`, exempting the Account AWS exempts
-- `attachServiceControlPolicy`, attaching a policy document to the root, a unit, or an Account
+- `attachServiceControlPolicy`, attaching a policy document to the root, a unit, or an Account, and
+  answering with the id that takes it off again
+- `detachServiceControlPolicy`, taking one policy off a node and leaving the rest
+- `accountIds`, reading which Accounts the organization holds
 - `detachFullAwsAccess`, turning a node's policies into an allow list
 - `detachServiceControlPolicies`, taking every policy back off one node and leaving the rest alone
 - `removeAccount`, taking an Account out of the organization

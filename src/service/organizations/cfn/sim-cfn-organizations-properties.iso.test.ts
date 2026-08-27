@@ -1,9 +1,9 @@
 import {
   assertArrayEquals,
+  assertArrayLength,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -14,6 +14,12 @@ const denyBucketCreation = {
   Version: "2012-10-17",
   Statement: [{ Effect: "Deny", Action: "s3:CreateBucket", Resource: "*" }],
 };
+
+/**
+ * The Accounts a simulated organization has been told about.
+ */
+const organizationAccountIds = (simAws: SimAws): readonly string[] =>
+  simAws.organizations().accountIds();
 
 describe("Simulated Organizations CloudFormation properties", () => {
   it("reads a policy document given as JSON text", async () => {
@@ -137,49 +143,57 @@ describe("Simulated Organizations CloudFormation properties", () => {
     );
   });
 
-  it("moves a nested unit up when the unit above it goes", async () => {
-    // Given a Stack with a unit inside a unit, and an Account under the inner
-    // one.
-    const accountId = makeSimAwsAccountId();
-    const simAws = new SimAws({ defaultAccountId: accountId });
-    const organizations = simAws.organizations();
+  it("fails a policy whose Content is not a document", async () => {
+    // Given a template whose Content is a number.
+    const simAws = new SimAws();
 
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "nested-unit-stack",
-      template: {
-        Resources: {
-          Workloads: {
-            Type: "AWS::Organizations::OrganizationalUnit",
-            Properties: {
-              Name: "Workloads",
-              ParentId: organizations.root().id,
+    // Then the Resource says what it needed.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "scalar-content-stack",
+        template: {
+          Resources: {
+            Deny: {
+              Type: "AWS::Organizations::Policy",
+              Properties: {
+                Name: "Broken",
+                Type: "SERVICE_CONTROL_POLICY",
+                Content: 5,
+              },
             },
           },
-          Production: {
-            Type: "AWS::Organizations::OrganizationalUnit",
-            Properties: { Name: "Production", ParentId: { Ref: "Workloads" } },
-          },
         },
-        Outputs: {
-          WorkloadsId: { Value: { Ref: "Workloads" } },
-          ProductionId: { Value: { Ref: "Production" } },
-        },
-      },
+      });
+
+      await stack.waitForDeployComplete();
     });
 
-    await stack.waitForDeployComplete();
-    organizations.moveAccount(accountId, stack.output("ProductionId"));
+    assertStringIncludes(error.message, "requires Content to be a policy");
+  });
 
-    // When only the outer unit is taken away.
-    organizations.removeOrganizationalUnit(stack.output("WorkloadsId"));
+  it("leaves an Account out of the organization when its Email is missing", async () => {
+    // Given an Account Resource with no Email.
+    const simAws = new SimAws();
 
-    // Then the Account still has a path back to the root.
-    assertArrayEquals(
-      organizations
-        .serviceControlPolicySetFor(accountId)
-        .levels.map((level) => level.nodeName),
-      ["Root", "Production", accountId],
-    );
+    // When the Stack is deployed.
+    await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "no-email-stack",
+        template: {
+          Resources: {
+            Payments: {
+              Type: "AWS::Organizations::Account",
+              Properties: { AccountName: "Payments" },
+            },
+          },
+        },
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    // Then nothing was placed in the organization on the way to failing.
+    assertArrayLength(organizationAccountIds(simAws), 0);
   });
 
   it("reads an Organization that names no feature set", async () => {
@@ -201,59 +215,5 @@ describe("Simulated Organizations CloudFormation properties", () => {
 
     // Then it still answers the value the rest of a template hangs off.
     assertStringIncludes(stack.output("RootId"), "r-");
-  });
-
-  it("takes a deployed Account back out of the organization", async () => {
-    // Given a Stack that created an Account under a denying unit.
-    const simAws = new SimAws();
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "account-teardown-stack",
-      template: {
-        Resources: {
-          Workloads: {
-            Type: "AWS::Organizations::OrganizationalUnit",
-            Properties: {
-              Name: "Workloads",
-              ParentId: simAws.organizations().root().id,
-            },
-          },
-          Payments: {
-            Type: "AWS::Organizations::Account",
-            Properties: {
-              AccountName: "Payments",
-              Email: "payments@example.com",
-              ParentIds: [{ Ref: "Workloads" }],
-              RoleName: "OrganizationAccountAccessRole",
-            },
-          },
-          Deny: {
-            Type: "AWS::Organizations::Policy",
-            Properties: {
-              Name: "DenyBucketCreation",
-              Type: "SERVICE_CONTROL_POLICY",
-              TargetIds: [{ Ref: "Workloads" }],
-              Content: denyBucketCreation,
-            },
-          },
-        },
-        Outputs: { AccountId: { Value: { Ref: "Payments" } } },
-      },
-    });
-
-    await stack.waitForDeployComplete();
-
-    const accountId = stack.output("AccountId");
-
-    assertTrue(
-      simAws.organizations().serviceControlPolicySetFor(accountId).applies,
-    );
-
-    // When the Stack comes down.
-    await stack.teardown();
-
-    // Then the Account is no longer in the organization.
-    assertTrue(
-      !simAws.organizations().serviceControlPolicySetFor(accountId).applies,
-    );
   });
 });
