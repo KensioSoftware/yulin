@@ -9,6 +9,8 @@ import { simIamStringValues } from "./sim-iam-string-values.js";
  * scalar or an array, with multiple policy values using OR semantics.
  */
 export abstract class SimIamScalarStringConditionOperator implements SimIamConditionOperator {
+  readonly matchesAbsentKey = false;
+
   /**
    * Check whether a given value matches the expected value.
    */

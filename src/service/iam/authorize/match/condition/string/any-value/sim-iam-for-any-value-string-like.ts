@@ -1,4 +1,4 @@
-import { simIamWildcardMatch } from "../../../../sim-iam-wildcard.js";
+import { simIamStringLikeComparison } from "../../sim-iam-string-comparison.js";
 import { SimIamForAnyValueStringConditionOperator } from "./sim-iam-for-any-value-string-condition-operator.js";
 
 /**
@@ -6,8 +6,6 @@ import { SimIamForAnyValueStringConditionOperator } from "./sim-iam-for-any-valu
  */
 export class SimIamForAnyValueStringLike extends SimIamForAnyValueStringConditionOperator {
   protected override valueMatches(actual: string, expected: string): boolean {
-    return simIamWildcardMatch(expected, actual, {
-      caseSensitive: true,
-    });
+    return simIamStringLikeComparison(actual, expected);
   }
 }

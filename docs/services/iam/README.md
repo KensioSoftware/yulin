@@ -221,10 +221,18 @@ Policy statements can carry `Condition` blocks. Sim IAM currently supports the `
 `StringLike`, `ArnLike`, `ArnEquals` and `NumericLessThanEquals` operators, along with the
 `ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
 
+The negated operators `StringNotEquals`, `StringNotLike`, `ArnNotEquals` and `ArnNotLike` are
+supported too, each unqualified and in both set forms. A list of policy values under a negated
+operator is an AND (the request value has to differ from every one of them), where the same list
+under a positive operator is an OR. A service control policy writes its carve-outs this way, hanging
+`ArnNotLike` on `aws:PrincipalArn` to deny an action to every principal outside a named set of
+roles.
+
 `ArnLike` and `ArnEquals` behave identically, as AWS documents them doing. Both compare the six
 colon-delimited components of an ARN separately, and both accept `*` and `?` wildcards in any of
 them. A wildcard stays inside the component it is written in. `arn:aws:s3:*` matches nothing,
-because a pattern needs as many components as the ARN it is matched against.
+because a pattern needs as many components as the ARN it is matched against. `ArnNotEquals` and
+`ArnNotLike` compare an ARN the same way and answer the opposite.
 
 Condition context values are supplied by the service handling the simulated request, such as S3
 object tags. Sim IAM automatically derives global values it can work out itself, such as
@@ -288,8 +296,11 @@ const decision = simIam.authorize({
 console.log(decision.isAllowed);
 ```
 
-A condition that references a context key with no supplied value fails to match, leaving the
-request implicitly denied unless another statement allows it.
+An unqualified positive operator naming a context key the request supplies no value for fails to
+match, leaving the request implicitly denied unless another statement allows it. Its negated form
+matches instead, as AWS documents. With no value in the request there is none for the policy value
+to equal. A `ForAnyValue:` operator answers false for an absent key whatever it wraps, because no
+request value is there to satisfy it.
 
 ## Users and access keys
 
@@ -1098,6 +1109,8 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   CloudFormation teardown clears a User's policies before deleting it
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request
+- A positive `ForAllValues:` condition fails to match a request carrying no value for the key, and
+  fails to match an empty value set. AWS matches both, and the negated form here matches both
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
   with the credential scope date, but is never compared to a clock. A client stamping real time can
   therefore reach a simulation keeping a different one. Session expiry _is_ enforced, against

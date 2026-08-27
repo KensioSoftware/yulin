@@ -12,8 +12,9 @@ import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-pars
  * key lookup. Individual condition operators encapsulate value validation,
  * comparison, and set semantics.
  *
- * Unsupported operators and missing context keys fail closed by making the
- * condition non-matching.
+ * An unsupported operator fails closed by making the condition non-matching. A
+ * context key the request carries no value for is left to the operator, which
+ * answers for itself whether an absent key matches it.
  */
 export class SimIamPolicyConditionMatcher {
   private readonly conditionContext: ReadonlyMap<string, SimIamConditionValue>;
@@ -69,7 +70,7 @@ export class SimIamPolicyConditionMatcher {
     const actual = this.conditionContext.get(this.normalizeContextKey(key));
 
     if (actual === undefined) {
-      return false;
+      return operator.matchesAbsentKey;
     }
 
     return operator.matches(actual, expected);
