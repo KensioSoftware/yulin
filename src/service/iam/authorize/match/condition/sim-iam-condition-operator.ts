@@ -9,6 +9,15 @@ import type { SimIamConditionValue } from "../../../policy/sim-iam-policy.js";
  */
 export interface SimIamConditionOperator {
   /**
+   * Whether the operator matches a request carrying no value for the key.
+   *
+   * A positive operator has nothing to compare and so matches nothing. A
+   * negated one matches, as AWS documents: with no value in the request there
+   * is none that could equal the policy value.
+   */
+  readonly matchesAbsentKey: boolean;
+
+  /**
    * Determine whether an actual request value satisfies the expected policy value.
    */
   matches(
@@ -16,3 +25,8 @@ export interface SimIamConditionOperator {
     expected: SimIamConditionValue,
   ): boolean;
 }
+
+/**
+ * Builds a fresh condition operator for one keyword.
+ */
+export type SimIamConditionOperatorFactory = () => SimIamConditionOperator;

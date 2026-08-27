@@ -1,4 +1,8 @@
-import type { SimIamConditionOperator } from "./sim-iam-condition-operator.js";
+import type {
+  SimIamConditionOperator,
+  SimIamConditionOperatorFactory,
+} from "./sim-iam-condition-operator.js";
+import { simIamNegatedOperatorFactories } from "./negated/sim-iam-negated-operator-factories.js";
 import { SimIamForAllValuesStringEquals } from "./string/all-values/sim-iam-for-all-values-string-equals.js";
 import { SimIamForAllValuesStringLike } from "./string/all-values/sim-iam-for-all-values-string-like.js";
 import { SimIamForAnyValueStringEquals } from "./string/any-value/sim-iam-for-any-value-string-equals.js";
@@ -8,8 +12,6 @@ import { SimIamStringLike } from "./string/like/sim-iam-string-like.js";
 import { SimIamNumericLessThanEquals } from "./numeric/less-than-equals/sim-iam-number-lte.js";
 import { SimIamArnEquals } from "./arn/equals/sim-iam-arn-equals.js";
 import { SimIamArnLike } from "./arn/like/sim-iam-arn-like.js";
-
-type SimIamConditionOperatorFactory = () => SimIamConditionOperator;
 
 const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
   ["ArnEquals", (): SimIamConditionOperator => new SimIamArnEquals()],
@@ -36,6 +38,7 @@ const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
     "ForAllValues:StringLike",
     (): SimIamConditionOperator => new SimIamForAllValuesStringLike(),
   ],
+  ...simIamNegatedOperatorFactories,
 ]);
 
 /**

@@ -221,10 +221,18 @@ Policy statements can carry `Condition` blocks. Sim IAM currently supports the `
 `StringLike`, `ArnLike`, `ArnEquals` and `NumericLessThanEquals` operators, along with the
 `ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
 
+The negated operators `StringNotEquals`, `StringNotLike`, `ArnNotEquals` and `ArnNotLike` are
+supported too, each unqualified and in both set forms. A list of policy values under a negated
+operator is an AND (the request value has to differ from every one of them), where the same list
+under a positive operator is an OR. A service control policy writes its carve-outs this way, hanging
+`ArnNotLike` on `aws:PrincipalArn` to deny an action to every principal outside a named set of
+roles.
+
 `ArnLike` and `ArnEquals` behave identically, as AWS documents them doing. Both compare the six
 colon-delimited components of an ARN separately, and both accept `*` and `?` wildcards in any of
 them. A wildcard stays inside the component it is written in. `arn:aws:s3:*` matches nothing,
-because a pattern needs as many components as the ARN it is matched against.
+because a pattern needs as many components as the ARN it is matched against. `ArnNotEquals` and
+`ArnNotLike` compare an ARN the same way and answer the opposite.
 
 Condition context values are supplied by the service handling the simulated request, such as S3
 object tags. Sim IAM automatically derives global values it can work out itself, such as
@@ -288,8 +296,10 @@ const decision = simIam.authorize({
 console.log(decision.isAllowed);
 ```
 
-A condition that references a context key with no supplied value fails to match, leaving the
-request implicitly denied unless another statement allows it.
+A positive operator naming a context key the request supplies no value for fails to match, leaving
+the request implicitly denied unless another statement allows it. A negated operator matches an
+absent key, as AWS documents. With no value in the request there is none for the policy value to
+equal.
 
 ## Users and access keys
 

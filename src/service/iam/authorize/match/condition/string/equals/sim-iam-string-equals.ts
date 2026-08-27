@@ -1,3 +1,4 @@
+import { simIamStringEqualsComparison } from "../../sim-iam-string-comparison.js";
 import { SimIamScalarStringConditionOperator } from "../sim-iam-scalar-string-condition-operator.js";
 
 /**
@@ -5,6 +6,6 @@ import { SimIamScalarStringConditionOperator } from "../sim-iam-scalar-string-co
  */
 export class SimIamStringEquals extends SimIamScalarStringConditionOperator {
   protected override valueMatches(actual: string, expected: string): boolean {
-    return actual === expected;
+    return simIamStringEqualsComparison(actual, expected);
   }
 }

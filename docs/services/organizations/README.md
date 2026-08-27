@@ -391,6 +391,8 @@ Simulated Organizations supports:
 - `Action`, `NotAction`, `Resource`, `NotResource` and `Condition` in an SCP statement
 - The `ArnEquals`, `ArnLike`, `NumericLessThanEquals`, `StringEquals` and `StringLike` condition
   operators, and their `ForAnyValue:` and `ForAllValues:` set forms
+- The negated `ArnNotEquals`, `ArnNotLike`, `StringNotEquals` and `StringNotLike` operators and
+  their set forms, which a `Deny` statement exempting named roles hangs on `aws:PrincipalArn`
 - `AccessDenied` messages naming the service control policy, as AWS words them
 - Denial reporting through `decision.serviceControlPolicy`, naming the levels that allowed nothing
 - The `AWS::Organizations::Organization`, `::OrganizationalUnit`, `::Account` and `::Policy`
@@ -408,5 +410,5 @@ Simulated Organizations supports:
 | CloudFormation              | `AWS::Organizations::Organization`, `::OrganizationalUnit`, `::Account` and `::Policy` are not created from a template.             |
 | Organization condition keys | `aws:PrincipalOrgID` and `aws:PrincipalOrgPaths` are not populated. A condition naming either fails to match.                       |
 | Service principals          | A request whose caller is a service principal or anonymous belongs to no Account and is subject to no policy.                       |
-| Condition operator coverage | An operator sim IAM does not know fails closed, so the statement holding it never matches.                                          |
+| Condition operator coverage | The operators above are evaluated. Anything else fails closed and the statement holding it matches nothing.                         |
 | HTTP API                    | Organizations is not served as an HTTP API by `serveSimAws`.                                                                        |

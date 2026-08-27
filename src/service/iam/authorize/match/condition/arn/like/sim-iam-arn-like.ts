@@ -1,4 +1,4 @@
-import { simIamArnMatch } from "../../../../sim-iam-arn-match.js";
+import { simIamArnComparison } from "../../sim-iam-string-comparison.js";
 import { SimIamScalarStringConditionOperator } from "../../string/sim-iam-scalar-string-condition-operator.js";
 
 /**
@@ -11,6 +11,6 @@ import { SimIamScalarStringConditionOperator } from "../../string/sim-iam-scalar
  */
 export class SimIamArnLike extends SimIamScalarStringConditionOperator {
   protected override valueMatches(actual: string, expected: string): boolean {
-    return simIamArnMatch(expected, actual);
+    return simIamArnComparison(actual, expected);
   }
 }
