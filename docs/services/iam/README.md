@@ -235,9 +235,19 @@ because a pattern needs as many components as the ARN it is matched against. `Ar
 `ArnNotLike` compare an ARN the same way and answer the opposite.
 
 Condition context values are supplied by the service handling the simulated request, such as S3
-object tags. Sim IAM automatically derives global values it can work out itself, such as
-`aws:PrincipalArn` from the resolved caller. Context-key names are matched case-insensitively,
-while string values remain case-sensitive.
+object tags. Sim IAM automatically derives the global values it can work out itself, `aws:PrincipalArn`
+from the resolved caller and `aws:RequestedRegion` from the Region the request was made in. A value a
+service supplies under either name is overwritten by the derived one. Context-key names are matched
+case-insensitively, while string values remain case-sensitive.
+
+Every simulated service supplies its own Region. A policy conditioned on `aws:RequestedRegion`
+therefore sees the Region of the service that handled the request, whichever Region the caller was
+in, and a CloudFormation deployment carries the Region of the Stack it is deploying. IAM, CloudFront
+and Route53 are global, with one endpoint between all Regions. Their requests carry `us-east-1`, as
+they do on AWS (which is why a service control policy confining an Account to a list of Regions has
+to leave the global services' actions out of the condition). A request made straight to
+`simIam.authorize(...)` carries no Region unless it is given one, and a statement conditioned on the
+key then matches nothing.
 
 ```typescript sim-iam-policy-conditions
 /**

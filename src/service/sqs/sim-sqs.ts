@@ -5,10 +5,8 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimSqsAuthorizer } from "./command/authorize/sim-sqs-authorizer.js";
 import { SimSqsChangeMessageVisibility } from "./command/message/sim-sqs-change-message-visibility.js";
 import { SimSqsDeleteMessageCommands } from "./command/message/sim-sqs-delete-message-commands.js";
@@ -60,9 +58,10 @@ export class SimSqs {
   constructor(properties: SimSqsProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const access = new SimSqsQueueAccess({
       queues: this.queues,

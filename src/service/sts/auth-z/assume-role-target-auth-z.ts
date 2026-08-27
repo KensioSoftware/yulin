@@ -1,5 +1,6 @@
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
 import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
@@ -12,6 +13,11 @@ import {
 
 interface AssumeRoleTargetRoleAuthorizerProperties {
   readonly iamResolver: SimIamAccountResolver;
+
+  /**
+   * The Region the STS request was made in.
+   */
+  readonly regionName: AwsRegionName;
 }
 
 type AssumeRoleTargetRole = SimGetRoleCommandOutput["Role"];
@@ -42,12 +48,14 @@ interface AssumeRoleTargetAuthorization {
  */
 export class AssumeRoleTargetRoleAuthorizer {
   private readonly iamResolver: SimIamAccountResolver;
+  private readonly regionName: AwsRegionName;
   private readonly targetResolver = new AssumeRoleTargetResolver();
   private readonly trustPolicyAuthorizer =
     new AssumeRoleTrustPolicyAuthorizer();
 
   constructor(properties: AssumeRoleTargetRoleAuthorizerProperties) {
     this.iamResolver = properties.iamResolver;
+    this.regionName = properties.regionName;
   }
 
   /**
@@ -77,6 +85,7 @@ export class AssumeRoleTargetRoleAuthorizer {
       roleArn: input.roleArn,
       role,
       targetIam,
+      region: this.regionName,
       caller: input.caller,
       conditionContext: input.conditionContext,
     });

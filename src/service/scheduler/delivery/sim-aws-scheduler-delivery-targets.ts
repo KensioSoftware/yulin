@@ -50,7 +50,7 @@ export class SimAwsSchedulerDeliveryTargets implements SimSchedulerDeliveryTarge
       arn.regionName,
     );
 
-    const caller = await assumeSchedulerExecutionRole(role, roleScope.iam());
+    const caller = await assumeSchedulerExecutionRole(role, roleScope);
 
     await this.invoke(arn.service, { request, caller });
   }

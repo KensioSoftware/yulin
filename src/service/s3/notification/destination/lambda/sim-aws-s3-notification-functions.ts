@@ -6,6 +6,7 @@ import type { SimS3NotificationDestinationRequest } from "../sim-s3-notification
 import { simS3ServicePrincipal } from "../sim-s3-service-principal.js";
 import { SimS3NotificationFunctionArn } from "./sim-s3-notification-function-arn.js";
 import type { SimS3NotificationFunctions } from "./sim-s3-notification-functions.js";
+import { simScopeIamAuthZ } from "../../../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimAwsS3NotificationFunctionsProperties {
   readonly simAws: SimAws;
@@ -99,7 +100,7 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
   }
 
   private iam(arn: SimS3NotificationFunctionArn): SimIamInterServiceAuthZ {
-    return this.scope(arn).iam();
+    return simScopeIamAuthZ(this.scope(arn));
   }
 
   private scope(

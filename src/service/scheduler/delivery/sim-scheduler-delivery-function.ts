@@ -7,6 +7,7 @@ import {
   type SimSchedulerAssumedDelivery,
   simSchedulerDeliveryDocument,
 } from "./sim-scheduler-delivery.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 const invokeAction = "lambda:InvokeFunction";
 
@@ -44,7 +45,7 @@ export class SimSchedulerDeliveryFunction {
       );
     }
 
-    const decision = this.scope.iam().authorize({
+    const decision = simScopeIamAuthZ(this.scope).authorize({
       action: invokeAction,
       resource: targetArn.value,
       caller: delivery.caller,

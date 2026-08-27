@@ -5,10 +5,8 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import type * as simSchedulerCommands from "./command/sim-scheduler-command.types.js";
 import type { SimSchedulerDeliveryTargets } from "./delivery/sim-scheduler-delivery.js";
 import type { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-delivery-failures.js";
@@ -59,9 +57,10 @@ export class SimScheduler extends SimSchedulerInspection {
 
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.background = background;
     this.commands = new SimSchedulerCommands({

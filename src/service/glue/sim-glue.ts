@@ -6,10 +6,8 @@ import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/fa
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimGlueAuthorizer } from "./command/authorize/sim-glue-authorizer.js";
 import { SimGlueDatabaseCommands } from "./command/database/sim-glue-database-commands.js";
 import type * as simGlueCommands from "./command/database/database.command.js";
@@ -63,9 +61,10 @@ export class SimGlue {
   constructor(properties: SimGlueProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const authorizer = new SimGlueAuthorizer({ iam, accountRegionScope });
 

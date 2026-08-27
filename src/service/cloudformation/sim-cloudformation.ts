@@ -42,10 +42,8 @@ import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import { SimCloudFormationAuthorization } from "./authorize/sim-cloudformation-authorization.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 
 /**
  * Options accepted by simulated CloudFormation command operations.
@@ -79,9 +77,10 @@ export class SimCloudFormation {
     const {
       simAws,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background,
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.simAws = simAws;
     this.background = background;

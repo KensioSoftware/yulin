@@ -2,7 +2,7 @@ import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
-import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimElbV2CfnResourceFactory } from "./cfn/sim-elbv2-cfn-resource-factory.js";
 import type * as elbV2 from "./command/sim-elbv2-command.types.js";
 import { SimElbV2Commands } from "./command/sim-elbv2-commands.js";
@@ -40,7 +40,6 @@ export class SimElbV2 {
   constructor(properties: SimElbV2Properties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       registry = new SimElbV2Registry(),
     } = properties;
@@ -48,7 +47,7 @@ export class SimElbV2 {
     this.stores = new SimElbV2Stores({ registry });
     this.commands = new SimElbV2Commands({
       stores: this.stores,
-      iam,
+      iam: simIamInRegion(properties.iam, accountRegionScope.regionName),
       background,
       accountRegionScope,
       acmRegistry: properties.acmRegistry,

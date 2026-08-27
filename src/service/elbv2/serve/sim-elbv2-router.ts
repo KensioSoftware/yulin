@@ -9,6 +9,7 @@ import type { SimElbV2LoadBalancer } from "../load-balancer/sim-elbv2-load-balan
 import type { SimElbV2Registry } from "../registry/sim-elbv2-registry.js";
 import type { SimElbV2 } from "../sim-elbv2.js";
 import type { SimElbV2TargetGroup } from "../target-group/sim-elbv2-target-group.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimElbV2RouterProperties {
   /**
@@ -134,7 +135,7 @@ export class SimElbV2Router {
       return undefined;
     }
 
-    return { simFunction, iam: scope.iam() };
+    return { simFunction, iam: simScopeIamAuthZ(scope) };
   }
 
   /**

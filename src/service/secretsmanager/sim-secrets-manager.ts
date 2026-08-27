@@ -6,10 +6,8 @@ import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-route
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimKms } from "../kms/index.js";
 import { SimSecretsManagerCfnResourceFactory } from "./cfn/sim-cfn-secrets-manager-resource-factory.js";
 import { SimSecretsManagerAuthorizer } from "./command/authorize/sim-secrets-manager-authorizer.js";
@@ -68,9 +66,10 @@ export class SimSecretsManager {
   constructor(properties: SimSecretsManagerProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     const { kms = new SimKms({ accountRegionScope, iam, background }) } =
       properties;

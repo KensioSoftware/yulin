@@ -4,6 +4,7 @@ import type { SimLambdaFunctionTarget } from "../../../lambda/function/version/s
 import { SimLogsDeliveryNotPermitted } from "../../error/sim-logs-delivery.error.js";
 import { SimLogsResourceNotFoundException } from "../../error/sim-logs.error.js";
 import type { SimLogsSubscriptionFunctionArn } from "./sim-logs-subscription-function-arn.js";
+import { simScopeIamAuthZ } from "../../../iam/authorize/sim-iam-region-auth-z.js";
 
 /**
  * The service principal CloudWatch Logs invokes a destination function as.
@@ -44,7 +45,7 @@ export function permittedSimLogsDestinationFunction(
 
   const servicePrincipal = simLogsServicePrincipal(scope.region.regionName);
   const decision = new SimLambdaServiceInvokeAuthorizer({
-    iam: scope.iam(),
+    iam: simScopeIamAuthZ(scope),
   }).authorize({ resource: target.resource, servicePrincipal });
 
   if (decision.isDenied) {

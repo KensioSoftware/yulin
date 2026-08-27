@@ -9,6 +9,7 @@ import {
   simSnsServicePrincipal,
 } from "../sim-sns-delivery.js";
 import { simSnsLambdaEventDocument } from "./sim-sns-lambda-event.js";
+import { simScopeIamAuthZ } from "../../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimSnsDeliveryFunctionProperties {
   readonly arn: SimSnsFunctionEndpointArn;
@@ -63,7 +64,7 @@ export class SimSnsDeliveryFunction {
     }
 
     const decision = new SimLambdaServiceInvokeAuthorizer({
-      iam: this.scope.iam(),
+      iam: simScopeIamAuthZ(this.scope),
     }).authorize({
       resource: target.resource,
       servicePrincipal: simSnsServicePrincipal,

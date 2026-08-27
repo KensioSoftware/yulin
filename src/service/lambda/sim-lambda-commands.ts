@@ -6,10 +6,8 @@ import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import type { SimSqsPollQueues } from "../sqs/poll/sim-sqs-poll-queues.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimLambdaAliasCommands } from "./command/alias/sim-lambda-alias-commands.js";
 import { SimLambdaEventInvokeConfigCommands } from "./command/event-invoke-config/sim-lambda-event-invoke-config-commands.js";
 import { SimLambdaEventSourceMappingCommands } from "./command/event-source-mapping/sim-lambda-event-source-mapping-commands.js";
@@ -116,7 +114,6 @@ export class SimLambdaCommands {
   constructor(properties: SimLambdaCommandsProperties) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       codeStore,
       vmSdkModuleProvider,
@@ -137,6 +134,8 @@ export class SimLambdaCommands {
       containerImages = new SimLambdaNoContainerImages(),
       destinations = new SimLambdaNoDestinationTargets(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.containerImages = containerImages;
     this.eventInvokeConfigStore = new SimLambdaEventInvokeConfigStore({

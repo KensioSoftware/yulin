@@ -10,6 +10,7 @@ import type {
   SimCognitoTriggerFunctionRequest,
   SimCognitoTriggerFunctions,
 } from "./sim-cognito-trigger-functions.js";
+import { simScopeIamAuthZ } from "../../../iam/authorize/sim-iam-region-auth-z.js";
 
 /**
  * The service principal real Cognito invokes a user pool trigger as.
@@ -137,7 +138,9 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
   private iam(target: SimLambdaFunctionTarget): SimIamInterServiceAuthZ {
     const { accountId, regionName } = target.simFunction.accountRegionScope;
 
-    return this.simAws.accountRegionScope(accountId, regionName).iam();
+    return simScopeIamAuthZ(
+      this.simAws.accountRegionScope(accountId, regionName),
+    );
   }
 }
 

@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { IamRoleArnParser } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimIam } from "../../iam/sim-iam.js";
@@ -47,9 +48,12 @@ export interface SimServiceRoleAssumption {
   readonly sessionName: string;
 
   /**
-   * The IAM of the role's own Account, which is not always the target's.
+   * The Account and Region scope the role is assumed in.
+   *
+   * Its IAM is the role's own Account's, which is not always the target's, and
+   * its Region is the one the assume request is made in.
    */
-  readonly iam: SimIam;
+  readonly scope: SimAwsAccountRegionContainer;
 
   readonly refusals: SimServiceRoleRefusals;
 }
@@ -83,7 +87,8 @@ export function simServiceRoleTarget(roleArn: string): SimServiceRoleTarget {
 export async function assumeSimServiceRole(
   assumption: SimServiceRoleAssumption,
 ): Promise<SimAwsCaller> {
-  const { target, servicePrincipal, sessionName, iam, refusals } = assumption;
+  const { target, servicePrincipal, sessionName, scope, refusals } = assumption;
+  const iam = scope.iam();
   const role = await roleOrRefuse(target, iam, refusals);
 
   try {
@@ -91,6 +96,7 @@ export async function assumeSimServiceRole(
       roleArn: target.roleArn,
       role,
       targetIam: iam,
+      region: scope.accountRegionScope.regionName,
       caller: { kind: "service", service: servicePrincipal },
     });
   } catch (error) {

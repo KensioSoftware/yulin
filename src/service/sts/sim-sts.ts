@@ -57,6 +57,7 @@ export class SimSts {
   ): Promise<SimAssumeRoleCommandOutput> {
     const handler = new AssumeRoleCommandHandler({
       sourceAccountId: this.accountRegionScope.accountId,
+      regionName: this.accountRegionScope.regionName,
       iamResolver: this.iamResolver,
       background: this.background,
     });

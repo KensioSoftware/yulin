@@ -5,6 +5,7 @@ import type { SimLambdaFunctionReference } from "../../lambda/function/sim-lambd
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesTaskFailure } from "../error/sim-step-functions.error.js";
 import type { SimStatesLambdaTarget } from "./sim-states-lambda-target.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 /**
  * The action an execution needs to invoke a function.
@@ -84,7 +85,7 @@ export class SimStatesTaskFunction {
     request: SimStatesTaskFunctionRequest,
     functionArn: string,
   ): void {
-    const decision = this.#scope.iam().authorize({
+    const decision = simScopeIamAuthZ(this.#scope).authorize({
       action: invokeAction,
       resource: functionArn,
       caller: request.caller,

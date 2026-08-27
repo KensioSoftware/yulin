@@ -6,10 +6,8 @@ import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-route
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import {
   SimWafNoProtection,
   type SimWafProtection,
@@ -121,7 +119,6 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
   constructor(properties: SimCognitoIdentityProviderProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       userPoolRegistry = new SimCognitoUserPoolRegistry(),
       domainRegistry = new SimCognitoDomainRegistry(),
@@ -130,6 +127,8 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
       webAcls = new SimWafNoProtection(),
       messageLog = new SimAwsMessageLog(),
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
     const pools = new SimCognitoUserPoolStore({
       registry: userPoolRegistry,
       domains: domainRegistry,

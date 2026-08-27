@@ -3,6 +3,7 @@ import { SimSqsServiceSendAuthorizer } from "../../../../sqs/command/authorize/s
 import type { SimS3NotificationDestinationRequest } from "../sim-s3-notification-destination.js";
 import { simS3ServicePrincipal } from "../sim-s3-service-principal.js";
 import type { SimS3NotificationQueueArn } from "./sim-s3-notification-queue-arn.js";
+import { simScopeIamAuthZ } from "../../../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimS3NotificationQueueProperties {
   readonly arn: SimS3NotificationQueueArn;
@@ -38,7 +39,7 @@ export class SimS3NotificationQueue {
     }
 
     const decision = new SimSqsServiceSendAuthorizer({
-      iam: this.scope.iam(),
+      iam: simScopeIamAuthZ(this.scope),
     }).authorize({
       queue,
       servicePrincipal: simS3ServicePrincipal,

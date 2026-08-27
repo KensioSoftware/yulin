@@ -84,7 +84,7 @@ export class SimAwsCfEdgeFunctions implements SimCfEdgeFunctions {
       target: simServiceRoleTarget(target.simFunction.roleArn),
       servicePrincipal: simLambdaEdgeServicePrincipal,
       sessionName,
-      iam: this.simAws.accountRegionScope(accountId, regionName).iam(),
+      scope: this.simAws.accountRegionScope(accountId, regionName),
       refusals: executionRoleRefusals(functionArn),
     });
   }

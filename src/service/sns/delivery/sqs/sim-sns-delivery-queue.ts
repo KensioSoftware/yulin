@@ -9,6 +9,7 @@ import {
   simSnsServicePrincipal,
 } from "../sim-sns-delivery.js";
 import { SimSnsQueueMessage } from "./sim-sns-queue-message.js";
+import { simScopeIamAuthZ } from "../../../iam/authorize/sim-iam-region-auth-z.js";
 
 interface SimSnsDeliveryQueueProperties {
   readonly arn: SimSnsQueueEndpointArn;
@@ -56,7 +57,7 @@ export class SimSnsDeliveryQueue {
     }
 
     const decision = new SimSqsServiceSendAuthorizer({
-      iam: this.scope.iam(),
+      iam: simScopeIamAuthZ(this.scope),
     }).authorize({
       queue,
       servicePrincipal: simSnsServicePrincipal,

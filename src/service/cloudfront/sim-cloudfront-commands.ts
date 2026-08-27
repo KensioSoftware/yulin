@@ -6,10 +6,11 @@ import type { SimAcmRegistry } from "../acm/registry/sim-acm-registry.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+  simIamGlobalServiceRegion,
+  simIamInRegion,
+} from "../iam/authorize/sim-iam-region-auth-z.js";
 import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
@@ -162,13 +163,15 @@ export class SimCloudFrontCommands {
       cloudFrontRegistry = new SimCloudFrontRegistry(),
       s3OriginResolver = emptyCloudFrontS3OriginResolver,
       customOriginDispatcher,
-      iam = new SimIamAllowAllAuth(),
       acmRegistry,
       webAclResolver,
       edgeFunctions,
       background = new BackgroundTasks(),
     } = properties;
 
+    // CloudFront is global rather than Region-scoped, so its requests are made
+    // in the Region its one endpoint is in.
+    const iam = simIamInRegion(properties.iam, simIamGlobalServiceRegion);
     const keyValueStores = new SimCloudFrontKeyValueStoreRegistry();
 
     this.edgeFunctions = edgeFunctions;

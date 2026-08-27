@@ -3,6 +3,7 @@ import { SimSnsServicePublishAuthorizer } from "../../../../sns/command/authoriz
 import type { SimS3NotificationDestinationRequest } from "../sim-s3-notification-destination.js";
 import { simS3ServicePrincipal } from "../sim-s3-service-principal.js";
 import type { SimS3NotificationTopicArn } from "./sim-s3-notification-topic-arn.js";
+import { simScopeIamAuthZ } from "../../../../iam/authorize/sim-iam-region-auth-z.js";
 
 /**
  * The subject real S3 publishes every event notification with.
@@ -48,7 +49,7 @@ export class SimS3NotificationTopic {
     }
 
     const decision = new SimSnsServicePublishAuthorizer({
-      iam: this.scope.iam(),
+      iam: simScopeIamAuthZ(this.scope),
     }).authorize({
       topic,
       servicePrincipal: simS3ServicePrincipal,

@@ -3,10 +3,8 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3BucketCommands } from "./command/bucket/sim-s3-bucket-commands.js";
 import { SimS3BucketPolicyCommands } from "./command/bucket-policy/sim-s3-bucket-policy-commands.js";
@@ -70,10 +68,14 @@ export class SimS3Commands {
 
   constructor(properties: SimS3CommandsProperties) {
     const {
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       notificationDestinations = new SimS3NoNotificationDestinations(),
     } = properties;
+
+    const iam = simIamInRegion(
+      properties.iam,
+      properties.accountRegionScope.regionName,
+    );
 
     this.objectNotifier = new SimS3ObjectNotifier({
       destinations: notificationDestinations,

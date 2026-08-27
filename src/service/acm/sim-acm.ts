@@ -32,10 +32,8 @@ import { ListCertificatesCommandHandler } from "./command/list-certificates/list
 import { SimAcmCfnResourceFactory } from "./cfn/sim-cfn-acm-resource-factory.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimAcmSdkCommandRouter } from "./sdk/sim-acm-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import { SimAcmCertificateValidation } from "./validation/sim-acm-certificate-validation.js";
@@ -72,10 +70,11 @@ export class SimAcm {
   constructor(properties: SimAcmProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       dnsRecords,
     } = properties;
+
+    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;

@@ -3,6 +3,10 @@ import type { SimArn } from "../../aws/arn.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimIamActionAuthorizer } from "../authorize/sim-iam-action-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../authorize/sim-iam-inter-service-auth-z.js";
+import {
+  simIamGlobalServiceRegion,
+  simIamInRegion,
+} from "../authorize/sim-iam-region-auth-z.js";
 import type { SimIamCredentialRegistry } from "../credential/sim-iam-credential-registry.js";
 import type { SimIamUserCredentialGenerator } from "../credential/user/sim-iam-user-credential-generator.js";
 import type { SimIamManagedPolicy } from "../policy/sim-iam-policy.js";
@@ -41,7 +45,11 @@ export class SimIamCommandHandlers {
   readonly policies: SimIamPolicyCommandHandlers;
 
   constructor(properties: SimIamCommandHandlersProperties) {
-    const authorizer = new SimIamActionAuthorizer({ iam: properties.iam });
+    // IAM is global rather than Region-scoped, so its own control-plane
+    // requests are made in the Region its one endpoint is in.
+    const authorizer = new SimIamActionAuthorizer({
+      iam: simIamInRegion(properties.iam, simIamGlobalServiceRegion),
+    });
 
     this.roles = new SimIamRoleCommandHandlers({
       accountId: properties.accountId,

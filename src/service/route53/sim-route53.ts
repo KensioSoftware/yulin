@@ -15,10 +15,11 @@ import {
 import { SimRoute53CloudFormationResourceFactory } from "./cfn/sim-cfn-route53-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimRoute53Registry } from "./registry/sim-route53-registry.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+  simIamGlobalServiceRegion,
+  simIamInRegion,
+} from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimRoute53SdkCommandRouter } from "./sdk/sim-route53-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimKmsKeyResolver } from "../kms/registry/sim-kms-registry.js";
@@ -73,10 +74,13 @@ export class SimRoute53 {
 
   constructor(properties: SimRoute53Properties = {}) {
     const {
-      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       route53Registry = new SimRoute53Registry(),
     } = properties;
+
+    // Route53 is global rather than Region-scoped, so its requests are made in
+    // the Region its one endpoint is in.
+    const iam = simIamInRegion(properties.iam, simIamGlobalServiceRegion);
 
     this.route53Registry = route53Registry;
     this.resolver = new SimRoute53Resolver({

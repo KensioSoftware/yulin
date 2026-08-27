@@ -7,6 +7,7 @@ import type {
 } from "../function/url/sim-lambda-function-url.js";
 import type { SimLambdaUrlRegistry } from "../registry/sim-lambda-url-registry.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 export interface SimLambdaFunctionUrlRoute {
   readonly functionUrl: SimLambdaFunctionUrl;
@@ -74,6 +75,6 @@ export class SimLambdaUrlRouter {
       return undefined;
     }
 
-    return { functionUrl, simFunction, iam: scope.iam() };
+    return { functionUrl, simFunction, iam: simScopeIamAuthZ(scope) };
   }
 }
