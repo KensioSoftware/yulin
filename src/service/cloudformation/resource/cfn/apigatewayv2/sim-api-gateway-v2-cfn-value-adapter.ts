@@ -2,6 +2,8 @@ import { SimHttpApiAuthorizer } from "../../../../apigatewayv2/api/authorizer/si
 import { SimHttpApiIntegration } from "../../../../apigatewayv2/api/integration/sim-http-api-integration.js";
 import { SimHttpApiRoute } from "../../../../apigatewayv2/api/route/sim-http-api-route.js";
 import { SimHttpApi } from "../../../../apigatewayv2/api/sim-http-api.js";
+import { SimApiMapping } from "../../../../apigatewayv2/domain/sim-api-mapping.js";
+import { SimHttpApiDomainName } from "../../../../apigatewayv2/domain/sim-http-api-domain-name.js";
 import { SimHttpApiStage } from "../../../../apigatewayv2/api/stage/sim-http-api-stage.js";
 import type {
   SimCfnResourceValueAdapterProperties,
@@ -11,6 +13,8 @@ import { SimHttpApiAuthorizerCfn } from "./sim-http-api-authorizer-cfn.js";
 import { SimHttpApiCfn } from "./sim-http-api-cfn.js";
 import { SimHttpApiIntegrationCfn } from "./sim-http-api-integration-cfn.js";
 import { SimHttpApiRouteCfn } from "./sim-http-api-route-cfn.js";
+import { SimApiMappingCfn } from "./sim-api-mapping-cfn.js";
+import { SimHttpApiDomainNameCfn } from "./sim-http-api-domain-name-cfn.js";
 import { SimHttpApiStageCfn } from "./sim-http-api-stage-cfn.js";
 
 /**
@@ -55,6 +59,20 @@ export function apiGatewayV2ValueAdapter(
     properties.simResource instanceof SimHttpApiStage
   ) {
     return new SimHttpApiStageCfn({ stage: properties.simResource });
+  }
+
+  if (
+    properties.type === "AWS::ApiGatewayV2::DomainName" &&
+    properties.simResource instanceof SimHttpApiDomainName
+  ) {
+    return new SimHttpApiDomainNameCfn({ domain: properties.simResource });
+  }
+
+  if (
+    properties.type === "AWS::ApiGatewayV2::ApiMapping" &&
+    properties.simResource instanceof SimApiMapping
+  ) {
+    return new SimApiMappingCfn({ mapping: properties.simResource });
   }
 
   return undefined;

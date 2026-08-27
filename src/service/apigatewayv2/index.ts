@@ -78,6 +78,7 @@ export { SimHttpApiRouteRank } from "./api/route/sim-http-api-route-rank.js";
 export {
   simApiMappingSelectionExpression,
   SimHttpApiDomainName,
+  simHttpApiRegionalHostedZoneId,
   type SimHttpApiDomainNameConfiguration,
   type SimHttpApiDomainNameView,
 } from "./domain/sim-http-api-domain-name.js";

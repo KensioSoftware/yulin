@@ -8,6 +8,17 @@ import { SimApiMappingStore } from "./sim-api-mapping-store.js";
 export const simApiMappingSelectionExpression = "$request.basepath";
 
 /**
+ * The Route53 Hosted Zone the regional endpoint of every custom domain sits
+ * in, which is what an alias record pointing at one names.
+ *
+ * Real API Gateway publishes a different id per Region. One fixed value stands
+ * for all of them here, the way `simElbV2CanonicalHostedZoneId` does for a
+ * load balancer: nothing resolves through it, and an alias record reaches the
+ * domain by the name it points at.
+ */
+export const simHttpApiRegionalHostedZoneId = "Z0000000000001";
+
+/**
  * One entry of a domain's `DomainNameConfigurations`, as it was written.
  *
  * Nothing here is applied. A simulated request arrives over plain HTTP on
@@ -65,6 +76,31 @@ export class SimHttpApiDomainName {
    */
   get hostname(): string {
     return this.domainName;
+  }
+
+  /**
+   * The hostname a DNS record pointing at this domain names, which is what
+   * `Fn::GetAtt RegionalDomainName` answers with.
+   *
+   * Real API Gateway issues a separate `d-<id>.execute-api.<region>` name here
+   * and expects the custom domain to be pointed at it. This answers with the
+   * custom domain's own hostname instead, so a CloudFront Origin or a Route53
+   * alias built on it reaches the domain. An `execute-api` name would be read
+   * as a generated API endpoint by simulated DNS and route to no API at all.
+   */
+  get regionalDomainName(): string {
+    return this.hostname;
+  }
+
+  /**
+   * The ARN of this domain, which `Fn::GetAtt DomainNameArn` answers with.
+   *
+   * API Gateway control-plane ARNs leave the Account segment empty and name
+   * the resource by its request path, as the ARNs commands are authorized
+   * against do.
+   */
+  get arn(): string {
+    return `arn:aws:apigateway:${this.accountRegionScope.regionName}::/domainnames/${this.domainName}`;
   }
 
   /**
