@@ -2127,18 +2127,21 @@ and a value carrying more is refused, as more than one `IdentitySource` is on `C
 
 [Simulated CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs") deploys
 `AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Authorizer`, `AWS::ApiGatewayV2::Integration`,
-`AWS::ApiGatewayV2::Route` and `AWS::ApiGatewayV2::Stage`. A synthesized or hand-written template
-produces an API that serves requests.
+`AWS::ApiGatewayV2::Route`, `AWS::ApiGatewayV2::Stage`, `AWS::ApiGatewayV2::DomainName` and
+`AWS::ApiGatewayV2::ApiMapping`. A synthesized or hand-written template produces an API that serves
+requests.
 
 `Ref` and `Fn::GetAtt` return what real CloudFormation returns for each type:
 
-| Resource type | `Ref`              | `Fn::GetAtt`                |
-| ------------- | ------------------ | --------------------------- |
-| `Api`         | the API id         | `ApiId`, `ApiEndpoint`      |
-| `Authorizer`  | the authorizer id  | `AuthorizerId`              |
-| `Integration` | the integration id | `IntegrationId`             |
-| `Route`       | the route id       | `RouteId`                   |
-| `Stage`       | the stage name     | none, as AWS documents none |
+| Resource type | `Ref`              | `Fn::GetAtt`                                                  |
+| ------------- | ------------------ | ------------------------------------------------------------- |
+| `Api`         | the API id         | `ApiId`, `ApiEndpoint`                                        |
+| `Authorizer`  | the authorizer id  | `AuthorizerId`                                                |
+| `Integration` | the integration id | `IntegrationId`                                               |
+| `Route`       | the route id       | `RouteId`                                                     |
+| `Stage`       | the stage name     | none, as AWS documents none                                   |
+| `DomainName`  | the domain name    | `RegionalDomainName`, `RegionalHostedZoneId`, `DomainNameArn` |
+| `ApiMapping`  | the mapping id     | `ApiMappingId`                                                |
 
 `Fn::GetAtt: ["Api", "ApiEndpoint"]` is the generated endpoint with no trailing slash and no stage
 segment, on the real `amazonaws.com` hostname. CDK's `httpApi.url` is built from `AWS::URLSuffix`
@@ -2366,9 +2369,27 @@ An `Api` carrying a `Policy` property is refused with its own message, in place 
 AWS has no such property on this Resource type, because an HTTP API has no resource policy. A template
 carrying one was written for a REST API.
 
-`AWS::ApiGatewayV2::Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the WebSocket-only
-`Model`, `RouteResponse` and `IntegrationResponse` create no resource. A template carrying one has
-that resource skipped.
+`AWS::ApiGatewayV2::Deployment`, `VpcLink` and the WebSocket-only `Model`, `RouteResponse` and
+`IntegrationResponse` create no resource. A template carrying one has that resource skipped.
+
+### A custom domain from a template
+
+`AWS::ApiGatewayV2::DomainName` creates the domain and `AWS::ApiGatewayV2::ApiMapping` points a base
+path of it at an API and a stage, the pair CDK's `apigatewayv2.DomainName` synthesizes. The mapping
+needs its stage to exist, and CDK gives it an explicit `DependsOn` for that, because the `Stage`
+property carries the stage's name rather than a `Ref` CloudFormation could take an order from. A
+hand-written template wanting the same order writes that `DependsOn` itself.
+
+`Fn::GetAtt: ["Domain", "RegionalDomainName"]` answers with the hostname the domain serves, so a
+CloudFront Origin or a Route53 alias record built on it reaches the API behind the domain. That is
+the stack shape a cache policy keying on `host` needs, since the generated endpoint refuses a
+forwarded viewer hostname (see [Which hostnames an API answers on](#which-hostnames-an-api-answers-on)).
+
+Real API Gateway issues a separate `d-<id>.execute-api.<region>.amazonaws.com` name here and expects
+DNS to point the custom domain at it. Answering with that name would leave the Origin pointing at a
+hostname simulated DNS reads as a generated API endpoint, resolving to no API at all.
+`RegionalHostedZoneId` answers with one fixed value for every Region, the way a load balancer's
+`CanonicalHostedZoneID` does.
 
 ## Authorization
 
@@ -2435,9 +2456,9 @@ the simulation without being given one. See the
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
   one JWT or Lambda `REQUEST` authorizer per security scheme an operation names
-- Deployment of `AWS::ApiGatewayV2::Api`, `Authorizer`, `Integration`, `Route` and `Stage` from a
-  CloudFormation template, including one synthesized by CDK from an `HttpApi`, and an `Api` declared
-  as an OpenAPI document through `Body`
+- Deployment of `AWS::ApiGatewayV2::Api`, `Authorizer`, `Integration`, `Route`, `Stage`, `DomainName`
+  and `ApiMapping` from a CloudFormation template, including one synthesized by CDK from an `HttpApi`,
+  and an `Api` declared as an OpenAPI document through `Body`
 - Authorization of every command by simulated IAM, against the HTTP method and resource path real
   API Gateway uses
 - SDK interception of an `ApiGatewayV2Client`
@@ -2561,9 +2582,14 @@ Current documented limitations:
   decide, and the record is where a test checks the domain got the certificate its stack meant to
   give it. `EndpointType: "EDGE"` is refused, since an edge-optimized custom domain is a REST API
   feature. `MutualTlsAuthentication` and `Tags` are refused by name.
-- The regional domain name AWS issues a custom domain, which is what a Route53 alias record points
-  at, is outside the simulation. `DomainNameConfigurations` reports no `ApiGatewayDomainName` and no
+- The regional domain name AWS issues a custom domain is the domain's own hostname here.
+  `Fn::GetAtt RegionalDomainName` answers with it, and `RegionalHostedZoneId` answers with one fixed
+  value for every Region. `DomainNameConfigurations` reports no `ApiGatewayDomainName` and no
   `HostedZoneId`, and only the custom domain's own hostname resolves.
+- `AWS::ApiGatewayV2::DomainName` records `RoutingMode`, `MutualTlsAuthentication` and `Tags` rather
+  than applying them, and records the `DomainNameConfigurations` members it does not read. Routing
+  rules are a second way to reach an API that nothing here models, and a simulated request carries no
+  client certificate to check.
 - `requestContext.http.path` drops a mapped base path alongside `rawPath`. AWS documents the
   `rawPath` half and shows the two fields carrying the same value, and publishes nothing about
   `http.path` under an API mapping on its own.

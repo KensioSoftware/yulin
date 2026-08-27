@@ -342,8 +342,8 @@ settles the request, except where its path is a template, which captures nothing
 
 ## CloudFormation
 
-`cfn/` creates the five `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory
-per type, each with a creator and a properties reader:
+`cfn/` creates the seven `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory
+per area, each with a creator and a properties reader:
 
 ```text
 cfn/
@@ -354,10 +354,15 @@ cfn/
 ├── sim-cfn-http-api-imports.ts                 which APIs a Body declared
 ├── api/         Api, and the Body an imported one carries
 ├── authorizer/  Authorizer
+├── domain/      DomainName and ApiMapping
 ├── integration/ Integration, and the two IntegrationUri forms
 ├── route/       Route
 └── stage/       Stage
 ```
+
+`domain/` holds two types rather than one, because a mapping is addressed by the domain holding it
+and neither is a part of an API. That is also why the resource deleter reaches both directly instead
+of through `SimCfnHttpApiPartDeleter`, which finds an API from a Resource's `ApiId` first.
 
 Every creator goes through the ordinary command, so a template is held to the same rules an SDK
 caller is, and the refusals above apply to a deployed Resource as well. Each properties reader states

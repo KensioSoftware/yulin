@@ -42,6 +42,46 @@ export class SimCfnApiGatewayV2PropertyValues extends SimCfnApiGatewayV2ScalarVa
   }
 
   /**
+   * Parse a property value that must be a list of objects when present, which
+   * is the shape a domain name's `DomainNameConfigurations` takes.
+   */
+  optionalRecordList(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): SimCfnTemplateValueRecord[] | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!Array.isArray(value)) {
+      throw this.invalidPropertyError(resource, label, "a list of objects");
+    }
+
+    return value.map((entry, index) =>
+      this.requiredRecord(resource, entry, `${label}[${String(index)}]`),
+    );
+  }
+
+  /**
+   * Parse a property value that must be an object, which is what one entry of
+   * a list of objects has to be.
+   */
+  requiredRecord(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): SimCfnTemplateValueRecord {
+    const record = this.optionalRecord(resource, value, label);
+
+    if (record === undefined) {
+      throw this.invalidPropertyError(resource, label, "an object");
+    }
+
+    return record;
+  }
+
+  /**
    * Parse a property value that must be a record of further properties when
    * present, which is the shape an authorizer's `JwtConfiguration` takes.
    */
