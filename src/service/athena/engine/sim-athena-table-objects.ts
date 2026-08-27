@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaScannedObjects } from "../execution/sim-athena-scanned-objects.js";
+import { simAthenaDecompressedBytes } from "./sim-athena-object-codec.js";
 
 /**
  * The narrow slice of simulated S3 the query engine reads a table through.
@@ -29,7 +30,7 @@ export function simAthenaTableObjects(
     : (s3 as SimAthenaTableObjects);
 }
 
-/** One object's bytes, read as UTF-8 text. */
+/** One object's bytes, decompressed by its key and read as UTF-8 text. */
 export async function simAthenaObjectText(
   objects: SimAthenaTableObjects,
   bucket: string,
@@ -42,6 +43,7 @@ export async function simAthenaObjectText(
   );
 
   const chunks = await Array.fromAsync(got.Body ?? []);
+  const bytes = simAthenaDecompressedBytes(key, Buffer.concat(chunks));
 
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return new TextDecoder().decode(bytes);
 }

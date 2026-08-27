@@ -190,6 +190,12 @@ field. It is a simulator accessor, read off `queryExecutions()`.
 descriptor. A table declaring Parquet lands in the same place as a table whose SerDe is absent.
 Guessing would answer a Parquet query with nonsense.
 
+`sim-athena-object-codec.ts` decompresses an object by the extension its key ends with, before a
+reader sees the bytes. Athena keys this on the extension too. Sniffing the magic number instead
+would read an object real Athena skips. `.gz`, `.zst` and `.deflate` are what Node's zlib covers,
+and an extension naming any other codec raises. The engine falls back to the declaration on that,
+because the alternative is a query succeeding with no rows.
+
 `sim-athena-json-records.ts` lays the OpenX SerDe's `mapping.<column>` parameters over each record
 before a column is looked up. A CloudFront access log table is what needs them. Its records are
 keyed `cs(Referer)` and `timestamp(ms)`, and an Athena column name holds letters, digits and

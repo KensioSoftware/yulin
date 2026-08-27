@@ -318,6 +318,12 @@ text in one reads as null.
 A nested object or array is kept as its JSON text, and `json_extract_scalar`, `cardinality` and
 `element_at` reach into it.
 
+An object's key says how it is compressed. A key ending `.gz`, `.zst` or `.deflate` is decompressed
+before the SerDe reads it. A CloudFront standard logging table needs that, since every object
+delivered under one is gzipped. Node's own zlib covers those three codecs. A key ending `.bz2`,
+`.bzip2`, `.lz4`, `.lzo` or `.snappy` turns the query down, and the declaration a test wrote answers
+it. Any other key is read as text.
+
 A `mapping.<column>` parameter on the OpenX JSON SerDe reads that column from the key it names. A
 CloudFront access log table needs it, since a record arrives keyed by `cs(Referer)` and no Athena
 column can be called that. The key matches a record's key of any case until the table sets
