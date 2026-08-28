@@ -1,7 +1,4 @@
-import {
-  SimSchedulerUnsimulatedInputException,
-  SimSchedulerValidationException,
-} from "../error/sim-scheduler.error.js";
+import { SimSchedulerValidationException } from "../error/sim-scheduler.error.js";
 
 const maximumNameLength = 64;
 
@@ -12,13 +9,11 @@ const maximumNameLength = 64;
 const allowedName = /^[0-9a-zA-Z\-_.]+$/u;
 
 /**
- * The one schedule group this simulation has.
+ * The schedule group a request naming none goes to.
  *
- * Every Account has a `default` group without one being created, and named
- * groups are a resource of their own with their own commands. Nothing here
- * creates one, so a schedule asking for another group is refused rather than
- * quietly put in `default`, where it would have the wrong ARN and be found by
- * a listing that should not see it.
+ * Every Account has a `default` group without one being created, which is why
+ * this is a name every scope already has rather than one the first request
+ * makes up.
  */
 export const defaultScheduleGroupName = "default";
 
@@ -69,25 +64,21 @@ export class SimSchedulerScheduleName {
 /**
  * The name of the schedule group a request names.
  *
- * A request naming no group gets `default`, as AWS does. One naming any other
- * group is refused: schedule groups are not simulated, and a schedule quietly
- * moved into `default` would carry an ARN naming a group it is not in.
+ * A request naming no group gets `default`, as AWS does. Whether the group is
+ * there is a separate question, asked once the caller has been authorized, so
+ * nothing here reaches a store.
  */
 export function requestedScheduleGroupName(value: string | undefined): string {
   if (value === undefined) {
     return defaultScheduleGroupName;
   }
 
-  const groupName = readName("GroupName", value);
+  return readName("GroupName", value);
+}
 
-  if (groupName !== defaultScheduleGroupName) {
-    throw new SimSchedulerUnsimulatedInputException(
-      `Schedule groups are not simulated, so a schedule goes in the ` +
-        `${defaultScheduleGroupName} group. GroupName '${groupName}' is ` +
-        `refused rather than put in ${defaultScheduleGroupName}, where its ` +
-        `ARN would name a group it is not in.`,
-    );
-  }
-
-  return groupName;
+/**
+ * The name of the schedule group a group command names, which is required.
+ */
+export function requiredScheduleGroupName(value: string | undefined): string {
+  return readName("Name", value);
 }

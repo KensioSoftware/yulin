@@ -1,9 +1,15 @@
-import { SimSchedulerError } from "../error/sim-scheduler.error.js";
+import {
+  SimSchedulerError,
+  SimSchedulerResourceNotFoundException,
+} from "../error/sim-scheduler.error.js";
 
 /**
- * The CloudFormation Resource type simulated Scheduler creates.
+ * The CloudFormation Resource types simulated Scheduler creates.
  */
 export const schedulerScheduleResourceType = "AWS::Scheduler::Schedule";
+
+export const schedulerScheduleGroupResourceType =
+  "AWS::Scheduler::ScheduleGroup";
 
 /**
  * Build the error a Resource of a simulated Scheduler type is refused with.
@@ -14,14 +20,14 @@ export const schedulerScheduleResourceType = "AWS::Scheduler::Schedule";
  * while nothing ever fired. So a refusal here says the Resource is invalid.
  */
 export function simCfnSchedulerResourceError(
+  resourceType: string,
   logicalId: string,
   reason: string,
   cause?: unknown,
 ): Error {
-  return new Error(
-    `Invalid ${schedulerScheduleResourceType} Resource ${logicalId}: ${reason}`,
-    { cause },
-  );
+  return new Error(`Invalid ${resourceType} Resource ${logicalId}: ${reason}`, {
+    cause,
+  });
 }
 
 /**
@@ -34,6 +40,7 @@ export function simCfnSchedulerResourceError(
  * so a refusal the CloudFormation layer decided keeps its own wording.
  */
 export async function simCfnSchedulerResourceCreation<T>(
+  resourceType: string,
   logicalId: string,
   create: () => Promise<T>,
 ): Promise<T> {
@@ -41,9 +48,35 @@ export async function simCfnSchedulerResourceCreation<T>(
     return await create();
   } catch (error) {
     if (error instanceof SimSchedulerError) {
-      throw simCfnSchedulerResourceError(logicalId, error.message, error);
+      throw simCfnSchedulerResourceError(
+        resourceType,
+        logicalId,
+        error.message,
+        error,
+      );
     }
 
     throw error;
+  }
+}
+
+/**
+ * Remove the resource one Resource created, leaving one that has already gone.
+ *
+ * Real CloudFormation treats deleting a Resource that has already gone as
+ * done rather than as a failure, and a Scheduler teardown reaches that case. A
+ * schedule group takes its schedules with it. A schedule whose template named
+ * its group as a string rather than by `Ref` declares no dependency on it, and
+ * may find itself already deleted by the time its own turn comes.
+ */
+export async function simCfnSchedulerResourceDeletion(
+  remove: () => Promise<void>,
+): Promise<void> {
+  try {
+    await remove();
+  } catch (error) {
+    if (!(error instanceof SimSchedulerResourceNotFoundException)) {
+      throw error;
+    }
   }
 }

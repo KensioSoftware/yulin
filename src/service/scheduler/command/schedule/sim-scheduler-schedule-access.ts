@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimSchedulerScheduleGroupStore } from "../../group/sim-scheduler-schedule-group-store.js";
 import { schedulerScheduleArn } from "../../schedule/sim-scheduler-schedule-arn.js";
 import {
   requestedScheduleGroupName,
@@ -19,6 +20,7 @@ export interface SimSchedulerRequestedSchedule {
 
 interface SimSchedulerScheduleAccessProperties {
   readonly schedules: SimSchedulerScheduleStore;
+  readonly groups: SimSchedulerScheduleGroupStore;
   readonly authorizer: SimSchedulerAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
@@ -37,11 +39,13 @@ interface SimSchedulerScheduleRequest {
  */
 export class SimSchedulerScheduleAccess {
   private readonly schedules: SimSchedulerScheduleStore;
+  private readonly groups: SimSchedulerScheduleGroupStore;
   private readonly authorizer: SimSchedulerAuthorizer;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(properties: SimSchedulerScheduleAccessProperties) {
     this.schedules = properties.schedules;
+    this.groups = properties.groups;
     this.authorizer = properties.authorizer;
     this.accountRegionScope = properties.accountRegionScope;
   }
@@ -67,7 +71,23 @@ export class SimSchedulerScheduleAccess {
     requested: SimSchedulerRequestedSchedule,
     options?: SimSchedulerRequestOptions,
   ): void {
-    this.authorizer.authorizeSchedule(action, this.arnFor(requested), options);
+    this.authorizer.authorizeResource(action, this.arnFor(requested), options);
+  }
+
+  /**
+   * Ensure the group a request names is there, which AWS requires of every
+   * request naming one.
+   *
+   * Real Scheduler refuses a schedule whose `GroupName` names no group rather
+   * than creating it in `default`, and so does this. The group is in a
+   * schedule's ARN, and a schedule quietly moved would carry an ARN naming a
+   * group it had never been put in.
+   *
+   * Asked after the caller is authorized, so a caller with no permission
+   * learns nothing about which groups exist.
+   */
+  requireGroup(groupName: string): void {
+    this.groups.require(groupName);
   }
 
   /**
@@ -81,6 +101,7 @@ export class SimSchedulerScheduleAccess {
     const requested = this.requested(request);
 
     this.authorize(action, requested, options);
+    this.requireGroup(requested.groupName);
 
     return this.schedules.require(requested.groupName, requested.name.value);
   }
@@ -97,9 +118,13 @@ export class SimSchedulerScheduleAccess {
     requested: string | undefined,
     options?: SimSchedulerRequestOptions,
   ): string {
-    this.authorizer.authorizeAnySchedule(action, options);
+    this.authorizer.authorizeAnyResource(action, options);
 
-    return requestedScheduleGroupName(requested);
+    const groupName = requestedScheduleGroupName(requested);
+
+    this.requireGroup(groupName);
+
+    return groupName;
   }
 
   /**

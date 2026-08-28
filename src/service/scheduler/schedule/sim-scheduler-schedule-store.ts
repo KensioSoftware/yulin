@@ -63,6 +63,20 @@ export class SimSchedulerScheduleStore {
   }
 
   /**
+   * Forget every schedule of one group.
+   *
+   * Deleting a group takes its schedules with it, as it does on AWS, and how
+   * to find them is this store's own business rather than the command's.
+   */
+  removeGroup(groupName: string): void {
+    for (const schedule of this.all) {
+      if (schedule.groupName === groupName) {
+        this.remove(schedule);
+      }
+    }
+  }
+
+  /**
    * Forget a deleted schedule.
    */
   remove(schedule: SimSchedulerSchedule): void {

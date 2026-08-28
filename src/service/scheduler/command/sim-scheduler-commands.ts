@@ -4,9 +4,12 @@ import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-
 import type { SimSchedulerDeliveryTargets } from "../delivery/sim-scheduler-delivery.js";
 import { SimSchedulerNoDeliveryTargets } from "../delivery/sim-scheduler-no-delivery-targets.js";
 import { SimSchedulerTargetDelivery } from "../delivery/sim-scheduler-target-delivery.js";
+import type { SimSchedulerScheduleGroupStore } from "../group/sim-scheduler-schedule-group-store.js";
 import { SimSchedulerSchedules } from "../schedule/sim-scheduler-schedules.js";
 import type { SimSchedulerScheduleStore } from "../schedule/sim-scheduler-schedule-store.js";
 import { SimSchedulerAuthorizer } from "./authorize/sim-scheduler-authorizer.js";
+import { SimSchedulerGroupAccess } from "./group/sim-scheduler-group-access.js";
+import { SimSchedulerGroupCommands } from "./group/sim-scheduler-group-commands.js";
 import { SimSchedulerCreateSchedule } from "./schedule/sim-scheduler-create-schedule.js";
 import { SimSchedulerScheduleAccess } from "./schedule/sim-scheduler-schedule-access.js";
 import { SimSchedulerScheduleCommands } from "./schedule/sim-scheduler-schedule-commands.js";
@@ -15,6 +18,7 @@ import { SimSchedulerUpdateSchedule } from "./schedule/sim-scheduler-update-sche
 
 interface SimSchedulerCommandsProperties {
   readonly schedules: SimSchedulerScheduleStore;
+  readonly groups: SimSchedulerScheduleGroupStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly deliveryTargets?: SimSchedulerDeliveryTargets | undefined;
@@ -31,14 +35,16 @@ export class SimSchedulerCommands {
   public readonly scheduleCreation: SimSchedulerCreateSchedule;
   public readonly scheduleUpdate: SimSchedulerUpdateSchedule;
   public readonly schedules: SimSchedulerScheduleCommands;
+  public readonly groups: SimSchedulerGroupCommands;
   public readonly delivery: SimSchedulerTargetDelivery;
   public readonly firing: SimSchedulerSchedules;
 
   constructor(properties: SimSchedulerCommandsProperties) {
-    const { schedules, accountRegionScope, background } = properties;
+    const { schedules, groups, accountRegionScope, background } = properties;
     const authorizer = new SimSchedulerAuthorizer({ iam: properties.iam });
     const access = new SimSchedulerScheduleAccess({
       schedules,
+      groups,
       authorizer,
       accountRegionScope,
     });
@@ -70,5 +76,14 @@ export class SimSchedulerCommands {
       firing: this.firing,
     });
     this.schedules = new SimSchedulerScheduleCommands({ schedules, access });
+    this.groups = new SimSchedulerGroupCommands({
+      groups,
+      schedules,
+      access: new SimSchedulerGroupAccess({
+        groups,
+        authorizer,
+        accountRegionScope,
+      }),
+    });
   }
 }

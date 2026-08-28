@@ -7,8 +7,8 @@ import type { SimSchedulerRequestOptions } from "../sim-scheduler-request-option
 /**
  * The resource an action with no resource type authorizes against.
  *
- * `ListSchedules` names no schedule, so IAM evaluates it against `*` and only a
- * policy whose Resource is `*` allows it.
+ * `ListSchedules` and `ListScheduleGroups` name nothing, so IAM evaluates them
+ * against `*` and only a policy whose Resource is `*` allows them.
  */
 const noResource = "*";
 
@@ -22,7 +22,8 @@ interface SimSchedulerAuthorizerProperties {
  * The resource is the schedule ARN, which carries its group:
  * `arn:aws:scheduler:<region>:<account>:schedule/<group>/<name>`. A policy
  * written without the group in it matches nothing here, as it matches nothing
- * on real AWS.
+ * on real AWS. A group command authorizes against the group's own ARN, which
+ * is a different resource path: `schedule-group/<name>`.
  *
  * This is the caller's own authorization to manage schedules, and is a separate
  * question from whether a schedule's execution role may invoke its target. The
@@ -38,33 +39,16 @@ export class SimSchedulerAuthorizer {
   }
 
   /**
-   * Ensure the caller may perform an action on a schedule, named by its ARN.
+   * Ensure the caller may perform an action on a resource, named by its ARN.
    *
-   * The schedule need not exist: `CreateSchedule` authorizes against the ARN
-   * the schedule is about to have.
+   * The resource need not exist: `CreateSchedule` authorizes against the ARN
+   * the schedule is about to have, and `CreateScheduleGroup` against the
+   * group's.
    */
-  authorizeSchedule(
-    action: string,
-    scheduleArn: string,
-    options?: SimSchedulerRequestOptions,
-  ): SimAwsResolvedCaller {
-    return this.authorizeResource(action, scheduleArn, options);
-  }
-
-  /**
-   * Ensure the caller may perform an action naming no particular schedule.
-   */
-  authorizeAnySchedule(
-    action: string,
-    options?: SimSchedulerRequestOptions,
-  ): SimAwsResolvedCaller {
-    return this.authorizeResource(action, noResource, options);
-  }
-
-  private authorizeResource(
+  authorizeResource(
     action: string,
     resource: string,
-    options: SimSchedulerRequestOptions | undefined,
+    options?: SimSchedulerRequestOptions,
   ): SimAwsResolvedCaller {
     const decision = this.iam.authorize({
       action,
@@ -84,5 +68,15 @@ export class SimSchedulerAuthorizer {
     }
 
     return decision.caller;
+  }
+
+  /**
+   * Ensure the caller may perform an action naming no particular resource.
+   */
+  authorizeAnyResource(
+    action: string,
+    options?: SimSchedulerRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, noResource, options);
   }
 }

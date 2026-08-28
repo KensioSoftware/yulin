@@ -3,6 +3,11 @@ import type { SimSchedulerSchedule } from "../schedule/sim-scheduler-schedule.js
 import type { SimScheduler } from "../sim-scheduler.js";
 
 /**
+ * The `AWS::Scheduler::*` Resource types this service creates.
+ */
+export type SimSchedulerCfnResourceTypeName = "Schedule" | "ScheduleGroup";
+
+/**
  * Find the schedule a Resource just created, in whichever group it went into.
  *
  * The group is left out of the lookup when the template named none, so the
@@ -25,15 +30,21 @@ export function createdSchedule(
 }
 
 /**
- * Refuse a Resource type this service does not create.
+ * Read the Resource type a request names, refusing one this service does not
+ * create.
  *
- * Schedule groups are the other `AWS::Scheduler::*` type, and are reported as
- * unsupported rather than quietly treated as deployed.
+ * A schedule and a schedule group are the whole of `AWS::Scheduler::*`, so
+ * anything else is a type AWS has added since, reported as unsupported rather
+ * than quietly treated as deployed.
  */
-export function refuseUnknownType(resourceTypeName: string): void {
-  if (resourceTypeName !== "Schedule") {
-    throw new Error(
-      `Unsupported sim Scheduler CloudFormation Resource ${resourceTypeName}`,
-    );
+export function schedulerResourceTypeName(
+  resourceTypeName: string,
+): SimSchedulerCfnResourceTypeName {
+  if (resourceTypeName === "Schedule" || resourceTypeName === "ScheduleGroup") {
+    return resourceTypeName;
   }
+
+  throw new Error(
+    `Unsupported sim Scheduler CloudFormation Resource ${resourceTypeName}`,
+  );
 }

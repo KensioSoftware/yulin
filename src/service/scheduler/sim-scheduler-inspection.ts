@@ -1,3 +1,5 @@
+import type { SimSchedulerScheduleGroup } from "./group/sim-scheduler-schedule-group.js";
+import type { SimSchedulerScheduleGroupStore } from "./group/sim-scheduler-schedule-group-store.js";
 import { defaultScheduleGroupName } from "./schedule/sim-scheduler-schedule-name.js";
 import type { SimSchedulerSchedule } from "./schedule/sim-scheduler-schedule.js";
 import type { SimSchedulerScheduleStore } from "./schedule/sim-scheduler-schedule-store.js";
@@ -13,6 +15,7 @@ import type { SimSchedulerScheduleStore } from "./schedule/sim-scheduler-schedul
  */
 export abstract class SimSchedulerInspection {
   protected abstract readonly scheduleStore: SimSchedulerScheduleStore;
+  protected abstract readonly groupStore: SimSchedulerScheduleGroupStore;
 
   /**
    * Find a schedule by name, in a group.
@@ -32,5 +35,22 @@ export abstract class SimSchedulerInspection {
    */
   get allSchedules(): readonly SimSchedulerSchedule[] {
     return this.scheduleStore.all;
+  }
+
+  /**
+   * Find a schedule group by name.
+   */
+  findScheduleGroup(groupName: string): SimSchedulerScheduleGroup | undefined {
+    return this.groupStore.find(groupName);
+  }
+
+  /**
+   * Every schedule group this scope holds, in creation order.
+   *
+   * `default` is always the first of them, since every Account has it without
+   * anyone creating one.
+   */
+  get allScheduleGroups(): readonly SimSchedulerScheduleGroup[] {
+    return this.groupStore.all;
   }
 }

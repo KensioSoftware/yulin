@@ -1,19 +1,13 @@
-import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
-import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimScheduler } from "../sim-scheduler.js";
-import {
-  createdSchedule,
-  refuseUnknownType,
-} from "./sim-cfn-scheduler-resource-lookup.js";
-import { SimCfnScheduleProperties } from "./sim-cfn-schedule-properties.js";
-import { simCfnSchedulerResourceCreation } from "./sim-cfn-scheduler-resource-error.js";
-import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import { SimCfnScheduleCreator } from "./sim-cfn-schedule-creator.js";
+import { SimCfnScheduleGroupCreator } from "./sim-cfn-schedule-group-creator.js";
+import { schedulerResourceTypeName } from "./sim-cfn-scheduler-resource-lookup.js";
 
 interface SimSchedulerCfnResourceFactoryProperties {
   readonly scheduler: SimScheduler;
@@ -22,85 +16,47 @@ interface SimSchedulerCfnResourceFactoryProperties {
 /**
  * CloudFormation Resource factory for simulated Scheduler resources.
  *
- * There is one type, and the schedule goes through the ordinary CreateSchedule
- * command rather than being constructed directly, so a schedule a template
- * deployed is the same thing an SDK caller would have got, down to the
- * refusals.
+ * Two types, a schedule and the group it goes in, both created through the
+ * ordinary Scheduler commands rather than constructed directly.
  */
 export class SimSchedulerCfnResourceFactory implements SimCfnServiceResourceFactory {
-  private readonly scheduler: SimScheduler;
+  private readonly scheduleCreator: SimCfnScheduleCreator;
+  private readonly groupCreator: SimCfnScheduleGroupCreator;
 
   constructor(properties: SimSchedulerCfnResourceFactoryProperties) {
-    this.scheduler = properties.scheduler;
+    this.scheduleCreator = new SimCfnScheduleCreator(properties);
+    this.groupCreator = new SimCfnScheduleGroupCreator(properties);
   }
 
   /**
-   * Create a simulated schedule from a CloudFormation Resource.
+   * Create a simulated Scheduler resource from a CloudFormation Resource.
    */
   async create(
     resourceTypeName: string,
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
-    refuseUnknownType(resourceTypeName);
+    if (schedulerResourceTypeName(resourceTypeName) === "ScheduleGroup") {
+      return await this.groupCreator.create(resource, context);
+    }
 
-    const properties = this.read(
-      resource,
-      context.resolvedProperties ?? resource.properties,
-    );
-    const input = properties.scheduleInput();
-
-    return await simCfnSchedulerResourceCreation(
-      resource.logicalId,
-      async () => {
-        await this.scheduler.createSchedule(
-          { input },
-          simCfnResourceCallerOptions(context.caller),
-        );
-
-        const schedule = createdSchedule(this.scheduler, input);
-
-        assertDefined(
-          schedule,
-          `sim Scheduler schedule ${String(input.Name)} after ` +
-            `CloudFormation creation`,
-        );
-
-        return schedule;
-      },
-    );
+    return await this.scheduleCreator.create(resource, context);
   }
 
   /**
-   * Delete the schedule a Resource created.
+   * Delete the resource a Resource created.
    */
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
     context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    refuseUnknownType(resourceTypeName);
+    if (schedulerResourceTypeName(resourceTypeName) === "ScheduleGroup") {
+      await this.groupCreator.delete(resource, context);
 
-    const properties = this.read(
-      resource,
-      context.resolvedProperties ?? resource.properties,
-    );
+      return;
+    }
 
-    await this.scheduler.deleteSchedule(
-      {
-        input: {
-          Name: properties.name(),
-          GroupName: properties.scheduleInput().GroupName,
-        },
-      },
-      simCfnResourceCallerOptions(context.caller),
-    );
-  }
-
-  private read(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): SimCfnScheduleProperties {
-    return new SimCfnScheduleProperties({ resource, properties });
+    await this.scheduleCreator.delete(resource, context);
   }
 }

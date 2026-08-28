@@ -1,6 +1,7 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateScheduleCommand,
+  CreateScheduleGroupCommand,
   GetScheduleCommand,
   ListSchedulesCommand,
 } from "@aws-sdk/client-scheduler";
@@ -129,6 +130,42 @@ describe("Scheduler IAM authorization", () => {
     // missing, which is the order every command in the simulation uses.
     assertInstanceOf(error, SimSchedulerAccessDeniedException);
     assertStringIncludes(error.message, "scheduler:GetSchedule");
+  });
+
+  it("authorizes a group command against the group's own ARN", async () => {
+    // Given a Role allowed to create one group, named by its schedule-group
+    // ARN, which is a different resource path from a schedule's.
+    const { simAws, caller } = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "scheduler:CreateScheduleGroup",
+      Resource:
+        "arn:aws:scheduler:us-east-1:888888888888:schedule-group/analytics",
+    });
+
+    // When it creates that group, and then another.
+    const created = await simAws
+      .scheduler()
+      .createScheduleGroup(
+        new CreateScheduleGroupCommand({ Name: "analytics" }),
+        { caller },
+      );
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .scheduler()
+        .createScheduleGroup(
+          new CreateScheduleGroupCommand({ Name: "billing" }),
+          { caller },
+        );
+    });
+
+    // Then only the one its policy names is allowed.
+    assertIdentical(
+      created.ScheduleGroupArn,
+      "arn:aws:scheduler:us-east-1:888888888888:schedule-group/analytics",
+    );
+    assertInstanceOf(error, SimSchedulerAccessDeniedException);
+    assertStringIncludes(error.message, "scheduler:CreateScheduleGroup");
   });
 
   it("authorizes a listing against every schedule rather than one", async () => {

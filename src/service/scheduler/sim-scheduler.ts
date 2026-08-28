@@ -12,6 +12,7 @@ import type { SimSchedulerDeliveryTargets } from "./delivery/sim-scheduler-deliv
 import type { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-delivery-failures.js";
 import { SimSchedulerCommands } from "./command/sim-scheduler-commands.js";
 import type { SimSchedulerRequestOptions } from "./command/sim-scheduler-request-options.js";
+import { SimSchedulerScheduleGroupStore } from "./group/sim-scheduler-schedule-group-store.js";
 import { SimSchedulerScheduleStore } from "./schedule/sim-scheduler-schedule-store.js";
 import { SimSchedulerCfnResourceFactory } from "./cfn/sim-scheduler-cfn-resource-factory.js";
 import { SimSchedulerSdkCommandRouter } from "./sdk/sim-scheduler-sdk-command-router.js";
@@ -45,6 +46,7 @@ interface SimSchedulerProperties {
  */
 export class SimScheduler extends SimSchedulerInspection {
   protected readonly scheduleStore = new SimSchedulerScheduleStore();
+  protected readonly groupStore: SimSchedulerScheduleGroupStore;
   private readonly commands: SimSchedulerCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSchedulerSdkCommandRouter(this);
@@ -63,8 +65,13 @@ export class SimScheduler extends SimSchedulerInspection {
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.background = background;
+    this.groupStore = new SimSchedulerScheduleGroupStore({
+      accountRegionScope,
+      clock: background,
+    });
     this.commands = new SimSchedulerCommands({
       schedules: this.scheduleStore,
+      groups: this.groupStore,
       iam,
       background,
       deliveryTargets: properties.deliveryTargets,
@@ -135,6 +142,50 @@ export class SimScheduler extends SimSchedulerInspection {
   ): Promise<simSchedulerCommands.SimListSchedulesCommandOutput> {
     await this.background.sequence();
     return this.commands.schedules.listSchedules(command, options);
+  }
+
+  /**
+   * Handle a CreateScheduleGroup Command from the SDK.
+   */
+  async createScheduleGroup(
+    command: simSchedulerCommands.SimCreateScheduleGroupCommand,
+    options?: SimSchedulerRequestOptions,
+  ): Promise<simSchedulerCommands.SimCreateScheduleGroupCommandOutput> {
+    await this.background.sequence();
+    return this.commands.groups.createScheduleGroup(command, options);
+  }
+
+  /**
+   * Handle a GetScheduleGroup Command from the SDK.
+   */
+  async getScheduleGroup(
+    command: simSchedulerCommands.SimGetScheduleGroupCommand,
+    options?: SimSchedulerRequestOptions,
+  ): Promise<simSchedulerCommands.SimGetScheduleGroupCommandOutput> {
+    await this.background.sequence();
+    return this.commands.groups.getScheduleGroup(command, options);
+  }
+
+  /**
+   * Handle a DeleteScheduleGroup Command from the SDK.
+   */
+  async deleteScheduleGroup(
+    command: simSchedulerCommands.SimDeleteScheduleGroupCommand,
+    options?: SimSchedulerRequestOptions,
+  ): Promise<simSchedulerCommands.SimDeleteScheduleGroupCommandOutput> {
+    await this.background.sequence();
+    return this.commands.groups.deleteScheduleGroup(command, options);
+  }
+
+  /**
+   * Handle a ListScheduleGroups Command from the SDK.
+   */
+  async listScheduleGroups(
+    command: simSchedulerCommands.SimListScheduleGroupsCommand,
+    options?: SimSchedulerRequestOptions,
+  ): Promise<simSchedulerCommands.SimListScheduleGroupsCommandOutput> {
+    await this.background.sequence();
+    return this.commands.groups.listScheduleGroups(command, options);
   }
 
   /**
