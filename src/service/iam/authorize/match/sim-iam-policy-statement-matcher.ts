@@ -6,7 +6,8 @@ import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-doc
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
 import { SimIamPolicyConditionMatcher } from "./condition/sim-iam-policy-condition-matcher.js";
 import { SimIamPolicyPrincipalMatcher } from "./sim-iam-policy-principal-matcher.js";
-import type { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
+import { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
+import { SimIamUnevaluatedStatements } from "../unevaluated/sim-iam-unevaluated-statements.js";
 
 /**
  * Matches one parsed IAM policy statement against one authorization request.
@@ -25,16 +26,30 @@ import type { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
  * - Action and NotAction;
  * - Resource and NotResource;
  * - supported IAM string conditions.
+ *
+ * One matcher reads every policy of one request, and it is also where the
+ * statements the simulator could not evaluate are collected. A statement is
+ * recorded only once everything else about it has matched. Each entry is a
+ * statement that would have applied to this request had its condition been
+ * readable.
  */
 export class SimIamPolicyStatementMatcher {
   private readonly conditionMatcher: SimIamPolicyConditionMatcher;
   private readonly principalMatcher: SimIamPolicyPrincipalMatcher;
+  private readonly unevaluated = new SimIamUnevaluatedStatements();
 
   constructor(private readonly context: SimIamAuthZContext) {
     this.conditionMatcher = new SimIamPolicyConditionMatcher(
       context.conditionContext,
     );
     this.principalMatcher = new SimIamPolicyPrincipalMatcher(context);
+  }
+
+  /**
+   * The statements read so far that the simulator could not evaluate.
+   */
+  get unevaluatedStatements(): SimIamUnevaluatedStatements {
+    return this.unevaluated;
   }
 
   /**
@@ -50,12 +65,36 @@ export class SimIamPolicyStatementMatcher {
   ): SimIamPrincipalMatch {
     const principal = this.principalMatcher.matches(policy, statement);
 
-    return principal.when(
-      principal.matched &&
-        this.actionMatches(statement) &&
-        this.resourceMatches(policy, statement) &&
-        this.conditionMatcher.matches(statement.condition),
-    );
+    if (
+      !principal.matched ||
+      !this.actionMatches(statement) ||
+      !this.resourceMatches(policy, statement)
+    ) {
+      return SimIamPrincipalMatch.none();
+    }
+
+    return principal.when(this.conditionMatches(policy, statement));
+  }
+
+  /**
+   * Check the statement's condition block, recording it as unevaluated where
+   * an operator stopped the simulator reading it.
+   */
+  private conditionMatches(
+    policy: SimIamAuthZPolicySource,
+    statement: SimIamParsedPolicyStatement,
+  ): boolean {
+    const condition = this.conditionMatcher.matches(statement.condition);
+
+    for (const operator of condition.unsupportedOperators) {
+      this.unevaluated.record(
+        policy,
+        statement.source,
+        `unsupported condition operator ${operator}`,
+      );
+    }
+
+    return condition.matched;
   }
 
   /**

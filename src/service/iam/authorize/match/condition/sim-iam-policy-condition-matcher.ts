@@ -2,6 +2,7 @@ import type {
   SimIamConditionValue,
   SimIamPolicyDocumentCondition,
 } from "../../../policy/sim-iam-policy.js";
+import type { SimIamConditionMatch } from "./sim-iam-condition-match.js";
 import type { SimIamConditionOperator } from "./sim-iam-condition-operator.js";
 import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-parser.js";
 
@@ -12,11 +13,17 @@ import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-pars
  * key lookup. Individual condition operators encapsulate value validation,
  * comparison, and set semantics.
  *
- * An unsupported operator fails closed by making the condition non-matching. A
- * context key the request carries no value for is left to the operator, which
- * answers for itself whether an absent key matches it.
+ * An unsupported operator fails closed by making the condition non-matching,
+ * and is named in the result so the decision can report the statement as one
+ * it never read. A context key the request carries no value for is left to the
+ * operator, which answers for itself whether an absent key matches it.
  */
 export class SimIamPolicyConditionMatcher {
+  private static readonly noCondition: SimIamConditionMatch = {
+    matched: true,
+    unsupportedOperators: [],
+  };
+
   private readonly conditionContext: ReadonlyMap<string, SimIamConditionValue>;
 
   constructor(
@@ -35,28 +42,42 @@ export class SimIamPolicyConditionMatcher {
    * Match every operator and every key in a condition block.
    *
    * Separate operators and separate keys use logical AND semantics.
+   *
+   * Every operator in the block is read. Stopping at the first that fails
+   * would leave the operators the simulator could not evaluate depending on
+   * the order the policy happens to list them in.
    */
-  matches(condition: SimIamPolicyDocumentCondition | undefined): boolean {
+  matches(
+    condition: SimIamPolicyDocumentCondition | undefined,
+  ): SimIamConditionMatch {
     if (condition === undefined) {
-      return true;
+      return SimIamPolicyConditionMatcher.noCondition;
     }
 
-    return Object.entries(condition).every(([keyword, keyValues]) =>
-      this.operatorMatches(keyword, keyValues),
-    );
+    const unsupportedOperators: string[] = [];
+    let matched = true;
+
+    for (const [keyword, keyValues] of Object.entries(condition)) {
+      const operator = this.operatorParser.parse(keyword);
+
+      if (operator === undefined) {
+        unsupportedOperators.push(keyword);
+        continue;
+      }
+
+      matched = this.operatorMatches(operator, keyValues) && matched;
+    }
+
+    return {
+      matched: matched && unsupportedOperators.length === 0,
+      unsupportedOperators: matched ? unsupportedOperators : [],
+    };
   }
 
   private operatorMatches(
-    keyword: string,
+    operator: SimIamConditionOperator,
     keyValues: Readonly<Record<string, SimIamConditionValue>>,
   ): boolean {
-    const operator = this.operatorParser.parse(keyword);
-
-    /* v8 ignore if -- defensive */
-    if (operator === undefined) {
-      return false;
-    }
-
     return Object.entries(keyValues).every(([key, expected]) =>
       this.entryMatches(operator, key, expected),
     );

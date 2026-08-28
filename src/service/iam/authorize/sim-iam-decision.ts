@@ -6,6 +6,7 @@ import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resol
 import { SimIamPolicyEvaluation } from "./allow/sim-iam-policy-evaluation.js";
 import { SimIamScpGate } from "./scp/sim-iam-scp-gate.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision-value.js";
+import type { SimIamUnevaluatedStatement } from "./unevaluated/sim-iam-unevaluated-statement.type.js";
 
 export { SimIamPolicyDecisionValue } from "./sim-iam-decision-value.js";
 
@@ -37,6 +38,7 @@ export class SimIamPolicyDecision {
   private readonly request: SimIamAuthZContext;
   private readonly policies: SimIamPolicyEvaluation;
   private readonly scpGate: SimIamScpGate;
+  private readonly statementMatcher: SimIamPolicyStatementMatcher;
 
   constructor(
     request: SimIamAuthZContext,
@@ -45,6 +47,7 @@ export class SimIamPolicyDecision {
     const statementMatcher = new SimIamPolicyStatementMatcher(request);
 
     this.request = request;
+    this.statementMatcher = statementMatcher;
     this.policies = new SimIamPolicyEvaluation({
       policies: [...request.identityPolicies, ...request.resourcePolicies],
       policyDocumentParser,
@@ -165,6 +168,19 @@ export class SimIamPolicyDecision {
    */
   get allowStatements(): readonly SimIamPolicyDocumentStatement[] {
     return this.policies.allowStatements.all;
+  }
+
+  /**
+   * The statements the simulator could not evaluate, and why.
+   *
+   * Sim IAM fails closed on a condition operator it has no implementation
+   * for, and a statement holding one matches nothing. A Deny that would have
+   * stopped the request in a real account leaves an ordinary Allow here. A
+   * decision reached over policies the simulator read in full reports
+   * nothing.
+   */
+  get unevaluatedStatements(): readonly SimIamUnevaluatedStatement[] {
+    return this.statementMatcher.unevaluatedStatements.all;
   }
 
   /**

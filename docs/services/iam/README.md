@@ -85,7 +85,9 @@ The decision exposes `value` (`"Allow"`, `"ExplicitDeny"`, or `"ImplicitDeny"`),
 flags `isAllowed`, `isDenied`, `isExplicitDeny`, and `isImplicitDeny`, the matching
 `allowStatements` and `explicitDenyStatements`, and the resolved `caller` for diagnostics. The
 matching Allows are also available per side as `identityAllowStatements` and
-`resourceAllowStatements`. A cross-Account denial is best read from those.
+`resourceAllowStatements`. A cross-Account denial is best read from those. Statements the simulator
+could not evaluate are reported by `unevaluatedStatements`, covered under
+[Statements left unevaluated](#statements-left-unevaluated).
 
 If the caller is omitted, authorization defaults to the root principal of the Account owning the
 sim IAM instance. That principal is allowed within its own Account. An explicit
@@ -311,6 +313,59 @@ match, leaving the request implicitly denied unless another statement allows it.
 matches instead, as AWS documents. With no value in the request there is none for the policy value
 to equal. A `ForAnyValue:` operator answers false for an absent key whatever it wraps, because no
 request value is there to satisfy it.
+
+### Statements left unevaluated
+
+An operator from outside the list above fails closed. The statement holding it matches nothing, and
+a `Deny` written that way stops nothing. The request then goes through on whatever else allows it,
+which is how a guardrail comes to report a healthy Allow. `decision.unevaluatedStatements` reports
+each of those statements, with the policy it came from (`policy`), how that policy reached the
+request (`sourceType`), the statement as its document declared it (`statement`), and the operator
+the simulator could not evaluate (`reason`).
+
+Every operator in a condition block is read, and an unsupported one leaves the rest of the block
+evaluated as usual. A statement reaches the list once everything else about it has matched. Its
+Principal, Action and Resource applied to the request, and the unsupported operator was the only
+thing standing between the statement and the request. A decision reached over policies the
+simulator read in full reports an empty list, and a test asserting on a guardrail can say so.
+
+```typescript sim-iam-unevaluated-statements
+/**
+ * Reporting simulated IAM statements that could not be evaluated.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+simAws.organizations().attachServiceControlPolicy(
+  "123456789012",
+  {
+    Version: "2012-10-17",
+    Statement: {
+      Sid: "DenyBucketCreationAfterFreeze",
+      Effect: "Deny",
+      Action: "s3:CreateBucket",
+      Resource: "*",
+      Condition: {
+        DateGreaterThan: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
+      },
+    },
+  },
+  { policyName: "BucketGuardrail" },
+);
+
+const decision = simAws.account("123456789012").iam().authorize({
+  action: "s3:CreateBucket",
+  resource: "arn:aws:s3:::123456789012-reports",
+});
+
+const [unevaluated] = decision.unevaluatedStatements;
+
+console.log(decision.isAllowed); // true
+console.log(unevaluated?.policy); // "BucketGuardrail"
+console.log(unevaluated?.reason); // "unsupported condition operator DateGreaterThan"
+```
 
 ## Users and access keys
 
@@ -1118,7 +1173,8 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
   CloudFormation teardown clears a User's policies before deleting it
 - Only the condition operators listed above are supported. A statement using any other operator
-  fails closed, matching no request
+  fails closed, matching no request. `decision.unevaluatedStatements` names those statements, and a
+  test can assert that a decision was reached over policies read in full
 - A positive `ForAllValues:` condition fails to match a request carrying no value for the key, and
   fails to match an empty value set. AWS matches both, and the negated form here matches both
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
