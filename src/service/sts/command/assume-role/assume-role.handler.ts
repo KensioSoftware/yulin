@@ -15,7 +15,10 @@ import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role
 import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
 import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsDefaultCaller,
+} from "../../../aws/caller/sim-aws-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
 interface AssumeRoleCommandHandlerProperties {
@@ -28,6 +31,11 @@ interface AssumeRoleCommandHandlerProperties {
 
   readonly iamResolver: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * The caller this simulation attributes a request naming none to.
+   */
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -44,7 +52,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   SimAssumeRoleCommandOutput
 > {
   private readonly background: BackgroundScheduler;
-  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly callerResolver: SimAwsCallerResolver;
   private readonly requestParser = new SimStsAssumeRoleRequestParser();
   private readonly authorizationCoordinator: AssumeRoleAuthorizationCoordinator;
   private readonly sessionCreator: SimStsAssumeRoleSessionCreator;
@@ -60,6 +68,9 @@ export class AssumeRoleCommandHandler implements CommandHandler<
 
     this.sourceAccountId = sourceAccountId;
     this.background = background;
+    this.callerResolver = new SimAwsCallerResolver({
+      defaultCaller: properties.defaultCaller,
+    });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,
       iamResolver,

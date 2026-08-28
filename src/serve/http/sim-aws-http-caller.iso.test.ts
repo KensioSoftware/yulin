@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { signAwsRequest } from "../../../test/sigv4/sign-aws-request.js";
 import { createSigner } from "../../../test/sigv4/sim-signer.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
+import { simIamRoleWithPolicyFactory } from "../../service/iam/role/sim-iam-role-with-policy.factory.js";
 import { makeLambdaZipFileInput } from "../../service/lambda/function/code/lambda-zip-file-input.js";
 import { simAwsCallerHeaderName } from "../../service/iam/request/sim-aws-caller-header.js";
 import {
@@ -60,6 +61,35 @@ describe("The caller of a served simulated AWS request", () => {
 
     // Then the simulator reports the caller as anonymous, not the Account
     // root, which is what an omitted in-process caller would have meant
+    expect(response.headers.get(simAwsCallerHeaderName)).toBe("anonymous");
+    expect(response.headers.get(simAwsAuthHeaderName)).toBe("none");
+  });
+
+  it("keeps an unauthenticated request anonymous under a default caller", async () => {
+    // Given a simulation that names a default caller for its own calls, which
+    // is what the Function below is then created as
+    const simAws = new SimAws({
+      defaultCaller: {
+        kind: "arn",
+        arn: "arn:aws:iam::888888888888:role/Administrator",
+      },
+    });
+    await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "Administrator",
+        actions: ["*"],
+        caller: simAws.account().rootPrincipal,
+      },
+      simAws,
+    );
+    const url = await serveHeaderEcho(simAws);
+
+    // When a request arrives over HTTP carrying no identity
+    const response = await new SimAwsHttp({ simAws }).fetch(url);
+
+    // Then it is still anonymous. The default is a convenience for calls made
+    // inside the process, and applying it here would hand that Role to anyone
+    // who could reach the port
     expect(response.headers.get(simAwsCallerHeaderName)).toBe("anonymous");
     expect(response.headers.get(simAwsAuthHeaderName)).toBe("none");
   });

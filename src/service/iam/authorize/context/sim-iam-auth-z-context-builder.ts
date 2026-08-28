@@ -3,6 +3,7 @@ import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import type {
   SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
@@ -125,6 +126,8 @@ interface SimIamAuthZContextBuilderProperties {
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
 
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
   /**
    * Resolves other Accounts' IAM in the same simulation, for the identity side
    * of a cross-Account request.
@@ -177,10 +180,13 @@ export class SimIamAuthZContextBuilder {
   private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
-    this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
-      makeSimAwsAccountRootPrincipal(properties.accountId),
-      properties.credentialIdentityResolver,
-    );
+    this.callerContextBuilder = new SimIamAuthZCallerContextBuilder({
+      accountRootPrincipal: makeSimAwsAccountRootPrincipal(
+        properties.accountId,
+      ),
+      credentialIdentityResolver: properties.credentialIdentityResolver,
+      defaultCaller: properties.defaultCaller,
+    });
     this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies: properties.policies,
       roles: properties.roles,

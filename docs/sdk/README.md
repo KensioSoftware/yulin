@@ -80,7 +80,9 @@ Each sent Command resolves its own simulated Account and Region scope:
 The resolved caller reaches the simulated service, and simulated [IAM](https://yulinsim.dev/services/iam/)
 authorization applies to it exactly as it does for direct sim service use. A caller without
 permission for a Command is denied, as on real AWS. Where no caller can be identified, Commands run
-as the simulation's default Account root.
+as the simulation's `defaultCaller`, and as the default Account root where the simulation was given
+none. See
+[Name the caller a simulation uses by default](https://yulinsim.dev/services/iam/#name-the-caller-a-simulation-uses-by-default).
 
 `runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent during
 the run are attributed to that caller, with no changes to the client or the code under test:

@@ -288,6 +288,94 @@ console.log(stack.getResource("ReportsBucket")?.status); // "CREATE_COMPLETE"
 The Role is created before the policy is attached. Creating it afterwards is a call the policy
 denies the root, and the account root is who a bare `createRole` runs as.
 
+## Name the caller the rest of a test reads as
+
+A deployment names its own principal. Every other call in the test still names none, and each one is
+the account root. Under a policy denying that root, a test reading back what a stack made is denied
+on every read.
+
+`defaultCaller` on `SimAws` says who those calls are. A test then reads the account as the person or
+role that would really be looking at it, and an explicit `caller` still wins wherever one is given.
+
+```typescript sim-organizations-scp-default-caller
+/**
+ * Reading an account whose organization denies its root principal.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const administratorArn = "arn:aws:iam::123456789012:role/Administrator";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultCaller: { kind: "arn", arn: administratorArn },
+});
+
+// The Role is created as the account root, because a simulation with a default
+// caller attributes these two commands to a Role that has no policy yet.
+const root = simAws.account().rootPrincipal;
+const simIam = simAws.iam();
+
+await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "Administrator",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+  { caller: root },
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Administrator",
+    PolicyName: "Administer",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+    }),
+  }),
+  { caller: root },
+);
+
+simAws.organizations().attachServiceControlPolicy("123456789012", {
+  Version: "2012-10-17",
+  Statement: {
+    Sid: "DenyRootPrincipal",
+    Effect: "Deny",
+    Action: "*",
+    Resource: "*",
+    Condition: { ArnLike: { "aws:PrincipalArn": "arn:aws:iam::*:root" } },
+  },
+});
+
+await simAws.ssm().putParameter({
+  input: { Name: "/reports/bucket", Type: "String", Value: "reports-bucket" },
+});
+
+const read = await simAws
+  .ssm()
+  .getParameter({ input: { Name: "/reports/bucket" } });
+
+const identity = await simAws.sts().getCallerIdentity({});
+
+console.log(read.Parameter?.Value); // "reports-bucket"
+console.log(identity.Arn); // "arn:aws:iam::123456789012:role/Administrator"
+```
+
+Setup runs before the policy is attached, for the same reason the deploy Role above does. The Role a
+simulation reads as has to exist and hold a policy, and creating it is itself a call.
+
+Naming a default caller says who an unattributed call comes from, and leaves the root's own identity
+access where it was. A test about root behaviour names `simAws.account().rootPrincipal` and gets the
+root. Under the policy above that call is denied, which is what the statement is written to do.
+
 ## Write an allow list instead of a deny list
 
 `detachFullAwsAccess` takes AWS's own policy off an account. What remains has to allow an action

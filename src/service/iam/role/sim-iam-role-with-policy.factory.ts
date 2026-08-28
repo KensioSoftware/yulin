@@ -1,5 +1,6 @@
 import { AsyncMappedFactory } from "@kensio/part-factory";
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCreateRoleCommandOutput } from "../command/role/create-role/create-role.command.js";
 import { simIamPolicyDocumentFactory } from "../policy/sim-iam-policy-document.factory.js";
 
@@ -15,6 +16,15 @@ export interface SimIamRoleWithPolicyInput {
   readonly policyName: string;
   readonly actions: readonly string[];
   readonly resource: string;
+
+  /**
+   * The principal creating the Role.
+   *
+   * A simulation given a default caller attributes these two commands to it,
+   * and a Role being created for that caller has no policies to allow them
+   * yet. Naming the Account root here is how such a test bootstraps.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -51,33 +61,42 @@ export const simIamRoleWithPolicyFactory = new AsyncMappedFactory<
     policyName: "ApplicationPolicy",
     actions: [],
     resource: "*",
+    caller: undefined,
   }),
   async (input, simAws) => {
     const simIam = simAws.iam();
+    const options =
+      input.caller === undefined ? undefined : { caller: input.caller };
 
-    const creation = await simIam.createRole({
-      input: {
-        RoleName: input.roleName,
-        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Principal: {
-              AWS: `arn:aws:iam::${simAws.defaultAccountId}:root`,
+    const creation = await simIam.createRole(
+      {
+        input: {
+          RoleName: input.roleName,
+          AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+            Statement: {
+              Principal: {
+                AWS: `arn:aws:iam::${simAws.defaultAccountId}:root`,
+              },
+              Action: "sts:AssumeRole",
             },
-            Action: "sts:AssumeRole",
-          },
-        }),
+          }),
+        },
       },
-    });
+      options,
+    );
 
-    await simIam.putRolePolicy({
-      input: {
-        RoleName: input.roleName,
-        PolicyName: input.policyName,
-        PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: input.actions, Resource: input.resource },
-        }),
+    await simIam.putRolePolicy(
+      {
+        input: {
+          RoleName: input.roleName,
+          PolicyName: input.policyName,
+          PolicyDocument: simIamPolicyDocumentFactory.make({
+            Statement: { Action: input.actions, Resource: input.resource },
+          }),
+        },
       },
-    });
+      options,
+    );
 
     return creation.Role;
   },

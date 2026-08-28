@@ -89,9 +89,12 @@ matching Allows are also available per side as `identityAllowStatements` and
 could not evaluate are reported by `unevaluatedStatements`, covered under
 [Statements left unevaluated](#statements-left-unevaluated).
 
-If the caller is omitted, authorization defaults to the root principal of the Account owning the
-sim IAM instance. That principal is allowed within its own Account. An explicit
-`{ kind: "anonymous" }` caller suppresses the fallback and is evaluated without identity policies.
+If the caller is omitted, authorization defaults to the simulation's own
+[default caller](#name-the-caller-a-simulation-uses-by-default), and to the root principal of the
+Account owning the sim IAM instance where the simulation has none. That root principal is allowed
+within its own Account, subject to any service control policy over that Account. An explicit
+`{ kind: "anonymous" }` caller suppresses both fallbacks and is
+evaluated without identity policies.
 
 Resource policies live with the service that owns the target resource, such as an S3 Bucket policy,
 and are supplied with the authorization request.
@@ -528,6 +531,87 @@ The resolved caller ARN is the STS assumed-role session ARN, such as
 the derived `aws:PrincipalArn` come from the underlying Role. A caller that the trust policy does
 not allow is denied the assume request, session credentials require their session token, and
 expired sessions are rejected.
+
+## Name the caller a simulation uses by default
+
+Every simulated operation takes a `caller`, and a call that gives none is decided as the root
+principal of the Account it reaches. `defaultCaller` on `SimAws` names a principal for those calls,
+such as the Role an operator would be reading the account through.
+
+```typescript sim-iam-default-caller
+/**
+ * Naming who a call that states no caller comes from.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultCaller: {
+    kind: "arn",
+    arn: "arn:aws:iam::123456789012:role/Administrator",
+  },
+});
+
+// The Role is created as the Account root. A simulation with a default caller
+// attributes these commands to it, and it holds no policy until they are done.
+const root = simAws.account().rootPrincipal;
+const simIam = simAws.iam();
+
+await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "Administrator",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+  { caller: root },
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Administrator",
+    PolicyName: "Administer",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+    }),
+  }),
+  { caller: root },
+);
+
+const decision = simAws.iam().authorize({
+  action: "s3:GetObject",
+  resource: "arn:aws:s3:::reports-bucket/summary.csv",
+});
+
+console.log(decision.caller.arn); // "arn:aws:iam::123456789012:role/Administrator"
+console.log(decision.isAllowed); // true
+```
+
+`defaultCaller` takes a principal or a caller resolved elsewhere, such as an assumed-role session
+carrying the Role its policies come from. Credentials are the one caller it refuses. Only the
+Account that issued a key can authenticate it, and a default is held for a whole simulation.
+
+The default reaches a direct sim service call, an intercepted SDK Command, a CloudFormation
+deployment and STS. Three things outrank it, each of them a caller stated for the request in hand.
+An operation's own `caller` wins, as does the ambient caller of a `runAs` block and the `caller` a
+deployment is given.
+
+A simulation told no `defaultCaller` decides an unattributed call as the Account root, which is what
+every simulation did before the option existed. The root keeps the identity access sim IAM gives it
+either way, and a test about root behaviour reaches it as `simAws.account().rootPrincipal`. A
+service control policy denying that root still overrides the access.
+
+The reason to name one is a service control policy denying the Account root.
+[Simulated Organizations](https://yulinsim.dev/services/organizations/) covers that case, where
+every unattributed read is otherwise denied on a message about the root.
 
 ## Callers of HTTP requests
 

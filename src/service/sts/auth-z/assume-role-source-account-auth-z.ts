@@ -2,7 +2,6 @@ import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-r
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
-import { makeSimAwsAccountRootPrincipal } from "../../aws/caller/sim-aws-account-root-principal.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
 interface AssumeRoleSourceAccountAuthorizerProperties {
@@ -38,8 +37,8 @@ export interface AssumeRoleSourceAuthorizationInput {
  * trust authorization is a separate responsibility and must be performed even
  * when the source and target Account are the same.
  *
- * When no caller principal is supplied, Sim IAM applies its normal default
- * caller behavior for the source Account.
+ * When no caller principal is supplied, sim IAM applies its own default caller
+ * behaviour for the source Account.
  */
 export class AssumeRoleSourcePrincipalAuthorizer {
   private readonly sourceAccountId: SimAwsAccountId;
@@ -60,15 +59,15 @@ export class AssumeRoleSourcePrincipalAuthorizer {
    */
   authorize(input: AssumeRoleSourceAuthorizationInput): void {
     const sourceIam = this.iamResolver.iamForAccount(this.sourceAccountId);
-    const callerPrincipal =
-      input.callerPrincipal ??
-      makeSimAwsAccountRootPrincipal(this.sourceAccountId);
 
+    // A request with no caller principal of its own is left for sim IAM to
+    // attribute. The simulation's default caller reaches this decision the way
+    // it reaches every other one.
     const decision = sourceIam.authorize({
       action: "sts:AssumeRole",
       resource: input.roleArn,
       region: this.regionName,
-      caller: callerPrincipal,
+      caller: input.callerPrincipal,
     });
 
     if (
@@ -76,7 +75,7 @@ export class AssumeRoleSourcePrincipalAuthorizer {
       (decision.isImplicitDeny && Boolean(input.identityPolicyAllowRequired))
     ) {
       throw new SimIamAccessDenied({
-        principal: callerPrincipal,
+        principal: decision.caller.principal,
         action: "sts:AssumeRole",
         resource: input.roleArn,
       });

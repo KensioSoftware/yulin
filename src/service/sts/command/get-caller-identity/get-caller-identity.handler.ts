@@ -1,6 +1,9 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsDefaultCaller,
+} from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
@@ -14,6 +17,11 @@ import { simStsCallerUserId } from "./sim-sts-caller-user-id.js";
 interface GetCallerIdentityCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
+
+  /**
+   * The caller this simulation attributes a request naming none to.
+   */
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -30,13 +38,16 @@ export class GetCallerIdentityCommandHandler implements CommandHandler<
   SimGetCallerIdentityCommand,
   SimGetCallerIdentityCommandOutput
 > {
-  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly callerResolver: SimAwsCallerResolver;
   private readonly sourceAccountId: SimAwsAccountId;
   private readonly iamResolver: SimIamAccountResolver;
 
   constructor(properties: GetCallerIdentityCommandHandlerProperties) {
     this.sourceAccountId = properties.sourceAccountId;
     this.iamResolver = properties.iamResolver;
+    this.callerResolver = new SimAwsCallerResolver({
+      defaultCaller: properties.defaultCaller,
+    });
   }
 
   /**

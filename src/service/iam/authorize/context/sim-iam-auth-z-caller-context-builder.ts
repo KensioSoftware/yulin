@@ -5,6 +5,7 @@ import {
 } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type {
   SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
@@ -15,22 +16,48 @@ export interface SimIamAuthZCallerContext {
 }
 
 /**
+ * What building a caller context needs beyond the request's own caller.
+ */
+export interface SimIamAuthZCallerContextBuilderProperties {
+  /**
+   * The root principal of the Account deciding the request.
+   *
+   * This is both the last fallback for a request that names no caller and the
+   * principal holding the Account's intrinsic unrestricted access. The default
+   * caller stands apart from it. Naming a default says who an unattributed
+   * call comes from, and leaves the root's own access where AWS puts it.
+   */
+  readonly accountRootPrincipal: SimAwsPrincipal;
+
+  readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
+
+  /**
+   * The caller this simulation attributes an unattributed request to.
+   */
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+}
+
+/**
  * Resolves the caller and any policy sources implied by that caller.
  *
- * The configured default principal represents the simulated account root. It is
- * used only when the request omits a caller. An explicit anonymous caller does
- * not fall back to root.
+ * A request that omits a caller is decided as the simulation's default caller,
+ * and as the Account root where the simulation named none. An explicit
+ * anonymous caller falls back to neither.
  */
 export class SimIamAuthZCallerContextBuilder {
   private readonly callerResolver: SimAwsCallerResolver;
-  private readonly defaultCallerPrincipal: SimAwsPrincipal;
+  private readonly accountRootPrincipal: SimAwsPrincipal;
+  private readonly accountRootArn?: string | undefined;
 
-  constructor(
-    defaultCallerPrincipal: SimAwsPrincipal,
-    credentialIdentityResolver: SimAwsCredentialIdentityResolver,
-  ) {
-    this.defaultCallerPrincipal = defaultCallerPrincipal;
-    this.callerResolver = new SimAwsCallerResolver(credentialIdentityResolver);
+  constructor(properties: SimIamAuthZCallerContextBuilderProperties) {
+    const root = properties.accountRootPrincipal;
+
+    this.accountRootPrincipal = root;
+    this.accountRootArn = root.kind === "arn" ? root.arn : undefined;
+    this.callerResolver = new SimAwsCallerResolver({
+      credentialIdentityResolver: properties.credentialIdentityResolver,
+      defaultCaller: properties.defaultCaller,
+    });
   }
 
   /**
@@ -40,7 +67,7 @@ export class SimIamAuthZCallerContextBuilder {
   build(caller: SimAwsCaller | undefined): SimIamAuthZCallerContext {
     const resolvedCaller = this.callerResolver.resolve(
       caller,
-      this.defaultCallerPrincipal,
+      this.accountRootPrincipal,
     );
 
     return {
@@ -50,17 +77,18 @@ export class SimIamAuthZCallerContextBuilder {
   }
 
   /**
-   * Give the configured account-root principal unrestricted identity access.
+   * Give the Account's root principal unrestricted identity access.
+   *
+   * The comparison names the root principal explicitly, so a simulation with a
+   * default caller keeps this access on the root where AWS has it.
    */
   private rootPolicySources(
     caller: SimAwsResolvedCaller,
   ): readonly SimIamAuthZPolicySource[] {
-    const defaultCaller = this.callerResolver.resolve(
-      this.defaultCallerPrincipal,
-      this.defaultCallerPrincipal,
-    );
-
-    if (defaultCaller.arn === undefined || caller.arn !== defaultCaller.arn) {
+    if (
+      this.accountRootArn === undefined ||
+      caller.arn !== this.accountRootArn
+    ) {
       return [];
     }
 

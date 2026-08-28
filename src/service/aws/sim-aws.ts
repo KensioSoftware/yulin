@@ -69,6 +69,7 @@ export class SimAws extends SimAwsServiceAccessors {
       defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
       defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
       clock,
+      defaultCaller,
       background: suppliedBackground,
     } = properties;
 
@@ -85,6 +86,7 @@ export class SimAws extends SimAwsServiceAccessors {
     this.serviceFactory = new SimAwsServiceFactory({
       simAws: this,
       background,
+      defaultCaller,
     });
     this.iamRegistry = this.serviceFactory.iamRegistry;
     this.scopes = new SimAwsScopeRegistry({ simAws: this });
