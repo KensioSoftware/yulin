@@ -37,6 +37,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [SNS](https://yulinsim.dev/services/sns/ "Simulated SNS usage docs")
 - [SQS](https://yulinsim.dev/services/sqs/ "Simulated SQS usage docs")
 - [SSM Parameter Store](https://yulinsim.dev/services/ssm/ "Simulated SSM Parameter Store usage docs")
+- [Step Functions](https://yulinsim.dev/services/stepfunctions/ "Simulated Step Functions usage docs")
 - [STS](https://yulinsim.dev/services/sts/ "Simulated STS usage docs")
 - [WAFv2](https://yulinsim.dev/services/wafv2/ "Simulated WAFv2 usage docs")
 

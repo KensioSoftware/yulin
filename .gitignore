@@ -238,6 +238,10 @@ src/docs/docs/api/*.mdx
 # build so that a consumer's `extends` path does not go through `dist/`.
 /cffjs2.oxlintrc.json
 
+# The published index of the documentation pages, written into the package root
+# by the build from the links in docs/README.md.
+/llms.txt
+
 # Misc
 .DS_Store
 

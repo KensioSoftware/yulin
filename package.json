@@ -11,9 +11,10 @@
     "yulin": "./dist/cli/yulin.js"
   },
   "scripts": {
-    "clean": "rm -rf ./dist/ ./*.tsbuildinfo ./cffjs2.oxlintrc.json",
-    "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm oxlint:config",
+    "clean": "rm -rf ./dist/ ./*.tsbuildinfo ./cffjs2.oxlintrc.json ./llms.txt",
+    "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm oxlint:config && pnpm docs:index",
     "oxlint:config": "pnpm tsx scripts/mts/write-oxlint-config.mts",
+    "docs:index": "pnpm tsx scripts/mts/write-llms-index.mts",
     "build:check": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm build",
     "verify:pack": "pnpm tsx scripts/mts/verify-pack.mts",
@@ -27,7 +28,7 @@
     "examples:tsc": "tsc -p docs/tsconfig.json",
     "examples:tsc:cdk": "tsc -p docs/tsconfig.cdk.json",
     "examples:lint": "oxlint --type-aware --max-warnings=0 docs",
-    "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:tsc:cdk && pnpm examples:lint",
+    "examples:check": "pnpm docs:index && pnpm examples:extract && pnpm examples:tsc && pnpm examples:tsc:cdk && pnpm examples:lint",
     "fta": "./scripts/sh/fta.sh",
     "check": "pnpm fmt && pnpm fta && pnpm build:check && pnpm examples:check && pnpm test:coverage",
     "tf:init": "./scripts/sh/tf-init.sh"
@@ -213,7 +214,9 @@
   },
   "files": [
     "dist",
+    "docs/**/README.md",
     "cffjs2.oxlintrc.json",
+    "llms.txt",
     "README.md",
     "LICENSE"
   ],

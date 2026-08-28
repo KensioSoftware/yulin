@@ -27,6 +27,7 @@ import {
   importSubpaths,
 } from "./verify-pack-consumer.mjs";
 import {
+  assertDocumentationPublished,
   assertFileExportsResolve,
   assertOxlintConfigExtendable,
 } from "./verify-pack-files.mjs";
@@ -58,8 +59,13 @@ const forbiddenTarballEntries = [
  * File count is the tighter of the two. Yulin is thousands of small modules
  * rather than a few large ones, and a consumer feels that in how long an
  * install takes to unpack far more than it feels the megabytes.
+ *
+ * The unpacked limit went from 20 MiB to 24 MiB when the documentation pages
+ * joined the package. They add about two megabytes across 45 pages and an
+ * index, taking the tarball to 17.83 MiB, and the gap above it is back to
+ * what it was.
  */
-const maximumUnpackedBytes = 20 * 1024 * 1024;
+const maximumUnpackedBytes = 24 * 1024 * 1024;
 const maximumFileCount = 12_000;
 
 /**
@@ -112,6 +118,7 @@ async function main(): Promise<void> {
 
     assertFileExportsResolve(consumerDirectory, fileExports);
     await assertOxlintConfigExtendable(consumerDirectory, manifest);
+    await assertDocumentationPublished(consumerDirectory, manifest);
     await assertTypesUsable(consumerDirectory);
   } finally {
     await rm(workDirectory, { recursive: true, force: true });
