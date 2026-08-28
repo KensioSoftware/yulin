@@ -2,7 +2,7 @@ import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimArn } from "../../aws/arn.js";
 import type { SimAwsCredentialIdentityResolver } from "../../aws/caller/sim-aws-caller-resolver.js";
 import type {
-  SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../aws/caller/sim-aws-caller.js";
 import type { SimIamManagedPolicy } from "../policy/sim-iam-policy.js";
@@ -28,7 +28,7 @@ interface SimIamAccountAuthZProperties {
    *
    * Left out, such a request is decided as this Account's root principal.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   /**
    * Resolves other Accounts' IAM in the same simulation.

@@ -65,3 +65,13 @@ export type SimAwsCaller =
   | SimAwsPrincipal
   | SimCredentialCaller
   | SimResolvedCaller;
+
+/**
+ * Caller a simulation attributes a request that names none of its own to.
+ *
+ * A principal, or a caller something else has already resolved. Credentials
+ * are left out because the Account that issued a key is the only thing able to
+ * authenticate it, while a default is held for a whole simulation. A key from
+ * one Account would fail wherever another Account decided the request.
+ */
+export type SimAwsDefaultCaller = SimAwsPrincipal | SimResolvedCaller;

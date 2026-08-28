@@ -5,7 +5,7 @@ import type {
 import type { SimClock } from "../../util/clock/sim-clock.js";
 import type { SimIamSigV4ExpectedScope } from "../iam/sigv4/sim-iam-sigv4-expected-scope.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
-import type { SimAwsCaller } from "./caller/sim-aws-caller.js";
+import type { SimAwsDefaultCaller } from "./caller/sim-aws-caller.js";
 import type { AwsRegionName } from "./sim-aws-region.js";
 
 /**
@@ -48,7 +48,7 @@ export interface SimAwsProperties {
    * Account it reaches. A service control policy denying that root then denies
    * the call. That is the reason to name a default.
    */
-  readonly defaultCaller?: SimAwsCaller;
+  readonly defaultCaller?: SimAwsDefaultCaller;
 
   readonly background?: BackgroundScheduler & BackgroundCompleter;
   /**

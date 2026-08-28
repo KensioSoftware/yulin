@@ -5,7 +5,7 @@ import {
 import type { SimArn } from "../aws/arn.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import type { SimAwsDefaultCaller } from "../aws/caller/sim-aws-caller.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimIamAccountAuthZ } from "./authorize/sim-iam-account-auth-z.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
@@ -39,7 +39,7 @@ export interface SimIamProperties {
    * A SimAws passes on what it was built with. Left out, such a request is
    * decided as the Account root, which is what a standalone SimIam does.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   /**
    * Resolves the IAM of other Accounts in the same simulation.

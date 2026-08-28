@@ -1,6 +1,7 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type {
   SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
   SimCredentialCaller,
 } from "./sim-aws-caller.js";
@@ -46,7 +47,7 @@ export interface SimAwsCallerResolverProperties {
    * consulted ahead of the operation default. A simulation that names no
    * default caller keeps the Account root fallback.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -62,7 +63,7 @@ export class SimAwsCallerResolver {
     | SimAwsCredentialIdentityResolver
     | undefined;
 
-  private readonly defaultCaller?: SimAwsCaller | undefined;
+  private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   constructor(properties: SimAwsCallerResolverProperties = {}) {
     this.credentialIdentityResolver = properties.credentialIdentityResolver;

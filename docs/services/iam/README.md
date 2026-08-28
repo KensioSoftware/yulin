@@ -595,6 +595,10 @@ console.log(decision.caller.arn); // "arn:aws:iam::123456789012:role/Administrat
 console.log(decision.isAllowed); // true
 ```
 
+`defaultCaller` takes a principal or a caller resolved elsewhere, such as an assumed-role session
+carrying the Role its policies come from. Credentials are the one caller it refuses. Only the
+Account that issued a key can authenticate it, and a default is held for a whole simulation.
+
 The default reaches a direct sim service call, an intercepted SDK Command, a CloudFormation
 deployment and STS. Three things outrank it, each of them a caller stated for the request in hand.
 An operation's own `caller` wins, as does the ambient caller of a `runAs` block and the `caller` a

@@ -4,7 +4,7 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
-import type { SimAwsCaller } from "../caller/sim-aws-caller.js";
+import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
 import type { SimApiGateway } from "../../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
@@ -58,7 +58,7 @@ interface SimAwsServiceFactoryProperties {
   /**
    * The caller this simulation attributes a call naming none to.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**

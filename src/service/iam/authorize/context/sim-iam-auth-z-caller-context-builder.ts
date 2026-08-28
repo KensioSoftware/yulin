@@ -5,6 +5,7 @@ import {
 } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type {
   SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
@@ -33,7 +34,7 @@ export interface SimIamAuthZCallerContextBuilderProperties {
   /**
    * The caller this simulation attributes an unattributed request to.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**

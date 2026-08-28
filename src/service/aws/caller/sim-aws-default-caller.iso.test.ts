@@ -154,6 +154,45 @@ describe("Simulated AWS default caller", () => {
     assertStringIncludes(error.message, `User: ${bystander.Arn}`);
   });
 
+  it("takes a resolved caller, applying the Role behind a session", async () => {
+    // Given a Role, and a default caller standing for a session of it.
+    const accountId = makeSimAwsAccountId();
+    const roleArn = `arn:aws:iam::${accountId}:role/Operator`;
+    const simAws = new SimAws({
+      defaultAccountId: accountId,
+      defaultCaller: {
+        kind: "resolved",
+        principal: {
+          kind: "arn",
+          arn: `arn:aws:sts::${accountId}:assumed-role/Operator/session`,
+        },
+        identityPolicyPrincipal: { kind: "arn", arn: roleArn },
+      },
+    });
+
+    await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "Operator",
+        actions: ["ssm:GetParameter"],
+        caller: simAws.account().rootPrincipal,
+      },
+      simAws,
+    );
+
+    // When a call is made without naming a caller.
+    const decision = simAws
+      .iam()
+      .authorize({ action: "ssm:GetParameter", resource: "*" });
+
+    // Then the session made the request and the Role's policies allowed it.
+    assertIdentical(
+      decision.caller.arn,
+      `arn:aws:sts::${accountId}:assumed-role/Operator/session`,
+    );
+    assertIdentical(decision.caller.identityPolicyArn, roleArn);
+    assertTrue(decision.isAllowed);
+  });
+
   it("keeps the Account root's own unrestricted access", async () => {
     // Given a simulation whose default caller is an operator Role.
     const { simAws, root } = await simAwsWithOperator();

@@ -3,6 +3,7 @@ import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import type {
   SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
@@ -125,8 +126,7 @@ interface SimIamAuthZContextBuilderProperties {
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
 
-  /** The caller this simulation attributes a request naming none to. */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   /**
    * Resolves other Accounts' IAM in the same simulation, for the identity side

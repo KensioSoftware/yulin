@@ -16,7 +16,10 @@ import { GetCallerIdentityCommandHandler } from "./command/get-caller-identity/g
 import { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsDefaultCaller,
+} from "../aws/caller/sim-aws-caller.js";
 import { SimStsSdkCommandRouter } from "./sdk/sim-sts-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
@@ -31,7 +34,7 @@ interface SimStsProperties {
    * Left out, such a request is the source Account's root principal, which is
    * the identity GetCallerIdentity then reports.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -45,7 +48,7 @@ export class SimSts {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
   private readonly iamResolver: SimIamAccountResolver;
-  private readonly defaultCaller?: SimAwsCaller | undefined;
+  private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
   private readonly sdkRouter = new SimStsSdkCommandRouter(this);
 
   constructor(properties: SimStsProperties = {}) {

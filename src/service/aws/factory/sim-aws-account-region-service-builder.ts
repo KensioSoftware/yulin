@@ -4,7 +4,7 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
-import type { SimAwsCaller } from "../caller/sim-aws-caller.js";
+import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
 import {
   simAwsEventBridgeDeliveryTargets,
   simAwsRekognitionImages,
@@ -56,7 +56,7 @@ interface SimAwsAccountRegionServiceBuilderProperties {
   /**
    * The caller this simulation attributes a request naming none to.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -89,7 +89,7 @@ export class SimAwsAccountRegionServiceBuilder {
   private readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly messageLog: SimAwsMessageLog;
-  private readonly defaultCaller?: SimAwsCaller | undefined;
+  private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   constructor(properties: SimAwsAccountRegionServiceBuilderProperties) {
     this.simAws = properties.simAws;

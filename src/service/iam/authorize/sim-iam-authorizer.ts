@@ -7,7 +7,7 @@ import {
 } from "./context/sim-iam-auth-z-context-builder.js";
 import { SimIamPolicyDecision } from "./sim-iam-decision.js";
 import type {
-  SimAwsCaller,
+  SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../aws/caller/sim-aws-caller.js";
 import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
@@ -24,7 +24,7 @@ interface SimIamAuthorizerProperties {
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
   readonly iamResolver?: SimIamAccountResolver | undefined;
   readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 }

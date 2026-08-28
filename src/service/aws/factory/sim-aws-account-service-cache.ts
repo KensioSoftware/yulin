@@ -4,7 +4,7 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
-import type { SimAwsCaller } from "../caller/sim-aws-caller.js";
+import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
 import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
@@ -44,7 +44,7 @@ interface SimAwsAccountServiceCacheProperties {
   /**
    * The caller this simulation attributes a request naming none to.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -76,7 +76,7 @@ export class SimAwsAccountServiceCache {
   private readonly iamRegistry: SimIamRegistry;
   private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
   private readonly scpResolver: SimIamServiceControlPolicyResolver;
-  private readonly defaultCaller?: SimAwsCaller | undefined;
+  private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
   private readonly route53Registry: SimRoute53Registry;
   private readonly kmsRegistry: SimKmsRegistry;
   private readonly serviceHosts: SimAwsServiceHosts;

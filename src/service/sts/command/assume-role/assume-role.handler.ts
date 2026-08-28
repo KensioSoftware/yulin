@@ -15,7 +15,10 @@ import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role
 import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
 import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsDefaultCaller,
+} from "../../../aws/caller/sim-aws-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
 interface AssumeRoleCommandHandlerProperties {
@@ -32,7 +35,7 @@ interface AssumeRoleCommandHandlerProperties {
   /**
    * The caller this simulation attributes a request naming none to.
    */
-  readonly defaultCaller?: SimAwsCaller | undefined;
+  readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 }
 
 /**
@@ -66,8 +69,6 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     this.sourceAccountId = sourceAccountId;
     this.background = background;
     this.callerResolver = new SimAwsCallerResolver({
-      credentialIdentityResolver:
-        iamResolver.findIamForAccount(sourceAccountId)?.credentials,
       defaultCaller: properties.defaultCaller,
     });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
