@@ -8,6 +8,7 @@ import {
   type LambdaCodeZipFiles,
   makeLambdaCodeZip,
 } from "./make-lambda-code-zip.js";
+import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import { SimLambdaVmZipCode } from "./sim-lambda-vm-zip-code.js";
 
 /**
@@ -24,6 +25,13 @@ export interface SimLambdaVmZipFunctionInput {
   readonly code: string | LambdaCodeZipFiles;
   readonly handlerName: string;
   readonly memorySizeMb: number;
+
+  /**
+   * What provides the modules the archive does not bundle, as the real
+   * runtime provides the AWS SDK. Left out, the code has none, and an SDK
+   * require is refused for want of one.
+   */
+  readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
 }
 
 /**
@@ -67,6 +75,7 @@ export const simLambdaVmZipFunctionFactory = new MappedFactory<
         archive,
         handlerName: input.handlerName,
         environment,
+        sdkModuleProvider: input.sdkModuleProvider,
       }),
     });
   },

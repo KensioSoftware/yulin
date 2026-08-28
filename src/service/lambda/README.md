@@ -198,6 +198,13 @@ as-is, uninstrumented. Interception is per client instance (`function/code/vm/sd
 fail with `Runtime.ImportModuleError` and guidance to wire a `vmSdkModuleProvider` or bundle the
 package.
 
+A package the host cannot resolve is refused with `SimLambdaSdkPackagesNotInstalledError`.
+`sdk/sim-lambda-provided-sdk-module.ts` catches that one error type, reads `@aws-sdk/*` specifiers
+out of the archive's own JavaScript files, drops the ones the archive bundles, and asks the
+provider's `unresolvedModules` which of the rest the host is missing too. The refusal names them
+all, and one install covers the set. Resolution stays lazy. An archive that runs is never read for
+this, and a package reached only through a bundled dependency is refused on its own.
+
 Note that the `vm` context is a namespacing convenience, not a security boundary: function code
 runs in-process with the same trust as the test suite itself, in keeping with the simulator's
 in-process, Docker-free design. Do not run untrusted code through the simulator.

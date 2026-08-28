@@ -597,6 +597,12 @@ real runtime's `AWS_REGION` provides. An explicit region on the client wins. The
 takes precedence. A package bundled under the archive's `node_modules/` is used as it stands, and
 reaches the simulation through the transport below.
 
+An `@aws-sdk/*` package the project has not installed is refused when the function code requires
+it. The message names every other AWS SDK package the code imports and the project is missing too.
+One install then covers the set. (The archive is the only place to read what a third-party function
+imports.) Packages bundled under the archive's `node_modules/` are left out of that list, along with
+anything only a bundled dependency imports.
+
 ### Function code that bundles the SDK
 
 Some deployment packages inline the SDK rather than relying on the runtime to provide it. CDK's
