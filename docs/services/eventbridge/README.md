@@ -703,6 +703,11 @@ The role is the whole of the decision. It has to trust `events.amazonaws.com` in
 the target runs. A role that may not becomes a recorded
 [delivery failure](#reading-back-a-failed-delivery), and the caller who put the event sees no error.
 
+The trust policy may carry the condition AWS recommends against the confused deputy problem. The
+rule's ARN is supplied as `aws:SourceArn` and the account it belongs to as `aws:SourceAccount`, the
+same pair a queue or topic policy is conditioned on for the other target types. A role scoped to one
+rule is assumable for that rule and for no other.
+
 Which containers actually run is [simulated ECS](https://yulinsim.dev/services/ecs/)'s answer, and never the rule's. A
 container with a binding runs its handler, and a container without one is recorded as not simulated.
 A target naming a task definition with nothing bound therefore records a task that never started,

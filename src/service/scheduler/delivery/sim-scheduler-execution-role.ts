@@ -3,10 +3,13 @@ import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-reg
 import {
   assumeSimServiceRole,
   type SimServiceRoleRefusals,
+} from "../../sts/service-role/sim-service-role.js";
+import {
   type SimServiceRoleTarget,
   simServiceRoleTarget,
-} from "../../sts/service-role/sim-service-role.js";
+} from "../../sts/service-role/sim-service-role-target.js";
 import { SimSchedulerDeliveryNotPermitted } from "../error/sim-scheduler-delivery.error.js";
+import type { SimSchedulerSchedule } from "../schedule/sim-scheduler-schedule.js";
 import { simSchedulerServicePrincipal } from "./sim-scheduler-delivery.js";
 
 /**
@@ -53,16 +56,23 @@ const refusals: SimServiceRoleRefusals = {
  * function as the `events.amazonaws.com` service principal and the target's own
  * resource policy decides; a schedule assumes a role, and the role's policies
  * decide.
+ *
+ * The schedule comes along because its group ARN is the `aws:SourceArn` AWS
+ * documents for the trust policy condition it recommends against the confused
+ * deputy problem. A schedule ARN is not accepted there, and CDK writes the
+ * group ARN into the execution roles it generates.
  */
 export async function assumeSchedulerExecutionRole(
   target: SimSchedulerExecutionRoleTarget,
   scope: SimAwsAccountRegionContainer,
+  schedule: SimSchedulerSchedule,
 ): Promise<SimAwsCaller> {
   return await assumeSimServiceRole({
     target,
     servicePrincipal: simSchedulerServicePrincipal,
     sessionName,
     scope,
+    source: { arn: schedule.groupArn, accountId: schedule.accountId },
     refusals,
   });
 }
