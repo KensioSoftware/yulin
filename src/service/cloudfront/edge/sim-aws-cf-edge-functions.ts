@@ -3,8 +3,8 @@ import type { SimLambdaFunctionTarget } from "../../lambda/function/version/sim-
 import {
   assumeSimServiceRole,
   type SimServiceRoleRefusals,
-  simServiceRoleTarget,
 } from "../../sts/service-role/sim-service-role.js";
+import { simServiceRoleTarget } from "../../sts/service-role/sim-service-role-target.js";
 import { SimCloudFrontInvalidLambdaFunctionAssociation } from "../error/sim-cloudfront.error.js";
 import { edgeFunctionArnParts } from "./sim-cf-edge-function-arn.js";
 import type { SimCfEdgeFunctions } from "./sim-cf-edge-functions.js";

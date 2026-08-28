@@ -3,9 +3,11 @@ import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-reg
 import {
   assumeSimServiceRole,
   type SimServiceRoleRefusals,
+} from "../../sts/service-role/sim-service-role.js";
+import {
   type SimServiceRoleTarget,
   simServiceRoleTarget,
-} from "../../sts/service-role/sim-service-role.js";
+} from "../../sts/service-role/sim-service-role-target.js";
 import { SimStatesTaskFailure } from "../error/sim-step-functions.error.js";
 
 /**

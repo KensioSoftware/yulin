@@ -1,6 +1,7 @@
 import type { SimSchedule } from "../../../util/schedule/sim-schedule.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimSchedulerTarget } from "../target/sim-scheduler-target.js";
+import { schedulerScheduleGroupArn } from "../group/sim-scheduler-schedule-group-arn.js";
 import { schedulerScheduleArn } from "./sim-scheduler-schedule-arn.js";
 import type { SimSchedulerScheduleName } from "./sim-scheduler-schedule-name.js";
 import type { SimSchedulerScheduleState } from "./sim-scheduler-schedule-state.js";
@@ -39,6 +40,22 @@ export class SimSchedulerSchedule {
   public readonly name: SimSchedulerScheduleName;
   public readonly groupName: string;
   public readonly arn: string;
+
+  /**
+   * The ARN of the group this schedule is in.
+   *
+   * Kept beside the schedule's own ARN because it is a different resource path
+   * and the two are easy to confuse. This is the one AWS recommends as the
+   * `aws:SourceArn` of an execution role's trust policy.
+   */
+  public readonly groupArn: string;
+
+  /**
+   * The Account this schedule is in, supplied as `aws:SourceAccount` when its
+   * execution role is assumed.
+   */
+  public readonly accountId: string;
+
   public readonly target: SimSchedulerTarget;
   public readonly actionAfterCompletion: SimSchedulerActionAfterCompletion;
   public readonly description: string | undefined;
@@ -60,6 +77,11 @@ export class SimSchedulerSchedule {
       properties.name.value,
       properties.accountRegionScope,
     );
+    this.groupArn = schedulerScheduleGroupArn(
+      properties.groupName,
+      properties.accountRegionScope,
+    );
+    this.accountId = properties.accountRegionScope.accountId;
     this.schedule = properties.schedule;
     this.target = properties.target;
     this.actionAfterCompletion = properties.actionAfterCompletion;

@@ -1,19 +1,16 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
-import { IamRoleArnParser } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimIam } from "../../iam/sim-iam.js";
 import { AssumeRoleTrustPolicyAuthorizer } from "../auth-z/assume-role-trust-policy-authorizer.js";
-
-/**
- * Which IAM a role ARN belongs to, and what the role is called there.
- */
-export interface SimServiceRoleTarget {
-  readonly accountId: SimAwsAccountId;
-  readonly roleName: string;
-  readonly roleArn: string;
-}
+import {
+  simServiceRoleConditionContext,
+  type SimServiceRoleSource,
+} from "./sim-service-role-source.js";
+import {
+  simServiceRoleCaller,
+  type SimServiceRoleTarget,
+} from "./sim-service-role-target.js";
 
 /**
  * How a service says that it could not assume a role, in its own words.
@@ -55,20 +52,16 @@ export interface SimServiceRoleAssumption {
    */
   readonly scope: SimAwsAccountRegionContainer;
 
+  /**
+   * Which of the service's own resources the role is assumed for.
+   *
+   * A service that states one has its trust policy evaluated with
+   * `aws:SourceArn` and `aws:SourceAccount` in hand, which is what a role
+   * carrying AWS's confused deputy condition needs to be assumable at all.
+   */
+  readonly source?: SimServiceRoleSource | undefined;
+
   readonly refusals: SimServiceRoleRefusals;
-}
-
-/**
- * Read the Account and name out of a role ARN a service will assume.
- *
- * The ARN is checked for being a role ARN where the request that carried it was
- * written, so this is reading a known shape rather than validating an unknown
- * one.
- */
-export function simServiceRoleTarget(roleArn: string): SimServiceRoleTarget {
-  const parts = new IamRoleArnParser().parse(roleArn);
-
-  return { accountId: parts.accountId, roleName: parts.roleName, roleArn };
 }
 
 /**
@@ -87,7 +80,8 @@ export function simServiceRoleTarget(roleArn: string): SimServiceRoleTarget {
 export async function assumeSimServiceRole(
   assumption: SimServiceRoleAssumption,
 ): Promise<SimAwsCaller> {
-  const { target, servicePrincipal, sessionName, scope, refusals } = assumption;
+  const { target, servicePrincipal, sessionName, scope, source, refusals } =
+    assumption;
   const iam = scope.iam();
   const role = await roleOrRefuse(target, iam, refusals);
 
@@ -98,6 +92,7 @@ export async function assumeSimServiceRole(
       targetIam: iam,
       region: scope.accountRegionScope.regionName,
       caller: { kind: "service", service: servicePrincipal },
+      conditionContext: simServiceRoleConditionContext(source),
     });
   } catch (error) {
     if (error instanceof SimIamAccessDenied) {
@@ -107,14 +102,7 @@ export async function assumeSimServiceRole(
     throw error;
   }
 
-  return {
-    kind: "resolved",
-    principal: {
-      kind: "arn",
-      arn: `arn:aws:sts::${target.accountId}:assumed-role/${target.roleName}/${sessionName}`,
-    },
-    identityPolicyPrincipal: { kind: "arn", arn: target.roleArn },
-  };
+  return simServiceRoleCaller(target, sessionName);
 }
 
 /**

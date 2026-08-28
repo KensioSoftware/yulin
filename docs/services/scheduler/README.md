@@ -175,6 +175,12 @@ Two things therefore have to be right, and they are fixed in different places:
 - A policy **on the role** has to allow the action on the target, being `lambda:InvokeFunction`,
   `sqs:SendMessage`, `sns:Publish` or `ecs:RunTask`.
 
+A trust policy may also carry the condition AWS recommends against the confused deputy problem. The
+schedule's group ARN is supplied as `aws:SourceArn`, and the Account the schedule is in as
+`aws:SourceAccount`. A role scoped to one schedule group is assumable by schedules in that group and
+by nothing else. CDK writes that condition into the execution roles it generates for a schedule
+target, so a role taken from a synthesized template works here unchanged.
+
 When either is missing the target goes uninvoked and no error is thrown, exactly as on AWS, where the
 failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally. A
 test asserting on a failed invocation reads `deliveryFailures`:
@@ -795,7 +801,3 @@ Resources of the same stack.
   for each of them, in this process and one after another.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Nothing here retries, so it has
   no request to make idempotent.
-- A schedule's execution role is assumed with no `aws:SourceArn` condition key supplied. AWS
-  recommends scoping that key to a schedule group ARN in the role's trust policy, against the
-  confused deputy problem, and a trust policy carrying that condition admits nothing here. Every
-  firing of a schedule using such a role is recorded in `deliveryFailures`.
