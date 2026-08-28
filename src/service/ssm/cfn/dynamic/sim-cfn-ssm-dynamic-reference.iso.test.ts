@@ -127,6 +127,23 @@ describe("SSM CloudFormation dynamic references", () => {
     assertIdentical(readValue(simAws), "prod-db.internal");
   });
 
+  it("resolves a reference an Fn::Join built out of its own text", async () => {
+    // Given a parameter, and a template writing the reference in pieces rather
+    // than as one string.
+    const simAws = simAwsInEuWest2();
+    await simAws.ssm().putParameter({
+      input: { Name: "/myapp/db-host", Type: "String", Value: "db.internal" },
+    });
+
+    // When the pieces are joined.
+    await deployReading(simAws, {
+      "Fn::Join": ["", ["{{", "resolve:ssm:/myapp/db-host}}"]],
+    });
+
+    // Then the joined string is read as a reference, as it is on AWS.
+    assertIdentical(readValue(simAws), "db.internal");
+  });
+
   it("hands a StringList parameter to Fn::Split as one comma-separated string", async () => {
     // Given a StringList parameter.
     const simAws = simAwsInEuWest2();

@@ -31,6 +31,20 @@ const denyAccountRoot = {
   },
 } as const;
 
+/**
+ * An organization denying every read of a parameter, whatever principal makes
+ * it, which is the policy a real deployment fails a Stack against.
+ */
+const denyEveryParameterRead = {
+  Version: "2012-10-17",
+  Statement: {
+    Sid: "DenyEverySsmRead",
+    Effect: "Deny",
+    Action: "ssm:GetParameter*",
+    Resource: "*",
+  },
+} as const;
+
 interface DeploymentAccount {
   readonly simAws: SimAws;
   readonly accountId: SimAwsAccountId;
@@ -166,6 +180,62 @@ describe("the principal a CloudFormation dynamic reference is resolved as", () =
 
     assertNonNullable(user?.loginProfile, "the deployed User's login profile");
     assertIdentical(user.loginProfile.password, "hunter2");
+  });
+
+  it("reads a plain ssm reference as that Role too", async () => {
+    // Given a parameter stored in the clear, the same deploy Role, and the
+    // same organization.
+    const { simAws, accountId } = deploymentAccount();
+    const deployer = await deployRole(simAws, "deployer", ["*"]);
+
+    await simAws.ssm().putParameter({
+      input: { Name: "/site/origin", Type: "String", Value: "edge.internal" },
+    });
+
+    simAws
+      .organizations()
+      .attachServiceControlPolicy(accountId, denyAccountRoot);
+
+    // When a Stack reading it is deployed as the Role.
+    await deployReading(simAws, "{{resolve:ssm:/site/origin}}", deployer);
+
+    // Then the parameter was read as the Role rather than as the root.
+    assertIdentical(readParameter(simAws), "edge.internal");
+  });
+
+  it("fails the Resource where the deployment may not read an ssm reference", async () => {
+    // Given a parameter, a deploy Role allowed everything, and an organization
+    // denying every Parameter Store read.
+    const { simAws, accountId } = deploymentAccount();
+    const deployer = await deployRole(simAws, "deployer", ["*"]);
+
+    await simAws.ssm().putParameter({
+      input: { Name: "/site/origin", Type: "String", Value: "edge.internal" },
+    });
+
+    simAws
+      .organizations()
+      .attachServiceControlPolicy(accountId, denyEveryParameterRead);
+
+    // When a Stack reading that parameter is deployed as the Role.
+    const error = await assertThrowsErrorAsync(async () => {
+      await deployReading(simAws, "{{resolve:ssm:/site/origin}}", deployer);
+    });
+
+    // Then the Resource failed on the read, rather than being created with a
+    // value the deny should have kept from it.
+    assertStringIncludes(
+      error.message,
+      `arn:aws:iam::${accountId}:role/deployer is not authorized to perform: ssm:GetParameter`,
+    );
+    assertIdentical(
+      simAws
+        .cloudFormation()
+        .getStackByName("site-stack")
+        ?.getResource("EdgeToken")?.status,
+      "CREATE_FAILED",
+    );
+    assertUndefined(readParameter(simAws));
   });
 
   it("leaves a deployment that names no caller reading as the Account root", async () => {

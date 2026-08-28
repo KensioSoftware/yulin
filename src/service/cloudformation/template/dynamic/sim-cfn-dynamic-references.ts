@@ -4,7 +4,9 @@ import { currentSimCfnValuePath } from "../value/sim-cfn-value-path.js";
 import { SimCfnAwaitedDynamicReferences } from "./sim-cfn-awaited-dynamic-references.js";
 import { fillSimCfnDynamicReferencePlaceholders } from "./sim-cfn-dynamic-reference-placeholder.js";
 import { substituteSimCfnDynamicReferences } from "./sim-cfn-dynamic-reference-scan.js";
+import { SimCfnPrefetchedDynamicReferences } from "./sim-cfn-prefetched-dynamic-references.js";
 import type {
+  SimCfnDynamicReference,
   SimCfnDynamicReferenceResolution,
   SimCfnDynamicReferenceResolver,
 } from "./sim-cfn-dynamic-reference.type.js";
@@ -29,8 +31,9 @@ interface SimCfnDynamicReferencesProperties {
  * what the ones this simulation has yet to implement do.
  *
  * One of these belongs to a single Resource's property resolution. That is
- * what lets it hold the references still being read. `substitute` runs while
- * the properties resolve, and `settle` finishes them afterwards.
+ * what lets it hold the references still being read. `prefetch` reads them
+ * ahead of resolution, `substitute` runs while the properties resolve, and
+ * `settle` finishes whatever the prefetch pass never reached.
  */
 export class SimCfnDynamicReferences {
   private readonly resolvers: ReadonlyMap<
@@ -44,10 +47,31 @@ export class SimCfnDynamicReferences {
 
   private readonly awaited = new SimCfnAwaitedDynamicReferences();
 
+  private readonly prefetched = new SimCfnPrefetchedDynamicReferences();
+
   constructor(properties: SimCfnDynamicReferencesProperties) {
     this.resolvers = properties.resolvers;
     this.propertyIgnorer = properties.propertyIgnorer;
     this.resourceType = properties.resourceType;
+  }
+
+  /**
+   * Read every reference the properties hold, before resolving them for real.
+   *
+   * A service that has to be waited on cannot answer during resolution, which
+   * is synchronous, so an `Fn::Split` over a reference would otherwise split
+   * something that is not the value yet. Resolving the properties twice is
+   * what avoids that: this pass leaves every reference as the template wrote
+   * it and only collects what the services answer, and the pass after it finds
+   * the answers already here.
+   *
+   * Nothing is recorded here and no failure escapes. A template this pass
+   * cannot resolve is resolved again straight afterwards, and that is the pass
+   * whose failure the Resource reports. A reference the pass never reached, or
+   * one whose service refused it, is left to `substitute` and `settle`.
+   */
+  async prefetch(resolve: () => void): Promise<void> {
+    await this.prefetched.read(resolve);
   }
 
   /**
@@ -65,17 +89,7 @@ export class SimCfnDynamicReferences {
         return;
       }
 
-      const path = currentSimCfnValuePath();
-      const resolution = resolver.resolve(reference, {
-        resourceType: this.resourceType,
-        propertyPath: path,
-      });
-
-      if (resolution instanceof Promise) {
-        return this.awaited.hold(resolution, path);
-      }
-
-      return this.answer(resolution, path);
+      return this.substituted(resolver, reference);
     });
   }
 
@@ -103,6 +117,43 @@ export class SimCfnDynamicReferences {
     );
 
     return fillSimCfnDynamicReferencePlaceholders(properties, values);
+  }
+
+  /**
+   * What one reference is replaced with, given the service answering it.
+   */
+  private substituted(
+    resolver: SimCfnDynamicReferenceResolver,
+    reference: SimCfnDynamicReference,
+  ): string {
+    const path = currentSimCfnValuePath();
+    const key = `${path} ${reference.text}`;
+    const prefetched = this.prefetched.answerFor(key);
+
+    if (prefetched !== undefined) {
+      return this.answer(prefetched, path);
+    }
+
+    if (this.prefetched.isHeld(key)) {
+      return reference.text;
+    }
+
+    const resolution = resolver.resolve(reference, {
+      resourceType: this.resourceType,
+      propertyPath: path,
+    });
+
+    if (this.prefetched.isReading) {
+      this.prefetched.hold(key, resolution);
+
+      return reference.text;
+    }
+
+    if (resolution instanceof Promise) {
+      return this.awaited.hold(resolution, path);
+    }
+
+    return this.answer(resolution, path);
   }
 
   /**

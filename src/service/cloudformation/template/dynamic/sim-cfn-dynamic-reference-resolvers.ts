@@ -49,8 +49,8 @@ export const simCfnDynamicReferenceResolvers: ReadonlyMap<
 > = new Map([
   [
     "ssm",
-    ({ scopedAws }): SimCfnDynamicReferenceResolver =>
-      scopedAws.ssm().cfnDynamicReferenceResolver(),
+    ({ scopedAws, caller }): SimCfnDynamicReferenceResolver =>
+      scopedAws.ssm().cfnDynamicReferenceResolver(caller),
   ],
   [
     "ssm-secure",

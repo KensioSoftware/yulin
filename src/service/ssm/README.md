@@ -149,9 +149,10 @@ There is no resource policy support, so cross-account access to a parameter cann
 - Every deployment of an `AWS::SSM::Parameter` is a create, because sim CloudFormation has no stack
   updates. A name another stack already used is refused rather than overwritten.
 - `{{resolve:ssm:...}}` dynamic references resolve here. `cfn/dynamic/` holds the resolver the
-  CloudFormation engine reaches through `SimSsm.cfnDynamicReferenceResolver()`. A reference this
-  store cannot answer resolves to a stand-in value and is recorded, which is the same best-effort
-  answer an unsupported property gets.
+  CloudFormation engine reaches through `SimSsm.cfnDynamicReferenceResolver()`. The parameter is
+  read through `GetParameter` as the caller deploying the Stack, and a policy denying that read
+  fails the Resource. A reference this store cannot answer resolves to a stand-in value and is
+  recorded, which is the same best-effort answer an unsupported property gets.
 - An `AWS::SSM::Parameter::Value<...>` template parameter is read here too.
   `cfn/parameter/sim-cfn-ssm-parameter-value-reader.ts` holds the reader the CloudFormation engine
   reaches through `SimSsm.cfnParameterValueReader()`, and a name this store cannot answer gets the

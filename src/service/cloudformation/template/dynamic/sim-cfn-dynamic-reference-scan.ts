@@ -1,3 +1,4 @@
+import type { SimCfnTemplateValue } from "../value/sim-cfn-template-value.js";
 import type { SimCfnDynamicReference } from "./sim-cfn-dynamic-reference.type.js";
 
 /**
@@ -30,6 +31,35 @@ type SimCfnDynamicReferenceSubstitution = (
  */
 export function hasSimCfnDynamicReference(text: string): boolean {
   return text.includes(dynamicReferenceOpening);
+}
+
+/**
+ * Whether anything in a template value was written as a dynamic reference.
+ *
+ * The opening is written literally in every template but a contrived one, so
+ * this answers whether a Resource's properties are worth reading references
+ * out of before they are resolved. A template building the opening itself,
+ * out of an `Fn::Join` over its characters, is answered no and reads its
+ * references while resolving instead.
+ */
+export function hasSimCfnDynamicReferenceIn(
+  value: SimCfnTemplateValue,
+): boolean {
+  if (typeof value === "string") {
+    return hasSimCfnDynamicReference(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasSimCfnDynamicReferenceIn(entry));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).some((entry) =>
+      hasSimCfnDynamicReferenceIn(entry),
+    );
+  }
+
+  return false;
 }
 
 /**

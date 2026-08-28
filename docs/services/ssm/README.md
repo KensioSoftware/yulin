@@ -440,6 +440,10 @@ Real CloudFormation makes no dependency out of a dynamic reference, and neither 
 parameter another resource of the same stack creates is only there in time when the template says
 `DependsOn`.
 
+The parameter is read with `GetParameter`, as the caller deploying the stack. A policy denying that
+read fails the resource holding the reference, the way it fails a real deployment. A stack deployed
+without a caller reads as the account root.
+
 A `SecureString` parameter is read through `{{resolve:ssm-secure:...}}`, which the next section
 covers. `{{resolve:secretsmanager:...}}` reads a secret, and
 [simulated Secrets Manager](https://yulinsim.dev/services/secretsmanager/#reading-a-secret-with-a-dynamic-reference)
