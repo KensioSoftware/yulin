@@ -253,6 +253,18 @@ that SQLite reads as its own JSON operator. Registering the name would leave the
 as that operator and answer something. Leaving it absent makes SQLite refuse the statement, which
 is a refusal rather than a wrong answer.
 
+`sim-athena-binary-shims.ts` holds the hashing functions and the encodings that carry bytes in and
+out of them. A `varbinary` lives in SQLite as a blob. A digest travels as bytes, and two rows
+carrying the same digest count as one value. Node has every digest apart from xxHash64 and
+MurmurHash3, and `sim-athena-xxhash64.ts` and `sim-athena-murmur3.ts` write those two out. Both are
+checked against published vectors and against the worked example in Trino's own documentation.
+
+`sim-athena-count-distinct.ts` works on the statement text before `astify` reads it. The parser's
+Athena grammar takes a column after `DISTINCT` and refuses anything else, and
+`count(DISTINCT concat(a, b))` never gets that far. The rewrite turns that call into
+`count_distinct(...)`, registered by `sim-athena-aggregate-shims.ts`. A plain column is left alone (SQLite counts one natively), and a call written inside a
+string literal is left alone as well.
+
 `sim-athena-timestamp-text.ts` is what keeps a timestamp's shape. A value arrives as text and has
 to leave as text written the same way, so an instant is rendered back through the value it came
 from. A value carrying a numeric UTC offset is refused for the same reason. Rendering

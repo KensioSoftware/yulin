@@ -17,11 +17,23 @@ export function simAthenaScalarShim(
   name: string,
   implementation: SimAthenaScalarShim,
 ): void {
-  database.function(
-    name,
-    { varargs: true, deterministic: true },
-    implementation,
+  database.function(name, { varargs: true, deterministic: true }, (...values) =>
+    withEmptyBytes(implementation(...values)),
   );
+}
+
+/**
+ * One answer, with an empty `varbinary` written so that SQLite keeps it.
+ *
+ * `node:sqlite` reads a zero length typed array as SQL NULL where its backing
+ * store carries no pointer, and `TextEncoder` answers with exactly that over an
+ * empty string. Copying those bytes gives the empty blob back, and `to_utf8('')`
+ * then answers the empty `varbinary` Trino answers with rather than a null.
+ */
+function withEmptyBytes(answered: SQLInputValue): SQLInputValue {
+  return answered instanceof Uint8Array && answered.length === 0
+    ? Buffer.alloc(0)
+    : answered;
 }
 
 /**
@@ -56,4 +68,24 @@ export function shimNumber(
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * One argument as bytes, or nothing where it is null.
+ *
+ * The binary functions take a `varbinary`, and Trino refuses text where one is
+ * wanted rather than converting it. SQLite has no such analysis to run, so a
+ * column of text reaching `sha256` without a `to_utf8` around it is hashed as
+ * its UTF-8 bytes, which is what the missing call would have produced.
+ */
+export function shimBytes(
+  value: SQLOutputValue | undefined,
+): Uint8Array | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  return value instanceof Uint8Array
+    ? value
+    : new TextEncoder().encode(String(value));
 }

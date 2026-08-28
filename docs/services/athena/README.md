@@ -380,11 +380,23 @@ its declared result.
 | JSON          | `json_extract`, `json_extract_scalar`, `json_parse`, `json_size`                                                                                                                                      |
 | Array and map | `array_agg`, `cardinality`, `contains`, `element_at`, `array_join`, `slice`                                                                                                                           |
 | String        | `regexp_like`, `regexp_extract`, `regexp_replace`, `split_part`, `strpos`                                                                                                                             |
+| Binary        | `md5`, `sha1`, `sha256`, `sha512`, `xxhash64`, `murmur3`, `crc32`, `to_hex`, `from_hex`, `to_base64`, `from_base64`, `to_utf8`, `from_utf8`                                                           |
 | URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`, `url_decode`, `url_encode`                  |
 | Approximate   | `approx_distinct`, `approx_percentile`                                                                                                                                                                |
 
 `substr` and `format` are SQLite's own. Both count from one and take the same `%s` and `%d` a
 statement writes, so shadowing either would replace something that works.
+
+The hashing functions answer with bytes and `to_hex` writes those bytes in the upper case Trino
+writes them in. Node carries every digest here apart from xxHash64 and MurmurHash3, and both of
+those are written out by hand against their published vectors. Trino refuses text where a
+`varbinary` is wanted, and SQLite has no analysis to refuse it with. A column reaching `sha256`
+with no `to_utf8` around it is hashed as its UTF-8 bytes.
+
+`count(DISTINCT <expression>)` runs. The parser's Athena grammar takes a column after `DISTINCT`
+and refuses everything else. The call is rewritten onto an aggregate of the simulator's own before
+the statement is read. A plain `count(DISTINCT <column>)` is left alone and SQLite counts it. A
+call written inside a string literal is left alone as well.
 
 `current_date` and `current_timestamp` read the simulator's clock. A test that froze time gets the
 instant it froze, and the same test answers the same way on every machine. Athena reads both at the
@@ -912,11 +924,25 @@ Current documented limitations:
   down, since JavaScript can turn no flag on part way through one.
 - The date and time functions work on the ISO-8601 text a JSON or CSV object carries. A column
   written any other way gets whatever slicing that text comes to.
+- A `varbinary` in a result row reads as its bytes decoded as UTF-8. A digest read that way loses
+  whatever in it was no UTF-8. A query answering with one wants `to_hex` or `to_base64` around it.
+- `from_hex` and `from_base64` turn the query down over text the encoding cannot carry. Trino fails
+  the query, and reading as much of the text as parses would answer with bytes nobody wrote.
+- `from_utf8` with a replacement named turns the query down where the bytes already carry the
+  replacement character. Trino writes the replacement only where a sequence was broken, and nothing
+  survives decoding to tell one of those apart from a character the bytes held.
+- `spooky_hash_v2_32` and `spooky_hash_v2_64` are absent, and so are the other Trino hashes with no
+  entry in the table above.
 - `approx_distinct` and `approx_percentile` are computed exactly. The simulation is more accurate
   than AWS here, and at the scale a test seeds the difference cannot show.
 - Three classes of expression the engine accepts are ones real Athena refuses. `1 / 0` answers
   null, `CAST('abc' AS INTEGER)` answers 0, and `1 || 'x'` answers `'1x'`. Each of them fails a
   real query.
+- A column of text reaching `sha256` or any of the other byte-only functions is hashed as its UTF-8
+  bytes. Athena refuses the argument and fails the query, and a test writing one gets an answer
+  where real Athena would have given an error. SQLite has no analysis to refuse the argument with,
+  and a Glue `binary` column arrives here as text, so refusing it would turn down a query Athena
+  runs.
 - `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
   Athena answers null, which is the same forgiving direction as the cast above. Reading the
   statement without the rewrite would turn the whole query down.

@@ -124,3 +124,131 @@ describe("the Trino functions a query reaches for", () => {
     assertObjectEquals(answered.rows, [["declared"]]);
   });
 });
+
+const visits = [
+  { c_ip: "198.51.100.7", cs_user_agent: "Firefox" },
+  { c_ip: "198.51.100.7", cs_user_agent: "Firefox" },
+  { c_ip: "198.51.100.7", cs_user_agent: "Safari" },
+  { c_ip: "203.0.113.4", cs_user_agent: "Safari" },
+];
+
+/** A simulation holding the access log rows, with the engine on. */
+async function aVisitSimulation(): Promise<SimAthenaEngineSimulation> {
+  const simulation = await anEngineSimulation();
+
+  aCatalogTable(simulation.simAws, {
+    name: "visits",
+    columns: [
+      { Name: "c_ip", Type: "string" },
+      { Name: "cs_user_agent", Type: "string" },
+    ],
+  });
+
+  await aSeededJson(simulation.simAws, "visits/part-0.json", visits);
+  await simulation.simAws.athena().engine().enable();
+  simulation.simAws
+    .athena()
+    .results()
+    .byDefault({ columns: ["fallback"], rows: [["declared"]] });
+
+  return simulation;
+}
+
+describe("counting unique visitors from a salted digest", () => {
+  it("hashes each visitor and counts the digests", async () => {
+    // Given four rows carrying three distinct address and agent pairs.
+    const simulation = await aVisitSimulation();
+
+    // When they are counted the way an analytics query counts a visitor,
+    // hashing the pair behind a salt so no address is kept.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT to_hex(sha256(to_utf8(" +
+        "concat('pepper', '|', c_ip, '|', cs_user_agent))))) AS visitors " +
+        "FROM rainlytics.visits",
+    );
+
+    // Then the engine answers it, and three distinct pairs come to three
+    // distinct digests.
+    assertIdentical(answered.answeredBy, "engine");
+    assertObjectEquals(answered.rows, [["3"]]);
+  });
+
+  it("counts a distinct expression as well as a distinct column", async () => {
+    // Given the same rows.
+    const simulation = await aVisitSimulation();
+
+    // When each of the three shapes of count is asked for.
+    const column = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT c_ip) AS v FROM rainlytics.visits",
+    );
+    const expression = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT concat(c_ip, '|', cs_user_agent)) AS v " +
+        "FROM rainlytics.visits",
+    );
+    const approximate = await anAnsweredQuery(
+      simulation,
+      "SELECT approx_distinct(concat(c_ip, '|', cs_user_agent)) AS v " +
+        "FROM rainlytics.visits",
+    );
+
+    // Then all three run. The parser's Athena grammar takes a column after
+    // DISTINCT and nothing else, so the middle one is rewritten onto an
+    // aggregate of the simulator's own rather than turned down.
+    assertObjectEquals(column.rows, [["2"]]);
+    assertObjectEquals(expression.rows, [["3"]]);
+    assertObjectEquals(approximate.rows, [["3"]]);
+  });
+
+  it("counts distinct digests by their bytes", async () => {
+    // Given the same rows.
+    const simulation = await aVisitSimulation();
+
+    // When the digests are counted without a `to_hex` around them.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT sha256(to_utf8(concat(c_ip, cs_user_agent)))) " +
+        "AS visitors FROM rainlytics.visits",
+    );
+
+    // Then the count is the same three. A digest is a blob here, and two rows
+    // carrying the same bytes are one value.
+    assertObjectEquals(answered.rows, [["3"]]);
+  });
+
+  it("turns down a statement whose parentheses do not close", async () => {
+    // Given the same rows.
+    const simulation = await aVisitSimulation();
+
+    // When a query leaves a parenthesis open.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT lower(c_ip) FROM rainlytics.visits",
+    );
+
+    // Then the declaration answers it. The rewrite finds no closing
+    // parenthesis, leaves the call as it was written, and the parser refuses
+    // the statement.
+    assertIdentical(answered.answeredBy, "declaration");
+    assertObjectEquals(answered.rows, [["declared"]]);
+  });
+
+  it("leaves a count written inside a string literal alone", async () => {
+    // Given the same rows.
+    const simulation = await aVisitSimulation();
+
+    // When a query compares a column against text that reads like one of
+    // these calls.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT count(DISTINCT lower(c_ip)) AS v FROM rainlytics.visits " +
+        "WHERE cs_user_agent <> 'count(DISTINCT lower(x))'",
+    );
+
+    // Then the rewrite reaches the call and not the literal, so the
+    // comparison is still made against the text somebody wrote.
+    assertObjectEquals(answered.rows, [["2"]]);
+  });
+});

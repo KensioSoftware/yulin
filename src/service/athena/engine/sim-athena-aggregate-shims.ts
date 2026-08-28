@@ -1,5 +1,12 @@
 import type { DatabaseSync, SQLOutputValue } from "node:sqlite";
 
+import { countDistinctShim } from "./sim-athena-count-distinct.js";
+import {
+  countedDistinctValues,
+  noDistinctValues,
+  withDistinctValue,
+} from "./sim-athena-distinct-values.js";
+
 /** What `approx_percentile` carries between rows. */
 interface SimAthenaPercentileState {
   readonly values: number[];
@@ -7,31 +14,29 @@ interface SimAthenaPercentileState {
 }
 
 /**
- * Trino's two approximate aggregates, computed exactly.
+ * Trino's two approximate aggregates, computed exactly, and the exact count
+ * behind `count(DISTINCT <expression>)`.
  *
- * Real Athena answers both from a sketch and this answers from the values
- * themselves, so the simulation is the more accurate of the two. At the scale
- * a test seeds that difference cannot show, and the alternative is a query
- * that refuses to run at all.
+ * Real Athena answers the approximate pair from a sketch and this answers from
+ * the values themselves, so the simulation is the more accurate of the two. At
+ * the scale a test seeds that difference cannot show, and the alternative is a
+ * query that refuses to run at all.
+ *
+ * `count_distinct` is nobody's function to write. It is what the SQL rewrite
+ * turns `count(DISTINCT <expression>)` into, because the parser's Athena
+ * grammar takes a column after `DISTINCT` and nothing else.
  *
  * The state travels as JSON because SQLite carries an aggregate's accumulator
  * as one of its own values rather than as an object.
  */
 export function simAthenaInstallAggregateShims(database: DatabaseSync): void {
-  database.aggregate("approx_distinct", {
-    start: "[]",
-    step: (accumulator: string, value: SQLOutputValue) => {
-      const seen = new Set(JSON.parse(accumulator) as unknown[]);
-
-      if (value !== null) {
-        seen.add(typeof value === "bigint" ? String(value) : value);
-      }
-
-      return JSON.stringify([...seen]);
-    },
-    result: (accumulator: string) =>
-      (JSON.parse(accumulator) as unknown[]).length,
-  });
+  for (const name of ["approx_distinct", countDistinctShim]) {
+    database.aggregate(name, {
+      start: noDistinctValues,
+      step: withDistinctValue,
+      result: countedDistinctValues,
+    });
+  }
 
   database.aggregate("approx_percentile", {
     start: () => JSON.stringify({ values: [], percentile: 0.5 }),
