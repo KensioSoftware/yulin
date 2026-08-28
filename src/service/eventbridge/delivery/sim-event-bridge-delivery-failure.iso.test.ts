@@ -1,4 +1,4 @@
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimEventBridgeDeliveryFailures } from "./sim-event-bridge-delivery-failures.js";
 
@@ -21,5 +21,34 @@ describe("EventBridge delivery failure", () => {
     // know what a target threw.
     assertIdentical(failures.all[0]?.message, "the queue said no");
     assertIdentical(failures.all[1]?.message, "the queue said no, rudely");
+  });
+
+  it("carries the message into JSON", () => {
+    // Given a delivery that failed with an Error, whose own message property
+    // is not enumerable and so does not serialise on its own.
+    const failures = new SimEventBridgeDeliveryFailures();
+
+    failures.record({
+      ruleName: "orders",
+      ruleArn: "arn:aws:events:us-east-1:888888888888:rule/orders",
+      targetId: "queue",
+      targetArn: "arn:aws:sqs:us-east-1:888888888888:orders",
+      eventId: "0f2c9d6e",
+      error: new Error("the queue said no"),
+    });
+
+    // When the failure is serialised. That is the first thing to reach for
+    // when a target received nothing.
+    const serialised = JSON.stringify(failures.all[0]);
+    const read: unknown = JSON.parse(serialised);
+
+    // Then the message is there alongside the fields naming the delivery.
+    assertObjectMatches(read, {
+      ruleName: "orders",
+      targetId: "queue",
+      targetArn: "arn:aws:sqs:us-east-1:888888888888:orders",
+      eventId: "0f2c9d6e",
+      message: "the queue said no",
+    });
   });
 });

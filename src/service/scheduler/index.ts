@@ -23,7 +23,10 @@ export {
   simSchedulerServicePrincipal,
   type SimSchedulerDeliveryTargets,
 } from "./delivery/sim-scheduler-delivery.js";
-export { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-delivery-failures.js";
+export {
+  SimSchedulerDeliveryFailure,
+  type SimSchedulerDeliveryFailureJson,
+} from "./delivery/sim-scheduler-delivery-failures.js";
 export {
   SimSchedulerDeliveryNotPermitted,
   SimSchedulerTargetNotFound,

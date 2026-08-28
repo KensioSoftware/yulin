@@ -235,6 +235,9 @@ console.log(failure?.message);
 //  allow scheduler.amazonaws.com to assume it, ..."
 ```
 
+`JSON.stringify` on a failure carries the message alongside the schedule, the target, the role and
+the instant it names.
+
 ### One-time schedules and what happens after
 
 An `at(...)` schedule fires once and then stops. By default it stays in the Account afterwards, which

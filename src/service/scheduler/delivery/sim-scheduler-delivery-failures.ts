@@ -8,6 +8,14 @@ interface SimSchedulerDeliveryFailureProperties {
 }
 
 /**
+ * A failed invocation as it serialises. Every property the failure holds, plus
+ * the message the getter reads off the error.
+ */
+export interface SimSchedulerDeliveryFailureJson extends SimSchedulerDeliveryFailureProperties {
+  readonly message: string;
+}
+
+/**
  * One invocation a schedule could not make.
  */
 export class SimSchedulerDeliveryFailure {
@@ -46,6 +54,26 @@ export class SimSchedulerDeliveryFailure {
     }
 
     return String(this.error);
+  }
+
+  /**
+   * The failure as JSON.stringify renders it, message included.
+   *
+   * Serialising a failure is the first thing to reach for when a schedule did
+   * not do what a test expected. The message is a getter on the prototype and
+   * would be left out. An Error keeps its own message on a non-enumerable
+   * property and prints as `{}`.
+   */
+  toJSON(): SimSchedulerDeliveryFailureJson {
+    return {
+      scheduleName: this.scheduleName,
+      scheduleArn: this.scheduleArn,
+      targetArn: this.targetArn,
+      roleArn: this.roleArn,
+      at: this.at,
+      message: this.message,
+      error: this.error,
+    };
   }
 }
 
