@@ -230,6 +230,22 @@ describe("Trino's binary encodings on SQLite", () => {
       anAnsweredExpression("from_base64('not base64!')"),
     );
   });
+
+  it("refuses base64 whose padding could never have been written", async () => {
+    // Given text padded to a length no encoder produces, and text one
+    // character over a multiple of four.
+    // When each is read back.
+    // Then the statement raises. `Buffer` decodes all four of these and
+    // answers with bytes nobody wrote.
+    await Promise.all(
+      ["=", "A=", "AAAA=", "A"].map(async (text) =>
+        assertThrowsErrorAsync(
+          async () => anAnsweredExpression(`from_base64('${text}')`),
+          text,
+        ),
+      ),
+    );
+  });
 });
 
 describe("reading bytes back as text", () => {

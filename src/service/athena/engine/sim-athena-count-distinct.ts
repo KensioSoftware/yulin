@@ -20,6 +20,7 @@ const namePart = /^(?:"[^"]*"|[A-Za-z_]\w*)$/u;
  * own, which counts the distinct values the same way.
  */
 export function simAthenaCountDistinct(sql: string): string {
+  const quoted = quotedPositions(sql);
   let rewritten = "";
   let read = 0;
 
@@ -30,9 +31,9 @@ export function simAthenaCountDistinct(sql: string): string {
     match !== null;
     match = opening.exec(sql)
   ) {
-    const closes = closingParenthesis(sql, opening.lastIndex);
+    const closes = closingParenthesis(sql, opening.lastIndex, quoted);
 
-    if (closes === undefined || isQuoted(sql, match.index)) {
+    if (closes === undefined || quoted.at(match.index) === true) {
       continue;
     }
 
@@ -61,23 +62,40 @@ function isColumnReference(argument: string): boolean {
 }
 
 /**
- * Whether this position sits inside a string literal.
+ * Whether the character at each position sits inside quotes.
  *
- * A literal is free to carry the text of a call, and rewriting inside one would
- * quietly change the value a comparison is made against. SQL escapes a quote
- * inside a literal by doubling it, which counts here as one literal ending and
- * another starting, so the count stays even either way.
+ * Both of SQL's quotes are tracked. A single quote opens a string literal and a
+ * double quote opens a delimited identifier, and either is free to carry the
+ * text of a call. Rewriting inside a literal would change the value a
+ * comparison is made against, and rewriting inside an identifier would name a
+ * different column.
+ *
+ * SQL escapes a quote inside either by doubling it, which reads here as one
+ * quoted run ending and another starting. The positions in between land the
+ * same way whichever reading is taken.
  */
-function isQuoted(sql: string, at: number): boolean {
-  let quotes = 0;
+function quotedPositions(sql: string): readonly boolean[] {
+  const inside: boolean[] = [];
+  let quote: string | undefined;
 
-  for (let read = 0; read < at; read += 1) {
-    if (sql.at(read) === "'") {
-      quotes += 1;
+  for (const character of quotableCharacters(sql)) {
+    if (quote === undefined && (character === "'" || character === '"')) {
+      quote = character;
+    } else if (quote === character) {
+      quote = undefined;
     }
+
+    inside.push(quote !== undefined);
   }
 
-  return quotes % 2 === 1;
+  return inside;
+}
+
+/** Each character of the statement, by position rather than by code point. */
+function* quotableCharacters(sql: string): Generator<string> {
+  for (let at = 0; at < sql.length; at += 1) {
+    yield sql.charAt(at);
+  }
 }
 
 /**
@@ -85,22 +103,21 @@ function isQuoted(sql: string, at: number): boolean {
  * statement never closes it.
  *
  * Depth is counted so that a call carrying calls of its own is read whole, and
- * a string literal is skipped so that a parenthesis inside one is not counted.
- * SQL escapes a quote inside a literal by doubling it, which reads here as one
- * literal ending and another starting.
+ * a parenthesis inside quotes is passed over so that it is not counted.
  */
-function closingParenthesis(sql: string, from: number): number | undefined {
+function closingParenthesis(
+  sql: string,
+  from: number,
+  quoted: readonly boolean[],
+): number | undefined {
   let depth = 0;
-  let quoted = false;
 
   for (let at = from; at < sql.length; at += 1) {
-    const character = sql.at(at);
+    const character = quoted.at(at) === true ? "" : sql.charAt(at);
 
-    if (character === "'") {
-      quoted = !quoted;
-    } else if (!quoted && character === "(") {
+    if (character === "(") {
       depth += 1;
-    } else if (!quoted && character === ")") {
+    } else if (character === ")") {
       if (depth === 0) {
         return at;
       }

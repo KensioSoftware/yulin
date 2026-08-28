@@ -938,6 +938,11 @@ Current documented limitations:
 - Three classes of expression the engine accepts are ones real Athena refuses. `1 / 0` answers
   null, `CAST('abc' AS INTEGER)` answers 0, and `1 || 'x'` answers `'1x'`. Each of them fails a
   real query.
+- A column of text reaching `sha256` or any of the other byte-only functions is hashed as its UTF-8
+  bytes. Athena refuses the argument and fails the query, and a test writing one gets an answer
+  where real Athena would have given an error. SQLite has no analysis to refuse the argument with,
+  and a Glue `binary` column arrives here as text, so refusing it would turn down a query Athena
+  runs.
 - `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
   Athena answers null, which is the same forgiving direction as the cast above. Reading the
   statement without the rewrite would turn the whole query down.

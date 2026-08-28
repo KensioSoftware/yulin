@@ -9,6 +9,12 @@ const shapes: ReadonlyMap<string, RegExp> = new Map([
   ["base64", /^[\d+/A-Za-z]*={0,2}$/u],
 ]);
 
+/** Whether the length of this text is one the encoding could have written. */
+const lengths: ReadonlyMap<string, (text: string) => boolean> = new Map([
+  ["hex", (text: string) => text.length % 2 === 0],
+  ["base64", isBase64Length],
+]);
+
 /** One character or none, counted in code points the way Trino counts them. */
 const oneCharacter = /^.?$/u;
 
@@ -33,13 +39,35 @@ export function simAthenaDecodedText(
     return null;
   }
 
-  const even = encoding === "base64" || text.length % 2 === 0;
+  const read =
+    shapes.get(encoding)?.test(text) === true &&
+    lengths.get(encoding)?.(text) === true;
 
-  if (!even || shapes.get(encoding)?.test(text) !== true) {
+  if (!read) {
     throw new SimAthenaSetUpError(`from_${encoding} takes ${encoding} text`);
   }
 
   return new Uint8Array(Buffer.from(text, encoding));
+}
+
+/**
+ * Whether base64 of this length decodes, padding and all.
+ *
+ * Base64 carries three bytes in every four characters, and a length one over a
+ * multiple of four is a length no encoder could have written. Padding fills the
+ * last four out, so text carrying any has to be a multiple of four long.
+ * `Buffer` takes `A=` and `AAAA=` and answers with bytes nobody wrote.
+ */
+function isBase64Length(text: string): boolean {
+  let padding = 0;
+
+  while (text.charAt(text.length - padding - 1) === "=") {
+    padding += 1;
+  }
+
+  const body = text.length - padding;
+
+  return body % 4 !== 1 && (padding === 0 || text.length % 4 === 0);
 }
 
 /**
