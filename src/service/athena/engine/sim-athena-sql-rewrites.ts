@@ -1,3 +1,5 @@
+import { simAthenaCountDistinct } from "./sim-athena-count-distinct.js";
+
 /** What a statement asks for, once the parser's grammar has been worked around. */
 export interface SimAthenaParserSql {
   readonly sql: string;
@@ -18,14 +20,16 @@ const withOrdinality = /\s+WITH\s+ORDINALITY\b/giu;
 /**
  * The statement as the parser's Athena grammar will take it.
  *
- * The two rewrites close a gap in that grammar rather than a gap in SQLite.
+ * Every rewrite here closes a gap in that grammar rather than a gap in SQLite.
  * `try_cast` becomes a plain cast, which changes meaning in the forgiving
  * direction, since SQLite already answers with a value where a cast fails
  * rather than failing the query. Trino writes `OFFSET` before `LIMIT` and every
- * other dialect writes it after.
+ * other dialect writes it after. `count(DISTINCT <expression>)` becomes a call
+ * to an aggregate of the simulator's own, since the grammar takes a column
+ * after `DISTINCT` and nothing else.
  */
 export function simAthenaSqlForParser(sql: string): SimAthenaParserSql {
-  const rewritten = sql
+  const rewritten = simAthenaCountDistinct(sql)
     .replaceAll(/\btry_cast\s*\(/giu, "CAST(")
     .replaceAll(
       /\bOFFSET\s+(\d+)\s+LIMIT\s+(\d+)/giu,

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { simAthenaInstallAggregateShims } from "./sim-athena-aggregate-shims.js";
 import { simAthenaInstallArrayShims } from "./sim-athena-array-shims.js";
+import { simAthenaInstallBinaryShims } from "./sim-athena-binary-shims.js";
 import { simAthenaInstallClockShims } from "./sim-athena-clock-shims.js";
 import { simAthenaInstallDateArithmeticShims } from "./sim-athena-date-arithmetic-shims.js";
 import { simAthenaInstallDateShims } from "./sim-athena-date-shims.js";
@@ -30,6 +31,7 @@ export function simAthenaInstallShims(
   simAthenaInstallJsonDocumentShims(database);
   simAthenaInstallArrayShims(database);
   simAthenaInstallStringShims(database);
+  simAthenaInstallBinaryShims(database);
   simAthenaInstallRegexpShims(database);
   simAthenaInstallUrlShims(database);
   simAthenaInstallAggregateShims(database);
