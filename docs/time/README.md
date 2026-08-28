@@ -73,8 +73,9 @@ clock stopped.
 ## Advancing time
 
 `advanceBy(...)` takes a duration written as any combination of `days`, `hours`, `minutes`,
-`seconds` and `milliseconds`, which add together. Durations are never negative, since time passing
-only runs forwards. `setTo(...)` is the explicit way to move a clock back.
+`seconds` and `milliseconds`, which add together. A bare number counts milliseconds, as it does for
+`setTimeout`, and `advanceBy(3_600_000)` moves an hour. Durations are never negative, since time
+passing only runs forwards. `setTo(...)` is the explicit way to move a clock back.
 
 Advancing moves the clock, and it runs whatever the passage of time should have caused. Work
 scheduled for an instant inside the interval is dispatched in due order, each task running with the

@@ -74,8 +74,10 @@ export class SimControllableClock implements SimClock {
 
   /**
    * Move simulated time forward by a duration, and stop there.
+   *
+   * A bare number counts milliseconds, as it does for `setTimeout`.
    */
-  advanceBy(duration: SimDuration | SimDurationInput): void {
+  advanceBy(duration: SimDuration | SimDurationInput | number): void {
     const milliseconds = SimDuration.of(duration).toMilliseconds();
 
     this.setTo(new Date(this.now().getTime() + milliseconds));

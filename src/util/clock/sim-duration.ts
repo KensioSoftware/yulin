@@ -76,11 +76,19 @@ export class SimDuration {
   }
 
   /**
-   * Build a duration from the components a caller wrote, or pass one through.
+   * Build a duration from the components a caller wrote, from a plain number of
+   * milliseconds, or pass an existing duration through.
+   *
+   * A bare number counts milliseconds, as it does for `setTimeout`. That is what
+   * a caller reaching for `advanceBy(1000)` has in mind.
    */
-  static of(duration: SimDuration | SimDurationInput): SimDuration {
+  static of(duration: SimDuration | SimDurationInput | number): SimDuration {
     if (duration instanceof this) {
       return duration;
+    }
+
+    if (typeof duration === "number") {
+      return this.ofMilliseconds(duration);
     }
 
     return new this(totalMilliseconds(duration));

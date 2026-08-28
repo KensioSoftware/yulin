@@ -113,8 +113,12 @@ export class SimClockControl implements SimClock {
    * The duration is measured from a frozen instant. Advancing by exactly a
    * buffering interval or a schedule period lands on the due instant every
    * time, whatever the host clock does while the advance runs.
+   *
+   * A bare number counts milliseconds, as it does for `setTimeout`.
    */
-  async advanceBy(duration: SimDuration | SimDurationInput): Promise<void> {
+  async advanceBy(
+    duration: SimDuration | SimDurationInput | number,
+  ): Promise<void> {
     this.clock.freeze();
 
     const milliseconds = SimDuration.of(duration).toMilliseconds();
