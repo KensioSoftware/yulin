@@ -57,6 +57,13 @@ The skill sends the AI agent to these docs for anything API-shaped, and
 plain markdown by appending `llms.txt` to its URL, one file per guide and one per simulated service.
 That index works with or without the skill installed.
 
+The same pages ship inside the package. An installed project holds them under
+`node_modules/@kensio/yulin/docs/`, indexed by `node_modules/@kensio/yulin/llms.txt`, and they
+document the version in that package rather than the current release. An agent with no network
+reach has them, and so does one working on a project held a few versions back. Ripgrep and most
+editor search skip `node_modules` by default. An agent finds these files when something names the
+path for it.
+
 The skill lives at
 [kensio.ai/skills/yulin-aws-simulation](https://kensio.ai/skills/yulin-aws-simulation), versioned
 separately from Yulin and licensed Apache-2.0.

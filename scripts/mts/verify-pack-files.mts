@@ -3,7 +3,9 @@
  *
  * An export naming a JSON file is not something the import check can reach,
  * and the Oxlint config fragment is named by path from a consumer's own config
- * rather than imported at all. Both are checked against the installed tarball.
+ * rather than imported at all. The documentation is read by a person or a
+ * coding agent and never resolved by anything. All three are checked against
+ * the installed tarball.
  */
 
 import { readFile, stat } from "node:fs/promises";
@@ -14,6 +16,9 @@ import type { FileExport, PackageManifest } from "./verify-pack.type.mjs";
 
 /** The Oxlint config fragment, as it sits in the published package root. */
 const oxlintConfigFileName = "cffjs2.oxlintrc.json";
+
+/** The documentation index, as it sits in the published package root. */
+const documentationIndexFileName = "llms.txt";
 
 /**
  * Resolves every string-valued export the way a consumer would.
@@ -95,6 +100,62 @@ export async function assertOxlintConfigExtendable(
 
   console.log(
     "Oxlint config sits in the package root and finds its own plugin.",
+  );
+}
+
+/**
+ * Checks the documentation the package ships against its own index.
+ *
+ * The pages reach the tarball through a glob in `files`, and a glob that stops
+ * matching publishes a package whose index points at nothing. Every entry in
+ * `llms.txt` is looked up in the installed package, which covers the index and
+ * the pages together.
+ */
+export async function assertDocumentationPublished(
+  consumerDirectory: string,
+  manifest: PackageManifest,
+): Promise<void> {
+  const packageRoot = path.join(
+    consumerDirectory,
+    "node_modules",
+    manifest.name,
+  );
+  const indexPath = path.join(packageRoot, documentationIndexFileName);
+
+  if (!(await isFile(indexPath))) {
+    throw new Error(
+      `The tarball has no ${documentationIndexFileName} in its package root, so the documentation it ships has no index.`,
+    );
+  }
+
+  const index = await readFile(indexPath, "utf8");
+  const pages = index
+    .matchAll(/^- \[[^\]]+]\(([^\s)]+)\)/gm)
+    .map(([, page]) => page ?? "")
+    .toArray();
+
+  if (pages.length === 0) {
+    throw new Error(
+      `${documentationIndexFileName} lists no pages, so the tarball ships an index of nothing.`,
+    );
+  }
+
+  const missing: string[] = [];
+
+  for (const page of pages) {
+    if (!(await isFile(path.join(packageRoot, page)))) {
+      missing.push(page);
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `${documentationIndexFileName} names pages the tarball does not have:\n${missing.map((page) => `  ${page}`).join("\n")}`,
+    );
+  }
+
+  console.log(
+    `All ${String(pages.length)} documentation pages named by ${documentationIndexFileName} are in the tarball.`,
   );
 }
 

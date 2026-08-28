@@ -22,6 +22,8 @@ npm i -D @kensio/yulin
 - [ACM](https://yulinsim.dev/services/acm/ "Simulated ACM docs")
 - [API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway HTTP API docs")
 - [API Gateway REST APIs](https://yulinsim.dev/services/apigateway/ "Simulated API Gateway REST API docs")
+- [Athena](https://yulinsim.dev/services/athena/ "Simulated Amazon Athena docs")
+- [Bedrock](https://yulinsim.dev/services/bedrock/ "Simulated Amazon Bedrock docs")
 - [CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs")
 - [CloudFront](https://yulinsim.dev/services/cloudfront/ "Simulated CloudFront docs")
 - [CloudWatch metrics](https://yulinsim.dev/services/cloudwatch/ "Simulated CloudWatch metrics docs")
@@ -29,12 +31,16 @@ npm i -D @kensio/yulin
 - [DynamoDB](https://yulinsim.dev/services/dynamodb/ "Simulated DynamoDB docs")
 - [ECR](https://yulinsim.dev/services/ecr/ "Simulated ECR docs")
 - [ECS](https://yulinsim.dev/services/ecs/ "Simulated ECS docs")
+- [Elastic Load Balancing](https://yulinsim.dev/services/elbv2/ "Simulated Application Load Balancer docs")
 - [EventBridge](https://yulinsim.dev/services/eventbridge/ "Simulated EventBridge docs")
 - [Glue](https://yulinsim.dev/services/glue/ "Simulated Glue Data Catalog docs")
 - [IAM](https://yulinsim.dev/services/iam/ "Simulated IAM docs")
+- [Kinesis Data Firehose](https://yulinsim.dev/services/firehose/ "Simulated Kinesis Data Firehose docs")
+- [Kinesis Data Streams](https://yulinsim.dev/services/kinesis/ "Simulated Kinesis Data Streams docs")
 - [KMS](https://yulinsim.dev/services/kms/ "Simulated KMS docs")
 - [Lambda](https://yulinsim.dev/services/lambda/ "Simulated Lambda docs")
 - [CloudWatch Logs](https://yulinsim.dev/services/logs/ "Simulated CloudWatch Logs docs")
+- [Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies docs")
 - [Personalize](https://yulinsim.dev/services/personalize/ "Simulated Amazon Personalize docs")
 - [Rekognition](https://yulinsim.dev/services/rekognition/ "Simulated Rekognition docs")
 - [Route53](https://yulinsim.dev/services/route53/ "Simulated Route53 docs")
@@ -54,9 +60,16 @@ npm i -D @kensio/yulin
 - [AI skill](https://yulinsim.dev/ai-skill/ "Yulin AI skill docs")
 - [The AWS CLI](https://yulinsim.dev/cli/ "The AWS CLI against simulated AWS docs")
 - [AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs")
+- [Event factories](https://yulinsim.dev/factories/ "Test factories for AWS event shapes docs")
+- [Linting CloudFront Functions JS2](https://yulinsim.dev/lint/ "CloudFront Functions JS2 lint config docs")
+- [Non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/ "Dependencies Yulin does not simulate docs")
 - [Serving on localhost](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost docs")
 - [Simulated time](https://yulinsim.dev/time/ "Simulated time docs")
 - [Terraform](https://yulinsim.dev/terraform/ "Deploying Terraform into simulated AWS docs")
+
+Every page listed above also ships inside the package as markdown, documenting the version
+installed. `node_modules/@kensio/yulin/llms.txt` indexes them, and a coding agent with no network
+reach can read them from there.
 
 ## Usage
 

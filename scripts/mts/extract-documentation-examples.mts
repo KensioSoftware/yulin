@@ -1,7 +1,9 @@
 #!/usr/bin/env -S pnpm tsx
 
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { findReadmes } from "./documentation-readmes.mjs";
 
 const projectRoot = path.resolve(import.meta.dirname, "../..");
 const documentationDirectory = path.join(projectRoot, "docs");
@@ -31,26 +33,6 @@ async function main(): Promise<void> {
       await writeFile(outputPath, `${example.code.trimEnd()}\n`, "utf8");
     }
   }
-}
-
-async function findReadmes(directory: string): Promise<readonly string[]> {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const readmePaths: string[] = [];
-
-  for (const entry of entries) {
-    const entryPath = path.join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      readmePaths.push(...(await findReadmes(entryPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name === "README.md") {
-      readmePaths.push(entryPath);
-    }
-  }
-
-  return readmePaths;
 }
 
 function extractTypescriptExamples(
