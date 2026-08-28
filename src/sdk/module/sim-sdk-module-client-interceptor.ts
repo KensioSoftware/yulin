@@ -1,5 +1,6 @@
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import { installSendPatch, type SimSdkSendHandler } from "../send-patch.js";
+import { SimSdkStaticClientFactories } from "./sim-sdk-static-client-factory.js";
 
 /**
  * An SDK client class: a constructable whose instances have a send method.
@@ -73,6 +74,11 @@ export class SimSdkModuleClientInterceptor {
    *
    * Reflect.construct with the incoming new target preserves subclassing and
    * instanceof against the real class.
+   *
+   * The class's own static methods are wrapped as well, so a client built by
+   * a static factory such as `DynamoDBDocumentClient.from` is patched too.
+   * Such a factory constructs from the class binding it closes over rather
+   * than through this proxy, so the construct trap never sees it.
    */
   private wrapClientClass(
     clientClass: SimSdkClientConstructor,
@@ -80,6 +86,7 @@ export class SimSdkModuleClientInterceptor {
     const sendHandler = this.sendHandler;
     const configureArguments = (constructorArguments: unknown[]): unknown[] =>
       this.regionDefaultedArguments(constructorArguments);
+    const staticFactories = new SimSdkStaticClientFactories(sendHandler);
 
     return new Proxy(clientClass, {
       construct(
@@ -94,6 +101,18 @@ export class SimSdkModuleClientInterceptor {
         ) as object;
         installSendPatch(instance, sendHandler);
         return instance;
+      },
+
+      get(
+        target: SimSdkClientConstructor,
+        property: string | symbol,
+        receiver: unknown,
+      ): unknown {
+        const value: unknown = Reflect.get(target, property, receiver);
+        if (typeof value !== "function" || !Object.hasOwn(target, property)) {
+          return value;
+        }
+        return staticFactories.wrap(value);
       },
     });
   }

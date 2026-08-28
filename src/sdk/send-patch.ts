@@ -101,6 +101,18 @@ export function installSendPatch(
 }
 
 /**
+ * Whether a simulated send patch is currently installed on a target.
+ *
+ * Only an own patched send counts, which is the property installSendPatch
+ * writes, so an instance inheriting a patched send from a patched prototype
+ * reports false.
+ */
+export function hasSendPatch(target: object): boolean {
+  const send: unknown = Object.getOwnPropertyDescriptor(target, "send")?.value;
+  return typeof send === "function" && installedSends.has(send);
+}
+
+/**
  * Name a patch target for diagnostics: the client's class name for instances
  * and prototypes alike, when it has one.
  */
