@@ -6,11 +6,25 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimIamMalformedPolicyDocument } from "../../error/sim-iam.error.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimIamCloudFormationResourceFactory } from "../sim-cfn-iam-resource-factory.js";
 import { SimCfnIamPolicyCreator } from "./sim-cfn-iam-policy-creator.js";
+
+const assumeRolePolicyDocument = {
+  Version: "2012-10-17",
+  Statement: [
+    {
+      Effect: "Allow",
+      Principal: {
+        Service: "athena.amazonaws.com",
+      },
+      Action: "sts:AssumeRole",
+    },
+  ],
+};
 
 const validPolicyDocument = {
   Version: "2012-10-17",
@@ -196,6 +210,59 @@ describe("IAM CloudFormation Policy validation", () => {
         Groups: ["SomeGroup"],
       },
       "Groups are not simulated",
+    );
+  });
+
+  it("rejects a PolicyDocument holding an unresolved intrinsic", async () => {
+    // Given a template whose Policy statement names a Resource that the
+    // template never declares, which leaves the Fn::GetAtt unresolved and
+    // stored in the document as written.
+    const simAws = new SimAws();
+
+    // When the template is deployed through sim CloudFormation.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "dangling-intrinsic-stack",
+        template: {
+          Resources: {
+            QueryRole: {
+              Type: "AWS::IAM::Role",
+              Properties: {
+                RoleName: "QueryRole",
+                AssumeRolePolicyDocument: assumeRolePolicyDocument,
+              },
+            },
+            QueryPolicy: {
+              Type: "AWS::IAM::Policy",
+              Properties: {
+                PolicyName: "RunQueries",
+                Roles: [{ Ref: "QueryRole" }],
+                PolicyDocument: {
+                  Version: "2012-10-17",
+                  Statement: [
+                    {
+                      Effect: "Allow",
+                      Action: "athena:StartQueryExecution",
+                      Resource: { "Fn::GetAtt": ["DoesNotExist", "Arn"] },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    // Then the deployment fails on the policy holding it, and the message
+    // names the Role, the policy and the statement.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Resource QueryPolicy creation failed: Role " +
+        '"QueryRole" policy "RunQueries" statement 1: Resource must be a ' +
+        "string or an array of strings, but holds " +
+        '{"Fn::GetAtt":["DoesNotExist","Arn"]}',
     );
   });
 });

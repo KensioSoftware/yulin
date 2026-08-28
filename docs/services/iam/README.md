@@ -762,6 +762,11 @@ resource. Every entry names a Role or a User in the Stack's Account. An entry na
 principal fails the resource, and so does a policy naming no principal at all. A `Groups` property
 still fails the resource.
 
+A statement value of the wrong type fails the resource too. A `Ref` or an `Fn::GetAtt` naming a
+Resource the template leaves out survives resolution and reaches IAM as an object where `Action` or
+`Resource` takes a string. The put refuses it with `MalformedPolicyDocument`, naming the Role or
+User, the policy and the statement holding it.
+
 An `AWS::IAM::ManagedPolicy` also carries `Roles`, and attaches itself to each Role it names as it
 is created (the attachment `AttachRolePolicy` records). A name no simulated Role in the Account
 answers to fails the resource. Deleting the stack takes the policy back off the Roles still

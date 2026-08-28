@@ -43,7 +43,10 @@ export class CreatePolicyInputResolver {
       throw new Error("PolicyName is required");
     }
 
-    this.policyDocValidator.validateOptional(command.input.PolicyDocument);
+    this.policyDocValidator.validateOptional(command.input.PolicyDocument, {
+      attachedTo: "Policy",
+      name: policyName,
+    });
 
     const path = normalisePolicyPath(command.input.Path);
     const arn = makeSimPolicyArn({

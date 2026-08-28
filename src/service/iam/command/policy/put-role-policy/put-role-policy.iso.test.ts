@@ -194,7 +194,7 @@ describe("IAM PutRolePolicyCommand", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertIdentical(
       error.message,
-      "IAM policy statement must define either Action or NotAction",
+      'Role "ApplicationRole" policy "InvalidPolicy" statement 1: must define either Action or NotAction',
     );
   });
 
@@ -240,7 +240,58 @@ describe("IAM PutRolePolicyCommand", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertIdentical(
       error.message,
-      "IAM policy statement must define either Resource or NotResource",
+      'Role "ApplicationRole" policy "InvalidPolicy" statement 1: must define either Resource or NotResource',
+    );
+  });
+
+  it("throws when a policy statement Resource is not a string or a list", async () => {
+    // Given an IAM Role exists.
+    const simAws = new SimAws();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
+
+    await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "ApplicationRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
+      }),
+    );
+
+    // When an inline policy statement holds an unresolved CloudFormation
+    // intrinsic where its Resource ARN belongs.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.putRolePolicy(
+        new PutRolePolicyCommand({
+          RoleName: "ApplicationRole",
+          PolicyName: "InvalidPolicy",
+          PolicyDocument: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Action: "athena:StartQueryExecution",
+                Resource: { "Fn::GetAtt": ["DoesNotExist", "Arn"] },
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    // Then the document is rejected at the put, where the Role, the policy and
+    // the statement can all be named.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      'Role "ApplicationRole" policy "InvalidPolicy" statement 1: Resource ' +
+        "must be a string or an array of strings, but holds " +
+        '{"Fn::GetAtt":["DoesNotExist","Arn"]}',
     );
   });
 });

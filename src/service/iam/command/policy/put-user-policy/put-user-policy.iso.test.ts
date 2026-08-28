@@ -168,7 +168,7 @@ describe("IAM PutUserPolicyCommand", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertIdentical(
       error.message,
-      "IAM policy statement must define either Action or NotAction",
+      'User "ApplicationUser" policy "InvalidPolicy" statement 1: must define either Action or NotAction',
     );
   });
 });

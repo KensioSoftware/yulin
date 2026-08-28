@@ -53,7 +53,11 @@ export class PutUserPolicyCommandHandler implements CommandHandler<
     assertDefined(policyName, "PutUserPolicyCommand.input.PolicyName");
     const policyDocument = command.input.PolicyDocument;
 
-    this.policyDocValidator.validateRequired(policyDocument);
+    this.policyDocValidator.validateRequired(policyDocument, {
+      attachedTo: "User",
+      name: username,
+      policyName,
+    });
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
