@@ -26,7 +26,12 @@ import {
   findMissingTypes,
   importSubpaths,
 } from "./verify-pack-consumer.mjs";
+import {
+  assertFileExportsResolve,
+  assertOxlintConfigExtendable,
+} from "./verify-pack-files.mjs";
 import type {
+  FileExport,
   ImportResult,
   PackageManifest,
   Subpath,
@@ -80,6 +85,7 @@ const requiredExports = new Map<string, readonly string[]>([
 async function main(): Promise<void> {
   const manifest = await readManifest();
   const subpaths = collectSubpaths(manifest);
+  const fileExports = collectFileExports(manifest);
 
   const workDirectory = await mkdtemp(
     path.join(os.tmpdir(), "yulin-verify-pack-"),
@@ -104,6 +110,8 @@ async function main(): Promise<void> {
 
     report(results, missingTypes);
 
+    assertFileExportsResolve(consumerDirectory, fileExports);
+    await assertOxlintConfigExtendable(consumerDirectory, manifest);
     await assertTypesUsable(consumerDirectory);
   } finally {
     await rm(workDirectory, { recursive: true, force: true });
@@ -114,6 +122,27 @@ async function readManifest(): Promise<PackageManifest> {
   const raw = await readFile(path.join(projectRoot, "package.json"), "utf8");
 
   return JSON.parse(raw) as PackageManifest;
+}
+
+/**
+ * Every export subpath that names a file rather than a module.
+ *
+ * `collectSubpaths` passes over these, because importing a JSON file is not
+ * what a consumer does with one. They are resolved instead.
+ */
+function collectFileExports(manifest: PackageManifest): readonly FileExport[] {
+  const fileExports: FileExport[] = [];
+
+  for (const [key, target] of Object.entries(manifest.exports)) {
+    if (typeof target === "string") {
+      fileExports.push({
+        specifier: `${manifest.name}${key.slice(1)}`,
+        target,
+      });
+    }
+  }
+
+  return fileExports;
 }
 
 /** Every importable export subpath, excluding plain file exports. */

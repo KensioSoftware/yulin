@@ -234,6 +234,10 @@ scripts/input/*
 .cache-loader
 src/docs/docs/api/*.mdx
 
+# The published Oxlint config fragment, written into the package root by the
+# build so that a consumer's `extends` path does not go through `dist/`.
+/cffjs2.oxlintrc.json
+
 # Misc
 .DS_Store
 

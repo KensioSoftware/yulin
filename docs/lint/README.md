@@ -53,9 +53,7 @@ places.
 
 ```json
 {
-  "extends": [
-    "./node_modules/@kensio/yulin/dist/config/oxlint/cffjs2.oxlintrc.json"
-  ],
+  "extends": ["./node_modules/@kensio/yulin/cffjs2.oxlintrc.json"],
   "rules": {
     "no-console": "error"
   }
@@ -63,8 +61,9 @@ places.
 ```
 
 Oxlint's `extends` takes a file path rather than a package name. The path into `node_modules` is
-written out in full. The fragment brings its own `overrides` entry scoped to `**/*.cff.js` and the
-JS plugin the rules live in, and leaves every other file to your own rules.
+written out in full. The file sits in the package root. A build that moves what it emits under
+`dist/` leaves the path alone. The fragment brings its own `overrides` entry scoped to `**/*.cff.js`
+and the JS plugin the rules live in, and leaves every other file to your own rules.
 
 The plugin is loaded through Oxlint's JS plugin support, which needs Oxlint 1.77 or later.
 
@@ -134,9 +133,7 @@ In Oxlint, the same thing goes in an `overrides` entry after the `extends`:
 
 ```json
 {
-  "extends": [
-    "./node_modules/@kensio/yulin/dist/config/oxlint/cffjs2.oxlintrc.json"
-  ],
+  "extends": ["./node_modules/@kensio/yulin/cffjs2.oxlintrc.json"],
   "overrides": [
     {
       "files": ["**/*.cff.js"],
@@ -151,7 +148,7 @@ In Oxlint, the same thing goes in an `overrides` entry after the `extends`:
 ## Available functionality
 
 - A flat ESLint config at `@kensio/yulin/eslint`, exported as `cloudFrontFunctionsJs2`
-- An Oxlint config fragment at `dist/config/oxlint/cffjs2.oxlintrc.json`, with the object it is
+- An Oxlint config fragment at `cffjs2.oxlintrc.json` in the package root, with the object it is
   generated from exported as `cloudFrontFunctionsJs2Oxlint` from `@kensio/yulin/oxlint`
 - Nine `cff-js2` rules, one per restriction, shared by both linters
 - Scoping to `**/*.cff.js`, leaving a repository's own rules untouched elsewhere

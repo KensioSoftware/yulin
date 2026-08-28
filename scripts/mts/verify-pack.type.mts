@@ -13,6 +13,14 @@ export type ExportTarget =
   | string
   | { readonly import: string; readonly types: string };
 
+/** A string-valued export: a file the package publishes under a name. */
+export interface FileExport {
+  /** Specifier a consumer would resolve, e.g. `@kensio/yulin/package.json`. */
+  readonly specifier: string;
+  /** Package-relative path the export points at. */
+  readonly target: string;
+}
+
 export interface Subpath {
   /** Specifier a consumer would import, e.g. `@kensio/yulin/s3`. */
   readonly specifier: string;

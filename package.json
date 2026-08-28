@@ -11,7 +11,7 @@
     "yulin": "./dist/cli/yulin.js"
   },
   "scripts": {
-    "clean": "rm -rf ./dist/ ./*.tsbuildinfo",
+    "clean": "rm -rf ./dist/ ./*.tsbuildinfo ./cffjs2.oxlintrc.json",
     "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm oxlint:config",
     "oxlint:config": "pnpm tsx scripts/mts/write-oxlint-config.mts",
     "build:check": "tsc -p tsconfig.json --noEmit",
@@ -140,7 +140,7 @@
       "import": "./dist/config/oxlint/index.js",
       "types": "./dist/config/oxlint/index.d.ts"
     },
-    "./oxlint/cffjs2.oxlintrc.json": "./dist/config/oxlint/cffjs2.oxlintrc.json",
+    "./oxlint/cffjs2.oxlintrc.json": "./cffjs2.oxlintrc.json",
     "./package.json": "./package.json",
     "./organizations": {
       "import": "./dist/service/organizations/index.js",
@@ -213,6 +213,7 @@
   },
   "files": [
     "dist",
+    "cffjs2.oxlintrc.json",
     "README.md",
     "LICENSE"
   ],
