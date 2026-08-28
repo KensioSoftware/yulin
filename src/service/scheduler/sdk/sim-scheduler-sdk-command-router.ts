@@ -4,6 +4,12 @@ import {
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type {
+  SimCreateScheduleGroupCommand,
+  SimDeleteScheduleGroupCommand,
+  SimGetScheduleGroupCommand,
+  SimListScheduleGroupsCommand,
+} from "../command/group/group.command.js";
+import type {
   SimCreateScheduleCommand,
   SimDeleteScheduleCommand,
   SimGetScheduleCommand,
@@ -57,6 +63,38 @@ export class SimSchedulerSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simScheduler.listSchedules(
             command as SimListSchedulesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateScheduleGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simScheduler.createScheduleGroup(
+            command as SimCreateScheduleGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetScheduleGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simScheduler.getScheduleGroup(
+            command as SimGetScheduleGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteScheduleGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simScheduler.deleteScheduleGroup(
+            command as SimDeleteScheduleGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListScheduleGroupsCommand",
+        async (command, context): Promise<unknown> =>
+          await simScheduler.listScheduleGroups(
+            command as SimListScheduleGroupsCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -17,3 +17,19 @@ export type {
   SimUpdateScheduleCommand,
   SimUpdateScheduleCommandOutput,
 } from "./schedule/schedule.command.js";
+export type {
+  SimCreateScheduleGroupCommand,
+  SimCreateScheduleGroupCommandInput,
+  SimCreateScheduleGroupCommandOutput,
+  SimDeleteScheduleGroupCommand,
+  SimDeleteScheduleGroupCommandInput,
+  SimDeleteScheduleGroupCommandOutput,
+  SimGetScheduleGroupCommand,
+  SimGetScheduleGroupCommandInput,
+  SimGetScheduleGroupCommandOutput,
+  SimListScheduleGroupsCommand,
+  SimListScheduleGroupsCommandInput,
+  SimListScheduleGroupsCommandOutput,
+  SimSchedulerListedScheduleGroup,
+  SimSchedulerTag,
+} from "./group/group.command.js";

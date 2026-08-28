@@ -5,6 +5,8 @@ export {
   type SimSchedulerActionAfterCompletion,
 } from "./schedule/sim-scheduler-schedule.js";
 export { schedulerScheduleArn } from "./schedule/sim-scheduler-schedule-arn.js";
+export { SimSchedulerScheduleGroup } from "./group/sim-scheduler-schedule-group.js";
+export { schedulerScheduleGroupArn } from "./group/sim-scheduler-schedule-group-arn.js";
 export {
   defaultScheduleGroupName,
   SimSchedulerScheduleName,

@@ -1,7 +1,8 @@
 # Simulated EventBridge Scheduler implementation
 
-This directory contains the simulated EventBridge Scheduler service implementation. Schedules, their
-targets, the five commands that manage them, and firing a schedule as simulated time advances.
+This directory contains the simulated EventBridge Scheduler service implementation. Schedules, the
+groups they go in, their targets, the commands that manage them, and firing a schedule as simulated
+time advances.
 
 The guiding decision is that this is a separate service from simulated EventBridge rather than a
 corner of it. The two look similar from a distance and differ in every detail that matters: a
@@ -32,9 +33,10 @@ from it; a schedule has exactly one and cannot be created without it, so it is a
 policy written without the group matches nothing.
 
 `SimSchedulerScheduleName` validates a schedule name and a group name, which AWS constrains
-identically. `requestedScheduleGroupName` is where the one-group decision lives: a request naming
-any group but `default` is refused as unsimulated rather than quietly moved, because a schedule moved
-into `default` would carry an ARN naming a group it is not in.
+identically. `requestedScheduleGroupName` reads the group a schedule request names and defaults it
+to `default`. Whether that group exists is asked separately, by `SimSchedulerScheduleAccess`, after
+the caller has been authorized. A caller with no permission therefore learns nothing about which
+groups an account has.
 
 `SimSchedulerTarget` requires both `Arn` and `RoleArn`, as AWS does, and validates the role ARN when
 the schedule is written rather than when it first falls due. A schedule that could never invoke
@@ -45,6 +47,23 @@ the same three services today and they are answering different questions: EventB
 its rules cannot deliver to, and this refuses one that Scheduler's much larger real target list does
 not reach here. Sharing would tie two services' supported-target sets together, and those sets are
 not the same on real AWS.
+
+## Schedule groups
+
+`group/` holds the group model. `SimSchedulerScheduleGroup` is a name, an ARN and two timestamps, and
+`schedulerScheduleGroupArn` builds the `schedule-group/<name>` path, which is a different resource
+from a schedule's `schedule/<group>/<name>`. An IAM policy naming one does not match the other.
+
+`SimSchedulerScheduleGroupStore` builds its own groups rather than taking them from a writer, which
+is the opposite of how schedules are handled. A schedule is read out of a request carrying a dozen
+properties, and reading it in one place is what keeps Create and Update agreeing. A group is a name
+and two timestamps. The store also seeds `default` when it is constructed, because every Account has
+that group without anyone creating one.
+
+Deleting a group deletes its schedules, as AWS does. `SimSchedulerScheduleStore.removeGroup` is where
+that happens, since how the schedules of a group are found is the store's own business.
+`SimSchedulerGroupAccess.requireDeletable` refuses `default`. AWS does not document what it answers
+for that request, and a simulation that let the group go would have no way of getting it back.
 
 ## Schedule expressions
 
@@ -133,6 +152,20 @@ role's permission to run it is ECS's answer rather than a second one kept here. 
 and its `Input`, which is the task's overrides, are read by `src/service/ecs/target/`, shared with
 EventBridge because a rule target says the same things about a task in the same words.
 
+## CloudFormation
+
+`cfn/` creates `AWS::Scheduler::Schedule` and `AWS::Scheduler::ScheduleGroup`, one creator class
+each, dispatched by `SimSchedulerCfnResourceFactory`. Both go through the ordinary Scheduler
+commands, so what a template may ask for is decided once by the service rather than again here.
+`simCfnSchedulerResourceError` is what keeps a refusal from reading as an unsupported Resource. Sim
+CloudFormation steps over one of those, and a schedule stepped over would leave a Stack looking
+deployed while nothing ever fired.
+
+`simCfnSchedulerResourceDeletion` swallows a not-found on the way down. A group takes its schedules
+with it, so a schedule whose template named its group as a string rather than by `Ref` declares no
+dependency on it and may find itself already deleted when its own turn comes. Real CloudFormation
+treats a Resource that has already gone as deleted.
+
 ## Authorization
 
 `SimSchedulerAuthorizer` authorizes the caller against the schedule ARN. It is deliberately not
@@ -142,12 +175,16 @@ the command that created the schedule.
 
 ## Divergences
 
-Four, all deliberate.
+Five, all deliberate.
 
-Schedule groups are **refused rather than simulated**. A `GroupName` other than `default` fails, where
-real AWS creates the schedule in whichever group is named. Accepting the name and using `default`
-anyway would produce a schedule whose ARN named a group it was not in, and refusing is the smaller
-lie.
+A schedule group is **`ACTIVE` or gone**. Real Scheduler holds a group in `DELETING` while the
+schedules in it are removed, and reaching that state needs a deletion that takes time. Deleting a
+group here removes its schedules in the same call, so nothing is ever seen in `DELETING`.
+
+Group **tags are refused** by `CreateScheduleGroup` and **recorded as ignored** by CloudFormation.
+The two answers differ because the requests do. An SDK caller asking for a tag meant to ask for it.
+The CDK puts a Stack's tags on every taggable Resource in it, and failing a Stack over a tag nothing
+reads would refuse a template nobody wrote that way.
 
 `ClientToken` is **accepted and ignored**, on `CreateSchedule`, `UpdateSchedule` and
 `DeleteSchedule`. It exists to make a retried request idempotent, nothing here retries, and refusing

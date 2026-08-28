@@ -11,6 +11,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
+  SimSchedulerResourceNotFoundException,
   SimSchedulerUnsimulatedInputException,
   SimSchedulerValidationException,
 } from "../../error/sim-scheduler.error.js";
@@ -70,11 +71,13 @@ describe("Scheduler schedule validation", () => {
     assertStringIncludes(error.message, "does not promise");
   });
 
-  it("refuses a schedule group other than the default one", async () => {
+  it("refuses a schedule whose group has not been created", async () => {
+    // Given a schedule asking for a group nothing created, which is what real
+    // Scheduler answers with a not-found rather than putting it in default.
     const error = await refusedSchedule({ GroupName: "reporting" });
 
-    assertInstanceOf(error, SimSchedulerUnsimulatedInputException);
-    assertStringIncludes(error.message, "Schedule groups are not simulated");
+    assertInstanceOf(error, SimSchedulerResourceNotFoundException);
+    assertStringIncludes(error.message, "Schedule group reporting");
   });
 
   it("refuses a timezone rather than running the schedule in UTC anyway", async () => {

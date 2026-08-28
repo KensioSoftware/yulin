@@ -1,7 +1,11 @@
 import {
   CreateScheduleCommand,
+  CreateScheduleGroupCommand,
   DeleteScheduleCommand,
+  DeleteScheduleGroupCommand,
   GetScheduleCommand,
+  GetScheduleGroupCommand,
+  ListScheduleGroupsCommand,
   ListSchedulesCommand,
   SchedulerClient,
   UpdateScheduleCommand,
@@ -84,5 +88,34 @@ describe("Scheduler SDK interception", () => {
     // Then each was handled by the simulation rather than reaching AWS.
     assertArrayLength(listed.Schedules ?? [], 1);
     assertArrayLength(afterDelete.Schedules ?? [], 0);
+  });
+
+  it("routes every schedule group command", async () => {
+    // Given an intercepted client.
+    using simSdk = new SimSdk();
+    simSdk.intercept(SchedulerClient);
+
+    const client = new SchedulerClient({ region: "eu-west-2" });
+
+    // When a group is created, read, listed and deleted.
+    await client.send(new CreateScheduleGroupCommand({ Name: "analytics" }));
+
+    const described = await client.send(
+      new GetScheduleGroupCommand({ Name: "analytics" }),
+    );
+    const listed = await client.send(new ListScheduleGroupsCommand({}));
+
+    await client.send(new DeleteScheduleGroupCommand({ Name: "analytics" }));
+
+    const afterDelete = await client.send(new ListScheduleGroupsCommand({}));
+
+    // Then each reached the simulation, in the client's own Region, and the
+    // listing keeps the default group the deletion did not touch.
+    assertIdentical(
+      described.Arn,
+      "arn:aws:scheduler:eu-west-2:888888888888:schedule-group/analytics",
+    );
+    assertArrayLength(listed.ScheduleGroups ?? [], 2);
+    assertArrayLength(afterDelete.ScheduleGroups ?? [], 1);
   });
 });

@@ -432,6 +432,73 @@ A listing carries less than a describe, as it does on AWS. It has the target's A
 and no expression at all. Code reading `ScheduleExpression` off a listing gets
 `undefined` from AWS, and gets `undefined` here too.
 
+## Schedule groups
+
+Every account and region starts with a `default` group. A schedule naming no group goes in it.
+
+A schedule's name is unique within its group, and the group is in the schedule's ARN. Two
+deployments of one construct into the same account and region collide on schedule names unless each
+one brings its own group.
+
+```typescript sim-scheduler-schedule-group
+/**
+ * A schedule group scoping the names of one deployment's schedules.
+ */
+
+import {
+  CreateScheduleCommand,
+  CreateScheduleGroupCommand,
+  ListSchedulesCommand,
+} from "@aws-sdk/client-scheduler";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const scheduler = simAws.scheduler();
+
+const group = await scheduler.createScheduleGroup(
+  new CreateScheduleGroupCommand({ Name: "reporting-pr-412" }),
+);
+
+console.log(group.ScheduleGroupArn);
+// "arn:aws:scheduler:us-east-1:888888888888:schedule-group/reporting-pr-412"
+
+const created = await scheduler.createSchedule(
+  new CreateScheduleCommand({
+    Name: "pageviews-hourly",
+    GroupName: "reporting-pr-412",
+    ScheduleExpression: "rate(1 hour)",
+    FlexibleTimeWindow: { Mode: "OFF" },
+    Target: {
+      Arn: "arn:aws:lambda:us-east-1:888888888888:function:report",
+      RoleArn: "arn:aws:iam::888888888888:role/SchedulerRole",
+    },
+  }),
+);
+
+// The group is in the schedule's ARN. The same schedule name is free in every
+// other group, including default.
+console.log(created.ScheduleArn);
+// ".../schedule/reporting-pr-412/pageviews-hourly"
+
+const listed = await scheduler.listSchedules(
+  new ListSchedulesCommand({ GroupName: "reporting-pr-412" }),
+);
+
+console.log(listed.Schedules?.length); // 1
+```
+
+A `GroupName` for a group that has yet to be created raises `ResourceNotFoundException`, and so
+does a listing for one. Real Scheduler answers the same way. A schedule quietly moved into `default`
+would carry an ARN naming a group it had never been put in.
+
+`GetScheduleGroup` reports a group's ARN, state and timestamps. `ListScheduleGroups` reports them
+all in creation order, narrowed by `NamePrefix` and paged by `MaxResults` and `NextToken`.
+
+`DeleteScheduleGroup` deletes the schedules in the group along with it, as AWS does. It refuses the
+`default` group, which comes with the account. Losing that group would leave every request naming
+no group with nowhere to go.
+
 ## Permissions
 
 Every operation is authorized against the schedule ARN, which carries the group:
@@ -608,6 +675,68 @@ A property this simulation leaves out is refused at deploy time, naming the Reso
 schedule that behaves differently from the one declared would be worse. Tearing the stack down
 removes the schedules it created, and no schedule fires afterwards.
 
+### Deploying a schedule group
+
+`AWS::Scheduler::ScheduleGroup` deploys too, so a stack can bring the group its schedules go in.
+
+```typescript sim-scheduler-cfn-schedule-group
+/**
+ * A stack deploying its own schedule group, with a schedule in it.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reporting-stack",
+  template: {
+    Resources: {
+      ReportGroup: {
+        Type: "AWS::Scheduler::ScheduleGroup",
+        Properties: { Name: "reporting-pr-412" },
+      },
+      HourlyReport: {
+        Type: "AWS::Scheduler::Schedule",
+        Properties: {
+          Name: "pageviews-hourly",
+          GroupName: { Ref: "ReportGroup" },
+          ScheduleExpression: "rate(1 hour)",
+          FlexibleTimeWindow: { Mode: "OFF" },
+          Target: {
+            Arn: "arn:aws:sqs:us-east-1:888888888888:reports",
+            RoleArn: "arn:aws:iam::888888888888:role/SchedulerRole",
+          },
+        },
+      },
+    },
+    Outputs: {
+      GroupArn: { Value: { "Fn::GetAtt": ["ReportGroup", "Arn"] } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// An identity policy granting `scheduler:` actions on the group names this
+// ARN. So does the `aws:SourceArn` condition AWS recommends in a schedule
+// execution role's trust policy, which the simulation does not supply.
+console.log(stack.output("GroupArn"));
+// "arn:aws:scheduler:us-east-1:888888888888:schedule-group/reporting-pr-412"
+```
+
+`Ref` returns the group's **name** and `Fn::GetAtt` answers `Arn`, `State`, `CreationDate` and
+`LastModificationDate`. A group the template leaves unnamed gets one generated from the stack name
+and the logical ID.
+
+`Tags` on a group are recorded as an ignored property and the group deploys without them. The CDK
+puts a stack's tags on every taggable Resource in it, so a template gains them without asking.
+Failing the whole stack over a tag would refuse a deployment for a property the simulation ignores
+anyway. Read the record back from `stack.getResource("<logicalId>")?.ignoredProperties`.
+
+Tearing the stack down removes the group. Its schedules go with it, whether or not they are
+Resources of the same stack.
+
 ## Available functionality
 
 - `CreateSchedule`, `GetSchedule`, `UpdateSchedule`, `DeleteSchedule` and `ListSchedules`.
@@ -618,7 +747,10 @@ removes the schedules it created, and no schedule fires afterwards.
 - ECS targets, running a simulated task as the execution role, with the task definition and
   `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
 - `ActionAfterCompletion`, and `deliveryFailures` for invocations that did not happen.
-- The `default` schedule group in every account and region, without one being created.
+- `CreateScheduleGroup`, `GetScheduleGroup`, `DeleteScheduleGroup` and `ListScheduleGroups`, over
+  the `default` group every account and region starts with and any group created beside it.
+- `AWS::Scheduler::Schedule` and `AWS::Scheduler::ScheduleGroup` deployed from a CloudFormation
+  template.
 - Creation and modification timestamps from the simulation's clock, and prefix-narrowed,
   state-narrowed, paged listings.
 - IAM authorization against the schedule ARN.
@@ -633,9 +765,13 @@ removes the schedules it created, and no schedule fires afterwards.
 - An invocation is attempted once. There is no retry and no dead letter queue. A target that throws
   is recorded as a failure, and never redelivered. A failed invocation never rejects
   `advanceBy(...)`, and is read from `deliveryFailures`.
-- Schedule groups are absent as a manageable resource. Every schedule is in `default`, and a
-  `GroupName` naming any other group is refused. Putting it quietly in `default` would give it an
-  ARN naming the wrong group.
+- A schedule group carries no tags. `CreateScheduleGroup` refuses `Tags`, since the simulation
+  stores them nowhere. A template's `Tags` are recorded as an ignored property and the group still
+  deploys.
+- A schedule group is `ACTIVE` or gone. Deleting one removes its schedules in the same call, where
+  real Scheduler holds the group in `DELETING` until they have gone.
+- The `default` schedule group cannot be deleted. AWS leaves the answer to that request
+  undocumented.
 - `FlexibleTimeWindow` with `Mode: "FLEXIBLE"` is refused. Real Scheduler invokes the target at an
   unpredictable moment inside the window, and firing at the exact due time instead would let a test
   rely on timing AWS leaves unpromised.
@@ -659,6 +795,7 @@ removes the schedules it created, and no schedule fires afterwards.
   for each of them, in this process and one after another.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Nothing here retries, so it has
   no request to make idempotent.
-- `AWS::Scheduler::ScheduleGroup` is absent as a CloudFormation resource type.
-  `AWS::Scheduler::Schedule` is there, under
-  [deploying from a template](#deploying-from-a-cloudformation-template).
+- A schedule's execution role is assumed with no `aws:SourceArn` condition key supplied. AWS
+  recommends scoping that key to a schedule group ARN in the role's trust policy, against the
+  confused deputy problem, and a trust policy carrying that condition admits nothing here. Every
+  firing of a schedule using such a role is recorded in `deliveryFailures`.

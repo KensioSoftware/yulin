@@ -10,7 +10,10 @@ import type {
   SimSchedulerRequestTarget,
   SimSchedulerScheduleInput,
 } from "../command/schedule/schedule.command.js";
-import { simCfnSchedulerResourceError } from "./sim-cfn-scheduler-resource-error.js";
+import {
+  schedulerScheduleResourceType,
+  simCfnSchedulerResourceError,
+} from "./sim-cfn-scheduler-resource-error.js";
 
 const maximumNameLength = 64;
 
@@ -131,17 +134,9 @@ export class SimCfnScheduleProperties {
   }
 
   private dateProperty(name: string): Date | undefined {
-    const value = this.properties.get(name);
+    const value = this.stringProperty(name);
 
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (typeof value !== "string") {
-      throw this.propertyError(`${name} must be a string`);
-    }
-
-    return new Date(value);
+    return value === undefined ? undefined : new Date(value);
   }
 
   private stringProperty(name: string): string | undefined {
@@ -159,6 +154,10 @@ export class SimCfnScheduleProperties {
   }
 
   private propertyError(reason: string): Error {
-    return simCfnSchedulerResourceError(this.resource.logicalId, reason);
+    return simCfnSchedulerResourceError(
+      schedulerScheduleResourceType,
+      this.resource.logicalId,
+      reason,
+    );
   }
 }
