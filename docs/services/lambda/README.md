@@ -153,9 +153,21 @@ The vm runtime models the real Node.js runtime closely:
   (`Runtime.ImportModuleError`, `Runtime.HandlerNotFound`, `Runtime.UserCodeSyntaxError`,
   `Runtime.MalformedHandlerName`). Creation succeeds either way.
 
-Code is CommonJS, as zipped `.js` files are on the real `nodejs` runtimes. ES module source
-(`export` syntax) is unsupported so far, and fails with a clear hint. `Code.ZipFile` bytes that fail to
-unzip are rejected at creation with the AWS-like
+Code is CommonJS, as zipped `.js` files are on the real `nodejs` runtimes. An ES module deployment
+package is refused at cold start. A handler file ending in `.mjs` is reported as
+`Runtime.ImportModuleError` naming the file. A `.js` file opening on `import` is reported as
+`Runtime.UserCodeSyntaxError: Cannot use import statement outside a module`. The archive's root
+`package.json` goes unread. Declaring `"type": "module"` in it makes no difference to either.
+Real Lambda has run ES module packages since nodejs14.x, and `NodejsFunction` in CDK emits one
+under `format: OutputFormat.ESM`.
+
+There are two ways round that. An [executable binding](#executable-bindings) or
+`makeLambdaZipFileInput(...)` backs the function with a real in-process handler. The test's own
+module system loads that handler, and its format is whatever the test file's is. An ESM project
+needs nothing further. Where the archive itself has to be the deployed artefact, compile a CommonJS
+build of the same source and deploy that as the function's code.
+
+`Code.ZipFile` bytes that fail to unzip are rejected at creation with the AWS-like
 `InvalidParameterValueException: Could not unzip uploaded file`.
 
 The archives are real zip files, and they interoperate with real tooling in both directions. A zip
@@ -3535,8 +3547,13 @@ Current documented limitations:
   API Gateway integration and authorizer URIs, and `AWS::Lambda::Permission`. The
   `AWS::Lambda::Url` and `AWS::Lambda::EventSourceMapping` template readers still refuse or drop a
   qualifier.
-- The vm runtime supports CommonJS function code only. ES module source (`.mjs` / `export` syntax)
-  has yet to land.
+- The vm runtime supports CommonJS function code only. An ES module deployment package is refused
+  at cold start, whether the handler file ends in `.mjs` or a `.js` file opens on `import`.
+  Evaluating one would need `vm.SourceTextModule`, which Node.js gates behind
+  `--experimental-vm-modules` at process launch, and a simulator that made every consumer pass a
+  Node.js flag would cost more than it repaid. Back the function with an in-process handler, or
+  deploy a CommonJS build of the same source. See
+  [zip-packaged code and the vm runtime](#zip-packaged-code-and-the-vm-runtime).
 - A handler function reference is recorded through the process console and the process standard
   streams, both of which a test runner is free to replace. `console.trace` and `console.dir`
   decorate what they print, and either one reaches the log group only where the host console passes
