@@ -143,10 +143,16 @@ containers keeps the `RunTask` caller's context, so leaving it would attribute a
 to whoever started the task.
 
 `SimEcsContainerEnvironment` merges the container definition's `environment` with its resolved
-secrets, any `RunTask` override and the Region variables, and applies them through
-`simProcessEnvironment`, the shared `process.env` patch under `util/process/`. It is shared with
-simulated Lambda because it patches a process global: two of them would each install a getter, and
-the second would capture whatever the first was reporting as its host environment.
+secrets, any `RunTask` override and the Region variables, lays them over the host process
+environment, and applies the result through `simProcessEnvironment`, the shared `process.env` patch
+under `util/process/`. It is shared with simulated Lambda because it patches a process global: two
+of them would each install a getter, and the second would capture whatever the first was reporting
+as its host environment.
+
+The host variables are read for each run. A variable the test process sets between two runs reaches
+the second of them. Every container gets the Region variables, whatever its definition
+declares. Without them an SDK client the container builds resolves its Region from the machine the
+test happens to run on, and its calls land in a Region the simulated task knows nothing about.
 
 ## Container secrets
 

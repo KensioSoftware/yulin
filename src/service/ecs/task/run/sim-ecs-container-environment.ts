@@ -25,8 +25,9 @@ interface SimEcsContainerEnvironmentProperties {
  * The variables are applied to `process.env` for the length of the run, in the
  * same way a sim Lambda function's are: a bound handler is an ordinary closure
  * with no sandbox of its own, so asynchronous context tracking is what gives
- * it an environment. A container declaring nothing is left reading the host
- * environment untouched.
+ * it an environment. They are laid over the host process environment, so a
+ * container still reads what the test process set, and a container declaring
+ * nothing of its own still runs in its task's Region.
  */
 export class SimEcsContainerEnvironment {
   private readonly regionName: string;
@@ -60,30 +61,26 @@ export class SimEcsContainerEnvironment {
   }
 
   /**
-   * Whether this container has an environment of its own at all.
-   */
-  get hasVariables(): boolean {
-    return (
-      this.declared.length > 0 ||
-      this.overridden.length > 0 ||
-      Object.keys(this.secrets).length > 0
-    );
-  }
-
-  /**
    * Run a container's handler with this environment applied to process.env.
    *
-   * A container with nothing of its own is left reading the host environment
-   * untouched, Region variables included. Giving it only the Region ones would
-   * take away everything the test process set, which is where an in-process
-   * handler's configuration usually comes from.
+   * The host process environment is underneath, because that is where an
+   * in-process handler's configuration usually comes from. It is read for each
+   * run, so a variable the test process sets between two runs reaches the
+   * second of them.
+   *
+   * The container's own variables are laid over it, the Region ones included.
+   * A real task agent sets those whatever the definition declares, and without
+   * them a client the handler builds resolves its Region from the machine the
+   * test happens to run on.
    */
   async runWith<T>(run: () => Promise<T>): Promise<T> {
-    if (!this.hasVariables) {
-      return await run();
-    }
-
-    return await simProcessEnvironment.run(this.variables(), run);
+    return await simProcessEnvironment.run(
+      {
+        ...simProcessEnvironment.definedHostVariables(),
+        ...this.variables(),
+      },
+      run,
+    );
   }
 
   /**

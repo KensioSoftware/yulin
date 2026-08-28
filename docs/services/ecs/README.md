@@ -439,7 +439,9 @@ request routed to the container, and is covered under
 The container definition's `environment` is visible through `process.env` for the length of the run,
 along with any `RunTask` container override and the region variables a real task agent sets. This
 works the same way it does for a sim Lambda function handler, through Node.js asynchronous context
-tracking. A container that declares nothing reads the host environment untouched.
+tracking. The host process environment is underneath, and what the test process set stays readable.
+Every container gets the region variables, whatever its definition declares, and an SDK client the
+container builds reads `AWS_REGION` to find the region its task runs in.
 
 ```typescript sim-ecs-run-task-environment
 /**
