@@ -43,6 +43,24 @@ describe("SimDuration", () => {
     expect(SimDuration.ofMilliseconds(250).toMilliseconds()).toBe(250);
   });
 
+  it("reads a bare number as milliseconds", () => {
+    // Given a duration written as a bare number, as setTimeout takes one
+    const duration = SimDuration.of(3_600_000);
+
+    // When it is measured
+    // Then the number counted as milliseconds
+    expect(duration.toMilliseconds()).toBe(60 * 60 * 1000);
+  });
+
+  it("refuses a bare number that cannot describe elapsed time", () => {
+    // Given durations written as numbers that are negative or not finite
+    // When they are built
+    // Then they are refused as their millisecond components would be
+    expect(() => SimDuration.of(-1)).toThrow(SimInvalidDuration);
+    expect(() => SimDuration.of(-1)).toThrow(/milliseconds/);
+    expect(() => SimDuration.of(NaN)).toThrow(SimInvalidDuration);
+  });
+
   it("passes an existing duration through", () => {
     // Given a duration that has already been built
     const duration = SimDuration.of({ seconds: 30 });

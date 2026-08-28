@@ -65,6 +65,17 @@ describe("SimClockControl", () => {
     expect(control.isFrozen).toBe(true);
   });
 
+  it("advances simulated time by a number of milliseconds", async () => {
+    // Given control over a simulation's clock
+    const { control } = simulatedTime();
+
+    // When time is advanced by a bare number
+    await control.advanceBy(20 * 60 * 1000);
+
+    // Then the number counted as milliseconds, and time moved by it
+    expect(control.now()).toStrictEqual(new Date("2026-07-26T09:20:00.000Z"));
+  });
+
   it("measures an advance from where the clock stood when it started", async () => {
     // Given a simulation on a host clock that moves while an advance runs, and
     // work due now that buffers for an hour once it runs
