@@ -1,6 +1,7 @@
 import type { JSONString } from "../../../util/type-guard/json.js";
 import { jsonParse } from "../../../util/type-guard/json.js";
-import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
+import { simAwsCallerFor } from "../../aws/caller/sim-aws-resolved-caller.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
@@ -25,7 +26,7 @@ interface AssumeRoleTrustPolicyAuthorizationInput {
    */
   readonly region?: AwsRegionName | undefined;
 
-  readonly caller: SimAwsPrincipal;
+  readonly caller: SimAwsResolvedCaller;
   readonly conditionContext?:
     | Readonly<Record<string, SimIamConditionValue>>
     | undefined;
@@ -65,11 +66,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
     input: AssumeRoleTrustPolicyAuthorizationInput,
   ): AssumeRoleTrustPolicyAuthorization {
     if (input.role.AssumeRolePolicyDocument === undefined) {
-      throw new SimIamAccessDenied({
-        principal: input.caller,
-        action: "sts:AssumeRole",
-        resource: input.roleArn,
-      });
+      this.refuse(input);
     }
 
     const trustPolicy = jsonParse(
@@ -80,7 +77,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
       action: "sts:AssumeRole",
       resource: input.roleArn,
       region: input.region,
-      caller: input.caller,
+      caller: simAwsCallerFor(input.caller),
       conditionContext: input.conditionContext,
       resourcePolicies: [
         {
@@ -93,11 +90,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
     });
 
     if (decision.isDenied || !decision.isAllowedByTrustPolicy) {
-      throw new SimIamAccessDenied({
-        principal: input.caller,
-        action: "sts:AssumeRole",
-        resource: input.roleArn,
-      });
+      this.refuse(input);
     }
 
     return {
@@ -106,5 +99,16 @@ export class AssumeRoleTrustPolicyAuthorizer {
         decision.trustAllowStatements,
       ),
     };
+  }
+
+  /**
+   * Refuse the request as the caller that made it.
+   */
+  private refuse(input: AssumeRoleTrustPolicyAuthorizationInput): never {
+    throw new SimIamAccessDenied({
+      principal: input.caller.principal,
+      action: "sts:AssumeRole",
+      resource: input.roleArn,
+    });
   }
 }

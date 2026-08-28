@@ -458,6 +458,10 @@ Simulated STS issues temporary credentials for IAM Roles with `AssumeRoleCommand
 request is evaluated against the Role's trust policy, and the returned credentials resolve to an
 assumed-role session principal whose permissions come from the underlying Role's policies.
 
+A session carries two ARNs, the session's own and the Role's, and a resource policy naming either
+one applies to it. A Bucket policy naming a Role therefore covers every session of that Role, as it
+does in AWS, and `aws:PrincipalArn` holds the Role's ARN throughout.
+
 ```typescript sim-iam-sts-assume-role
 /**
  * Assuming a simulated IAM Role through simulated STS.

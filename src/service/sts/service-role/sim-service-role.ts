@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import { simAwsResolvedCallerOf } from "../../aws/caller/sim-aws-resolved-caller.js";
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import type { SimIam } from "../../iam/sim-iam.js";
@@ -91,7 +92,10 @@ export async function assumeSimServiceRole(
       role,
       targetIam: iam,
       region: scope.accountRegionScope.regionName,
-      caller: { kind: "service", service: servicePrincipal },
+      caller: simAwsResolvedCallerOf({
+        kind: "service",
+        service: servicePrincipal,
+      }),
       conditionContext: simServiceRoleConditionContext(source),
     });
   } catch (error) {

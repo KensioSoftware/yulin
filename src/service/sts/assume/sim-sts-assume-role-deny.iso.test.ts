@@ -9,6 +9,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { simAwsResolvedCallerOf } from "../../aws/caller/sim-aws-resolved-caller.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { AssumeRoleTrustPolicyAuthorizer } from "../auth-z/assume-role-trust-policy-authorizer.js";
@@ -304,7 +305,7 @@ describe("STS AssumeRole denial", () => {
         // @ts-expect-error TS2322 -- testing invalid role
         role,
         targetIam: simIam,
-        caller,
+        caller: simAwsResolvedCallerOf(caller),
       });
     });
 

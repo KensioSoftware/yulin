@@ -1,7 +1,5 @@
-import type {
-  SimArnPrincipal,
-  SimAwsPrincipal,
-} from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
@@ -22,7 +20,15 @@ interface AssumeRoleAuthorizationCoordinatorProperties {
 interface AssumeRoleAuthorizationInput {
   readonly roleArn: string;
   readonly roleArnParts: IamRoleArnParts;
-  readonly caller: SimArnPrincipal;
+
+  /**
+   * The caller as the request boundary resolved it.
+   *
+   * Both sides of an AssumeRole decision need the identity whose policies
+   * apply, which is the Role behind an assumed-role session. Passing the
+   * resolved caller whole is what carries it here.
+   */
+  readonly caller: SimAwsResolvedCaller;
   readonly conditionContext?:
     | Readonly<Record<string, SimIamConditionValue>>
     | undefined;
@@ -75,9 +81,9 @@ export class AssumeRoleAuthorizationCoordinator {
 
     this.sourcePrincipalAuthorizer.authorize({
       roleArn: input.roleArn,
-      callerPrincipal: input.caller,
+      caller: input.caller,
       identityPolicyAllowRequired: !this.hasDirectSameAccountUserGrant(
-        input.caller,
+        input.caller.principal,
         input.roleArnParts.accountId,
         targetAuthorization.trust.isDirectPrincipalGrant,
       ),
