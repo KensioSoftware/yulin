@@ -28,6 +28,11 @@ interface AssumeRoleCommandHandlerProperties {
 
   readonly iamResolver: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * The caller this simulation attributes a request naming none to.
+   */
+  readonly defaultCaller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -44,7 +49,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   SimAssumeRoleCommandOutput
 > {
   private readonly background: BackgroundScheduler;
-  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly callerResolver: SimAwsCallerResolver;
   private readonly requestParser = new SimStsAssumeRoleRequestParser();
   private readonly authorizationCoordinator: AssumeRoleAuthorizationCoordinator;
   private readonly sessionCreator: SimStsAssumeRoleSessionCreator;
@@ -60,6 +65,11 @@ export class AssumeRoleCommandHandler implements CommandHandler<
 
     this.sourceAccountId = sourceAccountId;
     this.background = background;
+    this.callerResolver = new SimAwsCallerResolver({
+      credentialIdentityResolver:
+        iamResolver.findIamForAccount(sourceAccountId)?.credentials,
+      defaultCaller: properties.defaultCaller,
+    });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,
       iamResolver,

@@ -14,6 +14,11 @@ import { simStsCallerUserId } from "./sim-sts-caller-user-id.js";
 interface GetCallerIdentityCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
+
+  /**
+   * The caller this simulation attributes a request naming none to.
+   */
+  readonly defaultCaller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -30,13 +35,19 @@ export class GetCallerIdentityCommandHandler implements CommandHandler<
   SimGetCallerIdentityCommand,
   SimGetCallerIdentityCommandOutput
 > {
-  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly callerResolver: SimAwsCallerResolver;
   private readonly sourceAccountId: SimAwsAccountId;
   private readonly iamResolver: SimIamAccountResolver;
 
   constructor(properties: GetCallerIdentityCommandHandlerProperties) {
     this.sourceAccountId = properties.sourceAccountId;
     this.iamResolver = properties.iamResolver;
+    this.callerResolver = new SimAwsCallerResolver({
+      credentialIdentityResolver: properties.iamResolver.findIamForAccount(
+        properties.sourceAccountId,
+      )?.credentials,
+      defaultCaller: properties.defaultCaller,
+    });
   }
 
   /**

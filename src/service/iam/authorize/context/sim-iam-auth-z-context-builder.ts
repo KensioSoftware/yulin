@@ -125,6 +125,9 @@ interface SimIamAuthZContextBuilderProperties {
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
 
+  /** The caller this simulation attributes a request naming none to. */
+  readonly defaultCaller?: SimAwsCaller | undefined;
+
   /**
    * Resolves other Accounts' IAM in the same simulation, for the identity side
    * of a cross-Account request.
@@ -177,10 +180,13 @@ export class SimIamAuthZContextBuilder {
   private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
-    this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
-      makeSimAwsAccountRootPrincipal(properties.accountId),
-      properties.credentialIdentityResolver,
-    );
+    this.callerContextBuilder = new SimIamAuthZCallerContextBuilder({
+      accountRootPrincipal: makeSimAwsAccountRootPrincipal(
+        properties.accountId,
+      ),
+      credentialIdentityResolver: properties.credentialIdentityResolver,
+      defaultCaller: properties.defaultCaller,
+    });
     this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies: properties.policies,
       roles: properties.roles,

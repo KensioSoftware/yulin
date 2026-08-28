@@ -24,6 +24,14 @@ interface SimStsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iamResolver?: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * The caller this simulation attributes a request naming none to.
+   *
+   * Left out, such a request is the source Account's root principal, which is
+   * the identity GetCallerIdentity then reports.
+   */
+  readonly defaultCaller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -37,6 +45,7 @@ export class SimSts {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
   private readonly iamResolver: SimIamAccountResolver;
+  private readonly defaultCaller?: SimAwsCaller | undefined;
   private readonly sdkRouter = new SimStsSdkCommandRouter(this);
 
   constructor(properties: SimStsProperties = {}) {
@@ -44,6 +53,7 @@ export class SimSts {
       properties.accountRegionScope ?? simAwsAccountRegionScopeFactory.make();
     this.iamResolver = properties.iamResolver ?? new SimIamRegistry();
     this.background = properties.background ?? new BackgroundTasks();
+    this.defaultCaller = properties.defaultCaller;
   }
 
   /**
@@ -60,6 +70,7 @@ export class SimSts {
       regionName: this.accountRegionScope.regionName,
       iamResolver: this.iamResolver,
       background: this.background,
+      defaultCaller: this.defaultCaller,
     });
     return await handler.handle(command, options);
   }
@@ -76,6 +87,7 @@ export class SimSts {
     const handler = new GetCallerIdentityCommandHandler({
       sourceAccountId: this.accountRegionScope.accountId,
       iamResolver: this.iamResolver,
+      defaultCaller: this.defaultCaller,
     });
 
     return await handler.handle(command, options);

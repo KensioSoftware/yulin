@@ -4,6 +4,7 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
+import type { SimAwsCaller } from "../caller/sim-aws-caller.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
 import type { SimApiGateway } from "../../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
@@ -53,6 +54,11 @@ import { SimAwsMessageLog } from "../message/sim-aws-message-log.js";
 interface SimAwsServiceFactoryProperties {
   readonly simAws: SimAws;
   readonly background: BackgroundScheduler & BackgroundCompleter;
+
+  /**
+   * The caller this simulation attributes a call naming none to.
+   */
+  readonly defaultCaller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -158,10 +164,16 @@ export class SimAwsServiceFactory {
       iamRegistry: this.iamRegistry,
       accessKeyRegistry: this.requestAuth.accessKeyRegistry,
       scpResolver: this.organizations,
+      // Simulated IAM applies this wherever a request names no caller of its
+      // own, in place of the Account root it would otherwise be decided as.
+      defaultCaller: properties.defaultCaller,
     });
     this.accountRegionServices = new SimAwsAccountRegionServiceBuilder({
       simAws: properties.simAws,
       background: properties.background,
+      // STS reports and evaluates the same default. An unattributed
+      // GetCallerIdentity answers with the principal everything else uses.
+      defaultCaller: properties.defaultCaller,
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,

@@ -5,6 +5,7 @@ import type {
 import type { SimClock } from "../../util/clock/sim-clock.js";
 import type { SimIamSigV4ExpectedScope } from "../iam/sigv4/sim-iam-sigv4-expected-scope.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
+import type { SimAwsCaller } from "./caller/sim-aws-caller.js";
 import type { AwsRegionName } from "./sim-aws-region.js";
 
 /**
@@ -33,6 +34,22 @@ export interface SimAwsProperties {
    */
   readonly defaultAccountId?: SimAwsAccountId | string;
   readonly defaultRegionName?: AwsRegionName;
+
+  /**
+   * The principal this simulation attributes a call naming no caller to.
+   *
+   * Every simulated operation takes a `caller`, and one is set for a
+   * deployment through `deployTemplate` and `deployCdkOut`. This says who the
+   * calls that name none are, such as the role an operator reads the account
+   * through. An explicit caller always wins, as does the ambient caller of a
+   * `runAs` block.
+   *
+   * Left out, a call naming no caller is decided as the root principal of the
+   * Account it reaches. A service control policy denying that root then denies
+   * the call. That is the reason to name a default.
+   */
+  readonly defaultCaller?: SimAwsCaller;
+
   readonly background?: BackgroundScheduler & BackgroundCompleter;
   /**
    * Clock this simulation's timestamps start from, defaulting to the real
