@@ -56,6 +56,16 @@ export interface SimCfnResourceResolveContext {
    * another service rather than from the template. A dynamic reference is one.
    */
   readonly simAws?: SimAws | undefined;
+
+  /**
+   * The principal the operation runs as, which a value read out of another
+   * service is authorized as. Real CloudFormation reads a dynamic reference
+   * under the Stack's execution role rather than as the Account root.
+   *
+   * Left out unless the deployment named one, which leaves each service to its
+   * own omitted-caller default of the Account root.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 export interface SimCloudFormationResourceCreateContext {

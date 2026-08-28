@@ -1,4 +1,9 @@
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type {
   SimCfnDynamicReference,
   SimCfnDynamicReferenceResolution,
@@ -6,10 +11,10 @@ import type {
 } from "../../../cloudformation/template/dynamic/sim-cfn-dynamic-reference.type.js";
 import { SimSecretsManagerError } from "../../error/sim-secrets-manager.error.js";
 import type { SimSecretsManager } from "../../sim-secrets-manager.js";
-import { simCfnSecretsManagerJsonKeyValue } from "./sim-cfn-secrets-manager-json-key.js";
+import { simCfnSecretsManagerReferenceStandIn } from "./sim-cfn-secrets-manager-reference-stand-in.js";
+import { simCfnSecretsManagerReferenceValue } from "./sim-cfn-secrets-manager-reference-value.js";
 import {
   parseSimCfnSecretsManagerReference,
-  type SimCfnSecretsManagerReference,
   SimCfnSecretsManagerReferenceProblem,
 } from "./sim-cfn-secrets-manager-reference-body.js";
 
@@ -21,17 +26,21 @@ interface SimCfnSecretsManagerDynamicReferenceResolverProperties {
   readonly secretsManagerIn: (
     scope: SimAwsAccountRegionScope,
   ) => SimSecretsManager;
+
+  /** The principal the deployment runs as, which the secret is read as. */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
  * Answers `{{resolve:secretsmanager:...}}` references from simulated Secrets
  * Manager.
  *
- * The secret is read as the caller deploying the Stack would read it, at the
- * point the Resource holding the reference is created. Real CloudFormation
- * makes no dependency out of a dynamic reference, so a secret another Resource
- * of the same Stack creates is only there in time if the template says
- * `DependsOn`.
+ * The secret is read as the principal the deployment names, at the point the
+ * Resource holding the reference is created. A deployment naming none reads as
+ * the Account root, which is Secrets Manager's own default. Real
+ * CloudFormation makes no dependency out of a dynamic reference, so a secret
+ * another Resource of the same Stack creates is only there in time if the
+ * template says `DependsOn`.
  *
  * Reading goes through the ordinary GetSecretValue command, which decrypts the
  * version through simulated KMS, so the answer comes back as a promise. That
@@ -49,11 +58,14 @@ export class SimCfnSecretsManagerDynamicReferenceResolver implements SimCfnDynam
     scope: SimAwsAccountRegionScope,
   ) => SimSecretsManager;
 
+  private readonly callerOptions: SimCfnResourceCallerOptions;
+
   constructor(
     properties: SimCfnSecretsManagerDynamicReferenceResolverProperties,
   ) {
     this.secretsManager = properties.secretsManager;
     this.secretsManagerIn = properties.secretsManagerIn;
+    this.callerOptions = simCfnResourceCallerOptions(properties.caller);
   }
 
   /**
@@ -68,10 +80,20 @@ export class SimCfnSecretsManagerDynamicReferenceResolver implements SimCfnDynam
       const parsed = parseSimCfnSecretsManagerReference(reference.body);
       secretId = parsed.secretId;
 
-      return { value: await this.read(parsed) };
+      return {
+        value: await simCfnSecretsManagerReferenceValue(
+          this.secretsManagerFor(parsed.scope),
+          parsed,
+          this.callerOptions,
+        ),
+      };
     } catch (error) {
       if (error instanceof SimCfnSecretsManagerReferenceProblem) {
-        return this.standIn(reference, secretId, error.message);
+        return simCfnSecretsManagerReferenceStandIn(
+          reference,
+          secretId,
+          error.message,
+        );
       }
 
       /* v8 ignore next 3 -- defensive: only Secrets Manager reaches here */
@@ -79,7 +101,7 @@ export class SimCfnSecretsManagerDynamicReferenceResolver implements SimCfnDynam
         throw error;
       }
 
-      return this.standIn(
+      return simCfnSecretsManagerReferenceStandIn(
         reference,
         secretId,
         `and simulated Secrets Manager could not read it (${error.message})`,
@@ -88,56 +110,14 @@ export class SimCfnSecretsManagerDynamicReferenceResolver implements SimCfnDynam
   }
 
   /**
-   * Read the version the reference selects, or the current one.
+   * The Secrets Manager a reference reads from: the Stack's own, or the one a
+   * full secret ARN names.
    */
-  private async read(
-    reference: SimCfnSecretsManagerReference,
-  ): Promise<string> {
-    const { secretId, scope, jsonKey, versionStage, versionId } = reference;
-    const secretsManager =
-      scope === undefined ? this.secretsManager : this.secretsManagerIn(scope);
-
-    const read = await secretsManager.getSecretValue({
-      input: {
-        SecretId: secretId,
-        VersionStage: versionStage,
-        VersionId: versionId,
-      },
-    });
-
-    const secretString = read.SecretString;
-
-    if (secretString === undefined) {
-      throw new SimCfnSecretsManagerReferenceProblem(
-        `and '${secretId}' holds a binary value, which a dynamic reference ` +
-          `cannot read`,
-      );
-    }
-
-    if (jsonKey === undefined) {
-      return secretString;
-    }
-
-    return simCfnSecretsManagerJsonKeyValue(secretString, secretId, jsonKey);
-  }
-
-  /**
-   * The value a reference Secrets Manager could not answer resolves to.
-   *
-   * The shape follows the `ssm` references beside it, and CDK before them,
-   * which fills an unresolved context lookup with `dummy-value-for-<name>`. A
-   * test reading one back sees where it came from.
-   */
-  private standIn(
-    reference: SimCfnDynamicReference,
-    secretId: string,
-    reason: string,
-  ): SimCfnDynamicReferenceResolution {
-    return {
-      value: `dummy-value-for-${secretId}`,
-      reason:
-        `holds ${reference.text}, ${reason}, so the Resource is created ` +
-        `with a stand-in value`,
-    };
+  private secretsManagerFor(
+    scope: SimAwsAccountRegionScope | undefined,
+  ): SimSecretsManager {
+    return scope === undefined
+      ? this.secretsManager
+      : this.secretsManagerIn(scope);
   }
 }

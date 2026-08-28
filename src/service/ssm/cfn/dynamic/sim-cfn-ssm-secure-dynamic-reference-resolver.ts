@@ -1,4 +1,9 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type {
   SimCfnDynamicReference,
   SimCfnDynamicReferenceResolution,
@@ -16,6 +21,9 @@ import {
 
 interface SimCfnSsmSecureDynamicReferenceResolverProperties {
   readonly ssm: SimSsm;
+
+  /** The principal the deployment runs as, which the parameter is read as. */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -23,11 +31,12 @@ interface SimCfnSsmSecureDynamicReferenceResolverProperties {
  * Store.
  *
  * The parameter is read the way `GetParameter` with `WithDecryption` reads it,
- * as the caller deploying the Stack, so the value comes back decrypted through
- * the simulated KMS key it was written under. A caller the key does not admit
- * is denied here, which is the failure a real deployment hits. Decrypting
- * cannot be done synchronously, so the answer comes back as a promise for the
- * CloudFormation engine to wait on.
+ * as the principal the deployment names, so the value comes back decrypted
+ * through the simulated KMS key it was written under. A caller the key does
+ * not admit is denied here, which is the failure a real deployment hits. A
+ * deployment naming no principal reads as the Account root, which is Parameter
+ * Store's own default. Decrypting cannot be done synchronously, so the answer
+ * comes back as a promise for the CloudFormation engine to wait on.
  *
  * A reference the template had no business writing fails the Resource, which
  * `sim-cfn-ssm-secure-refusals.ts` holds the rules for. Everything else
@@ -38,8 +47,11 @@ interface SimCfnSsmSecureDynamicReferenceResolverProperties {
 export class SimCfnSsmSecureDynamicReferenceResolver implements SimCfnDynamicReferenceResolver {
   private readonly ssm: SimSsm;
 
+  private readonly callerOptions: SimCfnResourceCallerOptions;
+
   constructor(properties: SimCfnSsmSecureDynamicReferenceResolverProperties) {
     this.ssm = properties.ssm;
+    this.callerOptions = simCfnResourceCallerOptions(properties.caller);
   }
 
   /**
@@ -82,9 +94,10 @@ export class SimCfnSsmSecureDynamicReferenceResolver implements SimCfnDynamicRef
     const selector = version === undefined ? name : `${name}:${version}`;
 
     try {
-      const read = await this.ssm.getParameter({
-        input: { Name: selector, WithDecryption: true },
-      });
+      const read = await this.ssm.getParameter(
+        { input: { Name: selector, WithDecryption: true } },
+        this.callerOptions,
+      );
 
       const parameter = read.Parameter;
 

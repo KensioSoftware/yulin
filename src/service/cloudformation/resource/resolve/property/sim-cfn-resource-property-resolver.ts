@@ -122,11 +122,15 @@ export class SimCfnResourcePropertyResolver {
    * Absent where the caller has no simulation to read from, which is how the
    * resolver is used on its own in tests. A reference then stays in the
    * property as the template wrote it.
+   *
+   * The principal the operation runs as goes with the simulation, so a
+   * reference is read as the deployment's own caller rather than as the
+   * Account root.
    */
   private dynamicReferences(
     context: SimCfnResourceResolveContext,
   ): SimCfnDynamicReferences | undefined {
-    const { simAws } = context;
+    const { simAws, caller } = context;
 
     if (simAws === undefined || this.accountRegionScope === undefined) {
       return undefined;
@@ -134,6 +138,7 @@ export class SimCfnResourcePropertyResolver {
 
     return makeSimCfnDynamicReferences({
       simAws,
+      caller,
       accountRegionScope: this.accountRegionScope,
       propertyIgnorer: this.propertyIgnorer,
       resourceType: this.resourceType,
