@@ -317,15 +317,17 @@ request value is there to satisfy it.
 ### Statements left unevaluated
 
 An operator from outside the list above fails closed. The statement holding it matches nothing, and
-a `Deny` written that way allows the request it was meant to stop. `decision.unevaluatedStatements`
-reports each of those statements, with the policy it came from (`policy`), how that policy reached
-the request (`sourceType`), the statement as its document declared it (`statement`), and the
-operator that stopped the simulator reading it (`reason`).
+a `Deny` written that way stops nothing. The request then goes through on whatever else allows it,
+which is how a guardrail comes to report a healthy Allow. `decision.unevaluatedStatements` reports
+each of those statements, with the policy it came from (`policy`), how that policy reached the
+request (`sourceType`), the statement as its document declared it (`statement`), and the operator
+the simulator could not evaluate (`reason`).
 
-A statement reaches the list once everything else about it has matched. Its Principal, Action and
-Resource applied to the request, and the condition block was the only part left to read. A decision
-reached over policies the simulator read in full reports an empty list, and a test asserting on a
-guardrail can say so.
+Every operator in a condition block is read, and an unsupported one leaves the rest of the block
+evaluated as usual. A statement reaches the list once everything else about it has matched. Its
+Principal, Action and Resource applied to the request, and the unsupported operator was the only
+thing standing between the statement and the request. A decision reached over policies the
+simulator read in full reports an empty list, and a test asserting on a guardrail can say so.
 
 ```typescript sim-iam-unevaluated-statements
 /**
