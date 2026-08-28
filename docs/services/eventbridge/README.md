@@ -973,6 +973,9 @@ console.log(failure?.message);
 A target that names nothing reads differently from one whose policy said no, because a policy saying
 no is a modelled outcome a test may be asking for on purpose.
 
+`JSON.stringify` on a failure carries the message alongside the rule, the target and the event it
+names.
+
 ## Permissions
 
 Most operations are authorized by simulated IAM against the bus ARN. The two that name no bus

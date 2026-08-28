@@ -8,6 +8,14 @@ interface SimEventBridgeDeliveryFailureProperties {
 }
 
 /**
+ * A failed delivery as it serialises. Every property the failure holds, plus
+ * the message the getter reads off the error.
+ */
+export interface SimEventBridgeDeliveryFailureJson extends SimEventBridgeDeliveryFailureProperties {
+  readonly message: string;
+}
+
+/**
  * One event a rule could not get to one of its targets.
  */
 export class SimEventBridgeDeliveryFailure {
@@ -36,6 +44,26 @@ export class SimEventBridgeDeliveryFailure {
     }
 
     return String(this.error);
+  }
+
+  /**
+   * The failure as JSON.stringify renders it, message included.
+   *
+   * Serialising a failure is the first thing to reach for when a target
+   * received nothing. The message is a getter on the prototype and would be
+   * left out. An Error keeps its own message on a non-enumerable property and
+   * prints as `{}`.
+   */
+  toJSON(): SimEventBridgeDeliveryFailureJson {
+    return {
+      ruleName: this.ruleName,
+      ruleArn: this.ruleArn,
+      targetId: this.targetId,
+      targetArn: this.targetArn,
+      eventId: this.eventId,
+      message: this.message,
+      error: this.error,
+    };
   }
 }
 
