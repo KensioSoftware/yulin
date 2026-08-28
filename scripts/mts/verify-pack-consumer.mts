@@ -8,9 +8,10 @@
  */
 
 import { execa } from "execa";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { isFile } from "./verify-pack-files.mjs";
 import type {
   ImportResult,
   PackageManifest,
@@ -147,16 +148,6 @@ export async function findMissingTypes(
   }
 
   return missing;
-}
-
-async function isFile(filePath: string): Promise<boolean> {
-  try {
-    const entry = await stat(filePath);
-
-    return entry.isFile();
-  } catch {
-    return false;
-  }
 }
 
 /** Imports each subpath in a child process running inside the consumer. */

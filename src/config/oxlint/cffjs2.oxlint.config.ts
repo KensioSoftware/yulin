@@ -19,12 +19,13 @@ export interface OxlintConfig {
 }
 
 /**
- * Where the built plugin sits, relative to the built config that names it.
+ * Where the built plugin sits, relative to the published config that names it.
  *
  * Oxlint resolves a plugin specifier against the config file's own location,
- * so this path is the one inside `dist/`, not the one in the source tree.
+ * and the config is written to the package root, so this path goes down into
+ * `dist/` rather than across the source tree.
  */
-const pluginSpecifier = "../lint/cff-js2-oxlint-plugin.js";
+const pluginSpecifier = "./dist/config/lint/cff-js2-oxlint-plugin.js";
 
 /**
  * Oxlint's half of the CloudFront Functions JS2 lint setup.
