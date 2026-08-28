@@ -26,6 +26,21 @@ export class SimLambdaVmModuleResolver {
     return this.resolvePackage(specifier);
   }
 
+  /**
+   * Whether the archive bundles a bare specifier itself.
+   *
+   * The archive takes precedence over anything the runtime provides, so a
+   * specifier it resolves is never asked of the module provider.
+   */
+  bundlesPackage(specifier: string): boolean {
+    try {
+      this.resolvePackage(specifier);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private resolveCandidates(basePath: string, specifier: string): string {
     const candidates = [
       basePath,

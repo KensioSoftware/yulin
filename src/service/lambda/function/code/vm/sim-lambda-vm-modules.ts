@@ -1,7 +1,9 @@
-import { createRequire, isBuiltin } from "node:module";
+import { isBuiltin } from "node:module";
 import path from "node:path";
 import vm from "node:vm";
 import type { SimZipArchive } from "../../../../../util/zip/zip-archive.js";
+import { requireHostModule } from "./sim-lambda-host-modules.js";
+import { provideSdkModule } from "./sdk/sim-lambda-provided-sdk-module.js";
 import type { SimLambdaVmSdkModuleProvider } from "./sdk/sim-lambda-vm-sdk-module-provider.js";
 import { loadJsonModule } from "./sim-lambda-vm-json-module.js";
 import type {
@@ -16,8 +18,6 @@ import { userCodeSyntaxError } from "./sim-lambda-vm-syntax-error.js";
  * bounded like real Lambda bounds its init phase.
  */
 const moduleEvaluationTimeoutMs = 5000;
-
-const hostRequire = createRequire(import.meta.url);
 
 interface SimLambdaVmModulesProperties {
   readonly archive: SimZipArchive;
@@ -51,7 +51,7 @@ export class SimLambdaVmModules {
     if (isBuiltin(specifier)) {
       return (
         this.properties.sdkModuleProvider.provideModule(specifier) ??
-        hostRequire(specifier)
+        requireHostModule(specifier)
       );
     }
 
@@ -78,7 +78,7 @@ export class SimLambdaVmModules {
    * original archive resolution error is reported.
    */
   private provideModule(specifier: string, archiveError: unknown): unknown {
-    const provided = this.properties.sdkModuleProvider.provideModule(specifier);
+    const provided = provideSdkModule(specifier, this.properties);
     if (provided === undefined) {
       throw archiveError;
     }

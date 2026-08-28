@@ -1,5 +1,3 @@
-import { createRequire } from "node:module";
-import path from "node:path";
 import { SimSdkModuleClientInterceptor } from "../../../../../../sdk/module/sim-sdk-module-client-interceptor.js";
 import { SimSdkCommandDispatcher } from "../../../../../../sdk/sim-sdk-command-dispatcher.js";
 import type { AwsRegionName } from "../../../../../aws/sim-aws-region.js";
@@ -12,11 +10,14 @@ import {
 } from "../../../outbound/sim-lambda-http-module.js";
 import type { SimLambdaOutboundHttp } from "../../../outbound/sim-lambda-outbound-http.js";
 import {
+  isModuleNotFoundError,
+  requireHostModule,
+} from "../sim-lambda-host-modules.js";
+import { SimLambdaSdkPackagesNotInstalledError } from "./sim-lambda-sdk-packages-not-installed.error.js";
+import {
   awsSdkPackagePrefix,
   type SimLambdaVmSdkModuleProvider,
 } from "./sim-lambda-vm-sdk-module-provider.js";
-
-const hostRequire = createRequire(import.meta.url);
 
 interface SimSdkLambdaVmModuleProviderProperties {
   readonly simAws: SimAws;
@@ -97,6 +98,33 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
     return module;
   }
 
+  /**
+   * Which of the given specifiers this provider serves and the host cannot
+   * resolve.
+   *
+   * Resolution only. A package that resolves and then throws while it
+   * initializes is installed, and that error belongs to the function code
+   * requiring it rather than to a report of what is missing.
+   */
+  unresolvedModules(specifiers: readonly string[]): readonly string[] {
+    return specifiers.filter(
+      (specifier) =>
+        specifier.startsWith(awsSdkPackagePrefix) && !this.resolves(specifier),
+    );
+  }
+
+  private resolves(specifier: string): boolean {
+    if (this.providedModules.has(specifier)) {
+      return true;
+    }
+    try {
+      this.requireModule(specifier);
+      return true;
+    } catch (error) {
+      return !isModuleNotFoundError(error);
+    }
+  }
+
   private hostModuleExports(specifier: string): object {
     let moduleExports: unknown;
     try {
@@ -107,13 +135,9 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
       if (!isModuleNotFoundError(error)) {
         throw error;
       }
-      throw new Error(
-        `Cannot provide ${specifier} to sim Lambda function code: the ` +
-          "package is not installed. Install it in your project, as the " +
-          "real Lambda runtime provides it, or bundle it into the function " +
-          "code archive.",
-        { cause: error },
-      );
+      throw new SimLambdaSdkPackagesNotInstalledError([specifier], {
+        cause: error,
+      });
     }
 
     if (typeof moduleExports !== "object" || moduleExports === null) {
@@ -124,34 +148,4 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
     }
     return moduleExports;
   }
-}
-
-/**
- * Require an AWS SDK package from the host.
- *
- * The packages are installed by the consuming project, as they are provided
- * by the real Lambda runtime rather than by this package. Requiring from
- * this module's context covers hoisted installs; the working-directory
- * fallback covers stricter package layouts.
- */
-function requireHostModule(specifier: string): unknown {
-  try {
-    return hostRequire(specifier);
-  } catch {
-    /* v8 ignore next 4 -- only reachable in consumer package layouts where
-       this package's own require context cannot see the SDK packages. */
-    return createRequire(path.join(process.cwd(), "package.json"))(specifier);
-  }
-}
-
-/**
- * Whether an error is a Node.js module resolution failure, as opposed to an
- * error thrown while a resolved module initializes.
- */
-function isModuleNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    (error.code === "MODULE_NOT_FOUND" || error.code === "ERR_MODULE_NOT_FOUND")
-  );
 }

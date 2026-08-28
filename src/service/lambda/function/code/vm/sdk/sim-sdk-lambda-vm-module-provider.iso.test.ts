@@ -2,6 +2,7 @@ import http from "node:http";
 import https from "node:https";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  assertArrayEquals,
   assertFalse,
   assertIdentical,
   assertNonNullable,
@@ -115,6 +116,54 @@ describe("SimSdkLambdaVmModuleProvider", () => {
 
     assertStringIncludes(error.message, "@aws-sdk/client-unknown");
     assertStringIncludes(error.message, "not installed");
+  });
+
+  it("names the packages the host cannot resolve", () => {
+    // Given a provider whose host has one of the packages and not the other.
+    const provider = new SimSdkLambdaVmModuleProvider({
+      simAws: new SimAws(),
+      requireModule: (specifier) => {
+        if (specifier === "@aws-sdk/client-present") {
+          return { presentExport: true };
+        }
+        throw makeModuleNotFoundError(specifier);
+      },
+    });
+
+    // When the provider is asked which of a set it cannot resolve.
+    const unresolved = provider.unresolvedModules([
+      "@aws-sdk/client-present",
+      "@aws-sdk/client-unknown",
+      "left-pad",
+    ]);
+
+    // Then only the AWS SDK package it serves and cannot resolve is named:
+    // a package it does not serve at all is nothing for it to report.
+    assertArrayEquals(unresolved, ["@aws-sdk/client-unknown"]);
+  });
+
+  it("counts an already-provided package as resolved", () => {
+    // Given a provider that has already provided a package.
+    const provider = new SimSdkLambdaVmModuleProvider({ simAws: new SimAws() });
+    provider.provideModule("@aws-sdk/client-s3");
+
+    // When it is asked whether that package is missing, then it is not.
+    assertArrayEquals(provider.unresolvedModules(["@aws-sdk/client-s3"]), []);
+  });
+
+  it("counts a package that fails to initialize as installed", () => {
+    // Given a provider whose host resolves the package and the package
+    // throws while it initializes.
+    const provider = new SimSdkLambdaVmModuleProvider({
+      simAws: new SimAws(),
+      requireModule: () => {
+        throw new Error("boom during package initialization");
+      },
+    });
+
+    // When it is asked whether the package is missing, then it is not: the
+    // package is there, and its own error belongs to the code requiring it.
+    assertArrayEquals(provider.unresolvedModules(["@aws-sdk/client-s3"]), []);
   });
 
   it("propagates installed-package initialization failures unchanged", () => {

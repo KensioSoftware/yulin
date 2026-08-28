@@ -19,6 +19,16 @@ export const awsSdkPackagePrefix = "@aws-sdk/";
  */
 export interface SimLambdaVmSdkModuleProvider {
   provideModule(specifier: string): unknown;
+
+  /**
+   * Which of the given specifiers this provider serves and cannot resolve.
+   *
+   * The module system asks once a package has turned out to be missing. The
+   * refusal then names every package the project has to install, where on
+   * its own it would name only the one the function code reached first. A
+   * provider that does not answer is asked for one specifier at a time.
+   */
+  unresolvedModules?(specifiers: readonly string[]): readonly string[];
 }
 
 /**
