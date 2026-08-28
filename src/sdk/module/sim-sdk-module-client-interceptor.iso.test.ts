@@ -18,6 +18,29 @@ import { SimSdkModuleClientInterceptor } from "./sim-sdk-module-client-intercept
 class FakeSdkClient {
   constructor(readonly clientConfiguration?: { region?: string }) {}
 
+  /**
+   * A static factory, as `DynamoDBDocumentClient.from` is: it constructs
+   * from the class binding it closes over, never through a wrapper.
+   */
+  static from(clientConfiguration?: { region?: string }): FakeSdkClient {
+    return new FakeSdkClient(clientConfiguration);
+  }
+
+  /**
+   * A static factory building through the class it was called on, which is
+   * the intercepted one when the call went through interception.
+   */
+  static build(this: typeof FakeSdkClient): FakeSdkClient {
+    return new this();
+  }
+
+  /**
+   * A static that returns something other than a client.
+   */
+  static describe(): string {
+    return "fake-sdk-client";
+  }
+
   send(command: object): Promise<unknown> {
     return Promise.resolve({ realSend: command });
   }
@@ -96,6 +119,52 @@ describe("SimSdkModuleClientInterceptor", () => {
       realSend: object;
     };
     assertIdentical(directResult.realSend, command);
+  });
+
+  it("send-patches the clients a static factory builds", async () => {
+    // Given a module whose client class export has been intercepted.
+    const { interceptor, sends } = makeInterceptor();
+    const intercepted = interceptor.interceptModule(fakeModuleExports()) as {
+      FakeSdkClient: typeof FakeSdkClient;
+    };
+
+    // When a client comes from the class's own static factory, which
+    // constructs the real class rather than the intercepted one.
+    const client = intercepted.FakeSdkClient.from();
+    const command = new FakeSdkCommand({ TableName: "table" });
+    const result = await client.send(command);
+
+    // Then that client's send went to the simulated send handler too.
+    assertIdentical(result, "sim-send-result");
+    assertArrayLength(sends, 1);
+    const recordedSend = sends[0];
+    assertNonNullable(recordedSend);
+    assertIdentical(recordedSend.client, client);
+
+    // And a static returning something that is not a client is untouched.
+    assertIdentical(intercepted.FakeSdkClient.describe(), "fake-sdk-client");
+
+    // And the factory built the real class, so instanceof still holds.
+    assertInstanceOf(client, FakeSdkClient);
+    assertFalse(Object.hasOwn(FakeSdkClient.from(), "send"));
+  });
+
+  it("leaves a factory's already-patched client alone", async () => {
+    // Given a module whose client class export has been intercepted.
+    const { interceptor, sends } = makeInterceptor();
+    const intercepted = interceptor.interceptModule(fakeModuleExports()) as {
+      FakeSdkClient: typeof FakeSdkClient;
+    };
+
+    // When a static factory builds through the intercepted class itself, so
+    // the construct trap has already patched what it returns.
+    const client = intercepted.FakeSdkClient.build();
+    const result = await client.send(new FakeSdkCommand({}));
+
+    // Then the one patch stands, rather than a second being rejected as a
+    // double interception.
+    assertIdentical(result, "sim-send-result");
+    assertArrayLength(sends, 1);
   });
 
   it("passes non-client exports through by identity", () => {
