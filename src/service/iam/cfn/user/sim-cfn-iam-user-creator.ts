@@ -7,6 +7,7 @@ import {
   SimCfnIamUserPropertiesParser,
   type SimCfnIamUserProperties,
 } from "./sim-cfn-iam-user-properties-parser.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamUserCreatorProperties {
   readonly iam: SimIam;
@@ -29,20 +30,24 @@ export class SimCfnIamUserCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimIamUser> {
     const userProperties = this.propsParser.parse(resource, properties);
 
-    await this.iam.createUser({
-      input: {
-        UserName: userProperties.userName,
-        Path: userProperties.path,
+    await this.iam.createUser(
+      {
+        input: {
+          UserName: userProperties.userName,
+          Path: userProperties.path,
+        },
       },
-    });
+      options,
+    );
 
     await Promise.all([
-      this.putInlinePolicies(userProperties),
-      this.attachManagedPolicies(userProperties),
-      this.createLoginProfile(userProperties),
+      this.putInlinePolicies(userProperties, options),
+      this.attachManagedPolicies(userProperties, options),
+      this.createLoginProfile(userProperties, options),
     ]);
 
     const user = this.iam.users.get(userProperties.userName as SimIamUsername);
@@ -56,31 +61,39 @@ export class SimCfnIamUserCreator {
 
   private async putInlinePolicies(
     userProperties: SimCfnIamUserProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await Promise.all(
       userProperties.inlinePolicies.map(async (inlinePolicy) =>
-        this.iam.putUserPolicy({
-          input: {
-            UserName: userProperties.userName,
-            PolicyName: inlinePolicy.policyName,
-            PolicyDocument: inlinePolicy.policyDocument,
+        this.iam.putUserPolicy(
+          {
+            input: {
+              UserName: userProperties.userName,
+              PolicyName: inlinePolicy.policyName,
+              PolicyDocument: inlinePolicy.policyDocument,
+            },
           },
-        }),
+          options,
+        ),
       ),
     );
   }
 
   private async attachManagedPolicies(
     userProperties: SimCfnIamUserProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await Promise.all(
       userProperties.managedPolicyArns.map(async (policyArn) =>
-        this.iam.attachUserPolicy({
-          input: {
-            UserName: userProperties.userName,
-            PolicyArn: policyArn,
+        this.iam.attachUserPolicy(
+          {
+            input: {
+              UserName: userProperties.userName,
+              PolicyArn: policyArn,
+            },
           },
-        }),
+          options,
+        ),
       ),
     );
   }
@@ -91,6 +104,7 @@ export class SimCfnIamUserCreator {
    */
   private async createLoginProfile(
     userProperties: SimCfnIamUserProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const { loginProfile } = userProperties;
 
@@ -98,12 +112,15 @@ export class SimCfnIamUserCreator {
       return;
     }
 
-    await this.iam.createLoginProfile({
-      input: {
-        UserName: userProperties.userName,
-        Password: loginProfile.password,
-        PasswordResetRequired: loginProfile.passwordResetRequired,
+    await this.iam.createLoginProfile(
+      {
+        input: {
+          UserName: userProperties.userName,
+          Password: loginProfile.password,
+          PasswordResetRequired: loginProfile.passwordResetRequired,
+        },
       },
-    });
+      options,
+    );
   }
 }

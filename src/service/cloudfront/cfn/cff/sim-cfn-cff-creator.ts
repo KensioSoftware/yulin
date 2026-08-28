@@ -10,6 +10,10 @@ import type {
   SimCloudFrontFunctionName,
 } from "../../cff/sim-cloudfront-function.js";
 import { SimCfnCffCreateInputBuilder } from "./sim-cfn-cff-create-input-builder.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCfFunctionCreatorProperties {
   readonly cloudFront: SimCloudFront;
@@ -58,9 +62,10 @@ export class SimCfnCffCreator {
     });
     const functionInput = inputBuilder.build();
 
-    const output = await this.cloudFront.createFunction({
-      input: functionInput,
-    });
+    const output = await this.cloudFront.createFunction(
+      { input: functionInput },
+      simCfnResourceCallerOptions(context?.caller),
+    );
 
     const createdFunctionName = output.FunctionSummary
       .Name as SimCloudFrontFunctionName;
@@ -73,5 +78,26 @@ export class SimCfnCffCreator {
     );
 
     return cloudFrontFunction;
+  }
+
+  /**
+   * Delete the Function an AWS::CloudFront::Function Resource created.
+   */
+  async delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    const cloudFrontFunction = resource.simResource as
+      | SimCloudFrontFunction
+      | undefined;
+    assertDefined(
+      cloudFrontFunction,
+      `sim CloudFront Function for CloudFormation Resource ${resource.logicalId}`,
+    );
+
+    await this.cloudFront.deleteFunction(
+      { input: { Name: cloudFrontFunction.name } },
+      options,
+    );
   }
 }

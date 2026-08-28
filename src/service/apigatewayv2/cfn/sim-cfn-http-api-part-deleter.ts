@@ -6,6 +6,7 @@ import type { SimHttpApiIntegration } from "../api/integration/sim-http-api-inte
 import type { SimHttpApiRoute } from "../api/route/sim-http-api-route.js";
 import type { SimHttpApiStage } from "../api/stage/sim-http-api-stage.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiPartDeleterProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -37,6 +38,7 @@ export class SimCfnHttpApiPartDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const apiId = this.apiId(resource, properties);
 
@@ -44,36 +46,40 @@ export class SimCfnHttpApiPartDeleter {
       case "Authorizer": {
         const { authorizerId } = this.part<SimHttpApiAuthorizer>(resource);
 
-        await this.apiGatewayV2.deleteAuthorizer({
-          input: { ApiId: apiId, AuthorizerId: authorizerId },
-        });
+        await this.apiGatewayV2.deleteAuthorizer(
+          { input: { ApiId: apiId, AuthorizerId: authorizerId } },
+          options,
+        );
 
         return;
       }
       case "Integration": {
         const { integrationId } = this.part<SimHttpApiIntegration>(resource);
 
-        await this.apiGatewayV2.deleteIntegration({
-          input: { ApiId: apiId, IntegrationId: integrationId },
-        });
+        await this.apiGatewayV2.deleteIntegration(
+          { input: { ApiId: apiId, IntegrationId: integrationId } },
+          options,
+        );
 
         return;
       }
       case "Route": {
         const { routeId } = this.part<SimHttpApiRoute>(resource);
 
-        await this.apiGatewayV2.deleteRoute({
-          input: { ApiId: apiId, RouteId: routeId },
-        });
+        await this.apiGatewayV2.deleteRoute(
+          { input: { ApiId: apiId, RouteId: routeId } },
+          options,
+        );
 
         return;
       }
       case "Stage": {
         const { stageName } = this.part<SimHttpApiStage>(resource);
 
-        await this.apiGatewayV2.deleteStage({
-          input: { ApiId: apiId, StageName: stageName },
-        });
+        await this.apiGatewayV2.deleteStage(
+          { input: { ApiId: apiId, StageName: stageName } },
+          options,
+        );
 
         return;
       }

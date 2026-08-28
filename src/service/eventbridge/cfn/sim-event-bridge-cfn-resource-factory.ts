@@ -4,6 +4,7 @@ import type {
   SimCloudFormationResourceCreateContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimEventBridge } from "../sim-event-bridge.js";
 import { SimCfnEventBusCreator } from "./bus/sim-cfn-event-bus-creator.js";
 import { SimCfnEventRuleCreator } from "./rule/sim-cfn-event-rule-creator.js";
@@ -47,12 +48,14 @@ export class SimEventBridgeCfnResourceFactory implements SimCfnServiceResourceFa
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
 
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "EventBus": {
-        return await this.busCreator.create(resource, properties);
+        return await this.busCreator.create(resource, properties, options);
       }
       case "Rule": {
-        return await this.ruleCreator.create(resource, properties);
+        return await this.ruleCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -77,6 +80,7 @@ export class SimEventBridgeCfnResourceFactory implements SimCfnServiceResourceFa
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

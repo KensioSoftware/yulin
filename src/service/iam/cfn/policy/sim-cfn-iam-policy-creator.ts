@@ -5,6 +5,7 @@ import {
   SimCfnIamPolicyPropertiesParser,
   type SimCfnIamPolicyProperties,
 } from "./sim-cfn-iam-policy-properties-parser.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamPolicyCreatorProperties {
   readonly iam: SimIam;
@@ -35,12 +36,13 @@ export class SimCfnIamPolicyCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<undefined> {
     const policyProperties = this.propsParser.parse(resource, properties);
 
     await Promise.all([
-      this.putRolePolicies(policyProperties),
-      this.putUserPolicies(policyProperties),
+      this.putRolePolicies(policyProperties, options),
+      this.putUserPolicies(policyProperties, options),
     ]);
 
     return undefined;
@@ -48,32 +50,40 @@ export class SimCfnIamPolicyCreator {
 
   private async putRolePolicies(
     policyProperties: SimCfnIamPolicyProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await Promise.all(
       policyProperties.roleNames.map(async (roleName) =>
-        this.iam.putRolePolicy({
-          input: {
-            RoleName: roleName,
-            PolicyName: policyProperties.policyName,
-            PolicyDocument: policyProperties.policyDocument,
+        this.iam.putRolePolicy(
+          {
+            input: {
+              RoleName: roleName,
+              PolicyName: policyProperties.policyName,
+              PolicyDocument: policyProperties.policyDocument,
+            },
           },
-        }),
+          options,
+        ),
       ),
     );
   }
 
   private async putUserPolicies(
     policyProperties: SimCfnIamPolicyProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await Promise.all(
       policyProperties.usernames.map(async (username) =>
-        this.iam.putUserPolicy({
-          input: {
-            UserName: username,
-            PolicyName: policyProperties.policyName,
-            PolicyDocument: policyProperties.policyDocument,
+        this.iam.putUserPolicy(
+          {
+            input: {
+              UserName: username,
+              PolicyName: policyProperties.policyName,
+              PolicyDocument: policyProperties.policyDocument,
+            },
           },
-        }),
+          options,
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import { jsonStringify } from "../../../../util/type-guard/json.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSns } from "../../sim-sns.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import { simSnsPolicyAttributeName } from "../../topic/sim-sns-topic-attribute-names.js";
 import { parseSnsTopicArn } from "../../topic/sim-sns-topic-arn.js";
@@ -43,6 +44,7 @@ export class SimCfnSnsTopicPolicyCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSnsTopic> {
     const { logicalId } = resource;
     const topicArns = simCfnSnsPolicyTopicArns(logicalId, properties);
@@ -56,7 +58,7 @@ export class SimCfnSnsTopicPolicyCreator {
       async () => {
         const topics = await Promise.all(
           topicArns.map(async (topicArn) =>
-            this.policyApplied(topicArn, policy),
+            this.policyApplied(topicArn, policy, options),
           ),
         );
 
@@ -72,19 +74,52 @@ export class SimCfnSnsTopicPolicyCreator {
   }
 
   /**
+   * Take the policy back off every topic the Resource named.
+   *
+   * The Resource points at only the first of them, so the topics are read from
+   * the template the same way creation read them.
+   */
+  async delete(
+    resource: SimCfnResource,
+    properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    const topicArns = simCfnSnsPolicyTopicArns(resource.logicalId, properties);
+
+    await Promise.all(
+      topicArns.map(async (topicArn) =>
+        this.sns.setTopicAttributes(
+          {
+            input: {
+              TopicArn: topicArn,
+              AttributeName: simSnsPolicyAttributeName,
+              AttributeValue: "",
+            },
+          },
+          options,
+        ),
+      ),
+    );
+  }
+
+  /**
    * Set the policy on one topic and hand back the topic it was set on.
    */
   private async policyApplied(
     topicArn: string,
     policy: string,
+    options: SimCfnResourceCallerOptions,
   ): Promise<SimSnsTopic> {
-    await this.sns.setTopicAttributes({
-      input: {
-        TopicArn: topicArn,
-        AttributeName: simSnsPolicyAttributeName,
-        AttributeValue: policy,
+    await this.sns.setTopicAttributes(
+      {
+        input: {
+          TopicArn: topicArn,
+          AttributeName: simSnsPolicyAttributeName,
+          AttributeValue: policy,
+        },
       },
-    });
+      options,
+    );
 
     const parts = parseSnsTopicArn(topicArn);
     assertDefined(parts, `topic ARN ${topicArn} SetTopicAttributes accepted`);

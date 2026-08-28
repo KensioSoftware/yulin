@@ -6,6 +6,7 @@ import type { SimAthena } from "../../sim-athena.js";
 import { simCfnAthenaResourceCreation } from "../sim-cfn-athena-resource-error.js";
 import { athenaNamedQueryResourceType } from "../sim-cfn-athena-resource-types.js";
 import { SimCfnAthenaNamedQueryProperties } from "./sim-cfn-athena-named-query-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnAthenaNamedQueryCreatorProperties {
   readonly athena: SimAthena;
@@ -33,6 +34,7 @@ export class SimCfnAthenaNamedQueryCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimAthenaNamedQuery> {
     const read = new SimCfnAthenaNamedQueryProperties({
       resource,
@@ -46,7 +48,7 @@ export class SimCfnAthenaNamedQueryCreator {
       athenaNamedQueryResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.athena.createNamedQuery({ input });
+        const created = await this.athena.createNamedQuery({ input }, options);
         const namedQuery = this.athena
           .namedQueries()
           .find((candidate) => candidate.namedQueryId === created.NamedQueryId);
@@ -65,9 +67,13 @@ export class SimCfnAthenaNamedQueryCreator {
   /**
    * Delete the named query a Resource created.
    */
-  async delete(namedQuery: SimAthenaNamedQuery): Promise<void> {
-    await this.athena.deleteNamedQuery({
-      input: { NamedQueryId: namedQuery.namedQueryId },
-    });
+  async delete(
+    namedQuery: SimAthenaNamedQuery,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.athena.deleteNamedQuery(
+      { input: { NamedQueryId: namedQuery.namedQueryId } },
+      options,
+    );
   }
 }

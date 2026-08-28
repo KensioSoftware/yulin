@@ -15,6 +15,7 @@ import { simCfnCfDistroWithRunnableEdgeAssociations } from "./sim-cfn-cf-distro-
 import { simCfnCfDistroWithHeldResponseHeadersPolicies } from "./sim-cfn-cf-distro-response-headers-policy.js";
 import { simCfnCfDistroWithoutAbsentWebAcl } from "./sim-cfn-cf-distro-web-acl.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
+import { simCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCfDistroCreatorProperties {
   readonly cloudFront: SimCloudFront;
@@ -62,16 +63,19 @@ export class SimCfnCfDistroCreator {
       logicalId: resource.logicalId,
       distributionConfig: distributionConfigValue,
     });
-    const output = await this.cloudFront.createDistribution({
-      input: {
-        DistributionConfig: deployableConfig(
-          resource,
-          validator.validate(),
-          context.simAws,
-          this.cloudFront,
-        ),
+    const output = await this.cloudFront.createDistribution(
+      {
+        input: {
+          DistributionConfig: deployableConfig(
+            resource,
+            validator.validate(),
+            context.simAws,
+            this.cloudFront,
+          ),
+        },
       },
-    });
+      simCfnResourceCallerOptions(context.caller),
+    );
 
     const distributionId = output.Distribution?.Id;
     assertDefined(

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import {
   loadCdkAssemblyStacks,
   type SimCdkAssemblyStack,
@@ -29,8 +30,14 @@ export interface SimCloudFormationDeployCdkOutProperties {
   readonly stackNames?: readonly string[] | undefined;
 
   /**
-   * Bindings, parameters and a transform for individual Stacks, keyed the same
-   * way `stackNames` names them.
+   * The principal every Stack in the assembly is deployed as, which one named
+   * in `stackOptions` overrides for its own Stack.
+   */
+  readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * Bindings, parameters, a caller and a transform for individual Stacks,
+   * keyed the same way `stackNames` names them.
    */
   readonly stackOptions?: SimCfnCdkOutStackOptionsByName | undefined;
 }
@@ -42,6 +49,7 @@ export interface SimCfnCdkOutPlannedStack extends SimCdkAssemblyStack {
 
 export interface SimCfnCdkOutPlan {
   readonly stacks: readonly SimCfnCdkOutPlannedStack[];
+  readonly caller?: SimAwsCaller | undefined;
   readonly stackOptions?: SimCfnCdkOutStackOptionsByName | undefined;
 }
 
@@ -55,7 +63,7 @@ export async function planCdkOutDeployment(properties: {
   readonly request: SimCloudFormationDeployCdkOutProperties | string;
   readonly defaultRegionName: AwsRegionName;
 }): Promise<SimCfnCdkOutPlan> {
-  const { directoryPath, stackNames, stackOptions } = cdkOutDeployment(
+  const { directoryPath, stackNames, caller, stackOptions } = cdkOutDeployment(
     properties.request,
   );
 
@@ -72,6 +80,7 @@ export async function planCdkOutDeployment(properties: {
       ...stack,
       regionName: stack.regionName ?? properties.defaultRegionName,
     })),
+    caller,
     stackOptions,
   };
 }

@@ -1,4 +1,5 @@
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
@@ -63,6 +64,16 @@ export interface SimCloudFormationResourceCreateContext {
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal the deployment runs as, which every service command creating
+   * a Resource is authorized as.
+   *
+   * Left out unless the deployment named one, which leaves each service to its
+   * own omitted-caller default: the Account root, as it is everywhere else in
+   * the simulation.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -78,4 +89,7 @@ export interface SimCloudFormationResourceDeleteContext {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
+
+  /** The principal the teardown runs as, as creation carries it. */
+  readonly caller?: SimAwsCaller | undefined;
 }

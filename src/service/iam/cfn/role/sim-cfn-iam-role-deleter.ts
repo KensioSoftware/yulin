@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamRole } from "../../role/sim-iam-role.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamRoleDeleterProperties {
   readonly iam: SimIam;
@@ -30,36 +31,49 @@ export class SimCfnIamRoleDeleter {
   /**
    * Delete the Role a CloudFormation Resource created.
    */
-  async delete(resource: SimCfnResource): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const role = resource.simResource as SimIamRole | undefined;
     assertDefined(
       role,
       `sim IAM Role for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.detachPolicies(role);
-    await this.deleteInlinePolicies(role);
+    await this.detachPolicies(role, options);
+    await this.deleteInlinePolicies(role, options);
 
-    await this.iam.deleteRole({ input: { RoleName: role.roleName } });
+    await this.iam.deleteRole({ input: { RoleName: role.roleName } }, options);
   }
 
-  private async detachPolicies(role: SimIamRole): Promise<void> {
+  private async detachPolicies(
+    role: SimIamRole,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     await Promise.all(
       [...role.attachedPolicyArns].map(async (policyArn) =>
-        this.iam.detachRolePolicy({
-          input: { RoleName: role.roleName, PolicyArn: policyArn },
-        }),
+        this.iam.detachRolePolicy(
+          { input: { RoleName: role.roleName, PolicyArn: policyArn } },
+          options,
+        ),
       ),
     );
   }
 
-  private async deleteInlinePolicies(role: SimIamRole): Promise<void> {
+  private async deleteInlinePolicies(
+    role: SimIamRole,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     await Promise.all(
-      role.inlinePolicies.keys().map(async (policyName) =>
-        this.iam.deleteRolePolicy({
-          input: { RoleName: role.roleName, PolicyName: policyName },
-        }),
-      ),
+      role.inlinePolicies
+        .keys()
+        .map(async (policyName) =>
+          this.iam.deleteRolePolicy(
+            { input: { RoleName: role.roleName, PolicyName: policyName } },
+            options,
+          ),
+        ),
     );
   }
 }

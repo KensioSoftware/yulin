@@ -5,6 +5,7 @@ import type { SimHttpApiIntegration } from "../../api/integration/sim-http-api-i
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiIntegrationProperties } from "./sim-cfn-http-api-integration-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiIntegrationCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -33,6 +34,7 @@ export class SimCfnHttpApiIntegrationCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiIntegration> {
     const integrationProperties = new SimCfnHttpApiIntegrationProperties({
       resource,
@@ -45,9 +47,10 @@ export class SimCfnHttpApiIntegrationCreator {
       apiId,
     );
 
-    const created = await this.apiGatewayV2.createIntegration({
-      input: integrationProperties.createIntegrationInput(),
-    });
+    const created = await this.apiGatewayV2.createIntegration(
+      { input: integrationProperties.createIntegrationInput() },
+      options,
+    );
 
     const integration = this.apiGatewayV2
       .findApi(apiId)

@@ -8,6 +8,7 @@ import type { SimRoute53 } from "../../../sim-route53.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import { SimCfnRoute53RecordSetBuilder } from "../build/sim-cfn-r53-record-set-builder.js";
 import { SimCfnRoute53RecordSetHostedZoneResolver } from "../resolve/sim-cfn-r53-rec-set-zone-resolver.js";
+import type { SimCfnResourceCallerOptions } from "../../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRoute53RecordSetApplicatorProperties {
   readonly route53: SimRoute53;
@@ -33,6 +34,7 @@ export class SimCfnRoute53RecordSetApplicator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRoute53Record> {
     // The record set is built first because resolving the Hosted Zone can
     // register one, and a RecordSet that turns out to be unbuildable or of a
@@ -51,19 +53,22 @@ export class SimCfnRoute53RecordSetApplicator {
       properties,
     );
 
-    await this.route53.changeResourceRecordSets({
-      input: {
-        HostedZoneId: hostedZoneId,
-        ChangeBatch: {
-          Changes: [
-            {
-              Action: "CREATE",
-              ResourceRecordSet: recordSet,
-            },
-          ],
+    await this.route53.changeResourceRecordSets(
+      {
+        input: {
+          HostedZoneId: hostedZoneId,
+          ChangeBatch: {
+            Changes: [
+              {
+                Action: "CREATE",
+                ResourceRecordSet: recordSet,
+              },
+            ],
+          },
         },
       },
-    });
+      options,
+    );
 
     const hostedZone = this.route53.hostedZones.get(hostedZoneId);
     assertDefined(hostedZone, "Sim Route53 Hosted Zone after update");
@@ -77,5 +82,42 @@ export class SimCfnRoute53RecordSetApplicator {
     assertDefined(record, "Sim Route53 Record after update");
 
     return record;
+  }
+
+  /**
+   * Remove the Record Set a Resource created.
+   *
+   * Route53 only takes changes, so this is a ChangeResourceRecordSets carrying
+   * a DELETE change built from the same template properties that created it.
+   */
+  async delete(
+    resource: SimCfnResource,
+    properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    const hostedZoneId = this.hostedZoneResolver.hostedZoneId(
+      resource,
+      properties,
+    );
+    const recordSet = new SimCfnRoute53RecordSetBuilder(
+      resource,
+      properties,
+    ).build();
+
+    await this.route53.changeResourceRecordSets(
+      {
+        input: {
+          HostedZoneId: hostedZoneId,
+          ChangeBatch: {
+            Changes: [{ Action: "DELETE", ResourceRecordSet: recordSet }],
+          },
+        },
+      },
+      options,
+    );
+
+    await this.route53.hostedZones
+      .get(hostedZoneId)
+      ?.waitForSynchronizationComplete();
   }
 }

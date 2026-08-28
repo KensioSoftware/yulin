@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoUserPoolDomain } from "../../user-pool/domain/sim-cognito-user-pool-domain.js";
 import { SimCfnCognitoDomainProperties } from "./sim-cfn-cognito-domain-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoDomainCreatorProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -31,15 +32,17 @@ export class SimCfnCognitoDomainCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCognitoUserPoolDomain> {
     const domainProperties = new SimCfnCognitoDomainProperties({
       resource,
       properties,
     });
 
-    await this.cognito.createUserPoolDomain({
-      input: domainProperties.createUserPoolDomainInput(),
-    });
+    await this.cognito.createUserPoolDomain(
+      { input: domainProperties.createUserPoolDomainInput() },
+      options,
+    );
 
     const domain = this.cognito.findUserPoolDomainInAnyAccount(
       domainProperties.domain(),

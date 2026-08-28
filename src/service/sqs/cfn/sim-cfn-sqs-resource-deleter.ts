@@ -4,6 +4,7 @@ import type { SimSqs } from "../sim-sqs.js";
 import type { SimSqsQueue } from "../queue/sim-sqs-queue.js";
 import { simSqsQueuePolicyAttributeName } from "../queue/sim-sqs-queue-attribute-specs.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSqsResourceDeleterProperties {
   readonly sqs: SimSqs;
@@ -31,14 +32,15 @@ export class SimCfnSqsResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "Queue": {
-        await this.deleteQueue(resource);
+        await this.deleteQueue(resource, options);
         return;
       }
       case "QueuePolicy": {
-        await this.clearQueuePolicy(properties);
+        await this.clearQueuePolicy(properties, options);
         return;
       }
       default: {
@@ -49,14 +51,17 @@ export class SimCfnSqsResourceDeleter {
     }
   }
 
-  private async deleteQueue(resource: SimCfnResource): Promise<void> {
+  private async deleteQueue(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const queue = resource.simResource as SimSqsQueue | undefined;
     assertDefined(
       queue,
       `sim SQS queue for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.sqs.deleteQueue({ input: { QueueUrl: queue.url } });
+    await this.sqs.deleteQueue({ input: { QueueUrl: queue.url } }, options);
   }
 
   /**
@@ -67,6 +72,7 @@ export class SimCfnSqsResourceDeleter {
    */
   private async clearQueuePolicy(
     properties: SimCfnTemplateValueRecord,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const queues = properties["Queues"];
 
@@ -79,12 +85,15 @@ export class SimCfnSqsResourceDeleter {
       queues
         .filter((queueUrl): queueUrl is string => typeof queueUrl === "string")
         .map(async (queueUrl) =>
-          this.sqs.setQueueAttributes({
-            input: {
-              QueueUrl: queueUrl,
-              Attributes: { [simSqsQueuePolicyAttributeName]: "" },
+          this.sqs.setQueueAttributes(
+            {
+              input: {
+                QueueUrl: queueUrl,
+                Attributes: { [simSqsQueuePolicyAttributeName]: "" },
+              },
             },
-          }),
+            options,
+          ),
         ),
     );
   }

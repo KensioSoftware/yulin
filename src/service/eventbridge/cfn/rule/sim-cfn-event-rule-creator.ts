@@ -7,6 +7,7 @@ import { simCfnEventBridgeResourceCreation } from "../sim-cfn-event-bridge-resou
 import { eventRuleResourceType } from "../sim-cfn-event-bridge-resource-types.js";
 import { SimCfnEventRuleProperties } from "./sim-cfn-event-rule-properties.js";
 import type { SimCfnEventRuleTarget } from "./sim-cfn-event-rule-targets.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnEventRuleCreatorProperties {
   readonly eventBridge: SimEventBridge;
@@ -37,6 +38,7 @@ export class SimCfnEventRuleCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimEventRule> {
     const ruleProperties = new SimCfnEventRuleProperties({
       resource,
@@ -53,18 +55,21 @@ export class SimCfnEventRuleCreator {
       eventRuleResourceType,
       resource.logicalId,
       async () => {
-        await this.eventBridge.putRule({
-          input: {
-            Name: name,
-            EventBusName: busName,
-            EventPattern: ruleProperties.eventPattern(),
-            ScheduleExpression: ruleProperties.scheduleExpression(),
-            State: ruleProperties.state(),
-            Description: ruleProperties.description(),
+        await this.eventBridge.putRule(
+          {
+            input: {
+              Name: name,
+              EventBusName: busName,
+              EventPattern: ruleProperties.eventPattern(),
+              ScheduleExpression: ruleProperties.scheduleExpression(),
+              State: ruleProperties.state(),
+              Description: ruleProperties.description(),
+            },
           },
-        });
+          options,
+        );
 
-        await this.putTargets(name, busName, targets);
+        await this.putTargets(name, busName, targets, options);
 
         const rule = this.eventBridge.findRule(name, busName);
 
@@ -85,21 +90,25 @@ export class SimCfnEventRuleCreator {
     ruleName: string,
     busName: string | undefined,
     targets: readonly SimCfnEventRuleTarget[],
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (targets.length === 0) {
       return;
     }
 
-    await this.eventBridge.putTargets({
-      input: {
-        Rule: ruleName,
-        EventBusName: busName,
-        Targets: targets.map((target) => ({
-          Id: target.Id,
-          Arn: target.Arn,
-          Input: target.Input,
-        })),
+    await this.eventBridge.putTargets(
+      {
+        input: {
+          Rule: ruleName,
+          EventBusName: busName,
+          Targets: targets.map((target) => ({
+            Id: target.Id,
+            Arn: target.Arn,
+            Input: target.Input,
+          })),
+        },
       },
-    });
+      options,
+    );
   }
 }

@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimLogsDeliveryDestination } from "../../delivery/sim-logs-delivery-destination.js";
 import type { SimLogs } from "../../sim-logs.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliveryDestinationUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
 
@@ -39,6 +40,7 @@ export class SimCfnDeliveryDestinationCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLogsDeliveryDestination> {
     const reader = new SimCfnDeliveryProperties({
       resource,
@@ -51,17 +53,20 @@ export class SimCfnDeliveryDestinationCreator {
 
     reader.recordIgnoredProperties();
 
-    await this.#logs.putDeliveryDestination({
-      input: {
-        name,
-        outputFormat: reader.optionalString("OutputFormat"),
-        deliveryDestinationConfiguration: {
-          destinationResourceArn: reader.requiredString(
-            "DestinationResourceArn",
-          ),
+    await this.#logs.putDeliveryDestination(
+      {
+        input: {
+          name,
+          outputFormat: reader.optionalString("OutputFormat"),
+          deliveryDestinationConfiguration: {
+            destinationResourceArn: reader.requiredString(
+              "DestinationResourceArn",
+            ),
+          },
         },
       },
-    });
+      options,
+    );
 
     const destination = this.#logs.findDeliveryDestination(name);
 
@@ -76,9 +81,13 @@ export class SimCfnDeliveryDestinationCreator {
   /**
    * Delete a delivery destination created from a CloudFormation Resource.
    */
-  async delete(destination: SimLogsDeliveryDestination): Promise<void> {
-    await this.#logs.deleteDeliveryDestination({
-      input: { name: destination.name },
-    });
+  async delete(
+    destination: SimLogsDeliveryDestination,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#logs.deleteDeliveryDestination(
+      { input: { name: destination.name } },
+      options,
+    );
   }
 }

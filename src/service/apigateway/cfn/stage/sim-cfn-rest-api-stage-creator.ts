@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimRestApiStage } from "../../api/stage/sim-rest-api-stage.js";
 import type { SimApiGateway } from "../../sim-api-gateway.js";
 import { SimCfnRestApiStageProperties } from "./sim-cfn-rest-api-stage-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRestApiStageCreatorProperties {
   readonly apiGateway: SimApiGateway;
@@ -28,6 +29,7 @@ export class SimCfnRestApiStageCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRestApiStage> {
     const stageProperties = new SimCfnRestApiStageProperties({
       resource,
@@ -35,9 +37,10 @@ export class SimCfnRestApiStageCreator {
     });
     const restApiId = stageProperties.restApiId();
 
-    const created = await this.apiGateway.createStage({
-      input: stageProperties.createStageInput(),
-    });
+    const created = await this.apiGateway.createStage(
+      { input: stageProperties.createStageInput() },
+      options,
+    );
 
     const stage = this.apiGateway
       .findRestApi(restApiId)

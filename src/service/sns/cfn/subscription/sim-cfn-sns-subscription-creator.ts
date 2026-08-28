@@ -2,6 +2,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSns } from "../../sim-sns.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSnsSubscription } from "../../subscription/sim-sns-subscription.js";
 import { simCfnSnsResourceCreation } from "../sim-cfn-sns-resource-error.js";
 import { snsSubscriptionResourceType } from "../sim-cfn-sns-resource-types.js";
@@ -33,6 +34,7 @@ export class SimCfnSnsSubscriptionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSnsSubscription> {
     const input = new SimCfnSnsSubscriptionProperties({
       resource,
@@ -43,7 +45,7 @@ export class SimCfnSnsSubscriptionCreator {
       snsSubscriptionResourceType,
       resource.logicalId,
       async () => {
-        const subscribed = await this.sns.subscribe({ input });
+        const subscribed = await this.sns.subscribe({ input }, options);
 
         const arn = subscribed.SubscriptionArn;
         assertDefined(

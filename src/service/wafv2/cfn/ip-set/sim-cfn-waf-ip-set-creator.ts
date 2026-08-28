@@ -6,6 +6,7 @@ import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
 import { wafIpSetResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafIpSetConfig } from "./sim-cfn-waf-ip-set-config.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnWafIpSetCreatorProperties {
   readonly wafV2: SimWafV2;
@@ -32,6 +33,7 @@ export class SimCfnWafIpSetCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimWafIpSet> {
     const input = new SimCfnWafIpSetConfig({
       resource,
@@ -42,7 +44,7 @@ export class SimCfnWafIpSetCreator {
       wafIpSetResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#wafV2.createIpSet({ input });
+        const created = await this.#wafV2.createIpSet({ input }, options);
         const arn = created.Summary?.ARN;
 
         assertDefined(
@@ -67,19 +69,26 @@ export class SimCfnWafIpSetCreator {
   /**
    * Delete the IP set an AWS::WAFv2::IPSet Resource created.
    */
-  async delete(resource: SimCfnResource, ipSet: SimWafIpSet): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    ipSet: SimWafIpSet,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     await simCfnWafResourceCommand(
       wafIpSetResourceType,
       resource.logicalId,
       async () =>
-        await this.#wafV2.deleteIpSet({
-          input: {
-            Name: ipSet.name,
-            Scope: ipSet.scope,
-            Id: ipSet.id,
-            LockToken: ipSet.lockToken,
+        await this.#wafV2.deleteIpSet(
+          {
+            input: {
+              Name: ipSet.name,
+              Scope: ipSet.scope,
+              Id: ipSet.id,
+              LockToken: ipSet.lockToken,
+            },
           },
-        }),
+          options,
+        ),
     );
   }
 }

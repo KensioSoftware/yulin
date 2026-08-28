@@ -5,6 +5,7 @@ import type { SimElbV2ListenerRule } from "../../listener/rule/sim-elbv2-listene
 import type { SimElbV2 } from "../../sim-elbv2.js";
 import type { SimElbV2Stores } from "../../sim-elbv2-stores.js";
 import { SimCfnElbV2ListenerRuleProperties } from "./sim-cfn-elbv2-listener-rule-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnElbV2ListenerRuleCreatorProperties {
   readonly elbV2: SimElbV2;
@@ -35,6 +36,7 @@ export class SimCfnElbV2ListenerRuleCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimElbV2ListenerRule> {
     const declared = new SimCfnElbV2ListenerRuleProperties({
       resource,
@@ -44,7 +46,7 @@ export class SimCfnElbV2ListenerRuleCreator {
 
     declared.recordIgnoredProperties();
 
-    const created = await this.elbV2.createRule({ input });
+    const created = await this.elbV2.createRule({ input }, options);
     const ruleArn = created.Rules?.[0]?.RuleArn;
 
     assertDefined(
@@ -60,7 +62,10 @@ export class SimCfnElbV2ListenerRuleCreator {
   /**
    * Delete a rule created from a ListenerRule Resource.
    */
-  async delete(rule: SimElbV2ListenerRule): Promise<void> {
-    await this.elbV2.deleteRule({ input: { RuleArn: rule.arn } });
+  async delete(
+    rule: SimElbV2ListenerRule,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.elbV2.deleteRule({ input: { RuleArn: rule.arn } }, options);
   }
 }

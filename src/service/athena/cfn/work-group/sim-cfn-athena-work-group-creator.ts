@@ -10,6 +10,7 @@ import type {
 import { simCfnAthenaResourceCreation } from "../sim-cfn-athena-resource-error.js";
 import { athenaWorkGroupResourceType } from "../sim-cfn-athena-resource-types.js";
 import { SimCfnAthenaWorkGroupProperties } from "./sim-cfn-athena-work-group-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnAthenaWorkGroupCreatorProperties {
   readonly athena: SimAthena;
@@ -36,6 +37,7 @@ export class SimCfnAthenaWorkGroupCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimAthenaWorkGroup> {
     const read = this.read(resource, properties);
 
@@ -55,8 +57,8 @@ export class SimCfnAthenaWorkGroupCreator {
          */
         const state = workGroupStateFrom(read.state());
 
-        await this.athena.createWorkGroup({ input });
-        await this.applyState(String(input.Name), state);
+        await this.athena.createWorkGroup({ input }, options);
+        await this.applyState(String(input.Name), state, options);
 
         const workGroup = this.athena.findWorkGroup(String(input.Name));
 
@@ -77,23 +79,29 @@ export class SimCfnAthenaWorkGroupCreator {
    * Deleted recursively, so a workgroup the stack also gave named queries goes
    * with them rather than failing the stack deletion.
    */
-  async delete(workGroup: SimAthenaWorkGroup): Promise<void> {
-    await this.athena.deleteWorkGroup({
-      input: { WorkGroup: workGroup.name, RecursiveDeleteOption: true },
-    });
+  async delete(
+    workGroup: SimAthenaWorkGroup,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.athena.deleteWorkGroup(
+      { input: { WorkGroup: workGroup.name, RecursiveDeleteOption: true } },
+      options,
+    );
   }
 
   private async applyState(
     name: string,
     state: SimAthenaWorkGroupState | undefined,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (state === undefined) {
       return;
     }
 
-    await this.athena.updateWorkGroup({
-      input: { WorkGroup: name, State: state },
-    });
+    await this.athena.updateWorkGroup(
+      { input: { WorkGroup: name, State: state } },
+      options,
+    );
   }
 
   private read(

@@ -14,6 +14,7 @@ import { SimCfnApiGatewayResourceDeleter } from "./sim-cfn-api-gateway-resource-
 import { simCfnApiGatewayUnsupportedReason } from "./sim-cfn-api-gateway-unsupported.js";
 import { SimCfnRestApiImports } from "./sim-cfn-rest-api-imports.js";
 import { SimCfnRestApiStageCreator } from "./stage/sim-cfn-rest-api-stage-creator.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimApiGatewayCfnResourceFactoryProperties {
   readonly apiGateway: SimApiGateway;
@@ -60,25 +61,34 @@ export class SimApiGatewayCfnResourceFactory implements SimCfnServiceResourceFac
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "RestApi": {
-        return await this.apiCreator.create(resource, properties);
+        return await this.apiCreator.create(resource, properties, options);
       }
       case "Resource": {
-        return await this.resourceCreator.create(resource, properties);
+        return await this.resourceCreator.create(resource, properties, options);
       }
       case "Authorizer": {
-        return await this.authorizerCreator.create(resource, properties);
+        return await this.authorizerCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "Method": {
-        return await this.methodCreator.create(resource, properties);
+        return await this.methodCreator.create(resource, properties, options);
       }
       case "Deployment": {
-        return await this.deploymentCreator.create(resource, properties);
+        return await this.deploymentCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "Stage": {
-        return await this.stageCreator.create(resource, properties);
+        return await this.stageCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -101,6 +111,7 @@ export class SimApiGatewayCfnResourceFactory implements SimCfnServiceResourceFac
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

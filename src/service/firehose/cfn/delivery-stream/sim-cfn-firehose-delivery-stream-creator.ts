@@ -6,6 +6,7 @@ import type { SimFirehoseDeliveryStream } from "../../stream/sim-firehose-delive
 import { simCfnFirehoseResourceCreation } from "../sim-cfn-firehose-resource-error.js";
 import { firehoseDeliveryStreamResourceType } from "../sim-cfn-firehose-resource-types.js";
 import { SimCfnFirehoseDeliveryStreamProperties } from "./sim-cfn-firehose-delivery-stream-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnFirehoseDeliveryStreamCreatorProperties {
   readonly firehose: SimFirehose;
@@ -40,6 +41,7 @@ export class SimCfnFirehoseDeliveryStreamCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimFirehoseDeliveryStream> {
     return await simCfnFirehoseResourceCreation(
       firehoseDeliveryStreamResourceType,
@@ -51,7 +53,7 @@ export class SimCfnFirehoseDeliveryStreamCreator {
         });
         const input = streamProperties.createInput();
 
-        await this.firehose.createDeliveryStream({ input });
+        await this.firehose.createDeliveryStream({ input }, options);
 
         const deliveryStream = this.firehose.findDeliveryStream(
           streamProperties.name(),

@@ -7,6 +7,7 @@ import { simCfnPersonalizeCreated } from "./sim-cfn-personalize-created.js";
 import { SimCfnPersonalizeProperties } from "./sim-cfn-personalize-properties.js";
 import { simCfnPersonalizeResourceCreation } from "./sim-cfn-personalize-resource-error.js";
 import { personalizeDatasetGroupResourceType } from "./sim-cfn-personalize-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const readProperties = new Set(["Name", "Domain", "KmsKeyArn", "RoleArn"]);
 
@@ -41,6 +42,7 @@ export class SimCfnPersonalizeDatasetGroupCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimPersonalizeDatasetGroup> {
     const read = new SimCfnPersonalizeProperties({
       resourceType: personalizeDatasetGroupResourceType,
@@ -62,7 +64,10 @@ export class SimCfnPersonalizeDatasetGroupCreator {
       personalizeDatasetGroupResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#personalize.createDatasetGroup({ input });
+        const created = await this.#personalize.createDatasetGroup(
+          { input },
+          options,
+        );
 
         return simCfnPersonalizeCreated(
           this.#resources.datasetGroups,
@@ -74,9 +79,13 @@ export class SimCfnPersonalizeDatasetGroupCreator {
   }
 
   /** Delete a dataset group an AWS::Personalize::DatasetGroup Resource made. */
-  async delete(datasetGroup: SimPersonalizeDatasetGroup): Promise<void> {
-    await this.#personalize.deleteDatasetGroup({
-      input: { datasetGroupArn: datasetGroup.arn },
-    });
+  async delete(
+    datasetGroup: SimPersonalizeDatasetGroup,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#personalize.deleteDatasetGroup(
+      { input: { datasetGroupArn: datasetGroup.arn } },
+      options,
+    );
   }
 }

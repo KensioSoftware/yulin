@@ -5,6 +5,7 @@ import type { SimHttpApiAuthorizer } from "../../api/authorizer/sim-http-api-aut
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiAuthorizerProperties } from "./sim-cfn-http-api-authorizer-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiAuthorizerCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -34,6 +35,7 @@ export class SimCfnHttpApiAuthorizerCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiAuthorizer> {
     const authorizerProperties = new SimCfnHttpApiAuthorizerProperties({
       resource,
@@ -46,9 +48,10 @@ export class SimCfnHttpApiAuthorizerCreator {
       apiId,
     );
 
-    const created = await this.apiGatewayV2.createAuthorizer({
-      input: authorizerProperties.createAuthorizerInput(),
-    });
+    const created = await this.apiGatewayV2.createAuthorizer(
+      { input: authorizerProperties.createAuthorizerInput() },
+      options,
+    );
 
     const authorizer = this.apiGatewayV2
       .findApi(apiId)

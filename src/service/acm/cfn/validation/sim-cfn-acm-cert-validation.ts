@@ -5,6 +5,7 @@ import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js
 import type { SimAcmDomainValidation } from "../../certificate/sim-acm-domain-validation.js";
 import { SimAcmDnsValidationFailed } from "../../error/sim-acm.error.js";
 import { SimCfnAcmValidationRecords } from "./sim-cfn-acm-validation-records.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnAcmCertificateValidationProperties {
   readonly acm: SimAcm;
@@ -35,13 +36,18 @@ export class SimCfnAcmCertificateValidation {
     resource: SimCfnResource,
     certificate: SimAcmCertificate,
     hostedZoneIdsByDomain: ReadonlyMap<string, string>,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const { accountId, regionName } = resource.accountRegionScope;
     const validationRecords = new SimCfnAcmValidationRecords({
       route53: this.simAws.accountRegionScope(accountId, regionName).route53(),
     });
 
-    await validationRecords.publish(certificate, hostedZoneIdsByDomain);
+    await validationRecords.publish(
+      certificate,
+      hostedZoneIdsByDomain,
+      options,
+    );
     await this.acm.settleCertificateValidation(certificate);
 
     if (certificate.status === "ISSUED") {

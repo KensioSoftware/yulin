@@ -2,6 +2,7 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimElbV2 } from "../sim-elbv2.js";
 import type { SimElbV2Stores } from "../sim-elbv2-stores.js";
@@ -10,6 +11,7 @@ import { SimCfnElbV2LoadBalancerCreator } from "./load-balancer/sim-cfn-elbv2-lo
 import { SimCfnElbV2ListenerRuleCreator } from "./rule/sim-cfn-elbv2-listener-rule-creator.js";
 import { SimCfnElbV2TargetGroupCreator } from "./target-group/sim-cfn-elbv2-target-group-creator.js";
 import { SimElbV2CfnResourceDeleter } from "./sim-elbv2-cfn-resource-deleter.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimElbV2CfnResourceFactoryProperties {
   readonly elbV2: SimElbV2;
@@ -58,19 +60,28 @@ export class SimElbV2CfnResourceFactory implements SimCfnServiceResourceFactory 
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "LoadBalancer": {
-        return await this.loadBalancerCreator.create(resource, properties);
+        return await this.loadBalancerCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "TargetGroup": {
-        return await this.targetGroupCreator.create(resource, properties);
+        return await this.targetGroupCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "Listener": {
-        return await this.listenerCreator.create(resource, properties);
+        return await this.listenerCreator.create(resource, properties, options);
       }
       case "ListenerRule": {
-        return await this.ruleCreator.create(resource, properties);
+        return await this.ruleCreator.create(resource, properties, options);
       }
       default: {
         throw new Error(
@@ -86,7 +97,12 @@ export class SimElbV2CfnResourceFactory implements SimCfnServiceResourceFactory 
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

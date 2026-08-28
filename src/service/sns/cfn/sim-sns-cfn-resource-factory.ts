@@ -9,6 +9,7 @@ import { SimCfnSnsResourceDeleter } from "./sim-cfn-sns-resource-deleter.js";
 import { SimCfnSnsSubscriptionCreator } from "./subscription/sim-cfn-sns-subscription-creator.js";
 import { SimCfnSnsTopicCreator } from "./topic/sim-cfn-sns-topic-creator.js";
 import { SimCfnSnsTopicPolicyCreator } from "./topic-policy/sim-cfn-sns-topic-policy-creator.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimSnsCfnResourceFactoryProperties {
   readonly sns: SimSns;
@@ -31,7 +32,10 @@ export class SimSnsCfnResourceFactory implements SimCfnServiceResourceFactory {
     this.topicPolicyCreator = new SimCfnSnsTopicPolicyCreator({
       sns: properties.sns,
     });
-    this.deleter = new SimCfnSnsResourceDeleter({ sns: properties.sns });
+    this.deleter = new SimCfnSnsResourceDeleter({
+      sns: properties.sns,
+      topicPolicyCreator: this.topicPolicyCreator,
+    });
   }
 
   /**
@@ -48,15 +52,25 @@ export class SimSnsCfnResourceFactory implements SimCfnServiceResourceFactory {
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
 
+    const options = simCfnResourceCallerOptions(context.caller);
+
     switch (resourceTypeName) {
       case "Topic": {
-        return await this.topicCreator.create(resource, properties);
+        return await this.topicCreator.create(resource, properties, options);
       }
       case "Subscription": {
-        return await this.subscriptionCreator.create(resource, properties);
+        return await this.subscriptionCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "TopicPolicy": {
-        return await this.topicPolicyCreator.create(resource, properties);
+        return await this.topicPolicyCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       default: {
         throw new Error(
@@ -78,6 +92,7 @@ export class SimSnsCfnResourceFactory implements SimCfnServiceResourceFactory {
       resourceTypeName,
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 }

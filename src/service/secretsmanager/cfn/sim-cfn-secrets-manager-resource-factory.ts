@@ -2,7 +2,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSecretsManager } from "../sim-secrets-manager.js";
 import { SimCfnSecretsManagerSecretCreator } from "./secret/sim-cfn-secrets-manager-secret-creator.js";
 import type { SimSecretsManagerSecret } from "../secret/sim-secrets-manager-secret.js";
@@ -44,6 +46,7 @@ export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourc
         return await this.secretCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
+          simCfnResourceCallerOptions(context.caller),
         );
       }
       default: {
@@ -66,6 +69,7 @@ export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourc
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
     if (resourceTypeName !== "Secret") {
       throw new Error(
@@ -79,8 +83,9 @@ export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourc
       `sim Secrets Manager secret for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.secretsManager.deleteSecret({
-      input: { SecretId: secret.arn.value },
-    });
+    await this.secretsManager.deleteSecret(
+      { input: { SecretId: secret.arn.value } },
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

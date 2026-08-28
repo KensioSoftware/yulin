@@ -5,6 +5,7 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaVersionCreatorProperties {
   readonly lambda: SimLambda;
@@ -37,6 +38,7 @@ export class SimCfnLambdaVersionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaFunction> {
     const functionName = simCfnLambdaTargetFunctionName(
       this.propertyParser.requiredString(
@@ -46,16 +48,19 @@ export class SimCfnLambdaVersionCreator {
       ),
     );
 
-    const published = await this.lambda.publishVersion({
-      input: {
-        FunctionName: functionName,
-        Description: this.propertyParser.optionalString(
-          resource,
-          properties["Description"],
-          "Description",
-        ),
+    const published = await this.lambda.publishVersion(
+      {
+        input: {
+          FunctionName: functionName,
+          Description: this.propertyParser.optionalString(
+            resource,
+            properties["Description"],
+            "Description",
+          ),
+        },
       },
-    });
+      options,
+    );
 
     const version = this.lambda.getSimFunctionTarget(
       functionName,

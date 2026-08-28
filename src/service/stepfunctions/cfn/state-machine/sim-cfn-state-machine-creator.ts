@@ -7,6 +7,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import { SimCfnStateMachineProperties } from "./sim-cfn-state-machine-properties.js";
 import { simCfnStepFunctionsResourceCommand } from "../sim-cfn-step-functions-resource-error.js";
 import { stateMachineResourceType } from "../sim-cfn-step-functions-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnStateMachineCreatorProperties {
   readonly stepFunctions: SimStepFunctions;
@@ -40,6 +41,7 @@ export class SimCfnStateMachineCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimStateMachine> {
     const stateMachineProperties = new SimCfnStateMachineProperties({
       resource,
@@ -56,15 +58,18 @@ export class SimCfnStateMachineCreator {
       stateMachineResourceType,
       resource.logicalId,
       async () => {
-        await this.#stepFunctions.createStateMachine({
-          input: {
-            name,
-            definition,
-            roleArn,
-            tags,
-            ...(type !== undefined && { type }),
+        await this.#stepFunctions.createStateMachine(
+          {
+            input: {
+              name,
+              definition,
+              roleArn,
+              tags,
+              ...(type !== undefined && { type }),
+            },
           },
-        });
+          options,
+        );
 
         const stateMachine = this.#stepFunctions.findStateMachine(name);
         assertDefined(

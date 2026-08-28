@@ -67,6 +67,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
       template,
       cdkOutContext,
       bindings,
+      caller,
       exports,
     } = properties;
 
@@ -91,6 +92,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
       stackName,
       cdkOutContext,
       bindings,
+      caller,
     });
     this.lifecycle = new SimCfnStackDeploymentLifecycle({
       background,
@@ -170,10 +172,9 @@ export class SimCfnStack implements SimCfnDeployedStack {
     updater.assertHasChanges();
 
     // Only once the update is going ahead, so a refused update leaves the Stack
-    // reading the cloud assembly it was deployed from.
-    if (properties.cdkOutContext !== undefined) {
-      this.operations.useCdkOutContext(properties.cdkOutContext);
-    }
+    // reading the cloud assembly it was deployed from and running as whoever
+    // deployed it.
+    this.operations.useUpdate(properties);
 
     this.cfnTemplate = template;
     this.template = template.template;

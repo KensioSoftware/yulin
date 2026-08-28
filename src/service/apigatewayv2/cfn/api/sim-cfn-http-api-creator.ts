@@ -6,6 +6,7 @@ import type { SimHttpApi } from "../../api/sim-http-api.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiProperties } from "./sim-cfn-http-api-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -36,13 +37,14 @@ export class SimCfnHttpApiCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApi> {
     const apiProperties = new SimCfnHttpApiProperties({
       resource,
       properties,
     });
 
-    const created = await this.created(apiProperties);
+    const created = await this.created(apiProperties, options);
 
     if (apiProperties.imported()) {
       this.imports.record(created.ApiId, resource.logicalId);
@@ -62,15 +64,18 @@ export class SimCfnHttpApiCreator {
    */
   private async created(
     apiProperties: SimCfnHttpApiProperties,
+    options: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiView> {
     if (apiProperties.imported()) {
-      return await this.apiGatewayV2.importApi({
-        input: apiProperties.importApiInput(),
-      });
+      return await this.apiGatewayV2.importApi(
+        { input: apiProperties.importApiInput() },
+        options,
+      );
     }
 
-    return await this.apiGatewayV2.createApi({
-      input: apiProperties.createApiInput(),
-    });
+    return await this.apiGatewayV2.createApi(
+      { input: apiProperties.createApiInput() },
+      options,
+    );
   }
 }

@@ -2,7 +2,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimDynamoDb } from "../sim-dynamodb.js";
 import { SimCfnDynamoDbGlobalTableCreator } from "./global-table/sim-cfn-dynamodb-global-table-creator.js";
 import { SimCfnDynamoDbTableCreator } from "./table/sim-cfn-dynamodb-table-creator.js";
@@ -47,13 +49,18 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
 
     switch (resourceTypeName) {
       case "Table": {
-        return await this.tableCreator.create(resource, properties);
+        return await this.tableCreator.create(resource, properties, options);
       }
       case "GlobalTable": {
-        return await this.globalTableCreator.create(resource, properties);
+        return await this.globalTableCreator.create(
+          resource,
+          properties,
+          options,
+        );
       }
       default: {
         throw new Error(
@@ -69,7 +76,12 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

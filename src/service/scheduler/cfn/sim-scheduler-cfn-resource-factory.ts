@@ -13,6 +13,7 @@ import {
 } from "./sim-cfn-scheduler-resource-lookup.js";
 import { SimCfnScheduleProperties } from "./sim-cfn-schedule-properties.js";
 import { simCfnSchedulerResourceCreation } from "./sim-cfn-scheduler-resource-error.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimSchedulerCfnResourceFactoryProperties {
   readonly scheduler: SimScheduler;
@@ -52,7 +53,10 @@ export class SimSchedulerCfnResourceFactory implements SimCfnServiceResourceFact
     return await simCfnSchedulerResourceCreation(
       resource.logicalId,
       async () => {
-        await this.scheduler.createSchedule({ input });
+        await this.scheduler.createSchedule(
+          { input },
+          simCfnResourceCallerOptions(context.caller),
+        );
 
         const schedule = createdSchedule(this.scheduler, input);
 
@@ -82,12 +86,15 @@ export class SimSchedulerCfnResourceFactory implements SimCfnServiceResourceFact
       context.resolvedProperties ?? resource.properties,
     );
 
-    await this.scheduler.deleteSchedule({
-      input: {
-        Name: properties.name(),
-        GroupName: properties.scheduleInput().GroupName,
+    await this.scheduler.deleteSchedule(
+      {
+        input: {
+          Name: properties.name(),
+          GroupName: properties.scheduleInput().GroupName,
+        },
       },
-    });
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 
   private read(

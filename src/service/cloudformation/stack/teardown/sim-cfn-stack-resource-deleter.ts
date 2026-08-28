@@ -1,4 +1,5 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import { SimCfnStackPendingDeletions } from "./sim-cfn-stack-pending-deletions.js";
 import { SimCfnStackResourceBatchDeleter } from "./sim-cfn-stack-resource-batch-deleter.js";
@@ -7,6 +8,7 @@ interface SimCfnStackResourceDeleterProperties {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly stackName: string;
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -30,13 +32,14 @@ export class SimCfnStackResourceDeleter {
   private readonly batchDeleter: SimCfnStackResourceBatchDeleter;
 
   constructor(properties: SimCfnStackResourceDeleterProperties) {
-    const { simAws, resources, stackName } = properties;
+    const { simAws, resources, stackName, caller } = properties;
 
     this.resources = resources;
     this.stackName = stackName;
     this.batchDeleter = new SimCfnStackResourceBatchDeleter({
       simAws,
       resources,
+      caller,
     });
   }
 

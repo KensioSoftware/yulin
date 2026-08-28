@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoGroup } from "../../user-pool/group/sim-cognito-group.js";
 import { SimCfnCognitoGroupProperties } from "./sim-cfn-cognito-group-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoGroupCreatorProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -29,6 +30,7 @@ export class SimCfnCognitoGroupCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCognitoGroup> {
     const groupProperties = new SimCfnCognitoGroupProperties({
       resource,
@@ -36,9 +38,10 @@ export class SimCfnCognitoGroupCreator {
     });
     const groupName = groupProperties.groupName();
 
-    await this.cognito.createGroup({
-      input: groupProperties.createGroupInput(),
-    });
+    await this.cognito.createGroup(
+      { input: groupProperties.createGroupInput() },
+      options,
+    );
 
     const group = this.cognito
       .userPool(groupProperties.userPoolId())

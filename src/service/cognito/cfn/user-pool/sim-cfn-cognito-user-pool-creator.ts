@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import { SimCfnCognitoUserPoolProperties } from "./sim-cfn-cognito-user-pool-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoUserPoolCreatorProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -31,15 +32,17 @@ export class SimCfnCognitoUserPoolCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCognitoUserPool> {
     const poolProperties = new SimCfnCognitoUserPoolProperties({
       resource,
       properties,
     });
 
-    const created = await this.cognito.createUserPool({
-      input: poolProperties.createUserPoolInput(),
-    });
+    const created = await this.cognito.createUserPool(
+      { input: poolProperties.createUserPoolInput() },
+      options,
+    );
 
     const userPoolId = created.UserPool?.Id;
     assertDefined(
@@ -47,7 +50,7 @@ export class SimCfnCognitoUserPoolCreator {
       `sim Cognito user pool id after CloudFormation creation for ${resource.logicalId}`,
     );
 
-    await this.setMfaConfig(poolProperties, userPoolId);
+    await this.setMfaConfig(poolProperties, userPoolId, options);
 
     return this.cognito.userPool(userPoolId);
   }
@@ -63,6 +66,7 @@ export class SimCfnCognitoUserPoolCreator {
   private async setMfaConfig(
     poolProperties: SimCfnCognitoUserPoolProperties,
     userPoolId: string,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const input = poolProperties.setUserPoolMfaConfigInput(userPoolId);
 
@@ -70,6 +74,6 @@ export class SimCfnCognitoUserPoolCreator {
       return;
     }
 
-    await this.cognito.setUserPoolMfaConfig({ input });
+    await this.cognito.setUserPoolMfaConfig({ input }, options);
   }
 }

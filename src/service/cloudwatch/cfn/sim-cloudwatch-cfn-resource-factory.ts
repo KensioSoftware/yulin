@@ -3,7 +3,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCloudWatchAlarm } from "../alarm/sim-cloudwatch-alarm.js";
 import type { SimCloudWatch } from "../sim-cloudwatch.js";
 import { SimCfnAlarmCreator } from "./alarm/sim-cfn-alarm-creator.js";
@@ -44,6 +46,7 @@ export class SimCloudWatchCfnResourceFactory implements SimCfnServiceResourceFac
     return this.#alarmCreator.create(
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 
@@ -51,7 +54,11 @@ export class SimCloudWatchCfnResourceFactory implements SimCfnServiceResourceFac
    * Delete a simulated CloudWatch resource created from a CloudFormation
    * Resource.
    */
-  delete(resourceTypeName: string, resource: SimCfnResource): Promise<void> {
+  delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
     requireAlarmResourceType(resourceTypeName, " deletion");
 
     const alarm = resource.simResource as SimCloudWatchAlarm | undefined;
@@ -61,7 +68,10 @@ export class SimCloudWatchCfnResourceFactory implements SimCfnServiceResourceFac
       `sim CloudWatch alarm for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    return this.#alarmCreator.delete(alarm);
+    return this.#alarmCreator.delete(
+      alarm,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }
 

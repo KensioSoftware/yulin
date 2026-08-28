@@ -3,7 +3,12 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import {
+  simCfnResourceCallerOptions,
+  type SimCfnResourceCallerOptions,
+} from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSesV2 } from "../sim-ses-v2.js";
 import { SimCfnSesConfigurationSetCreator } from "./configuration-set/sim-cfn-ses-configuration-set-creator.js";
@@ -30,8 +35,12 @@ interface SimCfnSesResourceHandler {
   create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options: SimCfnResourceCallerOptions,
   ): Promise<object>;
-  delete(resource: SimCfnResource): Promise<void>;
+  delete(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void>;
 }
 
 /**
@@ -78,6 +87,7 @@ export class SimSesCfnResourceFactory implements SimCfnServiceResourceFactory {
     return await this.handler(resourceTypeName, "").create(
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 
@@ -87,8 +97,12 @@ export class SimSesCfnResourceFactory implements SimCfnServiceResourceFactory {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.handler(resourceTypeName, " deletion").delete(resource);
+    await this.handler(resourceTypeName, " deletion").delete(
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 
   private handler(
@@ -119,16 +133,17 @@ function handler<T extends object>(
     create(
       resource: SimCfnResource,
       properties: SimCfnTemplateValueRecord,
+      options: SimCfnResourceCallerOptions,
     ): Promise<T>;
-    delete(created: T): Promise<void>;
+    delete(created: T, options: SimCfnResourceCallerOptions): Promise<void>;
   },
   described: string,
 ): SimCfnSesResourceHandler {
   return {
-    create: async (resource, properties): Promise<T> =>
-      await creator.create(resource, properties),
-    delete: async (resource): Promise<void> => {
-      await creator.delete(created<T>(resource, described));
+    create: async (resource, properties, options): Promise<T> =>
+      await creator.create(resource, properties, options),
+    delete: async (resource, options): Promise<void> => {
+      await creator.delete(created<T>(resource, described), options);
     },
   };
 }

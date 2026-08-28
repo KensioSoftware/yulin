@@ -7,6 +7,7 @@ import type { SimCloudFormationResourceDeleteContext } from "../../cloudformatio
 import type { SimKinesis } from "../sim-kinesis.js";
 import { SimCfnKinesisResourceDeleter } from "./sim-cfn-kinesis-resource-deleter.js";
 import { SimCfnKinesisStreamCreator } from "./stream/sim-cfn-kinesis-stream-creator.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimKinesisCfnResourceFactoryProperties {
   readonly kinesis: SimKinesis;
@@ -51,6 +52,7 @@ export class SimKinesisCfnResourceFactory implements SimCfnServiceResourceFactor
     return await this.streamCreator.create(
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 
@@ -60,8 +62,12 @@ export class SimKinesisCfnResourceFactory implements SimCfnServiceResourceFactor
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
-    _context: SimCloudFormationResourceDeleteContext,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

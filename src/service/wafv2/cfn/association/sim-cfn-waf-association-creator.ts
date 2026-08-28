@@ -7,6 +7,7 @@ import { wafWebAclAssociationResourceType } from "../sim-cfn-waf-resource-types.
 import { SimCfnWafAssociationConfig } from "./sim-cfn-waf-association-config.js";
 import { simCfnWafAssociationSkipError } from "./sim-cfn-waf-association-skip.js";
 import { SimWafCfnWebAclAssociation } from "./sim-cfn-waf-web-acl-association.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnWafAssociationCreatorProperties {
   readonly wafV2: SimWafV2;
@@ -40,6 +41,7 @@ export class SimCfnWafAssociationCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimWafCfnWebAclAssociation> {
     const config = new SimCfnWafAssociationConfig({ resource, properties });
     const association = new SimWafCfnWebAclAssociation({
@@ -60,12 +62,15 @@ export class SimCfnWafAssociationCreator {
       wafWebAclAssociationResourceType,
       resource.logicalId,
       async () => {
-        await this.#wafV2.associateWebAcl({
-          input: {
-            ResourceArn: association.resourceArn,
-            WebACLArn: association.webAclArn,
+        await this.#wafV2.associateWebAcl(
+          {
+            input: {
+              ResourceArn: association.resourceArn,
+              WebACLArn: association.webAclArn,
+            },
           },
-        });
+          options,
+        );
 
         return association;
       },
@@ -88,15 +93,17 @@ export class SimCfnWafAssociationCreator {
   async delete(
     resource: SimCfnResource,
     association: SimWafCfnWebAclAssociation,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     await simCfnWafResourceCommand(
       wafWebAclAssociationResourceType,
       resource.logicalId,
       async () => {
         try {
-          await this.#wafV2.disassociateWebAcl({
-            input: { ResourceArn: association.resourceArn },
-          });
+          await this.#wafV2.disassociateWebAcl(
+            { input: { ResourceArn: association.resourceArn } },
+            options,
+          );
         } catch (error) {
           if (!(error instanceof SimWafUnavailableEntityException)) {
             throw error;

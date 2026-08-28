@@ -3,6 +3,7 @@ import type { SimKms } from "../sim-kms.js";
 import type { SimKmsKey } from "../key/sim-kms-key.js";
 import type { SimKmsAlias } from "../key/sim-kms-alias.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnKmsResourceDeleterProperties {
   readonly kms: SimKms;
@@ -29,6 +30,7 @@ export class SimCfnKmsResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "Key": {
@@ -38,7 +40,10 @@ export class SimCfnKmsResourceDeleter {
           `sim KMS Key for CloudFormation Resource ${resource.logicalId}`,
         );
 
-        await this.kms.scheduleKeyDeletion({ input: { KeyId: key.keyId } });
+        await this.kms.scheduleKeyDeletion(
+          { input: { KeyId: key.keyId } },
+          options,
+        );
 
         return;
       }
@@ -49,9 +54,10 @@ export class SimCfnKmsResourceDeleter {
           `sim KMS Alias for CloudFormation Resource ${resource.logicalId}`,
         );
 
-        await this.kms.deleteAlias({
-          input: { AliasName: alias.aliasName },
-        });
+        await this.kms.deleteAlias(
+          { input: { AliasName: alias.aliasName } },
+          options,
+        );
 
         return;
       }

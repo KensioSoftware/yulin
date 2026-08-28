@@ -7,6 +7,7 @@ import { simCfnPersonalizeCreated } from "./sim-cfn-personalize-created.js";
 import { SimCfnPersonalizeProperties } from "./sim-cfn-personalize-properties.js";
 import { simCfnPersonalizeResourceCreation } from "./sim-cfn-personalize-resource-error.js";
 import { personalizeSolutionResourceType } from "./sim-cfn-personalize-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const readProperties = new Set([
   "Name",
@@ -51,6 +52,7 @@ export class SimCfnPersonalizeSolutionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimPersonalizeSolution> {
     const read = new SimCfnPersonalizeProperties({
       resourceType: personalizeSolutionResourceType,
@@ -74,7 +76,10 @@ export class SimCfnPersonalizeSolutionCreator {
       personalizeSolutionResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#personalize.createSolution({ input });
+        const created = await this.#personalize.createSolution(
+          { input },
+          options,
+        );
 
         return simCfnPersonalizeCreated(
           this.#resources.solutions,
@@ -86,9 +91,13 @@ export class SimCfnPersonalizeSolutionCreator {
   }
 
   /** Delete a solution an AWS::Personalize::Solution Resource made. */
-  async delete(solution: SimPersonalizeSolution): Promise<void> {
-    await this.#personalize.deleteSolution({
-      input: { solutionArn: solution.arn },
-    });
+  async delete(
+    solution: SimPersonalizeSolution,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#personalize.deleteSolution(
+      { input: { solutionArn: solution.arn } },
+      options,
+    );
   }
 }

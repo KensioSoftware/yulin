@@ -7,6 +7,7 @@ import type { SimKinesisStream } from "../../stream/sim-kinesis-stream.js";
 import { simCfnKinesisResourceCreation } from "../sim-cfn-kinesis-resource-error.js";
 import { kinesisStreamResourceType } from "../sim-cfn-kinesis-resource-types.js";
 import { SimCfnKinesisStreamProperties } from "./sim-cfn-kinesis-stream-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnKinesisStreamCreatorProperties {
   readonly kinesis: SimKinesis;
@@ -37,6 +38,7 @@ export class SimCfnKinesisStreamCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimKinesisStream> {
     const streamProperties = new SimCfnKinesisStreamProperties({
       resource,
@@ -52,18 +54,21 @@ export class SimCfnKinesisStreamCreator {
       kinesisStreamResourceType,
       resource.logicalId,
       async () => {
-        await this.kinesis.createStream({
-          input: {
-            StreamName: name,
-            ...(shardCount !== undefined && { ShardCount: shardCount }),
-            ...(streamMode !== undefined && {
-              StreamModeDetails: { StreamMode: streamMode },
-            }),
-            ...(tags !== undefined && { Tags: tags }),
+        await this.kinesis.createStream(
+          {
+            input: {
+              StreamName: name,
+              ...(shardCount !== undefined && { ShardCount: shardCount }),
+              ...(streamMode !== undefined && {
+                StreamModeDetails: { StreamMode: streamMode },
+              }),
+              ...(tags !== undefined && { Tags: tags }),
+            },
           },
-        });
+          options,
+        );
 
-        await this.applyRetention(name, retentionHours);
+        await this.applyRetention(name, retentionHours, options);
 
         const stream = this.kinesis.findStream(name);
         assertDefined(
@@ -88,6 +93,7 @@ export class SimCfnKinesisStreamCreator {
   private async applyRetention(
     name: string,
     retentionHours: number | undefined,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (
       retentionHours === undefined ||
@@ -96,8 +102,9 @@ export class SimCfnKinesisStreamCreator {
       return;
     }
 
-    await this.kinesis.increaseStreamRetentionPeriod({
-      input: { StreamName: name, RetentionPeriodHours: retentionHours },
-    });
+    await this.kinesis.increaseStreamRetentionPeriod(
+      { input: { StreamName: name, RetentionPeriodHours: retentionHours } },
+      options,
+    );
   }
 }

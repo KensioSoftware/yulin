@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimLogsDelivery } from "../../delivery/sim-logs-delivery.js";
 import type { SimLogs } from "../../sim-logs.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import { simCfnDeliveryInput } from "./sim-cfn-delivery-input.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliveryUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
@@ -41,6 +42,7 @@ export class SimCfnDeliveryCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLogsDelivery> {
     const reader = new SimCfnDeliveryProperties({
       resource,
@@ -52,9 +54,10 @@ export class SimCfnDeliveryCreator {
 
     reader.recordIgnoredProperties();
 
-    const created = await this.#logs.createDelivery({
-      input: simCfnDeliveryInput(reader),
-    });
+    const created = await this.#logs.createDelivery(
+      { input: simCfnDeliveryInput(reader) },
+      options,
+    );
     const delivery = this.#logs.findDelivery(created.delivery?.id ?? "");
 
     assertDefined(
@@ -68,7 +71,10 @@ export class SimCfnDeliveryCreator {
   /**
    * Delete a delivery created from a CloudFormation Resource.
    */
-  async delete(delivery: SimLogsDelivery): Promise<void> {
-    await this.#logs.deleteDelivery({ input: { id: delivery.id } });
+  async delete(
+    delivery: SimLogsDelivery,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#logs.deleteDelivery({ input: { id: delivery.id } }, options);
   }
 }

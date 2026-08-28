@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimKmsAlias } from "../../key/sim-kms-alias.js";
 import type { SimKms } from "../../sim-kms.js";
 import { SimCfnKmsAliasProperties } from "./sim-cfn-kms-alias-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnKmsAliasCreatorProperties {
   readonly kms: SimKms;
@@ -30,6 +31,7 @@ export class SimCfnKmsAliasCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimKmsAlias> {
     const aliasProperties = new SimCfnKmsAliasProperties({
       resource,
@@ -37,12 +39,15 @@ export class SimCfnKmsAliasCreator {
     });
     const aliasName = aliasProperties.aliasName();
 
-    await this.kms.createAlias({
-      input: {
-        AliasName: aliasName,
-        TargetKeyId: aliasProperties.targetKeyId(),
+    await this.kms.createAlias(
+      {
+        input: {
+          AliasName: aliasName,
+          TargetKeyId: aliasProperties.targetKeyId(),
+        },
       },
-    });
+      options,
+    );
 
     const alias = this.kms.findAlias(aliasName);
     assertDefined(

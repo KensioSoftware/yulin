@@ -5,6 +5,7 @@ import type { SimHttpApiRoute } from "../../api/route/sim-http-api-route.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
 import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiRouteProperties } from "./sim-cfn-http-api-route-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnHttpApiRouteCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -38,6 +39,7 @@ export class SimCfnHttpApiRouteCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimHttpApiRoute> {
     const routeProperties = new SimCfnHttpApiRouteProperties({
       resource,
@@ -50,9 +52,10 @@ export class SimCfnHttpApiRouteCreator {
       apiId,
     );
 
-    const created = await this.apiGatewayV2.createRoute({
-      input: routeProperties.createRouteInput(),
-    });
+    const created = await this.apiGatewayV2.createRoute(
+      { input: routeProperties.createRouteInput() },
+      options,
+    );
 
     const route = this.apiGatewayV2
       .findApi(apiId)

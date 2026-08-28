@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoUserPoolIdentityProvider } from "../../user-pool/idp/sim-cognito-user-pool-identity-provider.js";
 import { SimCfnCognitoIdpProperties } from "./sim-cfn-cognito-idp-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCognitoIdpCreatorProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -31,6 +32,7 @@ export class SimCfnCognitoIdpCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCognitoUserPoolIdentityProvider> {
     const providerProperties = new SimCfnCognitoIdpProperties({
       resource,
@@ -38,9 +40,10 @@ export class SimCfnCognitoIdpCreator {
     });
     const providerName = providerProperties.providerName();
 
-    await this.cognito.createIdentityProvider({
-      input: providerProperties.createIdentityProviderInput(),
-    });
+    await this.cognito.createIdentityProvider(
+      { input: providerProperties.createIdentityProviderInput() },
+      options,
+    );
 
     const provider = this.cognito
       .userPool(providerProperties.userPoolId())

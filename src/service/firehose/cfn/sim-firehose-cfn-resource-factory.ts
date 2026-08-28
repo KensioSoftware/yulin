@@ -8,6 +8,7 @@ import type { SimFirehose } from "../sim-firehose.js";
 import { SimCfnFirehoseDeliveryStreamCreator } from "./delivery-stream/sim-cfn-firehose-delivery-stream-creator.js";
 import { SimCfnFirehoseResourceDeleter } from "./sim-cfn-firehose-resource-deleter.js";
 import { firehoseDeliveryStreamResourceTypeName } from "./sim-cfn-firehose-resource-types.js";
+import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimFirehoseCfnResourceFactoryProperties {
   readonly firehose: SimFirehose;
@@ -49,6 +50,7 @@ export class SimFirehoseCfnResourceFactory implements SimCfnServiceResourceFacto
     return await this.deliveryStreamCreator.create(
       resource,
       context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
     );
   }
 
@@ -59,8 +61,12 @@ export class SimFirehoseCfnResourceFactory implements SimCfnServiceResourceFacto
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
-    _context: SimCloudFormationResourceDeleteContext,
+    context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    await this.deleter.delete(resourceTypeName, resource);
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      simCfnResourceCallerOptions(context.caller),
+    );
   }
 }

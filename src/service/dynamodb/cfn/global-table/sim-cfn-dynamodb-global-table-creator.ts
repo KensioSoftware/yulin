@@ -3,6 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimCfnDynamoDbTableCreator } from "../table/sim-cfn-dynamodb-table-creator.js";
 import { SimCfnDynamoDbGlobalTableProperties } from "./sim-cfn-dynamodb-global-table-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnDynamoDbGlobalTableCreatorProperties {
   readonly tableCreator: SimCfnDynamoDbTableCreator;
@@ -30,6 +31,7 @@ export class SimCfnDynamoDbGlobalTableCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimDynamoDbTable> {
     const globalTable = new SimCfnDynamoDbGlobalTableProperties({
       resource,
@@ -39,6 +41,7 @@ export class SimCfnDynamoDbGlobalTableCreator {
     return await this.tableCreator.create(
       resource,
       globalTable.tableProperties(),
+      options,
     );
   }
 }

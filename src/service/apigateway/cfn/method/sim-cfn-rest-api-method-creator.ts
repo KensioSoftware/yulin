@@ -6,6 +6,7 @@ import type { SimApiGateway } from "../../sim-api-gateway.js";
 import type { SimCfnRestApiImports } from "../sim-cfn-rest-api-imports.js";
 import { SimCfnRestApiMethodIntegration } from "./sim-cfn-rest-api-method-integration.js";
 import { SimCfnRestApiMethodProperties } from "./sim-cfn-rest-api-method-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnRestApiMethodCreatorProperties {
   readonly apiGateway: SimApiGateway;
@@ -38,6 +39,7 @@ export class SimCfnRestApiMethodCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimRestApiMethod> {
     const methodProperties = new SimCfnRestApiMethodProperties({
       resource,
@@ -50,10 +52,11 @@ export class SimCfnRestApiMethodCreator {
       address.restApiId,
     );
 
-    await this.apiGateway.putMethod({
-      input: methodProperties.putMethodInput(),
-    });
-    await this.integration.put(methodProperties, address);
+    await this.apiGateway.putMethod(
+      { input: methodProperties.putMethodInput() },
+      options,
+    );
+    await this.integration.put(methodProperties, address, options);
 
     const method = this.apiGateway
       .findRestApi(address.restApiId)

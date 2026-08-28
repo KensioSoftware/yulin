@@ -5,6 +5,7 @@ import type {
   BackgroundScheduler,
 } from "../../../../util/background/background.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimCfnStack,
@@ -29,6 +30,10 @@ interface CreateStackCommandHandlerProperties {
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /** The principal the Stack's Resources are created as. */
+  readonly caller?: SimAwsCaller | undefined;
+
   readonly exports?: SimCfnExports | undefined;
 }
 
@@ -47,6 +52,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
+  private readonly caller: SimAwsCaller | undefined;
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: CreateStackCommandHandlerProperties) {
@@ -57,6 +63,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       background,
       cdkOutContext,
       bindings,
+      caller,
       exports,
     } = properties;
 
@@ -66,6 +73,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     this.background = background;
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
+    this.caller = caller;
     this.exports = exports;
   }
 
@@ -120,6 +128,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       template,
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
+      caller: this.caller,
       exports: this.exports,
     });
 

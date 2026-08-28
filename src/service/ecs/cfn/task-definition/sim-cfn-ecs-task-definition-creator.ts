@@ -7,6 +7,7 @@ import type { SimEcsTaskDefinition } from "../../task-definition/sim-ecs-task-de
 import type { SimEcs } from "../../sim-ecs.js";
 import { SimCfnEcsContainerBindings } from "../bind/sim-cfn-ecs-container-bindings.js";
 import { SimCfnEcsTaskDefinitionProperties } from "./sim-cfn-ecs-task-definition-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnEcsTaskDefinitionCreatorProperties {
   readonly ecs: SimEcs;
@@ -46,6 +47,7 @@ export class SimCfnEcsTaskDefinitionCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
     bindings?: readonly SimCfnBinding[],
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimEcsTaskDefinition> {
     const taskDefinitionProperties = new SimCfnEcsTaskDefinitionProperties({
       resource,
@@ -60,7 +62,10 @@ export class SimCfnEcsTaskDefinitionCreator {
       containerNames: simCfnEcsDeclaredContainerNames(input),
     });
 
-    const registered = await this.ecs.registerTaskDefinition({ input });
+    const registered = await this.ecs.registerTaskDefinition(
+      { input },
+      options,
+    );
     const taskDefinitionArn = registered.taskDefinition?.taskDefinitionArn;
 
     assertDefined(
@@ -81,10 +86,14 @@ export class SimCfnEcsTaskDefinitionCreator {
    * is also what an update does with the revision it replaces, since sim
    * CloudFormation replaces a changed Resource rather than updating it.
    */
-  async delete(taskDefinition: SimEcsTaskDefinition): Promise<void> {
-    await this.ecs.deregisterTaskDefinition({
-      input: { taskDefinition: taskDefinition.taskDefinitionArn },
-    });
+  async delete(
+    taskDefinition: SimEcsTaskDefinition,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.ecs.deregisterTaskDefinition(
+      { input: { taskDefinition: taskDefinition.taskDefinitionArn } },
+      options,
+    );
   }
 }
 

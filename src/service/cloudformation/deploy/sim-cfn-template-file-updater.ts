@@ -80,6 +80,7 @@ export class SimCfnTemplateFileUpdater implements SimCfnTemplateFileUpdating {
       stacks: this.stacks,
       background: this.background,
       cdkOutContext: loaded.cdkOutContext,
+      caller: loaded.caller,
     });
 
     await handler.handle({

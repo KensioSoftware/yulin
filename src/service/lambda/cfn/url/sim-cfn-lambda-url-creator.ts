@@ -9,6 +9,7 @@ import type {
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaUrlCreatorProperties {
   readonly lambda: SimLambda;
@@ -35,6 +36,7 @@ export class SimCfnLambdaUrlCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaFunctionUrl> {
     const targetFunctionArn = this.propertyParser.requiredString(
       resource,
@@ -43,21 +45,24 @@ export class SimCfnLambdaUrlCreator {
     );
     const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
 
-    await this.lambda.createFunctionUrlConfig({
-      input: {
-        FunctionName: functionName,
-        AuthType: this.propertyParser.requiredString(
-          resource,
-          properties["AuthType"],
-          "AuthType",
-        ) as SimLambdaFunctionUrlAuthType,
-        InvokeMode: this.propertyParser.optionalString(
-          resource,
-          properties["InvokeMode"],
-          "InvokeMode",
-        ) as SimLambdaFunctionUrlInvokeMode | undefined,
+    await this.lambda.createFunctionUrlConfig(
+      {
+        input: {
+          FunctionName: functionName,
+          AuthType: this.propertyParser.requiredString(
+            resource,
+            properties["AuthType"],
+            "AuthType",
+          ) as SimLambdaFunctionUrlAuthType,
+          InvokeMode: this.propertyParser.optionalString(
+            resource,
+            properties["InvokeMode"],
+            "InvokeMode",
+          ) as SimLambdaFunctionUrlInvokeMode | undefined,
+        },
       },
-    });
+      options,
+    );
 
     const functionUrl = this.lambda.getSimFunctionUrl(functionName);
     assertDefined(

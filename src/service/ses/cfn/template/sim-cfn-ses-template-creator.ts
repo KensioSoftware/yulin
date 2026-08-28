@@ -6,6 +6,7 @@ import type { SimSesTemplate } from "../../template/sim-ses-template.js";
 import { simCfnSesResourceCreation } from "../sim-cfn-ses-resource-error.js";
 import { sesTemplateResourceType } from "../sim-cfn-ses-resource-types.js";
 import { SimCfnSesTemplateProperties } from "./sim-cfn-ses-template-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnSesTemplateCreatorProperties {
   readonly ses: SimSesV2;
@@ -33,6 +34,7 @@ export class SimCfnSesTemplateCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimSesTemplate> {
     const templateProperties = new SimCfnSesTemplateProperties({
       resource,
@@ -47,9 +49,10 @@ export class SimCfnSesTemplateCreator {
       sesTemplateResourceType,
       resource.logicalId,
       async () => {
-        await this.#ses.createEmailTemplate({
-          input: { TemplateName: templateName, TemplateContent: content },
-        });
+        await this.#ses.createEmailTemplate(
+          { input: { TemplateName: templateName, TemplateContent: content } },
+          options,
+        );
 
         const template = this.#ses.findTemplate(templateName);
 
@@ -66,9 +69,13 @@ export class SimCfnSesTemplateCreator {
   /**
    * Delete a template created from an AWS::SES::Template Resource.
    */
-  async delete(template: SimSesTemplate): Promise<void> {
-    await this.#ses.deleteEmailTemplate({
-      input: { TemplateName: template.templateName },
-    });
+  async delete(
+    template: SimSesTemplate,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#ses.deleteEmailTemplate(
+      { input: { TemplateName: template.templateName } },
+      options,
+    );
   }
 }

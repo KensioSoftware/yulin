@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCloudFront } from "../../sim-cloudfront.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnCfDistroDeleterProperties {
   readonly cloudFront: SimCloudFront;
@@ -30,7 +31,10 @@ export class SimCfnCfDistroDeleter {
   /**
    * Disable and then delete the Distribution a Resource created.
    */
-  async delete(resource: SimCfnResource): Promise<void> {
+  async delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const distribution = resource.simResource as
       | SimCloudFrontDistribution
       | undefined;
@@ -39,15 +43,17 @@ export class SimCfnCfDistroDeleter {
       `sim CloudFront Distribution for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.disable(distribution);
+    await this.disable(distribution, options);
 
-    await this.cloudFront.deleteDistribution({
-      input: { Id: distribution.distributionId },
-    });
+    await this.cloudFront.deleteDistribution(
+      { input: { Id: distribution.distributionId } },
+      options,
+    );
   }
 
   private async disable(
     distribution: SimCloudFrontDistribution,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const { distributionConfig } = distribution;
     assertDefined(
@@ -55,11 +61,14 @@ export class SimCfnCfDistroDeleter {
       `sim CloudFront Distribution ${distribution.distributionId} configuration to disable`,
     );
 
-    await this.cloudFront.updateDistribution({
-      input: {
-        Id: distribution.distributionId,
-        DistributionConfig: { ...distributionConfig, Enabled: false },
+    await this.cloudFront.updateDistribution(
+      {
+        input: {
+          Id: distribution.distributionId,
+          DistributionConfig: { ...distributionConfig, Enabled: false },
+        },
       },
-    });
+      options,
+    );
   }
 }

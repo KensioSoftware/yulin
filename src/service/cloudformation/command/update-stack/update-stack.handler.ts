@@ -5,6 +5,7 @@ import type {
   BackgroundScheduler,
 } from "../../../../util/background/background.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type {
@@ -33,6 +34,12 @@ interface UpdateStackCommandHandlerProperties {
    */
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 
+  /**
+   * The principal to apply the changed template as, for an update that names
+   * one. Left out, the Stack goes on running as whoever deployed it.
+   */
+  readonly caller?: SimAwsCaller | undefined;
+
   /** The export names published in this Account and Region. */
   readonly exports?: SimCfnExports | undefined;
 }
@@ -51,6 +58,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly caller: SimAwsCaller | undefined;
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: UpdateStackCommandHandlerProperties) {
@@ -59,6 +67,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
     this.stacks = properties.stacks;
     this.background = properties.background;
     this.cdkOutContext = properties.cdkOutContext;
+    this.caller = properties.caller;
     this.exports = properties.exports;
   }
 
@@ -112,7 +121,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
         accountRegionScope: this.accountRegionScope,
         exports: this.exports,
       }),
-      { cdkOutContext: this.cdkOutContext },
+      { cdkOutContext: this.cdkOutContext, caller: this.caller },
     );
 
     return {

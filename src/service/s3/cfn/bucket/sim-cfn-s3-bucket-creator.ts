@@ -6,6 +6,7 @@ import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-n
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimCfnS3BucketConfigurator } from "./sim-cfn-s3-bucket-configurator.js";
 import { SimCfnS3BucketPropertyRules } from "./sim-cfn-s3-bucket-property-rules.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnS3BucketCreatorProperties {
   readonly simS3: SimS3;
@@ -32,6 +33,7 @@ export class SimCfnS3BucketCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimS3Bucket> {
     new SimCfnS3BucketPropertyRules({
       logicalId: resource.logicalId,
@@ -42,7 +44,7 @@ export class SimCfnS3BucketCreator {
     const bucketName = this.bucketNameForResource(resource, properties);
     validateS3BucketName(bucketName);
 
-    await this.simS3.createBucket({ input: { Bucket: bucketName } });
+    await this.simS3.createBucket({ input: { Bucket: bucketName } }, options);
 
     const bucket = this.simS3.getSimBucketByName(bucketName);
     assertDefined(
@@ -55,6 +57,7 @@ export class SimCfnS3BucketCreator {
       resource,
       properties,
       bucketName,
+      options,
     }).configure();
 
     return bucket;

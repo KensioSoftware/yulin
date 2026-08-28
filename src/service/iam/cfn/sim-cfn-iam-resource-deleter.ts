@@ -6,6 +6,7 @@ import type { SimIamManagedPolicy } from "../policy/sim-iam-policy.js";
 import { SimCfnIamRoleDeleter } from "./role/sim-cfn-iam-role-deleter.js";
 import { SimCfnIamUserDeleter } from "./user/sim-cfn-iam-user-deleter.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnIamResourceDeleterProperties {
   readonly iam: SimIam;
@@ -32,22 +33,23 @@ export class SimCfnIamResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     switch (resourceTypeName) {
       case "ManagedPolicy": {
-        await this.deleteManagedPolicy(resource);
+        await this.deleteManagedPolicy(resource, options);
         return;
       }
       case "Policy": {
-        await this.deleteInlinePolicy(properties);
+        await this.deleteInlinePolicy(properties, options);
         return;
       }
       case "Role": {
-        await this.roleDeleter.delete(resource);
+        await this.roleDeleter.delete(resource, options);
         return;
       }
       case "User": {
-        await this.userDeleter.delete(resource);
+        await this.userDeleter.delete(resource, options);
         return;
       }
       default: {
@@ -58,15 +60,18 @@ export class SimCfnIamResourceDeleter {
     }
   }
 
-  private async deleteManagedPolicy(resource: SimCfnResource): Promise<void> {
+  private async deleteManagedPolicy(
+    resource: SimCfnResource,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     const policy = resource.simResource as SimIamManagedPolicy | undefined;
     assertDefined(
       policy,
       `sim IAM Managed Policy for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.detachManagedPolicy(policy.arn);
-    await this.iam.deletePolicy({ input: { PolicyArn: policy.arn } });
+    await this.detachManagedPolicy(policy.arn, options);
+    await this.iam.deletePolicy({ input: { PolicyArn: policy.arn } }, options);
   }
 
   /**
@@ -78,15 +83,19 @@ export class SimCfnIamResourceDeleter {
    * Resource is deleted. A Role declared outside the Stack keeps it. This
    * clears whatever attachments are left either way.
    */
-  private async detachManagedPolicy(policyArn: SimArn): Promise<void> {
+  private async detachManagedPolicy(
+    policyArn: SimArn,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
     await Promise.all(
       this.iam.roles
         .values()
         .filter((role) => role.attachedPolicyArns.has(policyArn))
         .map(async (role) =>
-          this.iam.detachRolePolicy({
-            input: { RoleName: role.roleName, PolicyArn: policyArn },
-          }),
+          this.iam.detachRolePolicy(
+            { input: { RoleName: role.roleName, PolicyArn: policyArn } },
+            options,
+          ),
         ),
     );
   }
@@ -100,6 +109,7 @@ export class SimCfnIamResourceDeleter {
    */
   private async deleteInlinePolicy(
     properties: SimCfnTemplateValueRecord,
+    options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     const policyName = properties["PolicyName"];
     const roles = properties["Roles"];
@@ -113,9 +123,10 @@ export class SimCfnIamResourceDeleter {
       roles
         .filter((roleName): roleName is string => typeof roleName === "string")
         .map(async (roleName) =>
-          this.iam.deleteRolePolicy({
-            input: { RoleName: roleName, PolicyName: policyName },
-          }),
+          this.iam.deleteRolePolicy(
+            { input: { RoleName: roleName, PolicyName: policyName } },
+            options,
+          ),
         ),
     );
   }

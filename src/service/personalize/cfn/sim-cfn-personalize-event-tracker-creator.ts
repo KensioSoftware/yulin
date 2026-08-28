@@ -7,6 +7,7 @@ import { simCfnPersonalizeCreated } from "./sim-cfn-personalize-created.js";
 import { SimCfnPersonalizeProperties } from "./sim-cfn-personalize-properties.js";
 import { simCfnPersonalizeResourceCreation } from "./sim-cfn-personalize-resource-error.js";
 import { personalizeEventTrackerResourceType } from "./sim-cfn-personalize-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 const readProperties = new Set(["Name", "DatasetGroupArn"]);
 
@@ -37,6 +38,7 @@ export class SimCfnPersonalizeEventTrackerCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimPersonalizeEventTracker> {
     const read = new SimCfnPersonalizeProperties({
       resourceType: personalizeEventTrackerResourceType,
@@ -55,7 +57,10 @@ export class SimCfnPersonalizeEventTrackerCreator {
       personalizeEventTrackerResourceType,
       resource.logicalId,
       async () => {
-        const created = await this.#personalize.createEventTracker({ input });
+        const created = await this.#personalize.createEventTracker(
+          { input },
+          options,
+        );
 
         return simCfnPersonalizeCreated(
           this.#resources.eventTrackers,
@@ -67,9 +72,13 @@ export class SimCfnPersonalizeEventTrackerCreator {
   }
 
   /** Delete a tracker an AWS::Personalize::EventTracker Resource made. */
-  async delete(eventTracker: SimPersonalizeEventTracker): Promise<void> {
-    await this.#personalize.deleteEventTracker({
-      input: { eventTrackerArn: eventTracker.arn },
-    });
+  async delete(
+    eventTracker: SimPersonalizeEventTracker,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#personalize.deleteEventTracker(
+      { input: { eventTrackerArn: eventTracker.arn } },
+      options,
+    );
   }
 }

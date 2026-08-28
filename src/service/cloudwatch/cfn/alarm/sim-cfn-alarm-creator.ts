@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCloudWatchAlarm } from "../../alarm/sim-cloudwatch-alarm.js";
 import type { SimCloudWatch } from "../../sim-cloudwatch.js";
 import { SimCfnAlarmProperties } from "./sim-cfn-alarm-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnAlarmCreatorProperties {
   readonly cloudWatch: SimCloudWatch;
@@ -30,13 +31,17 @@ export class SimCfnAlarmCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimCloudWatchAlarm> {
     const alarmProperties = new SimCfnAlarmProperties({ resource, properties });
     const alarmName = alarmProperties.alarmName();
 
     alarmProperties.recordIgnoredProperties();
 
-    await this.#cloudWatch.putMetricAlarm({ input: alarmProperties.input() });
+    await this.#cloudWatch.putMetricAlarm(
+      { input: alarmProperties.input() },
+      options,
+    );
 
     const alarm = this.#cloudWatch.findAlarm(alarmName);
 
@@ -55,9 +60,13 @@ export class SimCfnAlarmCreator {
    * removing it, which is what lets a torn-down stack settle rather than
    * leaving an alarm waking up to read a metric nothing watches.
    */
-  async delete(alarm: SimCloudWatchAlarm): Promise<void> {
-    await this.#cloudWatch.deleteAlarms({
-      input: { AlarmNames: [alarm.name] },
-    });
+  async delete(
+    alarm: SimCloudWatchAlarm,
+    options?: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    await this.#cloudWatch.deleteAlarms(
+      { input: { AlarmNames: [alarm.name] } },
+      options,
+    );
   }
 }

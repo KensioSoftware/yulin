@@ -6,6 +6,7 @@ import type { SimApiMapping } from "../domain/sim-api-mapping.js";
 import type { SimHttpApiDomainName } from "../domain/sim-http-api-domain-name.js";
 import { SimCfnHttpApiPartDeleter } from "./sim-cfn-http-api-part-deleter.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnApiGatewayV2ResourceDeleterProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
@@ -37,11 +38,15 @@ export class SimCfnApiGatewayV2ResourceDeleter {
     resourceTypeName: string,
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (resourceTypeName === "Api") {
       const api = this.deleted<SimHttpApi>(resource, "HTTP API");
 
-      await this.apiGatewayV2.deleteApi({ input: { ApiId: api.apiId } });
+      await this.apiGatewayV2.deleteApi(
+        { input: { ApiId: api.apiId } },
+        options,
+      );
 
       return;
     }
@@ -52,46 +57,47 @@ export class SimCfnApiGatewayV2ResourceDeleter {
         "HTTP API domain name",
       );
 
-      await this.apiGatewayV2.deleteDomainName({
-        input: { DomainName: domain.domainName },
-      });
+      await this.apiGatewayV2.deleteDomainName(
+        { input: { DomainName: domain.domainName } },
+        options,
+      );
 
       return;
     }
 
     if (resourceTypeName === "ApiMapping") {
-      await this.deleteApiMapping(resource, properties);
+      // A mapping is addressed by its domain as well as its own id. The domain
+      // name comes from the Resource's own property, where creation read it
+      // from, and still resolves because a mapping never outlives its domain.
+      const mapping = this.deleted<SimApiMapping>(resource, "API mapping");
+      const domainName = properties["DomainName"];
+
+      /* v8 ignore if -- creation refused the Resource without a DomainName */
+      if (typeof domainName !== "string") {
+        throw new TypeError(
+          `AWS::ApiGatewayV2::ApiMapping ${resource.logicalId} requires a DomainName string to delete`,
+        );
+      }
+
+      await this.apiGatewayV2.deleteApiMapping(
+        {
+          input: {
+            DomainName: domainName,
+            ApiMappingId: mapping.apiMappingId,
+          },
+        },
+        options,
+      );
 
       return;
     }
 
-    await this.partDeleter.delete(resourceTypeName, resource, properties);
-  }
-
-  /**
-   * Delete an API mapping, which is addressed by its domain and its own id.
-   *
-   * The domain name comes from the Resource's own property, where creation
-   * read it from, and still resolves because a mapping never outlives the
-   * domain holding it.
-   */
-  private async deleteApiMapping(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): Promise<void> {
-    const mapping = this.deleted<SimApiMapping>(resource, "API mapping");
-    const domainName = properties["DomainName"];
-
-    /* v8 ignore if -- creation refused the Resource without a DomainName */
-    if (typeof domainName !== "string") {
-      throw new TypeError(
-        `AWS::ApiGatewayV2::ApiMapping ${resource.logicalId} requires a DomainName string to delete`,
-      );
-    }
-
-    await this.apiGatewayV2.deleteApiMapping({
-      input: { DomainName: domainName, ApiMappingId: mapping.apiMappingId },
-    });
+    await this.partDeleter.delete(
+      resourceTypeName,
+      resource,
+      properties,
+      options,
+    );
   }
 
   private deleted<T extends object>(

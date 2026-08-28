@@ -168,8 +168,8 @@ and resource policies decide its requests as they did before.
 ## Catch a deployment the policy denies
 
 Sim CloudFormation creates each resource through the owning service's command handler, and that
-handler authorizes. A deployment carries no caller, so IAM decides it as the account root, and an
-SCP applies to a member account's root the same way AWS does.
+handler authorizes. A deployment that names no principal is decided as the account root. An SCP
+applies to a member account's root the same way AWS does.
 
 ```typescript sim-organizations-scp-deployment
 /**
@@ -215,6 +215,78 @@ console.log(failed?.status); // "CREATE_FAILED"
 
 The resource is left `CREATE_FAILED` and the deployment rejects. A test asserting that a stack
 deploys then fails on the policy, with the policy named in the message.
+
+## Name the principal a deployment runs as
+
+An organization that denies its accounts' root principals is ordinary, and a deployment decided as
+the root fails under one. `caller` says which principal the resources are created as, and a
+statement conditioned on `aws:PrincipalArn` then has a deploy role to match against.
+
+```typescript sim-organizations-scp-deploy-role
+/**
+ * A policy denying the account root, and a deployment that names a Role.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+const roleCreation = await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "cdk-deploy-role",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "cloudformation.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "cdk-deploy-role",
+    PolicyName: "Deploy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "s3:*", Resource: "*" },
+    }),
+  }),
+);
+
+simAws.organizations().attachServiceControlPolicy("123456789012", {
+  Version: "2012-10-17",
+  Statement: {
+    Sid: "DenyRootPrincipal",
+    Effect: "Deny",
+    Action: "*",
+    Resource: "*",
+    Condition: { ArnLike: { "aws:PrincipalArn": "arn:aws:iam::*:root" } },
+  },
+});
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reports-stack",
+  template: {
+    Resources: {
+      ReportsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "reports-bucket" },
+      },
+    },
+  },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
+});
+
+console.log(stack.getResource("ReportsBucket")?.status); // "CREATE_COMPLETE"
+```
+
+The Role is created before the policy is attached. Creating it afterwards is a call the policy
+denies the root, and the account root is who a bare `createRole` runs as.
 
 ## Write an allow list instead of a deny list
 

@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLambdaEventInvokeConfig } from "../../function/event-invoke/sim-lambda-event-invoke-config.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaEventInvokeConfigProperties } from "./sim-cfn-lambda-event-invoke-config-properties.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaEventInvokeConfigCreatorProperties {
   readonly lambda: SimLambda;
@@ -31,6 +32,7 @@ export class SimCfnLambdaEventInvokeConfigCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaEventInvokeConfig> {
     const { functionName, qualifier, input } =
       new SimCfnLambdaEventInvokeConfigProperties({
@@ -38,7 +40,7 @@ export class SimCfnLambdaEventInvokeConfigCreator {
         properties,
       }).createInput();
 
-    await this.lambda.putFunctionEventInvokeConfig({ input });
+    await this.lambda.putFunctionEventInvokeConfig({ input }, options);
 
     const config = this.lambda.getSimEventInvokeConfig(functionName, qualifier);
 

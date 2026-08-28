@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimFirehose } from "../sim-firehose.js";
 import type { SimFirehoseDeliveryStream } from "../stream/sim-firehose-delivery-stream.js";
 import { firehoseDeliveryStreamResourceTypeName } from "./sim-cfn-firehose-resource-types.js";
+import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnFirehoseResourceDeleterProperties {
   readonly firehose: SimFirehose;
@@ -25,6 +26,7 @@ export class SimCfnFirehoseResourceDeleter {
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<void> {
     if (resourceTypeName !== firehoseDeliveryStreamResourceTypeName) {
       throw new Error(
@@ -40,8 +42,9 @@ export class SimCfnFirehoseResourceDeleter {
       `sim Firehose delivery stream for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    await this.firehose.deleteDeliveryStream({
-      input: { DeliveryStreamName: deliveryStream.name },
-    });
+    await this.firehose.deleteDeliveryStream(
+      { input: { DeliveryStreamName: deliveryStream.name } },
+      options,
+    );
   }
 }

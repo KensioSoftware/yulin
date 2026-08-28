@@ -5,6 +5,7 @@ import type { SimLambdaPermission } from "../../function/policy/sim-lambda-permi
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { simCfnLambdaTargetFunction } from "../function/sim-cfn-lambda-target-function.js";
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaPermissionCreatorProperties {
   readonly lambda: SimLambda;
@@ -42,6 +43,7 @@ export class SimCfnLambdaPermissionCreator {
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): Promise<SimLambdaPermission> {
     const { functionName, qualifier } = simCfnLambdaTargetFunction(
       this.propertyParser.requiredString(
@@ -51,48 +53,51 @@ export class SimCfnLambdaPermissionCreator {
       ),
     );
 
-    await this.lambda.addPermission({
-      input: {
-        FunctionName: functionName,
-        Qualifier: qualifier,
-        StatementId: resource.logicalId,
-        Action: this.propertyParser.requiredString(
-          resource,
-          properties["Action"],
-          "Action",
-        ),
-        Principal: this.propertyParser.requiredString(
-          resource,
-          properties["Principal"],
-          "Principal",
-        ),
-        FunctionUrlAuthType: this.propertyParser.optionalString(
-          resource,
-          properties["FunctionUrlAuthType"],
-          "FunctionUrlAuthType",
-        ),
-        SourceArn: this.propertyParser.optionalString(
-          resource,
-          properties["SourceArn"],
-          "SourceArn",
-        ),
-        SourceAccount: this.propertyParser.optionalString(
-          resource,
-          properties["SourceAccount"],
-          "SourceAccount",
-        ),
-        PrincipalOrgID: this.propertyParser.optionalString(
-          resource,
-          properties["PrincipalOrgID"],
-          "PrincipalOrgID",
-        ),
-        InvokedViaFunctionUrl: this.propertyParser.optionalBoolean(
-          resource,
-          properties["InvokedViaFunctionUrl"],
-          "InvokedViaFunctionUrl",
-        ),
+    await this.lambda.addPermission(
+      {
+        input: {
+          FunctionName: functionName,
+          Qualifier: qualifier,
+          StatementId: resource.logicalId,
+          Action: this.propertyParser.requiredString(
+            resource,
+            properties["Action"],
+            "Action",
+          ),
+          Principal: this.propertyParser.requiredString(
+            resource,
+            properties["Principal"],
+            "Principal",
+          ),
+          FunctionUrlAuthType: this.propertyParser.optionalString(
+            resource,
+            properties["FunctionUrlAuthType"],
+            "FunctionUrlAuthType",
+          ),
+          SourceArn: this.propertyParser.optionalString(
+            resource,
+            properties["SourceArn"],
+            "SourceArn",
+          ),
+          SourceAccount: this.propertyParser.optionalString(
+            resource,
+            properties["SourceAccount"],
+            "SourceAccount",
+          ),
+          PrincipalOrgID: this.propertyParser.optionalString(
+            resource,
+            properties["PrincipalOrgID"],
+            "PrincipalOrgID",
+          ),
+          InvokedViaFunctionUrl: this.propertyParser.optionalBoolean(
+            resource,
+            properties["InvokedViaFunctionUrl"],
+            "InvokedViaFunctionUrl",
+          ),
+        },
       },
-    });
+      options,
+    );
 
     const permission = this.lambda
       .getSimFunctionTarget(functionName, qualifier)

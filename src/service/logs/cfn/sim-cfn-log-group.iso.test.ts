@@ -191,7 +191,7 @@ describe("AWS::Logs::LogGroup", () => {
       factory.create("MetricFilter", {} as never, {} as never),
     );
     const deleted = await assertThrowsErrorAsync(async () =>
-      factory.delete("MetricFilter", {} as never),
+      factory.delete("MetricFilter", {} as never, {} as never),
     );
 
     // Then both are reported as unsupported, which the Stack records as a

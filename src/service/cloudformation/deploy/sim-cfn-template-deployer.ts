@@ -23,6 +23,7 @@ import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment
 import { SimCfnTemplateFileWatches } from "../watch/sim-cfn-template-file-watches.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type {
   BackgroundCompleter,
@@ -38,6 +39,16 @@ export interface SimCloudFormationCreateStackProperties {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
+
+  /**
+   * The principal the deployment runs as.
+   *
+   * Every Resource is created, updated and deleted through the command an SDK
+   * caller would reach, and this is who those commands are authorized as. Left
+   * out, they are decided as the Account root, which is what a service control
+   * policy denying an Account's root principal then denies.
+   */
+  readonly caller?: SimAwsCaller | undefined;
 
   /**
    * The synthesized CDK template file this in-memory template stands in for.
@@ -114,6 +125,7 @@ export class SimCloudFormationTemplateDeployer {
       template: properties.template,
       parameters: properties.parameters,
       bindings: properties.bindings,
+      caller: properties.caller,
       cdkOutContext: await cdkOutContextForTemplatePath(
         properties.templatePath,
       ),
@@ -181,6 +193,7 @@ export class SimCloudFormationTemplateDeployer {
     readonly template: CfnTemplateBodyRecord;
     readonly parameters?: Record<string, string> | undefined;
     readonly bindings?: readonly SimCfnBinding[] | undefined;
+    readonly caller?: SimAwsCaller | undefined;
     readonly cdkOutContext?: SimCdkOutContext | undefined;
   }): Promise<SimCfnDeployedStack> {
     await this.createStackWithContext(
@@ -198,6 +211,7 @@ export class SimCloudFormationTemplateDeployer {
       },
       properties.cdkOutContext,
       properties.bindings,
+      properties.caller,
     );
 
     const stack = this.stacks.get(
@@ -226,6 +240,7 @@ export class SimCloudFormationTemplateDeployer {
     },
     cdkOutContext?: SimCdkOutContext,
     bindings?: readonly SimCfnBinding[],
+    caller?: SimAwsCaller,
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,
@@ -234,6 +249,7 @@ export class SimCloudFormationTemplateDeployer {
       background: this.background,
       cdkOutContext,
       bindings,
+      caller,
       exports: this.exports,
     });
 

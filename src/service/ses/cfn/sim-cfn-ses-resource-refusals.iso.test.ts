@@ -78,7 +78,7 @@ describe("simulated SES CloudFormation refusals", () => {
       await simAws
         .sesV2()
         .cfnResourceFactory()
-        .delete("ReceiptRule", deployedResourceObject(resource));
+        .delete("ReceiptRule", deployedResourceObject(resource), {} as never);
     });
 
     assertStringIncludes(
