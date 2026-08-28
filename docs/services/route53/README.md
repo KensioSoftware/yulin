@@ -766,7 +766,9 @@ and DNSSEC. Answers are always authoritative.
 ## Local hostname resolution
 
 When Yulin is served on localhost, Route53 can map your own test hostnames to simulated service
-targets. Request the local server using the hostname plus the `sim-aws.localhost` suffix.
+targets. Request the local server using the hostname plus the `sim-aws.localhost` suffix. A test in
+the same process needs no server at all, and is covered under
+[Fetching a hostname in the same process](#fetching-a-hostname-in-the-same-process).
 
 For example, if Route53 contains a record for `www.example.test`, request:
 
@@ -943,6 +945,180 @@ try {
 
 You can also call `srv.localUrl(...)` with a URL that contains the simulated hostname when you want
 the server to adapt it to the selected local port.
+
+### Fetching a hostname in the same process
+
+`SimAwsHttp` sends a request into the simulation with nothing listening. It resolves the hostname
+through sim Route53 the same way the local server does. The name is requested as your application
+writes it, with no suffix and no port.
+
+Reach for `SimAwsHttp` in a test, and for `serveSimAws` when the request comes from outside the
+process, such as a browser, `curl` or an SDK client pointed at a local endpoint. Both go through the
+same routing and service code, and a request answered one way is answered the same way the other.
+See [requests without a port](https://yulinsim.dev/serve/#requests-without-a-port "Requests without a port docs").
+
+Below, `www.example.test` is redirected to the apex. One request checks four pieces of the stack at
+once. The ACM certificate has to cover the alternate domain name, the Hosted Zone record has to
+point at the Distribution, the Distribution has to accept that `Host`, and the viewer-request
+Function has to write the `Location`. An assertion against the synthesized template passes with the
+Route53 record missing.
+
+```typescript sim-route53-in-process-redirect
+/**
+ * Redirecting a simulated Route53 hostname with no server listening.
+ */
+
+import { RequestCertificateCommand } from "@aws-sdk/client-acm";
+import {
+  CreateDistributionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-cloudfront";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeCffFunctionCodeInput,
+  type CloudFrontFunction,
+} from "@kensio/yulin/cloudfront";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+const cloudFront = simAws.cloudFront();
+
+const hostedZoneCreation = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "redirect-zone",
+  }),
+);
+
+// CloudFront reads its certificate from us-east-1, wherever the rest of the
+// stack lives.
+const certificateRequest = await simAws
+  .region("us-east-1")
+  .acm()
+  .requestCertificate(
+    new RequestCertificateCommand({ DomainName: "www.example.test" }),
+  );
+
+await simAws
+  .region("us-east-1")
+  .acm()
+  .completeDnsValidation(certificateRequest.CertificateArn);
+
+function redirectToApex(
+  event: CloudFrontFunction.ViewerRequestEvent,
+): CloudFrontFunction.Response {
+  const query = Object.entries(event.request.querystring)
+    .map(([name, parameter]) => `${name}=${parameter.value}`)
+    .join("&");
+
+  return {
+    statusCode: 301,
+    statusDescription: "Moved Permanently",
+    headers: {
+      location: {
+        value: `https://example.test${event.request.uri}${query.length > 0 ? `?${query}` : ""}`,
+      },
+    },
+  };
+}
+
+const functionCreation = await cloudFront.createFunction(
+  new CreateFunctionCommand({
+    Name: "redirect-to-apex",
+    FunctionConfig: {
+      Comment: "Redirect www to the apex",
+      Runtime: "cloudfront-js-2.0",
+    },
+    FunctionCode: makeCffFunctionCodeInput(redirectToApex),
+  }),
+);
+
+const distributionCreation = await cloudFront.createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "redirect-distribution",
+      Comment: "Apex redirect",
+      Enabled: true,
+      Aliases: { Quantity: 1, Items: ["www.example.test"] },
+      // The Function answers every request, and the Origin goes unread.
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "apex-origin",
+            DomainName: "origin.example.test",
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "http-only",
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "apex-origin",
+        ViewerProtocolPolicy: "redirect-to-https",
+        FunctionAssociations: {
+          Quantity: 1,
+          Items: [
+            {
+              EventType: "viewer-request",
+              FunctionARN: functionCreation.FunctionMetadata.FunctionARN,
+            },
+          ],
+        },
+      },
+      ViewerCertificate: {
+        ACMCertificateArn: certificateRequest.CertificateArn,
+        SSLSupportMethod: "sni-only",
+      },
+    },
+  }),
+);
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneCreation.HostedZone!.Id!,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "A",
+            AliasTarget: {
+              HostedZoneId: "Z2FDTNDATAQYW2",
+              DNSName: distributionCreation.Distribution!.DomainName!,
+              EvaluateTargetHealth: false,
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const http = new SimAwsHttp({ simAws });
+const response = await http.fetch("https://www.example.test/docs/x?a=1");
+
+console.log(response.status); // 301
+console.log(response.headers.get("location")); // https://example.test/docs/x?a=1
+```
+
+`SimAwsHttp` returns the response the service answered with, and leaves the `Location` for the
+caller to follow.
+
+Take the record out and the request answers 501. Nothing else in the simulation answers for
+`www.example.test`. Take the name out of the Distribution's `Aliases` and it answers 404, since the
+`Host` has to be one of the alternate domain names, as it does on AWS.
 
 ### What a name can resolve to
 
@@ -1558,6 +1734,7 @@ Sim Route53 currently supports:
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution, with or without the `sim-aws.localhost` suffix on the requested hostname
+- Hostname resolution with no server listening, through `SimAwsHttp`
 - Names resolving to simulated S3 websites and buckets, CloudFront distributions, ELBv2 load
   balancers, Lambda Function URLs, HTTP APIs and the Cognito user pool endpoint, listed under
   [What a name can resolve to](#what-a-name-can-resolve-to)
