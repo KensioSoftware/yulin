@@ -9,6 +9,7 @@ import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-
 import type { SimCfnExports } from "../../../export/sim-cfn-exports.js";
 import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
 import { makeSimCfnDynamicReferences } from "../../../template/dynamic/make-sim-cfn-dynamic-references.js";
+import { hasSimCfnDynamicReferenceIn } from "../../../template/dynamic/sim-cfn-dynamic-reference-scan.js";
 import type { SimCfnDynamicReferences } from "../../../template/dynamic/sim-cfn-dynamic-references.js";
 import type { SimCfnPropertyIgnorer } from "../../ignore/sim-cfn-ignored-property.type.js";
 
@@ -63,10 +64,13 @@ export class SimCfnResourcePropertyResolver {
    * {@link SimCfnTemplateValueResolver}. If no Parameters are available, an empty
    * Parameter resolver is used so Resource Refs can still resolve.
    *
-   * Resolution itself is synchronous, and the awaiting happens around it. A
-   * dynamic reference naming a service that has to be waited on resolves to a
-   * marker while the properties resolve, and the values replace the markers
-   * here.
+   * Resolution itself is synchronous, and the awaiting happens around it.
+   * Properties holding a dynamic reference are resolved twice: the first pass
+   * reads the references and leaves them as the template wrote them, and the
+   * second finds the answers waiting, so an intrinsic function reading a
+   * reference's value gets the value rather than a marker. A reference the
+   * first pass never reached resolves to a marker instead, and the values
+   * replace the markers here.
    *
    * Resource Refs are read from the creation context. If a referenced Resource
    * is unexpectedly absent, the Ref is preserved as `{ Ref: logicalId }` rather
@@ -107,13 +111,17 @@ export class SimCfnResourcePropertyResolver {
       },
     });
 
-    const resolved = resolver.resolveRecord(properties);
-
     if (dynamicReferences === undefined) {
-      return resolved;
+      return resolver.resolveRecord(properties);
     }
 
-    return await dynamicReferences.settle(resolved);
+    if (hasSimCfnDynamicReferenceIn(properties)) {
+      await dynamicReferences.prefetch(() => {
+        resolver.resolveRecord(properties);
+      });
+    }
+
+    return await dynamicReferences.settle(resolver.resolveRecord(properties));
   }
 
   /**
