@@ -159,18 +159,20 @@ describe("The environment a simulated ECS container runs with", () => {
     assertIdentical(observed, "eu-west-2");
   });
 
-  it("leaves the host environment alone for a container declaring nothing", async () => {
-    // Given a container with no environment of its own.
+  it("gives a container declaring nothing the host environment and the Region", async () => {
+    // Given a container with no environment of its own, in a known Region.
     const simAws = new SimAws();
-    const ecs = simAws.ecs();
-    await simEcsClusterFactory.make({}, simAws);
+    const ecs = simAws.account("222222222222").region("eu-west-2").ecs();
+    await ecs.createCluster({ input: {} });
     process.env["YULIN_ECS_HOST_VARIABLE"] = "host";
-    let observed: string | undefined;
+    process.env["AWS_REGION"] = "ap-south-1";
+    const observed: Record<string, string | undefined> = {};
     ecs.bindContainer({
       family: "checkout",
       containerName: "app",
       run: () => {
-        observed = process.env["YULIN_ECS_HOST_VARIABLE"];
+        observed["host"] = process.env["YULIN_ECS_HOST_VARIABLE"];
+        observed["region"] = process.env["AWS_REGION"];
       },
     });
     await ecs.registerTaskDefinition(
@@ -184,10 +186,14 @@ describe("The environment a simulated ECS container runs with", () => {
     await ecs.runTask(new RunTaskCommand({ taskDefinition: "checkout" }));
     await simAws.backgroundTasksComplete();
 
-    // Then it read the host environment, since there was nothing of its own to
-    // give it.
-    assertIdentical(observed, "host");
-
     delete process.env["YULIN_ECS_HOST_VARIABLE"];
+    delete process.env["AWS_REGION"];
+
+    // Then it read the host environment it would have read anyway, with the
+    // task's own Region over the top rather than the one the machine running
+    // the test is configured for. A client the container builds is reached by
+    // the same variable, so it talks to the Region the task runs in.
+    assertIdentical(observed["host"], "host");
+    assertIdentical(observed["region"], "eu-west-2");
   });
 });
