@@ -372,9 +372,9 @@ console.log(identity.Arn); // "arn:aws:iam::123456789012:role/Administrator"
 Setup runs before the policy is attached, for the same reason the deploy Role above does. The Role a
 simulation reads as has to exist and hold a policy, and creating it is itself a call.
 
-The account root keeps the unrestricted access sim IAM gives it. Naming a default caller says who an
-unattributed call comes from and leaves the root's own access alone. A test about root behaviour
-names `simAws.account().rootPrincipal` and gets it.
+Naming a default caller says who an unattributed call comes from, and leaves the root's own identity
+access where it was. A test about root behaviour names `simAws.account().rootPrincipal` and gets the
+root. Under the policy above that call is denied, which is what the statement is written to do.
 
 ## Write an allow list instead of a deny list
 

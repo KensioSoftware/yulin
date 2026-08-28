@@ -92,7 +92,8 @@ could not evaluate are reported by `unevaluatedStatements`, covered under
 If the caller is omitted, authorization defaults to the simulation's own
 [default caller](#name-the-caller-a-simulation-uses-by-default), and to the root principal of the
 Account owning the sim IAM instance where the simulation has none. That root principal is allowed
-within its own Account. An explicit `{ kind: "anonymous" }` caller suppresses both fallbacks and is
+within its own Account, subject to any service control policy over that Account. An explicit
+`{ kind: "anonymous" }` caller suppresses both fallbacks and is
 evaluated without identity policies.
 
 Resource policies live with the service that owns the target resource, such as an S3 Bucket policy,
@@ -600,8 +601,9 @@ An operation's own `caller` wins, as does the ambient caller of a `runAs` block 
 deployment is given.
 
 A simulation told no `defaultCaller` decides an unattributed call as the Account root, which is what
-every simulation did before the option existed. The root keeps its unrestricted access either way,
-and a test about root behaviour reaches it as `simAws.account().rootPrincipal`.
+every simulation did before the option existed. The root keeps the identity access sim IAM gives it
+either way, and a test about root behaviour reaches it as `simAws.account().rootPrincipal`. A
+service control policy denying that root still overrides the access.
 
 The reason to name one is a service control policy denying the Account root.
 [Simulated Organizations](https://yulinsim.dev/services/organizations/) covers that case, where
