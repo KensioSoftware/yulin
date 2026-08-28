@@ -1,4 +1,5 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnPropertyIgnorer } from "../../resource/ignore/sim-cfn-ignored-property.type.js";
 import { SimCfnDynamicReferences } from "./sim-cfn-dynamic-references.js";
@@ -7,6 +8,7 @@ import { simCfnDynamicReferenceResolvers } from "./sim-cfn-dynamic-reference-res
 interface MakeSimCfnDynamicReferencesProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly caller?: SimAwsCaller | undefined;
   readonly propertyIgnorer?: SimCfnPropertyIgnorer | undefined;
   readonly resourceType?: string | undefined;
 }
@@ -17,7 +19,7 @@ interface MakeSimCfnDynamicReferencesProperties {
 export function makeSimCfnDynamicReferences(
   properties: MakeSimCfnDynamicReferencesProperties,
 ): SimCfnDynamicReferences {
-  const { simAws, accountRegionScope, propertyIgnorer, resourceType } =
+  const { simAws, accountRegionScope, caller, propertyIgnorer, resourceType } =
     properties;
 
   const scopedAws = simAws.accountRegionScope(
@@ -33,7 +35,7 @@ export function makeSimCfnDynamicReferences(
         .entries()
         .map(([service, resolver]) => [
           service,
-          resolver({ simAws, scopedAws }),
+          resolver({ simAws, scopedAws, caller }),
         ]),
     ),
   });

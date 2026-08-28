@@ -215,9 +215,15 @@ export class SimSsm {
 
   /**
    * Get the resolver for `{{resolve:ssm-secure:...}}` dynamic references.
+   *
+   * The caller is the principal the deployment holding the reference runs as,
+   * which the parameter is read as. Left out where the deployment named none,
+   * leaving the read as the Account root.
    */
-  cfnSecureDynamicReferenceResolver(): SimCfnSsmSecureDynamicReferenceResolver {
-    return new SimCfnSsmSecureDynamicReferenceResolver({ ssm: this });
+  cfnSecureDynamicReferenceResolver(
+    caller?: SimAwsCaller,
+  ): SimCfnSsmSecureDynamicReferenceResolver {
+    return new SimCfnSsmSecureDynamicReferenceResolver({ ssm: this, caller });
   }
 
   /**
