@@ -36,7 +36,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-// An execution role policy is often written against this, since it covers
-// every schedule the group will ever hold.
+// An identity policy granting `scheduler:` actions on the group names this
+// ARN. So does the `aws:SourceArn` condition AWS recommends in a schedule
+// execution role's trust policy, which the simulation does not supply.
 console.log(stack.output("GroupArn"));
 // "arn:aws:scheduler:us-east-1:888888888888:schedule-group/reporting-pr-412"

@@ -5,8 +5,9 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
  *
  * `arn:aws:scheduler:<region>:<account>:schedule-group/<name>`. That is a
  * different resource path from a schedule's `schedule/<group>/<name>`. An
- * execution role is often written against this one, since a policy naming the
- * group covers every schedule that will ever be put in it.
+ * identity policy granting `scheduler:` actions on the group names this one,
+ * and so does the `aws:SourceArn` condition AWS recommends in a schedule
+ * execution role's trust policy.
  */
 export function schedulerScheduleGroupArn(
   groupName: string,

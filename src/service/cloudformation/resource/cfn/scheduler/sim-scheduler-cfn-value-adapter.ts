@@ -41,9 +41,9 @@ class SimSchedulerScheduleCfn implements SimCfnResourceValueAdapter {
 /**
  * CloudFormation-facing values for a simulated schedule group.
  *
- * `Arn` is the one worth having. A schedule's execution role is often written
- * against the group's ARN, since a policy naming the group covers every
- * schedule that will ever go in it.
+ * `Arn` is the one worth having. An identity policy granting `scheduler:`
+ * actions on the group names it, and so does the `aws:SourceArn` condition AWS
+ * recommends in a schedule execution role's trust policy.
  */
 class SimSchedulerScheduleGroupCfn implements SimCfnResourceValueAdapter {
   private readonly group: SimSchedulerScheduleGroup;

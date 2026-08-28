@@ -718,8 +718,9 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-// An execution role policy is often written against this, since it covers
-// every schedule the group will ever hold.
+// An identity policy granting `scheduler:` actions on the group names this
+// ARN. So does the `aws:SourceArn` condition AWS recommends in a schedule
+// execution role's trust policy, which the simulation does not supply.
 console.log(stack.output("GroupArn"));
 // "arn:aws:scheduler:us-east-1:888888888888:schedule-group/reporting-pr-412"
 ```
@@ -794,6 +795,7 @@ Resources of the same stack.
   for each of them, in this process and one after another.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Nothing here retries, so it has
   no request to make idempotent.
-- `AWS::Scheduler::ScheduleGroup` is absent as a CloudFormation resource type.
-  `AWS::Scheduler::Schedule` is there, under
-  [deploying from a template](#deploying-from-a-cloudformation-template).
+- A schedule's execution role is assumed with no `aws:SourceArn` condition key supplied. AWS
+  recommends scoping that key to a schedule group ARN in the role's trust policy, against the
+  confused deputy problem, and a trust policy carrying that condition admits nothing here. Every
+  firing of a schedule using such a role is recorded in `deliveryFailures`.

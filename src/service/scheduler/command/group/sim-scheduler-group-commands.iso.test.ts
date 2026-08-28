@@ -152,6 +152,22 @@ describe("Scheduler schedule group commands", () => {
     assertStringIncludes(error.message, "Schedule group tags");
   });
 
+  it("takes an empty tag list, which asks for nothing", async () => {
+    // Given a request carrying an empty list, which some clients send for an
+    // untagged group.
+    const simAws = new SimAws();
+
+    await simAws.scheduler().createScheduleGroup(
+      new CreateScheduleGroupCommand({
+        Name: "analytics",
+        Tags: [],
+      }),
+    );
+
+    // Then the group is created, since there was nothing to drop.
+    assertNonNullable(simAws.scheduler().findScheduleGroup("analytics"));
+  });
+
   it("narrows a listing by name prefix, in creation order", async () => {
     // Given three groups beside the default one, created in this order.
     const simAws = new SimAws();
