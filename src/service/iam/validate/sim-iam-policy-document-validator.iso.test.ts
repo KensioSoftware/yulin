@@ -1,4 +1,5 @@
 import {
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsError,
@@ -117,7 +118,7 @@ describe("SimIamPolicyDocumentValidator", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertStringIncludes(
       error.message,
-      'IAM policy statement Effect must be either "Allow" or "Deny"',
+      'IAM policy statement 1: Effect must be either "Allow" or "Deny"',
     );
   });
 
@@ -143,7 +144,7 @@ describe("SimIamPolicyDocumentValidator", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertStringIncludes(
       error.message,
-      'IAM policy statement Effect must be either "Allow" or "Deny"',
+      'IAM policy statement 1: Effect must be either "Allow" or "Deny"',
     );
   });
 
@@ -168,7 +169,7 @@ describe("SimIamPolicyDocumentValidator", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertStringIncludes(
       error.message,
-      "IAM policy statement must define either Action or NotAction",
+      "IAM policy statement 1: must define either Action or NotAction",
     );
   });
 
@@ -193,7 +194,109 @@ describe("SimIamPolicyDocumentValidator", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
     assertStringIncludes(
       error.message,
-      "IAM policy statement must define either Resource or NotResource",
+      "IAM policy statement 1: must define either Resource or NotResource",
+    );
+  });
+
+  it("rejects a statement field holding an object", () => {
+    // Given an IAM policy statement whose Resource holds an unresolved
+    // CloudFormation intrinsic in place of an ARN.
+    const validator: SimIamPolicyDocumentValidator =
+      new SimIamPolicyDocumentValidator();
+    const policyDocument = JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "athena:StartQueryExecution",
+        Resource: { "Fn::GetAtt": ["DoesNotExist", "Arn"] },
+      },
+    });
+
+    // When the policy document is validated for a Role's inline policy.
+    const error = assertThrowsError(() => {
+      validator.validateRequired(policyDocument, {
+        attachedTo: "Role",
+        name: "QueryRole",
+        policyName: "RunQueries",
+      });
+    });
+
+    // Then the document is rejected naming the Role, the policy, the statement
+    // and the value it holds.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      'Role "QueryRole" policy "RunQueries" statement 1: Resource must be a ' +
+        "string or an array of strings, but holds " +
+        '{"Fn::GetAtt":["DoesNotExist","Arn"]}',
+    );
+  });
+
+  it("rejects a statement field holding an array of anything else", () => {
+    // Given an IAM policy statement whose Action list holds an object among
+    // its action names.
+    const validator: SimIamPolicyDocumentValidator =
+      new SimIamPolicyDocumentValidator();
+    const policyDocument = JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: ["s3:GetObject", { Ref: "ExtraAction" }],
+          Resource: "arn:aws:s3:::example-bucket/*",
+        },
+      ],
+    });
+
+    // When the policy document is validated.
+    const error = assertThrowsError(() => {
+      validator.validateRequired(policyDocument);
+    });
+
+    // Then the document is rejected naming the field and what it holds.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      "IAM policy statement 1: Action must be a string or an array of " +
+        'strings, but holds ["s3:GetObject",{"Ref":"ExtraAction"}]',
+    );
+  });
+
+  it("names the statement a malformed value is in", () => {
+    // Given an IAM policy document whose second statement is the malformed one.
+    const validator: SimIamPolicyDocumentValidator =
+      new SimIamPolicyDocumentValidator();
+    const policyDocument = JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::example-bucket/*",
+        },
+        {
+          Effect: "Allow",
+          Action: { Ref: "QueryAction" },
+          Resource: "*",
+        },
+      ],
+    });
+
+    // When the policy document is validated for a User's inline policy.
+    const error = assertThrowsError(() => {
+      validator.validateRequired(policyDocument, {
+        attachedTo: "User",
+        name: "Analyst",
+        policyName: "RunQueries",
+      });
+    });
+
+    // Then the rejection names the statement the malformed value is in.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      'User "Analyst" policy "RunQueries" statement 2: Action must be a ' +
+        'string or an array of strings, but holds {"Ref":"QueryAction"}',
     );
   });
 });

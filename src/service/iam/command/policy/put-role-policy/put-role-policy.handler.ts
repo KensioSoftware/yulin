@@ -58,7 +58,11 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
     }
 
     const policyDocument = command.input.PolicyDocument;
-    this.policyDocValidator.validateRequired(policyDocument);
+    this.policyDocValidator.validateRequired(policyDocument, {
+      attachedTo: "Role",
+      name: roleName,
+      policyName,
+    });
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

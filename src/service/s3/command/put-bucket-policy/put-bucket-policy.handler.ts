@@ -62,7 +62,10 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
   ): Promise<SimPutBucketPolicyCommandOutput> {
     assertDefined(command.input.Bucket, "PutBucketPolicyCommand.input.Bucket");
     assertDefined(command.input.Policy, "PutBucketPolicyCommand.input.Policy");
-    this.policyValidator.validateRequired(command.input.Policy);
+    this.policyValidator.validateRequired(command.input.Policy, {
+      attachedTo: "Bucket",
+      name: command.input.Bucket,
+    });
 
     const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = requireSimS3Bucket(this.buckets, bucketName);
