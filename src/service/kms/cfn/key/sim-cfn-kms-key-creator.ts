@@ -57,7 +57,7 @@ export class SimCfnKmsKeyCreator {
     const key = this.kms.findKey(keyId);
     assertDefined(key, `sim KMS key ${keyId} after CloudFormation creation`);
 
-    this.applyEnabled(key, keyProperties.enabled());
+    await this.applyEnabled(keyId, keyProperties.enabled(), options);
 
     return key;
   }
@@ -66,15 +66,20 @@ export class SimCfnKmsKeyCreator {
    * Apply `Enabled: false`, which asks for a key that is disabled the moment
    * it exists.
    *
-   * CreateKey has no input for that, as the real API has none either: real
-   * CloudFormation makes the key and then disables it. The key model is
-   * disabled directly rather than through DisableKey, because CloudFormation
-   * is acting as the key's creator here and has no caller identity of its own
-   * to authorize.
+   * CreateKey has no input for that, as the real API has none either. Real
+   * CloudFormation makes the key and then disables it, and this goes through
+   * DisableKey for the same reason, so a deployment allowed to make keys and
+   * not to disable them is refused here rather than quietly disabling one.
    */
-  private applyEnabled(key: SimKmsKey, enabled: boolean): void {
-    if (!enabled) {
-      key.disable();
+  private async applyEnabled(
+    keyId: string,
+    enabled: boolean,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    if (enabled) {
+      return;
     }
+
+    await this.kms.disableKey({ input: { KeyId: keyId } }, options);
   }
 }

@@ -1,5 +1,6 @@
 import {
   assertIdentical,
+  assertMapSize,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -14,6 +15,7 @@ import {
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIamUsername } from "../../iam/user/sim-iam-user.js";
 import { TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
@@ -205,6 +207,85 @@ describe("the principal a simulated CloudFormation deployment runs as", () => {
     assertNonNullable(simAws.s3().getSimBucketByName("site-uploads"));
   });
 
+  it("refuses a key the deployment may create and may not disable", async () => {
+    // Given a deploy Role that may make KMS keys and nothing else.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    const maker = await deployRole(simAws, accountId, "maker", "kms:CreateKey");
+
+    // When it deploys a key the template asks to be disabled from the start.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "keys-stack",
+        template: {
+          Resources: {
+            ReportsKey: {
+              Type: "AWS::KMS::Key",
+              Properties: { Enabled: false },
+            },
+          },
+        },
+        caller: maker,
+      });
+    });
+
+    // Then disabling it was refused, rather than done as nobody in particular.
+    assertStringIncludes(error.message, "kms:DisableKey");
+  });
+
+  it("leaves a User's policies on it when the teardown may not delete it", async () => {
+    // Given a Stack holding a User with an inline policy, deployed as a Role
+    // that may not delete Users.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    const maker = await deployRole(simAws, accountId, "maker", [
+      "iam:CreateUser",
+      "iam:PutUserPolicy",
+    ]);
+    const cloudFormation = simAws.cloudFormation();
+    const stack = await cloudFormation.deployTemplate({
+      stackName: "people-stack",
+      template: {
+        Resources: {
+          Reader: {
+            Type: "AWS::IAM::User",
+            Properties: {
+              UserName: "reader",
+              Policies: [
+                {
+                  PolicyName: "ReadReports",
+                  PolicyDocument: {
+                    Version: "2012-10-17",
+                    Statement: {
+                      Effect: "Allow",
+                      Action: "s3:GetObject",
+                      Resource: "*",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+      caller: maker,
+    });
+
+    // When the Stack is torn down.
+    await assertThrowsErrorAsync(async () => {
+      await stack.teardown();
+    });
+
+    // Then the User is where it was, with the policy the Stack put on it.
+    const user = simAws
+      .account(accountId)
+      .iam()
+      .users.get("reader" as SimIamUsername);
+
+    assertNonNullable(user);
+    assertMapSize(user.inlinePolicies, 1);
+  });
+
   it("deploys every Stack in a cloud assembly as the caller it is given", async () => {
     // Given an assembly of one Stack, and a Role that may not make Buckets.
     const accountId = makeSimAwsAccountId();
@@ -284,7 +365,7 @@ async function deployRole(
   simAws: SimAws,
   accountId: SimAwsAccountId,
   roleName: string,
-  action: string,
+  action: string | readonly string[],
 ): Promise<SimAwsCaller> {
   const iam = simAws.account(accountId).iam();
 
