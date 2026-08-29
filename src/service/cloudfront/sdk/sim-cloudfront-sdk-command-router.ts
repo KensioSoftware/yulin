@@ -7,6 +7,11 @@ import type { SimCreateDistributionCommand } from "../command/create-distributio
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
 import type { SimDeleteDistributionCommand } from "../command/delete-distribution/delete-distribution.command.js";
 import type { SimDeleteFunctionCommand } from "../command/delete-function/delete-function.command.js";
+import type {
+  SimDescribeFunctionCommand,
+  SimGetFunctionCommand,
+  SimListFunctionsCommand,
+} from "../command/function/sim-cf-function-command.types.js";
 import type { SimGetDistributionCommand } from "../command/get-distribution/get-distribution.command.js";
 import type {
   SimCreateKeyValueStoreCommand,
@@ -56,6 +61,30 @@ export class SimCloudFrontSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCloudFront.deleteFunction(
             command as SimDeleteFunctionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListFunctionsCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.listFunctions(
+            command as SimListFunctionsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeFunctionCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.describeFunction(
+            command as SimDescribeFunctionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetFunctionCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.getFunction(
+            command as SimGetFunctionCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -8,7 +8,10 @@ import {
   SimCloudFrontFunction,
   type SimCloudFrontFunctionName,
 } from "../../cff/sim-cloudfront-function.js";
-import { CffUint8ArrayFunctionCodeExtractor } from "../../cff/function-code-input/cff-function-code-input.js";
+import {
+  cffFunctionCodeSource,
+  CffUint8ArrayFunctionCodeExtractor,
+} from "../../cff/function-code-input/cff-function-code-input.js";
 import { cffCloudFrontModule } from "../../cff/kvs/cff-cloudfront-module.js";
 import {
   type BackgroundScheduler,
@@ -117,6 +120,12 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       accountId: this.accountId,
       handlerFunction,
       keyValueStore,
+      // The config a Function was created with is what every read of it
+      // reports, so it is kept rather than only acted on here.
+      comment: command.input.FunctionConfig?.Comment,
+      runtime: command.input.FunctionConfig?.Runtime,
+      functionCode: cffFunctionCodeSource(command.input.FunctionCode),
+      createdTime: this.background.now(),
     });
 
     this.cloudFrontFunctions.set(simCff.name, simCff);
