@@ -149,6 +149,11 @@ export class SimAwsServiceFactory {
   private readonly selfContainedServices: SimAwsSelfContainedServiceBuilder;
 
   constructor(properties: SimAwsServiceFactoryProperties) {
+    // Where a request naming no caller of its own looks before the default.
+    // Keyed on the SimAws instance, so a run-as on one simulation decides
+    // nothing in another.
+    const ambientCaller = simAwsRunAsAmbientCaller(properties.simAws);
+
     this.accountServices = new SimAwsAccountServiceCache({
       simAws: properties.simAws,
       background: properties.background,
@@ -168,8 +173,7 @@ export class SimAwsServiceFactory {
       // Simulated IAM applies this wherever a request names no caller of its
       // own, in place of the Account root it would otherwise be decided as.
       defaultCaller: properties.defaultCaller,
-      // A run-as block is more specific than either, so it is asked first.
-      ambientCaller: simAwsRunAsAmbientCaller(properties.simAws),
+      ambientCaller,
     });
     this.accountRegionServices = new SimAwsAccountRegionServiceBuilder({
       simAws: properties.simAws,
@@ -178,7 +182,7 @@ export class SimAwsServiceFactory {
       // GetCallerIdentity answers with the principal everything else uses,
       // the ambient run-as caller included.
       defaultCaller: properties.defaultCaller,
-      ambientCaller: simAwsRunAsAmbientCaller(properties.simAws),
+      ambientCaller,
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
