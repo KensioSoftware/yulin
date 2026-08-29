@@ -1554,6 +1554,10 @@ error status. It runs on whatever the Origin answered, including a 400 and above
 origin events differ from the viewer events, and CloudFront documents it. Returning a response
 replaces what the viewer gets.
 
+Both origin events run on a cache miss alone. A hit answers the viewer without either of them, as
+does a request a web ACL blocked or a viewer-request function answered. An `origin-request` function
+returning a response leaves the Origin unread, with no `origin-response` event after it.
+
 At both origin events the `host` header holds the Origin's own domain name. A viewer event shows the
 domain the viewer used.
 
@@ -2450,6 +2454,7 @@ try {
   const home = srv.localUrl(`http://${distroHostname}/`);
 
   const first = await fetch(home);
+  console.log(first.headers.get("x-cache")); // Miss from cloudfront
   console.log(await first.text()); // <h1>First</h1>
 
   // The Bucket holds a new page, which the Distribution has not been told
@@ -2457,7 +2462,14 @@ try {
   await publish("<h1>Second</h1>");
 
   const second = await fetch(home);
+  console.log(second.headers.get("x-cache")); // Hit from cloudfront
   console.log(await second.text()); // <h1>First</h1>
+
+  // The entry goes on ageing while simulated time moves.
+  await simAws.clock().advanceBy({ seconds: 30 });
+
+  const aged = await fetch(home);
+  console.log(aged.headers.get("age")); // 30
 
   // Another point of presence has nothing cached under that key.
   const coldEdge = await fetch(home, {
@@ -2640,6 +2652,21 @@ zero. Where it is higher, the floor overrides the Origin and the answer is held 
 seconds. That last one is CloudFront's own behaviour, and the
 [AWS documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html)
 carries a warning about it.
+
+### Telling a hit from a miss
+
+Every answer carries `X-Cache`. It reads `Hit from cloudfront` where the Distribution held the
+object and `Miss from cloudfront` where the Origin answered. A hit carries `Age` as well, the whole
+seconds the entry has been held, counted on the simulation's clock from the moment the Origin
+answered. Advancing simulated time by a minute adds 60 to the age the next hit reports.
+
+Both headers go on ahead of the Behavior's response headers policy and the viewer-response event. A
+policy listing `X-Cache` among its headers to remove takes it off, and a viewer-response CloudFront
+Function or Lambda@Edge function reads both in its event.
+
+A hit is answered without running either origin event. `origin-request` and `origin-response` run on
+the miss that filled the cache and on nothing after it, as they do on AWS. The viewer events run
+either way, and so does the Behavior's response headers policy.
 
 ### Applying a response headers policy
 
@@ -3793,17 +3820,17 @@ Where sim CloudFront knowingly behaves differently from AWS:
   `Stale-While-Revalidate` and `Stale-If-Error` are read as no directive at all. Nothing stale is
   ever served.
 - **A cached entry stays until it expires or an invalidation clears it.** Nothing evicts one to make
-  room, and the response carries no `X-Cache` or `Age` header.
+  room.
+- **`X-Cache` says Hit or Miss and nothing else.** Real CloudFront also reports `RefreshHit`,
+  `Error`, `Redirect`, `LambdaGeneratedResponse` and `FunctionGeneratedResponse` there. A response
+  answered before the cache was reached (one a web ACL blocked, or one a viewer-request function
+  returned) carries no `X-Cache` at all.
 - **An invalidation listing is never paged.** `ListInvalidations` echoes the `Marker` and `MaxItems`
   it was sent and answers with every invalidation the Distribution holds. `IsTruncated` is always
   false and no `NextMarker` comes back. Real CloudFront pages at 100.
 - **A Behavior with no cache policy caches nothing.** Real CloudFront falls back to the legacy
   `ForwardedValues` and the TTLs beside it, and sim CloudFront skips both. Give the Behavior a
   `CachePolicyId`, as CDK and the console both do.
-- **The origin events run on a cache miss, and every request that reaches the Origin is one.** A
-  request a web ACL blocked or a viewer-request function answered reaches neither event, and an
-  `origin-request` function that returns a response leaves the Origin unread with no
-  `origin-response` event after it.
 - **An Origin keeps its kind and its Bucket through an origin-request function.** Real CloudFront
   lets a handler hand back `origin.s3` where it was given `origin.custom`, or point an S3 Origin at
   another Bucket. Both need something a simulated Origin does not hold, the dispatcher that reaches

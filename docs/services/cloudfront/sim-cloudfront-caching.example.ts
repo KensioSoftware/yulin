@@ -89,6 +89,7 @@ try {
   const home = srv.localUrl(`http://${distroHostname}/`);
 
   const first = await fetch(home);
+  console.log(first.headers.get("x-cache")); // Miss from cloudfront
   console.log(await first.text()); // <h1>First</h1>
 
   // The Bucket holds a new page, which the Distribution has not been told
@@ -96,7 +97,14 @@ try {
   await publish("<h1>Second</h1>");
 
   const second = await fetch(home);
+  console.log(second.headers.get("x-cache")); // Hit from cloudfront
   console.log(await second.text()); // <h1>First</h1>
+
+  // The entry goes on ageing while simulated time moves.
+  await simAws.clock().advanceBy({ seconds: 30 });
+
+  const aged = await fetch(home);
+  console.log(aged.headers.get("age")); // 30
 
   // Another point of presence has nothing cached under that key.
   const coldEdge = await fetch(home, {
