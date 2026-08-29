@@ -558,37 +558,37 @@ const simAws = new SimAws({
   },
 });
 
-// The Role is created as the Account root. A simulation with a default caller
-// attributes these commands to it, and it holds no policy until they are done.
-const root = simAws.account().rootPrincipal;
+// The Role is created inside a run as the Account root. A simulation with a
+// default caller attributes these commands to it, and it holds no policy until
+// they are done.
 const simIam = simAws.iam();
 
-await simIam.createRole(
-  new CreateRoleCommand({
-    RoleName: "Administrator",
-    AssumeRolePolicyDocument: JSON.stringify({
-      Version: "2012-10-17",
-      Statement: {
-        Effect: "Allow",
-        Principal: { AWS: "arn:aws:iam::123456789012:root" },
-        Action: "sts:AssumeRole",
-      },
+await simAws.runAs(simAws.account().rootPrincipal, async () => {
+  await simIam.createRole(
+    new CreateRoleCommand({
+      RoleName: "Administrator",
+      AssumeRolePolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: { AWS: "arn:aws:iam::123456789012:root" },
+          Action: "sts:AssumeRole",
+        },
+      }),
     }),
-  }),
-  { caller: root },
-);
+  );
 
-await simIam.putRolePolicy(
-  new PutRolePolicyCommand({
-    RoleName: "Administrator",
-    PolicyName: "Administer",
-    PolicyDocument: JSON.stringify({
-      Version: "2012-10-17",
-      Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+  await simIam.putRolePolicy(
+    new PutRolePolicyCommand({
+      RoleName: "Administrator",
+      PolicyName: "Administer",
+      PolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+      }),
     }),
-  }),
-  { caller: root },
-);
+  );
+});
 
 const decision = simAws.iam().authorize({
   action: "s3:GetObject",
@@ -605,7 +605,8 @@ Account that issued a key can authenticate it, and a default is held for a whole
 
 The default reaches a direct sim service call, an intercepted SDK Command, a CloudFormation
 deployment and STS. Three things outrank it, each of them a caller stated for the request in hand.
-An operation's own `caller` wins, as does the ambient caller of a `runAs` block and the `caller` a
+An operation's own `caller` wins, as does the ambient caller of a `runAs` block (covered in
+[Run a block of calls as one caller](#run-a-block-of-calls-as-one-caller)) and the `caller` a
 deployment is given.
 
 A simulation told no `defaultCaller` decides an unattributed call as the Account root, which is what
@@ -616,6 +617,86 @@ service control policy denying that root still overrides the access.
 The reason to name one is a service control policy denying the Account root.
 [Simulated Organizations](https://yulinsim.dev/services/organizations/) covers that case, where
 every unattributed read is otherwise denied on a message about the root.
+
+## Run a block of calls as one caller
+
+`simAws.runAs(caller, run)` sets an ambient caller for the length of a run. Everything called during
+the run is attributed to that principal, and the code being tested says nothing about it.
+
+```typescript sim-iam-run-as
+/**
+ * Attributing a block of calls to one simulated caller.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "Reporter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Reporter",
+    PolicyName: "ReadParameters",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "ssm:GetParameter", Resource: "*" },
+    }),
+  }),
+);
+
+await simAws.ssm().putParameter({
+  input: { Name: "/reports/last-run", Type: "String", Value: "done" },
+});
+
+const reporter = "arn:aws:iam::123456789012:role/Reporter";
+
+await simAws.runAs({ kind: "arn", arn: reporter }, async () => {
+  // The read is a direct sim service call, decided as the Reporter Role.
+  const read = await simAws
+    .ssm()
+    .getParameter({ input: { Name: "/reports/last-run" } });
+
+  const write = simIam.authorize({
+    action: "ssm:PutParameter",
+    resource: "*",
+  });
+
+  console.log(read.Parameter?.Value); // "done"
+  console.log(write.caller.arn); // "arn:aws:iam::123456789012:role/Reporter"
+  console.log(write.isDenied); // true
+});
+```
+
+The ambient caller reaches a direct sim service call and an intercepted SDK Command. An operation's
+own `caller` still wins, and `deployTemplate` and `deployCdkOut` take a `caller` of their own. Runs
+nest, and the innermost caller applies.
+
+A run belongs to the `SimAws` instance it was started on. Two simulations in one test file are two
+simulated universes, and a run on one leaves the other's calls where they were.
+
+Simulated Lambda and ECS set an ambient caller the same way. A Lambda handler runs as the function's
+execution Role and an ECS container runs as its task Role. A direct sim service call from inside
+either is decided as that Role, matching what the deployed code has credentials for.
+
+This is also how a simulation bootstraps the principal its own `defaultCaller` names. That Role has
+to be created before it can decide anything, and the creation therefore runs as something else.
+Wrapping it in `runAs(simAws.account().rootPrincipal, ...)` is the shape for that, since sim IAM
+gives the Account root unrestricted access.
 
 ## Callers of HTTP requests
 

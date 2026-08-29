@@ -5,6 +5,7 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../caller/sim-aws-ambient-caller.js";
 import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
@@ -45,6 +46,11 @@ interface SimAwsAccountServiceCacheProperties {
    * The caller this simulation attributes a request naming none to.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
@@ -77,6 +83,7 @@ export class SimAwsAccountServiceCache {
   private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
   private readonly scpResolver: SimIamServiceControlPolicyResolver;
   private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+  private readonly ambientCaller?: SimAwsAmbientCaller | undefined;
   private readonly route53Registry: SimRoute53Registry;
   private readonly kmsRegistry: SimKmsRegistry;
   private readonly serviceHosts: SimAwsServiceHosts;
@@ -99,6 +106,7 @@ export class SimAwsAccountServiceCache {
     this.iamRegistry = properties.iamRegistry;
     this.scpResolver = properties.scpResolver;
     this.defaultCaller = properties.defaultCaller;
+    this.ambientCaller = properties.ambientCaller;
     this.accessKeyRegistry = properties.accessKeyRegistry;
     this.route53Registry = properties.route53Registry;
     this.kmsRegistry = properties.kmsRegistry;
@@ -169,8 +177,10 @@ export class SimAwsAccountServiceCache {
           // the Account, so IAM asks simulated Organizations about it.
           scpResolver: this.scpResolver,
           // Who a request naming no caller comes from is decided for the
-          // whole simulation. Every Account in it applies the same default.
+          // whole simulation. Every Account in it applies the same default,
+          // and answers to the same run-as block ahead of it.
           defaultCaller: this.defaultCaller,
+          ambientCaller: this.ambientCaller,
           // Access keys are indexed simulation-wide as they are issued, so a
           // signed request naming only a key id can be traced to this Account.
           credentialRegistry: new SimIamCredentialRegistry({

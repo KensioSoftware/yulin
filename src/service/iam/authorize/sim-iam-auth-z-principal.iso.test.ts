@@ -9,7 +9,7 @@ import {
 } from "@kensio/smartass";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimIamResourcePolicyInput } from "./context/sim-iam-auth-z-context-builder.js";
+import type { SimIamResourcePolicyInput } from "./context/sim-iam-authorization-input.js";
 
 const functionArn = "arn:aws:lambda:us-east-1:888888888888:function:orders";
 

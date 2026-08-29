@@ -5,6 +5,7 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
+import { simAwsRunAsAmbientCaller } from "../caller/sim-aws-ambient-caller.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
 import type { SimApiGateway } from "../../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
@@ -167,13 +168,17 @@ export class SimAwsServiceFactory {
       // Simulated IAM applies this wherever a request names no caller of its
       // own, in place of the Account root it would otherwise be decided as.
       defaultCaller: properties.defaultCaller,
+      // A run-as block is more specific than either, so it is asked first.
+      ambientCaller: simAwsRunAsAmbientCaller(properties.simAws),
     });
     this.accountRegionServices = new SimAwsAccountRegionServiceBuilder({
       simAws: properties.simAws,
       background: properties.background,
       // STS reports and evaluates the same default. An unattributed
-      // GetCallerIdentity answers with the principal everything else uses.
+      // GetCallerIdentity answers with the principal everything else uses,
+      // the ambient run-as caller included.
       defaultCaller: properties.defaultCaller,
+      ambientCaller: simAwsRunAsAmbientCaller(properties.simAws),
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,

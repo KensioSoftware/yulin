@@ -1,5 +1,5 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
+import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-authorization-input.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
 import { SimSnsAuthorizationErrorException } from "../../error/sim-sns.error.js";

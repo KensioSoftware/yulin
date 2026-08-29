@@ -19,6 +19,7 @@ import type {
   SimAwsCaller,
   SimAwsDefaultCaller,
 } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
 interface AssumeRoleCommandHandlerProperties {
@@ -36,6 +37,11 @@ interface AssumeRoleCommandHandlerProperties {
    * The caller this simulation attributes a request naming none to.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
@@ -70,6 +76,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     this.background = background;
     this.callerResolver = new SimAwsCallerResolver({
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
     });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,

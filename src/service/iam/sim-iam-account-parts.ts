@@ -6,6 +6,7 @@ import type { SimArn } from "../aws/arn.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAwsDefaultCaller } from "../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../aws/caller/sim-aws-ambient-caller.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimIamAccountAuthZ } from "./authorize/sim-iam-account-auth-z.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
@@ -40,6 +41,14 @@ export interface SimIamProperties {
    * decided as the Account root, which is what a standalone SimIam does.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   *
+   * A SimAws passes on the run-as block it is inside, if any. A standalone
+   * SimIam has no run-as around it and leaves this out.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 
   /**
    * Resolves the IAM of other Accounts in the same simulation.
@@ -113,6 +122,7 @@ export class SimIamAccountParts {
       users: this.users,
       credentialIdentityResolver: credentialRegistry,
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
       iamResolver: properties.iamResolver,
       scpResolver: properties.scpResolver,
     });

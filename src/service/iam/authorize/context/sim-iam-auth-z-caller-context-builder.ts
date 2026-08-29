@@ -8,6 +8,7 @@ import type {
   SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
 
 export interface SimIamAuthZCallerContext {
@@ -35,14 +36,20 @@ export interface SimIamAuthZCallerContextBuilderProperties {
    * The caller this simulation attributes an unattributed request to.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where an unattributed request looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
  * Resolves the caller and any policy sources implied by that caller.
  *
- * A request that omits a caller is decided as the simulation's default caller,
- * and as the Account root where the simulation named none. An explicit
- * anonymous caller falls back to neither.
+ * A request that omits a caller is decided as the ambient caller of the run-as
+ * block it is inside, then as the simulation's default caller, and as the
+ * Account root where there is neither. An explicit anonymous caller falls back
+ * to none of them.
  */
 export class SimIamAuthZCallerContextBuilder {
   private readonly callerResolver: SimAwsCallerResolver;
@@ -57,6 +64,7 @@ export class SimIamAuthZCallerContextBuilder {
     this.callerResolver = new SimAwsCallerResolver({
       credentialIdentityResolver: properties.credentialIdentityResolver,
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
     });
   }
 

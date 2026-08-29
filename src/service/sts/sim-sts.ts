@@ -20,6 +20,7 @@ import type {
   SimAwsCaller,
   SimAwsDefaultCaller,
 } from "../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../aws/caller/sim-aws-ambient-caller.js";
 import { SimStsSdkCommandRouter } from "./sdk/sim-sts-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
@@ -35,6 +36,14 @@ interface SimStsProperties {
    * the identity GetCallerIdentity then reports.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   *
+   * A run-as block decides who the requests inside it are, so an unattributed
+   * GetCallerIdentity in one reports the caller that block named.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
@@ -49,6 +58,7 @@ export class SimSts {
   private readonly background: BackgroundScheduler;
   private readonly iamResolver: SimIamAccountResolver;
   private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+  private readonly ambientCaller?: SimAwsAmbientCaller | undefined;
   private readonly sdkRouter = new SimStsSdkCommandRouter(this);
 
   constructor(properties: SimStsProperties = {}) {
@@ -57,6 +67,7 @@ export class SimSts {
     this.iamResolver = properties.iamResolver ?? new SimIamRegistry();
     this.background = properties.background ?? new BackgroundTasks();
     this.defaultCaller = properties.defaultCaller;
+    this.ambientCaller = properties.ambientCaller;
   }
 
   /**
@@ -74,6 +85,7 @@ export class SimSts {
       iamResolver: this.iamResolver,
       background: this.background,
       defaultCaller: this.defaultCaller,
+      ambientCaller: this.ambientCaller,
     });
     return await handler.handle(command, options);
   }
@@ -91,6 +103,7 @@ export class SimSts {
       sourceAccountId: this.accountRegionScope.accountId,
       iamResolver: this.iamResolver,
       defaultCaller: this.defaultCaller,
+      ambientCaller: this.ambientCaller,
     });
 
     return await handler.handle(command, options);
