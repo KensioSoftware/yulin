@@ -4,6 +4,8 @@ import { SimStateMachineAlreadyExists } from "../../error/sim-step-functions.err
 import { SimStateMachine } from "../../machine/sim-state-machine.js";
 import { simStateMachineArn } from "../../machine/sim-state-machine-arn.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
+import type { SimStepFunctionsAuthorizer } from "../authorize/sim-step-functions-authorizer.js";
+import type { SimStepFunctionsRequestOptions } from "../sim-step-functions-request-options.js";
 import type {
   SimCreateStateMachineCommand,
   SimCreateStateMachineCommandOutput,
@@ -15,6 +17,7 @@ import {
 
 interface SimStateMachineCreateProperties {
   readonly stateMachines: SimStateMachineStore;
+  readonly authorizer: SimStepFunctionsAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
 }
@@ -24,11 +27,13 @@ interface SimStateMachineCreateProperties {
  */
 export class SimStateMachineCreate {
   readonly #stateMachines: SimStateMachineStore;
+  readonly #authorizer: SimStepFunctionsAuthorizer;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
   readonly #background: BackgroundScheduler;
 
   constructor(properties: SimStateMachineCreateProperties) {
     this.#stateMachines = properties.stateMachines;
+    this.#authorizer = properties.authorizer;
     this.#accountRegionScope = properties.accountRegionScope;
     this.#background = properties.background;
   }
@@ -42,12 +47,20 @@ export class SimStateMachineCreate {
    *
    * `CreateStateMachine` is idempotent. A second request carrying the same
    * name, definition and type answers with the state machine that is already
-   * there.
+   * there, and is authorized the same way as the first.
    */
   handle(
     command: SimCreateStateMachineCommand,
+    options?: SimStepFunctionsRequestOptions,
   ): SimCreateStateMachineCommandOutput {
     const read = readSimStateMachineCreateInput(command.input);
+
+    this.#authorizer.authorizeStateMachineName(
+      "states:CreateStateMachine",
+      read.name,
+      options?.caller,
+    );
+
     const existing = this.#stateMachines.findByName(read.name);
 
     if (existing !== undefined) {

@@ -2,7 +2,7 @@ import type { SimArn } from "../../aws/arn.js";
 import type { SimIamPolicy } from "../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../role/sim-iam-role.js";
 import { SimIamAuthZContextBuilder } from "./context/sim-iam-auth-z-context-builder.js";
-import type { SimIamAuthorizationInput } from "./context/sim-iam-authorization-input.js";
+import type { SimIamAuthorizationInput } from "./context/sim-iam-auth-z-input.js";
 import { SimIamPolicyDecision } from "./sim-iam-decision.js";
 import type {
   SimAwsDefaultCaller,

@@ -14,10 +14,10 @@ export const ssmDefaultKeyAlias = "alias/aws/ssm";
  * The service Parameter Store's KMS calls are made through, as
  * `kms:ViaService` names it.
  *
- * Supplying it is what lets a caller read a `SecureString` under the
- * `aws/ssm` managed key with no KMS permission of its own: that key's policy
- * admits the Account's principals only when the request reached KMS through
- * Systems Manager.
+ * The `aws/ssm` managed key's policy admits the Account's principals only when
+ * the request reached KMS through Systems Manager, so a request that does not
+ * supply this reaches the key at all only where the key policy names the
+ * caller.
  */
 export const ssmKmsViaService = "ssm";
 
@@ -40,6 +40,7 @@ export interface SimSsmKmsCrypto {
     options?: {
       caller?: SimAwsCaller | undefined;
       viaService?: string | undefined;
+      withCallerPermissions?: boolean | undefined;
     },
   ): Promise<{
     CiphertextBlob?: Uint8Array | undefined;
@@ -56,6 +57,7 @@ export interface SimSsmKmsCrypto {
     options?: {
       caller?: SimAwsCaller | undefined;
       viaService?: string | undefined;
+      withCallerPermissions?: boolean | undefined;
     },
   ): Promise<{
     Plaintext?: Uint8Array | undefined;

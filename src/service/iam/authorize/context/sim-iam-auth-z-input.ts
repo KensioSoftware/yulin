@@ -7,9 +7,6 @@ import type {
 import type { SimIamCallerConditionSource } from "./sim-iam-caller-condition-source.js";
 import type { SimIamAuthZPolicySourceType } from "./sim-iam-auth-z-context.js";
 
-/**
- * A resource policy the service owning the target resource supplies.
- */
 export interface SimIamResourcePolicyInput {
   readonly document: SimIamPolicyDocument;
   readonly sourceType?: Extract<
@@ -22,9 +19,6 @@ export interface SimIamResourcePolicyInput {
 
 /**
  * Entry-point input for sim IAM allow/deny authorization.
- *
- * This is what a service fills in to ask IAM to decide something, so it sits
- * apart from SimIamAuthZContextBuilder, which is what reads it.
  */
 export interface SimIamAuthorizationInput {
   readonly action: string;
@@ -92,4 +86,19 @@ export interface SimIamAuthorizationInput {
    * reaching it, which in AWS means a KMS key policy.
    */
   readonly requiresResourcePolicyAllow?: boolean | undefined;
+
+  /**
+   * Whether the service is making this request with the caller's own
+   * permissions rather than with its own.
+   *
+   * Off by default, which is the ordinary AWS rule. Within one Account a
+   * resource policy admitting the caller is enough on its own. A service sets
+   * this where it reaches another service as the caller. A resource policy
+   * that admits whoever the request came from then grants nothing by itself,
+   * because what it admits is the service. Reading a SecureString needs
+   * kms:Decrypt for that reason, even under the aws/ssm key, whose policy
+   * admits the Account's principals reaching KMS through Parameter Store. A
+   * resource policy naming the caller still allows the request on its own.
+   */
+  readonly withCallerPermissions?: boolean | undefined;
 }

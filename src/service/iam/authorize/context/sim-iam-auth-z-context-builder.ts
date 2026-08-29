@@ -18,7 +18,7 @@ import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,
 } from "./sim-iam-auth-z-context.js";
-import type { SimIamAuthorizationInput } from "./sim-iam-authorization-input.js";
+import type { SimIamAuthorizationInput } from "./sim-iam-auth-z-input.js";
 import { SimIamAuthZIdentityPolicyCoordinator } from "./identity-policy-source/sim-iam-auth-z-id-pol-coordinator.js";
 import {
   SimIamAuthZCallerContextBuilder,
@@ -142,10 +142,7 @@ export class SimIamAuthZContextBuilder {
       ],
       resourcePolicies: this.resourcePolicySources(input),
       serviceControlPolicies: this.scpSourceBuilder.build(callerContext.caller),
-      allowRequirement: this.allowRequirement.resolve(
-        callerAccount,
-        input.requiresResourcePolicyAllow,
-      ),
+      allowRequirement: this.allowRequirement.resolve(callerAccount, input),
       action: input.action,
       resource: input.resource,
       conditionContext: this.conditionContext(input, callerContext.caller),

@@ -106,10 +106,17 @@ following the shape every other service's resource factory has. `SimCfnLogGroupP
 and `SimCfnLogGroupPropertyRules` records the rest, so a reader can tell a real property this
 simulation chose not to act on from one CloudWatch Logs has never had.
 
-Creation goes through the service writer rather than the command layer, which is what makes a
-declared group and one a Lambda function made for itself the same thing. Real CloudFormation fails a
-deploy that declares a group already in the account; here that is the ordinary case, because a
-function that logged during test setup has already created `/aws/lambda/orders`.
+Creation goes through `CreateLogGroup`, and the refusal it answers a name already in use with is
+caught. The group under that name is adopted. A declared group and one a Lambda function made for
+itself are the same thing here, where real CloudFormation fails a deploy that declares a group
+already in the account. A function that logged during test setup has already created
+`/aws/lambda/orders`, and failing over it would be noise.
+
+Going through the command is what authorizes the deployment's caller for `logs:CreateLogGroup`. The
+refusal for a taken name is raised after that decision. A deployment denied the action fails
+whether or not the group is there. `RetentionInDays` goes through `PutRetentionPolicy` for the same
+reason, and a Resource setting no retention asks for nothing (a real deploy of that template asks
+for nothing either).
 
 Registering the service had one consequence worth recording. `SimCdkProviderScaffolding` used to
 recognise a CDK provider function's log group and report it as deliberately left out, because
@@ -177,11 +184,10 @@ added to CloudWatch Logs long after the log group operations and carry the error
 newer APIs. The two halves of one service therefore report a bad input under different names, and a
 caller catching by name has to know which half it is talking to.
 
-The CloudFormation creators go through the ordinary commands, unlike the log group creator, which
-writes to its store directly. There is no equivalent here of a log group a function already made for
-itself. A
-template therefore hits the same refusals an SDK caller would, down to the region rule and the one
-source per distribution.
+The CloudFormation creators go through the ordinary commands, as the log group creator does. None of
+them adopts what is already there, because there is no equivalent of a log group a function made for
+itself. A template therefore hits the same refusals an SDK caller would, down to the region rule and
+the one source per distribution.
 
 `SimLogsDeliveryOperations` and `SimLogsDeliveryInspection` hold the facade's nine delivery methods
 and its delivery accessors. `SimLogs` grows by one delegating method per simulated operation and was

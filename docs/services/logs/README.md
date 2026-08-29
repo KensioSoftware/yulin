@@ -260,6 +260,11 @@ The output still reaches the terminal as well. Real Lambda sends it to CloudWatc
 else, but a test tool that swallowed it would make a failing test harder to debug. Recording is a
 tee.
 
+An invocation that ends in an error nothing caught leaves an `ERROR Invoke Error` line in the group
+after whatever it printed, carrying the error's type, its message and its stack. The
+[simulated Lambda docs](https://yulinsim.dev/services/lambda/ "Simulated Lambda usage docs") show
+one.
+
 Each invocation's `context.logGroupName` and `context.logStreamName` name the group and stream that
 were actually written to. Stream names use the real `YYYY/MM/DD/[$LATEST]<hash>` format. The hash
 identifies the execution environment, and one environment serves more than one request. Match the

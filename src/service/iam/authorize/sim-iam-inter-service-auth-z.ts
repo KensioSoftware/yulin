@@ -1,4 +1,4 @@
-import type { SimIamAuthorizationInput } from "./context/sim-iam-authorization-input.js";
+import type { SimIamAuthorizationInput } from "./context/sim-iam-auth-z-input.js";
 import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 import { SimAwsCallerResolver } from "../../aws/caller/sim-aws-caller-resolver.js";
 

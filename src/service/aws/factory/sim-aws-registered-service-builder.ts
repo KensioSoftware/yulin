@@ -102,8 +102,11 @@ export class SimAwsRegisteredServiceBuilder {
    * nothing but that URI, and the function need not be in this scope.
    */
   createEcr(scope: SimAwsAccountRegionContainer): SimEcr {
+    const { accountRegionScope, iam } = this.scoped(scope);
+
     return new SimEcr({
-      accountRegionScope: scope.accountRegionScope,
+      accountRegionScope,
+      iam,
       registry: this.registries.ecr,
     });
   }

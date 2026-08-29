@@ -5,12 +5,16 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import type * as simStatesCommands from "./command/sim-step-functions-command.types.js";
+import { SimStepFunctionsAuthorizer } from "./command/authorize/sim-step-functions-authorizer.js";
 import { SimStatesExecutionDescribe } from "./command/execution/sim-states-execution-describe.js";
 import { SimStatesExecutionStart } from "./command/execution/sim-states-execution-start.js";
 import { SimStateMachineCreate } from "./command/machine/sim-state-machine-create.js";
 import { SimStateMachineReads } from "./command/machine/sim-state-machine-reads.js";
-import { SimStateMachineWrites } from "./command/machine/sim-state-machine-writes.js";
+import { SimStateMachineDelete } from "./command/machine/sim-state-machine-delete.js";
+import { SimStateMachineUpdate } from "./command/machine/sim-state-machine-update.js";
 import { SimStateMachineTagCommands } from "./command/tag/sim-state-machine-tag-commands.js";
 import type { SimStepFunctionsRequestOptions } from "./command/sim-step-functions-request-options.js";
 import {
@@ -28,6 +32,7 @@ import { SimStepFunctionsInspection } from "./sim-step-functions-inspection.js";
 
 interface SimStepFunctionsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 
   /**
@@ -52,6 +57,10 @@ interface SimStepFunctionsProperties {
  * `Task`, `Choice`, `Wait`, `Succeed` and `Fail`, and a definition using any
  * other is refused by name.
  *
+ * Creating and deleting a state machine are decided by simulated IAM. The
+ * other operations here are not. A caller an account would refuse still
+ * reaches those.
+ *
  * An execution runs on the simulation's background scheduler rather than in
  * the `StartExecution` call. An execution with nothing to wait for settles
  * before the caller sees it. A failing execution records the failure and never
@@ -62,7 +71,8 @@ export class SimStepFunctions {
   readonly #stateMachines = new SimStateMachineStore();
   readonly #executions = new SimStatesExecutionStore();
   readonly #machineReads: SimStateMachineReads;
-  readonly #machineWrites: SimStateMachineWrites;
+  readonly #machineUpdate: SimStateMachineUpdate;
+  readonly #machineDelete: SimStateMachineDelete;
   readonly #machineCreate: SimStateMachineCreate;
   readonly #executionStart: SimStatesExecutionStart;
   readonly #executionDescribe: SimStatesExecutionDescribe;
@@ -80,19 +90,29 @@ export class SimStepFunctions {
       definitions = new SimStatesNoDefinitionStore(),
     } = properties;
 
+    const authorizer = new SimStepFunctionsAuthorizer({
+      iam: simIamInRegion(properties.iam, accountRegionScope.regionName),
+      accountRegionScope,
+    });
+
     this.#background = background;
     this.#cfnFactory = new SimStepFunctionsCfnResourceFactory({
       stepFunctions: this,
       definitions,
     });
     this.#machineReads = new SimStateMachineReads(this.#stateMachines);
-    this.#machineWrites = new SimStateMachineWrites({
+    this.#machineUpdate = new SimStateMachineUpdate({
       stateMachines: this.#stateMachines,
-      executions: this.#executions,
       background,
+    });
+    this.#machineDelete = new SimStateMachineDelete({
+      stateMachines: this.#stateMachines,
+      authorizer,
+      executions: this.#executions,
     });
     this.#machineCreate = new SimStateMachineCreate({
       stateMachines: this.#stateMachines,
+      authorizer,
       accountRegionScope,
       background,
     });
@@ -126,10 +146,10 @@ export class SimStepFunctions {
   /** Handle a CreateStateMachine Command from the SDK. */
   async createStateMachine(
     command: simStatesCommands.SimCreateStateMachineCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimCreateStateMachineCommandOutput> {
     await this.#background.sequence();
-    return this.#machineCreate.handle(command);
+    return this.#machineCreate.handle(command, options);
   }
 
   /** Handle a DescribeStateMachine Command from the SDK. */
@@ -147,16 +167,16 @@ export class SimStepFunctions {
     _options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimUpdateStateMachineCommandOutput> {
     await this.#background.sequence();
-    return this.#machineWrites.update(command);
+    return this.#machineUpdate.handle(command);
   }
 
   /** Handle a DeleteStateMachine Command from the SDK. */
   async deleteStateMachine(
     command: simStatesCommands.SimDeleteStateMachineCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimDeleteStateMachineCommandOutput> {
     await this.#background.sequence();
-    return this.#machineWrites.delete(command);
+    return this.#machineDelete.handle(command, options);
   }
 
   /** Handle a ListStateMachines Command from the SDK. */
