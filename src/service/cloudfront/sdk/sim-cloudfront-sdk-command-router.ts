@@ -14,6 +14,11 @@ import type {
 } from "../command/function/sim-cf-function-command.types.js";
 import type { SimGetDistributionCommand } from "../command/get-distribution/get-distribution.command.js";
 import type {
+  SimCreateInvalidationCommand,
+  SimGetInvalidationCommand,
+  SimListInvalidationsCommand,
+} from "../command/invalidation/sim-cf-invalidation-command.types.js";
+import type {
   SimCreateKeyValueStoreCommand,
   SimDeleteKeyValueStoreCommand,
   SimDescribeKeyValueStoreCommand,
@@ -93,6 +98,30 @@ export class SimCloudFrontSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCloudFront.getDistribution(
             command as SimGetDistributionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateInvalidationCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.createInvalidation(
+            command as SimCreateInvalidationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetInvalidationCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.getInvalidation(
+            command as SimGetInvalidationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListInvalidationsCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.listInvalidations(
+            command as SimListInvalidationsCommand,
             simSdkCallerOptions(context),
           ),
       ],
