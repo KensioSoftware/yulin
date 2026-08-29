@@ -1,4 +1,4 @@
-import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
@@ -25,7 +25,7 @@ type AssumeRoleTargetRole = SimGetRoleCommandOutput["Role"];
 interface AssumeRoleTargetAuthorizationInput {
   readonly roleArn: string;
   readonly target: IamRoleArnParts | SimAwsAccountId;
-  readonly caller: SimAwsPrincipal;
+  readonly caller: SimAwsResolvedCaller;
   readonly conditionContext?:
     | Readonly<Record<string, SimIamConditionValue>>
     | undefined;

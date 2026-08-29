@@ -114,7 +114,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     const role = await this.authorizationCoordinator.authorize({
       roleArn: request.roleArn,
       roleArnParts: request.roleArnParts,
-      caller: caller.principal,
+      caller,
       conditionContext: request.conditionContext,
     });
 

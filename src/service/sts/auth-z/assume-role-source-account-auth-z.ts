@@ -1,7 +1,8 @@
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
-import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
+import { simAwsCallerFor } from "../../aws/caller/sim-aws-resolved-caller.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
 interface AssumeRoleSourceAccountAuthorizerProperties {
@@ -16,7 +17,14 @@ interface AssumeRoleSourceAccountAuthorizerProperties {
 
 export interface AssumeRoleSourceAuthorizationInput {
   readonly roleArn: string;
-  readonly callerPrincipal?: SimAwsPrincipal | undefined;
+
+  /**
+   * The caller as the request boundary resolved it.
+   *
+   * The identity policies deciding this are the ones held by the Role behind
+   * an assumed-role session, so the resolved caller travels here whole.
+   */
+  readonly caller?: SimAwsResolvedCaller | undefined;
 
   /**
    * Whether the caller must have an identity-policy Allow for sts:AssumeRole.
@@ -60,14 +68,15 @@ export class AssumeRoleSourcePrincipalAuthorizer {
   authorize(input: AssumeRoleSourceAuthorizationInput): void {
     const sourceIam = this.iamResolver.iamForAccount(this.sourceAccountId);
 
-    // A request with no caller principal of its own is left for sim IAM to
-    // attribute. The simulation's default caller reaches this decision the way
-    // it reaches every other one.
+    // A request with no caller of its own is left for sim IAM to attribute.
+    // The simulation's default caller reaches this decision the way it reaches
+    // every other one.
     const decision = sourceIam.authorize({
       action: "sts:AssumeRole",
       resource: input.roleArn,
       region: this.regionName,
-      caller: input.callerPrincipal,
+      caller:
+        input.caller === undefined ? undefined : simAwsCallerFor(input.caller),
     });
 
     if (

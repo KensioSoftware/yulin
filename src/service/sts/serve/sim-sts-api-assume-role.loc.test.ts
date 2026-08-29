@@ -2,6 +2,7 @@ import {
   CreateAccessKeyCommand,
   CreateRoleCommand,
   CreateUserCommand,
+  PutRolePolicyCommand,
 } from "@aws-sdk/client-iam";
 import {
   AssumeRoleCommand,
@@ -153,6 +154,66 @@ describe("Assuming a Role over the STS endpoint", () => {
     // handler catching it in production would see
     assertIdentical(error.name, "AccessDenied");
     assertStringIncludes(error.message, "sts:AssumeRole");
+  });
+
+  it("chains the session it hands back into a second Role", async () => {
+    // Given a Role this caller may assume, allowed to assume a second Role
+    // that trusts it
+    await createRole("Chainer", userArn);
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Chainer",
+        PolicyName: "Chain",
+        PolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Resource: "*",
+          },
+        }),
+      }),
+    );
+    await createRole("Chained", `arn:aws:iam::${accountId}:role/Chainer`);
+
+    // When the credentials from assuming the first are used to assume the
+    // second, which is what a process chaining Roles does
+    const first = await client.send(
+      new AssumeRoleCommand({
+        RoleArn: `arn:aws:iam::${accountId}:role/Chainer`,
+        RoleSessionName: "first",
+      }),
+    );
+    const credentials = first.Credentials;
+    assertDefined(credentials, "the first session's credentials");
+    assertDefined(credentials.AccessKeyId, "the session access key id");
+    assertDefined(credentials.SecretAccessKey, "the session secret");
+    assertDefined(credentials.SessionToken, "the session token");
+
+    const sessionClient = new STSClient({
+      region: simAws.defaultRegionName,
+      endpoint,
+      credentials: {
+        accessKeyId: credentials.AccessKeyId,
+        secretAccessKey: credentials.SecretAccessKey,
+        sessionToken: credentials.SessionToken,
+      },
+    });
+    const second = await sessionClient.send(
+      new AssumeRoleCommand({
+        RoleArn: `arn:aws:iam::${accountId}:role/Chained`,
+        RoleSessionName: "second",
+      }),
+    );
+
+    // Then the trust policy naming the first Role admitted its session, and
+    // that Role's own policy allowed the action
+    const chained = second.AssumedRoleUser;
+    assertDefined(chained, "the chained assumed Role user");
+    assertIdentical(
+      chained.Arn,
+      `arn:aws:sts::${accountId}:assumed-role/Chained/second`,
+    );
   });
 
   /**

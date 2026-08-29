@@ -153,6 +153,20 @@ Cross-Account assumption works the same way. Create the source and target Roles 
 simulated Accounts of the same `SimAws` instance, and call `assumeRole` on the source Account's
 `sts()`. The issued session belongs to the target Role's Account.
 
+## Role chaining
+
+A process that assumes a Role and then assumes a second one from that session is chaining Roles. The
+caller of the second request is the session, and the Role it holds the permissions of is what both
+sides of the decision are written against. The trust policy of the target names that Role, and the
+identity policy allowing `sts:AssumeRole` belongs to it.
+
+Both ARNs of a session are matched against a `Principal`, so a trust policy naming either the Role
+or one particular session admits it. AWS recommends naming the Role, and a session name is often
+decided at run time rather than written into a policy.
+
+Chaining over a served endpoint works the same way. Credentials from the first request sign the
+second, and the caller they resolve to carries the Role along with the session.
+
 ## ExternalId
 
 A trust policy can require an external ID through the `sts:ExternalId` condition key. The

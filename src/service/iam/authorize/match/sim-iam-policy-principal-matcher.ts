@@ -115,6 +115,12 @@ export class SimIamPolicyPrincipalMatcher {
    * The wildcard matches both authenticated and anonymous requests. Other AWS
    * forms require an ARN-based caller. Account delegation forms compare against
    * the account ID derived by the caller resolver.
+   *
+   * A pattern is compared against two ARNs, because an assumed-role session
+   * has two. The session ARN is the caller, and the Role behind it is the
+   * identity whose policies apply. AWS matches a policy naming either one, and
+   * recommends naming the Role. The two ARNs are the same for every caller
+   * that is not a session, so one comparison happens in that case.
    */
   private awsPatternMatches(pattern: string): SimIamPrincipalMatch {
     if (pattern === "*") {
@@ -135,9 +141,18 @@ export class SimIamPolicyPrincipalMatcher {
     }
 
     return SimIamPrincipalMatch.direct().when(
-      simIamWildcardMatch(pattern, caller.arn, {
-        caseSensitive: true,
-      }),
+      this.arnMatches(pattern, caller.arn) ||
+        this.arnMatches(pattern, caller.identityPolicyArn),
+    );
+  }
+
+  /**
+   * Whether a principal pattern names one of the caller's ARNs.
+   */
+  private arnMatches(pattern: string, arn: string | undefined): boolean {
+    return (
+      arn !== undefined &&
+      simIamWildcardMatch(pattern, arn, { caseSensitive: true })
     );
   }
 
