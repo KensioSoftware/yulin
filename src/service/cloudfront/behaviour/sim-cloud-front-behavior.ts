@@ -18,6 +18,12 @@ export interface SimCloudFrontBehavior {
    * AWS manages it. The simulated cache does not read it yet.
    */
   cachePolicyId?: string | undefined;
+  /**
+   * The origin request policy this Behavior was given, whether a template
+   * created it or AWS manages it. What reaches the Origin does not read it
+   * yet.
+   */
+  originRequestPolicyId?: string | undefined;
   functionAssociations?:
     | undefined
     | {

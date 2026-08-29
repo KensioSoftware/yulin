@@ -2324,6 +2324,136 @@ way an absent response headers policy does, and the Behavior reports no policy.
 `CreateDistribution` and `UpdateDistribution` still refuse the same ID with `NoSuchCachePolicy`, as
 real CloudFront refuses it.
 
+## Origin request policies
+
+An origin request policy decides which of the viewer's headers, cookies and query strings a cache
+Behavior carries to its Origin. Declare one as `AWS::CloudFront::OriginRequestPolicy` and point a
+Behavior's `OriginRequestPolicyId` at it with a `Ref`, which is what CDK's `OriginRequestPolicy`
+construct synthesizes.
+
+```typescript sim-cloudfront-origin-request-policy
+/**
+ * Reading back the origin request policy a Behavior was given.
+ */
+
+import { GetDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "site-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "site-bucket" },
+      },
+      BeaconPolicy: {
+        Type: "AWS::CloudFront::OriginRequestPolicy",
+        Properties: {
+          OriginRequestPolicyConfig: {
+            Name: "BeaconPolicy",
+            CookiesConfig: { CookieBehavior: "none" },
+            HeadersConfig: { HeaderBehavior: "none" },
+            QueryStringsConfig: { QueryStringBehavior: "all" },
+          },
+        },
+      },
+      SiteDistribution: {
+        Type: "AWS::CloudFront::Distribution",
+        DependsOn: ["SiteBucket", "BeaconPolicy"],
+        Properties: {
+          DistributionConfig: {
+            DefaultRootObject: "index.html",
+            Origins: [
+              {
+                Id: "SiteOrigin",
+                DomainName: "site-bucket.s3.amazonaws.com",
+                S3OriginConfig: {},
+              },
+            ],
+            DefaultCacheBehavior: {
+              TargetOriginId: "SiteOrigin",
+              ViewerProtocolPolicy: "allow-all",
+              // CORS-S3Origin, one of CloudFront's managed policies.
+              OriginRequestPolicyId: "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf",
+            },
+            CacheBehaviors: [
+              {
+                PathPattern: "/beacon",
+                TargetOriginId: "SiteOrigin",
+                ViewerProtocolPolicy: "allow-all",
+                OriginRequestPolicyId: { Ref: "BeaconPolicy" },
+              },
+            ],
+          },
+        },
+      },
+    },
+    Outputs: {
+      DistributionId: { Value: { Ref: "SiteDistribution" } },
+      BeaconPolicyId: { Value: { Ref: "BeaconPolicy" } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const read = await simAws
+  .cloudFront()
+  .getDistribution(
+    new GetDistributionCommand({ Id: stack.output("DistributionId") }),
+  );
+const config = read.Distribution?.DistributionConfig;
+
+// The managed ID the default Behavior was given.
+console.log(config?.DefaultCacheBehavior?.OriginRequestPolicyId);
+
+// The ID of the policy the template created, which the path Behavior Refs.
+console.log(
+  config?.CacheBehaviors?.Items?.[0]?.OriginRequestPolicyId ===
+    stack.output("BeaconPolicyId"),
+);
+```
+
+A Behavior records the ID it was given, and `GetDistribution` reports it back for both the default
+Behavior and a named one. An update changing the policy is reported the same way.
+
+Nothing here reads the policy itself. Sim CloudFront forwards the viewer's headers, cookies and
+query string to the Origin whole, whatever the policy would have narrowed them to on real
+CloudFront.
+
+A policy name is unique within an account, as it is in CloudFront. A second
+`AWS::CloudFront::OriginRequestPolicy` claiming a name is refused with
+`OriginRequestPolicyAlreadyExists`. `Name` and `Comment` are the parts of
+`OriginRequestPolicyConfig` the policy carries.
+
+### Managed origin request policies
+
+CloudFront's eight managed policies are here from the start, under the IDs AWS publishes, and a
+Behavior names one without a template creating anything. `AllViewer`
+(`216adef6-5c7f-47e4-b989-5492eafa07d3`), `AllViewerAndCloudFrontHeaders-2022-06`
+(`33f36d7e-f396-46d9-90e0-52428a34d9dc`), `AllViewerExceptHostHeader`
+(`b689b0a8-53d0-40ab-baf2-68738e2966ac`), `CORS-CustomOrigin`
+(`59781a5b-3903-41f3-afcb-af62929ccde1`), `CORS-S3Origin` (`88a5eaf4-2fd4-4709-b370-b4c650ea3fcf`),
+`Elemental-MediaTailor-PersonalizedManifests` (`775133bc-15f2-49f9-abea-afb2e0bf67d2`),
+`HostHeaderOnly` (`bf0718e1-ba1e-49d1-88b1-f726733018ae`) and `UserAgentRefererHeaders`
+(`acba4595-bd28-49b8-b9fe-13317c0390fa`) are each held under the name
+[AWS publishes](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html)
+for it. CDK's `OriginRequestPolicy.ALL_VIEWER` and its seven siblings synthesize those IDs. A stack
+reaching for one deploys.
+
+The managed policies sit in CloudFront's own namespace. A template may create a policy called
+`AllViewer` of its own, and deleting that stack leaves the managed one where it was.
+
+A CloudFormation Distribution whose Behavior names a policy that is neither managed nor created here
+deploys without one. The `OriginRequestPolicyId` lands on `stack.ignoredProperties` under that
+Behavior, the way an absent cache policy does, and the Behavior reports no policy.
+
+`CreateDistribution` and `UpdateDistribution` still refuse the same ID with
+`NoSuchOriginRequestPolicy`, as real CloudFront refuses it.
+
 ## Origin access controls
 
 An origin access control is how a Distribution authenticates to a private Origin. The Origin then
@@ -2945,6 +3075,8 @@ Sim CloudFront currently supports:
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::CachePolicy`, and a Behavior's `CachePolicyId` read back through `GetDistribution`
+- `AWS::CloudFront::OriginRequestPolicy`, and a Behavior's `OriginRequestPolicyId` read back the
+  same way
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
 - `AWS::CloudFront::OriginAccessControl`, letting an Origin read a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
@@ -3094,5 +3226,10 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **A cache policy carries its name and its comment, and nothing else.** The TTLs and
   `ParametersInCacheKeyAndForwardedToOrigin` of an `AWS::CloudFront::CachePolicy` are read past,
   since nothing here would act on them.
-- **`OriginRequestPolicyId` is accepted and ignored.** A Behavior's origin request policy is left
-  unvalidated, and `AWS::CloudFront::OriginRequestPolicy` is skipped.
+- **An origin request policy is recorded and never applied.** A Behavior's `OriginRequestPolicyId`
+  is checked against the policies this simulation holds and reported back. Sim CloudFront forwards
+  the viewer's headers, cookies and query string to the Origin whole, whatever the policy would
+  have narrowed them to on real CloudFront.
+- **An origin request policy carries its name and its comment, and nothing else.** The
+  `HeadersConfig`, `CookiesConfig` and `QueryStringsConfig` of an
+  `AWS::CloudFront::OriginRequestPolicy` are read past, since nothing here would act on them.

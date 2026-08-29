@@ -172,6 +172,7 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
     | undefined;
   readonly ResponseHeadersPolicyId?: string | undefined;
   readonly CachePolicyId?: string | undefined;
+  readonly OriginRequestPolicyId?: string | undefined;
 }
 
 /**

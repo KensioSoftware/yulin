@@ -13,6 +13,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
+import type { SimCloudFrontOriginRequestPolicyRegistry } from "../../origin-request-policy/sim-cf-origin-request-policy-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../../response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import type { SimCloudFrontCachePolicyRegistry } from "../../cache-policy/sim-cf-cache-policy-registry.js";
 import type { SimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl.js";
@@ -44,6 +45,7 @@ interface CreateDistributionCommandHandlerProperties {
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
   readonly cachePolicies: SimCloudFrontCachePolicyRegistry;
+  readonly originRequestPolicies: SimCloudFrontOriginRequestPolicyRegistry;
   readonly webAclResolver?: SimCfWebAclResolver | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;

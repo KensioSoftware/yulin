@@ -6,6 +6,8 @@ import { SimCloudFrontResponseHeadersPolicy } from "../../../../cloudfront/respo
 import { SimCloudFrontResponseHeadersPolicyCfn } from "./sim-cloudfront-rh-policy-cfn.js";
 import { SimCloudFrontCachePolicy } from "../../../../cloudfront/cache-policy/sim-cf-cache-policy.js";
 import { SimCloudFrontCachePolicyCfn } from "./sim-cloudfront-cache-policy-cfn.js";
+import { SimCloudFrontOriginRequestPolicy } from "../../../../cloudfront/origin-request-policy/sim-cf-origin-request-policy.js";
+import { SimCloudFrontOriginRequestPolicyCfn } from "./sim-cloudfront-orp-cfn.js";
 import { SimCloudFrontOriginAccessControl } from "../../../../cloudfront/origin-access-control/sim-cf-origin-access-control.js";
 import { SimCloudFrontOriginAccessControlCfn } from "./sim-cloudfront-oac-cfn.js";
 import { SimCloudFrontKeyValueStore } from "../../../../cloudfront/key-value-store/sim-cf-key-value-store.js";
@@ -51,6 +53,15 @@ export function cloudFrontValueAdapter(
     properties.simResource instanceof SimCloudFrontCachePolicy
   ) {
     return new SimCloudFrontCachePolicyCfn({
+      policy: properties.simResource,
+    });
+  }
+
+  if (
+    properties.type === "AWS::CloudFront::OriginRequestPolicy" &&
+    properties.simResource instanceof SimCloudFrontOriginRequestPolicy
+  ) {
+    return new SimCloudFrontOriginRequestPolicyCfn({
       policy: properties.simResource,
     });
   }
