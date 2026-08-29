@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutputSink } from "./sim-lambda-output-sink.js";
 import type { SimLambdaExecutableCode } from "../code/sim-lambda-executable-code.js";
+import { simLambdaInvokeErrorLine } from "./sim-lambda-invoke-error-log.js";
 import { SimLambdaLogWriter } from "./sim-lambda-log-writer.js";
 import {
   simLambdaLogGroupName,
@@ -89,7 +90,7 @@ export class SimLambdaFunctionLogging {
 
   /**
    * Run an invocation, recording whatever it left unterminated once it is
-   * over.
+   * over, and the error it ended in when it ended in one.
    *
    * The flush happens whether the handler returned or threw, because a handler
    * that logged and then failed is the one a test most wants to read the logs
@@ -98,9 +99,34 @@ export class SimLambdaFunctionLogging {
   async around<T>(run: () => Promise<T>): Promise<T> {
     try {
       return await run();
+    } catch (error) {
+      this.recordInvokeError(error);
+      throw error;
     } finally {
       this.#writer?.flush();
     }
+  }
+
+  /**
+   * Record an invocation that ended in an error nothing caught, as real
+   * Lambda's runtime records one.
+   *
+   * The caller still gets the error: an Invoke answers with `FunctionError`
+   * and the trace in its payload as before, and this only puts the same
+   * failure in the place code goes looking for it.
+   */
+  private recordInvokeError(error: unknown): void {
+    const writer = this.#writer;
+
+    if (writer === undefined) {
+      return;
+    }
+
+    // Whatever the handler wrote without closing the line is a line of its
+    // own. A handler that printed half a line before failing would otherwise
+    // have the error appended to it, where a filter for the error misses it.
+    writer.flush();
+    writer.write(simLambdaInvokeErrorLine(error));
   }
 
   private coldStart(): string {

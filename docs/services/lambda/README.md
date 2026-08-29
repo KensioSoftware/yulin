@@ -276,6 +276,62 @@ console.log(logged.events?.map((event) => event.message));
 await simAws.backgroundTasksComplete();
 ```
 
+### When a handler throws
+
+An invocation that ends in an error nothing caught leaves an `ERROR Invoke Error` line in the
+function's log group, as it does in an account. The line carries a JSON document holding the error's
+type, its message and its stack, with one array element per stack frame. Whatever the handler
+printed before it failed is recorded above it. A handler bound in-process and one packaged as zip
+code are both recorded this way.
+
+```typescript sim-lambda-unhandled-error-output
+/**
+ * Reading why an invocation failed out of the function's log group.
+ */
+
+import { FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        console.log("INFO handling order-1");
+
+        throw new Error("order has no items");
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+const failure = await simAws.logs().filterLogEvents(
+  new FilterLogEventsCommand({
+    logGroupName: "/aws/lambda/orders",
+    filterPattern: '"Invoke Error"',
+  }),
+);
+
+// ERROR Invoke Error {"errorType":"Error","errorMessage":"order has no items",...}
+console.log(failure.events?.at(0)?.message);
+
+await simAws.backgroundTasksComplete();
+```
+
+The caller still hears about it too. `Invoke` answers with `FunctionError` set to `Unhandled` and
+the same error document in its response payload.
+
+Real Lambda writes `START`, `END` and `REPORT` lines around every invocation. Simulated Lambda
+writes none of those.
+
 ## Function code from S3
 
 Function code can also be fetched from a zip object stored in sim S3, as SAM and CDK deployments
