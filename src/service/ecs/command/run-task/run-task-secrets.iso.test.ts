@@ -73,8 +73,13 @@ describe("Resolving a simulated ECS container's secrets", () => {
         Value: "k-1234",
       }),
     );
+    // The decryption is the execution Role's own, so it holds kms:Decrypt as
+    // well as the parameter permission.
     const executionRole = await simIamRoleWithPolicyFactory.make(
-      { roleName: "OrdersExecutionRole", actions: ["ssm:GetParameter"] },
+      {
+        roleName: "OrdersExecutionRole",
+        actions: ["ssm:GetParameter", "kms:Decrypt"],
+      },
       simAws,
     );
 

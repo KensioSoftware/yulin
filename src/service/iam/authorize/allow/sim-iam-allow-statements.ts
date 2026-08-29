@@ -17,13 +17,14 @@ export class SimIamAllowStatements {
   private readonly resourceStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly trustStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly delegatedStatements: SimIamPolicyDocumentStatement[] = [];
+  private readonly namingStatements: SimIamPolicyDocumentStatement[] = [];
 
   /**
    * Record a matching Allow against the policy side it came from.
    *
-   * A resource-policy Allow that matched by way of the caller's Account rather
-   * than the caller itself is kept apart as well, so a rule that cares about
-   * the difference can ask for it.
+   * How a resource-policy Allow came to match is kept alongside it, for the
+   * rules that care. A statement can match by way of the caller's Account, by
+   * naming the caller, or by admitting whoever the request came from.
    */
   record(
     policy: SimIamAuthZPolicySource,
@@ -36,6 +37,10 @@ export class SimIamAllowStatements {
 
     if (principal.isAccountDelegation) {
       this.delegatedStatements.push(statement);
+    }
+
+    if (principal.namesCaller) {
+      this.namingStatements.push(statement);
     }
 
     this.sideStatements(policy).push(statement);
@@ -74,12 +79,16 @@ export class SimIamAllowStatements {
    */
   get sides(): SimIamAllowSides {
     const delegated = new Set(this.delegatedStatements);
+    const naming = new Set(this.namingStatements);
 
     return new SimIamAllowSides({
       identity: this.identityStatements.length > 0,
       resource: this.resourceStatements.length > 0,
       resourceDirect: this.resourceStatements.some(
         (statement) => !delegated.has(statement),
+      ),
+      resourceNamesCaller: this.resourceStatements.some((statement) =>
+        naming.has(statement),
       ),
     });
   }

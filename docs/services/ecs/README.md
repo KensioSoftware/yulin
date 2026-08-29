@@ -706,7 +706,8 @@ real ECS accepts for a parameter in the task's own region. A Secrets Manager ARN
 key, a version stage and a version id after the secret id, in the form
 `...:secret:orders/db-AbCdEf:password::` that a CDK construct given a field writes. The key selects
 one field of a secret holding a JSON object. A `SecureString` parameter is decrypted, as it is for a
-real task.
+real task. The decryption is made with the execution role's own permissions, and that role needs
+`kms:Decrypt` on top of `ssm:GetParameter`.
 
 A secret that cannot be resolved stops the task before any container runs, with a
 `ResourceInitializationError` reason naming the variable:

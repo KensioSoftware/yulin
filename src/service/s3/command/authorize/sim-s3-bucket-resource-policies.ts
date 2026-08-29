@@ -1,4 +1,4 @@
-import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
+import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-input.js";
 import { simS3BucketArn } from "../../bucket/sim-s3-bucket-arn.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 

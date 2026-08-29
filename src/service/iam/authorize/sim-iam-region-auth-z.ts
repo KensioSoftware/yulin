@@ -1,6 +1,6 @@
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
-import type { SimIamAuthorizationInput } from "./context/sim-iam-auth-z-context-builder.js";
+import type { SimIamAuthorizationInput } from "./context/sim-iam-auth-z-input.js";
 import {
   SimIamAllowAllAuth,
   type SimIamAuthorizationDecision,

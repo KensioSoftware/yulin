@@ -25,7 +25,9 @@ interface SimKmsAuthorizerProperties {
  * Both carry the KMS condition values a key policy can be written against:
  * `kms:CallerAccount` for the Account the request came from, and
  * `kms:ViaService` where another service made the request on the caller's
- * behalf.
+ * behalf. A service passing on the caller's own KMS permissions says so, and
+ * a key policy admitting whoever the request came from is then not enough by
+ * itself.
  */
 export class SimKmsAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
@@ -57,6 +59,7 @@ export class SimKmsAuthorizer {
       callerConditions: this.callerAccount,
       resourcePolicies: [key.policy.asResourcePolicy()],
       requiresResourcePolicyAllow: true,
+      withCallerPermissions: options.withCallerPermissions,
     });
 
     if (decision.isDenied) {

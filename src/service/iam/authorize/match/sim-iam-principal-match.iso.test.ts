@@ -36,6 +36,38 @@ describe("SimIamPrincipalMatch.first", () => {
     assertTrue(first.isAccountDelegation);
   });
 
+  it("prefers a match naming the caller over a wildcard", () => {
+    // Given a Principal list holding a wildcard and the caller's own ARN.
+    const matches = [
+      SimIamPrincipalMatch.everyone(),
+      SimIamPrincipalMatch.direct(),
+    ];
+
+    // When the winning match is chosen.
+    const first = SimIamPrincipalMatch.first(matches);
+
+    // Then the statement counts as naming the caller. That is what lets a
+    // resource policy allow a request the caller has no permission for.
+    assertTrue(first.namesCaller);
+  });
+
+  it("keeps a wildcard match apart from one naming the caller", () => {
+    // Given only a wildcard, as the aws/ssm key policy has.
+    const matches = [
+      SimIamPrincipalMatch.none(),
+      SimIamPrincipalMatch.everyone(),
+    ];
+
+    // When the winning match is chosen.
+    const first = SimIamPrincipalMatch.first(matches);
+
+    // Then it matches without naming the caller, so a service passing on the
+    // caller's own permissions still needs IAM to allow them.
+    assertTrue(first.matched);
+    assertFalse(first.namesCaller);
+    assertFalse(first.isAccountDelegation);
+  });
+
   it("reports no match when nothing applies", () => {
     // Given nothing matching.
     const matches = [SimIamPrincipalMatch.none(), SimIamPrincipalMatch.none()];

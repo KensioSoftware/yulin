@@ -1,5 +1,5 @@
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimIamResourcePolicyInput } from "../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
+import type { SimIamResourcePolicyInput } from "../../iam/authorize/context/sim-iam-auth-z-input.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simKmsCallerAccountConditionKey } from "./sim-kms-caller-account.js";
 import {
