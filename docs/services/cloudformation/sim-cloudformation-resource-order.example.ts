@@ -6,6 +6,33 @@ import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "123456789012" });
 
+// The Role a real deployment already runs as, allowed to attach policies and
+// nothing else.
+await simAws.iam().createRole({
+  input: {
+    RoleName: "cdk-deploy-role",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sts:AssumeRole",
+        Principal: { Service: "cloudformation.amazonaws.com" },
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "cdk-deploy-role",
+    PolicyName: "deploy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "iam:*", Resource: "*" },
+    }),
+  },
+});
+
 const stack = await simAws.cloudFormation().deployTemplate({
   stackName: "alerts-stack",
   template: {

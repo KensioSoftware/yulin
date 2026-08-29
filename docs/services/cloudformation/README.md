@@ -1086,7 +1086,7 @@ await stack.waitForDeployComplete();
 Resources that reference another resource with `Ref` are also created after the referenced resource
 is ready.
 
-### The order independent Resources are created in
+### Deploying independent Resources in either order
 
 Resources with no dependency between them are created together, and the template's own order
 decides which one starts first. CloudFormation is free to pick either. A Stack that deploys only
@@ -1107,6 +1107,33 @@ Declare the Topic first and it fails on `sns:CreateTopic`. Both templates are th
 import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+// The Role a real deployment already runs as, allowed to attach policies and
+// nothing else.
+await simAws.iam().createRole({
+  input: {
+    RoleName: "cdk-deploy-role",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sts:AssumeRole",
+        Principal: { Service: "cloudformation.amazonaws.com" },
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "cdk-deploy-role",
+    PolicyName: "deploy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "iam:*", Resource: "*" },
+    }),
+  },
+});
 
 const stack = await simAws.cloudFormation().deployTemplate({
   stackName: "alerts-stack",
