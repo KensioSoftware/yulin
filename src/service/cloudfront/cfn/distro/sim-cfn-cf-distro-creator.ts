@@ -26,12 +26,12 @@ interface SimCfnCfDistroCreatorProperties {
  *
  * A `WebACLId` naming a web ACL this simulation does not hold is left out and
  * recorded, and so are a Lambda@Edge association it cannot run and a
- * `ResponseHeadersPolicyId` or `CachePolicyId` naming a policy it does not
- * hold. CloudFront has no Resource of its own for any of them, so all of them
- * live on the Distribution itself, and refusing one would take the
- * Distribution down over something that was never the point of the template.
- * The site a local dev server and a suite of tests make requests to has to
- * survive that.
+ * `ResponseHeadersPolicyId`, `CachePolicyId` or `OriginRequestPolicyId`
+ * naming a policy it does not hold. CloudFront has no Resource of its own for
+ * any of them, so all of them live on the Distribution itself, and refusing
+ * one would take the Distribution down over something that was never the point
+ * of the template. The site a local dev server and a suite of tests make
+ * requests to has to survive that.
  */
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;

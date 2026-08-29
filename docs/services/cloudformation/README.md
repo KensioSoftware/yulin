@@ -3518,7 +3518,8 @@ The resource types it creates are:
 - `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
 - `AWS::CloudFront::Distribution`, `AWS::CloudFront::Function`,
-  `AWS::CloudFront::ResponseHeadersPolicy` and `AWS::CloudFront::CachePolicy`
+  `AWS::CloudFront::ResponseHeadersPolicy`, `AWS::CloudFront::CachePolicy` and
+  `AWS::CloudFront::OriginRequestPolicy`
 - `AWS::CloudWatch::Alarm`
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`

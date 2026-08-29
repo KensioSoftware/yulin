@@ -1,12 +1,10 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCloudFrontCacheBehaviorConfig } from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
-
-/**
- * The policy properties a Behavior carries, in the terms a template writes
- * them in.
- */
-type BehaviorPolicyProperty = "ResponseHeadersPolicyId" | "CachePolicyId";
+import {
+  type BehaviorPolicyKind,
+  behaviorPolicyKinds,
+} from "./sim-cfn-cf-behavior-policy-kinds.js";
 
 /**
  * Takes a policy ID naming a policy this simulation does not hold off the
@@ -28,21 +26,9 @@ export class SimCfnCfDistroPolicyDrops {
     behavior: SimCloudFrontCacheBehaviorConfig,
     behaviorPath: string,
   ): SimCloudFrontCacheBehaviorConfig {
-    const withHeaders = this.heldPolicy(
+    return behaviorPolicyKinds.reduce(
+      (held, kind) => this.heldPolicy(held, behaviorPath, kind),
       behavior,
-      behaviorPath,
-      "ResponseHeadersPolicyId",
-      (policyId) =>
-        this.cloudFront.getResponseHeadersPolicyById(policyId) !== undefined,
-      headersPolicyDropReason,
-    );
-
-    return this.heldPolicy(
-      withHeaders,
-      behaviorPath,
-      "CachePolicyId",
-      (policyId) => this.cloudFront.getCachePolicyById(policyId) !== undefined,
-      cachePolicyDropReason,
     );
   }
 
@@ -53,44 +39,21 @@ export class SimCfnCfDistroPolicyDrops {
   private heldPolicy(
     behavior: SimCloudFrontCacheBehaviorConfig,
     behaviorPath: string,
-    property: BehaviorPolicyProperty,
-    held: (policyId: string) => boolean,
-    reason: (policyId: string) => string,
+    kind: BehaviorPolicyKind,
   ): SimCloudFrontCacheBehaviorConfig {
-    // oxlint-disable-next-line security/detect-object-injection
-    const policyId = behavior[property];
+    const policyId = behavior[kind.property];
 
-    if (policyId === undefined || held(policyId)) {
+    if (policyId === undefined || kind.held(this.cloudFront, policyId)) {
       return behavior;
     }
 
     this.count += 1;
     this.resource.ignoreProperty(
-      `${behaviorPath}.${property}`,
-      reason(policyId),
+      `${behaviorPath}.${kind.property}`,
+      `${kind.name} ${policyId} is not held by this simulation, so the ` +
+        `Behavior is deployed without one and ${kind.loses}`,
     );
 
-    return { ...behavior, [property]: undefined };
+    return { ...behavior, [kind.property]: undefined };
   }
-}
-
-/**
- * What a Behavior loses along with a response headers policy.
- */
-function headersPolicyDropReason(policyId: string): string {
-  return (
-    `response headers policy ${policyId} is not held by this simulation, so ` +
-    `the Behavior is deployed without one and serves every response without ` +
-    `the headers that policy would have set`
-  );
-}
-
-/**
- * What a Behavior loses along with a cache policy.
- */
-function cachePolicyDropReason(policyId: string): string {
-  return (
-    `cache policy ${policyId} is not held by this simulation, so the ` +
-    `Behavior is deployed without one and reports no CachePolicyId`
-  );
 }

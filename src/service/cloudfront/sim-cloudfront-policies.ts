@@ -4,6 +4,11 @@ import type {
 } from "./cache-policy/sim-cf-cache-policy.js";
 import { SimCloudFrontCachePolicyRegistry } from "./cache-policy/sim-cf-cache-policy-registry.js";
 import type {
+  SimCloudFrontOriginRequestPolicy,
+  SimCloudFrontOriginRequestPolicyId,
+} from "./origin-request-policy/sim-cf-origin-request-policy.js";
+import { SimCloudFrontOriginRequestPolicyRegistry } from "./origin-request-policy/sim-cf-origin-request-policy-registry.js";
+import type {
   SimCloudFrontResponseHeadersPolicy,
   SimCloudFrontResponseHeadersPolicyId,
 } from "./response-headers-policy/sim-cf-response-headers-policy.js";
@@ -12,16 +17,19 @@ import { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-p
 /**
  * The policies one simulated CloudFront holds.
  *
- * A cache Behavior names a response headers policy and a cache policy by ID,
- * and both are stored here. Neither has a create command in this simulation,
- * so CloudFormation is the only thing that makes one, and these methods are
- * how it hands a policy over. `SimCloudFront` extends this, and a caller
- * reaches the policies on the one service object.
+ * A cache Behavior names a response headers policy, a cache policy and an
+ * origin request policy by ID, and all three are stored here. None of them has
+ * a create command in this simulation, so CloudFormation is the only thing
+ * that makes one, and these methods are how it hands a policy over.
+ * `SimCloudFront` extends this, and a caller reaches the policies on the one
+ * service object.
  */
 export class SimCloudFrontPolicies {
   protected readonly responseHeadersPolicies =
     new SimCloudFrontResponseHeadersPolicyRegistry();
   protected readonly cachePolicies = new SimCloudFrontCachePolicyRegistry();
+  protected readonly originRequestPolicies =
+    new SimCloudFrontOriginRequestPolicyRegistry();
 
   /**
    * Store a simulated response headers policy. A name another policy already
@@ -71,5 +79,31 @@ export class SimCloudFrontPolicies {
     policyId: SimCloudFrontCachePolicyId | string,
   ): SimCloudFrontCachePolicy | undefined {
     return this.cachePolicies.byId(policyId);
+  }
+
+  /**
+   * Store a simulated origin request policy. A name another policy already
+   * holds is refused, as CloudFront refuses one.
+   */
+  addOriginRequestPolicy(policy: SimCloudFrontOriginRequestPolicy): void {
+    this.originRequestPolicies.add(policy);
+  }
+
+  /**
+   * Forget a simulated origin request policy.
+   */
+  removeOriginRequestPolicy(
+    policyId: SimCloudFrontOriginRequestPolicyId,
+  ): void {
+    this.originRequestPolicies.remove(policyId);
+  }
+
+  /**
+   * Get a simulated origin request policy by ID.
+   */
+  getOriginRequestPolicyById(
+    policyId: SimCloudFrontOriginRequestPolicyId | string,
+  ): SimCloudFrontOriginRequestPolicy | undefined {
+    return this.originRequestPolicies.byId(policyId);
   }
 }

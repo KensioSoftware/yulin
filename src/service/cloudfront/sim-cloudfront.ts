@@ -95,6 +95,7 @@ export class SimCloudFront extends SimCloudFrontPolicies {
       originAccessControls: this.originAccessControls,
       responseHeadersPolicies: this.responseHeadersPolicies,
       cachePolicies: this.cachePolicies,
+      originRequestPolicies: this.originRequestPolicies,
     });
   }
 

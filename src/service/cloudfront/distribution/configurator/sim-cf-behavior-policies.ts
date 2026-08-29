@@ -4,19 +4,21 @@ import type {
   SimCloudFrontDistributionConfig,
 } from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCfBehaviorCachePolicy } from "./sim-cf-behavior-cache-policy.js";
+import type { SimCfBehaviorOriginRequestPolicy } from "./sim-cf-behavior-origin-request-policy.js";
 import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 
 /**
  * The policies a Cache Behavior names, and whether this simulation holds them.
  *
- * A Behavior points at a response headers policy and a cache policy by ID, and
- * both live outside the Distribution. Each one is checked the same way and at
- * the same moment, so they are asked together.
+ * A Behavior points at a response headers policy, a cache policy and an origin
+ * request policy by ID, and all three live outside the Distribution. Each one
+ * is checked the same way and at the same moment, so they are asked together.
  */
 export class SimCfBehaviorPolicies {
   constructor(
     private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
     private readonly cachePolicy: SimCfBehaviorCachePolicy,
+    private readonly originRequestPolicy: SimCfBehaviorOriginRequestPolicy,
   ) {}
 
   /**
@@ -41,7 +43,7 @@ export class SimCfBehaviorPolicies {
   }
 
   /**
-   * Refuse one Behavior naming a policy of either kind which is not there.
+   * Refuse one Behavior naming a policy of any kind which is not there.
    */
   assertExists(
     behavior:
@@ -55,6 +57,10 @@ export class SimCfBehaviorPolicies {
     this.cachePolicy.assertExists(
       behavior.TargetOriginId,
       behavior.CachePolicyId,
+    );
+    this.originRequestPolicy.assertExists(
+      behavior.TargetOriginId,
+      behavior.OriginRequestPolicyId,
     );
   }
 }

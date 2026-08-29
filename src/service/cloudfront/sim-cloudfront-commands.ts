@@ -44,6 +44,7 @@ import {
 import type { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import type { SimCloudFrontCachePolicyRegistry } from "./cache-policy/sim-cf-cache-policy-registry.js";
+import type { SimCloudFrontOriginRequestPolicyRegistry } from "./origin-request-policy/sim-cf-origin-request-policy-registry.js";
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
 import type { SimCfDistributionConfigurationState } from "./distribution/sim-cf-distribution-configuration-state.js";
 import type { SimCfWebAclResolver } from "./web-acl/sim-cf-web-acl.js";
@@ -79,6 +80,7 @@ interface SimCloudFrontCommandsProperties extends SimCloudFrontProperties {
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
   readonly cachePolicies: SimCloudFrontCachePolicyRegistry;
+  readonly originRequestPolicies: SimCloudFrontOriginRequestPolicyRegistry;
 }
 
 /**
@@ -182,6 +184,7 @@ export class SimCloudFrontCommands {
       originAccessControls: properties.originAccessControls,
       responseHeadersPolicies: properties.responseHeadersPolicies,
       cachePolicies: properties.cachePolicies,
+      originRequestPolicies: properties.originRequestPolicies,
     };
     const keyValueStoreAccess = new SimCfKeyValueStoreAccess({
       accountId,

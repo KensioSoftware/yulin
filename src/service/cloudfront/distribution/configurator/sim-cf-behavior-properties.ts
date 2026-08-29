@@ -20,8 +20,12 @@ export function simCfBehaviorProperties(
     | SimCloudFrontCacheBehaviorConfig,
   policies: SimCfBehaviorPolicies,
 ): SimCloudFrontBehavior {
-  const { TargetOriginId, ResponseHeadersPolicyId, CachePolicyId } =
-    cacheBehavior;
+  const {
+    TargetOriginId,
+    ResponseHeadersPolicyId,
+    CachePolicyId,
+    OriginRequestPolicyId,
+  } = cacheBehavior;
 
   assertDefined(TargetOriginId, "CloudFront CacheBehavior TargetOriginId");
 
@@ -46,6 +50,9 @@ export function simCfBehaviorProperties(
     }),
     ...(CachePolicyId !== undefined && {
       cachePolicyId: CachePolicyId,
+    }),
+    ...(OriginRequestPolicyId !== undefined && {
+      originRequestPolicyId: OriginRequestPolicyId,
     }),
     functionAssociations: configureCffAssociations(cacheBehavior),
     lambdaFunctionAssociations: configureEdgeAssociations(cacheBehavior),

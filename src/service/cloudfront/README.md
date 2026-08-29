@@ -275,10 +275,27 @@ The policy carries nothing of `CachePolicyConfig` beyond `Name` and `Comment`. T
 sim CloudFront has no cache for them to decide anything about. Recording the ID is what lets a test
 assert which policy a Behavior was given.
 
-`SimCfBehaviorPolicies` asks both `SimCfBehaviorResponseHeadersPolicy` and
-`SimCfBehaviorCachePolicy` about one Behavior. A `CachePolicyId` naming nothing is
+`SimCfBehaviorPolicies` asks `SimCfBehaviorResponseHeadersPolicy`, `SimCfBehaviorCachePolicy` and
+`SimCfBehaviorOriginRequestPolicy` about one Behavior. A `CachePolicyId` naming nothing is
 `SimCloudFrontNoSuchCachePolicy`, which is what real CloudFront answers, and it comes at creation
 and update time as the response headers policy refusal does.
+
+## Origin request policies
+
+`origin-request-policy/` holds the model and its registry, laid out the same way as the cache
+policies above. A `SimCloudFrontOriginRequestPolicy` is a name, an ID and an optional comment.
+`sim-cf-managed-origin-request-policies.ts` builds CloudFront's eight managed policies under the IDs
+AWS publishes, and the registry keeps them in their own namespace. There is no
+CreateOriginRequestPolicy command, so `cfn/origin-request-policy/` is the only thing that makes one.
+
+The policy carries nothing of `OriginRequestPolicyConfig` beyond `Name` and `Comment`.
+`HeadersConfig`, `CookiesConfig` and `QueryStringsConfig` decide what an Origin fetch carries, and
+sim CloudFront forwards the viewer's request whole. Recording the ID is what lets a test assert
+which policy a Behavior was given.
+
+`SimCfBehaviorOriginRequestPolicy` refuses an `OriginRequestPolicyId` naming nothing with
+`SimCloudFrontNoSuchOriginRequestPolicy`, at creation and update time as the cache policy refusal
+comes.
 
 ## Origin access controls
 
@@ -296,9 +313,9 @@ when the Distribution is created, and stores the result on the `SimCloudFrontS3O
 CloudFront refuses the whole CreateDistribution, and so is an origin type that does not match the
 Origin it was named on: `assertSimCfOacOriginType` checks that in both directions, since an origin
 access control for a Bucket signs nothing a Function URL will admit.
-`SimCfBehaviorPolicies` resolves a Behavior's `ResponseHeadersPolicyId` and its `CachePolicyId` the
-same eager way, for the same reason: CloudFront checks them all at creation rather than when a
-request arrives.
+`SimCfBehaviorPolicies` resolves a Behavior's `ResponseHeadersPolicyId`, `CachePolicyId` and
+`OriginRequestPolicyId` the same eager way, for the same reason: CloudFront checks them all at
+creation rather than when a request arrives.
 
 `SimCfS3OriginSigner` reads the stored origin access control on every Origin fetch. One whose
 `signs` getter is true makes the read a request from the `cloudfront.amazonaws.com` service

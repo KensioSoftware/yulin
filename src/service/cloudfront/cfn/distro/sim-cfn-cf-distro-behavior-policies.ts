@@ -14,7 +14,8 @@ const defaultBehaviorPath = "DistributionConfig.DefaultCacheBehavior";
 
 /**
  * The DistributionConfig to deploy, without a policy ID naming a response
- * headers policy or a cache policy this simulation does not hold.
+ * headers policy, a cache policy or an origin request policy this simulation
+ * does not hold.
  *
  * `CreateDistribution` refuses such an ID, as real CloudFront refuses one, and
  * a Distribution deployed from a template is the one place that refusal costs
@@ -30,7 +31,7 @@ const defaultBehaviorPath = "DistributionConfig.DefaultCacheBehavior";
  * naming one keeps it.
  *
  * One Behavior losing a policy leaves the others holding theirs, and a
- * Behavior losing one kind of policy keeps the other.
+ * Behavior losing one kind of policy keeps the others.
  */
 export function simCfnCfDistroWithHeldBehaviorPolicies(
   resource: SimCfnResource,
