@@ -256,6 +256,33 @@ would have the Distribution answering with it for the length of the test.
 Caching is on. `SimCloudFrontRegistry` holds the flag, one registry per `SimAws` across every
 Account and Region, and `SimCloudFront.configureCaching` is how a test turns it off.
 
+## Invalidations
+
+`invalidation/` holds an invalidation and the collection a Distribution keeps them in.
+`command/invalidation/` holds the three commands, grouped as `SimCfInvalidationCommands` the way the
+Function commands are. `SimCfInvalidationAccess` resolves the Distribution each one names. It
+authorizes the action against the Distribution's ARN before it reads the Distribution map, and the
+ARN is built from the ID the caller gave. An unauthorized caller therefore learns nothing about
+which Distribution IDs exist.
+
+`SimCfDistributionCache.clearPaths` clears the entries. It reads the path back out of each key with
+`simCfCacheEntryKeyPath`. Matching a batch is then one pass over the keys, and the entry map needs
+no second index from path to entry. The edge in the key is ignored, because an invalidation reaches
+every point of presence.
+
+The entries go as the invalidation is created, and the invalidation reaches `Completed` on the
+background scheduler afterwards. Clearing on completion would leave a test waiting on the simulator
+before it could ask for the path again.
+
+`SimCfInvalidations` hangs off the Distribution, alongside the cache, and outlives a configuration
+update. Its `inProgressCount` is what `simCloudFrontDistributionView` reports as
+`InProgressInvalidationBatches`. The invalidations are held in creation order, and the listing
+reverses them.
+
+A `CallerReference` is looked up on that same collection. The paths are compared in the order they
+were sent, each one read the way `simCfInvalidationPath` reads it. `*` and `/*` are therefore one
+batch.
+
 ## CloudFront Functions
 
 Sim CloudFront Function support lives under `cff/`.

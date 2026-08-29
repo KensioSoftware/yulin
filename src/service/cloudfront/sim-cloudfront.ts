@@ -38,27 +38,24 @@ import type {
   SimGetDistributionCommandOutput,
 } from "./command/get-distribution/get-distribution.command.js";
 import type {
+  SimCreateInvalidationCommand,
+  SimCreateInvalidationCommandOutput,
+  SimGetInvalidationCommand,
+  SimGetInvalidationCommandOutput,
+  SimListInvalidationsCommand,
+  SimListInvalidationsCommandOutput,
+} from "./command/invalidation/sim-cf-invalidation-command.types.js";
+import type {
   SimUpdateDistributionCommand,
   SimUpdateDistributionCommandOutput,
 } from "./command/update-distribution/update-distribution.command.js";
-import type {
-  SimCloudFrontDistribution,
-  SimCloudFrontDistributionId,
-} from "./distribution/sim-cloudfront-distribution.js";
-import { SimCloudFrontCaching } from "./sim-cloudfront-caching.js";
-import type {
-  SimCloudFrontOriginAccessControl,
-  SimCloudFrontOriginAccessControlId,
-} from "./origin-access-control/sim-cf-origin-access-control.js";
-import { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
+import { SimCloudFrontDistributions } from "./sim-cloudfront-distributions.js";
 import type { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 import type { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 import { simCffNameInArn } from "./cff/sim-cff-arn.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import {
   SimCloudFrontCommands,
-  type SimCloudFrontDistributionMap,
-  type SimCloudFrontDistributionsById,
   type SimCloudFrontProperties,
   type SimCloudFrontRequestOptions,
 } from "./sim-cloudfront-commands.js";
@@ -71,11 +68,8 @@ export type {
 /**
  * Simulated CloudFront. Handles SDK commands. Emulates AWS behaviour and state.
  */
-export class SimCloudFront extends SimCloudFrontCaching {
-  private readonly distributions: SimCloudFrontDistributionMap = new Map();
+export class SimCloudFront extends SimCloudFrontDistributions {
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap = new Map();
-  private readonly originAccessControls =
-    new SimCloudFrontOriginAccessControlRegistry();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly commands: SimCloudFrontCommands;
@@ -119,24 +113,6 @@ export class SimCloudFront extends SimCloudFrontCaching {
   }
 
   /**
-   * Get the simulated Distributions owned by this sim CloudFront service.
-   */
-  getDistributions(): SimCloudFrontDistributionsById {
-    return this.distributions;
-  }
-
-  /**
-   * Get a simulated CloudFront Distribution by ID.
-   */
-  getSimDistributionById(
-    distributionId: SimCloudFrontDistributionId | string,
-  ): SimCloudFrontDistribution | undefined {
-    return this.distributions.get(
-      distributionId as SimCloudFrontDistributionId,
-    );
-  }
-
-  /**
    * Handle a Create Distribution Command from the SDK.
    */
   async createDistribution(
@@ -174,6 +150,42 @@ export class SimCloudFront extends SimCloudFrontCaching {
     options?: SimCloudFrontRequestOptions,
   ): Promise<SimDeleteDistributionCommandOutput> {
     return await this.commands.deleteDistribution(command, options);
+  }
+
+  /**
+   * Handle a Create Invalidation Command from the SDK.
+   */
+  async createInvalidation(
+    command: SimCreateInvalidationCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimCreateInvalidationCommandOutput> {
+    return await this.commands.invalidations.createInvalidation(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a Get Invalidation Command from the SDK.
+   */
+  async getInvalidation(
+    command: SimGetInvalidationCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimGetInvalidationCommandOutput> {
+    return await this.commands.invalidations.getInvalidation(command, options);
+  }
+
+  /**
+   * Handle a List Invalidations Command from the SDK.
+   */
+  async listInvalidations(
+    command: SimListInvalidationsCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimListInvalidationsCommandOutput> {
+    return await this.commands.invalidations.listInvalidations(
+      command,
+      options,
+    );
   }
 
   /**
@@ -249,38 +261,6 @@ export class SimCloudFront extends SimCloudFrontCaching {
     return this.cloudFrontFunctions.get(
       cloudFrontFunctionName as SimCloudFrontFunctionName,
     );
-  }
-
-  /**
-   * Store a simulated origin access control.
-   *
-   * There is no CreateOriginAccessControl command here, so CloudFormation is
-   * the only thing that makes one, and this is how it hands it over. A name
-   * another origin access control already holds is refused, as CloudFront
-   * refuses one.
-   */
-  addOriginAccessControl(
-    originAccessControl: SimCloudFrontOriginAccessControl,
-  ): void {
-    this.originAccessControls.add(originAccessControl);
-  }
-
-  /**
-   * Forget a simulated origin access control.
-   */
-  removeOriginAccessControl(
-    originAccessControlId: SimCloudFrontOriginAccessControlId,
-  ): void {
-    this.originAccessControls.remove(originAccessControlId);
-  }
-
-  /**
-   * Get a simulated origin access control by ID.
-   */
-  getOriginAccessControlById(
-    originAccessControlId: SimCloudFrontOriginAccessControlId | string,
-  ): SimCloudFrontOriginAccessControl | undefined {
-    return this.originAccessControls.byId(originAccessControlId);
   }
 
   /**

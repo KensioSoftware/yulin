@@ -2,7 +2,7 @@ import {
   type SimCfCachingConfiguration,
   SimCloudFrontRegistry,
 } from "./registry/sim-cloud-front-registry.js";
-import { SimCloudFrontPolicies } from "./sim-cloudfront-policies.js";
+import { SimCloudFrontOriginAccessControls } from "./sim-cloudfront-origin-access-controls.js";
 
 /**
  * The cache one simulated CloudFront's Distributions hold, and whether they
@@ -14,7 +14,7 @@ import { SimCloudFrontPolicies } from "./sim-cloudfront-policies.js";
  * `SimCloudFront` extends this, and a caller reaches it on the one service
  * object.
  */
-export class SimCloudFrontCaching extends SimCloudFrontPolicies {
+export class SimCloudFrontCaching extends SimCloudFrontOriginAccessControls {
   protected readonly cloudFrontRegistry: SimCloudFrontRegistry;
 
   constructor(cloudFrontRegistry?: SimCloudFrontRegistry) {

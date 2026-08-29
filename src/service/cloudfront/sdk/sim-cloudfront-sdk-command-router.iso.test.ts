@@ -9,7 +9,10 @@ import {
   DescribeFunctionCommand,
   GetDistributionCommand,
   GetFunctionCommand,
+  GetInvalidationCommand,
+  ListDistributionsCommand,
   ListFunctionsCommand,
+  ListInvalidationsCommand,
   UpdateDistributionCommand,
 } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
@@ -183,24 +186,82 @@ describe("simulated CloudFront SDK Command routing", () => {
     assertIdentical(Buffer.from(got.FunctionCode).toString(), functionCode);
   });
 
+  it("round-trips invalidation Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    await simSdk.simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "invalidated-bucket" }));
+
+    const client = new CloudFrontClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    const distroCreation = await client.send(
+      new CreateDistributionCommand({
+        DistributionConfig: {
+          CallerReference: "sdk-invalidation-ref-1",
+          Origins: {
+            Items: [
+              {
+                Id: "origin1",
+                DomainName: "invalidated-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
+            Quantity: 1,
+          },
+          DefaultCacheBehavior: {
+            TargetOriginId: "origin1",
+            ViewerProtocolPolicy: "redirect-to-https",
+          },
+          Comment: "SDK intercepted invalidations",
+          Enabled: true,
+        },
+      }),
+    );
+
+    assertNonNullable(distroCreation.Distribution?.Id);
+    const distributionId = distroCreation.Distribution.Id;
+
+    const invalidation = await client.send(
+      new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: "sdk-invalidation-batch-1",
+          Paths: { Quantity: 1, Items: ["/*"] },
+        },
+      }),
+    );
+
+    assertNonNullable(invalidation.Invalidation?.Id);
+
+    const got = await client.send(
+      new GetInvalidationCommand({
+        DistributionId: distributionId,
+        Id: invalidation.Invalidation.Id,
+      }),
+    );
+    const listing = await client.send(
+      new ListInvalidationsCommand({ DistributionId: distributionId }),
+    );
+
+    assertIdentical(got.Invalidation?.Id, invalidation.Invalidation.Id);
+    assertIdentical(listing.InvalidationList?.Quantity, 1);
+    assertIdentical(
+      listing.InvalidationList.Items?.[0]?.Id,
+      invalidation.Invalidation.Id,
+    );
+  });
+
   it("rejects a Command simulated CloudFront does not support", async () => {
     using simSdk = new SimSdk();
     const client = new CloudFrontClient({ region: "us-east-1" });
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(
-        new CreateInvalidationCommand({
-          DistributionId: "D123",
-          InvalidationBatch: {
-            CallerReference: "unsupported",
-            Paths: { Quantity: 1, Items: ["/*"] },
-          },
-        }),
-      );
+      await client.send(new ListDistributionsCommand({}));
     });
 
-    assertStringIncludes(error.message, "CreateInvalidationCommand");
+    assertStringIncludes(error.message, "ListDistributionsCommand");
     assertStringIncludes(error.message, "CreateDistributionCommand");
   });
 });
