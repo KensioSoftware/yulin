@@ -6,7 +6,10 @@ import {
   CreateInvalidationCommand,
   DeleteDistributionCommand,
   DeleteFunctionCommand,
+  DescribeFunctionCommand,
   GetDistributionCommand,
+  GetFunctionCommand,
+  ListFunctionsCommand,
   UpdateDistributionCommand,
 } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
@@ -134,6 +137,50 @@ describe("simulated CloudFront SDK Command routing", () => {
     assertUndefined(
       simSdk.simAws.cloudFront().getCloudFrontFunctionByName("intercepted-cff"),
     );
+  });
+
+  it("reads a Function back through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new CloudFrontClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    const functionCode = `
+          function handler(event) {
+            return event.request;
+          }
+        `;
+    await client.send(
+      new CreateFunctionCommand({
+        Name: "readable-cff",
+        FunctionConfig: {
+          Comment: "SDK intercepted CloudFront Function",
+          Runtime: "cloudfront-js-2.0",
+        },
+        FunctionCode: Buffer.from(functionCode),
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    // Listing, describing and getting all go through the router.
+    const listed = await client.send(new ListFunctionsCommand({}));
+    assertIdentical(
+      listed.FunctionList?.Items?.[0]?.FunctionConfig?.Runtime,
+      "cloudfront-js-2.0",
+    );
+
+    const described = await client.send(
+      new DescribeFunctionCommand({ Name: "readable-cff" }),
+    );
+    assertIdentical(
+      described.FunctionSummary?.FunctionConfig?.Comment,
+      "SDK intercepted CloudFront Function",
+    );
+
+    const got = await client.send(
+      new GetFunctionCommand({ Name: "readable-cff", Stage: "LIVE" }),
+    );
+    assertNonNullable(got.FunctionCode);
+    assertIdentical(Buffer.from(got.FunctionCode).toString(), functionCode);
   });
 
   it("rejects a Command simulated CloudFront does not support", async () => {

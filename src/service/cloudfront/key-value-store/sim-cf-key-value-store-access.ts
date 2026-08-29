@@ -2,7 +2,7 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
+import { simCfAuthorize } from "../sim-cf-authorize.js";
 import type { SimCloudFrontKeyValueStore } from "./sim-cf-key-value-store.js";
 import type { SimCloudFrontKeyValueStoreRegistry } from "./sim-cf-key-value-store-registry.js";
 
@@ -38,16 +38,7 @@ export class SimCfKeyValueStoreAccess {
    * Ensure the caller may take an action on a key value store ARN.
    */
   authorize(action: string, resource: string, caller?: SimAwsCaller): void {
-    const decision = this.iam.authorize({ action, resource, caller });
-
-    if (decision.isDenied) {
-      throw new SimIamAccessDenied({
-        principal: decision.caller.principal,
-        reason: decision.denialReason,
-        action,
-        resource,
-      });
-    }
+    simCfAuthorize({ iam: this.iam, action, resource, caller });
   }
 
   /**

@@ -26,6 +26,14 @@ import type {
   SimDeleteFunctionCommandOutput,
 } from "./command/delete-function/delete-function.command.js";
 import type {
+  SimDescribeFunctionCommand,
+  SimDescribeFunctionCommandOutput,
+  SimGetFunctionCommand,
+  SimGetFunctionCommandOutput,
+  SimListFunctionsCommand,
+  SimListFunctionsCommandOutput,
+} from "./command/function/sim-cf-function-command.types.js";
+import type {
   SimGetDistributionCommand,
   SimGetDistributionCommandOutput,
 } from "./command/get-distribution/get-distribution.command.js";
@@ -175,7 +183,7 @@ export class SimCloudFront extends SimCloudFrontPolicies {
     command: SimCreateFunctionCommand,
     options?: SimCloudFrontRequestOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
-    return await this.commands.createFunction(command, options);
+    return await this.commands.functions.createFunction(command, options);
   }
 
   /**
@@ -185,7 +193,37 @@ export class SimCloudFront extends SimCloudFrontPolicies {
     command: SimDeleteFunctionCommand,
     options?: SimCloudFrontRequestOptions,
   ): Promise<SimDeleteFunctionCommandOutput> {
-    return await this.commands.deleteFunction(command, options);
+    return await this.commands.functions.deleteFunction(command, options);
+  }
+
+  /**
+   * Handle a List Functions Command from the SDK.
+   */
+  async listFunctions(
+    command: SimListFunctionsCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimListFunctionsCommandOutput> {
+    return await this.commands.functions.listFunctions(command, options);
+  }
+
+  /**
+   * Handle a Describe Function Command from the SDK.
+   */
+  async describeFunction(
+    command: SimDescribeFunctionCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimDescribeFunctionCommandOutput> {
+    return await this.commands.functions.describeFunction(command, options);
+  }
+
+  /**
+   * Handle a Get Function Command from the SDK.
+   */
+  async getFunction(
+    command: SimGetFunctionCommand,
+    options?: SimCloudFrontRequestOptions,
+  ): Promise<SimGetFunctionCommandOutput> {
+    return await this.commands.functions.getFunction(command, options);
   }
 
   /**

@@ -19,6 +19,23 @@ export function makeCffFunctionCodeInput(
 }
 
 /**
+ * The source a Function reports as the code it was created with.
+ *
+ * A Function created from source keeps the bytes it was given. One created
+ * from a handler function reference was never given any source, so what it
+ * keeps is that handler's own source text, which is the code it runs.
+ */
+export function cffFunctionCodeSource(
+  functionCodeInput: FunctionCodeInput,
+): Uint8Array {
+  if (functionCodeInput instanceof CffUint8ArrayStowaway) {
+    return Buffer.from(functionCodeInput.handlerFunction.toString());
+  }
+
+  return functionCodeInput ?? new Uint8Array();
+}
+
+/**
  * A little trick to allow passing a handler function into CreateFunctionCommand
  * input as if it were a Uint8Array without TypeScript complaining.
  */

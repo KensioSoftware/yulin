@@ -7,6 +7,7 @@ import {
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
 import { SimCloudFrontPreconditionFailed } from "../error/sim-cf-key-value-store.error.js";
+import { makeSimCloudFrontETag } from "../sim-cf-etag.js";
 import {
   type SimCloudFrontKeyValuePair,
   SimCloudFrontKeyValueStoreKeys,
@@ -234,5 +235,5 @@ export function makeKeyValueStoreId(): SimCloudFrontKeyValueStoreId {
  * Generate a fake ETag, in the shape CloudFront gives one.
  */
 export function makeKeyValueStoreETag(): string {
-  return faker.helpers.fromRegExp(/E[0-9A-Z]{13}/);
+  return makeSimCloudFrontETag();
 }

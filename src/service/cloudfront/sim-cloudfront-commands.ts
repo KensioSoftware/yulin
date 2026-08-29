@@ -16,24 +16,12 @@ import type {
   SimCreateDistributionCommandOutput,
 } from "./command/create-distribution/create-distribution.command.js";
 import { CreateDistributionCommandHandler } from "./command/create-distribution/create-distribution.handler.js";
-import type {
-  SimCreateFunctionCommand,
-  SimCreateFunctionCommandOutput,
-} from "./command/create-function/create-function.command.js";
-import {
-  CreateFunctionCommandHandler,
-  type SimCloudFrontFunctionMap,
-} from "./command/create-function/create-function.handler.js";
+import type { SimCloudFrontFunctionMap } from "./command/create-function/create-function.handler.js";
 import type {
   SimDeleteDistributionCommand,
   SimDeleteDistributionCommandOutput,
 } from "./command/delete-distribution/delete-distribution.command.js";
 import { DeleteDistributionCommandHandler } from "./command/delete-distribution/delete-distribution.handler.js";
-import type {
-  SimDeleteFunctionCommand,
-  SimDeleteFunctionCommandOutput,
-} from "./command/delete-function/delete-function.command.js";
-import { DeleteFunctionCommandHandler } from "./command/delete-function/delete-function.handler.js";
 import type {
   SimGetDistributionCommand,
   SimGetDistributionCommandOutput,
@@ -65,6 +53,7 @@ import { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-s
 import { SimCloudFrontKeyValueStoreRegistry } from "./key-value-store/sim-cf-key-value-store-registry.js";
 import { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 import { SimCffKeyValueStoreUsers } from "./cff/kvs/sim-cff-key-value-store-users.js";
+import { SimCfFunctionCommands } from "./cff/sim-cf-function-commands.js";
 
 /**
  * How one simulated CloudFront is put together.
@@ -116,17 +105,6 @@ interface SimCloudFrontDistributionState {
 }
 
 /**
- * The state every CloudFront Function command works on.
- */
-interface SimCloudFrontFunctionState {
-  readonly accountId: SimAwsAccountId;
-  readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
-  readonly iam: SimIamInterServiceAuthZ;
-  readonly background: BackgroundScheduler;
-  readonly keyValueStores: SimCloudFrontKeyValueStoreRegistry;
-}
-
-/**
  * The commands of one simulated CloudFront, and the state they share.
  *
  * Every command authorizes against the same IAM and works on the same
@@ -153,8 +131,12 @@ export class SimCloudFrontCommands {
    */
   public readonly edgeFunctions: SimCfEdgeFunctions | undefined;
 
+  /**
+   * The CloudFront Function commands, and the Functions they work on.
+   */
+  public readonly functions: SimCfFunctionCommands;
+
   private readonly distributionState: SimCloudFrontDistributionState;
-  private readonly functionState: SimCloudFrontFunctionState;
   private readonly configurationState: SimCfDistributionConfigurationState;
 
   constructor(properties: SimCloudFrontCommandsProperties) {
@@ -184,13 +166,13 @@ export class SimCloudFrontCommands {
       iam,
       background,
     };
-    this.functionState = {
+    this.functions = new SimCfFunctionCommands({
       accountId,
       cloudFrontFunctions,
       iam,
       background,
       keyValueStores,
-    };
+    });
     this.configurationState = {
       s3OriginResolver,
       customOriginDispatcher,
@@ -267,31 +249,5 @@ export class SimCloudFrontCommands {
     return await new DeleteDistributionCommandHandler(
       this.distributionState,
     ).handle(command, options);
-  }
-
-  /**
-   * Handle a Create Function Command from the SDK.
-   */
-  async createFunction(
-    command: SimCreateFunctionCommand,
-    options?: SimCloudFrontRequestOptions,
-  ): Promise<SimCreateFunctionCommandOutput> {
-    return await new CreateFunctionCommandHandler(this.functionState).handle(
-      command,
-      options,
-    );
-  }
-
-  /**
-   * Handle a Delete Function Command from the SDK.
-   */
-  async deleteFunction(
-    command: SimDeleteFunctionCommand,
-    options?: SimCloudFrontRequestOptions,
-  ): Promise<SimDeleteFunctionCommandOutput> {
-    return await new DeleteFunctionCommandHandler(this.functionState).handle(
-      command,
-      options,
-    );
   }
 }

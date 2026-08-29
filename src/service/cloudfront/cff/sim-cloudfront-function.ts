@@ -7,6 +7,10 @@ import {
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
 import type { SimCloudFrontKeyValueStore } from "../key-value-store/sim-cf-key-value-store.js";
+import {
+  SimCffConfiguration,
+  type SimCffConfigurationProperties,
+} from "./sim-cff-configuration.js";
 import { cffCloudFrontModule } from "./kvs/cff-cloudfront-module.js";
 import { simCffCloudFrontGlobal } from "./kvs/sim-cff-cloudfront-global.js";
 
@@ -20,7 +24,7 @@ export type CloudFrontFunctionStatus =
   | "UNASSOCIATED"
   | "ASSOCIATED";
 
-interface SimCloudFrontFunctionProperties {
+interface SimCloudFrontFunctionProperties extends SimCffConfigurationProperties {
   name: SimCloudFrontFunctionName | string;
   status?: CloudFrontFunctionStatus;
   readonly accountId?: SimAwsAccountId;
@@ -45,6 +49,11 @@ export class SimCloudFrontFunction {
   public readonly name: SimCloudFrontFunctionName;
   public readonly accountId: SimAwsAccountId;
 
+  /**
+   * What this Function was created with, which every read of it reports.
+   */
+  public readonly config: SimCffConfiguration;
+
   #status: CloudFrontFunctionStatus;
   private readonly handlerFunction: CloudFrontFunction.Handler;
   private readonly eventAdapter: SimCffEventAdapter;
@@ -63,6 +72,7 @@ export class SimCloudFrontFunction {
     this.name = name as SimCloudFrontFunctionName;
     this.#status = status;
     this.accountId = accountId;
+    this.config = new SimCffConfiguration(properties);
     this.handlerFunction = handlerFunction;
     this.eventAdapter = eventAdapter;
     this.associatedKeyValueStore = properties.keyValueStore;

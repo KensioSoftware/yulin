@@ -1260,6 +1260,84 @@ service does. A test that deploys the Stack reports the overrun where the rest o
 ahead of `cdk deploy`. A handler passed as a function reference carries no source to count, and the
 limit leaves it alone.
 
+### Reading a Function back
+
+`ListFunctions` reports the Functions the Account holds. Each carries the `FunctionConfig` it was
+created with and the `FunctionMetadata` CloudFront gave it. `DescribeFunction` reports one by name,
+and `GetFunction` reports its code. A test that wants to know which Function a stack deployed, and
+on which runtime, asks one of these.
+
+```typescript sim-cloudfront-function-read
+/**
+ * Reading a deployed CloudFront Function back.
+ */
+
+import {
+  CreateFunctionCommand,
+  DescribeFunctionCommand,
+  GetFunctionCommand,
+  ListFunctionsCommand,
+} from "@aws-sdk/client-cloudfront";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCloudFront = simAws.cloudFront();
+
+await simCloudFront.createFunction(
+  new CreateFunctionCommand({
+    Name: "beacon",
+    FunctionConfig: {
+      Comment: "Answers the analytics beacon",
+      Runtime: "cloudfront-js-2.0",
+    },
+    FunctionCode: Buffer.from(`
+      function handler(event) {
+        return { statusCode: 204, statusDescription: "No Content" };
+      }
+    `),
+  }),
+);
+
+// CloudFront publishes a new Function in the background.
+await simAws.backgroundTasksComplete();
+
+const listed = await simCloudFront.listFunctions(new ListFunctionsCommand({}));
+
+// cloudfront-js-2.0
+console.log(listed.FunctionList.Items[0]?.FunctionConfig.Runtime);
+
+const described = await simCloudFront.describeFunction(
+  new DescribeFunctionCommand({ Name: "beacon", Stage: "LIVE" }),
+);
+
+// Answers the analytics beacon
+console.log(described.FunctionSummary.FunctionConfig.Comment);
+
+const got = await simCloudFront.getFunction(
+  new GetFunctionCommand({ Name: "beacon" }),
+);
+
+// The source the Function was created with.
+console.log(Buffer.from(got.FunctionCode).toString());
+```
+
+`Stage` picks the copy to read. A Function is created into `DEVELOPMENT` and reaches `LIVE` once
+CloudFront has published it, and an omitted `Stage` means `DEVELOPMENT`, as it does on AWS. Asking
+for the `LIVE` copy of a Function still waiting to publish fails with `NoSuchFunctionExists`, and so
+does a name the Account holds no Function under.
+
+`CreatedTime` and `LastModifiedTime` come off the simulated clock. Freezing time before the deploy
+pins both to an instant the test picked (see
+[Controlling simulated time](https://yulinsim.dev/time/ "Simulated time usage docs")).
+
+A Function backed by a handler function reference was given no source to keep. `GetFunction` answers
+with that handler's own source text. That is the code the Function runs.
+
+The whole list comes back. `Marker` and `MaxItems` paging is left out, matching the paging left out
+of the other simulated listings. `UpdateFunction`, `PublishFunction` and `TestFunction` are not
+simulated.
+
 ### Calling a Function handler without a Distribution
 
 A test of the handler on its own, with no Distribution in front of it, still has to pass it a whole
@@ -2851,7 +2929,8 @@ Sim CloudFront currently supports:
 
 - `CreateDistributionCommand`, `GetDistributionCommand`, `UpdateDistributionCommand` and
   `DeleteDistributionCommand`
-- `CreateFunctionCommand` and `DeleteFunctionCommand`
+- `CreateFunctionCommand`, `ListFunctionsCommand`, `DescribeFunctionCommand`, `GetFunctionCommand`
+  and `DeleteFunctionCommand`
 - Refusing Function code over CloudFront's 10 KB size limit, with `FunctionSizeLimitExceeded`
 - Key value stores, through both the CloudFront client and the key value store data client
 - S3 Origins backed by sim S3 Buckets, reading them as the Bucket policy allows
