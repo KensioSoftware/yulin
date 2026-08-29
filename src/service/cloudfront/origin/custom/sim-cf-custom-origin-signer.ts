@@ -87,18 +87,20 @@ export class SimCfCustomOriginSigner {
  * POST or PUT that carried no hash through a signing origin access control is
  * refused at the Origin, which is what real CloudFront and Lambda do with one.
  *
- * A viewer's own header travels with the rest of its headers, so nothing is
- * stated for it here.
+ * The viewer's own header is restated here rather than left to travel with the
+ * rest of them, since the Behavior's policies decide which of the viewer's
+ * headers reach the Origin and a signature is not theirs to withhold.
  *
  * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html
  */
 function payloadDeclaration(viewerRequest: Request): Record<string, string> {
-  if (
-    !bodyCarryingMethods.has(viewerRequest.method.toUpperCase()) ||
-    viewerRequest.headers.has(simIamSigV4ContentSha256Header)
-  ) {
+  if (!bodyCarryingMethods.has(viewerRequest.method.toUpperCase())) {
     return {};
   }
 
-  return { [simIamSigV4ContentSha256Header]: simIamSigV4UnsignedPayload };
+  return {
+    [simIamSigV4ContentSha256Header]:
+      viewerRequest.headers.get(simIamSigV4ContentSha256Header) ??
+      simIamSigV4UnsignedPayload,
+  };
 }

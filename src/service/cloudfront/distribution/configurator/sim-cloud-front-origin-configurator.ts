@@ -13,6 +13,7 @@ import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-acce
 import { assertSimCfOacOriginType } from "../../origin-access-control/sim-cf-oac-origin-type.js";
 import { SimCloudFrontInvalidOriginAccessControl } from "../../error/sim-cloudfront.error.js";
 import { simCfOriginCustomHeaders } from "../../origin/sim-cf-origin-custom-headers.js";
+import type { SimCfBehaviorPolicyRegistries } from "../../origin-request-policy/sim-cf-behavior-forwarded.js";
 
 /**
  * Applies Origin configuration to a sim CloudFront Distribution.
@@ -28,6 +29,7 @@ export class SimCloudFrontOriginConfigurator {
   constructor(
     private readonly s3OriginResolver: SimCloudFrontS3OriginResolver,
     private readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry,
+    private readonly policies: SimCfBehaviorPolicyRegistries,
     private readonly customOriginDispatcher?: SimCfCustomOriginDispatcher,
   ) {}
 
@@ -93,6 +95,7 @@ export class SimCloudFrontOriginConfigurator {
           originPath: origin.OriginPath,
           dispatcher: this.customOriginDispatcher,
           customHeaders,
+          policies: this.policies,
           ...(originAccessControl !== undefined && { originAccessControl }),
         }),
       );

@@ -1,10 +1,20 @@
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
 import { stripSimAwsControlHeaders } from "../../../iam/request/sim-aws-control-headers.js";
+import type { SimCfForwardedToOrigin } from "../../origin-request-policy/sim-cf-forwarded-to-origin.js";
+import {
+  simCfForwardedOriginHeaders,
+  simCfForwardedOriginSearch,
+} from "./sim-cf-custom-origin-forwarding.js";
 
 interface SimCfCustomOriginRequestProperties {
   readonly domainName: string;
   readonly originPath: string;
   readonly request: Request;
+  /**
+   * What the Behavior's cache policy and origin request policy carry to the
+   * Origin between them.
+   */
+  readonly forwarded: SimCfForwardedToOrigin;
   /**
    * The Origin's own custom headers, keyed by lower-case header name.
    */
@@ -20,16 +30,20 @@ interface SimCfCustomOriginRequestProperties {
 /**
  * Build the request sim CloudFront sends on to a custom Origin.
  *
- * CloudFront keeps the viewer's method, headers, query string and body, sends
- * the Origin's own domain as the host, and prefixes the Origin path to the
- * request path. The Origin domain is rewritten to its Yulin-local form here,
- * so that an AWS endpoint hostname is resolved by the same host handling that
- * serves the simulated environment on localhost.
+ * CloudFront keeps the viewer's method and body, prefixes the Origin path to
+ * the request path, and sends the Origin's own domain as the host. Of the
+ * viewer's headers, cookies and query strings it sends what the Behavior's two
+ * policies name between them and drops the rest. An Origin reads what the
+ * Distribution was configured to tell it.
+ *
+ * The Origin domain is rewritten to its Yulin-local form here, so that an AWS
+ * endpoint hostname is resolved by the same host handling that serves the
+ * simulated environment on localhost.
  */
 export function simCfCustomOriginRequest(
   properties: SimCfCustomOriginRequestProperties,
 ): Request {
-  const { request } = properties;
+  const { request, forwarded } = properties;
   const viewerUrl = new URL(request.url);
 
   const originUrl = new SimAwsLocalUrl({
@@ -39,9 +53,10 @@ export function simCfCustomOriginRequest(
     properties.originPath,
     viewerUrl.pathname,
   );
-  originUrl.search = viewerUrl.search;
+  originUrl.search = simCfForwardedOriginSearch(viewerUrl.search, forwarded);
 
-  const headers = new Headers(request.headers);
+  const headers = simCfForwardedOriginHeaders(request.headers, forwarded);
+
   headers.set("host", originUrl.host);
 
   // Who the Origin request is from is the Origin's business, not the viewer's,

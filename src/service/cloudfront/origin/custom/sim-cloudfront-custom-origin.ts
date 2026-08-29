@@ -6,6 +6,10 @@ import {
 } from "./sim-cf-custom-origin-edge.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
+import {
+  simCfBehaviorForwardedToOrigin,
+  type SimCfBehaviorPolicyRegistries,
+} from "../../origin-request-policy/sim-cf-behavior-forwarded.js";
 import type { SimCfCustomOriginDispatcher } from "./sim-cf-custom-origin-dispatcher.js";
 import { simCfCustomOriginRequest } from "./sim-cf-custom-origin-request.js";
 import { SimCfCustomOriginSigner } from "./sim-cf-custom-origin-signer.js";
@@ -21,6 +25,13 @@ interface SimCloudFrontCustomOriginProperties {
    * keyed by lower-case header name.
    */
   readonly customHeaders?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The policies a Behavior's forwarding is read from, which decide what of
+   * the viewer's request reaches this Origin. Without them a Behavior names no
+   * policy this Origin can read, and carries what CloudFront sends of its own
+   * accord and nothing else.
+   */
+  readonly policies?: SimCfBehaviorPolicyRegistries | undefined;
 }
 
 /**
@@ -56,6 +67,7 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
   private readonly originId: string;
   private readonly dispatcher: SimCfCustomOriginDispatcher;
   private readonly signer: SimCfCustomOriginSigner;
+  private readonly policies: SimCfBehaviorPolicyRegistries | undefined;
 
   constructor(
     private readonly properties: SimCloudFrontCustomOriginProperties,
@@ -67,10 +79,15 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
     this.originAccessControl = properties.originAccessControl;
     this.signer = new SimCfCustomOriginSigner(properties.originAccessControl);
     this.customHeaders = properties.customHeaders ?? {};
+    this.policies = properties.policies;
   }
 
   /**
    * Fetch the request from the simulated service behind this Origin.
+   *
+   * The Behavior the request resolved to decides what of the viewer's headers,
+   * cookies and query strings travels, so the policies are read per request
+   * rather than when the Origin was built.
    *
    * An Origin domain naming nothing in the simulation fails here rather than
    * being sent to the real domain, because a simulated Distribution reaching
@@ -81,6 +98,10 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
       domainName: this.domainName,
       originPath: this.originPath,
       request: request.req,
+      forwarded: simCfBehaviorForwardedToOrigin(
+        request.behavior,
+        this.policies,
+      ),
       customHeaders: this.customHeaders,
       signingHeaders: this.signer.forRequest(request),
     });

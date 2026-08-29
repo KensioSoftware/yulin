@@ -363,12 +363,11 @@ two `EnableAcceptEncoding` flags, along with the behaviour set each section may 
 `HeadersConfig` is the narrow one, taking `none` and `whitelist` where the other two also take
 `allExcept` and `all`.
 
-`cfn/cache-policy/` reads that half of the Resource. `sim-cfn-cf-cache-policy-section.ts` holds one
-reader for all three sections, along with the field names and the behaviour set each one takes. An
-absent section comes out as `none`, and a behaviour outside the set for its section fails the Stack,
-naming the Resource. `sim-cfn-cf-cache-policy-config.ts` reads the TTLs, giving one the template
-left out the default CloudFront applies, including the two cases where a long `MinTTL` raises the
-`DefaultTTL` and a long `DefaultTTL` raises the `MaxTTL`.
+`cfn/cache-policy/` reads that half of the Resource. `sim-cfn-cf-cache-policy-section.ts` holds the
+field names and the behaviour set each of the three sections takes, and `cfn/policy/` holds the
+reader they share with the origin request policy sections. `sim-cfn-cf-cache-policy-config.ts` reads
+the TTLs, giving one the template left out the default CloudFront applies, including the two cases
+where a long `MinTTL` raises the `DefaultTTL` and a long `DefaultTTL` raises the `MaxTTL`.
 
 `cache/` reads the policy on every request. See the Caching section below.
 
@@ -380,15 +379,32 @@ and update time as the response headers policy refusal does.
 ## Origin request policies
 
 `origin-request-policy/` holds the model and its registry, laid out the same way as the cache
-policies above. A `SimCloudFrontOriginRequestPolicy` is a name, an ID and an optional comment.
-`sim-cf-managed-origin-request-policies.ts` builds CloudFront's eight managed policies under the IDs
-AWS publishes, and the registry keeps them in their own namespace. There is no
+policies above. A `SimCloudFrontOriginRequestPolicy` is a name, an ID, an optional comment and a
+`SimCfOriginRequestForwarding`. `sim-cf-managed-origin-request-policies.ts` builds CloudFront's
+eight managed policies under the IDs AWS publishes, each with the three sections AWS publishes
+beside the ID, and the registry keeps them in their own namespace. There is no
 CreateOriginRequestPolicy command, so `cfn/origin-request-policy/` is the only thing that makes one.
 
-The policy carries nothing of `OriginRequestPolicyConfig` beyond `Name` and `Comment`.
-`HeadersConfig`, `CookiesConfig` and `QueryStringsConfig` decide what an Origin fetch carries, and
-sim CloudFront forwards the viewer's request whole. Recording the ID is what lets a test assert
-which policy a Behavior was given.
+`sim-cf-origin-request-forwarding.ts` holds the three sections of `OriginRequestPolicyConfig` and
+the behaviour set each one may name. `HeadersConfig` is the wide one here, taking `allViewer` and
+`allViewerAndWhitelistCloudFront` on top of the four a cache key section takes.
+
+`cfn/policy/sim-cfn-cf-policy-section.ts` reads one `<name>Config` section for both policy kinds.
+The two write the same fields and differ only in the behaviours each section offers, so
+`cfn/cache-policy/` and `cfn/origin-request-policy/` each hand it their own three specs. An absent
+section comes out as `none`, and a behaviour outside the set for its section fails the Stack, naming
+the Resource.
+
+`sim-cf-forwarded-to-origin.ts` is what an Origin fetch reads. A `SimCfForwardedToOrigin` holds the
+Behavior's cache key and its forwarding together, and answers whether one header, cookie or query
+string travels. CloudFront sends the union of the two, since an Origin has to be able to answer for
+the key its response was stored under. `sim-cf-behavior-forwarded.ts` resolves that pair from a
+Behavior's two policy IDs, per request, as `cache/` resolves the cache policy.
+
+`SimCloudFrontCustomOrigin` holds the two registries and resolves the pair on every fetch, and
+`simCfCustomOriginRequest` narrows the request to it. A Behavior naming neither policy carries
+neither, which is what real CloudFront does with one. The narrowing does not reach
+`SimCloudFrontS3Origin`, which reads its Bucket through GetObject and builds no request to narrow.
 
 `SimCfBehaviorOriginRequestPolicy` refuses an `OriginRequestPolicyId` naming nothing with
 `SimCloudFrontNoSuchOriginRequestPolicy`, at creation and update time as the cache policy refusal

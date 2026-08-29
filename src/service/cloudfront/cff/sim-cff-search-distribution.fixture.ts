@@ -5,6 +5,7 @@ import type { SimPayload2Event } from "../../../serve/payload-2/sim-payload-2-ev
 import { simHttpApiLambdaProxyFactory } from "../../apigatewayv2/api/sim-http-api-lambda-proxy.factory.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { simCfDistroConfigFactory } from "../distribution/sim-cf-distro-config.factory.js";
+import { simCfManagedOriginRequestPolicyIds } from "../origin-request-policy/sim-cf-managed-origin-request-policies.js";
 import { makeCffFunctionCodeInput } from "./function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
 
@@ -50,6 +51,9 @@ export async function searchDistributionUrl(
         DefaultCacheBehavior: {
           TargetOriginId: "SiteOrigin",
           ViewerProtocolPolicy: "allow-all",
+          // The Origin echoes the query it is sent, which reaches it only
+          // where the Behavior forwards it.
+          OriginRequestPolicyId: simCfManagedOriginRequestPolicyIds.allViewer,
           FunctionAssociations: {
             Items: [
               {

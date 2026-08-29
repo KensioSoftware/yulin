@@ -3,7 +3,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCloudFrontCachePolicy } from "../../cache-policy/sim-cf-cache-policy.js";
 import { simCfnCfCachePolicyCacheKey } from "./sim-cfn-cf-cache-policy-key.js";
-import type { SimCfnCfCachePolicyRefuse } from "./sim-cfn-cf-cache-policy-section.js";
+import type { SimCfnCfPolicyRefuse } from "../policy/sim-cfn-cf-policy-section.js";
 
 /**
  * Reads an AWS::CloudFront::CachePolicy Resource into a simulated policy.
@@ -21,7 +21,7 @@ export class SimCfnCfCachePolicyConfig {
   /**
    * Refuse this Resource, saying which part of it could not be read.
    */
-  private readonly refuse: SimCfnCfCachePolicyRefuse = (detail) => {
+  private readonly refuse: SimCfnCfPolicyRefuse = (detail) => {
     throw new Error(
       `Invalid AWS::CloudFront::CachePolicy ${this.resource.logicalId}: ${detail}`,
     );
@@ -80,7 +80,7 @@ export class SimCfnCfCachePolicyConfig {
 function ttlSeconds(
   config: Record<string, unknown>,
   field: string,
-  refuse: SimCfnCfCachePolicyRefuse,
+  refuse: SimCfnCfPolicyRefuse,
 ): number | undefined {
   // oxlint-disable-next-line security/detect-object-injection
   const value = config[field];
