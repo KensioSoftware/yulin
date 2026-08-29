@@ -252,3 +252,40 @@ describe("counting unique visitors from a salted digest", () => {
     assertObjectEquals(answered.rows, [["2"]]);
   });
 });
+
+describe("capping a count the way a rule caps one", () => {
+  it("caps a count per group and leaves a smaller one alone", async () => {
+    // Given four rows, three of them from the one address.
+    const simulation = await aVisitSimulation();
+
+    // When each address is counted under a cap of two.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT c_ip, least(count(*), 2) AS counted FROM rainlytics.visits " +
+        "GROUP BY c_ip ORDER BY c_ip",
+    );
+
+    // Then the engine runs the cap rather than reading back a declaration,
+    // which is what a rule written as a CASE was standing in for.
+    assertIdentical(answered.answeredBy, "engine");
+    assertObjectEquals(answered.rows, [
+      ["198.51.100.7", "2"],
+      ["203.0.113.4", "1"],
+    ]);
+  });
+
+  it("takes a floor under a count as well", async () => {
+    // Given the same rows.
+    const simulation = await aVisitSimulation();
+
+    // When the count is held up to sixty.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT greatest(count(*), 60) AS counted FROM rainlytics.visits",
+    );
+
+    // Then the larger of the two answers.
+    assertIdentical(answered.answeredBy, "engine");
+    assertObjectEquals(answered.rows, [["60"]]);
+  });
+});

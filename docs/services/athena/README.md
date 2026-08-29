@@ -383,9 +383,14 @@ its declared result.
 | Binary        | `md5`, `sha1`, `sha256`, `sha512`, `xxhash64`, `murmur3`, `crc32`, `to_hex`, `from_hex`, `to_base64`, `from_base64`, `to_utf8`, `from_utf8`                                                           |
 | URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`, `url_decode`, `url_encode`                  |
 | Approximate   | `approx_distinct`, `approx_percentile`                                                                                                                                                                |
+| Comparison    | `least`, `greatest`                                                                                                                                                                                   |
 
 `substr` and `format` are SQLite's own. Both count from one and take the same `%s` and `%d` a
 statement writes, so shadowing either would replace something that works.
+
+`least` and `greatest` take two arguments or more. Numbers order numerically and text orders by its
+code units, matching SQLite's own `min` and `max` in their wider forms. Trino refuses a call mixing
+the two types and this answers one, ordering everything as text. A `varbinary` argument raises.
 
 The hashing functions answer with bytes and `to_hex` writes those bytes in the upper case Trino
 writes them in. Node carries every digest here apart from xxHash64 and MurmurHash3, and both of
@@ -404,7 +409,8 @@ instant the query started, which is what the execution records.
 
 A function that cannot answer faithfully raises rather than guessing, and the query falls back.
 `date_add` with a unit Trino does not name, `slice` starting at zero, `array_join` over an array of
-objects, and `regexp_extract` naming a capture group the pattern has not got all land there. A null
+objects, `least` over a `varbinary`, and `regexp_extract` naming a capture group the pattern has not
+got all land there. A null
 answer would be a wrong answer wearing the shape of a right one.
 
 A function answers null where any argument is null, the way Trino's do. An argument left out takes

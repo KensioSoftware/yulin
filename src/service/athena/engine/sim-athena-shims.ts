@@ -4,6 +4,7 @@ import { simAthenaInstallAggregateShims } from "./sim-athena-aggregate-shims.js"
 import { simAthenaInstallArrayShims } from "./sim-athena-array-shims.js";
 import { simAthenaInstallBinaryShims } from "./sim-athena-binary-shims.js";
 import { simAthenaInstallClockShims } from "./sim-athena-clock-shims.js";
+import { simAthenaInstallComparisonShims } from "./sim-athena-comparison-shims.js";
 import { simAthenaInstallDateArithmeticShims } from "./sim-athena-date-arithmetic-shims.js";
 import { simAthenaInstallDateShims } from "./sim-athena-date-shims.js";
 import { simAthenaInstallJsonDocumentShims } from "./sim-athena-json-document-shims.js";
@@ -35,4 +36,5 @@ export function simAthenaInstallShims(
   simAthenaInstallRegexpShims(database);
   simAthenaInstallUrlShims(database);
   simAthenaInstallAggregateShims(database);
+  simAthenaInstallComparisonShims(database);
 }
