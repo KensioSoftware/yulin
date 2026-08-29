@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -120,11 +121,12 @@ describe("SimLambdaCloudFormationResourceFactory", () => {
     // When the Function resource type is created.
     const created = await factory.create("Function", resource, context);
 
-    // Then a function named from the logical ID is created with AWS-like
-    // default configuration.
-    const storedFunction = simLambda.getSimFunctionByName(
-      "DefaultNamedFunction",
-    );
+    // Then the name falls back to the logical ID, since there is no stack
+    // name to put in front of it, and the rest takes AWS-like defaults.
+    assertInstanceOf(created, SimLambdaFunction);
+    assertStringStartsWith(created.name, "DefaultNamedFunction-");
+
+    const storedFunction = simLambda.getSimFunctionByName(created.name);
 
     assertNonNullable(storedFunction);
     assertIdentical(created, storedFunction);

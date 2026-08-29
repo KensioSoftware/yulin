@@ -1,5 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
+import { simCfnIamOptionalString } from "../sim-cfn-iam-optional-string.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,
@@ -44,7 +46,7 @@ export class SimCfnIamUserPropertiesParser {
     return {
       userName:
         this.optionalString(resource, properties["UserName"], "UserName") ??
-        resource.logicalId,
+        simCfnIamPrincipalGeneratedName(resource),
       path: this.optionalString(resource, properties["Path"], "Path"),
       inlinePolicies: this.policiesParser.inlinePolicies(resource, properties),
       managedPolicyArns: this.policiesParser.managedPolicyArns(
@@ -134,16 +136,6 @@ export class SimCfnIamUserPropertiesParser {
     value: SimCfnTemplateValueRecord[string] | undefined,
     label: string,
   ): string | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (typeof value !== "string") {
-      throw new TypeError(
-        `Invalid ${resourceType} ${resource.logicalId}: ${label} must be a string`,
-      );
-    }
-
-    return value;
+    return simCfnIamOptionalString({ resourceType, resource, value, label });
   }
 }

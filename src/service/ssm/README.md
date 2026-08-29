@@ -102,6 +102,11 @@ the template properties and `SimCfnSsmParameterCreator` hands them to PutParamet
 template-created parameter is the same thing an SDK caller would get and the options this simulation
 refuses are refused in one place.
 
+A parameter the template does not name gets one from the stack name and the logical ID, through the
+shared `SimCfnGeneratedResourceName`. How much room the name has depends on the Account and Region,
+since Parameter Store counts the ARN prefix towards the same allowance, and
+`maximumSimSsmParameterNameLength` is where the two agree on the figure.
+
 The one rule that lives in the CloudFormation layer is the type. Real CloudFormation refuses
 `SecureString` for this Resource type whatever Parameter Store itself supports, because the plaintext
 value would sit in the template, so the refusal belongs to the Resource rather than to the

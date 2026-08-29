@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -42,10 +43,13 @@ describe("AWS::Glue::Database properties", () => {
     });
 
     // Then the name is built from the stack and the logical ID, lowercased,
-    // since Glue names are lowercase for Hive compatibility.
-    assertNonNullable(
-      simAws.glue().findDatabase("analytics-stack-logdatabase"),
-    );
+    // since Glue names are lowercase for Hive compatibility, and ends in the
+    // tail CloudFormation puts on a name it generates.
+    const [created] = simAws.glue().allDatabases();
+
+    assertNonNullable(created);
+    assertStringStartsWith(created.name, "analytics-stack-logdatabase-");
+    assertIdentical(created.name, created.name.toLowerCase());
 
     await simAws.backgroundTasksComplete();
   });

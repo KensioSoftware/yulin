@@ -4,21 +4,14 @@ import {
   SimSsmParameterPatternMismatchException,
   SimSsmValidationException,
 } from "../error/sim-ssm.error.js";
-import { ssmParameterArnPrefix } from "./sim-ssm-parameter-arn.js";
+import {
+  maximumSsmParameterArnLength,
+  ssmParameterArnPrefix,
+} from "./sim-ssm-parameter-arn.js";
 
 const allowedCharacters = /^[\w./-]+$/;
 const maxHierarchyLevels = 15;
 const reservedPrefixes = ["aws", "ssm"];
-
-/**
- * The longest a parameter name may be, counting the ARN that precedes it.
- *
- * Real Parameter Store reserves the rest of the 2048 character ARN for its own
- * use, and counts the ARN prefix towards the 1011 characters left. That is why
- * this limit needs the Account and Region: the same name is legal in one
- * Region and too long in another.
- */
-const maxArnLength = 1011;
 
 interface SimSsmParameterNameProperties {
   readonly name: string | undefined;
@@ -159,13 +152,13 @@ export class SimSsmParameterName {
     const arnLength =
       ssmParameterArnPrefix(accountRegionScope).length + this.resource.length;
 
-    if (arnLength <= maxArnLength) {
+    if (arnLength <= maximumSsmParameterArnLength) {
       return;
     }
 
     throw new SimSsmValidationException(
       `Parameter name '${this.value}' makes an ARN of ${String(arnLength)} ` +
-        `characters; Parameter Store allows ${String(maxArnLength)} ` +
+        `characters; Parameter Store allows ${String(maximumSsmParameterArnLength)} ` +
         `including the ARN prefix for this Account and Region`,
     );
   }

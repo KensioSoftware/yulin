@@ -3,6 +3,8 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
+  assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -104,7 +106,7 @@ describe("SSM CloudFormation Parameter deployment", () => {
     assertIdentical(stack.outputs.get("ParameterValue")?.value, "db.internal");
   });
 
-  it("names an unnamed parameter after its logical ID", async () => {
+  it("names an unnamed parameter after the stack and the logical ID", async () => {
     // Given a template leaving Name out, as CDK does for a parameter with no
     // explicit name.
     const simAws = simAwsInEuWest2();
@@ -123,11 +125,16 @@ describe("SSM CloudFormation Parameter deployment", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the parameter is named after its logical ID, as sim CloudFormation
-    // names other unnamed resources.
+    // Then the parameter is named after the stack and the logical ID, as
+    // CloudFormation names one.
+    const parameterName = stack.getResource("FeatureFlags")?.refValue;
+
+    assertTypeString(parameterName);
+    assertStringStartsWith(parameterName, "config-stack-FeatureFlags-");
+
     const read = await simAws
       .ssm()
-      .getParameter(new GetParameterCommand({ Name: "FeatureFlags" }));
+      .getParameter(new GetParameterCommand({ Name: parameterName }));
 
     assertNonNullable(read.Parameter);
     assertIdentical(read.Parameter.Value, "beta,canary");

@@ -12,6 +12,7 @@ import { SimCfnLambdaDeadLetterParser } from "./sim-cfn-lambda-dead-letter-parse
 import { SimCfnLambdaEnvironmentParser } from "./sim-cfn-lambda-environment-parser.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
+import { simCfnLambdaGeneratedFunctionName } from "./sim-cfn-lambda-generated-function-name.js";
 
 export interface SimCfnLambdaFunctionProperties {
   readonly functionName: string;
@@ -149,8 +150,8 @@ export class SimCfnLambdaFunctionPropertiesParser {
   }
 
   /**
-   * The function name defaults to the logical ID, as CloudFormation
-   * effectively names unnamed functions from it.
+   * An unnamed function gets the name CloudFormation generates for it, from
+   * the stack name and the logical ID.
    */
   private functionName(
     resource: SimCfnResource,
@@ -161,7 +162,7 @@ export class SimCfnLambdaFunctionPropertiesParser {
         resource,
         properties["FunctionName"],
         "FunctionName",
-      ) ?? resource.logicalId
+      ) ?? simCfnLambdaGeneratedFunctionName(resource)
     );
   }
 }

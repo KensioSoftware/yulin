@@ -15,6 +15,32 @@ export function ssmParameterArnPrefix(
   return `arn:aws:ssm:${regionName}:${accountId}:parameter/`;
 }
 
+/**
+ * The longest a parameter name may be, counting the ARN that precedes it.
+ *
+ * Real Parameter Store reserves the rest of the 2048 character ARN for its own
+ * use, and counts the ARN prefix towards the 1011 characters left. That is why
+ * this limit needs the Account and Region: the same name is legal in one
+ * Region and too long in another.
+ */
+export const maximumSsmParameterArnLength = 1011;
+
+/**
+ * The longest name a parameter may be given in this Account and Region.
+ *
+ * The ARN prefix comes out of the same allowance the name does, so the room
+ * left for a name depends on how long the Region's name is. A generated name
+ * is trimmed to this so that it is never one PutParameter would then refuse.
+ */
+export function maximumSimSsmParameterNameLength(
+  accountRegionScope: SimAwsAccountRegionScope,
+): number {
+  return (
+    maximumSsmParameterArnLength -
+    ssmParameterArnPrefix(accountRegionScope).length
+  );
+}
+
 interface SimSsmParameterArnProperties {
   readonly resource: string;
   readonly accountRegionScope: SimAwsAccountRegionScope;

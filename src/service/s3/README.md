@@ -799,7 +799,9 @@ Bucket resource creation flow:
 1. determine the Bucket name
 
 - use resolved `BucketName` when it is a string
-- otherwise default to the lowercased logical ID
+- otherwise generate one from the stack name and the logical ID, through the shared
+  `SimCfnGeneratedResourceName` in `sim-cfn-s3-bucket-generated-name.ts`, lower cased afterwards
+  because a bucket name is lowercase and a logical ID usually is not
 
 1. validate the Bucket name
 1. create the Bucket through the normal simulated `createBucket` command path

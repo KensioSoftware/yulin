@@ -577,9 +577,12 @@ The other generation options behave as they do on real AWS, being `PasswordLengt
 `IncludeSpace`, and `RequireEachIncludedType`. The last is on unless turned off, and a generated
 password carries one of every character type it was not told to exclude.
 
-A secret with no `Name` is named after its logical ID. Real CloudFormation names it after the stack
-and appends its own random characters. A template cannot rely on the exact generated name either
-way.
+A secret with no `Name` is named from the stack name, the logical ID and a tail derived from both.
+An `ApiSecret` in `db-stack` becomes `db-stack-ApiSecret-` and twelve more characters, where real
+CloudFormation ends the name in twelve random ones. Simulated Secrets Manager then appends its own
+six characters to the ARN, as it does for a secret named by hand. The name is trimmed to the 512
+characters a secret name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 ## Inside a simulated Lambda handler
 

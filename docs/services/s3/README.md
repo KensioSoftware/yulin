@@ -1697,8 +1697,13 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 An `AWS::S3::Bucket` resource carries five properties simulated S3 acts on. Those are `BucketName`,
 `LifecycleConfiguration`, `NotificationConfiguration`, `PublicAccessBlockConfiguration` and
 `WebsiteConfiguration`. See [Lifecycle configuration](#lifecycle-configuration) for the parts of a
-rule that are read. Without `BucketName` the Bucket is named after the resource's logical id,
-lowercased, where real CloudFormation invents a generated name.
+rule that are read.
+
+A Bucket with no `BucketName` is named from the stack name, the logical ID and a tail derived from
+both, lower cased as a bucket name has to be. A `SiteBucket` in `orders-stack` becomes
+`orders-stack-sitebucket-` and twelve more characters, where real CloudFormation ends the name in
+twelve random ones. The name is trimmed to the 63 characters a bucket name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),

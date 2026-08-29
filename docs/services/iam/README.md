@@ -1050,6 +1050,18 @@ is created (the attachment `AttachRolePolicy` records). A name no simulated Role
 answers to fails the resource. Deleting the stack takes the policy back off the Roles still
 carrying it, and then deletes the policy.
 
+A Role with no `RoleName`, a User with no `UserName` and a Managed Policy with no
+`ManagedPolicyName` are each named from the stack name, the logical ID and a tail derived from both.
+A `ServiceRole` in `iam-stack` becomes `iam-stack-ServiceRole-` and twelve more characters, where
+real CloudFormation ends the name in twelve random ones. The case is kept as it was written, the way
+IAM keeps it. A Role name and a User name are trimmed to 64 characters and a policy name to 128, and
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
+
+That name is what an IAM policy scoped by name prefix matches. A deploy Role allowed `iam:CreateRole`
+on `arn:aws:iam::123456789012:role/iam-stack-*` covers the Roles its own stack creates, here and in
+an account.
+
 ```typescript sim-iam-cloudformation
 /**
  * Creating IAM resources through simulated CloudFormation.

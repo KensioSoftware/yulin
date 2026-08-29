@@ -2838,7 +2838,7 @@ For `AWS::Lambda::Function`, `Ref` returns the function name and `Fn::GetAtt` su
 
 Supported function properties:
 
-- `FunctionName` (defaults to the logical ID)
+- `FunctionName` (a function with none is named after the stack and the logical ID)
 - `Role` (typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`, both resolving to the
   role's ARN)
 - `Code` (inline `ZipFile` source string, or `S3Bucket`/`S3Key` fetched from same-scope sim S3)
@@ -2850,6 +2850,12 @@ Supported function properties:
 - `Environment`
 - `DeadLetterConfig`, whose `TargetArn` names a queue or a topic. See
   [retries and destinations in templates](#retries-and-destinations-in-templates)
+
+A function with no `FunctionName` is named from the stack name, the logical ID and a tail derived
+from both. A `RatesFunction` in `orders-stack` becomes `orders-stack-RatesFunction-` and twelve more
+characters, where real CloudFormation ends the name in twelve random ones. The name is trimmed to
+the 64 characters a function name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 Code in a missing bucket fails the deploy AWS-style with a `NoSuchBucket` diagnostic.
 

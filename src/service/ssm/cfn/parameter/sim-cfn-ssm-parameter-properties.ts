@@ -4,6 +4,7 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSsmTag } from "../../command/parameter/parameter.command.js";
+import { simCfnSsmGeneratedParameterName } from "./sim-cfn-ssm-generated-parameter-name.js";
 
 interface SimCfnSsmParameterPropertiesProperties {
   readonly resource: SimCfnResource;
@@ -33,14 +34,13 @@ export class SimCfnSsmParameterProperties {
   /**
    * The parameter name.
    *
-   * An unnamed parameter is named after its logical ID, as sim CloudFormation
-   * names other unnamed resources. Real CloudFormation generates a name from
-   * the stack name and its own random characters, which a template could not
-   * predict anyway.
+   * An unnamed parameter is named after the stack and the logical ID, as
+   * CloudFormation names one.
    */
   name(): string {
     return (
-      this.string(this.properties["Name"], "Name") ?? this.resource.logicalId
+      this.string(this.properties["Name"], "Name") ??
+      simCfnSsmGeneratedParameterName(this.resource)
     );
   }
 
