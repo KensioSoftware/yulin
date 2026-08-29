@@ -17,7 +17,8 @@ export const simCfEdgeHeaderName = "x-sim-aws-cloudfront-edge";
  * The edge a request arrives at when it names none.
  *
  * Every request in a test lands here unless the test says otherwise, and a
- * second request for a key the first one stored is a hit.
+ * second request for a key the first one stored is a hit. A header carrying no
+ * value names no edge, and lands here too.
  */
 export const simCfDefaultEdgeId = "default";
 
@@ -40,7 +41,7 @@ export interface SimCfRequestEdge {
 export function simCfRequestEdge(request: Request): SimCfRequestEdge {
   const named = request.headers.get(simCfEdgeHeaderName)?.trim();
 
-  if (named === undefined) {
+  if (named === undefined || named.length === 0) {
     return { edgeId: simCfDefaultEdgeId, request };
   }
 

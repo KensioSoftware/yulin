@@ -222,15 +222,17 @@ right sim Distribution, Origin and Behavior.
 ## Caching
 
 `cache/` holds the cache itself, and `SimCfContentStage` under `controller/content/` is what the
-pipeline asks. The stage reads the key first. A hit is answered there, and the Origin stage with its
-two origin events runs on a miss alone, the way CloudFront runs them.
+pipeline asks. The stage reads the key first. A hit is answered there, and the Origin stage runs on
+a miss alone, the way CloudFront runs it. Which of the two origin events run on that miss is the
+Origin stage's own business, since an `origin-request` function answering with a response of its own
+leaves the Origin unread and nothing for `origin-response` to run on.
 
-`simCfCacheableKey` decides whether a request has a key at all. Three things leave it without one.
+`simCfCacheableKey` decides whether a request has a key at all. Four things leave it without one.
 Caching may be off for the `SimAws`. The Behavior's `cachePolicyId` may resolve to no policy this
-simulation holds, which covers a Behavior naming none. And the method may be outside the Behavior's
-`cachedMethods`. A policy whose `MaxTTL` is zero counts as caching nothing. That is the `MaxTTL`
-`CachingDisabled` carries, and it keeps that Behavior reading the Origin every time. Nothing
-expires yet, and the other two TTLs decide nothing.
+simulation holds, which covers a Behavior naming none. The policy it resolves to may have a `MaxTTL`
+of zero, which counts as caching nothing. That is the `MaxTTL` `CachingDisabled` carries, and it
+keeps that Behavior reading the Origin every time. And the method may be outside the Behavior's
+`cachedMethods`. Nothing expires yet, and the other two TTLs decide nothing.
 
 `simCfCacheEntryKey` builds the key from the request path, the query strings, headers and cookies
 the policy names, the normalized `Accept-Encoding` where the policy enables gzip or brotli, the

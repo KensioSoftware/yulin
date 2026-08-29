@@ -31,10 +31,11 @@ export interface SimCfContentRequest {
  * Origin, has an error replaced with the Distribution's custom error page, and
  * is stored under the key it missed on.
  *
- * An Origin error stays out of the cache. Real CloudFront holds one for
- * `ErrorCachingMinTTL`, which wants a TTL this simulation has yet to keep.
- * Caching an error with no expiry would leave a Distribution answering with it
- * for the length of the test.
+ * An error stays out of the cache, whether the Origin answered with it or an
+ * origin-response function made one of an Origin's answer. Real CloudFront
+ * holds one for `ErrorCachingMinTTL`, which wants a TTL this simulation has yet
+ * to keep. Caching an error with no expiry would leave a Distribution answering
+ * with it for the length of the test.
  */
 export class SimCfContentStage {
   constructor(
@@ -68,7 +69,11 @@ export class SimCfContentStage {
       originResult.response,
     );
 
-    if (key === undefined || originResult.originStatus >= 400) {
+    if (
+      key === undefined ||
+      originResult.originStatus >= 400 ||
+      response.status >= 400
+    ) {
       return { response, originStatus: originResult.originStatus };
     }
 

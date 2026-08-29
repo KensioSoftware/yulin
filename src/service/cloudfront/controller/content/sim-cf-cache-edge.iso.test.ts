@@ -56,6 +56,27 @@ describe("A sim CloudFront edge cache", () => {
     assertStringNotIncludes(await repeated.text(), simCfEdgeHeaderName);
   });
 
+  it("arrives at the default edge when the header names none", async () => {
+    // Given a Distribution that has answered a request at its default edge.
+    const simAws = new SimAws();
+    const reads: OriginReads = { count: 0 };
+    const distributionId = await distributionServing(
+      simAws,
+      await countingOrigin(simAws, reads),
+    );
+
+    await simCfSiteRequest(simAws, distributionId, "/greeting");
+
+    // When a request carries the header with nothing in it.
+    const blank = await simCfSiteRequest(simAws, distributionId, "/greeting", {
+      headers: { [simCfEdgeHeaderName]: " " },
+    });
+
+    // Then it lands at the same edge, and the cache answers it.
+    assertIdentical(await readNumber(blank), 1);
+    assertIdentical(reads.count, 1);
+  });
+
   it("sends the Origin the body of a request that named an edge", async () => {
     // Given a Distribution in front of an Origin that says what it was sent.
     const simAws = new SimAws();
