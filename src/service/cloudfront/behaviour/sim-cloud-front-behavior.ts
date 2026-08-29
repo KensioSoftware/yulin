@@ -6,6 +6,10 @@ export interface SimCloudFrontBehavior {
   pathPattern?: string; // undefined/default = *
   targetOriginName: string;
   allowedMethods: Set<string>;
+  /**
+   * The methods this Behavior caches a response for. A request made with any
+   * other method reaches the Origin every time.
+   */
   cachedMethods: Set<string>;
   viewerProtocolPolicy?: "allow-all" | "redirect-to-https" | "https-only";
   originPath?: string;
@@ -15,7 +19,8 @@ export interface SimCloudFrontBehavior {
   responseHeadersPolicyId?: string | undefined;
   /**
    * The cache policy this Behavior was given, whether a template created it or
-   * AWS manages it. The simulated cache does not read it yet.
+   * AWS manages it. It decides what the Distribution's cache keys on, and a
+   * Behavior naming no policy this simulation holds caches nothing.
    */
   cachePolicyId?: string | undefined;
   /**

@@ -263,7 +263,8 @@ A viewer-response function never sees a custom error page. CloudFront runs no vi
 function once the Origin has answered 400 or higher, and simulated CloudFront does the same, for a
 CloudFront Function and a Lambda@Edge function alike. The status the Origin returned is what decides
 that, whatever `ResponseCode` puts in its place. `ErrorCachingMinTTL` is accepted and ignored, along
-with a rule that sets nothing else, since sim CloudFront has no cache to apply it to.
+with a rule that sets nothing else. An Origin error is never cached here, so there is no TTL for it
+to shorten.
 
 ## Serve simulated CloudFront on localhost
 
@@ -2309,8 +2310,9 @@ three TTLs, the three sections of `ParametersInCacheKeyAndForwardedToOrigin` and
 `EnableAcceptEncoding` flags. A test can assert that its Behavior leaves the query string out of the
 cache key before sim CloudFront has a cache to key.
 
-Nothing acts on any of it. Sim CloudFront holds no edge cache, and every request reaches the Origin
-whatever the policy would have cached on real CloudFront.
+The Distribution reads the policy on every request. The cache key comes from the three sections and
+the two flags, and a `MaxTTL` of zero is what makes a Behavior on `CachingDisabled` reach the Origin
+every time. [Caching](#caching) below covers what is stored and what is keyed on.
 
 A TTL the template left out falls back to CloudFront's own default (0 seconds for `MinTTL`, one day
 for `DefaultTTL` and 365 days for `MaxTTL`), and a `MinTTL` above a day raises the `DefaultTTL` with
@@ -2348,6 +2350,174 @@ way an absent response headers policy does, and the Behavior reports no policy.
 
 `CreateDistribution` and `UpdateDistribution` still refuse the same ID with `NoSuchCachePolicy`, as
 real CloudFront refuses it.
+
+## Caching
+
+A Distribution holds a cache. A request for a key it already holds is answered from that cache,
+leaving the Origin unread. The Behavior's cache policy decides the key, and decides whether the
+Behavior has one at all.
+
+```typescript sim-cloudfront-caching
+/**
+ * Serving a request from a Distribution's cache, and missing it at another
+ * edge.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.s3();
+
+  await simS3.createBucket(new CreateBucketCommand({ Bucket: "site-bucket" }));
+  await simS3.putPublicAccessBlock(
+    new PutPublicAccessBlockCommand({
+      Bucket: "site-bucket",
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        IgnorePublicAcls: true,
+      },
+    }),
+  );
+  await simS3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "site-bucket",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::site-bucket/*",
+        },
+      }),
+    }),
+  );
+
+  const publish = async (body: string): Promise<void> => {
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "site-bucket",
+        Key: "index.html",
+        ContentType: "text/html",
+        Body: body,
+      }),
+    );
+  };
+
+  await publish("<h1>First</h1>");
+
+  const distributionCreation = await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "cached-site",
+        Comment: "Cached site",
+        Enabled: true,
+        DefaultRootObject: "index.html",
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "site-origin",
+              DomainName: "site-bucket.s3.amazonaws.com",
+              S3OriginConfig: { OriginAccessIdentity: "" },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          // CachingOptimized, one of CloudFront's managed policies.
+          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6",
+        },
+      },
+    }),
+  );
+
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
+  const home = srv.localUrl(`http://${distroHostname}/`);
+
+  const first = await fetch(home);
+  console.log(await first.text()); // <h1>First</h1>
+
+  // The Bucket holds a new page, which the Distribution has not been told
+  // about.
+  await publish("<h1>Second</h1>");
+
+  const second = await fetch(home);
+  console.log(await second.text()); // <h1>First</h1>
+
+  // Another point of presence has nothing cached under that key.
+  const coldEdge = await fetch(home, {
+    headers: { "x-sim-aws-cloudfront-edge": "second-edge" },
+  });
+  console.log(await coldEdge.text()); // <h1>Second</h1>
+
+  // With caching off, every request reaches the Origin.
+  simAws.cloudFront().configureCaching({ enabled: false });
+
+  const uncached = await fetch(home);
+  console.log(await uncached.text()); // <h1>Second</h1>
+} finally {
+  await srv.close();
+}
+```
+
+### What the key is made of
+
+The key is the request path, plus whatever the Behavior's cache policy names. A query string, a
+header or a cookie the policy lists joins the key. Two requests differing only in a campaign
+parameter the policy leaves out share one entry. Where the policy enables gzip or brotli, the
+normalized `Accept-Encoding` joins the key, and one object is cached once compressed and once
+plain.
+
+The request method is part of the key as well, since a HEAD response carries no body and a GET
+response does. `CachedMethods` on the Behavior decides which methods are cached at all. It is `GET`
+and `HEAD` unless the Behavior widens it, and a POST reaches the Origin every time.
+
+### The edge a request arrives at
+
+CloudFront caches at each of its points of presence, several hundred of them, and one viewer's
+request fills the cache at one of them. The key carries an edge ID for that. Every request arrives
+at the same edge unless it sends an `x-sim-aws-cloudfront-edge` header naming another. A test that
+sends a different one is proving its app survives arriving somewhere cold.
+
+The header follows the `x-sim-aws-*` convention of the caller and request source headers, and sim
+CloudFront takes it off the request once it has read it. A web ACL rule, a CloudFront Function, a
+Lambda@Edge function and the Origin all see the request the viewer sent without it.
+
+### What a Distribution stores
+
+A Behavior stores what it serves where its cache policy is one this simulation holds and that
+policy's `MaxTTL` is above zero. That leaves out a Behavior naming a `CachePolicyId` from a real
+account, a Behavior naming none at all, and a Behavior on `CachingDisabled`. The alternative in each
+case would be a guessed TTL.
+
+An Origin error stays out of the cache. Real CloudFront holds one for `ErrorCachingMinTTL`, which
+wants an expiry this simulation has yet to keep.
+
+### Applying a response headers policy
+
+A response headers policy is applied to a response on its way out of the cache, as CloudFront
+applies one. The stored entry carries the Origin's own headers. A Behavior given a different policy
+therefore serves what it already holds under the new one, with no invalidation.
+
+### Turning it off
+
+`simAws.cloudFront().configureCaching({ enabled: false })` turns caching off for every Distribution
+in one `SimAws`, across every Account and Region. Caching is on by default, as CloudFront's is. A
+suite that repeats a request and wants each one to reach the Origin can turn it off in setup.
 
 ## Origin request policies
 
@@ -3100,6 +3270,8 @@ Sim CloudFront currently supports:
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::CachePolicy`, and a Behavior's `CachePolicyId` read back through `GetDistribution`
+- A cache on each Distribution, keyed on the Behavior's cache policy and on the edge the request
+  arrived at
 - `AWS::CloudFront::OriginRequestPolicy`, and a Behavior's `OriginRequestPolicyId` read back the
   same way
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
@@ -3116,11 +3288,16 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
-- **The origin events run on every request that reaches the Origin.** Real CloudFront runs
-  `origin-request` and `origin-response` on a cache miss, and serves a cache hit without reaching
-  either. Simulated CloudFront holds no cache, and every request that gets as far as the Origin is a
-  miss here. A request a web ACL blocked or a viewer-request function answered reaches neither
-  event, and an `origin-request` function that returns a response leaves the Origin unread with no
+- **A cached entry never expires.** A cache policy's three TTLs decide whether the Behavior caches
+  at all, and a `MaxTTL` of zero turns it off. Any other value stores an entry that is served until
+  the `SimAws` holding it is thrown away. There is no invalidation, and no `X-Cache` or `Age` header
+  on the response.
+- **A Behavior with no cache policy caches nothing.** Real CloudFront falls back to the legacy
+  `ForwardedValues` and the TTLs beside it, and sim CloudFront skips both. Give the Behavior a
+  `CachePolicyId`, as CDK and the console both do.
+- **The origin events run on a cache miss, and every request that reaches the Origin is one.** A
+  request a web ACL blocked or a viewer-request function answered reaches neither event, and an
+  `origin-request` function that returns a response leaves the Origin unread with no
   `origin-response` event after it.
 - **An Origin keeps its kind and its Bucket through an origin-request function.** Real CloudFront
   lets a handler hand back `origin.s3` where it was given `origin.custom`, or point an S3 Origin at

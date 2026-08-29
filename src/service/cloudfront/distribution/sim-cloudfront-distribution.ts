@@ -11,6 +11,7 @@ import {
 import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { SimCloudFrontDistributionNotDisabled } from "../error/sim-cloudfront.error.js";
+import { SimCfDistributionCache } from "../cache/sim-cf-distribution-cache.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,
@@ -40,6 +41,15 @@ export class SimCloudFrontDistribution {
   public readonly behaviors: SimCloudFrontBehavior[] = [];
   public readonly customErrorResponses: SimCloudFrontCustomErrorResponse[] = [];
   public readonly lastModifiedTime: Date;
+
+  /**
+   * What this Distribution has cached, keyed by cache key.
+   *
+   * A configuration update leaves it alone, as it leaves a real
+   * Distribution's cached objects alone: an object cached under the old
+   * configuration is served until something removes it.
+   */
+  public readonly cache = new SimCfDistributionCache();
 
   #status: SimCloudFrontDistributionStatus;
   #distributionConfig: SimCloudFrontDistributionConfig | undefined;

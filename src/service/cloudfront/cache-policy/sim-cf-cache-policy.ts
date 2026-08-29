@@ -26,8 +26,9 @@ interface SimCloudFrontCachePolicyProperties {
  *
  * A cache policy decides what a cache Behavior keys its cache on and how long
  * an object stays there. This simulation holds the policy under its ID, along
- * with its three TTLs and its cache key, and hands it back. Nothing caches
- * anything on them yet.
+ * with its three TTLs and its cache key, and keys the Distribution's cache on
+ * it. Nothing expires yet, so a `MaxTTL` of zero is read as a Behavior that
+ * caches nothing and the other two TTLs decide nothing.
  *
  * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/controlling-the-cache-key.html
  */
