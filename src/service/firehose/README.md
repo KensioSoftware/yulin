@@ -135,6 +135,11 @@ stream's ARN and then looks the delivery stream up, in that order, because that 
 IAM works in. A caller with no permission is refused for a delivery stream that was never created,
 and hears the same refusal either way.
 
+`CreateDeliveryStream` asks a second question through the shared `SimIamPassRoleAuthorizer`, whether
+the caller may hand Firehose the destination `RoleARN` and, for a Kinesis-sourced delivery stream,
+the source `RoleARN`. Both are read before the question is asked, so a configuration this simulation
+cannot deliver to is refused on its own terms rather than on a Role.
+
 Every Firehose operation names its delivery stream by name, and nothing here reads an ARN back.
 Compare `simKinesisRefLookupName`. It exists because a Kinesis request can name its stream either
 way.

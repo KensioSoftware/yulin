@@ -19,6 +19,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 import { simFirehoseDeliveryStreamFactory } from "../../stream/sim-firehose-delivery-stream.factory.js";
 
@@ -222,6 +223,21 @@ describe("Simulated Firehose IAM authorization", () => {
       BucketARN: "arn:aws:s3:::order-archive",
       RoleARN: "arn:aws:iam::888888888888:role/OrderArchiveRole",
     };
+
+    // And allowed to hand Firehose the Role the destination names, which is a
+    // separate decision from creating the delivery stream.
+    await simAws.iam().putRolePolicy({
+      input: {
+        RoleName: "OrderAdminRole",
+        PolicyName: "PassArchiveRole",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "iam:PassRole",
+            Resource: destination.RoleARN,
+          },
+        }),
+      },
+    });
 
     // When it creates that one, and then another.
     await simAws.firehose().createDeliveryStream(

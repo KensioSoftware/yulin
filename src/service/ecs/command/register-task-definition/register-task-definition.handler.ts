@@ -84,6 +84,10 @@ export class RegisterTaskDefinitionCommandHandler
       "ecs:RegisterTaskDefinition",
       options,
     );
+    this.authorizer.authorizePassRole(
+      [settings.taskRoleArn, settings.executionRoleArn],
+      options,
+    );
 
     const familyRevisions = this.taskDefinitions.family(family);
     const revision = familyRevisions.nextRevisionNumber();

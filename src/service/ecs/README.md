@@ -361,6 +361,11 @@ command instances.
   resource type at all, and gives `CreateCluster`, `ListClusters` and `ListTasks` none either. A
   policy naming a task definition ARN grants none of those, here as on AWS.
 
+`RegisterTaskDefinition` asks a second question through the shared `SimIamPassRoleAuthorizer`,
+whether the caller may hand ECS the `taskRoleArn` and the `executionRoleArn` the registration names.
+Each is its own decision, and one left out passes nothing. The refusal is ECS's own
+`AccessDeniedException`, keeping the rule above.
+
 ## CloudFormation
 
 `cfn/` holds what deploys `AWS::ECS::Cluster`, `AWS::ECS::TaskDefinition` and `AWS::ECS::Service`,

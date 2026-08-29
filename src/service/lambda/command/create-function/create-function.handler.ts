@@ -125,7 +125,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       this.accountRegionScope,
       input.name,
     );
-    this.authorizer.authorize(functionArn, options?.caller);
+    this.authorizer.authorize(functionArn, input.roleArn, options?.caller);
 
     this.requireAvailableFunctionName(input.name, functionArn);
 

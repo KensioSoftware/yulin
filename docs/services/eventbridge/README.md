@@ -1005,6 +1005,10 @@ console.log(JSON.stringify(policy).length > 0); // true
 A caller refused by IAM gets `AccessDeniedException`. Permission is checked before the bus is looked
 up, and a caller who may not reach a bus is refused whether or not that bus exists.
 
+An ECS target carries a `RoleArn`, which the rule runs the task as. Adding one hands EventBridge that
+Role, and `PutTargets` authorizes `iam:PassRole` against it. See
+[passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
+
 ## Scoping
 
 Buses belong to one account and region, as they do on real AWS:
@@ -1057,6 +1061,7 @@ no permission for.
   listings.
 - The event envelope EventBridge builds from an entry, reached through `eventsOn(...)`.
 - IAM authorization against the bus ARN.
+- `iam:PassRole` authorization of the `RoleArn` an ECS target carries.
 - SDK interception of `EventBridgeClient`.
 
 ## Limitations

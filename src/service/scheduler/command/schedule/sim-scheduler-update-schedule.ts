@@ -54,6 +54,8 @@ export class SimSchedulerUpdateSchedule {
     );
     const requested = this.access.requested(input);
 
+    this.access.authorizePassRole(input, options);
+
     // The creation date survives a replacement, because AWS does not consider
     // an updated schedule to be a new one.
     const schedule = this.writer.write(input, requested, existing.creationDate);

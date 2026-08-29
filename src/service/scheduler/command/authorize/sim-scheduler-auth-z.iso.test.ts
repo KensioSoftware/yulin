@@ -28,7 +28,7 @@ const scheduleArn =
  * A simulated AWS and a Role allowed only what one policy statement says.
  */
 async function simAwsWithRole(
-  statement: object,
+  statement: object | readonly object[],
 ): Promise<{ simAws: SimAws; caller: SimAwsCaller }> {
   const simAws = new SimAws();
 
@@ -74,12 +74,16 @@ function creation(): ConstructorParameters<typeof CreateScheduleCommand>[0] {
 
 describe("Scheduler IAM authorization", () => {
   it("admits a caller whose policy names the schedule ARN", async () => {
-    // Given a Role allowed to create one schedule, named with its group.
-    const { simAws, caller } = await simAwsWithRole({
-      Effect: "Allow",
-      Action: "scheduler:CreateSchedule",
-      Resource: scheduleArn,
-    });
+    // Given a Role allowed to create one schedule, named with its group, and
+    // to pass the execution role that schedule fires as.
+    const { simAws, caller } = await simAwsWithRole([
+      {
+        Effect: "Allow",
+        Action: "scheduler:CreateSchedule",
+        Resource: scheduleArn,
+      },
+      { Effect: "Allow", Action: "iam:PassRole", Resource: executionRoleArn },
+    ]);
 
     // When it creates that schedule.
     const created = await simAws

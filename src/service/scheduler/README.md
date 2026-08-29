@@ -173,6 +173,12 @@ involved in whether a schedule's execution role may invoke its target: that is a
 asked about a different principal, at a different time, and it belongs with firing rather than with
 the command that created the schedule.
 
+It is involved in a third question about that same execution role. Writing a schedule hands Scheduler
+the `Target.RoleArn` it will fire as, so Create and Update both authorize `iam:PassRole` against it
+through the shared `SimIamPassRoleAuthorizer`. The refusal is Scheduler's own
+`AccessDeniedException`, built from `simIamPassRoleDenialMessage`, so a caller catching this
+service's error type catches this refusal with the rest.
+
 ## Divergences
 
 Five, all deliberate.

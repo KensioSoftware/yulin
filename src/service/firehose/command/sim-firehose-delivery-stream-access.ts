@@ -66,6 +66,16 @@ export class SimFirehoseDeliveryStreamAccess {
   }
 
   /**
+   * Ensure the caller may hand Firehose every Role a request names.
+   */
+  authorizePassRole(
+    roleArns: readonly (string | undefined)[],
+    options?: SimFirehoseRequestOptions,
+  ): void {
+    this.authorizer.authorizePassRole(roleArns, options?.caller);
+  }
+
+  /**
    * Resolve the delivery stream a request names, authorizing the action first.
    */
   require(

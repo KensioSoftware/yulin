@@ -94,10 +94,12 @@ describe("the principal an AWS::StepFunctions::StateMachine Resource is created 
   });
 
   it("creates the state machine under a caller allowed the creation", async () => {
-    // Given a Role allowed to make state machines.
+    // Given a Role allowed to make state machines, and to pass the Role each
+    // one runs as.
     const simAws = new SimAws();
     const deployer = await roleAllowing(simAws, "Deployer", [
       "states:CreateStateMachine",
+      "iam:PassRole",
     ]);
 
     // When it deploys the Stack.
@@ -114,6 +116,7 @@ describe("the principal an AWS::StepFunctions::StateMachine Resource is created 
     const simAws = new SimAws();
     const maker = await roleAllowing(simAws, "Maker", [
       "states:CreateStateMachine",
+      "iam:PassRole",
     ]);
     const stack = await deployAsCaller(simAws, maker);
 

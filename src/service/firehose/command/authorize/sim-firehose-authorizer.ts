@@ -1,7 +1,9 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import { SimIamPassRoleAuthorizer } from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simFirehoseServicePrincipal } from "../../sim-firehose-service-principal.js";
 
 interface SimFirehoseAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -14,12 +16,34 @@ interface SimFirehoseAuthorizerProperties {
  * name, and the resource is the ARN of the delivery stream the operation names.
  * ListDeliveryStreams is the exception. It names no delivery stream, so it
  * authorizes against `*`.
+ *
+ * A delivery stream carries a Role for its destination, and a second one for
+ * its source where it reads a Kinesis stream. Firehose keeps both and delivers
+ * as them later, so creating one authorizes `iam:PassRole` against each.
  */
 export class SimFirehoseAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
+  private readonly passRole: SimIamPassRoleAuthorizer;
 
   constructor(properties: SimFirehoseAuthorizerProperties) {
     this.iam = properties.iam;
+    this.passRole = new SimIamPassRoleAuthorizer({
+      iam: properties.iam,
+      passedToService: simFirehoseServicePrincipal,
+    });
+  }
+
+  /**
+   * Ensure the caller may hand Firehose every Role a delivery stream names.
+   *
+   * A delivery stream taking records through PutRecord has no source Role, and
+   * one left out passes nothing.
+   */
+  authorizePassRole(
+    roleArns: readonly (string | undefined)[],
+    caller?: SimAwsCaller,
+  ): void {
+    this.passRole.authorizeAll(roleArns, caller);
   }
 
   /**

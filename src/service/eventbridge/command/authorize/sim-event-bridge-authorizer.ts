@@ -1,6 +1,11 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import {
+  SimIamPassRoleAuthorizer,
+  simIamPassRoleDenialMessage,
+} from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
+import { simEventBridgeServicePrincipal } from "../../delivery/sim-event-bridge-delivery.js";
 import { SimEventBridgeAccessDeniedException } from "../../error/sim-event-bridge.error.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 
@@ -29,6 +34,11 @@ interface SimEventBridgeAuthorizerProperties {
  * answers a refused request with. It has no error of its own for the case, so
  * there is nothing service-specific to translate to.
  *
+ * A target carrying a `RoleArn` hands EventBridge a Role it runs the target
+ * as later, and that is authorized as `iam:PassRole` against the Role. An ECS
+ * target is the only one this simulation reads a `RoleArn` from, since a
+ * `RoleArn` on any other target is refused.
+ *
  * Event bus resource policies are not part of the decision yet, because
  * nothing sets one: PutPermission and the bus `Policy` attribute are not
  * simulated. A caller from another Account therefore has no way to be admitted
@@ -37,9 +47,30 @@ interface SimEventBridgeAuthorizerProperties {
 export class SimEventBridgeAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly callerIdentifier = new SimIamCallerIdentifier();
+  private readonly passRole: SimIamPassRoleAuthorizer;
 
   constructor(properties: SimEventBridgeAuthorizerProperties) {
     this.iam = properties.iam;
+    this.passRole = new SimIamPassRoleAuthorizer({
+      iam: properties.iam,
+      passedToService: simEventBridgeServicePrincipal,
+      denied: (denial): Error =>
+        new SimEventBridgeAccessDeniedException(
+          simIamPassRoleDenialMessage(denial),
+        ),
+    });
+  }
+
+  /**
+   * Ensure the caller may hand EventBridge every Role a request names.
+   *
+   * A target with no Role of its own passes nothing.
+   */
+  authorizePassRole(
+    roleArns: readonly (string | undefined)[],
+    options?: SimEventBridgeRequestOptions,
+  ): void {
+    this.passRole.authorizeAll(roleArns, options?.caller);
   }
 
   /**

@@ -1,9 +1,11 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import { SimIamPassRoleAuthorizer } from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simStateMachineArn } from "../../machine/sim-state-machine-arn.js";
+import { simStatesServicePrincipal } from "../../task/sim-states-execution-role.js";
 
 interface SimStepFunctionsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -17,14 +19,30 @@ interface SimStepFunctionsAuthorizerProperties {
  * policy is written in. `CreateStateMachine` has no ARN to be given. It
  * authorizes against the one the state machine is about to have, which a
  * policy naming `stateMachine:orders-*` covers.
+ *
+ * A state machine's `roleArn` is a second question. Step Functions keeps that
+ * Role and runs every execution as it, so the caller creating one needs
+ * `iam:PassRole` on it. The resource there is the Role.
  */
 export class SimStepFunctionsAuthorizer {
   readonly #iam: SimIamInterServiceAuthZ;
   readonly #accountRegionScope: SimAwsAccountRegionScope;
+  readonly #passRole: SimIamPassRoleAuthorizer;
 
   constructor(properties: SimStepFunctionsAuthorizerProperties) {
     this.#iam = properties.iam;
     this.#accountRegionScope = properties.accountRegionScope;
+    this.#passRole = new SimIamPassRoleAuthorizer({
+      iam: properties.iam,
+      passedToService: simStatesServicePrincipal,
+    });
+  }
+
+  /**
+   * Ensure the caller may hand Step Functions a state machine's role.
+   */
+  authorizePassRole(roleArn: string, caller?: SimAwsCaller): void {
+    this.#passRole.authorize(roleArn, caller);
   }
 
   /**

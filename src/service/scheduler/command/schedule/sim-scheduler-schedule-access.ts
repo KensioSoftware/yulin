@@ -9,6 +9,7 @@ import type { SimSchedulerSchedule } from "../../schedule/sim-scheduler-schedule
 import type { SimSchedulerScheduleStore } from "../../schedule/sim-scheduler-schedule-store.js";
 import type { SimSchedulerAuthorizer } from "../authorize/sim-scheduler-authorizer.js";
 import type { SimSchedulerRequestOptions } from "../sim-scheduler-request-options.js";
+import type { SimSchedulerScheduleInput } from "./schedule.command.js";
 
 /**
  * Which schedule a request names, in which group.
@@ -72,6 +73,19 @@ export class SimSchedulerScheduleAccess {
     options?: SimSchedulerRequestOptions,
   ): void {
     this.authorizer.authorizeResource(action, this.arnFor(requested), options);
+  }
+
+  /**
+   * Ensure the caller may hand Scheduler the execution role a request names.
+   *
+   * A schedule fires as its `Target.RoleArn` long after the request that wrote
+   * it, so writing one is a hand-over of that Role.
+   */
+  authorizePassRole(
+    input: SimSchedulerScheduleInput,
+    options?: SimSchedulerRequestOptions,
+  ): void {
+    this.authorizer.authorizePassRole(input.Target?.RoleArn, options);
   }
 
   /**

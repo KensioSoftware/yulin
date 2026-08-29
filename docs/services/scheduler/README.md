@@ -510,7 +510,12 @@ no group with nowhere to go.
 
 ## Permissions
 
-Every operation is authorized against the schedule ARN, which carries the group:
+Every operation is authorized against the schedule ARN, which carries the group. A Create or an
+Update also hands Scheduler the `Target.RoleArn` the schedule fires as, and authorizes `iam:PassRole`
+against that Role. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service)
+in the IAM docs.
+
+The schedule ARN is what an operation authorizes against:
 
 ```typescript sim-scheduler-iam-policy
 /**
@@ -763,6 +768,7 @@ Resources of the same stack.
 - Creation and modification timestamps from the simulation's clock, and prefix-narrowed,
   state-narrowed, paged listings.
 - IAM authorization against the schedule ARN.
+- `iam:PassRole` authorization of the `Target.RoleArn` a Create or an Update hands over.
 - SDK interception of `SchedulerClient`.
 
 ## Limitations

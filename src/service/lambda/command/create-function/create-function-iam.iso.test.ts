@@ -35,7 +35,8 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
   });
 
   it("allows a Role when its policy permits lambda:CreateFunction", async () => {
-    // Given a Role allowed to create a specific Lambda function.
+    // Given a Role allowed to create a specific Lambda function, and to pass
+    // the execution role that function will run as.
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simIam = simAws.iam();
@@ -57,12 +58,20 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
         RoleName: "FunctionCreator",
         PolicyName: "CreateFunctionPolicy",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Action: "lambda:CreateFunction",
-            Resource:
-              `arn:aws:lambda:${simAws.defaultRegionName}:` +
-              `${accountId}:function:allowed-function`,
-          },
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "lambda:CreateFunction",
+              Resource:
+                `arn:aws:lambda:${simAws.defaultRegionName}:` +
+                `${accountId}:function:allowed-function`,
+            },
+            {
+              Effect: "Allow",
+              Action: "iam:PassRole",
+              Resource: `arn:aws:iam::${accountId}:role/ExecutionRole`,
+            },
+          ],
         }),
       }),
     );

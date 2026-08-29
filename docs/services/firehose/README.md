@@ -378,6 +378,10 @@ Deleting the delivery stream stops it reading. Records put afterwards stay on th
 Every Firehose operation authorizes against the `firehose:` action of the same name, on the ARN of
 the delivery stream it names. `ListDeliveryStreams` names none, and authorizes against `*`.
 
+Creating a delivery stream hands Firehose the destination `RoleARN`, and the source `RoleARN` too
+where it reads a Kinesis stream. `CreateDeliveryStream` authorizes `iam:PassRole` against each of
+them. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
+
 The delivery itself is a separate request, made as the delivery stream's `RoleARN`. The caller who
 put the record needs no S3 permission at all, and a Role that cannot write to the Bucket fails the
 delivery. Real
@@ -737,7 +741,7 @@ console.log(Contents?.length);
 
 | Command                  | Notes                                                                                                   |
 | ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `CreateDeliveryStream`   | A name already in use raises `ResourceInUseException`.                                                  |
+| `CreateDeliveryStream`   | A name already in use raises `ResourceInUseException`. Authorizes `iam:PassRole` on each Role it names. |
 | `DeleteDeliveryStream`   | The name is free again at once. Whatever was buffered goes with it.                                     |
 | `ListDeliveryStreams`    | Sorted by name, paged with `Limit` and `ExclusiveStartDeliveryStreamName`.                              |
 | `DescribeDeliveryStream` | Reports the one destination, and a Kinesis source under `Source`.                                       |
