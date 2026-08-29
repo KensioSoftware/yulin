@@ -1,10 +1,12 @@
 import {
+  assertArrayEquals,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -139,6 +141,46 @@ describe("AWS::CloudFront::CachePolicy", () => {
 
     // Then the comment is what the template wrote.
     assertIdentical(resource.simResource.comment, "No query string in the key");
+  });
+
+  it("carries the TTLs and the cache key a deployed template wrote", async () => {
+    // Given a template whose policy holds an object for an hour and keys on
+    // one query string.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "cache-policy-key-stack",
+      template: siteTemplate({
+        MinTTL: 60,
+        DefaultTTL: 3600,
+        MaxTTL: 86_400,
+        ParametersInCacheKeyAndForwardedToOrigin: {
+          EnableAcceptEncodingGzip: true,
+          CookiesConfig: { CookieBehavior: "none" },
+          HeadersConfig: { HeaderBehavior: "none" },
+          QueryStringsConfig: {
+            QueryStringBehavior: "whitelist",
+            QueryStrings: ["page"],
+          },
+        },
+      }),
+    });
+
+    await stack.waitForDeployComplete();
+
+    const resource = stack.getResource("BeaconPolicy");
+
+    assertNonNullable(resource);
+    assertInstanceOf(resource.simResource, SimCloudFrontCachePolicy);
+
+    // Then the policy the Behavior names holds what the template configured.
+    const policy = resource.simResource;
+
+    assertIdentical(policy.minTtlSec, 60);
+    assertIdentical(policy.defaultTtlSec, 3600);
+    assertIdentical(policy.maxTtlSec, 86_400);
+    assertIdentical(policy.cacheKey.queryStringBehavior, "whitelist");
+    assertArrayEquals(policy.cacheKey.queryStrings, ["page"]);
+    assertTrue(policy.cacheKey.enableAcceptEncodingGzip);
   });
 
   it("forgets the policy when the Stack is torn down", async () => {

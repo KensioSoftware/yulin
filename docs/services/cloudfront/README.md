@@ -2221,13 +2221,16 @@ const stack = await simAws.cloudFormation().deployTemplate({
           CachePolicyConfig: {
             Name: "BeaconPolicy",
             MinTTL: 0,
-            DefaultTTL: 0,
-            MaxTTL: 0,
+            DefaultTTL: 60,
+            MaxTTL: 3600,
             ParametersInCacheKeyAndForwardedToOrigin: {
-              EnableAcceptEncodingGzip: false,
+              EnableAcceptEncodingGzip: true,
               CookiesConfig: { CookieBehavior: "none" },
               HeadersConfig: { HeaderBehavior: "none" },
-              QueryStringsConfig: { QueryStringBehavior: "none" },
+              QueryStringsConfig: {
+                QueryStringBehavior: "whitelist",
+                QueryStrings: ["page"],
+              },
             },
           },
         },
@@ -2287,18 +2290,36 @@ console.log(
   config?.CacheBehaviors?.Items?.[0]?.CachePolicyId ===
     stack.output("BeaconPolicyId"),
 );
+
+// The policy itself, holding the TTLs and the cache key the template gave it.
+const beaconPolicy = simAws
+  .cloudFront()
+  .getCachePolicyById(stack.output("BeaconPolicyId"));
+
+console.log(beaconPolicy?.defaultTtlSec); // 60
+console.log(beaconPolicy?.cacheKey.queryStringBehavior); // "whitelist"
+console.log(beaconPolicy?.cacheKey.queryStrings); // ["page"]
 ```
 
 A Behavior records the ID it was given, and `GetDistribution` reports it back for both the default
 Behavior and a named one. An update changing the policy is reported the same way.
 
-Nothing here reads the policy itself. The TTLs, the cache key and the compression settings need a
-cache, and sim CloudFront holds none. Every request reaches the Origin whatever the policy would
-have cached on real CloudFront.
+The policy itself carries everything `CachePolicyConfig` holds. `getCachePolicyById` hands back the
+three TTLs, the three sections of `ParametersInCacheKeyAndForwardedToOrigin` and the two
+`EnableAcceptEncoding` flags. A test can assert that its Behavior leaves the query string out of the
+cache key before sim CloudFront has a cache to key.
+
+Nothing acts on any of it. Sim CloudFront holds no edge cache, and every request reaches the Origin
+whatever the policy would have cached on real CloudFront.
+
+A TTL the template left out falls back to CloudFront's own default (0 seconds for `MinTTL`, one day
+for `DefaultTTL` and 365 days for `MaxTTL`), and a `MinTTL` above a day raises the `DefaultTTL` with
+it the way CloudFront does. An absent cache key section falls back to `none`. A section naming a
+behaviour CloudFront does not offer fails the Stack, naming the Resource. `HeaderBehavior` takes
+`none` and `whitelist` alone, where CloudFront gives an origin request policy a wider set.
 
 A policy name is unique within an account, as it is in CloudFront. A second
 `AWS::CloudFront::CachePolicy` claiming a name is refused with `CachePolicyAlreadyExists`.
-`Name` and `Comment` are the parts of `CachePolicyConfig` the policy carries.
 
 ### Managed cache policies
 
@@ -2313,6 +2334,10 @@ Behavior names one without a template creating anything. `CachingOptimized`
 [AWS publishes](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html)
 for it. CDK's `CachePolicy.CACHING_OPTIMIZED` and its six siblings synthesize those IDs. A stack
 reaching for one deploys.
+
+Each also carries the TTLs and the cache key AWS publishes for it. A Behavior on `CachingOptimized`
+here holds the same 1 second floor, the same day of default TTL and the same empty cache key as one
+in an account.
 
 The managed policies sit in CloudFront's own namespace. A template may create a policy called
 `CachingDisabled` of its own, and deleting that stack leaves the managed one where it was.
@@ -3219,13 +3244,10 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **A cache policy is recorded and never applied.** Sim CloudFront models no edge caching. A
-  Behavior's `CachePolicyId` is checked against the policies this simulation holds and reported
-  back, and the TTLs, the cache key and the compression settings behind it decide nothing. Every
+- **A cache policy is recorded and never applied.** Sim CloudFront models no edge caching. A policy
+  holds its three TTLs and the whole of its cache key, and a Behavior's `CachePolicyId` is checked
+  against the policies this simulation holds and reported back. None of it decides anything. Every
   request reaches the Origin, whatever the policy would have cached on real CloudFront.
-- **A cache policy carries its name and its comment, and nothing else.** The TTLs and
-  `ParametersInCacheKeyAndForwardedToOrigin` of an `AWS::CloudFront::CachePolicy` are read past,
-  since nothing here would act on them.
 - **An origin request policy is recorded and never applied.** A Behavior's `OriginRequestPolicyId`
   is checked against the policies this simulation holds and reported back. Sim CloudFront forwards
   the viewer's headers, cookies and query string to the Origin whole, whatever the policy would

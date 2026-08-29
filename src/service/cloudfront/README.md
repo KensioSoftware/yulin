@@ -264,16 +264,27 @@ it.
 ## Cache policies
 
 `cache-policy/` holds the model and its registry, laid out the same way as the response headers
-policies above. A `SimCloudFrontCachePolicy` is a name, an ID and an optional comment.
-`sim-cf-managed-cache-policies.ts` builds CloudFront's seven managed policies under the IDs AWS
-publishes, and the registry keeps them in their own namespace, so a template may create a policy of
-its own under a managed name. There is no CreateCachePolicy command, so `cfn/cache-policy/` is the
-only thing that makes one.
+policies above. A `SimCloudFrontCachePolicy` is a name, an ID, an optional comment, three TTLs and a
+`SimCloudFrontCacheKey`. `sim-cf-managed-cache-policies.ts` builds CloudFront's seven managed
+policies under the IDs AWS publishes, each with the TTLs and the cache key AWS publishes beside the
+ID, and the registry keeps them in their own namespace, so a template may create a policy of its own
+under a managed name. There is no CreateCachePolicy command, so `cfn/cache-policy/` is the only
+thing that makes one.
 
-The policy carries nothing of `CachePolicyConfig` beyond `Name` and `Comment`. The TTLs and
-`ParametersInCacheKeyAndForwardedToOrigin` decide what a cache holds and how long it holds it, and
-sim CloudFront has no cache for them to decide anything about. Recording the ID is what lets a test
-assert which policy a Behavior was given.
+`sim-cf-cache-key.ts` holds the three sections of `ParametersInCacheKeyAndForwardedToOrigin` and the
+two `EnableAcceptEncoding` flags, along with the behaviour set each section may name.
+`HeadersConfig` is the narrow one, taking `none` and `whitelist` where the other two also take
+`allExcept` and `all`.
+
+`cfn/cache-policy/` reads that half of the Resource. `sim-cfn-cf-cache-policy-section.ts` holds one
+reader for all three sections, along with the field names and the behaviour set each one takes. An
+absent section comes out as `none`, and a behaviour outside the set for its section fails the Stack,
+naming the Resource. `sim-cfn-cf-cache-policy-config.ts` reads the TTLs, giving one the template
+left out the default CloudFront applies, including the two cases where a long `MinTTL` raises the
+`DefaultTTL` and a long `DefaultTTL` raises the `MaxTTL`.
+
+Sim CloudFront has no cache. None of this decides anything yet, and recording the ID is what lets a
+test assert which policy a Behavior was given.
 
 `SimCfBehaviorPolicies` asks `SimCfBehaviorResponseHeadersPolicy`, `SimCfBehaviorCachePolicy` and
 `SimCfBehaviorOriginRequestPolicy` about one Behavior. A `CachePolicyId` naming nothing is

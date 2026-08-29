@@ -21,13 +21,16 @@ const stack = await simAws.cloudFormation().deployTemplate({
           CachePolicyConfig: {
             Name: "BeaconPolicy",
             MinTTL: 0,
-            DefaultTTL: 0,
-            MaxTTL: 0,
+            DefaultTTL: 60,
+            MaxTTL: 3600,
             ParametersInCacheKeyAndForwardedToOrigin: {
-              EnableAcceptEncodingGzip: false,
+              EnableAcceptEncodingGzip: true,
               CookiesConfig: { CookieBehavior: "none" },
               HeadersConfig: { HeaderBehavior: "none" },
-              QueryStringsConfig: { QueryStringBehavior: "none" },
+              QueryStringsConfig: {
+                QueryStringBehavior: "whitelist",
+                QueryStrings: ["page"],
+              },
             },
           },
         },
@@ -87,3 +90,12 @@ console.log(
   config?.CacheBehaviors?.Items?.[0]?.CachePolicyId ===
     stack.output("BeaconPolicyId"),
 );
+
+// The policy itself, holding the TTLs and the cache key the template gave it.
+const beaconPolicy = simAws
+  .cloudFront()
+  .getCachePolicyById(stack.output("BeaconPolicyId"));
+
+console.log(beaconPolicy?.defaultTtlSec); // 60
+console.log(beaconPolicy?.cacheKey.queryStringBehavior); // "whitelist"
+console.log(beaconPolicy?.cacheKey.queryStrings); // ["page"]
