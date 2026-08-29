@@ -1,5 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
+import { simCfnIamOptionalString } from "../sim-cfn-iam-optional-string.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,
@@ -36,7 +38,7 @@ export class SimCfnIamRolePropertiesParser {
     return {
       roleName:
         this.optionalString(resource, properties["RoleName"], "RoleName") ??
-        resource.logicalId,
+        simCfnIamPrincipalGeneratedName(resource),
       path: this.optionalString(resource, properties["Path"], "Path"),
       description: this.optionalString(
         resource,
@@ -61,17 +63,12 @@ export class SimCfnIamRolePropertiesParser {
     value: SimCfnTemplateValueRecord[string] | undefined,
     label: string,
   ): string | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (typeof value !== "string") {
-      throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: ${label} must be a string`,
-      );
-    }
-
-    return value;
+    return simCfnIamOptionalString({
+      resourceType: "AWS::IAM::Role",
+      resource,
+      value,
+      label,
+    });
   }
 
   private jsonObject(

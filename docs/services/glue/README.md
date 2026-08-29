@@ -131,6 +131,12 @@ Column names keep the case they were given, including partition keys. Real Glue 
 and simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") folds a
 column name only when it runs a query.
 
+A database or a table the template leaves unnamed is named from the stack name, the logical ID and a
+tail derived from both, folded the same way. A `LogTable` in `analytics-stack` becomes
+`analytics-stack-logtable-` and twelve more characters, where real CloudFormation ends the name in
+twelve random ones. The name is trimmed to the 255 bytes the catalog allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
+
 ## Reading the catalog back
 
 `GetDatabase`, `GetDatabases`, `GetTable` and `GetTables` answer through the SDK. A `SimGlue` also

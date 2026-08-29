@@ -1,7 +1,12 @@
 import { SimSecretsManagerInvalidParameterException } from "../error/sim-secrets-manager.error.js";
 import { secretArnSuffixPattern } from "./sim-secrets-manager-secret-arn.js";
 
-const maxNameLength = 512;
+/**
+ * The longest name Secrets Manager accepts for a secret.
+ *
+ * https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_CreateSecret.html
+ */
+export const maximumSimSecretsManagerNameLength = 512;
 const allowedCharacters = /^[\w+=./@-]+$/;
 
 /**
@@ -25,9 +30,9 @@ export class SimSecretsManagerSecretName {
       );
     }
 
-    if (name.length > maxNameLength) {
+    if (name.length > maximumSimSecretsManagerNameLength) {
       throw new SimSecretsManagerInvalidParameterException(
-        `Secret name '${name}' is longer than the ${String(maxNameLength)} characters Secrets Manager allows`,
+        `Secret name '${name}' is longer than the ${String(maximumSimSecretsManagerNameLength)} characters Secrets Manager allows`,
       );
     }
 

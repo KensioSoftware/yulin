@@ -1,6 +1,7 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertStringStartsWith,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -71,7 +72,7 @@ describe("IAM CloudFormation Role", () => {
     assertIdentical(roleOut.Role.Arn, role.arn);
   });
 
-  it("defaults RoleName to the logical ID and Path to the root", async () => {
+  it("names an unnamed Role after the stack and the logical ID", async () => {
     // Given a CloudFormation template with a Role that omits its name and path.
     const simAws = new SimAws();
 
@@ -90,7 +91,8 @@ describe("IAM CloudFormation Role", () => {
       },
     });
 
-    // Then the Role uses the logical ID as its name and the root path.
+    // Then the Role is named after the stack and the logical ID, as
+    // CloudFormation names one, and takes the root path.
     const resource = stack.getResource("DefaultNamedRole");
 
     assertNonNullable(resource);
@@ -98,7 +100,10 @@ describe("IAM CloudFormation Role", () => {
     const role = simAws.iam().roles.get(resource.refValue as never);
 
     assertNonNullable(role);
-    assertIdentical(role.roleName, "DefaultNamedRole");
+    assertStringStartsWith(
+      role.roleName,
+      "iam-role-default-stack-DefaultNamedRole-",
+    );
     assertIdentical(role.path, "/");
     assertUndefined(role.description);
   });

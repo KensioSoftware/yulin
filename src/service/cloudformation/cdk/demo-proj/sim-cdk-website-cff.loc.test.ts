@@ -193,7 +193,7 @@ app.synth();
     // Then the Outputs should be available.
     assertStringStartsWith(
       stack.outputs.get("SiteBucketName")?.value,
-      "sitebucket",
+      "teststack-sitebucket",
     );
     const distroId = stack.outputs.get("CloudFrontDistributionId")?.value;
     assertStringLength(distroId, 14);

@@ -361,9 +361,13 @@ console.log(read.Parameter?.Value); // "db.internal"
 console.log(read.Parameter?.Version); // 1
 ```
 
-A parameter with no `Name` is named after its logical ID. Real CloudFormation generates a name from
-the stack name and its own random characters. A template cannot rely on the exact generated name
-either way.
+A parameter with no `Name` is named from the stack name, the logical ID and a tail derived from
+both. A `FeatureFlags` in `config-stack` becomes `config-stack-FeatureFlags-` and twelve more
+characters, where real CloudFormation ends the name in twelve random ones. The name carries no
+leading slash, putting the parameter at the top of the hierarchy where real CloudFormation puts one
+it names itself. Parameter Store counts the ARN prefix towards the 1011 characters a name may use,
+and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 An IAM policy granting access to a template-created parameter needs the ARN rather than the `Ref`.
 Build it with `Fn::Sub`, remembering that the ARN drops the name's leading slash:

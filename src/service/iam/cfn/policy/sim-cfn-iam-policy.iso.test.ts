@@ -4,6 +4,7 @@ import {
   assertNonNullable,
   assertThrowsErrorAsync,
   assertTrue,
+  assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -90,7 +91,7 @@ describe("IAM CloudFormation Policy", () => {
     const simAws = new SimAws();
 
     // When the template is deployed through sim CloudFormation.
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "iam-shared-policy-stack",
       template: {
         Resources: {
@@ -125,8 +126,12 @@ describe("IAM CloudFormation Policy", () => {
       },
     });
 
-    // Then both Roles carry the inline policy.
-    for (const roleName of ["FirstRole", "SecondRole"]) {
+    // Then both Roles carry the inline policy, under the names the stack
+    // generated for them. Neither is named after its logical ID alone.
+    for (const logicalId of ["FirstRole", "SecondRole"]) {
+      const roleName = stack.getResource(logicalId)?.refValue;
+      assertTypeString(roleName);
+
       const role = simAws.iam().roles.get(roleName as SimIamRoleName);
       assertNonNullable(role);
       assertNonNullable(role.inlinePolicies.get("SharedPolicy"));
@@ -194,7 +199,7 @@ describe("IAM CloudFormation Policy", () => {
     const simAws = new SimAws();
 
     // When the template is deployed through sim CloudFormation.
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "iam-mixed-principal-policy-stack",
       template: {
         Resources: {
@@ -220,10 +225,17 @@ describe("IAM CloudFormation Policy", () => {
       },
     });
 
-    // Then both principals carry the inline policy.
+    // Then both principals carry the inline policy, under the names the
+    // stack generated for them. Neither is named after its logical ID alone.
+    const roleName = stack.getResource("SharedRole")?.refValue;
+    const username = stack.getResource("SharedUser")?.refValue;
+
+    assertTypeString(roleName);
+    assertTypeString(username);
+
     const simIam = simAws.iam();
-    const role = simIam.roles.get("SharedRole" as SimIamRoleName);
-    const user = simIam.users.get("SharedUser" as SimIamUsername);
+    const role = simIam.roles.get(roleName as SimIamRoleName);
+    const user = simIam.users.get(username as SimIamUsername);
 
     assertNonNullable(role);
     assertNonNullable(user);

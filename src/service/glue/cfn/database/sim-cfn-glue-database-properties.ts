@@ -4,6 +4,7 @@ import type { SimGlueDatabaseInput } from "../../database/sim-glue-database-stor
 import { glueCfnPropertyError } from "../sim-cfn-glue-property-error.js";
 import { SimCfnGlueValues } from "../sim-cfn-glue-values.js";
 import { SimCfnGlueDatabaseRules } from "./sim-cfn-glue-database-rules.js";
+import { simCfnGlueGeneratedName } from "../sim-cfn-glue-generated-name.js";
 
 const resourceType = "AWS::Glue::Database";
 
@@ -46,12 +47,11 @@ export class SimCfnGlueDatabaseProperties {
    */
   databaseName(): string {
     const values = this.#values;
-    const stackName = this.#resource.stackName ?? "stack";
 
     return (
       values.optionalString(this.#input()["Name"], "DatabaseInput.Name") ??
       values.optionalString(this.#properties["DatabaseName"], "DatabaseName") ??
-      `${stackName}-${this.#resource.logicalId}`.toLowerCase()
+      simCfnGlueGeneratedName(this.#resource)
     );
   }
 

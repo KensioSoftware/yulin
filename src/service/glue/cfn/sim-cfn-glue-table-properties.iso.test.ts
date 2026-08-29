@@ -2,6 +2,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
@@ -285,10 +286,12 @@ describe("AWS::Glue::Table storage descriptor", () => {
       },
     });
 
-    // Then the name is built from the stack and the logical ID.
-    assertNonNullable(
-      simAws.glue().findTable("site_logs", "analytics-stack-logtable"),
-    );
+    // Then the name is built from the stack and the logical ID, and ends in
+    // the tail CloudFormation puts on a name it generates.
+    const [created] = simAws.glue().tablesInDatabase("site_logs");
+
+    assertNonNullable(created);
+    assertStringStartsWith(created.name, "analytics-stack-logtable-");
     assertUndefined(simAws.glue().findTable("site_logs", "LogTable"));
 
     await simAws.backgroundTasksComplete();

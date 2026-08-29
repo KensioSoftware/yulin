@@ -128,7 +128,10 @@ unsupported, which is what makes the engine skip them rather than fail the stack
 building a secret directly, so a secret a template deployed is the same thing an SDK caller would
 have got, name validation and ARN suffix included. Property reading lives in
 `SimCfnSecretsManagerSecretProperties`, which owns the one rule worth stating in a single place: a
-template supplies a value or asks for one to be generated, never both and never neither.
+template supplies a value or asks for one to be generated, never both and never neither. A secret
+with no `Name` gets one from the stack name and the logical ID, through the shared
+`SimCfnGeneratedResourceName`, trimmed to the same 512 characters `SimSecretsManagerSecretName`
+enforces.
 
 Password generation lives in `secret/generate/` rather than in `cfn/`, because it is Secrets Manager
 behaviour rather than CloudFormation behaviour — `GetRandomPassword` would use the same rules under

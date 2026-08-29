@@ -6,6 +6,7 @@ import { SimCfnGlueRecord } from "../sim-cfn-glue-record.js";
 import { SimCfnGlueValues } from "../sim-cfn-glue-values.js";
 import { SimCfnGlueTableInputReader } from "./sim-cfn-glue-table-input.js";
 import { simCfnGlueTableIgnored } from "./sim-cfn-glue-table-rules.js";
+import { simCfnGlueGeneratedName } from "../sim-cfn-glue-generated-name.js";
 
 const resourceType = "AWS::Glue::Table";
 
@@ -56,11 +57,8 @@ export class SimCfnGlueTableProperties {
    * since Glue names are lowercase for Hive compatibility.
    */
   tableName(): string {
-    const stackName = this.#resource.stackName ?? "stack";
-
     return (
-      this.#input().string("Name") ??
-      `${stackName}-${this.#resource.logicalId}`.toLowerCase()
+      this.#input().string("Name") ?? simCfnGlueGeneratedName(this.#resource)
     );
   }
 

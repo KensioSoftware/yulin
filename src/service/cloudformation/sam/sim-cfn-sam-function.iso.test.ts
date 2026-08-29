@@ -4,7 +4,9 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
+  assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -106,12 +108,12 @@ describe("SAM Serverless Function expansion", () => {
     );
   });
 
-  it("names the function from the SAM logical ID where the template does not", async () => {
+  it("names an unnamed SAM function after the stack and the SAM logical ID", async () => {
     // Given a SAM function that names itself nothing
     const simAws = new SimAws();
 
     // When it is deployed
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "unnamed-rates-stack",
       template: {
         Transform: "AWS::Serverless-2016-10-31",
@@ -128,9 +130,13 @@ describe("SAM Serverless Function expansion", () => {
       },
     });
 
-    // Then the function is named after the logical ID, as CloudFormation names
-    // an unnamed function from one
-    assertNonNullable(simAws.lambda().getSimFunctionByName("Rates"));
+    // Then the function is named after the stack and the SAM logical ID, as
+    // CloudFormation names an unnamed function
+    const functionName = stack.getResource("Rates")?.refValue;
+
+    assertTypeString(functionName);
+    assertStringStartsWith(functionName, "unnamed-rates-stack-Rates-");
+    assertNonNullable(simAws.lambda().getSimFunctionByName(functionName));
   });
 
   it("answers Ref and Fn::GetAtt against the SAM logical ID", async () => {
@@ -336,7 +342,7 @@ describe("SAM Serverless Function expansion", () => {
     const simAws = new SimAws();
 
     // When it is deployed with a handler bound to it
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "defaulted-rates-stack",
       template: {
         Transform: "AWS::Serverless-2016-10-31",
@@ -349,7 +355,11 @@ describe("SAM Serverless Function expansion", () => {
     });
 
     // Then the function was created from the defaults alone
-    const simFunction = simAws.lambda().getSimFunctionByName("Rates");
+    const functionName = stack.getResource("Rates")?.refValue;
+
+    assertTypeString(functionName);
+
+    const simFunction = simAws.lambda().getSimFunctionByName(functionName);
     assertNonNullable(simFunction);
     assertIdentical(simFunction.runtimeName, "nodejs22.x");
   });

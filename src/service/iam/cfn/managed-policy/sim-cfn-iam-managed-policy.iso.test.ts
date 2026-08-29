@@ -2,6 +2,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringStartsWith,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -61,7 +62,7 @@ describe("IAM CloudFormation ManagedPolicy", () => {
     assertIdentical(simAws.iam().policies.get(policy.arn), policy);
   });
 
-  it("defaults ManagedPolicyName to the logical ID and Path to the root", async () => {
+  it("names an unnamed Managed Policy after the stack and the logical ID", async () => {
     // Given a CloudFormation template with a Managed Policy that omits its name
     // and path.
     const simAws = new SimAws();
@@ -90,7 +91,8 @@ describe("IAM CloudFormation ManagedPolicy", () => {
       },
     });
 
-    // Then the Managed Policy uses the logical ID as its name and the root path.
+    // Then the Managed Policy is named after the stack and the logical ID,
+    // as CloudFormation names one, and takes the root path.
     const resource = stack.getResource("DefaultNamedPolicy");
 
     assertNonNullable(resource);
@@ -98,7 +100,10 @@ describe("IAM CloudFormation ManagedPolicy", () => {
     const policy = simAws.iam().policies.get(resource.refValue as SimArn);
 
     assertNonNullable(policy);
-    assertIdentical(policy.policyName, "DefaultNamedPolicy");
+    assertStringStartsWith(
+      policy.policyName,
+      "iam-managed-policy-default-stack-DefaultNamedPolicy-",
+    );
     assertIdentical(policy.path, "/");
     assertUndefined(policy.description);
   });

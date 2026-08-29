@@ -34,7 +34,9 @@ partition keys.
   condition parser in `src/service/dynamodb/expression/key-condition/`.
 - `cfn/` reads `AWS::Glue::Database` and `AWS::Glue::Table` properties and creates from them.
   `AWS::Glue::Crawler` and `AWS::Glue::Partition` are real resource types with no creator here. A
-  template declaring either records that Resource as skipped.
+  template declaring either records that Resource as skipped. An unnamed database or table is named
+  by `sim-cfn-glue-generated-name.ts`, which puts the shared `SimCfnGeneratedResourceName` through
+  the same lowercase fold every catalog name gets.
 - `write/sim-glue-catalog-writer.ts` is how CloudFormation writes to the catalog. A deploy happens
   as CloudFormation, and never as the caller a later request carries, so a Resource creator goes
   through here and skips the IAM authorization an SDK Command applies. The store refusals still

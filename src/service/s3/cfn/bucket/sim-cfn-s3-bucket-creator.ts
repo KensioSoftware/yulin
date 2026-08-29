@@ -3,6 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimS3 } from "../../sim-s3.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
+import { simCfnS3BucketGeneratedName } from "./sim-cfn-s3-bucket-generated-name.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimCfnS3BucketConfigurator } from "./sim-cfn-s3-bucket-configurator.js";
 import { SimCfnS3BucketPropertyRules } from "./sim-cfn-s3-bucket-property-rules.js";
@@ -64,8 +65,8 @@ export class SimCfnS3BucketCreator {
   }
 
   /**
-   * A Resource without a BucketName is named after its logical id, rather than
-   * the generated name real CloudFormation invents.
+   * A Resource without a BucketName gets the name CloudFormation generates for
+   * it, from the stack name and the logical ID.
    */
   private bucketNameForResource(
     resource: SimCfnResource,
@@ -77,6 +78,6 @@ export class SimCfnS3BucketCreator {
       return bucketName;
     }
 
-    return resource.logicalId.toLowerCase();
+    return simCfnS3BucketGeneratedName(resource);
   }
 }

@@ -3,6 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
 import { SimCfnIamManagedPolicyAttacher } from "./sim-cfn-iam-managed-policy-attacher.js";
+import { simCfnIamPolicyGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -66,7 +67,7 @@ export class SimCfnIamManagedPolicyCreator {
     const managedPolicyName = properties["ManagedPolicyName"];
 
     if (managedPolicyName === undefined) {
-      return resource.logicalId;
+      return simCfnIamPolicyGeneratedName(resource);
     }
 
     if (typeof managedPolicyName !== "string") {

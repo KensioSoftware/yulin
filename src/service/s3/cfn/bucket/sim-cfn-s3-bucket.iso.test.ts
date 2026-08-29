@@ -7,12 +7,15 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
+  assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
 import { SimS3BucketAlreadyExists } from "../../error/sim-s3.error.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 
@@ -58,7 +61,7 @@ describe("S3 CloudFormation Bucket Resource", () => {
     assertIdentical(resource.simResource, bucket);
   });
 
-  it("uses the logical ID as the Bucket name when BucketName is not specified", async () => {
+  it("names an unnamed Bucket after the stack and the logical ID", async () => {
     // Given a CloudFormation template declaring an S3 Bucket without BucketName.
     const unnamedBucketTemplate = {
       Resources: {
@@ -76,18 +79,55 @@ describe("S3 CloudFormation Bucket Resource", () => {
       template: unnamedBucketTemplate,
     });
 
-    // Then the simulated S3 Bucket is created using the logical ID fallback.
-    const bucket = simAws.s3().getSimBucketByName("testbucket");
-
-    assertNonNullable(bucket);
-    assertInstanceOf(bucket, SimS3Bucket);
-    assertIdentical(bucket.bucketName, "testbucket");
-
+    // Then the Bucket carries the name CloudFormation generates, lower cased
+    // as a bucket name has to be.
     const resource = stack.getResource("TestBucket");
 
     assertNonNullable(resource);
+    assertTypeString(resource.refValue);
+    assertStringStartsWith(resource.refValue, "test-stack-testbucket-");
+
+    const bucket = simAws.s3().getSimBucketByName(resource.refValue);
+
+    assertNonNullable(bucket);
+    assertInstanceOf(bucket, SimS3Bucket);
+    assertIdentical(bucket.bucketName, resource.refValue);
     assertIdentical(resource.status, "CREATE_COMPLETE");
     assertIdentical(resource.simResource, bucket);
+
+    // And the generated name is one S3 itself accepts.
+    validateS3BucketName(bucket.bucketName);
+  });
+
+  it("gives two stacks deploying one template distinct Bucket names", async () => {
+    // Given one template with an unnamed Bucket, which two stacks deploy. On
+    // real AWS each stack gets its own bucket, because the stack name is part
+    // of the generated name.
+    const template = { Resources: { Assets: { Type: "AWS::S3::Bucket" } } };
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    // When both are deployed.
+    const staging = await cloudFormation.deployTemplate({
+      stackName: "staging-stack",
+      template,
+    });
+    const production = await cloudFormation.deployTemplate({
+      stackName: "production-stack",
+      template,
+    });
+
+    // Then neither collided with the other, and each name carries its own
+    // stack.
+    const stagingName = staging.getResource("Assets")?.refValue;
+    const productionName = production.getResource("Assets")?.refValue;
+
+    assertTypeString(stagingName);
+    assertTypeString(productionName);
+    assertStringStartsWith(stagingName, "staging-stack-assets-");
+    assertStringStartsWith(productionName, "production-stack-assets-");
+    assertNonNullable(simAws.s3().getSimBucketByName(stagingName));
+    assertNonNullable(simAws.s3().getSimBucketByName(productionName));
   });
 
   it("creates Buckets in the CloudFormation Account Region scope and rejects duplicate names from another scope", async () => {

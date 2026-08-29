@@ -200,11 +200,19 @@ describe("Secrets Manager CloudFormation Secret deployment", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the secret is named after its logical ID, as sim CloudFormation
-    // names other unnamed resources.
+    // Then the secret is named after the stack and the logical ID, as
+    // CloudFormation names one, which its ARN carries.
+    const secretArn = stack.getResource("ApiSecret")?.refValue;
+
+    assertTypeString(secretArn);
+    assertStringStartsWith(
+      secretArn,
+      "arn:aws:secretsmanager:eu-west-2:111111111111:secret:db-stack-ApiSecret-",
+    );
+
     const read = await simAws
       .secretsManager()
-      .getSecretValue(new GetSecretValueCommand({ SecretId: "ApiSecret" }));
+      .getSecretValue(new GetSecretValueCommand({ SecretId: secretArn }));
 
     // And it holds the 32-character password real Secrets Manager defaults to.
     assertTypeString(read.SecretString);

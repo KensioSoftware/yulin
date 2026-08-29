@@ -687,7 +687,8 @@ via `SimLambda.cfnResourceFactory()` and resolved by the generic CloudFormation 
 deploying a template containing `AWS::Lambda::Function` creates a real `SimLambdaFunction`,
 reachable afterwards through `simAws.lambda()` and invokable via the SDK `InvokeCommand`.
 
-Supported `AWS::Lambda::Function` properties: `FunctionName` (defaults to the logical ID), `Role`
+Supported `AWS::Lambda::Function` properties: `FunctionName` (a function with none is named after
+the stack and the logical ID, through the shared `SimCfnGeneratedResourceName`), `Role`
 (typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`), `Code`, `Handler`, `Runtime`,
 `Description`, `Timeout`, `MemorySize`, `Environment`, and `DeadLetterConfig`. Malformed property
 values fail AWS-style with a `TypeError` naming the property and logical ID, down to the individual

@@ -2,6 +2,7 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertStringStartsWith,
   assertTypeString,
   assertTrue,
 } from "@kensio/smartass";
@@ -53,7 +54,7 @@ describe("IAM CloudFormation User", () => {
     assertIdentical(simAws.iam().users.get(user.userName), user);
   });
 
-  it("defaults UserName to the logical ID and Path to the root", async () => {
+  it("names an unnamed User after the stack and the logical ID", async () => {
     // Given a CloudFormation template with a User that omits its name and path.
     const simAws = new SimAws();
 
@@ -70,7 +71,8 @@ describe("IAM CloudFormation User", () => {
       },
     });
 
-    // Then the User uses the logical ID as its name and the root path.
+    // Then the User is named after the stack and the logical ID, as
+    // CloudFormation names one, and takes the root path.
     const resource = stack.getResource("DefaultNamedUser");
 
     assertNonNullable(resource);
@@ -78,7 +80,10 @@ describe("IAM CloudFormation User", () => {
     const user = simAws.iam().users.get(resource.refValue as never);
 
     assertNonNullable(user);
-    assertIdentical(user.userName, "DefaultNamedUser");
+    assertStringStartsWith(
+      user.userName,
+      "iam-user-default-stack-DefaultNamedUser-",
+    );
     assertIdentical(user.path, "/");
   });
 

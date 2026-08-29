@@ -1,11 +1,14 @@
 import {
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 import type { SimCloudFormationResourceCreateContext } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimS3CloudFormationResourceFactory } from "./sim-cfn-s3-resource-factory.js";
@@ -48,7 +51,7 @@ describe("SimS3CloudFormationResourceFactory", () => {
     assertIdentical(bucket, storedBucket);
   });
 
-  it("creates an S3 Bucket using the lower-case logical ID by default", async () => {
+  it("names a Bucket created outside a stack after the logical ID alone", async () => {
     // Given an S3 CloudFormation Resource factory and a Bucket resource without a
     // BucketName.
     const simAws = new SimAws();
@@ -72,8 +75,12 @@ describe("SimS3CloudFormationResourceFactory", () => {
     // When the Bucket resource type is created.
     const bucket = await factory.create("Bucket", resource, context);
 
-    // Then a Bucket named from the lower-case logical ID is created and returned.
-    const storedBucket = simS3.getSimBucketByName("examplebucket");
+    // Then the name falls back to the logical ID, since there is no stack
+    // name to put in front of it, lower cased as a bucket name has to be.
+    assertInstanceOf(bucket, SimS3Bucket);
+    assertStringStartsWith(bucket.bucketName, "examplebucket-");
+
+    const storedBucket = simS3.getSimBucketByName(bucket.bucketName);
 
     assertNonNullable(storedBucket);
     assertIdentical(bucket, storedBucket);
