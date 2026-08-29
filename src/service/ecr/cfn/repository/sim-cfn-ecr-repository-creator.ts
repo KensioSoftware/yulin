@@ -1,11 +1,14 @@
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimEcrAuthorizer } from "../../authorize/sim-ecr-authorizer.js";
 import type { SimEcrRepository } from "../../repository/sim-ecr-repository.js";
 import type { SimEcr } from "../../sim-ecr.js";
 import { SimCfnEcrRepositoryProperties } from "./sim-cfn-ecr-repository-properties.js";
 
 interface SimCfnEcrRepositoryCreatorProperties {
   readonly ecr: SimEcr;
+  readonly authorizer: SimEcrAuthorizer;
 }
 
 /**
@@ -19,17 +22,25 @@ interface SimCfnEcrRepositoryCreatorProperties {
  */
 export class SimCfnEcrRepositoryCreator {
   private readonly ecr: SimEcr;
+  private readonly authorizer: SimEcrAuthorizer;
 
   constructor(properties: SimCfnEcrRepositoryCreatorProperties) {
     this.ecr = properties.ecr;
+    this.authorizer = properties.authorizer;
   }
 
   /**
    * Create a repository from an AWS::ECR::Repository Resource.
+   *
+   * Naming the repository is what makes it. That is where the deployment's
+   * caller is authorized, as it is on a real deploy before ECR answers. A
+   * repository a test has already registered a handler in is adopted, and the
+   * caller is authorized for it either way.
    */
   create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): SimEcrRepository {
     const repositoryProperties = new SimCfnEcrRepositoryProperties({
       resource,
@@ -38,6 +49,12 @@ export class SimCfnEcrRepositoryCreator {
     const repositoryName = repositoryProperties.repositoryName();
 
     repositoryProperties.recordIgnoredProperties();
+
+    this.authorizer.authorizeRepository(
+      "ecr:CreateRepository",
+      repositoryName,
+      options?.caller,
+    );
 
     return this.ecr.repository(repositoryName);
   }
@@ -58,7 +75,17 @@ export class SimCfnEcrRepositoryCreator {
    * being protected here is a test's own registration rather than anything
    * CloudFormation put there.
    */
-  delete(resource: SimCfnResource, repository: SimEcrRepository): void {
+  delete(
+    resource: SimCfnResource,
+    repository: SimEcrRepository,
+    options?: SimCfnResourceCallerOptions,
+  ): void {
+    this.authorizer.authorizeRepository(
+      "ecr:DeleteRepository",
+      repository.repositoryName,
+      options?.caller,
+    );
+
     if (repository.hasImage) {
       throw new Error(
         `Unsupported sim ECR CloudFormation Resource ${resource.logicalId} ` +

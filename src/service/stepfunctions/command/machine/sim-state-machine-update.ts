@@ -1,40 +1,34 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { parseSimStatesDefinition } from "../../definition/sim-states-definition-parse.js";
 import { SimStatesInvalidRequest } from "../../error/sim-step-functions.error.js";
-import type { SimStatesExecutionStore } from "../../execution/sim-states-execution-store.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
 import type {
-  SimDeleteStateMachineCommand,
-  SimDeleteStateMachineCommandOutput,
   SimUpdateStateMachineCommand,
   SimUpdateStateMachineCommandOutput,
 } from "./machine.command.js";
 import { requireSimStateMachine } from "./sim-state-machine-lookup.js";
 
-interface SimStateMachineWritesProperties {
+interface SimStateMachineUpdateProperties {
   readonly stateMachines: SimStateMachineStore;
-  readonly executions: SimStatesExecutionStore;
   readonly background: BackgroundScheduler;
 }
 
 /**
- * The commands that change and delete state machines.
+ * The command that changes a state machine's definition or role.
  */
-export class SimStateMachineWrites {
+export class SimStateMachineUpdate {
   readonly #stateMachines: SimStateMachineStore;
-  readonly #executions: SimStatesExecutionStore;
   readonly #background: BackgroundScheduler;
 
-  constructor(properties: SimStateMachineWritesProperties) {
+  constructor(properties: SimStateMachineUpdateProperties) {
     this.#stateMachines = properties.stateMachines;
-    this.#executions = properties.executions;
     this.#background = properties.background;
   }
 
   /**
    * Change a state machine's definition or role.
    */
-  update(
+  handle(
     command: SimUpdateStateMachineCommand,
   ): SimUpdateStateMachineCommandOutput {
     const { stateMachineArn, definition, roleArn } = command.input;
@@ -61,23 +55,5 @@ export class SimStateMachineWrites {
     });
 
     return { updateDate: this.#background.now() };
-  }
-
-  /**
-   * Delete a state machine and forget its executions.
-   */
-  delete(
-    command: SimDeleteStateMachineCommand,
-  ): SimDeleteStateMachineCommandOutput {
-    const found = requireSimStateMachine(
-      this.#stateMachines,
-      command.input.stateMachineArn,
-      "DeleteStateMachine",
-    );
-
-    this.#stateMachines.remove(found.arn);
-    this.#executions.removeForStateMachine(found.arn);
-
-    return {};
   }
 }

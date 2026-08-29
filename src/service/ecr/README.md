@@ -17,8 +17,7 @@ Docker. So registering a handler as an image is a Yulin-native operation, `simul
 it cannot be mistaken for a simulated `PutImage`. `DescribeImages` and the rest would answer with
 made-up manifest data for the same reason, so they are absent rather than wrong.
 
-What is left is state and lookup, which is why there is no `command/` directory, no authorizer and
-no SDK router.
+What is left is state and lookup. There is no `command/` directory and no SDK router.
 
 ## Entry points
 
@@ -86,6 +85,12 @@ image is pushed by whatever built it, long before the stack that runs it.
 `SimCfnEcrRepositoryPropertyRules` records every other property as ignored. All of them describe
 image content, so a repository created without them is still a repository that does what one does
 here.
+
+`SimEcrAuthorizer` is the one thing here that reaches IAM, and the CloudFormation path is the only
+caller of it. A deployment authorizes `ecr:CreateRepository` before the repository is named and
+`ecr:DeleteRepository` before a teardown removes it, against the ARN `SimEcrRepositoryAddress`
+builds. Registering an image goes through neither. That is a test saying what an image is, and no
+principal makes the request.
 
 A teardown removes a repository holding no simulated image, and records the deletion of one that
 holds an image rather than carrying it out. The handler in it was registered outside any stack, and
