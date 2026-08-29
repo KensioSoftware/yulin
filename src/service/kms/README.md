@@ -154,10 +154,12 @@ usable in its own region.
 AWS managed key: use of the key allowed to `*` conditioned on both keys, and a second statement
 delegating only the key's metadata to the account. Nothing about using the key is delegated, so an
 identity policy granting `kms:Decrypt` on such a key reaches nothing by itself, and a caller reaches
-the key through the owning service. What the first statement admits is whoever the request came
-from, so a service passing the caller's own permissions on with `withCallerPermissions` needs IAM to
-allow that caller too. The key factory builds it whenever a key is
-made for a service, which the key store does on first reference to a reserved `alias/aws/` name.
+the key through the owning service. The first statement admits whoever the request came from and
+allows the request outright, which is why a caller holding `ssm:GetParameter` and nothing on KMS
+reads a `SecureString` under `aws/ssm`. `withCallerPermissions` is the option for a service passing
+the caller's own permissions on instead, which then needs IAM to allow that caller too. No simulated
+service sets it. The key factory builds the policy whenever a key is made for a service, which the
+key store does on first reference to a reserved `alias/aws/` name.
 
 Operations with no key to speak of, `CreateKey`, `ListKeys` and `ListAliases`, authorize against the
 region's keys with identity policies alone, because real KMS gives those actions no resource-level

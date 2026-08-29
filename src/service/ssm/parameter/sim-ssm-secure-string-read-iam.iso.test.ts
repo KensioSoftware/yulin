@@ -7,7 +7,6 @@ import {
   assertNonNullable,
   assertStringNotIncludes,
   assertThrowsErrorAsync,
-  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -15,7 +14,7 @@ import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
-describe("SSM SecureString IAM authorization", () => {
+describe("SSM SecureString read IAM authorization", () => {
   it("decrypts for a caller allowed both the parameter and the key", async () => {
     // Given a SecureString parameter under a customer managed key.
     const simAws = new SimAws();
@@ -123,6 +122,62 @@ describe("SSM SecureString IAM authorization", () => {
     assertIdentical(read.Parameter?.Value, "hunter2");
   });
 
+  it("decrypts for a caller whose kms:Decrypt is scoped to Systems Manager", async () => {
+    // Given a SecureString parameter under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata.Arn,
+      }),
+    );
+
+    // And a Role whose key permission is conditioned on the request reaching
+    // KMS through Parameter Store, which is how a stack scopes the grant when
+    // the key is chosen after synthesis.
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "ConfigReader", actions: ["ssm:GetParameter"] },
+      simAws,
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "KeyPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "kms:Decrypt",
+            Resource: "*",
+            Condition: {
+              StringEquals: {
+                "kms:ViaService": `ssm.${simAws.defaultRegionName}.amazonaws.com`,
+              },
+            },
+          },
+        }),
+      }),
+    );
+
+    // When it reads the parameter with decryption.
+    const read = await simAws.ssm().getParameter(
+      new GetParameterCommand({
+        Name: "/myapp/prod/db-password",
+        WithDecryption: true,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
+    );
+
+    // Then the condition matches and the read succeeds, as it does in an
+    // account. A check ignoring the condition would refuse a policy real IAM
+    // allows.
+    assertIdentical(read.Parameter?.Value, "hunter2");
+  });
+
   it("denies a decrypting read to a caller with no key permission", async () => {
     // Given a SecureString parameter under a customer managed key.
     const simAws = new SimAws();
@@ -226,151 +281,5 @@ describe("SSM SecureString IAM authorization", () => {
     // Then the read succeeds, because nothing decrypted, and what comes back
     // is the ciphertext rather than the secret.
     assertStringNotIncludes(String(read.Parameter?.Value), "hunter2");
-  });
-
-  it("denies a write to a caller with no key permission", async () => {
-    // Given a customer managed key.
-    const simAws = new SimAws();
-    const key = await simAws
-      .kms()
-      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
-    assertNonNullable(key.KeyMetadata?.Arn);
-
-    // And a Role allowed to write parameters but not to use the key.
-    const role = await simAws.iam().createRole(
-      new CreateRoleCommand({
-        RoleName: "ConfigReader",
-        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
-      }),
-    );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "ConfigReader",
-        PolicyName: "SecretPolicy",
-        PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "ssm:PutParameter", Resource: "*" },
-        }),
-      }),
-    );
-
-    // When it writes a SecureString under that key.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.ssm().putParameter(
-        new PutParameterCommand({
-          Name: "/myapp/prod/api-key",
-          Type: "SecureString",
-          Value: "secret",
-          KeyId: key.KeyMetadata?.Arn,
-        }),
-        { caller: { kind: "arn", arn: role.Role.Arn } },
-      ),
-    );
-
-    // Then it is denied: a standard tier write needs kms:Encrypt as well.
-    assertInstanceOf(error, SimIamAccessDenied);
-  });
-
-  it("writes for a caller allowed both the parameter and the key", async () => {
-    // Given a customer managed key.
-    const simAws = new SimAws();
-    const key = await simAws
-      .kms()
-      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
-    assertNonNullable(key.KeyMetadata?.Arn);
-
-    // And a Role allowed to write parameters and to encrypt with the key.
-    const role = await simAws.iam().createRole(
-      new CreateRoleCommand({
-        RoleName: "ConfigReader",
-        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
-      }),
-    );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "ConfigReader",
-        PolicyName: "SecretPolicy",
-        PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: [
-            { Effect: "Allow", Action: "ssm:PutParameter", Resource: "*" },
-            {
-              Effect: "Allow",
-              Action: "kms:Encrypt",
-              Resource: key.KeyMetadata.Arn,
-            },
-          ],
-        }),
-      }),
-    );
-
-    // When it writes a SecureString under that key.
-    const written = await simAws.ssm().putParameter(
-      new PutParameterCommand({
-        Name: "/myapp/prod/api-key",
-        Type: "SecureString",
-        Value: "secret",
-        KeyId: key.KeyMetadata.Arn,
-      }),
-      { caller: { kind: "arn", arn: role.Role.Arn } },
-    );
-
-    // Then the write succeeds.
-    assertIdentical(written.Version, 1);
-  });
-
-  it("leaves no parameter behind when the key permission is missing", async () => {
-    // Given a customer managed key.
-    const simAws = new SimAws();
-    const key = await simAws
-      .kms()
-      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
-    assertNonNullable(key.KeyMetadata?.Arn);
-
-    // And a Role allowed to write parameters but not to use the key.
-    const role = await simAws.iam().createRole(
-      new CreateRoleCommand({
-        RoleName: "ConfigReader",
-        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
-      }),
-    );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "ConfigReader",
-        PolicyName: "SecretPolicy",
-        PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "ssm:PutParameter", Resource: "*" },
-        }),
-      }),
-    );
-
-    // When a create is denied at the encryption step.
-    await assertThrowsErrorAsync(async () =>
-      simAws.ssm().putParameter(
-        new PutParameterCommand({
-          Name: "/myapp/prod/api-key",
-          Type: "SecureString",
-          Value: "secret",
-          KeyId: key.KeyMetadata?.Arn,
-        }),
-        { caller: { kind: "arn", arn: role.Role.Arn } },
-      ),
-    );
-
-    // Then no half-made parameter is left in the store.
-    assertUndefined(simAws.ssm().findParameter("/myapp/prod/api-key"));
   });
 });

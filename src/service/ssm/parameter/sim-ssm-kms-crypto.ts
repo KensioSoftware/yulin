@@ -21,6 +21,11 @@ export const ssmDefaultKeyAlias = "alias/aws/ssm";
  */
 export const ssmKmsViaService = "ssm";
 
+interface SimSsmKmsOptions {
+  readonly caller?: SimAwsCaller | undefined;
+  readonly viaService?: string | undefined;
+}
+
 /**
  * The narrow slice of simulated KMS that SecureString parameters need.
  *
@@ -37,11 +42,7 @@ export interface SimSsmKmsCrypto {
         EncryptionContext?: Readonly<Record<string, string>> | undefined;
       };
     },
-    options?: {
-      caller?: SimAwsCaller | undefined;
-      viaService?: string | undefined;
-      withCallerPermissions?: boolean | undefined;
-    },
+    options?: SimSsmKmsOptions,
   ): Promise<{
     CiphertextBlob?: Uint8Array | undefined;
     KeyId?: string | undefined;
@@ -54,11 +55,7 @@ export interface SimSsmKmsCrypto {
         EncryptionContext?: Readonly<Record<string, string>> | undefined;
       };
     },
-    options?: {
-      caller?: SimAwsCaller | undefined;
-      viaService?: string | undefined;
-      withCallerPermissions?: boolean | undefined;
-    },
+    options?: SimSsmKmsOptions,
   ): Promise<{
     Plaintext?: Uint8Array | undefined;
     KeyId?: string | undefined;
