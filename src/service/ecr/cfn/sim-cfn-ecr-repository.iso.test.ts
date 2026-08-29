@@ -4,6 +4,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -104,7 +105,10 @@ describe("AWS::ECR::Repository", () => {
     await stack.waitForDeployComplete();
 
     // Then the generated name is lower cased, since ECR names are.
-    assertTrue(simAws.ecr().hasRepository("platform-stack-ordersrepository"));
+    assertStringStartsWith(
+      simAws.ecr().allRepositories().at(0)?.repositoryName,
+      "platform-stack-ordersrepository-",
+    );
 
     await simAws.backgroundTasksComplete();
   });

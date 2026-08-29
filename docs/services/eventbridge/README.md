@@ -909,7 +909,10 @@ console.log(handled.length); // 1
 `Ref` returns the **name** of a bus or a rule, and never its ARN. That is what AWS returns, and it
 makes a bus `Ref` usable straight away as another resource's `EventBusName`. The ARN comes from
 `Fn::GetAtt ... Arn`, which an `AWS::Lambda::Permission` `SourceArn` needs. An unnamed rule gets a
-name generated from the stack name and the logical ID, as real CloudFormation generates one.
+name generated from the stack name, the logical ID and a tail derived from both, as
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+describe. A rule name caps at 64 characters, and a stack name and logical ID longer than that
+together are trimmed to 25 characters each.
 
 A target property this simulation leaves out, such as `InputTransformer` or `InputPath`, is refused
 at deploy time naming the property and the Resource. The alternative is a rule that sends the whole

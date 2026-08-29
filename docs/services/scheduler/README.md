@@ -678,7 +678,9 @@ console.log(simAws.scheduler().deliveryFailures.length); // 0
 
 `Ref` returns the schedule's **name** and `Fn::GetAtt ... Arn` its ARN, which carries the schedule
 group as it always does. A schedule the template leaves unnamed gets one generated from the stack
-name and the logical ID.
+name, the logical ID and a tail derived from both, as
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+describe.
 
 A property this simulation leaves out is refused at deploy time, naming the Resource. Deploying a
 schedule that behaves differently from the one declared would be worse. Tearing the stack down
@@ -735,8 +737,8 @@ console.log(stack.output("GroupArn"));
 ```
 
 `Ref` returns the group's **name** and `Fn::GetAtt` answers `Arn`, `State`, `CreationDate` and
-`LastModificationDate`. A group the template leaves unnamed gets one generated from the stack name
-and the logical ID.
+`LastModificationDate`. A group the template leaves unnamed gets one generated from the stack name,
+the logical ID and a tail derived from both, as a schedule does.
 
 `Tags` on a group are recorded as an ignored property and the group deploys without them. The CDK
 puts a stack's tags on every taggable Resource in it, so a template gains them without asking.

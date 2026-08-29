@@ -259,11 +259,10 @@ describe("DynamoDB CloudFormation Table deployment", () => {
 
     // Then the name carries the stack name and the logical ID, so a Lambda
     // environment variable built from the Ref reaches the deployed table.
-    assertIdentical(
-      stack.outputs.get("OrdersTableName")?.value,
-      "orders-stack-OrdersTable",
-    );
-    assertNonNullable(simAws.dynamoDb().findTable("orders-stack-OrdersTable"));
+    const tableName = stack.outputs.get("OrdersTableName")?.value;
+
+    assertStringStartsWith(tableName, "orders-stack-OrdersTable-");
+    assertNonNullable(simAws.dynamoDb().findTable(tableName));
   });
 
   it("gives two stacks deploying one template two differently named tables", async () => {

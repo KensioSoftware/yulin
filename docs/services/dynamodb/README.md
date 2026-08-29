@@ -3107,11 +3107,12 @@ the template gets wrong fails the same way it would for an SDK caller.
 updates it. A specification the template got wrong is refused in the words `UpdateTimeToLive`
 refuses it in.
 
-A table with no `TableName` is named after the stack and its logical ID. The table above with its
-name left out would be `orders-stack-OrdersTable`. Real CloudFormation adds random characters to
-that, which a template cannot predict either way. Two stacks deploying the same template get two
-differently named tables. The generated name is trimmed to the 255 characters a table name allows,
-ending in a hash of the untrimmed name so two long names that start the same stay apart.
+A table with no `TableName` is named after the stack, its logical ID and a tail derived from both.
+The table above with its name left out would be `orders-stack-OrdersTable-` and twelve more
+characters, where real CloudFormation ends the name in twelve random ones. Two stacks deploying the
+same template get two differently named tables. The name is trimmed to the 255 characters a table
+name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 `Fn::GetAtt … StreamArn` gives the ARN of the stream the table's `StreamSpecification` gave it. On a
 table with no `StreamSpecification` it is refused by name, naming the table, since an invented

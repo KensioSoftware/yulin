@@ -86,8 +86,9 @@ describe("ECS CloudFormation binding targets", () => {
   });
 
   it("binds a task definition by the family CloudFormation generated", async () => {
-    // Given a task definition the template names no family for, so the family
-    // is the one CloudFormation would have generated.
+    // Given a deployed task definition the template names no family for, whose
+    // generated family a Ref hands the test, since it ends in a tail derived
+    // from the stack name and the logical ID.
     const simAws = new SimAws();
     let runs = 0;
 
@@ -106,27 +107,37 @@ describe("ECS CloudFormation binding targets", () => {
             },
           },
         },
-      },
-      bindings: [
-        {
-          family: "orders-stack-WorkerTaskDefinition",
-          containerName: "app",
-          run: () => {
-            runs += 1;
-          },
+        Outputs: {
+          TaskDefinitionRef: { Value: { Ref: "WorkerTaskDefinition" } },
         },
-      ],
+      },
     });
 
     await stack.waitForDeployComplete();
 
-    // When a task is run from it.
-    await simAws.ecs().runTask(
-      new RunTaskCommand({
-        cluster: "orders",
-        taskDefinition: "orders-stack-WorkerTaskDefinition",
-      }),
+    const taskDefinitionArn = stack.outputs.get("TaskDefinitionRef")?.value;
+
+    assertStringIncludes(
+      taskDefinitionArn,
+      "task-definition/orders-stack-WorkerTaskDefinition-",
     );
+
+    const { family } = simAws.ecs().taskDefinition(taskDefinitionArn);
+
+    // When a handler is bound to that family and a task is run from it.
+    simAws.ecs().bindContainer({
+      family,
+      containerName: "app",
+      run: () => {
+        runs += 1;
+      },
+    });
+
+    await simAws
+      .ecs()
+      .runTask(
+        new RunTaskCommand({ cluster: "orders", taskDefinition: family }),
+      );
 
     await simAws.backgroundTasksComplete();
 

@@ -1052,11 +1052,11 @@ The properties applied to the queue are `VisibilityTimeout`, `DelaySeconds`,
 `MessageRetentionPeriod`, `MaximumMessageSize` and `ReceiveMessageWaitTimeSeconds`. Each is passed to
 `CreateQueue`, and a value outside the range real SQS accepts fails the resource.
 
-A queue with no `QueueName` is named from the stack name and the logical ID. The queue above with its
-name left out would be `orders-stack-OrdersQueue`. Real CloudFormation adds random characters to
-that, which a template cannot predict either way. The generated name is trimmed to the 80 characters
-a queue name allows, ending in a hash of the untrimmed name so two long names that start the same
-stay apart.
+A queue with no `QueueName` is named from the stack name, the logical ID and a tail derived from
+both. The queue above with its name left out would be `orders-stack-OrdersQueue-` and twelve more
+characters, where real CloudFormation ends the name in twelve random ones. The name is trimmed to
+the 80 characters a queue name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 `FifoQueue: true` fails the resource. Only standard queues are simulated, and a FIFO queue is named
 `<name>.fifo`, a name simulated SQS refuses to an SDK caller as well. There is no queue to create

@@ -440,8 +440,9 @@ them.
 - `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
   `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
   structural types. A field it does not name is stored and reported back all the same.
-- A cluster or task definition a template does not name gets a name composed from the stack name and
-  the logical ID, without the random part real CloudFormation adds, so a test can predict it.
+- A cluster or task definition a template does not name gets a name composed from the stack name,
+  the logical ID and a tail derived from both, through the shared `SimCfnGeneratedResourceName`. The
+  tail stands in for the random characters real CloudFormation ends one with.
 - A cluster property or task definition property `CreateCluster` or `RegisterTaskDefinition` would
   refuse is recorded as ignored rather than refused, so the stack deploys. A declaration nothing acts
   on is worth less than a stack that will not come up.

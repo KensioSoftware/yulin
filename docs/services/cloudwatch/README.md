@@ -285,10 +285,12 @@ deploy the stack, publish a breaching datapoint, advance the clock and read the 
 whatever is subscribed. Deleting the stack deletes the alarm and takes its scheduled evaluation back
 off the clock with it.
 
-`AlarmName` may be left out, and the alarm is then named after the stack and the logical ID. A test
-still has a name to pass to `DescribeAlarms`. Real CloudFormation generates a physical ID of the
-same shape with a random tail on the end. The tail is left off here, so the name is one a test can
-predict.
+`AlarmName` may be left out, and the alarm is then named after the stack, the logical ID and a tail
+derived from both. Real CloudFormation ends a physical ID of the same shape in twelve random
+characters, and the tail here comes from the name it follows, giving one alarm the same name at
+every deployment. `simAws.cloudWatch().allAlarms()` hands a test the name to pass to
+`DescribeAlarms`, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how a long name is trimmed.
 
 These are the properties acted on: `AlarmName`, `AlarmDescription`, `ActionsEnabled`,
 `AlarmActions`, `OKActions`, `InsufficientDataActions`, `Namespace`, `MetricName`, `Dimensions`,

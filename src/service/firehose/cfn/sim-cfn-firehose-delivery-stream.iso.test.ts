@@ -4,6 +4,7 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -136,13 +137,12 @@ describe("deployed AWS::KinesisFirehose::DeliveryStream Resources", () => {
     await stack.waitForDeployComplete();
 
     // Then CloudFormation named it, as real CloudFormation names one.
+    const streamName = stack.outputs.get("StreamRef")?.value;
+
+    assertStringStartsWith(streamName, "orders-stack-OrderEvents-");
     assertIdentical(
-      stack.outputs.get("StreamRef")?.value,
-      "orders-stack-OrderEvents",
-    );
-    assertIdentical(
-      simAws.firehose().findDeliveryStream("orders-stack-OrderEvents")?.name,
-      "orders-stack-OrderEvents",
+      simAws.firehose().findDeliveryStream(streamName)?.name,
+      streamName,
     );
   });
 

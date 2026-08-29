@@ -1688,11 +1688,11 @@ const { Messages } = await simAws
 console.log(Messages?.[0]?.Body); // "order-1"
 ```
 
-A topic with no `TopicName` is named from the stack name and the logical ID. The topic above with its
-name left out would be `orders-stack-OrdersTopic`. Real CloudFormation adds random characters to
-that, which a template cannot predict either way. The generated name is trimmed to the 256 characters
-a topic name allows, ending in a hash of the untrimmed name so two long names that start the same
-stay apart.
+A topic with no `TopicName` is named from the stack name, the logical ID and a tail derived from
+both. The topic above with its name left out would be `orders-stack-OrdersTopic-` and twelve more
+characters, where real CloudFormation ends the name in twelve random ones. The name is trimmed to
+the 256 characters a topic name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the stack name and the logical ID share what is left.
 
 A topic can also declare its subscriptions inside itself, with the `Subscription` property. That is
 how a hand-written template usually writes them. Each entry is a `Protocol` and an `Endpoint`, and

@@ -1,6 +1,7 @@
 import {
   assertIdentical,
   assertInstanceOf,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTypeString,
   assertUndefined,
@@ -130,9 +131,9 @@ describe("deployed AWS::StepFunctions::StateMachine Resources", () => {
     await stack.waitForDeployComplete();
 
     // Then CloudFormation named it, as real CloudFormation does.
-    assertIdentical(
+    assertStringStartsWith(
       stack.outputs.get("WorkflowName")?.value,
-      "enrolment-Workflow",
+      "enrolment-Workflow-",
     );
   });
 

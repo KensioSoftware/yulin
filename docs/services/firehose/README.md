@@ -607,8 +607,10 @@ writes into the Bucket beside it, as the Role beside it, and a Role without `s3:
 delivery the same way one created through `CreateDeliveryStream` does. Deleting the stack deletes the
 delivery stream.
 
-A delivery stream the template does not name is named after the stack and the logical ID, as real
-CloudFormation names one. The name is trimmed to the 64 characters Firehose allows.
+A delivery stream the template does not name is named after the stack, the logical ID and a tail
+derived from both, as real CloudFormation names one. The name is trimmed to the 64 characters
+Firehose allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how the two parts share what is left.
 
 `DeliveryStreamEncryptionConfigurationInput` and `DirectPutSourceConfiguration` are recorded against
 the resource as unsimulated, and the delivery stream deploys anyway. The destination properties this

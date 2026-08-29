@@ -1,10 +1,11 @@
 import { DescribeClustersCommand } from "@aws-sdk/client-ecs";
 import {
   assertArrayLength,
-  assertIdentical,
   assertFalse,
+  assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -102,13 +103,13 @@ describe("AWS::ECS::Cluster", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the cluster is named from the stack and the logical ID, without the
-    // random part real CloudFormation adds, so a test can predict it.
-    assertIdentical(
-      stack.outputs.get("ClusterRef")?.value,
-      "orders-stack-OrdersCluster",
-    );
-    assertTrue(simAws.ecs().cluster("orders-stack-OrdersCluster").isActive());
+    // Then the cluster is named from the stack, the logical ID and a tail
+    // derived from both, which a Ref hands a test rather than it writing the
+    // name out.
+    const clusterName = stack.outputs.get("ClusterRef")?.value;
+
+    assertStringStartsWith(clusterName, "orders-stack-OrdersCluster-");
+    assertTrue(simAws.ecs().cluster(clusterName).isActive());
 
     await simAws.backgroundTasksComplete();
   });

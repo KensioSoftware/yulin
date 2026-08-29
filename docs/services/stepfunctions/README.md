@@ -1181,8 +1181,10 @@ created. A location this simulation holds no object for drops that one state mac
 where it looked.
 
 `StateMachineName`, `RoleArn`, `StateMachineType` and `Tags` are carried across. A state machine the
-template does not name is named after the stack and the logical ID (`enrolment-Workflow`), the way
-CloudFormation names one. `Ref` answers with the ARN and `Fn::GetAtt` answers `Arn` and `Name`. Real
+template does not name is named after the stack, the logical ID and a tail derived from both
+(`enrolment-Workflow-8d267c9d4ae1`), the way CloudFormation names one, and
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover the tail. `Ref` answers with the ARN and `Fn::GetAtt` answers `Arn` and `Name`. Real
 CloudFormation publishes this one that way round too. Deleting the stack deletes the state machine.
 
 A definition holding a state type this simulator does not run drops that one state machine. The

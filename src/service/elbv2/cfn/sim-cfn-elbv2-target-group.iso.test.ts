@@ -8,6 +8,7 @@ import {
   assertNonNullable,
   assertStringEndsWith,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -243,7 +244,10 @@ describe("AWS::ElasticLoadBalancingV2::TargetGroup", () => {
     await stack.waitForDeployComplete();
 
     // Then it is named from the stack and the logical ID.
-    assertIdentical(simCfnElbV2Output(stack, "Name"), "shop-stack-Checkout");
+    assertStringStartsWith(
+      simCfnElbV2Output(stack, "Name"),
+      "shop-stack-Checkout-",
+    );
 
     await simAws.backgroundTasksComplete();
   });

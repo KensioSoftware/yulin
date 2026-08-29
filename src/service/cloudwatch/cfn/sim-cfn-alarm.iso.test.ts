@@ -11,6 +11,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTypeString,
 } from "@kensio/smartass";
@@ -139,7 +140,7 @@ describe("AWS::CloudWatch::Alarm", () => {
     const alarms = simAws.cloudWatch().allAlarms();
 
     assertArrayLength(alarms, 1);
-    assertIdentical(alarms.at(0)?.name, "orders-OrdersAlarm");
+    assertStringStartsWith(alarms.at(0)?.name, "orders-OrdersAlarm-");
   });
 
   it("resolves Ref to the name and Fn::GetAtt Arn to the alarm ARN", async () => {

@@ -275,8 +275,9 @@ await simAws.kinesis().putRecord(
 ```
 
 `Name`, `ShardCount`, `RetentionPeriodHours`, `StreamModeDetails` and `Tags` are read. A stream the
-template does not name is named after the stack and the logical ID, as real CloudFormation names
-one.
+template does not name is named after the stack, the logical ID and a tail derived from both, as
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+describe.
 
 `RetentionPeriodHours` is applied after the stream is created, because `CreateStream` takes no
 retention on real Kinesis either. It only ever goes up: a new stream keeps records for 24 hours,

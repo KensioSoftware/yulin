@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -130,14 +131,12 @@ describe("SNS CloudFormation Topic deployment", () => {
       },
     });
 
-    // Then the topic is named from the stack name and the logical ID, as real
-    // CloudFormation names one, without the random characters a template could
-    // not predict anyway.
-    assertIdentical(
-      stack.outputs.get("TopicName")?.value,
-      "orders-stack-OrdersTopic",
-    );
-    assertNonNullable(simAws.sns().findTopic("orders-stack-OrdersTopic"));
+    // Then the topic is named from the stack name, the logical ID and a tail
+    // derived from both, as real CloudFormation names one.
+    const topicName = stack.outputs.get("TopicName")?.value;
+
+    assertStringStartsWith(topicName, "orders-stack-OrdersTopic-");
+    assertNonNullable(simAws.sns().findTopic(topicName));
   });
 
   it("backs the CloudFormation Resource with the simulated topic", async () => {
