@@ -28,8 +28,8 @@ export interface SimCfOriginStageResult {
  * Fetches from the Behavior's Origin, running the Lambda@Edge functions on
  * either side of the fetch.
  *
- * Real CloudFront runs the origin events on a cache miss only. Nothing here
- * caches, so every request is a miss and both events run every time.
+ * Real CloudFront runs the origin events on a cache miss only, and so does
+ * this. A request the Distribution's cache answers never reaches this stage.
  */
 export class SimCfOriginStage {
   constructor(

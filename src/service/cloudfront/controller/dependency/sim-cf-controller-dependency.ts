@@ -10,6 +10,7 @@ import { SimLambdaEdgeOriginApplicator } from "../edge/sim-lambda-edge-origin-ap
 import { SimAwsCfEdgeFunctions } from "../../edge/sim-aws-cf-edge-functions.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 import { SimCfOriginStage } from "../origin/sim-cf-origin-stage.js";
+import { SimCfContentStage } from "../content/sim-cf-content-stage.js";
 import { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
 import { SimCfResponseHeadersApplicator } from "../response-headers/sim-cf-response-headers-applicator.js";
 import { SimCfWebAclGuard } from "../web-acl/sim-cf-web-acl-guard.js";
@@ -35,8 +36,7 @@ export interface SimCloudFrontControllerDependencies {
   readonly behaviourResolver: SimCloudFrontBehaviorResolver;
   readonly cffApplicator: SimCffApplicator;
   readonly edgeApplicator: SimLambdaEdgeApplicator;
-  readonly originStage: SimCfOriginStage;
-  readonly customErrorResponder: SimCfCustomErrorResponder;
+  readonly contentStage: SimCfContentStage;
   readonly responseHeadersApplicator: SimCfResponseHeadersApplicator;
 }
 
@@ -79,14 +79,15 @@ export class SimCloudFrontControllerDependenciesFactory {
       edgeApplicator:
         properties.edgeApplicator ??
         new SimLambdaEdgeApplicator({ edgeFunctions }),
-      originStage: new SimCfOriginStage(
-        originFetcher,
-        properties.edgeOriginApplicator ??
-          new SimLambdaEdgeOriginApplicator({ edgeFunctions }),
-      ),
-      customErrorResponder:
+      contentStage: new SimCfContentStage(
+        new SimCfOriginStage(
+          originFetcher,
+          properties.edgeOriginApplicator ??
+            new SimLambdaEdgeOriginApplicator({ edgeFunctions }),
+        ),
         properties.customErrorResponder ??
-        new SimCfCustomErrorResponder({ behaviourResolver, originFetcher }),
+          new SimCfCustomErrorResponder({ behaviourResolver, originFetcher }),
+      ),
       responseHeadersApplicator:
         properties.responseHeadersApplicator ??
         new SimCfResponseHeadersApplicator(),

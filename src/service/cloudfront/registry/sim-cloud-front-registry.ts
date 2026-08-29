@@ -5,13 +5,27 @@ import {
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 /**
+ * How a simulated AWS caches what its Distributions serve.
+ */
+export interface SimCfCachingConfiguration {
+  readonly enabled: boolean;
+}
+
+/**
  * Simulated CloudFront cross-Account registry of Distribution IDs.
  *
  * CloudFront is not region-scoped, so all region-scoped CloudFront service
  * instances for the same Account should delegate to the same Account-global
  * state.
+ *
+ * Whether Distributions cache what they serve lives here for the same reason.
+ * One registry is built per `SimAws` and shared by every Account and Region,
+ * so turning caching off turns it off for the whole simulated AWS rather than
+ * for one Account's Distributions.
  */
 export class SimCloudFrontRegistry {
+  #cachingEnabled = true;
+
   private readonly distributionAccountIds = new Map<
     SimCloudFrontDistributionId,
     SimAwsAccountId
@@ -26,6 +40,25 @@ export class SimCloudFrontRegistry {
     string,
     SimCloudFrontDistributionId
   >();
+
+  /**
+   * Whether Distributions here cache what they serve.
+   */
+  get cachingEnabled(): boolean {
+    return this.#cachingEnabled;
+  }
+
+  /**
+   * Turn the edge cache on or off for every Distribution in this simulated
+   * AWS.
+   *
+   * Caching is on, as CloudFront's is. Turning it off is for a suite that
+   * repeats a request and wants the Origin read every time, and it is the
+   * behaviour sim CloudFront had before it held a cache at all.
+   */
+  configureCaching(configuration: SimCfCachingConfiguration): void {
+    this.#cachingEnabled = configuration.enabled;
+  }
 
   /**
    * Allocate a globally unique simulated CloudFront Distribution ID.

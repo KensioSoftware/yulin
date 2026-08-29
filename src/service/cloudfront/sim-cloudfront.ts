@@ -45,7 +45,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "./distribution/sim-cloudfront-distribution.js";
-import { SimCloudFrontPolicies } from "./sim-cloudfront-policies.js";
+import { SimCloudFrontCaching } from "./sim-cloudfront-caching.js";
 import type {
   SimCloudFrontOriginAccessControl,
   SimCloudFrontOriginAccessControlId,
@@ -58,6 +58,7 @@ import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-
 import {
   SimCloudFrontCommands,
   type SimCloudFrontDistributionMap,
+  type SimCloudFrontDistributionsById,
   type SimCloudFrontProperties,
   type SimCloudFrontRequestOptions,
 } from "./sim-cloudfront-commands.js";
@@ -70,7 +71,7 @@ export type {
 /**
  * Simulated CloudFront. Handles SDK commands. Emulates AWS behaviour and state.
  */
-export class SimCloudFront extends SimCloudFrontPolicies {
+export class SimCloudFront extends SimCloudFrontCaching {
   private readonly distributions: SimCloudFrontDistributionMap = new Map();
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap = new Map();
   private readonly originAccessControls =
@@ -84,11 +85,12 @@ export class SimCloudFront extends SimCloudFrontPolicies {
   private readonly sdkRouter = new SimCloudFrontSdkCommandRouter(this);
 
   constructor(properties: SimCloudFrontProperties = {}) {
-    super();
+    super(properties.cloudFrontRegistry);
     this.accountRegionScope =
       properties.accountRegionScope ?? simAwsAccountRegionScopeFactory.make();
     this.commands = new SimCloudFrontCommands({
       ...properties,
+      cloudFrontRegistry: this.cloudFrontRegistry,
       accountId: this.accountRegionScope.accountId,
       distributions: this.distributions,
       cloudFrontFunctions: this.cloudFrontFunctions,
@@ -119,10 +121,7 @@ export class SimCloudFront extends SimCloudFrontPolicies {
   /**
    * Get the simulated Distributions owned by this sim CloudFront service.
    */
-  getDistributions(): ReadonlyMap<
-    SimCloudFrontDistributionId,
-    SimCloudFrontDistribution
-  > {
+  getDistributions(): SimCloudFrontDistributionsById {
     return this.distributions;
   }
 

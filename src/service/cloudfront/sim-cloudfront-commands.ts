@@ -96,6 +96,15 @@ export type SimCloudFrontDistributionMap = Map<
 >;
 
 /**
+ * The Distributions of one simulated CloudFront, as a caller reading them back
+ * sees them.
+ */
+export type SimCloudFrontDistributionsById = ReadonlyMap<
+  SimCloudFrontDistributionId,
+  SimCloudFrontDistribution
+>;
+
+/**
  * The state every Distribution command works on.
  */
 interface SimCloudFrontDistributionState {

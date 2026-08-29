@@ -1,14 +1,14 @@
 import type { SimCloudFrontControllerDependencies } from "./dependency/sim-cf-controller-dependency.js";
+import { simCfRequestEdge } from "../cache/sim-cf-edge.js";
 import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root-object-request.js";
 
 /**
  * Runs a single simulated CloudFront request through its lifecycle:
- * route to a Distribution, put the request through the Distribution's web ACL,
- * apply the default root object, resolve the matching Behavior, run
- * viewer-request hooks, fetch from the Origin with the origin hooks either
- * side of the fetch, replace an error response with the Distribution's custom
- * error page, apply the Behavior's response headers policy, then run
- * viewer-response hooks where the Origin did not answer with an error.
+ * read the edge it arrived at, route to a Distribution, put the request
+ * through the Distribution's web ACL, apply the default root object, resolve
+ * the matching Behavior, run viewer-request hooks, answer from that edge's
+ * cache or from the Origin, apply the Behavior's response headers policy, then
+ * run viewer-response hooks where the Origin did not answer with an error.
  *
  * A viewer hook is a CloudFront Function or a Lambda@Edge function. A Behavior
  * carries at most one of the two kinds at the viewer events, which
@@ -27,7 +27,11 @@ export class SimCloudFrontRequestPipeline {
    * Process one incoming request and produce the response the caller sees.
    */
   async handle(request: Request): Promise<Response> {
-    let requestReference = request;
+    // The edge is read first and its header taken off the request. A web ACL
+    // rule, an edge function and the Origin therefore never see an instruction
+    // that was addressed to the simulator.
+    const edge = simCfRequestEdge(request);
+    let requestReference = edge.request;
 
     const route = this.stages.distroRouter.routeForRequest(requestReference);
 
@@ -85,23 +89,17 @@ export class SimCloudFrontRequestPipeline {
     }
     requestReference = edgeResult;
 
-    // Fetch from the Origin, running the origin-request and origin-response
-    // Lambda@Edge functions on either side of the fetch. An origin-request
-    // function that answered with a response of its own leaves the Origin
-    // unread, and the response takes the Origin response's place from here on.
-    const originResult = await this.stages.originStage.fetch(
-      requestReference,
-      distro,
+    // Answer from this edge's cache where it holds the key, and from the Origin
+    // where it does not. A miss runs the origin-request and origin-response
+    // Lambda@Edge functions either side of the fetch, has an Origin error
+    // replaced with the Distribution's custom error page, and is stored.
+    const content = await this.stages.contentStage.serve({
+      request: requestReference,
+      cloudFront,
+      distribution: distro,
       behaviour,
-    );
-
-    // Replace an Origin error with the Distribution's custom error page, if it
-    // configures one for that status.
-    const errorResponse = await this.stages.customErrorResponder.apply(
-      requestReference,
-      distro,
-      originResult.response,
-    );
+      edgeId: edge.edgeId,
+    });
 
     // Apply the Behavior's response headers policy, if it names one. CloudFront
     // does this after the response leaves the cache and before the
@@ -110,16 +108,17 @@ export class SimCloudFrontRequestPipeline {
     const response = this.stages.responseHeadersApplicator.apply(
       cloudFront,
       requestReference,
-      errorResponse,
+      content.response,
       behaviour,
     );
 
     // CloudFront runs no viewer-response function when the Origin answered
     // 400 or higher, for either kind of function. The status that decides it
-    // is the one the Origin returned, so neither a custom error response
-    // carrying `ResponseCode: 200` above nor an origin-response function that
-    // replaced the status brings the function back.
-    if (originResult.originStatus >= 400) {
+    // is the one the Origin returned, or the one it returned when the cache
+    // entry being served was stored. Neither a custom error response carrying
+    // `ResponseCode: 200` nor an origin-response function that replaced the
+    // status brings the function back.
+    if (content.originStatus >= 400) {
       return response;
     }
 

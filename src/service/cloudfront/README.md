@@ -202,6 +202,8 @@ HTTP request behaviour is split across a few directories:
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
+- `controller/content/` answers a request from the Distribution's cache or from the Origin, and is
+  where the custom error responder and the Origin stage now sit.
 - `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reads a sim S3 Bucket through
   that Bucket's own GetObject command, while `origin/custom/` turns the Origin request back into an
   HTTP request and sends it into the wider simulated environment.
@@ -216,6 +218,43 @@ HTTP request behaviour is split across a few directories:
 
 When a sim AWS is served on localhost, CloudFront requests are routed through this layer to find the
 right sim Distribution, Origin and Behavior.
+
+## Caching
+
+`cache/` holds the cache itself, and `SimCfContentStage` under `controller/content/` is what the
+pipeline asks. The stage reads the key first. A hit is answered there, and the Origin stage runs on
+a miss alone, the way CloudFront runs it. Which of the two origin events run on that miss is the
+Origin stage's own business, since an `origin-request` function answering with a response of its own
+leaves the Origin unread and nothing for `origin-response` to run on.
+
+`simCfCacheableKey` decides whether a request has a key at all. Four things leave it without one.
+Caching may be off for the `SimAws`. The Behavior's `cachePolicyId` may resolve to no policy this
+simulation holds, which covers a Behavior naming none. The policy it resolves to may have a `MaxTTL`
+of zero, which counts as caching nothing. That is the `MaxTTL` `CachingDisabled` carries, and it
+keeps that Behavior reading the Origin every time. And the method may be outside the Behavior's
+`cachedMethods`. Nothing expires yet, and the other two TTLs decide nothing.
+
+`simCfCacheEntryKey` builds the key from the request path, the query strings, headers and cookies
+the policy names, the normalized `Accept-Encoding` where the policy enables gzip or brotli, the
+request method and the edge. The parts go through `jsonStringify`, so that a value carrying a
+separator cannot collide with another key. The method is in the key because a HEAD response carries
+no body.
+
+`SimCfDistributionCache` on the Distribution holds the bytes of a response. A body can be read once
+and two viewers each need one, so storing hands back a new Response built from what was stored, and
+the pipeline carries on with that. A status HTTP gives no body is rebuilt without one.
+
+`simCfRequestEdge` reads `x-sim-aws-cloudfront-edge` and takes it off the request, at the top of the
+pipeline before the web ACL. The name follows the `x-sim-aws-*` convention. The header is
+deliberately outside `simAwsControlHeaderNames`, whose members the HTTP boundary strips before a
+controller sees them. This one has to survive as far as CloudFront.
+
+The response headers policy is applied after the content stage. A policy change therefore takes
+effect on entries already stored. An Origin error is left unstored. Caching one with no expiry
+would have the Distribution answering with it for the length of the test.
+
+Caching is on. `SimCloudFrontRegistry` holds the flag, one registry per `SimAws` across every
+Account and Region, and `SimCloudFront.configureCaching` is how a test turns it off.
 
 ## CloudFront Functions
 
@@ -283,8 +322,7 @@ naming the Resource. `sim-cfn-cf-cache-policy-config.ts` reads the TTLs, giving 
 left out the default CloudFront applies, including the two cases where a long `MinTTL` raises the
 `DefaultTTL` and a long `DefaultTTL` raises the `MaxTTL`.
 
-Sim CloudFront has no cache. None of this decides anything yet, and recording the ID is what lets a
-test assert which policy a Behavior was given.
+`cache/` reads the policy on every request. See the Caching section below.
 
 `SimCfBehaviorPolicies` asks `SimCfBehaviorResponseHeadersPolicy`, `SimCfBehaviorCachePolicy` and
 `SimCfBehaviorOriginRequestPolicy` about one Behavior. A `CachePolicyId` naming nothing is
