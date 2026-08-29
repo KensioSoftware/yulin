@@ -1,7 +1,7 @@
 import type { SimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-front-behavior-resolver.js";
 import type { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
-import type { SimCloudFrontCustomErrorResponse } from "../../custom-error/sim-cloudfront-custom-error-response.js";
+import type { SimCloudFrontCustomErrorPage } from "../../custom-error/sim-cloudfront-custom-error-response.js";
 
 interface SimCfCustomErrorResponderProperties {
   readonly behaviourResolver: SimCloudFrontBehaviorResolver;
@@ -15,6 +15,10 @@ interface SimCfCustomErrorResponderProperties {
  * matching the response page path decides which Origin it comes from. That is
  * what lets a Distribution keep its error pages somewhere other than the
  * content that failed, as CloudFront does.
+ *
+ * A rule carrying `ErrorCachingMinTTL` alone has no page. The Origin's error
+ * reaches the viewer, and the rule says how long the Distribution holds it
+ * for.
  */
 export class SimCfCustomErrorResponder {
   private readonly behaviourResolver: SimCloudFrontBehaviorResolver;
@@ -34,23 +38,23 @@ export class SimCfCustomErrorResponder {
     distribution: SimCloudFrontDistribution,
     response: Response,
   ): Promise<Response> {
-    const customErrorResponse = distribution.customErrorResponses.find(
+    const page = distribution.customErrorResponses.find(
       (candidate) => candidate.errorCode === response.status,
-    );
+    )?.page;
 
-    if (customErrorResponse === undefined) {
+    if (page === undefined) {
       return response;
     }
 
-    return await this.responsePage(request, distribution, customErrorResponse);
+    return await this.responsePage(request, distribution, page);
   }
 
   private async responsePage(
     request: Request,
     distribution: SimCloudFrontDistribution,
-    customErrorResponse: SimCloudFrontCustomErrorResponse,
+    page: SimCloudFrontCustomErrorPage,
   ): Promise<Response> {
-    const pageRequest = this.pageRequest(request, customErrorResponse);
+    const pageRequest = this.pageRequest(request, page);
     const behaviour = this.behaviourResolver.resolve(pageRequest, distribution);
     const pageResponse = await this.originFetcher.fetch(
       pageRequest,
@@ -65,17 +69,17 @@ export class SimCfCustomErrorResponder {
     }
 
     return new Response(pageResponse.body, {
-      status: customErrorResponse.responseCode,
+      status: page.responseCode,
       headers: pageResponse.headers,
     });
   }
 
   private pageRequest(
     request: Request,
-    customErrorResponse: SimCloudFrontCustomErrorResponse,
+    page: SimCloudFrontCustomErrorPage,
   ): Request {
     const url = new URL(request.url);
-    url.pathname = customErrorResponse.responsePagePath;
+    url.pathname = page.responsePagePath;
     url.search = "";
 
     // The response page is fetched without a body, whatever the viewer sent,

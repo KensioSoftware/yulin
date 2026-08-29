@@ -1,5 +1,6 @@
 import { simCfCacheableRequest } from "../../cache/sim-cf-cacheable-request.js";
 import { simCfCacheTtlSec } from "../../cache/sim-cf-cache-ttl.js";
+import { simCfErrorCacheTtlSec } from "../../cache/sim-cf-error-cache-ttl.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
@@ -44,10 +45,10 @@ export interface SimCfContentStageResult extends SimCfOriginStageResult {
  * is stored under the key it missed on for as long as the Origin's headers and
  * the cache policy between them allow.
  *
- * An error stays out of the cache, whether the Origin answered with it or an
- * origin-response function made one of an Origin's answer. Real CloudFront
- * holds one for `ErrorCachingMinTTL`, which is a TTL of its own rather than the
- * one the Origin's headers ask for.
+ * An error is stored for a TTL of its own. The `ErrorCachingMinTTL` of the
+ * custom error response matching the status decides it, whether the Origin
+ * answered with the error or an origin-response function made one of an
+ * Origin's answer.
  */
 export class SimCfContentStage {
   constructor(
@@ -84,11 +85,7 @@ export class SimCfContentStage {
       originResult.response,
     );
 
-    if (
-      cacheable === undefined ||
-      originResult.originStatus >= 400 ||
-      response.status >= 400
-    ) {
+    if (cacheable === undefined) {
       return {
         response,
         originStatus: originResult.originStatus,
@@ -96,15 +93,22 @@ export class SimCfContentStage {
       };
     }
 
+    const errorTtlSec = simCfErrorCacheTtlSec({
+      originStatus: originResult.originStatus,
+      response,
+      customErrorResponses: distribution.customErrorResponses,
+    });
+
     return {
       response: await distribution.cache.store(
         cacheable.key,
         response,
-        simCfCacheTtlSec({
-          response,
-          policy: cacheable.policy,
-          now: distribution.clock.now(),
-        }),
+        errorTtlSec ??
+          simCfCacheTtlSec({
+            response,
+            policy: cacheable.policy,
+            now: distribution.clock.now(),
+          }),
       ),
       originStatus: originResult.originStatus,
       cacheHit: false,

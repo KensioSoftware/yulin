@@ -16,6 +16,7 @@ import {
 import {
   CreateDistributionCommand,
   type DefaultCacheBehavior,
+  type DistributionConfig,
 } from "@aws-sdk/client-cloudfront";
 
 import type { SimPayload2Event } from "../../src/serve/payload-2/sim-payload-2-event.type.js";
@@ -62,11 +63,16 @@ export async function countingOrigin(
 /**
  * A Distribution serving that Origin, whose default Behavior is the one the
  * test is about. It caches on CachingOptimized unless the test says otherwise.
+ *
+ * Both overrides are merged shallowly over what is built here. Pass
+ * `distributionConfig` for the Distribution settings a test is about, such as
+ * its `CustomErrorResponses`.
  */
 export async function distributionServing(
   simAws: SimAws,
   originHostname: string,
   cacheBehavior: Partial<DefaultCacheBehavior> = {},
+  distributionConfig: Partial<DistributionConfig> = {},
 ): Promise<string> {
   const creation = await simAws.cloudFront().createDistribution(
     new CreateDistributionCommand({
@@ -84,6 +90,7 @@ export async function distributionServing(
           CachePolicyId: simCfManagedCachePolicyIds.cachingOptimized,
           ...cacheBehavior,
         },
+        ...distributionConfig,
       },
     }),
   );
