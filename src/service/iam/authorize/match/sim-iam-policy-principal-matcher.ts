@@ -50,9 +50,9 @@ export class SimIamPolicyPrincipalMatcher {
     }
 
     if (statement.notPrincipal !== undefined) {
-      // Excluding the caller says nothing about the Account delegating, so a
-      // NotPrincipal that leaves the caller in is a direct grant.
-      return SimIamPrincipalMatch.direct().when(
+      // Leaving the caller out of the exclusion admits it without naming it,
+      // in the way a wildcard principal does.
+      return SimIamPrincipalMatch.everyone().when(
         !this.valueMatches(statement.notPrincipal).matched,
       );
     }
@@ -112,9 +112,12 @@ export class SimIamPolicyPrincipalMatcher {
   /**
    * Compare an AWS principal pattern with the resolved caller.
    *
-   * The wildcard matches both authenticated and anonymous requests. Other AWS
-   * forms require an ARN-based caller. Account delegation forms compare against
-   * the account ID derived by the caller resolver.
+   * The wildcard matches both authenticated and anonymous requests, and names
+   * neither. Other AWS forms require an ARN-based caller. Account delegation
+   * forms compare against the account ID derived by the caller resolver. An
+   * ARN carrying a wildcard of its own admits a set of principals without
+   * naming one, so it counts as a match on the same terms as `*`. Real IAM
+   * accepts no wildcard inside a Principal ARN at all.
    *
    * A pattern is compared against two ARNs, because an assumed-role session
    * has two. The session ARN is the caller, and the Role behind it is the
@@ -124,7 +127,7 @@ export class SimIamPolicyPrincipalMatcher {
    */
   private awsPatternMatches(pattern: string): SimIamPrincipalMatch {
     if (pattern === "*") {
-      return SimIamPrincipalMatch.direct();
+      return SimIamPrincipalMatch.everyone();
     }
 
     const caller = this.context.caller;
@@ -140,10 +143,20 @@ export class SimIamPolicyPrincipalMatcher {
       );
     }
 
-    return SimIamPrincipalMatch.direct().when(
+    return this.arnPatternMatch(pattern).when(
       this.arnMatches(pattern, caller.arn) ||
         this.arnMatches(pattern, caller.identityPolicyArn),
     );
+  }
+
+  /**
+   * The kind of match an ARN principal pattern makes, by whether it names one
+   * principal or admits a set of them.
+   */
+  private arnPatternMatch(pattern: string): SimIamPrincipalMatch {
+    return pattern.includes("*") || pattern.includes("?")
+      ? SimIamPrincipalMatch.everyone()
+      : SimIamPrincipalMatch.direct();
   }
 
   /**

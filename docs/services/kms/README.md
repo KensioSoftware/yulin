@@ -351,12 +351,17 @@ customer default:
 - The account root is allowed to read the key's metadata. That is the whole of what this policy
   delegates to IAM.
 
-That is why a role holding only `ssm:GetParameter` reads a decrypted `SecureString` under `aws/ssm`,
-and why a role holding `kms:Decrypt` on that key still cannot use it by calling KMS itself.
+That is why a role holding `kms:Decrypt` on such a key cannot use it by calling KMS itself.
 
 `kms:ViaService` is set by the service making the call on the caller's behalf. Sim SSM does this for
 `SecureString` parameters. Code calling simulated KMS directly sets it with the `viaService` request
 option, naming the service on its own (`ssm`), since the region is the key's.
+
+A service passing on the caller's own KMS permissions sets `withCallerPermissions` alongside it.
+What the policy above admits is the service a request came through. A request carrying this option
+is allowed only where IAM allows the caller the KMS action too, and a key policy naming the caller
+allows it on its own. Sim SSM sets the option when it decrypts a `SecureString`. A role holding
+`ssm:GetParameter` and no `kms:Decrypt` is refused the decrypted value.
 
 ```typescript sim-kms-aws-managed-key
 /**

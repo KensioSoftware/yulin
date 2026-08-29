@@ -22,4 +22,16 @@ export interface SimKmsRequestOptions {
    * and a policy conditioned on `kms:ViaService` then does not match.
    */
   readonly viaService?: string | undefined;
+
+  /**
+   * Whether the service named by `viaService` is making the request with the
+   * caller's own KMS permissions rather than with its own.
+   *
+   * Parameter Store decrypts a SecureString this way. A caller holding
+   * ssm:GetParameter and no kms:Decrypt is refused even under the aws/ssm key,
+   * whose policy admits the Account's principals reaching KMS through Systems
+   * Manager. A key policy naming the caller still allows the request on its
+   * own, as it does for any other KMS request.
+   */
+  readonly withCallerPermissions?: boolean | undefined;
 }

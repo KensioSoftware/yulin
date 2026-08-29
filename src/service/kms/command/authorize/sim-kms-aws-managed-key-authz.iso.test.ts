@@ -17,6 +17,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
+import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 
 const managedKeyAlias = "alias/aws/ssm";
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
@@ -61,6 +62,57 @@ describe("KMS AWS managed key authorization", () => {
 
     // Then the key policy admits it on its own, which is why a Role holding
     // only ssm:GetParameter reads a SecureString on real AWS.
+    assertNonNullable(encrypted.KeyId);
+  });
+
+  it("refuses a caller with no permission where the service passes its own on", async () => {
+    // Given a Role holding no KMS permission.
+    const simAws = new SimAws();
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Role-no-kms", actions: ["ssm:GetParameter"] },
+      simAws,
+    );
+
+    // When a service reaches the key with that Role's own permissions.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .kms()
+        .encrypt(
+          new EncryptCommand({ KeyId: managedKeyAlias, Plaintext: plaintext }),
+          {
+            caller: { kind: "arn", arn: role.Arn },
+            viaService: "ssm",
+            withCallerPermissions: true,
+          },
+        ),
+    );
+
+    // Then the key policy is not enough on its own: it admits whoever the
+    // request came from, which is the service rather than the Role behind it.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("admits a caller holding the permission where the service passes its own on", async () => {
+    // Given a Role holding the KMS permission itself.
+    const simAws = new SimAws();
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Role-kms-Encrypt", actions: ["kms:Encrypt"] },
+      simAws,
+    );
+
+    // When a service reaches the key with that Role's own permissions.
+    const encrypted = await simAws
+      .kms()
+      .encrypt(
+        new EncryptCommand({ KeyId: managedKeyAlias, Plaintext: plaintext }),
+        {
+          caller: { kind: "arn", arn: role.Arn },
+          viaService: "ssm",
+          withCallerPermissions: true,
+        },
+      );
+
+    // Then both sides allow it and the key is used.
     assertNonNullable(encrypted.KeyId);
   });
 

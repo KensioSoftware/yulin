@@ -7,6 +7,13 @@ interface SimIamAllowSidesProperties {
    * Defaults to the resource side, for callers with no reason to distinguish.
    */
   readonly resourceDirect?: boolean | undefined;
+
+  /**
+   * Whether a resource-policy Allow named the caller, rather than admitting it
+   * as one of a wider set through a wildcard principal. Defaults to the
+   * resource side in the same way.
+   */
+  readonly resourceNamesCaller?: boolean | undefined;
 }
 
 /**
@@ -21,12 +28,15 @@ export class SimIamAllowSides {
   private readonly identityAllowed: boolean;
   private readonly resourceAllowed: boolean;
   private readonly resourceDirectAllowed: boolean;
+  private readonly resourceNamesCallerAllowed: boolean;
 
   constructor(properties: SimIamAllowSidesProperties) {
     this.identityAllowed = properties.identity;
     this.resourceAllowed = properties.resource;
     this.resourceDirectAllowed =
       properties.resourceDirect ?? properties.resource;
+    this.resourceNamesCallerAllowed =
+      properties.resourceNamesCaller ?? properties.resource;
   }
 
   /**
@@ -44,8 +54,8 @@ export class SimIamAllowSides {
   }
 
   /**
-   * Whether a resource-based policy allowed the request by naming the caller,
-   * rather than by delegating to the caller's Account.
+   * Whether a resource-based policy allowed the request without delegating to
+   * the caller's Account.
    */
   get resourceDirect(): boolean {
     return this.resourceDirectAllowed;
@@ -57,6 +67,14 @@ export class SimIamAllowSides {
    */
   get resourceDelegated(): boolean {
     return this.resourceAllowed && !this.resourceDirectAllowed;
+  }
+
+  /**
+   * Whether a resource-based policy allowed the request by naming the caller,
+   * rather than by admitting whoever the request came from.
+   */
+  get resourceNamesCaller(): boolean {
+    return this.resourceNamesCallerAllowed;
   }
 }
 
@@ -129,6 +147,28 @@ export class SimIamMandatoryResourcePolicyRequirement implements SimIamAllowRequ
     }
 
     return allows.resourceDelegated && allows.identity;
+  }
+}
+
+/**
+ * The rule for a request one service makes to another with the caller's own
+ * permissions. The caller needs the permission itself.
+ *
+ * A resource policy naming the caller still allows the request on its own, as
+ * a KMS key policy naming a Role does. A policy admitting whoever the request
+ * came from does not, because what it admits is the service. That is the
+ * difference between a key policy naming a Role and the aws/ssm key policy,
+ * which admits the Account's principals reaching KMS through Parameter Store
+ * and still leaves a Role holding only ssm:GetParameter unable to decrypt a
+ * SecureString.
+ */
+export class SimIamCallerPermissionRequirement implements SimIamAllowRequirement {
+  /**
+   * Whether the caller holds the permission itself, or was named outright by
+   * the resource.
+   */
+  isSatisfiedBy(allows: SimIamAllowSides): boolean {
+    return allows.resourceNamesCaller || allows.identity;
   }
 }
 

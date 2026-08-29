@@ -3,7 +3,7 @@ import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
-import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
+import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-input.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
 import type * as simIamCommands from "./command/sim-iam-command.types.js";
 import type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";

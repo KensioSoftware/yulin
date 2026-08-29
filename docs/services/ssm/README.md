@@ -911,15 +911,24 @@ try {
 }
 ```
 
-### The aws/ssm managed key needs no permission
+### The aws/ssm managed key needs kms:Decrypt too
 
-A parameter naming no key is encrypted under the `aws/ssm` AWS managed key, and that key asks the
-caller for nothing. Parameter Store supplies `kms:ViaService`, and the managed key's policy allows
-the account's principals to use it through Systems Manager. A role holding only `ssm:GetParameter`
-therefore reads the decrypted value, as it does on real AWS.
+A parameter naming no key is encrypted under the `aws/ssm` AWS managed key. Parameter Store supplies
+`kms:ViaService`, and that key's policy allows the account's principals to use it through Systems
+Manager. What the policy admits is whoever the request came from. Parameter Store decrypts with the
+caller's own permissions, and a decrypting read needs `kms:Decrypt` on top of `ssm:GetParameter`. A
+role holding the parameter permission alone reads the ciphertext and is refused when it asks for
+decryption, as it is in a real account.
 
-The same role cannot take the ciphertext to KMS itself, because that policy allows nothing to a
-request arriving directly.
+The managed key's id is unknown when a template is synthesized. A policy scopes the grant with a
+`kms:ViaService` condition naming `ssm.<region>.amazonaws.com`, and simulated IAM evaluates that
+condition against the region the parameter belongs to.
+
+`GetParameters` and `GetParametersByPath` decrypt through the same path, and refuse the same way for
+a caller without the key permission.
+
+The same role cannot take the ciphertext to KMS itself, because the managed key's policy applies
+only to a request that reached KMS through Systems Manager.
 
 ```typescript sim-ssm-secure-string-managed-key
 /**
@@ -956,18 +965,26 @@ const role = await simAws.iam().createRole(
   }),
 );
 
-// The parameter, and no KMS permission at all.
+// The parameter, and the key through Systems Manager.
 await simAws.iam().putRolePolicy(
   new PutRolePolicyCommand({
     RoleName: "ConfigReader",
     PolicyName: "ReadDbPassword",
     PolicyDocument: JSON.stringify({
       Version: "2012-10-17",
-      Statement: {
-        Effect: "Allow",
-        Action: "ssm:GetParameter",
-        Resource: "*",
-      },
+      Statement: [
+        { Effect: "Allow", Action: "ssm:GetParameter", Resource: "*" },
+        {
+          Effect: "Allow",
+          Action: "kms:Decrypt",
+          Resource: "*",
+          Condition: {
+            StringEquals: {
+              "kms:ViaService": `ssm.${simAws.defaultRegionName}.amazonaws.com`,
+            },
+          },
+        },
+      ],
     }),
   }),
 );
@@ -1031,6 +1048,9 @@ Current documented limitations:
   without complaint.
 - `KeyId` on a `String` or `StringList` parameter is refused, since nothing would encrypt a value
   stored in the clear.
+- Writing a `SecureString` under the `aws/ssm` managed key asks the caller for no KMS permission,
+  where AWS documents `kms:Encrypt` for a standard tier write. A write under a customer managed key
+  does need it.
 - `DataType` other than `text` is refused. Real Parameter Store validates an `aws:ec2:image` value
   against EC2, which this simulation cannot do.
 - Filters are refused outright. `GetParametersByPath` refuses `ParameterFilters`, and

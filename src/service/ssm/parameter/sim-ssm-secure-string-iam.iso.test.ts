@@ -13,6 +13,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
+import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
 describe("SSM SecureString IAM authorization", () => {
   it("decrypts for a caller allowed both the parameter and the key", async () => {
@@ -70,6 +71,55 @@ describe("SSM SecureString IAM authorization", () => {
     );
 
     // Then it gets the plaintext.
+    assertIdentical(read.Parameter?.Value, "hunter2");
+  });
+
+  it("decrypts for a caller the key policy names and IAM allows nothing", async () => {
+    // Given a Role allowed to read and write parameters and no KMS action.
+    const simAws = new SimAws();
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "ConfigReader",
+        actions: ["ssm:GetParameter", "ssm:PutParameter"],
+      },
+      simAws,
+    );
+
+    // And a customer managed key whose own policy names that Role.
+    const key = await simAws.kms().createKey(
+      new CreateKeyCommand({
+        Policy: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: role.Arn },
+            Action: ["kms:Encrypt", "kms:Decrypt"],
+            Resource: "*",
+          },
+        }),
+      }),
+    );
+    assertNonNullable(key.KeyMetadata?.Arn);
+
+    // When the Role stores a SecureString under it and reads it back.
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata.Arn,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
+    );
+    const read = await simAws.ssm().getParameter(
+      new GetParameterCommand({
+        Name: "/myapp/prod/db-password",
+        WithDecryption: true,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
+    );
+
+    // Then the key policy is enough on its own, as it is on real AWS: a policy
+    // naming the caller grants to that caller, and only a policy admitting the
+    // Account at large leaves the permission to IAM.
     assertIdentical(read.Parameter?.Value, "hunter2");
   });
 
