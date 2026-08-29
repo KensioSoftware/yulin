@@ -17,6 +17,10 @@ import {
   SimIamMalformedPolicyDocument,
   SimIamNoSuchEntity,
 } from "../../../error/sim-iam.error.js";
+import { jsonStringify } from "../../../../../util/type-guard/json.js";
+import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
+import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
+import { maxSimIamInlinePolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
 
 describe("IAM PutUserPolicyCommand", () => {
   it("adds an inline identity policy to a User", async () => {
@@ -169,6 +173,37 @@ describe("IAM PutUserPolicyCommand", () => {
     assertIdentical(
       error.message,
       'User "ApplicationUser" policy "InvalidPolicy" statement 1: must define either Action or NotAction',
+    );
+  });
+
+  it("refuses an inline policy document over IAM's character limit", async () => {
+    // Given an IAM User exists.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws();
+    const simIam = simAws.account(accountId).iam();
+
+    await simIam.createUser(new CreateUserCommand({ UserName: "Analyst" }));
+
+    // When an inline policy one character past the 10,240 IAM takes is put
+    // onto them.
+    const policyDocument = jsonStringify(
+      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters + 1),
+    );
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.putUserPolicy(
+        new PutUserPolicyCommand({
+          UserName: "Analyst",
+          PolicyName: "ReadObjects",
+          PolicyDocument: policyDocument,
+        }),
+      ),
+    );
+
+    // Then IAM refuses the document, naming the User it was going onto.
+    assertInstanceOf(error, SimIamLimitExceeded);
+    assertIdentical(
+      error.message,
+      "Maximum policy size of 10240 bytes exceeded for user Analyst",
     );
   });
 });

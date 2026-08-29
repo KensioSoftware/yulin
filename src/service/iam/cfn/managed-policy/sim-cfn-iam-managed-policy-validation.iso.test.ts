@@ -1,5 +1,6 @@
 import {
   assertArrayLength,
+  assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -7,6 +8,8 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
+import { SimIamLimitExceeded } from "../../error/sim-iam.error.js";
+import { maxSimIamManagedPolicyCharacters } from "../../validate/size/sim-iam-policy-document-size.js";
 
 const readObjectsDocument = {
   Version: "2012-10-17",
@@ -310,6 +313,51 @@ describe("IAM CloudFormation ManagedPolicy validation", () => {
         (policy) => policy.PolicyName === "OrphanCheckPolicy",
       ),
       0,
+    );
+  });
+
+  it("fails the Resource when the PolicyDocument is over IAM's limit", async () => {
+    // Given a CloudFormation template whose Managed Policy document is past
+    // the 6,144 characters IAM takes.
+    const simAws = new SimAws();
+    const oversizedDocument = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: `arn:aws:s3:::reports-bucket/${"x".repeat(
+            maxSimIamManagedPolicyCharacters,
+          )}`,
+        },
+      ],
+    };
+
+    // When / then deploying the template throws.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "iam-managed-policy-oversized-stack",
+        template: {
+          Resources: {
+            OversizedPolicy: {
+              Type: "AWS::IAM::ManagedPolicy",
+              Properties: {
+                ManagedPolicyName: "OversizedPolicy",
+                PolicyDocument: oversizedDocument,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then the Resource fails on the document, rather than deploying a policy
+    // the account would refuse.
+    assertInstanceOf(error, SimIamLimitExceeded);
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Resource OversizedPolicy creation failed: " +
+        "Cannot exceed quota for PolicySize: 6144",
     );
   });
 });

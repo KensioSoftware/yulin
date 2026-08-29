@@ -130,3 +130,18 @@ export class SimIamMalformedPolicyDocument extends SimIamError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated IAM LimitExceeded error.
+ *
+ * IAM answers a request that would take the account past one of its quotas
+ * with this, such as a policy document longer than the limit for where it is
+ * going.
+ */
+export class SimIamLimitExceeded extends SimIamError {
+  public override readonly name = "LimitExceeded";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}

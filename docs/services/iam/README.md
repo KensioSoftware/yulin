@@ -220,6 +220,21 @@ Creating a duplicate Policy name in the same path throws an error, while the sam
 paths is allowed. Stored Policies can be inspected with `GetPolicyCommand` and
 `ListPoliciesCommand`.
 
+## Policy document character limits
+
+IAM caps a policy document by where it is going. A managed policy takes 6,144 characters, an inline
+policy on a Role or a User takes 10,240, and a Role trust policy takes 2,048. `CreatePolicy`,
+`PutRolePolicy`, `PutUserPolicy` and `CreateRole` refuse a document past the cap with
+`LimitExceeded`, in IAM's own wording. An `AWS::IAM::ManagedPolicy` or an `AWS::IAM::Policy`
+carrying one fails its Resource.
+
+IAM leaves whitespace out of the count, and so does the check here. A document indented for a
+reader measures the same as the one line `JSON.stringify` writes.
+
+A policy that has outgrown its cap cannot be deployed. The account keeps whichever version last
+fit, and the permission the policy was grown to grant goes missing weeks later, against a
+repository that still says it is there.
+
 ## Policy conditions
 
 Policy statements can carry `Condition` blocks. Sim IAM currently supports the `StringEquals`,
@@ -1437,6 +1452,7 @@ Sim IAM currently supports:
 - `GetRoleCommand` and `ListRolesCommand`, with pagination
 - `PutRolePolicyCommand`, for inline Role policies
 - `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
+- Refusing a policy document over IAM's character limit, with `LimitExceeded`
 - `AttachRolePolicyCommand`
 - `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand` and `AttachUserPolicyCommand`
 - `CreateLoginProfileCommand`, for a User's console password
@@ -1466,6 +1482,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - Permissions boundaries and session policies are not evaluated. Service control policies are, and
   are attached through [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
 - Managed Policies have a single version, and the policy version commands are absent
+- A policy document is measured against IAM's character limit one document at a time. The
+  20,480-character cap on the sum of a User's inline policies is absent, and so is the cap on how
+  many managed policies a Role may carry
 - `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
   `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
   CloudFormation teardown clears a User's policies before deleting it

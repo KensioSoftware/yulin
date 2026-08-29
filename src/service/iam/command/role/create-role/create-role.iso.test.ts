@@ -10,6 +10,10 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
+import { jsonStringify } from "../../../../../util/type-guard/json.js";
+import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
+import { simIamTrustPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
+import { maxSimIamTrustPolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
 
 describe("IAM CreateRoleCommand", () => {
   it("creates an IAM Role through the top-level SimIam service", async () => {
@@ -272,6 +276,32 @@ describe("IAM CreateRoleCommand", () => {
     assertIdentical(
       error.message,
       "Sim IAM Role already exists: DuplicateRole",
+    );
+  });
+
+  it("refuses a trust policy document over IAM's character limit", async () => {
+    // Given a trust policy one character past the 2,048 IAM takes.
+    const simAws = new SimAws();
+    const simIam = simAws.account(makeSimAwsAccountId()).iam();
+    const trustPolicy = jsonStringify(
+      simIamTrustPolicyDocumentOfSize(maxSimIamTrustPolicyCharacters + 1),
+    );
+
+    // When a Role is created with it.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.createRole(
+        new CreateRoleCommand({
+          RoleName: "ReportingRole",
+          AssumeRolePolicyDocument: trustPolicy,
+        }),
+      ),
+    );
+
+    // Then IAM refuses the document, naming the Role it was going onto.
+    assertInstanceOf(error, SimIamLimitExceeded);
+    assertIdentical(
+      error.message,
+      "Maximum policy size of 2048 bytes exceeded for role ReportingRole",
     );
   });
 });

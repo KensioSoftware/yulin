@@ -10,6 +10,10 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
+import { jsonStringify } from "../../../../../util/type-guard/json.js";
+import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
+import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
+import { maxSimIamManagedPolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
 
 describe("IAM CreatePolicyCommand", () => {
   it("creates an IAM Policy through the SimIam service", async () => {
@@ -246,5 +250,51 @@ describe("IAM CreatePolicyCommand", () => {
       secondPolicyOutput.Policy.Arn,
       "arn:aws:iam::123456789012:policy/service-role/SharedPolicyName",
     );
+  });
+
+  it("refuses a policy document over IAM's character limit", async () => {
+    // Given a managed policy document one character past the 6,144 IAM takes.
+    const simAws = new SimAws();
+    const simIam = simAws.account(makeSimAwsAccountId()).iam();
+    const policyDocument = jsonStringify(
+      simIamPolicyDocumentOfSize(maxSimIamManagedPolicyCharacters + 1),
+    );
+
+    // When the Policy is created from it.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.createPolicy(
+        new CreatePolicyCommand({
+          PolicyName: "ExecutionPolicy",
+          PolicyDocument: policyDocument,
+        }),
+      ),
+    );
+
+    // Then IAM refuses the document rather than keeping a policy no account
+    // would carry.
+    assertInstanceOf(error, SimIamLimitExceeded);
+    assertIdentical(error.message, "Cannot exceed quota for PolicySize: 6144");
+  });
+
+  it("accepts a document only under the limit once whitespace is out", async () => {
+    // Given a managed policy document at the limit, indented well past it.
+    const simAws = new SimAws();
+    const simIam = simAws.account(makeSimAwsAccountId()).iam();
+    const policyDocument = jsonStringify(
+      simIamPolicyDocumentOfSize(maxSimIamManagedPolicyCharacters),
+      undefined,
+      4,
+    );
+
+    // When the Policy is created from it.
+    const policyCreation = await simIam.createPolicy(
+      new CreatePolicyCommand({
+        PolicyName: "IndentedPolicy",
+        PolicyDocument: policyDocument,
+      }),
+    );
+
+    // Then the indentation counted for nothing, as it does in IAM.
+    assertIdentical(policyCreation.Policy.PolicyName, "IndentedPolicy");
   });
 });
