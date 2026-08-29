@@ -17,8 +17,75 @@ env:
 # and 16 GB, and on a public repository it costs nothing. The suite ran on a
 # larger third-party machine until August 2026.
 jobs:
+  # Lint, Test, Build and Pack are required checks on main. A workflow-level
+  # paths-ignore would leave a documentation-only pull request waiting forever
+  # on four checks that never report, because a filtered-out workflow reports
+  # nothing at all. Skipping each job with `if` does report, and a skipped
+  # required check counts as a passing one.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+      pack: ${{ steps.classify.outputs.pack }}
+    steps:
+      # There is no checkout here. The API already knows what the pull request
+      # touches, and asking it takes a few seconds against the minute a
+      # checkout and a pnpm install cost.
+      - id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          files=$(
+            gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" \
+              --jq '.[].filename'
+          )
+
+          code=false
+          pack=false
+          count=0
+
+          while IFS= read -r file; do
+            count=$((count + 1))
+
+            case "$file" in
+              # `*` matches `/` in a case pattern. One entry covers a tree.
+              README.md | LICENSE | .gitignore | .coderabbit.yaml) ;;
+              .github/pull_request_template.md | .github/dependabot.yml) ;;
+              .idea/*) ;;
+              # The Pack job runs `pnpm build`. That writes llms.txt from the
+              # links in docs/README.md, and fails on a page nothing links to.
+              # Lint and the type check only ever read the .example.ts files
+              # extracted from these pages, and those are committed.
+              docs/*.md) pack=true ;;
+              *)
+                code=true
+                pack=true
+                ;;
+            esac
+          done <<< "$files"
+
+          # The endpoint stops at 3000 files. Past that the list is truncated,
+          # and a job the pull request needs could be skipped on a partial
+          # view of it.
+          if [ "$count" -ge 3000 ]; then
+            code=true
+            pack=true
+          fi
+
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "pack=$pack" >> "$GITHUB_OUTPUT"
+          echo "$count changed files: code=$code pack=$pack" >> "$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,6 +102,8 @@ jobs:
 
   test:
     name: Test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -71,6 +140,8 @@ jobs:
 
   build:
     name: Build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -86,6 +157,8 @@ jobs:
 
   pack:
     name: Pack
+    needs: changes
+    if: needs.changes.outputs.pack == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
