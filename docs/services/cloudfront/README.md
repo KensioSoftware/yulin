@@ -2655,10 +2655,12 @@ carries a warning about it.
 
 ### Telling a hit from a miss
 
-Every answer carries `X-Cache`. It reads `Hit from cloudfront` where the Distribution held the
-object and `Miss from cloudfront` where the Origin answered. A hit carries `Age` as well, the whole
-seconds the entry has been held, counted on the simulation's clock from the moment the Origin
-answered. Advancing simulated time by a minute adds 60 to the age the next hit reports.
+An answer the cache or the Origin produced carries `X-Cache`. It reads `Hit from cloudfront` where
+the Distribution held the object and `Miss from cloudfront` where the Origin answered. A response
+returned earlier in the pipeline (one a web ACL blocked, or one a viewer-request function answered
+with) carries none. A hit carries `Age` as well, the whole seconds the entry has been held, counted
+on the simulation's clock from the moment the Origin answered. Advancing simulated time by a minute
+adds 60 to the age the next hit reports.
 
 Both headers go on ahead of the Behavior's response headers policy and the viewer-response event. A
 policy listing `X-Cache` among its headers to remove takes it off, and a viewer-response CloudFront
