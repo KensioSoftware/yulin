@@ -1,4 +1,3 @@
-import { PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { DecryptCommand } from "@aws-sdk/client-kms";
 import {
   GetParameterCommand,
@@ -16,7 +15,6 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
-import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
 /**
@@ -26,7 +24,7 @@ const parameterName = "/myapp/prod/db-password";
 const parameterValue = "hunter2";
 
 describe("SSM SecureString under the aws/ssm managed key", () => {
-  it("refuses a decrypting read to a caller holding no kms:Decrypt", async () => {
+  it("decrypts for a caller holding no KMS permission at all", async () => {
     // Given a parameter under the managed key, and a Role allowed to read
     // parameters and nothing else.
     const simAws = new SimAws();
@@ -43,43 +41,6 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
     );
 
     // When it reads the parameter with decryption.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.ssm().getParameter(
-        new GetParameterCommand({
-          Name: parameterName,
-          WithDecryption: true,
-        }),
-        { caller: { kind: "arn", arn: role.Arn } },
-      ),
-    );
-
-    // Then it is refused. Reaching the key through Systems Manager is what the
-    // managed key's policy admits, and using it is still the caller's own
-    // permission, which is the AccessDenied such a Role gets in an account.
-    assertInstanceOf(error, SimIamAccessDenied);
-    assertIdentical(error.action, "kms:Decrypt");
-  });
-
-  it("decrypts for a caller holding kms:Decrypt as well", async () => {
-    // Given a parameter under the managed key, and a Role allowed both the
-    // parameter and the key.
-    const simAws = new SimAws();
-    await simAws.ssm().putParameter(
-      new PutParameterCommand({
-        Name: parameterName,
-        Type: "SecureString",
-        Value: parameterValue,
-      }),
-    );
-    const role = await simIamRoleWithPolicyFactory.make(
-      {
-        roleName: "ConfigReader",
-        actions: ["ssm:GetParameter", "kms:Decrypt"],
-      },
-      simAws,
-    );
-
-    // When it reads the parameter with decryption.
     const read = await simAws
       .ssm()
       .getParameter(
@@ -87,56 +48,10 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
         { caller: { kind: "arn", arn: role.Arn } },
       );
 
-    // Then it gets the plaintext.
-    assertIdentical(read.Parameter?.Value, parameterValue);
-  });
-
-  it("decrypts for a caller whose kms:Decrypt is scoped to Systems Manager", async () => {
-    // Given a parameter under the managed key, and a Role whose key permission
-    // is conditioned on the request reaching KMS through Parameter Store. The
-    // managed key's id is not knowable when a template is synthesized, so this
-    // is how consumers scope the grant.
-    const simAws = new SimAws();
-    await simAws.ssm().putParameter(
-      new PutParameterCommand({
-        Name: parameterName,
-        Type: "SecureString",
-        Value: parameterValue,
-      }),
-    );
-    const role = await simIamRoleWithPolicyFactory.make(
-      { roleName: "ConfigReader", actions: ["ssm:GetParameter"] },
-      simAws,
-    );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "ConfigReader",
-        PolicyName: "KeyPolicy",
-        PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: {
-            Action: "kms:Decrypt",
-            Resource: "*",
-            Condition: {
-              StringEquals: {
-                "kms:ViaService": `ssm.${simAws.defaultRegionName}.amazonaws.com`,
-              },
-            },
-          },
-        }),
-      }),
-    );
-
-    // When it reads the parameter with decryption.
-    const read = await simAws
-      .ssm()
-      .getParameter(
-        new GetParameterCommand({ Name: parameterName, WithDecryption: true }),
-        { caller: { kind: "arn", arn: role.Arn } },
-      );
-
-    // Then the condition matches and the read succeeds, as it does in an
-    // account. A check ignoring the condition would refuse a policy real IAM
-    // allows.
+    // Then it gets the plaintext, as it does in an account. The managed key's
+    // policy grants the cryptographic actions to a wildcard principal under
+    // its via-service and caller-account conditions, and Parameter Store
+    // satisfies both of them.
     assertIdentical(read.Parameter?.Value, parameterValue);
   });
 
@@ -170,7 +85,7 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
     assertIdentical(read.Parameter?.Value, "db.example.com");
   });
 
-  it("reads the ciphertext for a caller holding no kms:Decrypt", async () => {
+  it("reads the ciphertext where the read asks for no decryption", async () => {
     // Given a parameter under the managed key, and a Role allowed to read
     // parameters and nothing else.
     const simAws = new SimAws();
@@ -198,7 +113,7 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
     assertStringNotIncludes(String(read.Parameter?.Value), parameterValue);
   });
 
-  it("refuses a decrypting batch read to a caller holding no kms:Decrypt", async () => {
+  it("decrypts a batch read for a caller holding no KMS permission", async () => {
     // Given a parameter under the managed key, and a Role allowed to read
     // parameters in batches and nothing else.
     const simAws = new SimAws();
@@ -215,23 +130,21 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
     );
 
     // When it reads the parameter through GetParameters with decryption.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.ssm().getParameters(
-        new GetParametersCommand({
-          Names: [parameterName],
-          WithDecryption: true,
-        }),
-        { caller: { kind: "arn", arn: role.Arn } },
-      ),
+    const read = await simAws.ssm().getParameters(
+      new GetParametersCommand({
+        Names: [parameterName],
+        WithDecryption: true,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
     );
 
-    // Then the batch is refused rather than reporting the name as invalid: a
-    // denial is not a name that resolves to nothing.
-    assertInstanceOf(error, SimIamAccessDenied);
-    assertIdentical(error.action, "kms:Decrypt");
+    // Then the batch comes back decrypted, and the name is not reported as one
+    // that failed to resolve.
+    assertIdentical(read.Parameters?.[0]?.Value, parameterValue);
+    assertIdentical(read.InvalidParameters?.length, 0);
   });
 
-  it("refuses a decrypting path listing to a caller holding no kms:Decrypt", async () => {
+  it("decrypts a path listing for a caller holding no KMS permission", async () => {
     // Given a parameter under the managed key, and a Role allowed to list a
     // path and nothing else.
     const simAws = new SimAws();
@@ -248,20 +161,17 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
     );
 
     // When it lists the path the parameter is under, with decryption.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.ssm().getParametersByPath(
-        new GetParametersByPathCommand({
-          Path: "/myapp/prod",
-          WithDecryption: true,
-        }),
-        { caller: { kind: "arn", arn: role.Arn } },
-      ),
+    const listed = await simAws.ssm().getParametersByPath(
+      new GetParametersByPathCommand({
+        Path: "/myapp/prod",
+        WithDecryption: true,
+      }),
+      { caller: { kind: "arn", arn: role.Arn } },
     );
 
-    // Then the listing is refused as well: access to a path is not access to
-    // the key protecting what is under it.
-    assertInstanceOf(error, SimIamAccessDenied);
-    assertIdentical(error.action, "kms:Decrypt");
+    // Then the listing decrypts what is under the path, on the parameter
+    // permission alone.
+    assertIdentical(listed.Parameters?.[0]?.Value, parameterValue);
   });
 
   it("writes for a caller holding no KMS permission", async () => {

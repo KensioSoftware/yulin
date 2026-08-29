@@ -37,15 +37,15 @@ interface SimSsmParameterKmsProperties {
  * and a decrypting read needs `kms:Decrypt`, each on top of the SSM permission
  * for the parameter itself.
  *
- * They are also made through the service, which is what reaches the `aws/ssm`
- * managed key at all. That key's policy admits the Account's principals when
- * `kms:ViaService` names Systems Manager, and Parameter Store is what supplies
- * it. Reaching the key is not the same as being allowed to use it, and a
- * decrypting read says so with `withCallerPermissions`, because that policy
- * admits whoever the request came from rather than the caller behind it. A
- * Role holding `ssm:GetParameter` and no `kms:Decrypt` reads the ciphertext
- * and not the value. A write under that key asks the caller for no KMS
- * permission here, where AWS documents `kms:Encrypt` for one.
+ * They are also made through the service, and passing through it is what
+ * reaches the `aws/ssm` managed key at all. That key's policy allows the
+ * cryptographic actions to a wildcard principal under `kms:ViaService` and
+ * `kms:CallerAccount` conditions, and Parameter Store supplies the first of
+ * them. A grant of that shape delegates nothing to IAM, and it admits the
+ * request by itself. A Role holding `ssm:GetParameter` and nothing on KMS
+ * reads the decrypted value, as it does in an account. A caller in another
+ * Account fails the `kms:CallerAccount` condition, and a caller reaching KMS
+ * directly carries no `kms:ViaService` for the policy to match.
  *
  * Standard tier Parameter Store encrypts under the key directly rather than
  * through a data key, so this is one Encrypt and one Decrypt and nothing more.
@@ -92,8 +92,7 @@ export class SimSsmParameterKms {
   }
 
   /**
-   * Decrypt a parameter value, which needs the same binding it was made with,
-   * and the caller's own permission to use the key.
+   * Decrypt a parameter value, which needs the same binding it was made with.
    */
   async decrypt(
     parameterArn: string,
@@ -109,11 +108,7 @@ export class SimSsmParameterKms {
               EncryptionContext: this.contextFor(parameterArn),
             },
           },
-          {
-            caller,
-            viaService: ssmKmsViaService,
-            withCallerPermissions: true,
-          },
+          { caller, viaService: ssmKmsViaService },
         ),
     );
 

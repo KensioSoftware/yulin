@@ -32,26 +32,14 @@ const role = await simAws.iam().createRole(
   }),
 );
 
-// The parameter, and the key through Systems Manager.
+// The parameter, and nothing on KMS.
 await simAws.iam().putRolePolicy(
   new PutRolePolicyCommand({
     RoleName: "ConfigReader",
     PolicyName: "ReadDbPassword",
     PolicyDocument: JSON.stringify({
       Version: "2012-10-17",
-      Statement: [
-        { Effect: "Allow", Action: "ssm:GetParameter", Resource: "*" },
-        {
-          Effect: "Allow",
-          Action: "kms:Decrypt",
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": `ssm.${simAws.defaultRegionName}.amazonaws.com`,
-            },
-          },
-        },
-      ],
+      Statement: { Effect: "Allow", Action: "ssm:GetParameter", Resource: "*" },
     }),
   }),
 );

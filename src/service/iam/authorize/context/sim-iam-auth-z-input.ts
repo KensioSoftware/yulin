@@ -95,10 +95,12 @@ export interface SimIamAuthorizationInput {
    * resource policy admitting the caller is enough on its own. A service sets
    * this where it reaches another service as the caller. A resource policy
    * that admits whoever the request came from then grants nothing by itself,
-   * because what it admits is the service. Reading a SecureString needs
-   * kms:Decrypt for that reason, even under the aws/ssm key, whose policy
-   * admits the Account's principals reaching KMS through Parameter Store. A
-   * resource policy naming the caller still allows the request on its own.
+   * because what it admits is the service. A resource policy naming the caller
+   * still allows the request on its own.
+   *
+   * No simulated service sets this. Parameter Store is the case it was written
+   * for, and the aws/ssm key policy grants its cryptographic actions to a
+   * wildcard principal outright.
    */
   readonly withCallerPermissions?: boolean | undefined;
 }

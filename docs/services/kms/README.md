@@ -357,11 +357,15 @@ That is why a role holding `kms:Decrypt` on such a key cannot use it by calling 
 `SecureString` parameters. Code calling simulated KMS directly sets it with the `viaService` request
 option, naming the service on its own (`ssm`), since the region is the key's.
 
-A service passing on the caller's own KMS permissions sets `withCallerPermissions` alongside it.
-What the policy above admits is the service a request came through. A request carrying this option
-is allowed only where IAM allows the caller the KMS action too, and a key policy naming the caller
-allows it on its own. Sim SSM sets the option when it decrypts a `SecureString`. A role holding
-`ssm:GetParameter` and no `kms:Decrypt` is refused the decrypted value.
+The first statement above allows the request outright, so nothing further is asked of the caller. A
+role holding `ssm:GetParameter` and nothing on KMS reads a decrypted `SecureString` under `aws/ssm`,
+because Parameter Store supplies the `kms:ViaService` value the policy wants (see
+[Sim SSM](../ssm/README.md#the-awsssm-managed-key-allows-the-read-itself)).
+
+A service that passes the caller's own KMS permissions on rather than its own sets
+`withCallerPermissions` alongside `viaService`. A request carrying that option is allowed only where
+IAM allows the caller the KMS action too, and a key policy naming the caller still allows it on its
+own. No simulated service sets it.
 
 ```typescript sim-kms-aws-managed-key
 /**

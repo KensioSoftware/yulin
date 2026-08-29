@@ -27,11 +27,15 @@ export interface SimKmsRequestOptions {
    * Whether the service named by `viaService` is making the request with the
    * caller's own KMS permissions rather than with its own.
    *
-   * Parameter Store decrypts a SecureString this way. A caller holding
-   * ssm:GetParameter and no kms:Decrypt is refused even under the aws/ssm key,
-   * whose policy admits the Account's principals reaching KMS through Systems
-   * Manager. A key policy naming the caller still allows the request on its
-   * own, as it does for any other KMS request.
+   * A key policy admitting whoever the request came from then grants nothing
+   * by itself, because what it admits is the service, and the caller has to
+   * hold the KMS action in an identity policy as well. A key policy naming the
+   * caller still allows the request on its own, as it does for any other KMS
+   * request.
+   *
+   * No simulated service sets this. Parameter Store is the case it was written
+   * for, and the aws/ssm key policy grants its cryptographic actions to a
+   * wildcard principal outright.
    */
   readonly withCallerPermissions?: boolean | undefined;
 }

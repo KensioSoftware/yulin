@@ -73,13 +73,10 @@ describe("Resolving a simulated ECS container's secrets", () => {
         Value: "k-1234",
       }),
     );
-    // The decryption is the execution Role's own, so it holds kms:Decrypt as
-    // well as the parameter permission.
+    // The parameter is under the aws/ssm managed key, whose policy allows the
+    // decryption on its own, so the execution Role needs no KMS permission.
     const executionRole = await simIamRoleWithPolicyFactory.make(
-      {
-        roleName: "OrdersExecutionRole",
-        actions: ["ssm:GetParameter", "kms:Decrypt"],
-      },
+      { roleName: "OrdersExecutionRole", actions: ["ssm:GetParameter"] },
       simAws,
     );
 

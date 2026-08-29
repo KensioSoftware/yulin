@@ -60,9 +60,10 @@ call and nothing more. Two details matter:
   write needs the caller's own `kms:Encrypt` and a decrypting read needs `kms:Decrypt`, each on top
   of the SSM permission for the parameter;
 - they are made through the service as well, carrying `kms:ViaService`, which is what reaches the
-  `aws/ssm` managed key at all and keeps it out of reach of anything calling KMS directly. A
-  decrypting read carries `withCallerPermissions` with it, leaving that key's account-wide statement
-  short of allowing the read on its own;
+  `aws/ssm` managed key at all and keeps it out of reach of anything calling KMS directly. That
+  key's statement allows the cryptographic actions to a wildcard principal under its two conditions,
+  and Parameter Store satisfies both, so a caller holding `ssm:GetParameter` alone reads the
+  decrypted value;
 - the parameter's ARN is bound in as the `PARAMETER_ARN` encryption context, as real Parameter Store
   binds it, so a ciphertext moved into another parameter cannot be decrypted there.
 

@@ -156,11 +156,12 @@ export class SimIamMandatoryResourcePolicyRequirement implements SimIamAllowRequ
  *
  * A resource policy naming the caller still allows the request on its own, as
  * a KMS key policy naming a Role does. A policy admitting whoever the request
- * came from does not, because what it admits is the service. That is the
- * difference between a key policy naming a Role and the aws/ssm key policy,
- * which admits the Account's principals reaching KMS through Parameter Store
- * and still leaves a Role holding only ssm:GetParameter unable to decrypt a
- * SecureString.
+ * came from does not, because what it admits is the service, and an identity
+ * policy has to allow the action as well.
+ *
+ * Nothing in the simulation asks for this rule. Parameter Store is the case it
+ * was written for, and the aws/ssm key policy grants its cryptographic actions
+ * to a wildcard principal outright.
  */
 export class SimIamCallerPermissionRequirement implements SimIamAllowRequirement {
   /**
