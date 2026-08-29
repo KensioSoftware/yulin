@@ -32,18 +32,20 @@ interface SimSsmParameterKmsProperties {
 /**
  * The KMS calls a SecureString parameter makes.
  *
- * The calls are made as the caller rather than as the service, which is the
- * point: a standard tier write needs `kms:Encrypt` on the key and a decrypting
- * read needs `kms:Decrypt`, each on top of the SSM permission for the
- * parameter itself.
+ * The calls are made as the caller rather than as the service. Under a
+ * customer managed key a standard tier write needs `kms:Encrypt` on the key
+ * and a decrypting read needs `kms:Decrypt`, each on top of the SSM permission
+ * for the parameter itself.
  *
  * They are also made through the service, which is what reaches the `aws/ssm`
- * managed key at all: its policy admits the Account's principals when
+ * managed key at all. That key's policy admits the Account's principals when
  * `kms:ViaService` names Systems Manager, and Parameter Store is what supplies
- * that. Reaching the key is not the same as being allowed to use it, and a
- * decrypting read says so, because that policy admits whoever the request came
- * from rather than the caller behind it. A Role holding `ssm:GetParameter` and
- * no `kms:Decrypt` reads the ciphertext and not the value.
+ * it. Reaching the key is not the same as being allowed to use it, and a
+ * decrypting read says so with `withCallerPermissions`, because that policy
+ * admits whoever the request came from rather than the caller behind it. A
+ * Role holding `ssm:GetParameter` and no `kms:Decrypt` reads the ciphertext
+ * and not the value. A write under that key asks the caller for no KMS
+ * permission here, where AWS documents `kms:Encrypt` for one.
  *
  * Standard tier Parameter Store encrypts under the key directly rather than
  * through a data key, so this is one Encrypt and one Decrypt and nothing more.

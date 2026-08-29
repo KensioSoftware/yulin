@@ -153,8 +153,10 @@ usable in its own region.
 `SimKmsKeyPolicy.awsManaged` is the policy those two exist for. It is the policy real AWS gives an
 AWS managed key: use of the key allowed to `*` conditioned on both keys, and a second statement
 delegating only the key's metadata to the account. Nothing about using the key is delegated, so an
-identity policy granting `kms:Decrypt` on such a key reaches nothing, and a caller with no KMS
-permission at all reaches it through the owning service. The key factory builds it whenever a key is
+identity policy granting `kms:Decrypt` on such a key reaches nothing by itself, and a caller reaches
+the key through the owning service. What the first statement admits is whoever the request came
+from, so a service passing the caller's own permissions on with `withCallerPermissions` needs IAM to
+allow that caller too. The key factory builds it whenever a key is
 made for a service, which the key store does on first reference to a reserved `alias/aws/` name.
 
 Operations with no key to speak of, `CreateKey`, `ListKeys` and `ListAliases`, authorize against the

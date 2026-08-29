@@ -64,9 +64,10 @@ export class SimKmsKeyPolicy {
    * through the service that owns the key, and it delegates nothing else to
    * IAM: the second statement covers reading the key's metadata and no more.
    *
-   * That is what makes an AWS managed key usable by a caller holding no KMS
-   * permission at all, and unusable by a caller holding kms:Decrypt on it who
-   * calls KMS directly.
+   * That is what makes an AWS managed key unusable by a caller holding
+   * kms:Decrypt on it who calls KMS directly. What the first statement admits
+   * is whoever reached KMS through the owning service, which allows the
+   * request on its own only where that service used its own permissions.
    */
   static awsManaged(
     keyArn: string,

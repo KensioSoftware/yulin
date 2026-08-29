@@ -200,6 +200,52 @@ describe("KMS key policy authorization", () => {
     assertIdentical(roundTripped.toString("utf8"), "hunter2");
   });
 
+  it("refuses a wildcard ARN principal to a caller passing its own permissions", async () => {
+    // Given a key whose policy names a set of Roles with a wildcard, and a
+    // Role in that set holding no permissions of its own.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    const roleArn = await makeRole(simAws, accountId, "MatchedByWildcard");
+
+    const created = await simAws.kms().createKey(
+      new CreateKeyCommand({
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { AWS: `arn:aws:iam::${accountId}:role/*` },
+              Action: "kms:Encrypt",
+              Resource: "*",
+            },
+          ],
+        }),
+      }),
+    );
+    assertNonNullable(created.KeyMetadata);
+
+    // When a service reaches the key with that Role's own permissions.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().encrypt(
+        new EncryptCommand({
+          KeyId: created.KeyMetadata?.Arn,
+          Plaintext: plaintext,
+        }),
+        {
+          caller: { kind: "arn", arn: roleArn },
+          viaService: "ssm",
+          withCallerPermissions: true,
+        },
+      ),
+    );
+
+    // Then the statement admits a set of principals without naming one, and
+    // the caller still needs the permission itself. Real IAM accepts no
+    // wildcard inside a Principal ARN in the first place.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
   it("authorizes Decrypt against the key the ciphertext names", async () => {
     // Given two keys, and a Role the second key's policy admits but not the
     // first's.
