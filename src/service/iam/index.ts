@@ -8,6 +8,10 @@ export type {
 } from "./policy/sim-iam-policy.js";
 export { SimIamAccessDenied, SimIamError } from "./error/sim-iam.error.js";
 export type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";
+export type {
+  SimIamDeployRoleInput,
+  SimIamDeployRolePolicy,
+} from "./role/sim-iam-deploy-role.js";
 export type { SimIamCredentialIdentity } from "./credential/sim-aws-credentials.js";
 export {
   SimIamCredentialScopeMismatch,

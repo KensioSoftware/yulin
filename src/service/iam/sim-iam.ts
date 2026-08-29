@@ -12,7 +12,10 @@ import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/fa
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
 import type { SimIamAccountIdentityPolicies } from "./authorize/identity/sim-iam-account-identity-policies.js";
 import type { SimIamAuthZPolicySource } from "./authorize/context/sim-iam-auth-z-context.js";
-import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
+import type {
+  SimArnPrincipal,
+  SimAwsPrincipal,
+} from "../aws/caller/sim-aws-caller.js";
 import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
@@ -23,6 +26,10 @@ import {
   SimIamAccountParts,
   type SimIamProperties,
 } from "./sim-iam-account-parts.js";
+import {
+  type SimIamDeployRoleInput,
+  SimIamDeployRoleMaker,
+} from "./role/sim-iam-deploy-role.js";
 
 /**
  * Simulated IAM service facade. Handles SDK commands. Emulates AWS behaviour
@@ -66,6 +73,7 @@ export class SimIam
   private readonly commands: SimIamCommandHandlers;
   private readonly accountAuthZ: SimIamAccountAuthZ;
   private readonly sdkRouter = new SimIamSdkCommandRouter(this);
+  private readonly deployRoles = new SimIamDeployRoleMaker(this);
 
   constructor(properties: SimIamProperties = {}) {
     const parts = new SimIamAccountParts(properties);
@@ -282,6 +290,17 @@ export class SimIam
     options?: SimIamRequestOptions,
   ): Promise<simIamCommands.SimCreateAccessKeyCommandOutput> {
     return await this.commands.users.createAccessKey(command, options);
+  }
+
+  /**
+   * Make a Role for a CloudFormation deployment to run as.
+   *
+   * The Role is trusted by `cloudformation.amazonaws.com` and allowed what the
+   * policy documents allow. What comes back goes straight to `caller` on
+   * `deployTemplate`, `deployTemplateFile` or `deployCdkOut`.
+   */
+  async makeDeployRole(input: SimIamDeployRoleInput): Promise<SimArnPrincipal> {
+    return await this.deployRoles.make(input);
   }
 
   /**
