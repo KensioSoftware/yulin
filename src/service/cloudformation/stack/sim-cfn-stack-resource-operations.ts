@@ -8,6 +8,7 @@ import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
+import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
 import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
 import { SimCfnStackUpdater } from "./update/sim-cfn-stack-updater.js";
 import type { SimCloudFormationStackName } from "./sim-cfn-stack.js";
@@ -31,6 +32,11 @@ interface SimCfnStackResourceOperationsProperties {
    * caller leaves each service to decide the request as the Account root.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The order Resources with no dependency between them are started in.
+   */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 }
 
 /**
@@ -51,6 +57,7 @@ export class SimCfnStackResourceOperations {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stackName: SimCloudFormationStackName;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
+  private readonly resourceOrder: SimCfnResourceOrder | undefined;
   private cdkOutContext: SimCdkOutContext | undefined;
   private caller: SimAwsCaller | undefined;
 
@@ -62,6 +69,7 @@ export class SimCfnStackResourceOperations {
       cdkOutContext,
       bindings,
       caller,
+      resourceOrder,
     } = properties;
 
     this.simAws = simAws;
@@ -70,6 +78,7 @@ export class SimCfnStackResourceOperations {
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
     this.caller = caller;
+    this.resourceOrder = resourceOrder;
   }
 
   /**
@@ -170,6 +179,7 @@ export class SimCfnStackResourceOperations {
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
       caller: this.caller,
+      resourceOrder: this.resourceOrder,
     });
   }
 
