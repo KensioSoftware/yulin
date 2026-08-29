@@ -749,6 +749,12 @@ the three listing operations an SDK caller reaches, and a deployment goes near n
 CloudFormation execution Role therefore carries the same policy here that a real deploy of the
 template needs.
 
+A delivery source over a CloudFront distribution takes one CloudFront permission on top of those.
+CloudWatch Logs checks the caller for `cloudfront:AllowVendedLogDeliveryForResource` against the
+distribution's ARN as the source is put, and a caller holding every `logs:` action and no CloudFront
+permission is refused. A policy naming another distribution is refused the same way. A delivery
+source over a resource of any other service asks for nothing outside `logs:`.
+
 ```typescript sim-logs-permissions
 /**
  * A simulated IAM policy allowing a Role to write one function's logs.

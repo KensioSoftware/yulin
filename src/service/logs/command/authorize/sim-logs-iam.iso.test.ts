@@ -242,12 +242,20 @@ describe("CloudWatch Logs delivery IAM authorization", () => {
   });
 
   it("allows a delivery source a policy names", async () => {
-    // Given a Role allowed to put delivery sources, and a distribution for
-    // the source to be over.
-    const simAws = await simAwsWithRole({
-      Action: "logs:PutDeliverySource",
-      Resource: `arn:aws:logs:us-east-1:${accountIdOneOnes}:delivery-source:*`,
-    });
+    // Given a Role allowed to put delivery sources over the distributions of
+    // its own account, and a distribution for the source to be over.
+    const simAws = await simAwsWithRole([
+      {
+        Effect: "Allow",
+        Action: "logs:PutDeliverySource",
+        Resource: `arn:aws:logs:us-east-1:${accountIdOneOnes}:delivery-source:*`,
+      },
+      {
+        Effect: "Allow",
+        Action: "cloudfront:AllowVendedLogDeliveryForResource",
+        Resource: `arn:aws:cloudfront::${accountIdOneOnes}:distribution/*`,
+      },
+    ]);
     const resourceArn = await simLogsDeliveryDistributionArn(simAws);
 
     // When it puts a delivery source.

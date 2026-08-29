@@ -25,6 +25,10 @@ const sourceName = "site-access-logs";
  * destination policy actions those handlers also list are left out, because
  * this simulation refuses tags and records a destination policy without acting
  * on it.
+ *
+ * The CloudFront action is the odd one. CloudWatch Logs checks it as the
+ * source over a distribution is put, and a policy assembled from the `logs:`
+ * side alone leaves it out.
  */
 const deliveryDeployActions = [
   "logs:GetDeliverySource",
@@ -33,13 +37,15 @@ const deliveryDeployActions = [
   "logs:PutDeliveryDestination",
   "logs:GetDelivery",
   "logs:CreateDelivery",
+  "cloudfront:AllowVendedLogDeliveryForResource",
 ];
 
 /**
  * The three Resources CloudFront standard logging v2 is made of.
  *
- * The Distribution is created outside the Stack and named here by its ARN. A
- * Role that may deploy this template therefore needs no CloudFront permission.
+ * The Distribution is created outside the Stack and named here by its ARN, so
+ * the Stack creates nothing of CloudFront. The Role deploying it still needs
+ * the one CloudFront permission that delivering a distribution's logs takes.
  */
 function loggingTemplate(resourceArn: string): CfnTemplateBodyRecord {
   return {
@@ -146,6 +152,28 @@ describe("the principal an AWS::Logs delivery Resource is created as", () => {
     // source was never put behind the refusal.
     assertStringIncludes(error.message, "logs:GetDeliverySource");
     assertStringIncludes(error.message, "role/Putter");
+    assertUndefined(simAws.logs().findDeliverySource(sourceName));
+  });
+
+  it("fails a delivery source under a caller denied the CloudFront action", async () => {
+    // Given a Role allowed every action the delivery handlers name, and
+    // nothing of CloudFront. That is the policy someone writes by asking which
+    // service owns the Resource type.
+    const simAws = new SimAws();
+    const error = await assertThrowsErrorAsync(async () => {
+      await deployAllowing(
+        simAws,
+        "Logger",
+        allBut("cloudfront:AllowVendedLogDeliveryForResource"),
+      );
+    });
+
+    // Then the deploy stops where the real one stopped, on an action of the
+    // service that owns the distribution being logged.
+    assertStringIncludes(
+      error.message,
+      "cloudfront:AllowVendedLogDeliveryForResource",
+    );
     assertUndefined(simAws.logs().findDeliverySource(sourceName));
   });
 

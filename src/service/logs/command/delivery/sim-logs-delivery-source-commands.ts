@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import { authorizeSimLogsVendedLogDelivery } from "../../delivery/cloudfront/sim-logs-vended-log-delivery.js";
 import {
   simLogsAnyDeliverySourceArn,
   simLogsDeliverySourceArn,
@@ -63,10 +64,12 @@ export class SimLogsDeliverySourceCommands {
    * Put a delivery source over a resource whose logs are to be delivered.
    *
    * The service is read from the resource ARN, as real CloudWatch Logs reads
-   * it, and the region the request was made in has to be one that service's
-   * delivery can be set up from. The ARN is then resolved to a resource the
-   * account holds. A source over a distribution the account never created
-   * fails here, ahead of the delivery that would have carried nothing.
+   * it. The caller is then checked against that service as well, because
+   * delivering a resource's logs is a permission the service owning it holds.
+   * The region the request was made in has to be one that service's delivery
+   * can be set up from, and the ARN is then resolved to a resource the account
+   * holds. A source over a distribution the account never created fails here,
+   * ahead of the delivery that would have carried nothing.
    */
   putDeliverySource(
     command: SimPutDeliverySourceCommand,
@@ -88,6 +91,13 @@ export class SimLogsDeliverySourceCommands {
     );
 
     const service = requiredSimLogsDeliveredService(resourceArn);
+
+    authorizeSimLogsVendedLogDelivery({
+      authorizer: this.#authorizer,
+      service,
+      resourceArn,
+      caller: options?.caller,
+    });
 
     requireSimLogsDeliverySource({
       service,
