@@ -5,7 +5,10 @@ import type {
   SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimLogsAuthorizer } from "../command/authorize/sim-logs-authorizer.js";
 import type { SimLogs } from "../sim-logs.js";
+import { SimCfnDeliveryAuthorization } from "./delivery/sim-cfn-delivery-authorization.js";
 import { SimCfnDeliveryCreator } from "./delivery/sim-cfn-delivery-creator.js";
 import { SimCfnDeliveryDestinationCreator } from "./delivery/sim-cfn-delivery-destination-creator.js";
 import { SimCfnDeliverySourceCreator } from "./delivery/sim-cfn-delivery-source-creator.js";
@@ -15,6 +18,8 @@ import { unsupportedSimLogsResourceType } from "./sim-logs-cfn-unsupported-resou
 
 interface SimLogsCfnResourceFactoryProperties {
   readonly logs: SimLogs;
+  readonly authorizer: SimLogsAuthorizer;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
 /**
@@ -37,12 +42,15 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
   readonly #deleter: SimLogsCfnResourceDeleter;
 
   constructor(properties: SimLogsCfnResourceFactoryProperties) {
+    const delivery = {
+      logs: properties.logs,
+      authorization: new SimCfnDeliveryAuthorization(properties),
+    };
+
     this.#logGroups = new SimCfnLogGroupCreator(properties);
-    this.#deliverySources = new SimCfnDeliverySourceCreator(properties);
-    this.#deliveryDestinations = new SimCfnDeliveryDestinationCreator(
-      properties,
-    );
-    this.#deliveries = new SimCfnDeliveryCreator(properties);
+    this.#deliverySources = new SimCfnDeliverySourceCreator(delivery);
+    this.#deliveryDestinations = new SimCfnDeliveryDestinationCreator(delivery);
+    this.#deliveries = new SimCfnDeliveryCreator(delivery);
     this.#deleter = new SimLogsCfnResourceDeleter({
       logGroups: this.#logGroups,
       deliverySources: this.#deliverySources,

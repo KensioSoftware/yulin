@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLogsDeliverySource } from "../../delivery/sim-logs-delivery-source.js";
 import type { SimLogs } from "../../sim-logs.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimCfnDeliveryAuthorization } from "./sim-cfn-delivery-authorization.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliverySourceUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
 
@@ -12,6 +13,7 @@ const actedOnProperties = new Set(["Name", "ResourceArn", "LogType"]);
 
 interface SimCfnDeliverySourceCreatorProperties {
   readonly logs: SimLogs;
+  readonly authorization: SimCfnDeliveryAuthorization;
 }
 
 /**
@@ -21,12 +23,17 @@ interface SimCfnDeliverySourceCreatorProperties {
  * store, so a template hits the same refusals an SDK caller would: a
  * distribution that already has a delivery source, and a CloudFront source
  * declared in a stack outside us-east-1.
+ *
+ * The handler reads the source back before it puts one, and that read is what
+ * a CloudFormation execution Role needs `logs:GetDeliverySource` for.
  */
 export class SimCfnDeliverySourceCreator {
   readonly #logs: SimLogs;
+  readonly #authorization: SimCfnDeliveryAuthorization;
 
   constructor(properties: SimCfnDeliverySourceCreatorProperties) {
     this.#logs = properties.logs;
+    this.#authorization = properties.authorization;
   }
 
   /**
@@ -47,6 +54,8 @@ export class SimCfnDeliverySourceCreator {
     const name = reader.requiredString("Name");
 
     reader.recordIgnoredProperties();
+
+    this.#authorization.authorizeDeliverySourceCreate(name, options?.caller);
 
     await this.#logs.putDeliverySource(
       {

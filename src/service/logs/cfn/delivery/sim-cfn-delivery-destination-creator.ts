@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLogsDeliveryDestination } from "../../delivery/sim-logs-delivery-destination.js";
 import type { SimLogs } from "../../sim-logs.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimCfnDeliveryAuthorization } from "./sim-cfn-delivery-authorization.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliveryDestinationUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
 
@@ -16,6 +17,7 @@ const actedOnProperties = new Set([
 
 interface SimCfnDeliveryDestinationCreatorProperties {
   readonly logs: SimLogs;
+  readonly authorization: SimCfnDeliveryAuthorization;
 }
 
 /**
@@ -26,12 +28,17 @@ interface SimCfnDeliveryDestinationCreatorProperties {
  * changes it replaces the Resource. Sim CloudFormation replaces a Resource
  * whose template entry changed at all, which lands on the same behaviour
  * without the destination having to say so.
+ *
+ * The handler reads the destination back before it puts one, and that read is
+ * what a CloudFormation execution Role needs `logs:GetDeliveryDestination` for.
  */
 export class SimCfnDeliveryDestinationCreator {
   readonly #logs: SimLogs;
+  readonly #authorization: SimCfnDeliveryAuthorization;
 
   constructor(properties: SimCfnDeliveryDestinationCreatorProperties) {
     this.#logs = properties.logs;
+    this.#authorization = properties.authorization;
   }
 
   /**
@@ -52,6 +59,11 @@ export class SimCfnDeliveryDestinationCreator {
     const name = reader.requiredString("Name");
 
     reader.recordIgnoredProperties();
+
+    this.#authorization.authorizeDeliveryDestinationCreate(
+      name,
+      options?.caller,
+    );
 
     await this.#logs.putDeliveryDestination(
       {

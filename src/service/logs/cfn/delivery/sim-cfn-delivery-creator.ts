@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimLogsDelivery } from "../../delivery/sim-logs-delivery.js";
 import type { SimLogs } from "../../sim-logs.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
+import type { SimCfnDeliveryAuthorization } from "./sim-cfn-delivery-authorization.js";
 import { simCfnDeliveryInput } from "./sim-cfn-delivery-input.js";
 import { SimCfnDeliveryProperties } from "./sim-cfn-delivery-properties.js";
 import { deliveryUnsimulatedReasons } from "./sim-cfn-delivery-unsimulated-properties.js";
@@ -20,6 +21,7 @@ const actedOnProperties = new Set([
 
 interface SimCfnDeliveryCreatorProperties {
   readonly logs: SimLogs;
+  readonly authorization: SimCfnDeliveryAuthorization;
 }
 
 /**
@@ -28,12 +30,17 @@ interface SimCfnDeliveryCreatorProperties {
  * A delivery is the join between a source and a destination, and both have to
  * be deployed before it. A template gets that ordering from naming them
  * through `Ref` and `Fn::GetAtt`.
+ *
+ * The handler reads deliveries back before it creates one, and that read is
+ * what a CloudFormation execution Role needs `logs:GetDelivery` for.
  */
 export class SimCfnDeliveryCreator {
   readonly #logs: SimLogs;
+  readonly #authorization: SimCfnDeliveryAuthorization;
 
   constructor(properties: SimCfnDeliveryCreatorProperties) {
     this.#logs = properties.logs;
+    this.#authorization = properties.authorization;
   }
 
   /**
@@ -53,6 +60,8 @@ export class SimCfnDeliveryCreator {
     });
 
     reader.recordIgnoredProperties();
+
+    this.#authorization.authorizeDeliveryCreate(options?.caller);
 
     const created = await this.#logs.createDelivery(
       { input: simCfnDeliveryInput(reader) },

@@ -33,11 +33,16 @@ export class SimLogs extends SimLogsDeliveryOperations {
   protected readonly commands: SimLogsCommands;
 
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);
-  readonly #cfnFactory = new SimLogsCfnResourceFactory({ logs: this });
+  readonly #cfnFactory: SimLogsCfnResourceFactory;
 
   constructor(properties: SimLogsProperties = {}) {
     super();
     this.commands = new SimLogsCommands(properties);
+    this.#cfnFactory = new SimLogsCfnResourceFactory({
+      logs: this,
+      authorizer: this.commands.authorizer,
+      accountRegionScope: this.commands.accountRegionScope,
+    });
   }
 
   /**
