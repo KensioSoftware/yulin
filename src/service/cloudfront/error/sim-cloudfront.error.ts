@@ -148,6 +148,35 @@ export class SimCloudFrontResponseHeadersPolicyAlreadyExists extends SimCloudFro
 }
 
 /**
+ * Simulated CloudFront NoSuchCachePolicy error.
+ *
+ * What CloudFront answers when a Behavior's `CachePolicyId` names no cache
+ * policy the account holds, at Distribution create or update time rather than
+ * when a request first needs the policy.
+ */
+export class SimCloudFrontNoSuchCachePolicy extends SimCloudFrontError {
+  public override readonly name = "NoSuchCachePolicy";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated CloudFront CachePolicyAlreadyExists error.
+ *
+ * CloudFront requires a cache policy name to be unique within an account, so a
+ * second policy claiming a name is refused rather than created.
+ */
+export class SimCloudFrontCachePolicyAlreadyExists extends SimCloudFrontError {
+  public override readonly name = "CachePolicyAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated CloudFront InvalidOriginAccessControl error.
  *
  * What CloudFront answers when an Origin's `OriginAccessControlId` names no

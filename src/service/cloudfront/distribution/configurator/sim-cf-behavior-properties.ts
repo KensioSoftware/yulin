@@ -5,7 +5,7 @@ import type {
 } from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
+import type { SimCfBehaviorPolicies } from "./sim-cf-behavior-policies.js";
 import { configureCffAssociations } from "./sim-cff-associations-configure.js";
 import { configureEdgeAssociations } from "../../edge/sim-cf-edge-associations-configure.js";
 import { assertConsistentQuantity } from "../../command/sim-cf-list-quantity.js";
@@ -18,13 +18,14 @@ export function simCfBehaviorProperties(
   cacheBehavior:
     | SimCloudFrontDefaultCacheBehaviorConfig
     | SimCloudFrontCacheBehaviorConfig,
-  responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
+  policies: SimCfBehaviorPolicies,
 ): SimCloudFrontBehavior {
-  const { TargetOriginId, ResponseHeadersPolicyId } = cacheBehavior;
+  const { TargetOriginId, ResponseHeadersPolicyId, CachePolicyId } =
+    cacheBehavior;
 
   assertDefined(TargetOriginId, "CloudFront CacheBehavior TargetOriginId");
 
-  responseHeadersPolicy.assertExists(TargetOriginId, ResponseHeadersPolicyId);
+  policies.assertExists(cacheBehavior);
 
   return {
     targetOriginName: TargetOriginId,
@@ -42,6 +43,9 @@ export function simCfBehaviorProperties(
     }),
     ...(ResponseHeadersPolicyId !== undefined && {
       responseHeadersPolicyId: ResponseHeadersPolicyId,
+    }),
+    ...(CachePolicyId !== undefined && {
+      cachePolicyId: CachePolicyId,
     }),
     functionAssociations: configureCffAssociations(cacheBehavior),
     lambdaFunctionAssociations: configureEdgeAssociations(cacheBehavior),

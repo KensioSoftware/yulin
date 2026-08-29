@@ -5,7 +5,7 @@ import type {
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 import type { SimCloudFrontOriginConfigurator } from "./sim-cloud-front-origin-configurator.js";
 import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavior-configurator.js";
-import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
+import type { SimCfBehaviorPolicies } from "./sim-cf-behavior-policies.js";
 import { SimCloudFrontCustomErrorConfigurator } from "./sim-cloud-front-custom-error-configurator.js";
 import { SimCloudFrontInvalidDefaultRootObject } from "../../error/sim-cloudfront.error.js";
 import {
@@ -41,7 +41,7 @@ export class SimCloudFrontDistributionConfigurator {
   constructor(
     private readonly originConfigurator: SimCloudFrontOriginConfigurator,
     private readonly behaviorConfigurator: SimCloudFrontBehaviorConfigurator,
-    private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
+    private readonly behaviorPolicies: SimCfBehaviorPolicies,
     private readonly webAcl: SimCfDistributionWebAcl,
   ) {}
 
@@ -58,7 +58,7 @@ export class SimCloudFrontDistributionConfigurator {
   assertConfigurable(
     distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
-    this.responseHeadersPolicy.assertAllExist(distributionConfig);
+    this.behaviorPolicies.assertAllExist(distributionConfig);
     this.webAcl.assertUsable(distributionConfig);
   }
 

@@ -12,7 +12,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.command.js";
 import { SimCfnCfDistroConfigValidator } from "./sim-cfn-cf-distro-config-validator.js";
 import { simCfnCfDistroWithRunnableEdgeAssociations } from "./sim-cfn-cf-distro-edge-associations.js";
-import { simCfnCfDistroWithHeldResponseHeadersPolicies } from "./sim-cfn-cf-distro-response-headers-policy.js";
+import { simCfnCfDistroWithHeldBehaviorPolicies } from "./sim-cfn-cf-distro-behavior-policies.js";
 import { simCfnCfDistroWithoutAbsentWebAcl } from "./sim-cfn-cf-distro-web-acl.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import { simCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -26,11 +26,12 @@ interface SimCfnCfDistroCreatorProperties {
  *
  * A `WebACLId` naming a web ACL this simulation does not hold is left out and
  * recorded, and so are a Lambda@Edge association it cannot run and a
- * `ResponseHeadersPolicyId` naming a policy it does not hold. CloudFront has no
- * Resource of its own for any of the three, so all of them live on the
- * Distribution itself, and refusing one would take the Distribution down over
- * something that was never the point of the template. The site a local dev
- * server and a suite of tests make requests to has to survive that.
+ * `ResponseHeadersPolicyId` or `CachePolicyId` naming a policy it does not
+ * hold. CloudFront has no Resource of its own for any of them, so all of them
+ * live on the Distribution itself, and refusing one would take the
+ * Distribution down over something that was never the point of the template.
+ * The site a local dev server and a suite of tests make requests to has to
+ * survive that.
  */
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;
@@ -106,7 +107,7 @@ function deployableConfig(
 ): SimCloudFrontDistributionConfig {
   return simCfnCfDistroWithoutAbsentWebAcl(
     resource,
-    simCfnCfDistroWithHeldResponseHeadersPolicies(
+    simCfnCfDistroWithHeldBehaviorPolicies(
       resource,
       simCfnCfDistroWithRunnableEdgeAssociations(
         resource,

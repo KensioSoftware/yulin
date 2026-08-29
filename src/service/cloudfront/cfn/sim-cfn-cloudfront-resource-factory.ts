@@ -10,6 +10,7 @@ import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
 import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
+import { SimCfnCfCachePolicyCreator } from "./cache-policy/sim-cfn-cf-cache-policy-creator.js";
 import { SimCfnCfOriginAccessControlCreator } from "./origin-access-control/sim-cfn-cf-oac-creator.js";
 import { SimCfnCfKeyValueStoreCreator } from "./key-value-store/sim-cfn-cf-kvs-creator.js";
 
@@ -21,6 +22,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly functionCreator: SimCfnCffCreator;
   private readonly distroDeleter: SimCfnCfDistroDeleter;
   private readonly responseHeadersPolicyCreator: SimCfnCfResponseHeadersPolicyCreator;
+  private readonly cachePolicyCreator: SimCfnCfCachePolicyCreator;
   private readonly originAccessControlCreator: SimCfnCfOriginAccessControlCreator;
   private readonly keyValueStoreCreator: SimCfnCfKeyValueStoreCreator;
 
@@ -30,6 +32,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
     this.responseHeadersPolicyCreator =
       new SimCfnCfResponseHeadersPolicyCreator({ cloudFront });
+    this.cachePolicyCreator = new SimCfnCfCachePolicyCreator({ cloudFront });
     this.originAccessControlCreator = new SimCfnCfOriginAccessControlCreator({
       cloudFront,
     });
@@ -57,6 +60,9 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "ResponseHeadersPolicy": {
         return this.responseHeadersPolicyCreator.create(resource, properties);
+      }
+      case "CachePolicy": {
+        return this.cachePolicyCreator.create(resource, properties);
       }
       case "OriginAccessControl": {
         return this.originAccessControlCreator.create(resource, properties);
@@ -98,6 +104,10 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "ResponseHeadersPolicy": {
         this.responseHeadersPolicyCreator.delete(resource);
+        return;
+      }
+      case "CachePolicy": {
+        this.cachePolicyCreator.delete(resource);
         return;
       }
       case "OriginAccessControl": {
