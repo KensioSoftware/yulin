@@ -2493,8 +2493,9 @@ request fills the cache at one of them. The key carries an edge ID for that. Eve
 at the same edge unless it sends an `x-sim-aws-cloudfront-edge` header naming another. A test that
 sends a different one is proving its app survives arriving somewhere cold.
 
-The header follows the `x-sim-aws-*` convention of the caller and request source headers, and sim
-CloudFront takes it off the request once it has read it. A web ACL rule, a CloudFront Function, a
+The header follows the `x-sim-aws-*` convention of the caller and request source headers, and
+`@kensio/yulin/cloudfront` exports the name as `simCfEdgeHeaderName`. Sim CloudFront takes it off
+the request once it has read it. A web ACL rule, a CloudFront Function, a
 Lambda@Edge function and the Origin all see the request the viewer sent without it.
 
 ### What a Distribution stores

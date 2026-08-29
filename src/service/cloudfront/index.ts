@@ -7,6 +7,11 @@ export { cloudFrontFunctionSourceFromModule } from "./cff/function-code-module/c
 export type { CloudFrontFunction } from "./typings/cloudfront-functions.namespace.js";
 export type { LambdaAtEdge } from "./typings/lambda-at-edge.namespace.js";
 export type { SimCfRedundantOrigin } from "./origin/sim-cf-redundant-origins.js";
+export {
+  simCfDefaultEdgeId,
+  simCfEdgeHeaderName,
+} from "./cache/sim-cf-edge.js";
+export type { SimCfCachingConfiguration } from "./registry/sim-cloud-front-registry.js";
 export type { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 export type { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
 export type {
