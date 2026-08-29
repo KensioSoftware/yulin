@@ -3,6 +3,7 @@ import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.j
 import {
   simCloudFrontCustomErrorCodes,
   simCloudFrontCustomErrorResponseCodes,
+  simCloudFrontDefaultErrorCachingMinTtlSec,
 } from "../../custom-error/sim-cloudfront-custom-error-response.js";
 import {
   SimCloudFrontInvalidArgument,
@@ -14,10 +15,10 @@ import {
  * Applies custom error response configuration to a sim CloudFront
  * Distribution.
  *
- * CloudFront pairs `ResponsePagePath` and `ResponseCode`: a rule carrying one
+ * CloudFront pairs `ResponsePagePath` and `ResponseCode`. A rule carrying one
  * without the other is refused rather than half applied. A rule carrying
- * neither only configures error caching, which this simulator does not model,
- * so it is accepted and left out of the Distribution's request handling.
+ * neither configures error caching alone, and it reaches the Distribution with
+ * no page for the viewer to be sent.
  */
 export class SimCloudFrontCustomErrorConfigurator {
   /**
@@ -39,6 +40,9 @@ export class SimCloudFrontCustomErrorConfigurator {
 
     const responsePagePath = customErrorResponse.ResponsePagePath;
     const responseCode = this.responseCode(customErrorResponse.ResponseCode);
+    const errorCachingMinTtlSec = this.errorCachingMinTtlSec(
+      customErrorResponse.ErrorCachingMinTTL,
+    );
 
     if (responsePagePath === undefined || responsePagePath === "") {
       if (responseCode !== undefined) {
@@ -46,6 +50,8 @@ export class SimCloudFrontCustomErrorConfigurator {
           `CloudFront CustomErrorResponse for ${String(errorCode)} has a ResponseCode without a ResponsePagePath`,
         );
       }
+
+      distribution.addCustomErrorResponse({ errorCode, errorCachingMinTtlSec });
 
       return;
     }
@@ -64,9 +70,31 @@ export class SimCloudFrontCustomErrorConfigurator {
 
     distribution.addCustomErrorResponse({
       errorCode,
-      responsePagePath,
-      responseCode,
+      errorCachingMinTtlSec,
+      page: { responsePagePath, responseCode },
     });
+  }
+
+  /**
+   * How long the rule holds its error for, which CloudFront defaults to ten
+   * seconds.
+   *
+   * A template can write a number as a string, and that one is read as the
+   * seconds it spells. Anything else falls back to the default. The
+   * alternative would be a stack that fails to deploy over the seconds an
+   * error is held for.
+   */
+  private errorCachingMinTtlSec(errorCachingMinTtl: unknown): number {
+    const seconds =
+      typeof errorCachingMinTtl === "string" && errorCachingMinTtl.trim() !== ""
+        ? Number(errorCachingMinTtl)
+        : errorCachingMinTtl;
+
+    return typeof seconds === "number" &&
+      Number.isFinite(seconds) &&
+      seconds >= 0
+      ? seconds
+      : simCloudFrontDefaultErrorCachingMinTtlSec;
   }
 
   private responseCode(

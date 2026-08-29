@@ -262,9 +262,12 @@ fetching it, as in CloudFront.
 A viewer-response function never sees a custom error page. CloudFront runs no viewer-response
 function once the Origin has answered 400 or higher, and simulated CloudFront does the same, for a
 CloudFront Function and a Lambda@Edge function alike. The status the Origin returned is what decides
-that, whatever `ResponseCode` puts in its place. `ErrorCachingMinTTL` is accepted and ignored, along
-with a rule that sets nothing else. An Origin error is never cached here, so there is no TTL for it
-to shorten.
+that, whatever `ResponseCode` puts in its place.
+
+`ErrorCachingMinTTL` says how many seconds the Distribution holds the error for before it reads the
+Origin again. A rule carrying it alone, with no `ResponsePagePath`, configures error caching for a
+status the Distribution serves no page for. See
+[What a Distribution stores](#what-a-distribution-stores).
 
 ## Serve simulated CloudFront on localhost
 
@@ -2518,8 +2521,12 @@ policy's `MaxTTL` is above zero. That leaves out a Behavior naming a `CachePolic
 account, a Behavior naming none at all, and a Behavior on `CachingDisabled`. The alternative in each
 case would be a guessed TTL.
 
-An Origin error stays out of the cache. Real CloudFront holds one for the `ErrorCachingMinTTL` its
-custom error response carries, and nothing here reads that yet.
+An error is held for a TTL of its own. It comes from the `ErrorCachingMinTTL` of the custom error
+response matching the status, and from CloudFront's ten seconds where the Distribution configures no
+rule for that status. The Origin's cache headers and the Behavior's cache policy have no say in it.
+A rule with `ErrorCachingMinTTL: 0` holds the error for no time at all, and every failing request
+reaches the Origin. A rule is matched on the status the Origin answered with. A 404 the Distribution
+serves as a 200 error page is held for the seconds the 404's own rule allows.
 
 ### How long an entry is held
 
@@ -3833,6 +3840,10 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **A Behavior with no cache policy caches nothing.** Real CloudFront falls back to the legacy
   `ForwardedValues` and the TTLs beside it, and sim CloudFront skips both. Give the Behavior a
   `CachePolicyId`, as CDK and the console both do.
+- **Every error status is held for its error TTL.** Real CloudFront caches 404, 414, 500, 501, 502,
+  503 and 504, and caches 400, 403 and 405 only where the Origin sent a `Cache-Control max-age` or
+  `s-maxage` header. It then holds the error for the longer of that header and `ErrorCachingMinTTL`.
+  Here every status of 400 and above is held for `ErrorCachingMinTTL` alone.
 - **An Origin keeps its kind and its Bucket through an origin-request function.** Real CloudFront
   lets a handler hand back `origin.s3` where it was given `origin.custom`, or point an S3 Origin at
   another Bucket. Both need something a simulated Origin does not hold, the dispatcher that reaches
