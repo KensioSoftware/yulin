@@ -9,6 +9,7 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
+  assertStringStartsWith,
   assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
@@ -97,7 +98,7 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
     const described = await cognito.describeUserPool(
       new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
     );
-    assertIdentical(described.UserPool?.Name, "app-stack-PoolD3F588B8");
+    assertStringStartsWith(described.UserPool?.Name, "app-stack-PoolD3F588B8-");
 
     // And the properties the template declared are reported back, so what the
     // stack asked for stays visible even though nothing here reads any of it.
@@ -128,9 +129,9 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
       }),
     );
     assertNonNullable(describedClient.UserPoolClient);
-    assertIdentical(
+    assertStringStartsWith(
       describedClient.UserPoolClient.ClientName,
-      "app-stack-PoolClient8A3E5EB7",
+      "app-stack-PoolClient8A3E5EB7-",
     );
     assertFalse(describedClient.UserPoolClient.AllowedOAuthFlowsUserPoolClient);
     assertArrayEquals(

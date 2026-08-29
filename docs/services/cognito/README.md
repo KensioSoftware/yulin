@@ -3314,10 +3314,11 @@ same thing about the property and differ in what they do about it. A direct API 
 request to fail, and a template has every other resource in it to think about.
 
 `UserPoolName` and `ClientName` are optional. A template that sets neither gets
-`<stack name>-<logical id>`, as real CloudFormation generates a name, trimmed to the 128 characters
-Cognito allows if the two are longer than that together. Real CloudFormation adds random characters
-on the end and this adds none. The name is the same on every deployment of the same template, and a
-test can assert it.
+`<stack name>-<logical id>-<tail>`, as real CloudFormation generates a name, trimmed to the 128
+characters Cognito allows if the parts are longer than that together. The tail is twelve characters
+derived from the other two, where real CloudFormation ends the name in twelve random ones. The name
+is the same on every deployment of the same template, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover how a long name is trimmed.
 
 ## Registering a pool with a chosen pool id
 
@@ -3461,13 +3462,13 @@ await stack.waitForDeployComplete();
 
 const userPoolId = stack.output("PoolId");
 
-// The pool is named after the stack and the logical id, as the template named
-// neither it nor the client.
+// The pool is named after the stack, the logical id and a tail derived from
+// both, as the template named neither it nor the client.
 const described = await simAws
   .cognitoIdentityProvider()
   .describeUserPool(new DescribeUserPoolCommand({ UserPoolId: userPoolId }));
 
-console.log(described.UserPool?.Name); // "app-stack-Pool"
+console.log(described.UserPool?.Name); // "app-stack-Pool-2c3041dc539d"
 
 // What the template declared is reported back. This one is acted on: it is
 // what says only an admin creates users in this pool.

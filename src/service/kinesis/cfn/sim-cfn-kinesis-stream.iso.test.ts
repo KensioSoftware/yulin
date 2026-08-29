@@ -4,6 +4,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -82,9 +83,9 @@ describe("deployed AWS::Kinesis::Stream Resources", () => {
     await stack.waitForDeployComplete();
 
     // Then CloudFormation named it, as real CloudFormation does.
-    assertIdentical(
+    assertStringStartsWith(
       stack.outputs.get("StreamRef")?.value,
-      "orders-stack-OrdersStream",
+      "orders-stack-OrdersStream-",
     );
   });
 

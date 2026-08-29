@@ -5,6 +5,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -111,8 +112,8 @@ describe("AWS::SES::Template", () => {
     // Then CloudFormation named it, the way it names any unnamed Resource.
     const name = stack.outputs.get("Name")?.value;
 
-    assertIdentical(name, "orders-WelcomeEmail");
-    assertNonNullable(simAws.sesV2().findTemplate("orders-WelcomeEmail"));
+    assertStringStartsWith(name, "orders-WelcomeEmail-");
+    assertNonNullable(simAws.sesV2().findTemplate(name));
   });
 
   it("leaves out a part the template does not set", async () => {

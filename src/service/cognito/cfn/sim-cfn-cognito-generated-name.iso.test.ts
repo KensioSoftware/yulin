@@ -2,6 +2,7 @@ import {
   assertFalse,
   assertIdentical,
   assertStringLength,
+  assertStringMatches,
   assertStringStartsWith,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -22,10 +23,10 @@ describe("SimCfnCognitoGeneratedName", () => {
       logicalId: "AppPoolClient",
     });
 
-    // When each generated name is read, then it carries both parts, as a real
-    // CloudFormation generated name does.
-    assertIdentical(pool.value, "app-stack-AppPool");
-    assertIdentical(client.value, "app-stack-AppPoolClient");
+    // When each generated name is read, then it carries both parts and a
+    // tail, as a real CloudFormation generated name does.
+    assertStringMatches(pool.value, /^app-stack-AppPool-[\da-f]{12}$/);
+    assertStringMatches(client.value, /^app-stack-AppPoolClient-[\da-f]{12}$/);
   });
 
   it("falls back to the logical ID with no stack name", () => {
@@ -40,10 +41,10 @@ describe("SimCfnCognitoGeneratedName", () => {
       logicalId: "AppPool",
     });
 
-    // When the generated name is read, then it is the logical ID on its own
+    // When the generated name is read, then it is the logical ID and a tail
     // rather than a name with an empty part in it.
-    assertIdentical(noStack.value, "AppPool");
-    assertIdentical(emptyStackName.value, "AppPool");
+    assertStringMatches(noStack.value, /^AppPool-[\da-f]{12}$/);
+    assertIdentical(emptyStackName.value, noStack.value);
   });
 
   it("trims a generated name to the 128 characters Cognito allows", () => {
@@ -52,10 +53,10 @@ describe("SimCfnCognitoGeneratedName", () => {
     const logicalId = "AppPoolWithARatherLongLogicalIdIndeed";
     const name = new SimCfnCognitoGeneratedName({ stackName, logicalId });
 
-    // When the generated name is read, then it is trimmed to fit, keeping the
-    // start, so the stack name is still in it.
+    // When the generated name is read, then it is trimmed to fit, and the
+    // logical ID keeps the characters the stack name does not need.
     assertStringLength(name.value, 128);
-    assertStringStartsWith(name.value, `${stackName}-AppPoolWithARather`);
+    assertStringStartsWith(name.value, `${"a".repeat(77)}-${logicalId}-`);
 
     // And the same template generates the same name again, rather than a new
     // one each deployment.

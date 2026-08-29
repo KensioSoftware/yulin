@@ -55,13 +55,13 @@ await stack.waitForDeployComplete();
 
 const userPoolId = stack.output("PoolId");
 
-// The pool is named after the stack and the logical id, as the template named
-// neither it nor the client.
+// The pool is named after the stack, the logical id and a tail derived from
+// both, as the template named neither it nor the client.
 const described = await simAws
   .cognitoIdentityProvider()
   .describeUserPool(new DescribeUserPoolCommand({ UserPoolId: userPoolId }));
 
-console.log(described.UserPool?.Name); // "app-stack-Pool"
+console.log(described.UserPool?.Name); // "app-stack-Pool-2c3041dc539d"
 
 // What the template declared is reported back. This one is acted on: it is
 // what says only an admin creates users in this pool.

@@ -2,6 +2,7 @@ import {
   assertFalse,
   assertIdentical,
   assertStringLength,
+  assertStringMatches,
   assertStringStartsWith,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -16,9 +17,9 @@ describe("SimCfnSqsQueueName", () => {
       logicalId: "OrdersQueue",
     });
 
-    // When the generated name is read, then it carries both, as a real
-    // CloudFormation generated name does.
-    assertIdentical(name.value, "orders-stack-OrdersQueue");
+    // When the generated name is read, then it carries both and a tail, as a
+    // real CloudFormation generated name does.
+    assertStringMatches(name.value, /^orders-stack-OrdersQueue-[\da-f]{12}$/);
   });
 
   it("falls back to the logical ID with no stack name", () => {
@@ -33,10 +34,10 @@ describe("SimCfnSqsQueueName", () => {
       logicalId: "OrdersQueue",
     });
 
-    // When the generated name is read, then it is the logical ID on its own
+    // When the generated name is read, then it is the logical ID and a tail
     // rather than a name with an empty part in it.
-    assertIdentical(noStack.value, "OrdersQueue");
-    assertIdentical(emptyStackName.value, "OrdersQueue");
+    assertStringMatches(noStack.value, /^OrdersQueue-[\da-f]{12}$/);
+    assertIdentical(emptyStackName.value, noStack.value);
   });
 
   it("trims a generated name to the 80 characters SQS allows", () => {
@@ -47,10 +48,13 @@ describe("SimCfnSqsQueueName", () => {
       logicalId: "OrdersQueueWithARatherLongLogicalId",
     });
 
-    // When the generated name is read, then it is trimmed to fit, keeping the
-    // start, so the stack name is still in it.
+    // When the generated name is read, then the stack name and the logical ID
+    // share what the tail leaves, so the stack name is still in it.
     assertStringLength(name.value, 80);
-    assertStringStartsWith(name.value, `${"a".repeat(60)}-OrdersQu`);
+    assertStringStartsWith(
+      name.value,
+      `${"a".repeat(33)}-OrdersQueueWithARatherLongLogical-`,
+    );
 
     // And the same template generates the same name again, rather than a new
     // one each deployment.

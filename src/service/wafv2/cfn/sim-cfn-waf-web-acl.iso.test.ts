@@ -7,6 +7,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTypeString,
 } from "@kensio/smartass";
@@ -258,9 +259,9 @@ describe("AWS::WAFv2::WebACL", () => {
     await stack.waitForDeployComplete();
 
     // Then the web ACL carries the name CloudFormation generated for it.
-    assertIdentical(
+    assertStringStartsWith(
       simAws.wafV2().allWebAcls("REGIONAL")[0]?.name,
-      "orders-OrdersAcl",
+      "orders-OrdersAcl-",
     );
   });
 

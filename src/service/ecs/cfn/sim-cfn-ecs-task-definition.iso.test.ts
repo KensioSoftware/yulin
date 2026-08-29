@@ -231,17 +231,23 @@ describe("AWS::ECS::TaskDefinition", () => {
             Properties: { ContainerDefinitions: [workerContainer] },
           },
         },
+        Outputs: {
+          TaskDefinitionRef: { Value: { Ref: "WorkerTaskDefinition" } },
+        },
       },
     });
 
     await stack.waitForDeployComplete();
 
-    // Then the family comes from the stack and the logical ID, without the
-    // random part real CloudFormation adds, so a test can predict it.
-    assertIdentical(
-      simAws.ecs().taskDefinition("orders-stack-WorkerTaskDefinition").revision,
-      1,
+    // Then the family comes from the stack, the logical ID and a tail derived
+    // from both, which the Ref a test reads carries.
+    const taskDefinitionArn = stack.outputs.get("TaskDefinitionRef")?.value;
+
+    assertStringIncludes(
+      taskDefinitionArn,
+      "task-definition/orders-stack-WorkerTaskDefinition-",
     );
+    assertIdentical(simAws.ecs().taskDefinition(taskDefinitionArn).revision, 1);
 
     await simAws.backgroundTasksComplete();
   });

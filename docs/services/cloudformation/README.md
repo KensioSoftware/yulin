@@ -2839,6 +2839,59 @@ one that reaches an Output in these docs.
 const nameServers = stack.outputs.get("HostedZoneNameServers")?.value;
 ```
 
+## Names CloudFormation generates
+
+A Resource whose template leaves its name out is named `<stack name>-<logical ID>-<tail>`, as real
+CloudFormation names one. The tail is twelve characters derived from the other two parts, standing
+in for the twelve random characters an account produces. The same template deployed under the same
+stack name generates the same name again, and a test reads that name back from a `Ref` or an
+attribute.
+
+```typescript sim-cloudformation-generated-resource-name
+/**
+ * Reading the name CloudFormation generated for a Resource the template does
+ * not name.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersQueue: { Type: "AWS::SQS::Queue" },
+    },
+    Outputs: {
+      QueueName: {
+        Value: { "Fn::GetAtt": ["OrdersQueue", "QueueName"] },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const queueName = stack.output("QueueName");
+
+console.log(queueName); // "orders-stack-OrdersQueue-1dca4dbe253b"
+```
+
+Each service caps how long a name may be. Where the stack name and the logical ID are too long
+together, thirteen characters of the limit are kept for the tail and its hyphen, and what is left is
+shared between the two parts either side of one more hyphen. The stack name rounds up, and each part
+takes the characters the other leaves. Where a service allows 64 characters, a long stack name keeps
+25 of them and a long logical ID keeps 25.
+
+The trimmed stack name is what an IAM policy scoped by name prefix matches. A stack called
+`ChineseboostAnalyticsStack` deploying an unnamed `AWS::Events::Rule` puts the rule under
+`ChineseboostAnalyticsStac-`. A deploy Role allowed `events:PutRule` on
+`ChineseboostAnalyticsStack-*` is refused here, as it is in an account.
+
+AWS documents none of the trimming, and the rule here is inferred from names real CloudFormation
+produced.
+
 ## Inspecting stacks and resources
 
 After deployment, you can inspect the returned stack and its resources.

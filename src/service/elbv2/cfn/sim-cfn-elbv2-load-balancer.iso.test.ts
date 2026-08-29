@@ -5,6 +5,7 @@ import {
   assertNonNullable,
   assertStringEndsWith,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -142,12 +143,12 @@ describe("AWS::ElasticLoadBalancingV2::LoadBalancer", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the name is the stack and the logical ID, without the random part
-    // real CloudFormation adds, so a test can predict it.
-    assertIdentical(stack.outputs.get("Name")?.value, "shop-stack-ShopAlb");
-    assertNonNullable(
-      simAws.elbV2().findLoadBalancerByName("shop-stack-ShopAlb"),
-    );
+    // Then the name is the stack, the logical ID and a tail derived from both,
+    // as real CloudFormation names one.
+    const loadBalancerName = stack.outputs.get("Name")?.value;
+
+    assertStringStartsWith(loadBalancerName, "shop-stack-ShopAlb-");
+    assertNonNullable(simAws.elbV2().findLoadBalancerByName(loadBalancerName));
 
     await simAws.backgroundTasksComplete();
   });

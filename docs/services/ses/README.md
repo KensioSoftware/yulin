@@ -515,7 +515,9 @@ CloudFormation is creating an identity that is already there.
 `FromEmailAddress`. `Ref` on a template, and its `Id` attribute, both return the template name.
 `Ref` on a configuration set returns its name. That Resource type has no `Fn::GetAtt` attributes at
 all, so reading one fails the deploy rather than answering something AWS would not. A set with no
-`Name` is named after the stack and the logical ID, as real CloudFormation names one.
+`Name` is named after the stack, the logical ID and a tail derived from both, as
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+describe.
 
 Deleting the stack removes all three.
 

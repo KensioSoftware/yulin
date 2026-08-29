@@ -1421,8 +1421,12 @@ fails the deployment.
 - `TargetGroupArn`, `TargetGroupName` and `TargetGroupFullName` on a target group
 - `ListenerArn` on a listener, and `RuleArn` and `IsDefault` on a rule
 
-An unnamed load balancer or target group is named after the stack and the logical ID, trimmed to the
-32 characters ELB allows. A target group declaring `Targets` has them registered as part of creating
+An unnamed load balancer or target group is named after the stack, the logical ID and a tail derived
+from both, trimmed to the 32 characters ELB allows. The tail takes 13 of those. A name that has to
+be trimmed gives the stack name and the logical ID nine characters each, and either takes what the
+other leaves.
+[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+cover the rule. A target group declaring `Targets` has them registered as part of creating
 it, and the group routes as soon as the stack has deployed.
 
 ```typescript sim-elbv2-cloudformation

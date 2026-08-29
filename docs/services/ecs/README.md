@@ -1432,7 +1432,9 @@ console.log(processedOrders); // ["outstanding orders"]
 
 A binding can name the task definition Resource instead, which is what a CDK stack gives a test to
 name. The construct ID is accepted as well as the synthesized logical ID, and the container name can
-be left out where the task definition declares one container. A binding naming an image repository
+be left out where the task definition declares one container. This is the form to use for a task
+definition the template declares no `Family` for, since the family CloudFormation generates for it
+ends in a tail a test would have to deploy the stack to learn. A binding naming an image repository
 matches any container running an image from it, whichever family declares it, which covers a tag
 that changes with every build.
 
@@ -1605,9 +1607,9 @@ const listed = await simAws
 console.log(listed.taskArns?.length); // 2
 ```
 
-An unnamed service is named after the stack and the logical ID, as a cluster and a family are. A
-service declaring no `DesiredCount` keeps one task running, which is what real CloudFormation gives
-a new service.
+An unnamed service is named after the stack, the logical ID and a tail derived from both, as a
+cluster and a family are. `Fn::GetAtt ... Name` answers with the generated name. A service declaring
+no `DesiredCount` keeps one task running, which is what real CloudFormation gives a new service.
 
 Updating the stack moves the service. A changed `DesiredCount` scales it, and a changed task
 definition moves it onto the revision the update registered, replacing the tasks it was keeping.
@@ -1973,9 +1975,12 @@ Current documented limitations:
   `DescribeServices` and `ListTasks` are what report those.
 - Task definition and cluster tags are stored and reported, but `TagResource`, `UntagResource` and
   `ListTagsForResource` are absent.
-- An unnamed cluster, task definition or service gets a name composed from the stack name and the
-  logical ID, without the random part real CloudFormation adds, which makes it predictable in a
-  test. A stack deployed twice under different names therefore gets two different families.
+- An unnamed cluster, task definition or service gets a name composed from the stack name, the
+  logical ID and a tail derived from both, in place of the random characters real CloudFormation
+  ends one with. The same stack redeployed gets the same names, and a stack deployed twice under
+  different names gets two different families.
+  [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+  cover the tail and how a long name is trimmed.
 - A service that declares no `DesiredCount` keeps one task running. That is the default real
   CloudFormation documents for a new service. A `DesiredCount` written as the text of a number is
   taken as that number, since a String Parameter resolves to text, and anything else is refused

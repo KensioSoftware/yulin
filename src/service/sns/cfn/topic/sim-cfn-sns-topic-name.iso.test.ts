@@ -2,6 +2,7 @@ import {
   assertFalse,
   assertIdentical,
   assertStringLength,
+  assertStringMatches,
   assertStringStartsWith,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -16,9 +17,9 @@ describe("SimCfnSnsTopicName", () => {
       logicalId: "OrdersTopic",
     });
 
-    // When the generated name is read, then it carries both, as a real
-    // CloudFormation generated name does.
-    assertIdentical(name.value, "orders-stack-OrdersTopic");
+    // When the generated name is read, then it carries both and a tail, as a
+    // real CloudFormation generated name does.
+    assertStringMatches(name.value, /^orders-stack-OrdersTopic-[\da-f]{12}$/);
   });
 
   it("falls back to the logical ID with no stack name", () => {
@@ -33,10 +34,10 @@ describe("SimCfnSnsTopicName", () => {
       logicalId: "OrdersTopic",
     });
 
-    // When the generated name is read, then it is the logical ID on its own
+    // When the generated name is read, then it is the logical ID and a tail
     // rather than a name with an empty part in it.
-    assertIdentical(noStack.value, "OrdersTopic");
-    assertIdentical(emptyStackName.value, "OrdersTopic");
+    assertStringMatches(noStack.value, /^OrdersTopic-[\da-f]{12}$/);
+    assertIdentical(emptyStackName.value, noStack.value);
   });
 
   it("trims a generated name to the 256 characters SNS allows", () => {
@@ -47,10 +48,13 @@ describe("SimCfnSnsTopicName", () => {
       logicalId: "OrdersTopicWithARatherLongLogicalIdIndeed".repeat(2),
     });
 
-    // When the generated name is read, then it is trimmed to fit, keeping the
-    // start, so the stack name is still in it.
+    // When the generated name is read, then it is trimmed to fit, and the
+    // logical ID keeps the characters the stack name does not need.
     assertStringLength(name.value, 256);
-    assertStringStartsWith(name.value, `${"a".repeat(200)}-OrdersTopic`);
+    assertStringStartsWith(
+      name.value,
+      `${"a".repeat(160)}-${"OrdersTopicWithARatherLongLogicalIdIndeed".repeat(2)}-`,
+    );
 
     // And the same template generates the same name again, rather than a new
     // one each deployment.

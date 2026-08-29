@@ -377,8 +377,9 @@ says the Resource is invalid, and `simCfnSnsResourceCreation` renames SNS's own 
 Resource asked for it, since an SNS error carries no logical ID.
 
 `SimCfnSnsTopicName` is the name a topic whose template does not name it gets, built on the shared
-`SimCfnGeneratedResourceName`. It leaves out the random characters real CloudFormation adds, so a test
-can predict it.
+`SimCfnGeneratedResourceName`. The tail on the end of it is derived from the stack name and the
+logical ID, in place of the random characters real CloudFormation ends one with, and the same
+template deployed again gets the same name.
 
 `AWS::SNS::TopicPolicy` has no existence of its own, in the same way `AWS::SQS::QueuePolicy` has
 none: it is the `Policy` attribute of the topics it names. The Resource is backed by the first of

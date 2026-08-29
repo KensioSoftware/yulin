@@ -4,6 +4,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsErrorAsync,
   assertTrue,
   assertTypeString,
@@ -74,21 +75,29 @@ describe("AWS::ECS::Service properties", () => {
     // which real CloudFormation fills both of in.
     const simAws = new SimAws();
 
-    // When it is deployed.
+    // When it is deployed, with the name it generated for the service read
+    // back through an attribute.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
-      template: serviceTemplate({}),
+      template: {
+        ...serviceTemplate({}),
+        Outputs: {
+          Name: { Value: { "Fn::GetAtt": ["WorkerService", "Name"] } },
+        },
+      },
     });
 
     await stack.waitForDeployComplete();
     await simAws.backgroundTasksComplete();
 
-    // Then the service is named from the stack and the logical ID, without the
-    // random part real CloudFormation adds, and it keeps the one task real
-    // CloudFormation gives a new service that declares no count.
-    const service = simAws
-      .ecs()
-      .service("orders-stack-WorkerService", "orders");
+    // Then the service is named from the stack, the logical ID and a tail
+    // derived from both, and it keeps the one task real CloudFormation gives a
+    // new service that declares no count.
+    const serviceName = stack.outputs.get("Name")?.value;
+
+    assertStringStartsWith(serviceName, "orders-stack-WorkerService-");
+
+    const service = simAws.ecs().service(serviceName, "orders");
 
     assertTrue(service.isActive());
     assertIdentical(service.desiredCount, 1);

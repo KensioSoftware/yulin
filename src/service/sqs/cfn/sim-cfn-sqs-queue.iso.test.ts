@@ -7,6 +7,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringStartsWith,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -201,14 +202,12 @@ describe("SQS CloudFormation Queue deployment", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the queue is named from the stack name and the logical ID, as real
-    // CloudFormation names one, without the random characters a template could
-    // not predict anyway.
-    assertIdentical(
-      stack.outputs.get("QueueName")?.value,
-      "orders-stack-OrdersQueue",
-    );
-    assertNonNullable(simAws.sqs().findQueue("orders-stack-OrdersQueue"));
+    // Then the queue is named from the stack name, the logical ID and a tail
+    // derived from both, as real CloudFormation names one.
+    const queueName = stack.outputs.get("QueueName")?.value;
+
+    assertStringStartsWith(queueName, "orders-stack-OrdersQueue-");
+    assertNonNullable(simAws.sqs().findQueue(queueName));
   });
 
   it("backs the CloudFormation Resource with the simulated queue", async () => {

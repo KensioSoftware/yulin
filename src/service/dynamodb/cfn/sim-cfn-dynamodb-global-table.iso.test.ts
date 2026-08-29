@@ -9,6 +9,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertStringStartsWith,
   assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
@@ -318,7 +319,7 @@ describe("DynamoDB CloudFormation GlobalTable deployment", () => {
 
     const tableName = stack.outputs.get("OrdersTableName")?.value;
     assertTypeString(tableName);
-    assertIdentical(tableName, "orders-stack-OrdersTable");
+    assertStringStartsWith(tableName, "orders-stack-OrdersTable-");
 
     // When an item is written to the table the Ref named.
     await simAws.dynamoDb().putItem(
