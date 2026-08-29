@@ -2355,7 +2355,8 @@ real CloudFront refuses it.
 
 A Distribution holds a cache. A request for a key it already holds is answered from that cache,
 leaving the Origin unread. The Behavior's cache policy decides the key, and decides whether the
-Behavior has one at all.
+Behavior has one at all. The policy and the Origin's own cache headers together decide how long an
+answer is held.
 
 ```typescript sim-cloudfront-caching
 /**
@@ -2505,8 +2506,140 @@ policy's `MaxTTL` is above zero. That leaves out a Behavior naming a `CachePolic
 account, a Behavior naming none at all, and a Behavior on `CachingDisabled`. The alternative in each
 case would be a guessed TTL.
 
-An Origin error stays out of the cache. Real CloudFront holds one for `ErrorCachingMinTTL`, which
-wants an expiry this simulation has yet to keep.
+An Origin error stays out of the cache. Real CloudFront holds one for the `ErrorCachingMinTTL` its
+custom error response carries, and nothing here reads that yet.
+
+### How long an entry is held
+
+An entry records the instant it expires, taken from the simulation's clock. A request arriving after
+that instant reaches the Origin, and what the Origin answers takes the expired entry's place. So a
+test reaches the moment its content goes stale by advancing simulated time, without waiting for it.
+
+```typescript sim-cloudfront-cache-expiry
+/**
+ * Expiring a cached object by moving simulated time past its cache control.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.s3();
+
+  await simS3.createBucket(new CreateBucketCommand({ Bucket: "news-bucket" }));
+  await simS3.putPublicAccessBlock(
+    new PutPublicAccessBlockCommand({
+      Bucket: "news-bucket",
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        IgnorePublicAcls: true,
+      },
+    }),
+  );
+  await simS3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "news-bucket",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::news-bucket/*",
+        },
+      }),
+    }),
+  );
+
+  // The Origin holds each version of the page for a minute.
+  const publish = async (body: string): Promise<void> => {
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "news-bucket",
+        Key: "index.html",
+        ContentType: "text/html",
+        CacheControl: "max-age=60",
+        Body: body,
+      }),
+    );
+  };
+
+  await publish("<h1>First</h1>");
+
+  const distributionCreation = await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "news-site",
+        Comment: "News site",
+        Enabled: true,
+        DefaultRootObject: "index.html",
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "news-origin",
+              DomainName: "news-bucket.s3.amazonaws.com",
+              S3OriginConfig: { OriginAccessIdentity: "" },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "news-origin",
+          ViewerProtocolPolicy: "allow-all",
+          // CachingOptimized, one of CloudFront's managed policies.
+          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6",
+        },
+      },
+    }),
+  );
+
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
+  const home = srv.localUrl(`http://${distroHostname}/`);
+
+  const first = await fetch(home);
+  console.log(await first.text()); // <h1>First</h1>
+
+  await publish("<h1>Second</h1>");
+
+  // Still inside the minute the Origin asked for.
+  const held = await fetch(home);
+  console.log(await held.text()); // <h1>First</h1>
+
+  // Simulated time moves past it, and the next request reaches the Origin.
+  await simAws.clock().advanceBy({ seconds: 61 });
+
+  const expired = await fetch(home);
+  console.log(await expired.text()); // <h1>Second</h1>
+} finally {
+  await srv.close();
+}
+```
+
+The Origin's own headers and the cache policy settle the TTL between them, the way they settle it in
+AWS. `s-maxage` is preferred to `max-age`, and `max-age` to `Expires`. Whatever the Origin asks for
+is held between the policy's `MinTTL` and `MaxTTL`. An Origin that asks for nothing gets the greater
+of `MinTTL` and `DefaultTTL`, which is a day on `CachingOptimized`.
+
+An `Expires` header has to carry one of the three date formats HTTP allows. Anything else, a
+locale-formatted date included, is read as an object that expired already, the way any HTTP cache
+reads it.
+
+`no-store`, `no-cache` and `private` keep the answer out of the cache while the policy's `MinTTL` is
+zero. Where it is higher, the floor overrides the Origin and the answer is held for `MinTTL`
+seconds. That last one is CloudFront's own behaviour, and the
+[AWS documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html)
+carries a warning about it.
 
 ### Applying a response headers policy
 
@@ -3454,7 +3587,7 @@ Sim CloudFront currently supports:
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::CachePolicy`, and a Behavior's `CachePolicyId` read back through `GetDistribution`
 - A cache on each Distribution, keyed on the Behavior's cache policy and on the edge the request
-  arrived at
+  arrived at, expiring on the simulation's clock
 - `CreateInvalidationCommand`, `GetInvalidationCommand` and `ListInvalidationsCommand`, clearing
   what a Distribution holds and reading the batches back
 - `AWS::CloudFront::OriginRequestPolicy`, and a Behavior's `OriginRequestPolicyId` read back the
@@ -3473,10 +3606,13 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
-- **A cached entry never expires.** A cache policy's three TTLs decide whether the Behavior caches
-  at all, and a `MaxTTL` of zero turns it off. Any other value stores an entry that is served until
-  an invalidation clears it or the `SimAws` holding it is thrown away. The response carries no
-  `X-Cache` or `Age` header.
+- **An expired entry is fetched again rather than revalidated.** Real CloudFront asks the Origin
+  whether the object has changed and takes a `304 Not Modified` as permission to carry on serving
+  what it holds. Here the expired entry is dropped and the Origin's next answer replaces it.
+  `Stale-While-Revalidate` and `Stale-If-Error` are read as no directive at all. Nothing stale is
+  ever served.
+- **A cached entry stays until it expires or an invalidation clears it.** Nothing evicts one to make
+  room, and the response carries no `X-Cache` or `Age` header.
 - **An invalidation listing is never paged.** `ListInvalidations` echoes the `Marker` and `MaxItems`
   it was sent and answers with every invalidation the Distribution holds. `IsTruncated` is always
   false and no `NextMarker` comes back. Real CloudFront pages at 100.
@@ -3609,10 +3745,6 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **A cache policy is recorded and never applied.** Sim CloudFront models no edge caching. A policy
-  holds its three TTLs and the whole of its cache key, and a Behavior's `CachePolicyId` is checked
-  against the policies this simulation holds and reported back. None of it decides anything. Every
-  request reaches the Origin, whatever the policy would have cached on real CloudFront.
 - **An origin request policy is recorded and never applied.** A Behavior's `OriginRequestPolicyId`
   is checked against the policies this simulation holds and reported back. Sim CloudFront forwards
   the viewer's headers, cookies and query string to the Origin whole, whatever the policy would

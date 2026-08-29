@@ -1,3 +1,4 @@
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { simCfInvalidationBatchCovers } from "../invalidation/sim-cf-invalidation-path.js";
 import { simCfCacheEntryKeyPath } from "./sim-cf-cache-entry-key-path.js";
 
@@ -14,6 +15,18 @@ interface SimCfCachedResponse {
   readonly statusText: string;
   readonly headers: readonly (readonly [string, string])[];
   readonly body: Uint8Array;
+
+  /**
+   * When the entry was stored, off the simulation's clock. This is what the
+   * `Age` header a hit carries will be measured from.
+   */
+  readonly storedAt: Date;
+
+  /**
+   * The instant the entry stops being served. A request arriving on or after
+   * it reaches the Origin.
+   */
+  readonly expiresAt: Date;
 }
 
 /**
@@ -29,35 +42,75 @@ const bodylessStatuses = new Set([101, 103, 204, 205, 304]);
  * per Distribution, which the edge in the key stands for. One cache holds an
  * entry per edge, and a request arriving at another edge misses.
  *
- * Nothing expires. There is no TTL here yet, so an entry stays until an
- * invalidation clears it, and the cache policy's TTLs decide only whether a
- * Behavior caches at all.
+ * An entry leaves the cache two ways. It expires on the simulation's clock
+ * rather than the host's. A test reaches the instant an object goes stale by
+ * advancing simulated time, with no waiting. Or an invalidation clears it ahead
+ * of that instant.
+ *
+ * Storing takes its seconds from the caller. An Origin's answer is held for
+ * what its cache policy allows, and an error's own `ErrorCachingMinTTL` fits
+ * the same call.
  */
 export class SimCfDistributionCache {
   private readonly entries = new Map<string, SimCfCachedResponse>();
+  private readonly clock: SimClock;
+
+  /**
+   * A cache built standalone, outside a Distribution, falls back to the real
+   * clock.
+   */
+  constructor(clock: SimClock = new SimRealClock()) {
+    this.clock = clock;
+  }
 
   /**
    * The response cached under a key, or none where the cache does not hold it.
+   *
+   * An entry that has reached its expiry is dropped here. The request then goes
+   * to the Origin, and what the Origin answers replaces the expired entry.
    */
   read(key: string): Response | undefined {
     const entry = this.entries.get(key);
 
-    return entry === undefined ? undefined : cachedResponse(entry);
+    if (entry === undefined) {
+      return undefined;
+    }
+
+    if (this.clock.now().getTime() >= entry.expiresAt.getTime()) {
+      this.entries.delete(key);
+
+      return undefined;
+    }
+
+    return cachedResponse(entry);
   }
 
   /**
-   * Cache a response under a key, and hand back one to carry on with.
+   * Cache a response under a key for a number of seconds, and hand back one to
+   * carry on with.
    *
    * Storing reads the response's body, which can only happen once, so the
    * response the caller continues with is built from the bytes that were
-   * stored rather than being the one passed in.
+   * stored rather than being the one passed in. A TTL of no seconds stores
+   * nothing, and the response passed in is handed straight back unread.
    */
-  async store(key: string, response: Response): Promise<Response> {
+  async store(
+    key: string,
+    response: Response,
+    ttlSec: number,
+  ): Promise<Response> {
+    if (!Number.isFinite(ttlSec) || ttlSec <= 0) {
+      return response;
+    }
+
+    const storedAt = this.clock.now();
     const entry: SimCfCachedResponse = {
       status: response.status,
       statusText: response.statusText,
       headers: [...response.headers],
       body: new Uint8Array(await response.arrayBuffer()),
+      storedAt,
+      expiresAt: new Date(storedAt.getTime() + ttlSec * 1000),
     };
 
     this.entries.set(key, entry);

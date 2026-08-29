@@ -108,6 +108,27 @@ export async function readNumber(response: Response): Promise<number> {
 }
 
 /**
+ * An Origin answering with the number of the read that answered, under the
+ * cache headers the test is about, so that a test can say how long the
+ * Distribution should hold what it gets.
+ */
+export async function cacheHeaderOrigin(
+  simAws: SimAws,
+  reads: OriginReads,
+  headers: Record<string, string>,
+): Promise<string> {
+  return await functionUrlHostname(simAws, "cache-header-origin", () => {
+    reads.count += 1;
+
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ read: reads.count }),
+    };
+  });
+}
+
+/**
  * An Origin answering with a status per read, so that a test can have the
  * first read fail and the second one answer.
  */

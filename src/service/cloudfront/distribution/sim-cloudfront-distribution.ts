@@ -27,8 +27,9 @@ interface SimCloudFrontDistributionProperties {
   readonly accountId?: SimAwsAccountId;
   readonly distributionConfig?: SimCloudFrontDistributionConfig;
   /**
-   * Clock stamping this Distribution's last modified time. A Distribution built
-   * standalone, outside a SimAws instance, falls back to the real clock.
+   * Clock stamping this Distribution's last modified time and expiring what its
+   * cache holds. A Distribution built standalone, outside a SimAws instance,
+   * falls back to the real clock.
    */
   readonly clock?: SimClock;
 }
@@ -44,13 +45,18 @@ export class SimCloudFrontDistribution {
   public readonly lastModifiedTime: Date;
 
   /**
+   * The clock this Distribution reads, which its cache expires on.
+   */
+  public readonly clock: SimClock;
+
+  /**
    * What this Distribution has cached, keyed by cache key.
    *
    * A configuration update leaves it alone, as it leaves a real
    * Distribution's cached objects alone: an object cached under the old
-   * configuration is served until something removes it.
+   * configuration is served until it expires or something removes it.
    */
-  public readonly cache = new SimCfDistributionCache();
+  public readonly cache: SimCfDistributionCache;
 
   /**
    * The invalidations this Distribution has been asked for.
@@ -80,6 +86,8 @@ export class SimCloudFrontDistribution {
       clock = new SimRealClock(),
     } = properties;
 
+    this.clock = clock;
+    this.cache = new SimCfDistributionCache(clock);
     this.lastModifiedTime = clock.now();
     this.distributionId = distributionId;
     this.#status = status;
