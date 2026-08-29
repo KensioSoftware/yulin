@@ -1,4 +1,5 @@
 import type { SimCloudFrontControllerDependencies } from "./dependency/sim-cf-controller-dependency.js";
+import { simCfCacheStatusResponse } from "../cache/sim-cf-cache-status.js";
 import { simCfRequestEdge } from "../cache/sim-cf-edge.js";
 import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root-object-request.js";
 
@@ -7,8 +8,9 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
  * read the edge it arrived at, route to a Distribution, put the request
  * through the Distribution's web ACL, apply the default root object, resolve
  * the matching Behavior, run viewer-request hooks, answer from that edge's
- * cache or from the Origin, apply the Behavior's response headers policy, then
- * run viewer-response hooks where the Origin did not answer with an error.
+ * cache or from the Origin, say which of the two answered in `X-Cache`, apply
+ * the Behavior's response headers policy, then run viewer-response hooks where
+ * the Origin did not answer with an error.
  *
  * A viewer hook is a CloudFront Function or a Lambda@Edge function. A Behavior
  * carries at most one of the two kinds at the viewer events, which
@@ -101,6 +103,12 @@ export class SimCloudFrontRequestPipeline {
       edgeId: edge.edgeId,
     });
 
+    // Say whether the cache or the Origin answered, as CloudFront says it. A
+    // hit already carries the `Age` the cache measured. Both go on ahead of the
+    // response headers policy and the viewer-response event. A policy can take
+    // either off, and a viewer-response function sees them.
+    const served = simCfCacheStatusResponse(content.response, content.cacheHit);
+
     // Apply the Behavior's response headers policy, if it names one. CloudFront
     // does this after the response leaves the cache and before the
     // viewer-response event, so the custom error page above carries the
@@ -108,7 +116,7 @@ export class SimCloudFrontRequestPipeline {
     const response = this.stages.responseHeadersApplicator.apply(
       cloudFront,
       requestReference,
-      content.response,
+      served,
       behaviour,
     );
 

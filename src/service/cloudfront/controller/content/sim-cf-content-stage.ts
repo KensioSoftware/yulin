@@ -25,6 +25,17 @@ export interface SimCfContentRequest {
 }
 
 /**
+ * What the content stage produced, and which of the two produced it.
+ */
+export interface SimCfContentStageResult extends SimCfOriginStageResult {
+  /**
+   * Whether the Distribution's cache answered, which the pipeline reports to
+   * the viewer in `X-Cache`.
+   */
+  readonly cacheHit: boolean;
+}
+
+/**
  * Answers a request from the Distribution's cache, or from the Origin.
  *
  * This is CloudFront's cache lookup and everything behind it. A key the cache
@@ -47,7 +58,7 @@ export class SimCfContentStage {
   /**
    * Answer one request, reading the Origin only where the cache cannot.
    */
-  async serve(content: SimCfContentRequest): Promise<SimCfOriginStageResult> {
+  async serve(content: SimCfContentRequest): Promise<SimCfContentStageResult> {
     const { request, distribution, behaviour } = content;
     const cacheable = simCfCacheableRequest(content);
     const cached =
@@ -59,7 +70,7 @@ export class SimCfContentStage {
     // status the pipeline reads is the cached one and a viewer-response
     // function runs on a hit as it ran on the miss that filled the cache.
     if (cached !== undefined) {
-      return { response: cached, originStatus: cached.status };
+      return { response: cached, originStatus: cached.status, cacheHit: true };
     }
 
     const originResult = await this.originStage.fetch(
@@ -78,7 +89,11 @@ export class SimCfContentStage {
       originResult.originStatus >= 400 ||
       response.status >= 400
     ) {
-      return { response, originStatus: originResult.originStatus };
+      return {
+        response,
+        originStatus: originResult.originStatus,
+        cacheHit: false,
+      };
     }
 
     return {
@@ -92,6 +107,7 @@ export class SimCfContentStage {
         }),
       ),
       originStatus: originResult.originStatus,
+      cacheHit: false,
     };
   }
 }

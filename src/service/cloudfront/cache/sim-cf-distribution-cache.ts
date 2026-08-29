@@ -1,5 +1,6 @@
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { simCfInvalidationBatchCovers } from "../invalidation/sim-cf-invalidation-path.js";
+import { simCfAgeHeaderName, simCfCacheAgeSec } from "./sim-cf-cache-status.js";
 import { simCfCacheEntryKeyPath } from "./sim-cf-cache-entry-key-path.js";
 
 /**
@@ -17,8 +18,8 @@ interface SimCfCachedResponse {
   readonly body: Uint8Array;
 
   /**
-   * When the entry was stored, off the simulation's clock. This is what the
-   * `Age` header a hit carries will be measured from.
+   * When the entry was stored, off the simulation's clock. The `Age` header a
+   * hit carries is measured from this.
    */
   readonly storedAt: Date;
 
@@ -68,6 +69,10 @@ export class SimCfDistributionCache {
    *
    * An entry that has reached its expiry is dropped here. The request then goes
    * to the Origin, and what the Origin answers replaces the expired entry.
+   *
+   * What comes back carries `Age`, counted on the simulation's clock from the
+   * instant the Origin's answer was stored. An `Age` the Origin sent is
+   * replaced by the Distribution's own, as CloudFront replaces one.
    */
   read(key: string): Response | undefined {
     const entry = this.entries.get(key);
@@ -76,13 +81,22 @@ export class SimCfDistributionCache {
       return undefined;
     }
 
-    if (this.clock.now().getTime() >= entry.expiresAt.getTime()) {
+    const now = this.clock.now();
+
+    if (now.getTime() >= entry.expiresAt.getTime()) {
       this.entries.delete(key);
 
       return undefined;
     }
 
-    return cachedResponse(entry);
+    const response = cachedResponse(entry);
+
+    response.headers.set(
+      simCfAgeHeaderName,
+      String(simCfCacheAgeSec(entry.storedAt, now)),
+    );
+
+    return response;
   }
 
   /**
@@ -140,6 +154,9 @@ export class SimCfDistributionCache {
 
 /**
  * Build a response from a cached one, which every read needs its own of.
+ *
+ * No `Age` goes on here. A response on its way into the cache has been held
+ * for no time at all, and only one leaving it has an age to report.
  */
 function cachedResponse(entry: SimCfCachedResponse): Response {
   return new Response(bodylessStatuses.has(entry.status) ? null : entry.body, {
