@@ -2931,14 +2931,189 @@ console.log(
 A Behavior records the ID it was given, and `GetDistribution` reports it back for both the default
 Behavior and a named one. An update changing the policy is reported the same way.
 
-Nothing here reads the policy itself. Sim CloudFront forwards the viewer's headers, cookies and
-query string to the Origin whole, whatever the policy would have narrowed them to on real
-CloudFront.
-
 A policy name is unique within an account, as it is in CloudFront. A second
 `AWS::CloudFront::OriginRequestPolicy` claiming a name is refused with
-`OriginRequestPolicyAlreadyExists`. `Name` and `Comment` are the parts of
-`OriginRequestPolicyConfig` the policy carries.
+`OriginRequestPolicyAlreadyExists`.
+
+`HeadersConfig`, `CookiesConfig` and `QueryStringsConfig` are read along with `Name` and `Comment`.
+`CookieBehavior` and `QueryStringBehavior` each take `none`, `whitelist`, `allExcept` and `all`.
+`HeaderBehavior` takes `none`, `whitelist`, `allExcept`, `allViewer` and
+`allViewerAndWhitelistCloudFront`. An absent section falls back to `none`. A section naming a
+behaviour CloudFront does not offer fails the Stack, naming the Resource.
+
+### What a custom Origin is sent
+
+A custom Origin is sent the headers, cookies and query strings the Behavior's cache policy and
+origin request policy name between them, and none of the rest of the viewer's request. That union is
+what real CloudFront sends. The cache policy half is in it because an Origin has to be able to
+answer for the key its response is stored under.
+
+Alongside it CloudFront sends what it sends of its own accord. `Host` is the Origin's own domain,
+whatever the policies name (a viewer's own `Host` never reaches an Origin here, so
+`AllViewerExceptHostHeader` and `AllViewer` reach a Function URL Origin alike).
+`User-Agent` is `Amazon CloudFront` unless the policies carry the viewer's own. `Accept-Encoding` is
+the normalized `gzip`, `br` or `gzip, br` the cache policy's `EnableAcceptEncoding` flags asked for.
+`Content-Length`, `Content-Type` and `Transfer-Encoding` describe the body and travel with it. The
+Origin's custom headers and its origin access control's signing headers are applied on top.
+
+```typescript sim-cloudfront-origin-request-forwarding
+/**
+ * What a custom Origin reads of the viewer's request, with and without an
+ * origin request policy.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+// A function reporting the query string and the user agent it was asked with.
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "search",
+    Role: "arn:aws:iam::111111111111:role/SearchRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: {
+          rawQueryString: string;
+          headers: Record<string, string>;
+        }) => ({
+          query: event.rawQueryString,
+          userAgent: event.headers["user-agent"],
+        }),
+      ),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "search", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /search",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /open/search",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "search",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+// Two Behaviors on the same Origin. The default names no policy, and /open/*
+// names AllViewer, one of CloudFront's managed policies.
+const distributionCreation = await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "search-site",
+      Comment: "Search CDN",
+      Enabled: true,
+      Origins: {
+        Quantity: 1,
+        Items: [
+          {
+            Id: "api-origin",
+            DomainName: new URL(ApiEndpoint).hostname,
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "https-only",
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "api-origin",
+        ViewerProtocolPolicy: "allow-all",
+      },
+      CacheBehaviors: {
+        Quantity: 1,
+        Items: [
+          {
+            PathPattern: "/open/*",
+            TargetOriginId: "api-origin",
+            ViewerProtocolPolicy: "allow-all",
+            OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3",
+          },
+        ],
+      },
+    },
+  }),
+);
+
+const distroHostname = distributionCreation.Distribution!.DomainName!;
+const srv = await serveSimAws({ simAws });
+
+try {
+  const withheld = await fetch(
+    srv.localUrl(`http://${distroHostname}/search?q=kettle`),
+    { headers: { "user-agent": "Firefox" } },
+  );
+
+  // {"query":"","userAgent":"Amazon CloudFront"}
+  console.log(await withheld.text());
+
+  const forwarded = await fetch(
+    srv.localUrl(`http://${distroHostname}/open/search?q=kettle`),
+    { headers: { "user-agent": "Firefox" } },
+  );
+
+  // {"query":"q=kettle","userAgent":"Firefox"}
+  console.log(await forwarded.text());
+} finally {
+  await srv.close();
+}
+```
+
+A Behavior naming neither policy sends the path and nothing else. That is a Distribution CloudFront
+would serve the same way, and an Origin reading a query string behind one is a bug worth a failing
+test.
+
+An S3 Origin is unaffected. It reads its Bucket through GetObject and builds no request to narrow.
 
 ### Managed origin request policies
 
@@ -2954,6 +3129,12 @@ Behavior names one without a template creating anything. `AllViewer`
 [AWS publishes](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html)
 for it. CDK's `OriginRequestPolicy.ALL_VIEWER` and its seven siblings synthesize those IDs. A stack
 reaching for one deploys.
+
+Each also carries the three sections AWS publishes for it. A Behavior on `AllViewer` here sends the
+Origin everything the viewer sent bar its `Host`, which is the Origin's own domain under every
+policy. One on `CORS-CustomOrigin` sends the `Origin` header alone. One on
+`AllViewerExceptHostHeader` sends what `AllViewer` sends, since the `Host` it withholds was never
+the viewer's here.
 
 The managed policies sit in CloudFront's own namespace. A template may create a policy called
 `AllViewer` of its own, and deleting that stack leaves the managed one where it was.
@@ -3745,10 +3926,11 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **An origin request policy is recorded and never applied.** A Behavior's `OriginRequestPolicyId`
-  is checked against the policies this simulation holds and reported back. Sim CloudFront forwards
-  the viewer's headers, cookies and query string to the Origin whole, whatever the policy would
-  have narrowed them to on real CloudFront.
-- **An origin request policy carries its name and its comment, and nothing else.** The
-  `HeadersConfig`, `CookiesConfig` and `QueryStringsConfig` of an
-  `AWS::CloudFront::OriginRequestPolicy` are read past, since nothing here would act on them.
+- **A viewer's `Host` header never reaches an Origin.** Real CloudFront forwards it where a policy
+  names it, which is what `AllViewerExceptHostHeader` exists to stop. Here an Origin request always
+  carries the Origin's own domain as `Host`, since the request has to reach the simulated service
+  its URL names.
+- **CloudFront's own headers are not generated.** `X-Amz-Cf-Id`, `Via`, `X-Forwarded-For` and the
+  `CloudFront-Viewer-*` family are absent from an Origin request, so a policy naming one of them
+  forwards nothing. `Host`, `User-Agent` and the normalized `Accept-Encoding` are the three this
+  simulation sends of its own accord.

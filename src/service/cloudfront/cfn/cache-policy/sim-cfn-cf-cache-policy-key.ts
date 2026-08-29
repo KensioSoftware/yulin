@@ -1,11 +1,13 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
 import { SimCloudFrontCacheKey } from "../../cache-policy/sim-cf-cache-key.js";
 import {
-  simCfnCfCacheKeySection,
+  simCfnCfPolicySection,
+  type SimCfnCfPolicyRefuse,
+} from "../policy/sim-cfn-cf-policy-section.js";
+import {
   simCfnCfCookiesSpec,
   simCfnCfHeadersSpec,
   simCfnCfQueryStringsSpec,
-  type SimCfnCfCachePolicyRefuse,
 } from "./sim-cfn-cf-cache-policy-section.js";
 
 const parametersField = "ParametersInCacheKeyAndForwardedToOrigin";
@@ -19,7 +21,7 @@ const parametersField = "ParametersInCacheKeyAndForwardedToOrigin";
  */
 export function simCfnCfCachePolicyCacheKey(
   config: Record<string, unknown>,
-  refuse: SimCfnCfCachePolicyRefuse,
+  refuse: SimCfnCfPolicyRefuse,
 ): SimCloudFrontCacheKey {
   // oxlint-disable-next-line security/detect-object-injection
   const parameters = config[parametersField];
@@ -32,17 +34,17 @@ export function simCfnCfCachePolicyCacheKey(
     return refuse(`${parametersField} must be an object`);
   }
 
-  const cookies = simCfnCfCacheKeySection(
+  const cookies = simCfnCfPolicySection(
     parameters,
     simCfnCfCookiesSpec,
     refuse,
   );
-  const headers = simCfnCfCacheKeySection(
+  const headers = simCfnCfPolicySection(
     parameters,
     simCfnCfHeadersSpec,
     refuse,
   );
-  const queries = simCfnCfCacheKeySection(
+  const queries = simCfnCfPolicySection(
     parameters,
     simCfnCfQueryStringsSpec,
     refuse,
@@ -67,7 +69,7 @@ export function simCfnCfCachePolicyCacheKey(
 function encodingFlag(
   parameters: Record<string, unknown>,
   encoding: string,
-  refuse: SimCfnCfCachePolicyRefuse,
+  refuse: SimCfnCfPolicyRefuse,
 ): boolean {
   const field = `EnableAcceptEncoding${encoding}`;
   // oxlint-disable-next-line security/detect-object-injection

@@ -43,6 +43,10 @@ export function makeSimCloudFrontDistributionConfigurator(
     new SimCloudFrontOriginConfigurator(
       properties.s3OriginResolver,
       properties.originAccessControls,
+      {
+        cachePolicies: properties.cachePolicies,
+        originRequestPolicies: properties.originRequestPolicies,
+      },
       properties.customOriginDispatcher,
     ),
     new SimCloudFrontBehaviorConfigurator(behaviorPolicies),

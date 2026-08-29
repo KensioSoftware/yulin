@@ -24,15 +24,20 @@ import { simHttpApiLambdaProxyFactory } from "../../../apigatewayv2/api/sim-http
 import { SimAws } from "../../../aws/sim-aws.js";
 import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { makeLambdaZipFileInput } from "../../../lambda/function/code/lambda-zip-file-input.js";
+import { simCfManagedOriginRequestPolicyIds } from "../../origin-request-policy/sim-cf-managed-origin-request-policies.js";
 import { SimCloudFront } from "../../sim-cloudfront.js";
 
 /**
  * Create a Distribution sending everything to one custom Origin, and return
  * the hostname a viewer reaches it on.
+ *
+ * A Behavior naming no origin request policy carries none of the viewer's
+ * query strings to the Origin, so a test about what the Origin reads names one.
  */
 async function distributionForOrigin(
   simAws: SimAws,
   origin: Origin,
+  originRequestPolicyId?: string,
 ): Promise<string> {
   const creation = await simAws.cloudFront().createDistribution(
     new CreateDistributionCommand({
@@ -49,6 +54,9 @@ async function distributionForOrigin(
             Items: ["GET", "HEAD", "POST"],
             CachedMethods: { Quantity: 2, Items: ["GET", "HEAD"] },
           },
+          ...(originRequestPolicyId !== undefined && {
+            OriginRequestPolicyId: originRequestPolicyId,
+          }),
         },
       },
     }),
@@ -160,17 +168,22 @@ describe("Simulated CloudFront custom Origin", () => {
       simAws,
     );
 
-    // And a Distribution whose Origin adds that prefix.
-    const distroHostname = await distributionForOrigin(simAws, {
-      Id: "api-origin",
-      DomainName: new URL(api.apiEndpoint).hostname,
-      OriginPath: "/v1",
-      CustomOriginConfig: {
-        HTTPPort: 80,
-        HTTPSPort: 443,
-        OriginProtocolPolicy: "https-only",
+    // And a Distribution whose Origin adds that prefix, on a Behavior
+    // forwarding what the viewer sent.
+    const distroHostname = await distributionForOrigin(
+      simAws,
+      {
+        Id: "api-origin",
+        DomainName: new URL(api.apiEndpoint).hostname,
+        OriginPath: "/v1",
+        CustomOriginConfig: {
+          HTTPPort: 80,
+          HTTPSPort: 443,
+          OriginProtocolPolicy: "https-only",
+        },
       },
-    });
+      simCfManagedOriginRequestPolicyIds.allViewer,
+    );
 
     // When a request is made without the prefix.
     const response = await new SimAwsHttp({ simAws }).fetch(
