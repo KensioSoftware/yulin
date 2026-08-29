@@ -168,6 +168,11 @@ holds back whatever follows the last newline until the write that completes it, 
 two calls is one event rather than two. What is still unterminated when the invocation ends is
 recorded then, whether the handler returned or threw.
 
+An invocation ending in an error nothing caught has the error recorded too, as real Lambda's runtime
+records one. `SimLambdaFunctionLogging.around` catches it, flushes whatever line was open, writes
+the `ERROR Invoke Error` document `simLambdaInvokeErrorLine` builds, and rethrows. The caller still
+gets `FunctionError` and the trace in its Invoke payload.
+
 `SimLambdaExecutableCode.recordOutputTo` is the seam. `SimLambdaVmZipCode` passes the sink to the
 sandbox streams; `SimLambdaHandlerReferenceCode` implements it as a no-op, because a referenced
 handler is an ordinary function closing over the test's own module scope and has no streams of its
