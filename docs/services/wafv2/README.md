@@ -1061,8 +1061,9 @@ A web ACL nothing coherent could be deployed from still fails the stack. A `Scop
 failure names the logical ID.
 
 `Name` is optional on all three named types. An unnamed resource is named after the stack, the
-logical ID and a tail derived from both, as real CloudFormation names one. The `orders-acl` above
-would have deployed as `orders-OrdersAcl-5615bd3c857f`, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
+logical ID and a tail derived from both, as real CloudFormation names one. The web ACL above sets a
+`Name` and keeps `orders-acl`. With that property left out it would have deployed as
+`orders-OrdersAcl-5615bd3c857f`, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
 cover where the tail comes from.
 
 ### Putting a deployed web ACL in front of something

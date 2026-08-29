@@ -26,8 +26,8 @@ interface SimCfnGeneratedResourceNameProperties {
  * reserves the last thirteen characters of it for the tail and its hyphen. What
  * is left over goes to the stack name and the logical ID either side of one
  * more hyphen, half each, the stack name rounding up and either taking what the
- * other does not use. So a 64 character limit trims a long stack name and a
- * long logical ID to 25 characters each. The rule is inferred from names real
+ * other does not use. Where a service allows 64 characters, a long stack name
+ * and a long logical ID keep 25 each. The rule is inferred from names real
  * CloudFormation produced, since AWS documents none of it.
  *
  * The tail is derived from the whole untrimmed name. That is what keeps two

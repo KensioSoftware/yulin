@@ -203,7 +203,7 @@ rather than an unsupported one, because sim CloudFormation skips a resource whos
 unsupported, and skipping is the wrong answer for a queue that cannot be created as asked.
 
 `SimCfnSqsQueueName` generates the name for a queue the template does not name, from the stack name
-and the logical ID. It applies the 80 character limit through the shared
+and the logical ID. It applies the 80 characters a queue name allows through the shared
 `SimCfnGeneratedResourceName`, which ends the name in a tail derived from the other two parts, in
 place of the random characters real CloudFormation ends one with.
 

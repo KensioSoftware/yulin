@@ -2881,8 +2881,8 @@ console.log(queueName); // "orders-stack-OrdersQueue-1dca4dbe253b"
 Each service caps how long a name may be. Where the stack name and the logical ID are too long
 together, thirteen characters of the limit are kept for the tail and its hyphen, and what is left is
 shared between the two parts either side of one more hyphen. The stack name rounds up, and each part
-takes the characters the other leaves. A 64 character limit trims a long stack name to 25 characters
-and a long logical ID to 25.
+takes the characters the other leaves. Where a service allows 64 characters, a long stack name keeps
+25 of them and a long logical ID keeps 25.
 
 The trimmed stack name is what an IAM policy scoped by name prefix matches. A stack called
 `ChineseboostAnalyticsStack` deploying an unnamed `AWS::Events::Rule` puts the rule under
