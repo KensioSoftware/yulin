@@ -227,12 +227,12 @@ a miss alone, the way CloudFront runs it. Which of the two origin events run on 
 Origin stage's own business, since an `origin-request` function answering with a response of its own
 leaves the Origin unread and nothing for `origin-response` to run on.
 
-`simCfCacheableKey` decides whether a request has a key at all. Four things leave it without one.
-Caching may be off for the `SimAws`. The Behavior's `cachePolicyId` may resolve to no policy this
-simulation holds, which covers a Behavior naming none. The policy it resolves to may have a `MaxTTL`
-of zero, which counts as caching nothing. That is the `MaxTTL` `CachingDisabled` carries, and it
-keeps that Behavior reading the Origin every time. And the method may be outside the Behavior's
-`cachedMethods`. Nothing expires yet, and the other two TTLs decide nothing.
+`simCfCacheableRequest` decides whether a request has a key at all, and answers with the policy
+beside it. Four things leave a request without a key. Caching may be off for the `SimAws`. The
+Behavior's `cachePolicyId` may resolve to no policy this simulation holds, which covers a Behavior
+naming none. The policy it resolves to may have a `MaxTTL` of zero, which counts as caching nothing.
+That is the `MaxTTL` `CachingDisabled` carries, and it keeps that Behavior reading the Origin every
+time. And the method may be outside the Behavior's `cachedMethods`.
 
 `simCfCacheEntryKey` builds the key from the request path, the query strings, headers and cookies
 the policy names, the normalized `Accept-Encoding` where the policy enables gzip or brotli, the
@@ -244,14 +244,30 @@ no body.
 and two viewers each need one, so storing hands back a new Response built from what was stored, and
 the pipeline carries on with that. A status HTTP gives no body is rebuilt without one.
 
+`simCfCacheTtlSec` settles how long an entry lives. It reads the Origin's `Cache-Control` through
+`simCfCacheControl`, preferring `s-maxage` to `max-age` and `max-age` to `Expires`, and holds the
+answer between the policy's `MinTTL` and `MaxTTL`. An Origin that asked for nothing gets the greater
+of `MinTTL` and `DefaultTTL`. `no-store`, `no-cache` and `private` are respected where `MinTTL` is
+zero. Where it is higher the floor overrides them, and the AWS
+[expiration documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html)
+carries a warning about that under its table.
+
+An entry records the instant it expires, off the Distribution's clock. `read` drops one that has
+reached that instant, and the request goes to the Origin. What the Origin answers then takes the
+expired entry's place. A test reaches the moment an object goes stale with
+`simAws.clock().advanceBy()`.
+
+`store` takes its seconds from the caller. That is what holds an Origin's answer for as long as its
+cache policy allows, and it leaves room for an error to be held for its own `ErrorCachingMinTTL`.
+
 `simCfRequestEdge` reads `x-sim-aws-cloudfront-edge` and takes it off the request, at the top of the
 pipeline before the web ACL. The name follows the `x-sim-aws-*` convention. The header is
 deliberately outside `simAwsControlHeaderNames`, whose members the HTTP boundary strips before a
 controller sees them. This one has to survive as far as CloudFront.
 
 The response headers policy is applied after the content stage. A policy change therefore takes
-effect on entries already stored. An Origin error is left unstored. Caching one with no expiry
-would have the Distribution answering with it for the length of the test.
+effect on entries already stored. An Origin error is left unstored. Real CloudFront holds one for
+the `ErrorCachingMinTTL` its custom error response carries, and nothing here reads that yet.
 
 Caching is on. `SimCloudFrontRegistry` holds the flag, one registry per `SimAws` across every
 Account and Region, and `SimCloudFront.configureCaching` is how a test turns it off.
