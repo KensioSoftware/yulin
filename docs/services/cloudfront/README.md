@@ -1009,7 +1009,13 @@ A `viewer-response` Function runs for an Origin status below 400. CloudFront ski
 viewer-response event once the Origin has answered 400 or higher (see
 [Limitations](#limitations)), and so does this simulation.
 
-Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
+Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`, or
+[CloudFormation bindings](https://yulinsim.dev/services/cloudformation/#cloudfront-function-bindings "CloudFront Function bindings usage docs")
+to back a template Resource with one. A handler reference is what to reach for first. It stops on a
+breakpoint and can close over the test's own state. Publish the source itself where the test is
+about the code the Distribution carries, down to the 10 KB it has to fit in. A
+[Lambda@Edge](#simulated-lambdaedge) function is an ordinary simulated Lambda function, and the same
+choice covers it.
 
 The `host` header a function sees is the hostname the request was made to CloudFront with, being the
 Distribution domain name or one of its alternate domain names. Requests served on localhost arrive

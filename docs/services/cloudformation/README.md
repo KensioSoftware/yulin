@@ -1864,9 +1864,14 @@ CloudFront hostname adapted to the local server.
 
 ## CloudFront Function bindings
 
-When a CDK template contains a CloudFront Function, you can bind the template resource to a real
-local handler function. This lets local integration tests execute the same handler function that
-will run at the CloudFront edge.
+A `bindings` entry backs an executable Resource of the template with a real in-process handler.
+`AWS::CloudFront::Function` and `AWS::Lambda::Function` both take one, and a binding is what to
+reach for first. The bound handler stops on a breakpoint and can close over the test's own state.
+Deploy without one where the test is about the code the template carries. That is the artefact a
+deployment runs.
+
+Binding a CloudFront Function a CDK template declares lets a local integration test run the same
+handler function that will run at the CloudFront edge.
 
 ```typescript sim-cloudformation-cloudfront-function-binding
 /**
@@ -1942,9 +1947,8 @@ to provide an executable local function directly.
 ## Lambda function bindings
 
 `AWS::Lambda::Function` resources support the same bindings. The deployed function is backed by your
-real in-process handler. Tests can close over test state and step through the handler in a debugger,
-while the stack still wires roles, grants and references as the template declares. A bound function
-may omit template `Code` and `Handler` entirely.
+real in-process handler, while the stack still wires roles, grants and references as the template
+declares. A bound function may omit template `Code` and `Handler` entirely.
 
 ```typescript sim-cloudformation-lambda-binding
 /**

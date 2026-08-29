@@ -84,6 +84,13 @@ The invoke call itself returns normally.
 
 ## Zip-packaged code and the vm runtime
 
+A real in-process handler is the one to reach for first. `makeLambdaZipFileInput(...)` backs a
+function created through the SDK with one, and an [executable binding](#executable-bindings) backs
+one a template declares. The handler stops on a breakpoint and can close over the test's own state.
+Run the packaged code where the test is about the bundle a deployment ships, its imports and its
+bundling included. Both paths invoke through simulated Lambda, and simulated IAM authorizes the
+handler's own AWS calls under the execution role either way.
+
 Real Lambda receives function code as a zip archive. `makeLambdaCodeZip(...)` builds real zip
 bytes from a source string (which becomes a single `index.js` module) or from a files map keyed by
 archive path (like a bundled deployment package). The archive runs in a Node.js `vm` context with
