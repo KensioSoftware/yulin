@@ -28,7 +28,7 @@ export function simCloudFrontDistributionView(
     ARN: simCloudFrontDistributionArn(distribution),
     Status: distribution.status,
     LastModifiedTime: distribution.lastModifiedTime,
-    InProgressInvalidationBatches: 0,
+    InProgressInvalidationBatches: distribution.invalidations.inProgressCount,
     DomainName: `${distribution.distributionId.toLowerCase()}.cloudfront.net`,
     DistributionConfig: distribution.distributionConfig,
   };

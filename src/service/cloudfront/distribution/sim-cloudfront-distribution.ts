@@ -12,6 +12,7 @@ import type { SimCloudFrontDistributionConfig } from "../command/create-distribu
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { SimCloudFrontDistributionNotDisabled } from "../error/sim-cloudfront.error.js";
 import { SimCfDistributionCache } from "../cache/sim-cf-distribution-cache.js";
+import { SimCfInvalidations } from "../invalidation/sim-cf-invalidations.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,
@@ -56,6 +57,15 @@ export class SimCloudFrontDistribution {
    * configuration is served until it expires or something removes it.
    */
   public readonly cache: SimCfDistributionCache;
+
+  /**
+   * The invalidations this Distribution has been asked for.
+   *
+   * They outlive a configuration update, as the cache does, since an
+   * invalidation is a record of what was cleared rather than part of the
+   * Distribution's configuration.
+   */
+  public readonly invalidations = new SimCfInvalidations();
 
   #status: SimCloudFrontDistributionStatus;
   #distributionConfig: SimCloudFrontDistributionConfig | undefined;

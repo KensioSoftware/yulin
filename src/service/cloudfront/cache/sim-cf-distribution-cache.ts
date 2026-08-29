@@ -1,4 +1,6 @@
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+import { simCfInvalidationBatchCovers } from "../invalidation/sim-cf-invalidation-path.js";
+import { simCfCacheEntryKeyPath } from "./sim-cf-cache-entry-key-path.js";
 
 /**
  * A response as a Distribution holds it, rather than as a stream something has
@@ -40,11 +42,14 @@ const bodylessStatuses = new Set([101, 103, 204, 205, 304]);
  * per Distribution, which the edge in the key stands for. One cache holds an
  * entry per edge, and a request arriving at another edge misses.
  *
- * An entry expires on the simulation's clock rather than the host's. A test
- * reaches the instant an object goes stale by advancing simulated time, with no
- * waiting. Storing takes its seconds from the caller. An Origin's answer is held
- * for what its cache policy allows, and an error's own `ErrorCachingMinTTL`
- * fits the same call.
+ * An entry leaves the cache two ways. It expires on the simulation's clock
+ * rather than the host's. A test reaches the instant an object goes stale by
+ * advancing simulated time, with no waiting. Or an invalidation clears it ahead
+ * of that instant.
+ *
+ * Storing takes its seconds from the caller. An Origin's answer is held for
+ * what its cache policy allows, and an error's own `ErrorCachingMinTTL` fits
+ * the same call.
  */
 export class SimCfDistributionCache {
   private readonly entries = new Map<string, SimCfCachedResponse>();
@@ -111,6 +116,25 @@ export class SimCfDistributionCache {
     this.entries.set(key, entry);
 
     return cachedResponse(entry);
+  }
+
+  /**
+   * Forget every entry an invalidation's paths name, at every edge.
+   *
+   * The path an entry was cached under is read back out of its key, so
+   * matching a batch costs a pass over the keys rather than a second map from
+   * path to entry. Nothing here is keyed on the edge, because an invalidation
+   * reaches every point of presence rather than the one a viewer happened to
+   * arrive at.
+   */
+  clearPaths(paths: readonly string[]): void {
+    for (const key of this.entries.keys()) {
+      const path = simCfCacheEntryKeyPath(key);
+
+      if (path !== undefined && simCfInvalidationBatchCovers(paths, path)) {
+        this.entries.delete(key);
+      }
+    }
   }
 }
 

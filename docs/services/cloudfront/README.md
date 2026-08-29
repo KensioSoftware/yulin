@@ -2653,6 +2653,188 @@ therefore serves what it already holds under the new one, with no invalidation.
 in one `SimAws`, across every Account and Region. Caching is on by default, as CloudFront's is. A
 suite that repeats a request and wants each one to reach the Origin can turn it off in setup.
 
+## Invalidations
+
+`CreateInvalidation` clears what a Distribution has cached. The next request for a cleared path
+reaches the Origin. This is the step a deploy takes once it has published new files, and it decides
+whether anyone sees them.
+
+```typescript sim-cloudfront-invalidation
+/**
+ * Clearing what a Distribution has cached, and reading the invalidation back.
+ */
+
+import {
+  CreateDistributionCommand,
+  CreateInvalidationCommand,
+  GetInvalidationCommand,
+  ListInvalidationsCommand,
+} from "@aws-sdk/client-cloudfront";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.s3();
+
+  await simS3.createBucket(
+    new CreateBucketCommand({ Bucket: "release-bucket" }),
+  );
+  await simS3.putPublicAccessBlock(
+    new PutPublicAccessBlockCommand({
+      Bucket: "release-bucket",
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        IgnorePublicAcls: true,
+      },
+    }),
+  );
+  await simS3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "release-bucket",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::release-bucket/*",
+        },
+      }),
+    }),
+  );
+
+  const publish = async (body: string): Promise<void> => {
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "release-bucket",
+        Key: "index.html",
+        ContentType: "text/html",
+        Body: body,
+      }),
+    );
+  };
+
+  await publish("<h1>First</h1>");
+
+  const simCloudFront = simAws.cloudFront();
+  const distributionCreation = await simCloudFront.createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "released-site",
+        Comment: "Released site",
+        Enabled: true,
+        DefaultRootObject: "index.html",
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "site-origin",
+              DomainName: "release-bucket.s3.amazonaws.com",
+              S3OriginConfig: { OriginAccessIdentity: "" },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          // CachingOptimized, one of CloudFront's managed policies.
+          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6",
+        },
+      },
+    }),
+  );
+
+  const distributionId = distributionCreation.Distribution!.Id!;
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
+  const home = srv.localUrl(`http://${distroHostname}/`);
+
+  const first = await fetch(home);
+  console.log(await first.text()); // <h1>First</h1>
+
+  // The deploy publishes a new page, which the Distribution is still holding
+  // the old version of.
+  await publish("<h1>Second</h1>");
+
+  const stale = await fetch(home);
+  console.log(await stale.text()); // <h1>First</h1>
+
+  const creation = await simCloudFront.createInvalidation(
+    new CreateInvalidationCommand({
+      DistributionId: distributionId,
+      InvalidationBatch: {
+        CallerReference: "deployment-1",
+        Paths: { Quantity: 1, Items: ["/*"] },
+      },
+    }),
+  );
+
+  console.log(creation.Invalidation!.Status); // InProgress
+
+  const released = await fetch(home);
+  console.log(await released.text()); // <h1>Second</h1>
+
+  // The invalidation finishes on the background scheduler.
+  await simAws.backgroundTasksComplete();
+
+  const invalidation = await simCloudFront.getInvalidation(
+    new GetInvalidationCommand({
+      DistributionId: distributionId,
+      Id: creation.Invalidation!.Id,
+    }),
+  );
+
+  console.log(invalidation.Invalidation!.Status); // Completed
+
+  const listing = await simCloudFront.listInvalidations(
+    new ListInvalidationsCommand({ DistributionId: distributionId }),
+  );
+
+  console.log(listing.InvalidationList!.Quantity); // 1
+} finally {
+  await srv.close();
+}
+```
+
+### The paths a batch names
+
+A path names one object. A path ending in a wildcard names everything below what comes before it.
+`/images/*` clears the images and leaves `/index.html` where it was, and `/*` clears everything the
+Distribution holds. A path arriving without its leading slash is read as though it had one. The
+bare `*` a console user types is the same batch as `/*`.
+
+An invalidation reaches every edge. A page cached at three points of presence is cleared at all
+three, whichever edge the requests that filled them arrived at.
+
+The entries go as the invalidation is created. Real CloudFront clears each point of presence over
+the following seconds, and a test waiting for that before asking again would be waiting on the
+simulator.
+
+### Reading an invalidation back
+
+An invalidation starts `InProgress` and reaches `Completed` on the background scheduler, the way a
+Distribution reaches `Deployed`. `GetDistribution` counts the running ones as
+`InProgressInvalidationBatches`.
+
+`GetInvalidation` answers with the batch of paths the invalidation was created from.
+`ListInvalidations` answers with the Distribution's whole list, most recently created first. An
+invalidation ID the Distribution has never held is `NoSuchInvalidation`.
+
+### Repeating a batch
+
+`CallerReference` makes a batch idempotent. Sending one twice with the same paths answers with the
+invalidation that reference already created, and clears nothing a second time. Sending it with
+different paths is `InvalidationBatchAlreadyExists`.
+
 ## Origin request policies
 
 An origin request policy decides which of the viewer's headers, cookies and query strings a cache
@@ -3406,6 +3588,8 @@ Sim CloudFront currently supports:
 - `AWS::CloudFront::CachePolicy`, and a Behavior's `CachePolicyId` read back through `GetDistribution`
 - A cache on each Distribution, keyed on the Behavior's cache policy and on the edge the request
   arrived at, expiring on the simulation's clock
+- `CreateInvalidationCommand`, `GetInvalidationCommand` and `ListInvalidationsCommand`, clearing
+  what a Distribution holds and reading the batches back
 - `AWS::CloudFront::OriginRequestPolicy`, and a Behavior's `OriginRequestPolicyId` read back the
   same way
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
@@ -3427,8 +3611,11 @@ Where sim CloudFront knowingly behaves differently from AWS:
   what it holds. Here the expired entry is dropped and the Origin's next answer replaces it.
   `Stale-While-Revalidate` and `Stale-If-Error` are read as no directive at all. Nothing stale is
   ever served.
-- **A cached entry stays until it expires.** Nothing evicts one to make room, there is no
-  invalidation, and a response carries no `X-Cache` or `Age` header.
+- **A cached entry stays until it expires or an invalidation clears it.** Nothing evicts one to make
+  room, and the response carries no `X-Cache` or `Age` header.
+- **An invalidation listing is never paged.** `ListInvalidations` echoes the `Marker` and `MaxItems`
+  it was sent and answers with every invalidation the Distribution holds. `IsTruncated` is always
+  false and no `NextMarker` comes back. Real CloudFront pages at 100.
 - **A Behavior with no cache policy caches nothing.** Real CloudFront falls back to the legacy
   `ForwardedValues` and the TTLs beside it, and sim CloudFront skips both. Give the Behavior a
   `CachePolicyId`, as CDK and the console both do.

@@ -1,8 +1,9 @@
-import { assertIdentical, assertTrue } from "@kensio/smartass";
+import { assertIdentical, assertTrue, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimCloudFrontCacheKey } from "../cache-policy/sim-cf-cache-key.js";
 import { simCfCacheEntryKey } from "./sim-cf-cache-entry-key.js";
+import { simCfCacheEntryKeyPath } from "./sim-cf-cache-entry-key-path.js";
 
 const edgeId = "default";
 const site = "https://d111111abcdef8.cloudfront.net";
@@ -189,6 +190,25 @@ describe("A sim CloudFront cache key", () => {
       keyFor("/one.html", new SimCloudFrontCacheKey(), { method: "HEAD" }) !==
         keyFor("/one.html"),
     );
+  });
+
+  it("carries the path back out of the key", () => {
+    // Given a request keyed under a path.
+    // When the path is read back out of the key.
+    // Then it is the one the request asked for, which is what an
+    // invalidation matches against.
+    assertIdentical(
+      simCfCacheEntryKeyPath(keyFor("/images/logo.png")),
+      "/images/logo.png",
+    );
+  });
+
+  it("carries no path out of something that is not a key", () => {
+    // Given JSON that is not one of these keys.
+    // When a path is read out of it.
+    // Then there is none, so an invalidation leaves the entry alone.
+    assertUndefined(simCfCacheEntryKeyPath(JSON.stringify("not-a-key")));
+    assertUndefined(simCfCacheEntryKeyPath(JSON.stringify([1, 2, 3])));
   });
 
   it("keys two edges apart", () => {

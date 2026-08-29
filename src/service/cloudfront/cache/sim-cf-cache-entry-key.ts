@@ -28,6 +28,9 @@ interface SimCfCacheEntryKeyProperties {
  * only in something the policy leaves out share one entry, which is the whole
  * point of a cache key.
  *
+ * The path sits third in the key, which `simCfCacheEntryKeyPath` reads it back
+ * out of when an invalidation matches an entry.
+ *
  * The method is part of the key here because a HEAD response carries no body
  * and a GET response does, so serving one from the other would answer with the
  * wrong thing.
