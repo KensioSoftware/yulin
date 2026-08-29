@@ -33,6 +33,7 @@ import type { SimCreateStackCommandOutput } from "../command/create-stack/create
 import { CreateStackCommandHandler } from "../command/create-stack/create-stack.handler.js";
 import { faker } from "@faker-js/faker";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
+import type { SimCfnResourceOrder } from "../stack/deploy/sim-cfn-resource-order.js";
 
 export interface SimCloudFormationCreateStackProperties {
   readonly stackName?: SimCloudFormationStackName | string;
@@ -49,6 +50,17 @@ export interface SimCloudFormationCreateStackProperties {
    * policy denying an Account's root principal then denies.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The order Resources with no dependency between them are created in.
+   *
+   * CloudFormation is free to create them either way round, and the template's
+   * own order is what a deployment does by default. `reversed` starts each
+   * dependency batch from its last Resource, so a Stack that only deploys in
+   * the order its template happens to be written fails here rather than in the
+   * account. Declared dependencies and `DependsOn` are honoured either way.
+   */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
   /**
    * The synthesized CDK template file this in-memory template stands in for.
@@ -126,6 +138,7 @@ export class SimCloudFormationTemplateDeployer {
       parameters: properties.parameters,
       bindings: properties.bindings,
       caller: properties.caller,
+      resourceOrder: properties.resourceOrder,
       cdkOutContext: await cdkOutContextForTemplatePath(
         properties.templatePath,
       ),
@@ -188,31 +201,10 @@ export class SimCloudFormationTemplateDeployer {
     this.watches.stopAll();
   }
 
-  private async deployTemplateWithContext(properties: {
-    readonly stackName: SimCloudFormationStackName | string;
-    readonly template: CfnTemplateBodyRecord;
-    readonly parameters?: Record<string, string> | undefined;
-    readonly bindings?: readonly SimCfnBinding[] | undefined;
-    readonly caller?: SimAwsCaller | undefined;
-    readonly cdkOutContext?: SimCdkOutContext | undefined;
-  }): Promise<SimCfnDeployedStack> {
-    await this.createStackWithContext(
-      {
-        input: {
-          StackName: properties.stackName,
-          TemplateBody: jsonStringify(properties.template),
-          Parameters: Object.entries(properties.parameters ?? {}).map(
-            ([parameterKey, parameterValue]) => ({
-              ParameterKey: parameterKey,
-              ParameterValue: parameterValue,
-            }),
-          ),
-        },
-      },
-      properties.cdkOutContext,
-      properties.bindings,
-      properties.caller,
-    );
+  private async deployTemplateWithContext(
+    properties: SimCfnTemplateDeployment,
+  ): Promise<SimCfnDeployedStack> {
+    await this.createStackWithContext(properties);
 
     const stack = this.stacks.get(
       properties.stackName as SimCloudFormationStackName,
@@ -228,33 +220,44 @@ export class SimCloudFormationTemplateDeployer {
   }
 
   private async createStackWithContext(
-    command: {
-      readonly input: {
-        readonly StackName: SimCloudFormationStackName | string;
-        readonly TemplateBody: string;
-        readonly Parameters: readonly {
-          readonly ParameterKey: string;
-          readonly ParameterValue: string;
-        }[];
-      };
-    },
-    cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnBinding[],
-    caller?: SimAwsCaller,
+    deployment: SimCfnTemplateDeployment,
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
-      cdkOutContext,
-      bindings,
-      caller,
+      cdkOutContext: deployment.cdkOutContext,
+      bindings: deployment.bindings,
+      caller: deployment.caller,
+      resourceOrder: deployment.resourceOrder,
       exports: this.exports,
     });
 
-    return await handler.handle(command);
+    return await handler.handle({
+      input: {
+        StackName: deployment.stackName,
+        TemplateBody: jsonStringify(deployment.template),
+        Parameters: Object.entries(deployment.parameters ?? {}).map(
+          ([parameterKey, parameterValue]) => ({
+            ParameterKey: parameterKey,
+            ParameterValue: parameterValue,
+          }),
+        ),
+      },
+    });
   }
+}
+
+/** One template on its way into a Stack, with everything it deploys with. */
+interface SimCfnTemplateDeployment {
+  readonly stackName: SimCloudFormationStackName | string;
+  readonly template: CfnTemplateBodyRecord;
+  readonly parameters?: Record<string, string> | undefined;
+  readonly bindings?: readonly SimCfnBinding[] | undefined;
+  readonly caller?: SimAwsCaller | undefined;
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
 /**

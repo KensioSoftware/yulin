@@ -7,6 +7,7 @@ import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
+import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -56,6 +57,12 @@ export interface SimCloudFormationStackProperties {
    * simulation.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The order this Stack starts Resources with no dependency between them in.
+   * The template's own order unless the deployment asked for another one.
+   */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
   /**
    * The export names published in the Account and Region this Stack deploys

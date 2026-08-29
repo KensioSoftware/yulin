@@ -4,6 +4,7 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCfnDeployedStack } from "../stack/sim-cfn-deployed-stack.type.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateFileTransform } from "./sim-cfn-template-file-transform.js";
+import type { SimCfnResourceOrder } from "../stack/deploy/sim-cfn-resource-order.js";
 
 /**
  * Adapts one Stack's parsed template, with the Stacks the same call has already
@@ -39,6 +40,12 @@ export interface SimCfnCdkOutStackOptions {
    * application Stack deployed by another is what this is for.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The order this Stack creates Resources with no dependency between them in,
+   * where the assembly's own order is not the right one for it.
+   */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
   readonly transform?: SimCfnCdkOutTemplateTransform | undefined;
 }

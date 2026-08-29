@@ -1086,6 +1086,72 @@ await stack.waitForDeployComplete();
 Resources that reference another resource with `Ref` are also created after the referenced resource
 is ready.
 
+### The order independent Resources are created in
+
+Resources with no dependency between them are created together, and the template's own order
+decides which one starts first. CloudFormation is free to pick either. A Stack that deploys only
+because of the order its template happens to be written in passes here and then fails in the
+account.
+
+The pair that costs a real deployment is an `AWS::IAM::Policy` widening the deploy Role and a
+Resource in the service that widening allows. Declare the policy first and the deployment succeeds.
+Declare the Topic first and it fails on `sns:CreateTopic`. Both templates are the same template.
+
+`resourceOrder: "reversed"` starts each dependency batch from its last Resource.
+
+```typescript sim-cloudformation-resource-order
+/**
+ * Deploying a template in the order CloudFormation could have picked instead.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "alerts-stack",
+  template: {
+    Resources: {
+      DeployerSns: {
+        Type: "AWS::IAM::Policy",
+        Properties: {
+          PolicyName: "DeployerSns",
+          Roles: ["cdk-deploy-role"],
+          PolicyDocument: {
+            Version: "2012-10-17",
+            Statement: { Effect: "Allow", Action: "sns:*", Resource: "*" },
+          },
+        },
+      },
+      Alerts: {
+        Type: "AWS::SNS::Topic",
+        DependsOn: "DeployerSns",
+        Properties: { TopicName: "alerts" },
+      },
+    },
+  },
+  caller: {
+    kind: "arn",
+    arn: "arn:aws:iam::123456789012:role/cdk-deploy-role",
+  },
+  resourceOrder: "reversed",
+});
+
+console.log(stack.getResource("Alerts")?.status); // "CREATE_COMPLETE"
+```
+
+Declared dependencies hold under either order. A Resource waits for everything its `Ref` and
+`Fn::GetAtt` expressions reach, and for everything its `DependsOn` names. Reversing a batch moves
+only the Resources CloudFormation was free to create either way round (the `DependsOn` above is what
+keeps the Topic behind the policy).
+
+Reversing one order gives the other one. Run a deployment both ways to cover the pair, since the
+template's own order is one of the two and `"reversed"` is the other. The default is `"template"`,
+which every deployment that asks for nothing gets.
+
+`deployTemplateFile(...)` takes the option too. `deployCdkOut(...)` takes one order for every Stack
+in the assembly, and a Stack named in `stackOptions` carries its own.
+
 ## Deploying synthesized CDK templates
 
 Use `deployTemplateFile(...)` to deploy a template file, including the JSON templates CDK synthesis

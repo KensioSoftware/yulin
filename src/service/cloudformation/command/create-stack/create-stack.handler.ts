@@ -22,6 +22,7 @@ import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-paramet
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
+import type { SimCfnResourceOrder } from "../../stack/deploy/sim-cfn-resource-order.js";
 
 interface CreateStackCommandHandlerProperties {
   readonly simAws: SimAws;
@@ -33,6 +34,9 @@ interface CreateStackCommandHandlerProperties {
 
   /** The principal the Stack's Resources are created as. */
   readonly caller?: SimAwsCaller | undefined;
+
+  /** The order Resources with no dependency between them are started in. */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
   readonly exports?: SimCfnExports | undefined;
 }
@@ -53,6 +57,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
   private readonly caller: SimAwsCaller | undefined;
+  private readonly resourceOrder: SimCfnResourceOrder | undefined;
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: CreateStackCommandHandlerProperties) {
@@ -64,6 +69,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       cdkOutContext,
       bindings,
       caller,
+      resourceOrder,
       exports,
     } = properties;
 
@@ -74,6 +80,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
     this.caller = caller;
+    this.resourceOrder = resourceOrder;
     this.exports = exports;
   }
 
@@ -129,6 +136,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
       caller: this.caller,
+      resourceOrder: this.resourceOrder,
       exports: this.exports,
     });
 

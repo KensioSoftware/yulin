@@ -68,6 +68,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
       cdkOutContext,
       bindings,
       caller,
+      resourceOrder,
       exports,
     } = properties;
 
@@ -93,6 +94,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
       cdkOutContext,
       bindings,
       caller,
+      resourceOrder,
     });
     this.lifecycle = new SimCfnStackDeploymentLifecycle({
       background,

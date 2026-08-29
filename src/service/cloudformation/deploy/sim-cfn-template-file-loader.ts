@@ -16,6 +16,7 @@ import {
 } from "./sim-cfn-template-file-transform.js";
 import { readTemplateFile } from "./sim-cfn-template-file-read.js";
 import { parseTemplateFileBody } from "./sim-cfn-template-file-parse.js";
+import type { SimCfnResourceOrder } from "../stack/deploy/sim-cfn-resource-order.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
@@ -32,6 +33,17 @@ export interface SimCloudFormationDeployTemplateFileProperties {
    * policy denying an Account's root principal then denies.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The order Resources with no dependency between them are created in.
+   *
+   * CloudFormation is free to create them either way round, and the template's
+   * own order is what a deployment does by default. `reversed` starts each
+   * dependency batch from its last Resource, so a Stack that only deploys in
+   * the order its template happens to be written fails here rather than in the
+   * account. Declared dependencies and `DependsOn` are honoured either way.
+   */
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
   /**
    * Adapt the parsed template before it is deployed, and again every time a
@@ -69,6 +81,7 @@ export interface SimCfnLoadedTemplateFile {
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
   readonly caller?: SimAwsCaller | undefined;
+  readonly resourceOrder?: SimCfnResourceOrder | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
@@ -85,7 +98,8 @@ export class SimCfnTemplateFileLoader {
     properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnLoadedTemplateFile> {
     const deployment = simCfnTemplateFileDeployment(properties);
-    const { templatePath, parameters, bindings, caller } = deployment;
+    const { templatePath, parameters, bindings, caller, resourceOrder } =
+      deployment;
     const stackName =
       deployment.stackName ?? stackNameFromTemplatePath(templatePath);
 
@@ -108,6 +122,7 @@ export class SimCfnTemplateFileLoader {
       parameters,
       bindings,
       caller,
+      resourceOrder,
       cdkOutContext,
     };
   }
