@@ -1,6 +1,9 @@
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { SimEcrAuthorizer } from "./authorize/sim-ecr-authorizer.js";
 import { SimEcrCfnResourceFactory } from "./cfn/sim-ecr-cfn-resource-factory.js";
 import { SimEcrRegistry } from "./registry/sim-ecr-registry.js";
 import { SimEcrRepositoryAddress } from "./repository/sim-ecr-repository-address.js";
@@ -9,6 +12,7 @@ import { SimEcrRepositoryStore } from "./repository/sim-ecr-repository-store.js"
 
 interface SimEcrProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly registry?: SimEcrRegistry;
 }
 
@@ -25,10 +29,15 @@ interface SimEcrProperties {
  * Repositories are scoped to an account and region, as they are on real AWS:
  * a repository ARN names the region, and the registry host in an image URI
  * carries both the account and the region.
+ *
+ * Nothing a test does here is authorized, for the same reason. Naming a
+ * repository is the simulator's own accessor, and no principal makes that
+ * request. A CloudFormation deployment does make one, and a Stack making or
+ * removing a repository is decided by simulated IAM as the caller it named.
  */
 export class SimEcr {
   private readonly repositories: SimEcrRepositoryStore;
-  private readonly cfnFactory = new SimEcrCfnResourceFactory({ ecr: this });
+  private readonly cfnFactory: SimEcrCfnResourceFactory;
 
   constructor(properties: SimEcrProperties = {}) {
     const {
@@ -36,9 +45,15 @@ export class SimEcr {
       registry = new SimEcrRegistry(),
     } = properties;
 
-    this.repositories = new SimEcrRepositoryStore({
-      address: new SimEcrRepositoryAddress(accountRegionScope),
-      registry,
+    const address = new SimEcrRepositoryAddress(accountRegionScope);
+
+    this.repositories = new SimEcrRepositoryStore({ address, registry });
+    this.cfnFactory = new SimEcrCfnResourceFactory({
+      ecr: this,
+      authorizer: new SimEcrAuthorizer({
+        iam: simIamInRegion(properties.iam, accountRegionScope.regionName),
+        address,
+      }),
     });
   }
 

@@ -41,7 +41,10 @@ export class SimLogsCfnResourceDeleter {
   ): Promise<void> {
     switch (resourceTypeName) {
       case "LogGroup": {
-        this.#creators.logGroups.delete(created<SimLogsLogGroup>(resource));
+        await this.#creators.logGroups.delete(
+          created<SimLogsLogGroup>(resource),
+          options,
+        );
 
         return;
       }

@@ -65,7 +65,7 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
 
     switch (resourceTypeName) {
       case "LogGroup": {
-        return this.#logGroups.create(resource, values);
+        return await this.#logGroups.create(resource, values, options);
       }
       case "DeliverySource": {
         return await this.#deliverySources.create(resource, values, options);
