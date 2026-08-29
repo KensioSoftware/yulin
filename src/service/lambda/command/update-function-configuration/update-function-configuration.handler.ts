@@ -85,6 +85,7 @@ export class UpdateFunctionConfigurationCommandHandler implements CommandHandler
     const functionName = simLambdaUnqualifiedFunctionOf(name);
     this.authorizer.authorize(
       this.functions.functionArn(functionName),
+      update.roleArn,
       options?.caller,
     );
 

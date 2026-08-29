@@ -1,7 +1,12 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import {
+  SimIamPassRoleAuthorizer,
+  simIamPassRoleDenialMessage,
+} from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
 import { SimEcsAccessDeniedException } from "../../error/sim-ecs.error.js";
+import { simEcsTasksServicePrincipal } from "../../sim-ecs-service-principal.js";
 import type { SimEcsRequestOptions } from "../sim-ecs-request-options.js";
 
 /**
@@ -33,13 +38,37 @@ interface SimEcsAuthorizerProperties {
  * A denial is reported as ECS's own AccessDeniedException rather than the
  * shared IAM error, because that is the error a real ECS caller would have to
  * handle.
+ *
+ * A registration carrying a `taskRoleArn` or an `executionRoleArn` hands ECS
+ * Roles it runs the task as later, and each one is authorized as
+ * `iam:PassRole` against the Role itself.
  */
 export class SimEcsAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly callerIdentifier = new SimIamCallerIdentifier();
+  private readonly passRole: SimIamPassRoleAuthorizer;
 
   constructor(properties: SimEcsAuthorizerProperties) {
     this.iam = properties.iam;
+    this.passRole = new SimIamPassRoleAuthorizer({
+      iam: properties.iam,
+      passedToService: simEcsTasksServicePrincipal,
+      denied: (denial): Error =>
+        new SimEcsAccessDeniedException(simIamPassRoleDenialMessage(denial)),
+    });
+  }
+
+  /**
+   * Ensure the caller may hand ECS every Role a task definition names.
+   *
+   * Both Roles are optional on a registration, and one left out passes
+   * nothing.
+   */
+  authorizePassRole(
+    roleArns: readonly (string | undefined)[],
+    options?: SimEcsRequestOptions,
+  ): void {
+    this.passRole.authorizeAll(roleArns, options?.caller);
   }
 
   /**

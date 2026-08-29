@@ -94,6 +94,11 @@ types, and a handler class beside it.
 ListEventBuses goes through it, and it authorizes before looking the bus up, so a caller with no
 permission is refused for a bus that does not exist rather than told the bus is missing.
 
+`PutTargets` asks a second question through the shared `SimIamPassRoleAuthorizer`, whether the
+caller may hand EventBridge the `RoleArn` a target carries. An ECS target is the only one a `RoleArn`
+is read from, since a `RoleArn` on any other target is refused as unsimulated. The refusal is
+EventBridge's own `AccessDeniedException`.
+
 `SimEventBridgePutEvents` is the one with real behaviour in it, and most of that behaviour is about
 what fails and how:
 

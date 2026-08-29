@@ -21,6 +21,12 @@ export class SimFirehoseDirectPutSource {
   public readonly deliveryStreamType = "DirectPut" as const;
 
   /**
+   * The Role reading is done as, which a delivery stream taking puts has none
+   * of. It reads nothing, so there is nothing for a Role to read it as.
+   */
+  public readonly roleArn = undefined;
+
+  /**
    * Take a put, which is where this delivery stream's records come from.
    */
   requirePut(): void {

@@ -1646,6 +1646,10 @@ task definition revision it would run, `DescribeTasks` and `StopTask`, which tak
 and the service operations, which take the service's ARN. `CreateService` authorizes against the ARN
 the service is about to have, and a policy can therefore name one service by name before it exists.
 
+A registration carrying a `taskRoleArn` or an `executionRoleArn` hands ECS a Role it runs the task
+as, and `RegisterTaskDefinition` authorizes `iam:PassRole` against each of them. Either Role left out
+passes nothing. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
+
 ```typescript sim-ecs-iam-policy
 /**
  * A simulated IAM policy allowing a Role to register task definitions.
@@ -1783,7 +1787,8 @@ console.log(described.taskDefinition?.revision); // 1
 
 ## Available functionality
 
-- `RegisterTaskDefinitionCommand`, with revisions numbered per family from one
+- `RegisterTaskDefinitionCommand`, with revisions numbered per family from one, authorizing
+  `iam:PassRole` on the `taskRoleArn` and the `executionRoleArn` it names
 - `DeregisterTaskDefinitionCommand`, marking one revision `INACTIVE`
 - `DescribeTaskDefinitionCommand`, taking a family, a `family:revision` or a full ARN
 - `ListTaskDefinitionsCommand` and `ListTaskDefinitionFamiliesCommand`, with prefix, status and

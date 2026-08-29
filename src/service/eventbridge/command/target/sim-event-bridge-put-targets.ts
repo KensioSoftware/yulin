@@ -63,6 +63,8 @@ export class SimEventBridgePutTargets {
       refuseUnsimulatedTargetInput(target);
     }
 
+    this.access.authorizePassRole(requested, options);
+
     const added = requested.map((target) => SimEventTarget.of(target));
 
     refuseRepeatedTargetIds(added);

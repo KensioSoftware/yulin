@@ -921,6 +921,115 @@ action, resource, and caller for diagnostics, before the service mutates any sta
 caller defaults to the Account root. The Account root is allowed within its own Account, and a test
 that never mentions IAM keeps working.
 
+## Passing a Role to a service
+
+A simulated service handed a Role keeps it and uses it later, under its own identity. AWS asks two
+questions about that. The first is whether the caller may create the thing. The second is whether the
+caller may hand that Role over, and its resource is the Role.
+
+Six simulated services ask the second question. A caller allowed the create action and refused
+`iam:PassRole` fails the request with an access-denied error naming the Role and the caller. A scoped
+deployment role refused `iam:PassRole` is one of the commoner ways a real deployment stops, and a
+deployment through
+[simulated CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation usage docs")
+carries the same decision to every Resource it creates.
+
+| Request                                                | The Role it hands over                   | `iam:PassedToService`     |
+| ------------------------------------------------------ | ---------------------------------------- | ------------------------- |
+| Lambda `CreateFunction`, `UpdateFunctionConfiguration` | `Role`                                   | `lambda.amazonaws.com`    |
+| Scheduler `CreateSchedule`, `UpdateSchedule`           | `Target.RoleArn`                         | `scheduler.amazonaws.com` |
+| EventBridge `PutTargets`                               | a target's `RoleArn`                     | `events.amazonaws.com`    |
+| Step Functions `CreateStateMachine`                    | `roleArn`                                | `states.amazonaws.com`    |
+| ECS `RegisterTaskDefinition`                           | `taskRoleArn` and `executionRoleArn`     | `ecs-tasks.amazonaws.com` |
+| Firehose `CreateDeliveryStream`                        | the destination Role and the source Role | `firehose.amazonaws.com`  |
+
+Each Role is a separate decision, so a caller allowed one of an ECS task definition's two Roles is
+refused on the other. A request leaving an optional Role out passes nothing and is asked nothing.
+
+The condition key `iam:PassedToService` carries the service principal the Role goes to. A
+CDK-generated deployment policy commonly conditions its `iam:PassRole` statement on that key, and a
+policy written that way matches here.
+
+```typescript sim-iam-pass-role
+/**
+ * Authorizing the execution role a Lambda function is created with.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+const deployerCreation = await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "Deployer",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "cloudformation.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Deployer",
+    PolicyName: "DeployFunctions",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        { Effect: "Allow", Action: "lambda:CreateFunction", Resource: "*" },
+        {
+          Effect: "Allow",
+          Action: "iam:PassRole",
+          Resource: "arn:aws:iam::123456789012:role/ReportsExecutionRole",
+          Condition: {
+            StringEquals: { "iam:PassedToService": "lambda.amazonaws.com" },
+          },
+        },
+      ],
+    }),
+  }),
+);
+
+const asDeployer = {
+  caller: { kind: "arn", arn: deployerCreation.Role.Arn },
+} as const;
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "reports",
+    Role: "arn:aws:iam::123456789012:role/ReportsExecutionRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+  }),
+  asDeployer,
+);
+
+try {
+  await simAws.lambda().createFunction(
+    new CreateFunctionCommand({
+      FunctionName: "invoices",
+      Role: "arn:aws:iam::123456789012:role/AdminRole",
+      Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+    }),
+    asDeployer,
+  );
+} catch (error) {
+  console.error("Passing AdminRole to Lambda was refused", error);
+}
+
+await simAws.backgroundTasksComplete();
+```
+
+A request naming no caller is decided as the Account root, which may pass any Role. A test that never
+mentions IAM keeps working.
+
 ## CloudFormation IAM resources
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
@@ -1323,6 +1432,8 @@ Sim IAM currently supports:
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and policy conditions with explicit-deny precedence
 - IAM authorization at simulated service boundaries, such as Route53 actions
+- `iam:PassRole` authorization of a Role handed to simulated Lambda, Scheduler, EventBridge, Step
+  Functions, ECS or Firehose, with `iam:PassedToService` supplied
 - Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
   signature, defaulting to anonymous, and the resource it is made on behalf of from
   `x-sim-aws-source-arn` and `x-sim-aws-source-account`

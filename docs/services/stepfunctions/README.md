@@ -1250,6 +1250,13 @@ rooted at `$`, since the context object is read rather than written.
 `States.UUID` and `States.MathRandom` are left out on purpose. Both answer differently on every call.
 A test asserting on the output of a state machine that used one could only assert on its shape.
 
+## Passing the execution role
+
+A state machine keeps the `roleArn` it is created with and runs every execution as it, so
+`CreateStateMachine` authorizes `iam:PassRole` against that Role as well as `states:CreateStateMachine`
+against the state machine. A caller allowed to create state machines and refused `iam:PassRole` fails
+the creation. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
+
 ## Where this differs from real Step Functions
 
 - **`StartExecution` runs the execution as far as it goes before it answers.** Real Step Functions

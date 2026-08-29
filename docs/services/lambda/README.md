@@ -4,7 +4,10 @@ Yulin includes a simulated AWS Lambda service for tests and local development. F
 and invoked in-process and in memory, with no containers and no real AWS infrastructure.
 
 Handlers run with their execution role as the simulated caller, so AWS calls made inside a handler
-are authorized by simulated IAM, as on real Lambda.
+are authorized by simulated IAM, as on real Lambda. Creating a function and changing its role are
+authorized as well, both against `lambda:` actions and against `iam:PassRole` on the execution role
+the request names. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service)
+in the IAM docs.
 
 Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath. Real `LambdaClient`
 instances can be routed into sim Lambda with
@@ -3495,6 +3498,8 @@ Sim Lambda currently supports:
   event to a simulated SQS queue or SNS topic
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
+- `iam:PassRole` authorization of the execution role named by `CreateFunctionCommand` and
+  `UpdateFunctionConfigurationCommand`, with `iam:PassedToService` supplied
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
   resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
   control

@@ -1,6 +1,11 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import {
+  SimIamPassRoleAuthorizer,
+  simIamPassRoleDenialMessage,
+} from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
+import { simSchedulerServicePrincipal } from "../../delivery/sim-scheduler-delivery.js";
 import { SimSchedulerAccessDeniedException } from "../../error/sim-scheduler.error.js";
 import type { SimSchedulerRequestOptions } from "../sim-scheduler-request-options.js";
 
@@ -28,14 +33,37 @@ interface SimSchedulerAuthorizerProperties {
  * This is the caller's own authorization to manage schedules, and is a separate
  * question from whether a schedule's execution role may invoke its target. The
  * second is asked when the schedule fires, against the role rather than the
- * caller, which is why nothing about the target is consulted here.
+ * caller.
+ *
+ * A third question is asked here, about the same execution role. A schedule
+ * keeps the `Target.RoleArn` it is given and fires as it later, so the caller
+ * writing it needs `iam:PassRole` on that Role.
  */
 export class SimSchedulerAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly callerIdentifier = new SimIamCallerIdentifier();
+  private readonly passRole: SimIamPassRoleAuthorizer;
 
   constructor(properties: SimSchedulerAuthorizerProperties) {
     this.iam = properties.iam;
+    this.passRole = new SimIamPassRoleAuthorizer({
+      iam: properties.iam,
+      passedToService: simSchedulerServicePrincipal,
+      denied: (denial): Error =>
+        new SimSchedulerAccessDeniedException(
+          simIamPassRoleDenialMessage(denial),
+        ),
+    });
+  }
+
+  /**
+   * Ensure the caller may hand Scheduler a schedule's execution role.
+   */
+  authorizePassRole(
+    roleArn: string | undefined,
+    options?: SimSchedulerRequestOptions,
+  ): void {
+    this.passRole.authorize(roleArn, options?.caller);
   }
 
   /**

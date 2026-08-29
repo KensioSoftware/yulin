@@ -60,6 +60,7 @@ export class SimStateMachineCreate {
       read.name,
       options?.caller,
     );
+    this.#authorizer.authorizePassRole(read.roleArn, options?.caller);
 
     const existing = this.#stateMachines.findByName(read.name);
 

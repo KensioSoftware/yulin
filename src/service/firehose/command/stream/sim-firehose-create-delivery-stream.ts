@@ -70,11 +70,18 @@ export class SimFirehoseCreateDeliveryStream {
 
     const createdAt = this.background.now();
     const source = simFirehoseSourceOf(input, this.scope, createdAt);
+    const destination = simFirehoseDestinationOf(input);
+
+    this.access.authorizePassRole(
+      [destination.roleArn, source.roleArn],
+      options,
+    );
+
     const arn = simFirehoseDeliveryStreamArn(this.scope, name);
     const deliveryStream = new SimFirehoseDeliveryStream({
       name,
       arn,
-      destination: simFirehoseDestinationOf(input),
+      destination,
       source,
       createdAt,
     });

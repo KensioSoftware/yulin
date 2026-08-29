@@ -663,6 +663,12 @@ account-scoped simulated IAM implementation when constructed through `SimAws`
 direct standalone construction. The Function URL commands share one `FunctionUrlAuthorizer` taking
 the action as a constructor value, since only the action name varies between them.
 
+`CreateFunction` and `UpdateFunctionConfiguration` ask a second question through the shared
+`SimIamPassRoleAuthorizer`, whether the caller may hand Lambda the execution role the request names.
+The resource there is the Role, and `iam:PassedToService` carries `lambda.amazonaws.com`. The
+`lambda:` action is decided first, so a caller refused both is told about the one real Lambda tells
+them about first. An update leaving `Role` out passes nothing and asks nothing.
+
 `command/authorize/sim-lambda-service-invoke-authorizer.ts` answers the other question: whether
 another simulated service may invoke a function. The caller is a service principal, which owns no
 identity policies, so the function's resource policy is the whole decision. The calling service

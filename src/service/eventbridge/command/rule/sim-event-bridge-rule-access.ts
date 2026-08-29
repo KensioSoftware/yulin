@@ -23,6 +23,13 @@ interface SimEventBridgeRuleAccessProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
+/**
+ * The part of a target that names a Role.
+ */
+interface SimEventBridgeTargetRole {
+  readonly RoleArn?: string | undefined;
+}
+
 interface SimEventBridgeRuleRequest {
   readonly Name?: string | undefined;
   readonly EventBusName?: string | undefined;
@@ -71,6 +78,22 @@ export class SimEventBridgeRuleAccess {
     options?: SimEventBridgeRequestOptions,
   ): void {
     this.authorizer.authorizeBus(action, this.arnFor(requested), options);
+  }
+
+  /**
+   * Ensure the caller may hand EventBridge every Role a request names.
+   *
+   * A rule runs its targets as the Role each one carries, long after the
+   * request that put them there, so adding one is a hand-over of that Role.
+   */
+  authorizePassRole(
+    targets: readonly SimEventBridgeTargetRole[],
+    options?: SimEventBridgeRequestOptions,
+  ): void {
+    this.authorizer.authorizePassRole(
+      targets.map((target) => target.RoleArn),
+      options,
+    );
   }
 
   /**

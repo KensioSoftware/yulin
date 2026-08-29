@@ -111,4 +111,81 @@ describe("Lambda UpdateFunctionConfigurationCommand IAM authorization", () => {
 
     await simAws.backgroundTasksComplete();
   });
+  it("refuses an update handing Lambda a role the caller may not pass", async () => {
+    // Given a Role allowed to change any function's settings and not to pass
+    // a Role.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    await createOrdersFunction(simAws, accountId);
+    const roleArn = await createRole(simAws, accountId, "SettingsDeployer");
+
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SettingsDeployer",
+        PolicyName: "UpdateSettings",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "lambda:UpdateFunctionConfiguration",
+            Resource: "*",
+          },
+        }),
+      }),
+    );
+
+    // When it replaces the function's execution role.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.lambda().updateFunctionConfiguration(
+        new UpdateFunctionConfigurationCommand({
+          FunctionName: "orders",
+          Role: `arn:aws:iam::${accountId}:role/ReplacementRole`,
+        }),
+        { caller: { kind: "arn", arn: roleArn } },
+      ),
+    );
+
+    // Then the refusal is about the Role it tried to hand over.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertIdentical(error.action, "iam:PassRole");
+    assertIdentical(
+      error.resource,
+      `arn:aws:iam::${accountId}:role/ReplacementRole`,
+    );
+
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("asks nothing about a role an update leaves alone", async () => {
+    // Given the same Role, which may change settings and not pass a Role.
+    const accountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    await createOrdersFunction(simAws, accountId);
+    const roleArn = await createRole(simAws, accountId, "SettingsDeployer");
+
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SettingsDeployer",
+        PolicyName: "UpdateSettings",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "lambda:UpdateFunctionConfiguration",
+            Resource: "*",
+          },
+        }),
+      }),
+    );
+
+    // When it changes a setting without naming a role.
+    const updated = await simAws.lambda().updateFunctionConfiguration(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "orders",
+        Timeout: 5,
+      }),
+      { caller: { kind: "arn", arn: roleArn } },
+    );
+
+    // Then the request passed nothing, so nothing was asked about passing.
+    assertIdentical(updated.Timeout, 5);
+
+    await simAws.backgroundTasksComplete();
+  });
 });

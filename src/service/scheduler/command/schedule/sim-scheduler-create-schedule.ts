@@ -49,6 +49,7 @@ export class SimSchedulerCreateSchedule {
     const requested = this.access.requested(input);
 
     this.access.authorize("scheduler:CreateSchedule", requested, options);
+    this.access.authorizePassRole(input, options);
     this.access.requireGroup(requested.groupName);
 
     if (

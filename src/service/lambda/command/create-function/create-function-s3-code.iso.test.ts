@@ -117,8 +117,8 @@ describe("Lambda CreateFunctionCommand S3 code location", () => {
   });
 
   it("authorizes the code object fetch as the creating caller", async () => {
-    // Given a caller Role allowed to create functions but not to read the
-    // code object from sim S3.
+    // Given a caller Role allowed to create functions and to pass the
+    // execution role, but not to read the code object from sim S3.
     const simAws = new SimAws();
     const accountId = simAws.defaultAccountId;
     await putCodeZip(
@@ -150,7 +150,7 @@ describe("Lambda CreateFunctionCommand S3 code location", () => {
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Action: "lambda:CreateFunction",
+            Action: ["lambda:CreateFunction", "iam:PassRole"],
             Resource: "*",
           },
         }),
