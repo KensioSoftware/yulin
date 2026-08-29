@@ -1,7 +1,10 @@
 import { describe, it } from "vitest";
 import {
+  assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
+  assertUndefined,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import {
@@ -10,6 +13,7 @@ import {
 } from "@aws-sdk/client-cloudfront";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import type { SimCloudFrontCustomErrorResponse } from "../../custom-error/sim-cloudfront-custom-error-response.js";
 import {
   SimCloudFrontInvalidArgument,
   SimCloudFrontInvalidErrorCode,
@@ -44,6 +48,46 @@ async function refusedCustomErrorResponse(
         }),
       ),
   );
+}
+
+/**
+ * Create a Distribution carrying one custom error response, returning the rule
+ * it was configured with.
+ */
+async function configuredCustomErrorResponse(
+  customErrorResponse: CustomErrorResponse,
+): Promise<SimCloudFrontCustomErrorResponse> {
+  const simAws = new SimAws();
+  const creation = await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "custom-error-config",
+        Comment: "Custom error response config",
+        Enabled: true,
+        Origins: { Quantity: 0, Items: [] },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+        },
+        CustomErrorResponses: {
+          Quantity: 1,
+          Items: [customErrorResponse],
+        },
+      },
+    }),
+  );
+
+  assertNonNullable(creation.Distribution?.Id);
+
+  const distribution = simAws
+    .cloudFront()
+    .getSimDistributionById(creation.Distribution.Id);
+
+  assertNonNullable(distribution);
+  const [configured] = distribution.customErrorResponses;
+  assertNonNullable(configured);
+
+  return configured;
 }
 
 describe("Sim CloudFront custom error response configuration", () => {
@@ -138,5 +182,19 @@ describe("Sim CloudFront custom error response configuration", () => {
     // failing on the request that would serve the page.
     assertInstanceOf(error, SimCloudFrontInvalidResponseCode);
     assertStringIncludes(error.message, "204");
+  });
+
+  it("holds an error for ten seconds where the seconds are no number", async () => {
+    // Given a rule for a status the Distribution serves no page for, whose
+    // ErrorCachingMinTTL a template left empty.
+    const configured = await configuredCustomErrorResponse({
+      ErrorCode: 500,
+      ErrorCachingMinTTL: "" as unknown as number,
+    });
+
+    // Then CloudFront's own ten seconds stand in, and the rule is configured
+    // with no page.
+    assertIdentical(configured.errorCachingMinTtlSec, 10);
+    assertUndefined(configured.page);
   });
 });

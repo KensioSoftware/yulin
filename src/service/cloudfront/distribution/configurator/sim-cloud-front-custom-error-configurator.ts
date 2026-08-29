@@ -79,16 +79,20 @@ export class SimCloudFrontCustomErrorConfigurator {
    * How long the rule holds its error for, which CloudFront defaults to ten
    * seconds.
    *
-   * A value a template wrote as something other than a number falls back to
-   * the same default. The alternative would be a stack that fails to deploy
-   * over the seconds an error is held for.
+   * A template can write a number as a string, and that one is read as the
+   * seconds it spells. Anything else falls back to the default. The
+   * alternative would be a stack that fails to deploy over the seconds an
+   * error is held for.
    */
-  private errorCachingMinTtlSec(
-    errorCachingMinTtl: number | undefined,
-  ): number {
-    const seconds = Number(errorCachingMinTtl);
+  private errorCachingMinTtlSec(errorCachingMinTtl: unknown): number {
+    const seconds =
+      typeof errorCachingMinTtl === "string" && errorCachingMinTtl.trim() !== ""
+        ? Number(errorCachingMinTtl)
+        : errorCachingMinTtl;
 
-    return Number.isFinite(seconds) && seconds >= 0
+    return typeof seconds === "number" &&
+      Number.isFinite(seconds) &&
+      seconds >= 0
       ? seconds
       : simCloudFrontDefaultErrorCachingMinTtlSec;
   }
