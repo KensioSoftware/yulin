@@ -1,5 +1,6 @@
 import type { SimCloudFrontCachePolicy } from "../cache-policy/sim-cf-cache-policy.js";
 import { simCfCacheControl } from "./sim-cf-cache-control.js";
+import { simCfHttpDateInstant } from "./sim-cf-http-date.js";
 
 interface SimCfCacheTtlProperties {
   /** The response the Origin answered with, whose headers carry the ask. */
@@ -54,9 +55,9 @@ export function simCfCacheTtlSec(properties: SimCfCacheTtlProperties): number {
  * response carries no such header.
  *
  * A date already gone by counts as no seconds, which the policy's `MinTTL`
- * then raises where it has one. A value that is not a date counts the same
- * way, following RFC 9111, which reads an unparsable `Expires` as an object
- * that has already expired.
+ * then raises where it has one. A value that is not an HTTP date counts the
+ * same way, following RFC 9111, which reads an unparsable `Expires` as an
+ * object that has already expired.
  */
 function expiresTtlSec(response: Response, now: Date): number | undefined {
   const expires = response.headers.get("expires");
@@ -65,7 +66,7 @@ function expiresTtlSec(response: Response, now: Date): number | undefined {
     return undefined;
   }
 
-  const instant = Date.parse(expires);
+  const instant = simCfHttpDateInstant(expires.trim());
 
-  return Number.isNaN(instant) ? 0 : (instant - now.getTime()) / 1000;
+  return instant === undefined ? 0 : (instant - now.getTime()) / 1000;
 }

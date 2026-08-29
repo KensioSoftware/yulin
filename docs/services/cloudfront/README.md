@@ -2631,6 +2631,10 @@ AWS. `s-maxage` is preferred to `max-age`, and `max-age` to `Expires`. Whatever 
 is held between the policy's `MinTTL` and `MaxTTL`. An Origin that asks for nothing gets the greater
 of `MinTTL` and `DefaultTTL`, which is a day on `CachingOptimized`.
 
+An `Expires` header has to carry one of the three date formats HTTP allows. Anything else, a
+locale-formatted date included, is read as an object that expired already, the way any HTTP cache
+reads it.
+
 `no-store`, `no-cache` and `private` keep the answer out of the cache while the policy's `MinTTL` is
 zero. Where it is higher, the floor overrides the Origin and the answer is held for `MinTTL`
 seconds. That last one is CloudFront's own behaviour, and the
@@ -3554,10 +3558,6 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **A cache policy is recorded and never applied.** Sim CloudFront models no edge caching. A policy
-  holds its three TTLs and the whole of its cache key, and a Behavior's `CachePolicyId` is checked
-  against the policies this simulation holds and reported back. None of it decides anything. Every
-  request reaches the Origin, whatever the policy would have cached on real CloudFront.
 - **An origin request policy is recorded and never applied.** A Behavior's `OriginRequestPolicyId`
   is checked against the policies this simulation holds and reported back. Sim CloudFront forwards
   the viewer's headers, cookies and query string to the Origin whole, whatever the policy would

@@ -129,7 +129,7 @@ describe("How long a sim CloudFront Distribution holds an Origin's answer", () =
     );
   });
 
-  it("reads an Expires header that is not a date as already expired", () => {
+  it("reads an Expires header that is not an HTTP date as already expired", () => {
     // Given a policy that would otherwise hold the answer for a day.
     const policy = new SimCloudFrontCachePolicy({
       name: "BeaconPolicy",
@@ -141,6 +141,36 @@ describe("How long a sim CloudFront Distribution holds an Origin's answer", () =
     // Then the answer is held for no time. An Origin naming no expiry at all
     // would have got the default TTL.
     assertIdentical(heldForSec(policy, { expires: "0" }), 0);
+
+    // And a date in a format HTTP does not allow counts the same way, however
+    // far in the future JavaScript's own parser would put it.
+    assertIdentical(heldForSec(policy, { expires: "12/31/2099" }), 0);
+    assertIdentical(heldForSec(policy, { expires: "2026-08-29T13:00:00Z" }), 0);
+    assertIdentical(
+      heldForSec(policy, { expires: "Sat, 32 Aug 2026 13:00:00 GMT" }),
+      0,
+    );
+  });
+
+  it("reads the two obsolete HTTP date formats as GMT", () => {
+    // Given a policy that grants whatever an Origin asks for.
+    const policy = new SimCloudFrontCachePolicy({
+      name: "BeaconPolicy",
+      minTtlSec: 0,
+      defaultTtlSec: 86_400,
+      maxTtlSec: 86_400,
+    });
+
+    // Then an RFC 850 date an hour out is an hour, and so is an asctime one,
+    // which states no zone of its own.
+    assertIdentical(
+      heldForSec(policy, { expires: "Saturday, 29-Aug-26 13:00:00 GMT" }),
+      3600,
+    );
+    assertIdentical(
+      heldForSec(policy, { expires: "Sat Aug 29 13:00:00 2026" }),
+      3600,
+    );
   });
 
   it("caps an Expires header at the policy's MaxTTL", () => {
