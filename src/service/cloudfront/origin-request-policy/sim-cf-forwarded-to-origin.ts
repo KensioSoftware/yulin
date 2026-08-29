@@ -49,6 +49,21 @@ export class SimCfForwardedToOrigin {
   }
 
   /**
+   * Whether the cache policy keyed on compression, which is either of its two
+   * `EnableAcceptEncoding` flags.
+   *
+   * A policy that did decides the `Accept-Encoding` the Origin is asked for on
+   * its own. AWS says as much: a policy naming the header alongside these
+   * flags has no effect on the Origin request.
+   */
+  get keysOnCompression(): boolean {
+    return (
+      this.cacheKey.enableAcceptEncodingGzip ||
+      this.cacheKey.enableAcceptEncodingBrotli
+    );
+  }
+
+  /**
    * The `Accept-Encoding` CloudFront sends where the cache policy keyed on
    * compression, or none where it did not.
    *

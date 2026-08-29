@@ -213,6 +213,21 @@ describe("What a CloudFront custom Origin is sent", () => {
     assertIdentical(read.headers["user-agent"], "Mozilla/5.0");
   });
 
+  it("normalizes the compression an origin request policy also carries", async () => {
+    // Given a Behavior on CachingOptimized and AllViewer, which is a cache
+    // policy keying on compression under a policy forwarding the viewer's own
+    // `Accept-Encoding` as well.
+    const read = await originReads({
+      CachePolicyId: simCfManagedCachePolicyIds.cachingOptimized,
+      OriginRequestPolicyId: simCfManagedOriginRequestPolicyIds.allViewer,
+    });
+
+    // Then the cache policy decides the header on its own, and the viewer's
+    // `deflate` never reaches the Origin. AWS says a policy naming the header
+    // alongside those flags has no effect.
+    assertIdentical(read.headers["accept-encoding"], "gzip, br");
+  });
+
   it("asks the Origin for the compression the cache policy keyed on", async () => {
     // Given a Behavior on CachingOptimized, which caches an object compressed
     // and uncompressed apart.

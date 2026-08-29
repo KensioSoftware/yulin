@@ -128,19 +128,25 @@ function applyUserAgent(
 }
 
 /**
- * Ask the Origin for the compression the cache policy keyed on, where the
- * policies did not carry the viewer's own `Accept-Encoding`.
+ * Ask the Origin for the compression the cache policy keyed on.
+ *
+ * A cache policy that set either `EnableAcceptEncoding` flag decides this
+ * header on its own, and the normalized value replaces a viewer's own that an
+ * origin request policy carried. A policy that set neither leaves whatever the
+ * policies carried, which is the viewer's header or no header at all.
  */
 function applyAcceptEncoding(
   viewerHeaders: Headers,
   headers: Headers,
   forwarded: SimCfForwardedToOrigin,
 ): void {
-  if (headers.has("accept-encoding")) {
+  if (!forwarded.keysOnCompression) {
     return;
   }
 
   const acceptEncoding = forwarded.normalizedAcceptEncoding(viewerHeaders);
+
+  headers.delete("accept-encoding");
 
   if (acceptEncoding !== undefined) {
     headers.set("accept-encoding", acceptEncoding);

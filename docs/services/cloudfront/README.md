@@ -3131,8 +3131,10 @@ for it. CDK's `OriginRequestPolicy.ALL_VIEWER` and its seven siblings synthesize
 reaching for one deploys.
 
 Each also carries the three sections AWS publishes for it. A Behavior on `AllViewer` here sends the
-Origin everything the viewer sent, one on `CORS-CustomOrigin` sends the `Origin` header alone, and
-one on `AllViewerExceptHostHeader` sends everything else the viewer sent.
+Origin everything the viewer sent bar its `Host`, which is the Origin's own domain under every
+policy. One on `CORS-CustomOrigin` sends the `Origin` header alone. One on
+`AllViewerExceptHostHeader` sends what `AllViewer` sends, since the `Host` it withholds was never
+the viewer's here.
 
 The managed policies sit in CloudFront's own namespace. A template may create a policy called
 `AllViewer` of its own, and deleting that stack leaves the managed one where it was.
