@@ -1989,9 +1989,10 @@ console.log(new TextDecoder().decode(output.Payload));
 
 Bindings can target the CloudFormation logical ID (or the CDK construct ID recovered from
 synthesized metadata), the function name, or the function ARN. Bound handlers still run with the
-function's execution Role as the ambient simulated caller, so downstream calls made through
-`SimSdk`-intercepted clients are authorized by simulated IAM as on real Lambda. Functions without
-a matching binding keep their template code, running in the simulated vm runtime.
+function's execution Role as the ambient simulated caller. Simulated IAM authorizes their downstream
+calls as on real Lambda, whether those go through a `SimSdk`-intercepted client or straight to a
+simulated service. Functions without a matching binding keep their template code, running in the
+simulated vm runtime.
 
 ### Naming the binding type
 

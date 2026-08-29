@@ -4,6 +4,7 @@ import type {
   SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamCallerAccountResolver } from "../caller-account/sim-iam-caller-account-resolver.js";
 import { SimIamAuthZAllowRequirement } from "./sim-iam-auth-z-allow-requirement.js";
@@ -44,6 +45,11 @@ interface SimIamAuthZContextBuilderProperties {
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
 
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 
   /**
    * Resolves other Accounts' IAM in the same simulation, for the identity side
@@ -103,6 +109,7 @@ export class SimIamAuthZContextBuilder {
       ),
       credentialIdentityResolver: properties.credentialIdentityResolver,
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
     });
     this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies: properties.policies,

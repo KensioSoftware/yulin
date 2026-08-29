@@ -19,6 +19,7 @@ import { describe, it, vi } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
 const thumbnailerArn =
   "arn:aws:lambda:us-east-1:888888888888:function:thumbnailer";
@@ -168,11 +169,15 @@ describe("Delivering a simulated S3 event notification", () => {
     await simAws
       .s3()
       .createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+    const executionRole = await simIamRoleWithPolicyFactory.make(
+      { roleName: "ThumbnailerRole", actions: ["s3:PutObject"] },
+      simAws,
+    );
     let written = 0;
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
         FunctionName: "thumbnailer",
-        Role: "arn:aws:iam::888888888888:role/ThumbnailerRole",
+        Role: executionRole.Arn,
         Code: {
           ZipFile: makeLambdaZipFileInput(async () => {
             written += 1;

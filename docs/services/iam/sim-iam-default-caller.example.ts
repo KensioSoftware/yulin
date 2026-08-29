@@ -13,37 +13,37 @@ const simAws = new SimAws({
   },
 });
 
-// The Role is created as the Account root. A simulation with a default caller
-// attributes these commands to it, and it holds no policy until they are done.
-const root = simAws.account().rootPrincipal;
+// The Role is created inside a run as the Account root. A simulation with a
+// default caller attributes these commands to it, and it holds no policy until
+// they are done.
 const simIam = simAws.iam();
 
-await simIam.createRole(
-  new CreateRoleCommand({
-    RoleName: "Administrator",
-    AssumeRolePolicyDocument: JSON.stringify({
-      Version: "2012-10-17",
-      Statement: {
-        Effect: "Allow",
-        Principal: { AWS: "arn:aws:iam::123456789012:root" },
-        Action: "sts:AssumeRole",
-      },
+await simAws.runAs(simAws.account().rootPrincipal, async () => {
+  await simIam.createRole(
+    new CreateRoleCommand({
+      RoleName: "Administrator",
+      AssumeRolePolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: { AWS: "arn:aws:iam::123456789012:root" },
+          Action: "sts:AssumeRole",
+        },
+      }),
     }),
-  }),
-  { caller: root },
-);
+  );
 
-await simIam.putRolePolicy(
-  new PutRolePolicyCommand({
-    RoleName: "Administrator",
-    PolicyName: "Administer",
-    PolicyDocument: JSON.stringify({
-      Version: "2012-10-17",
-      Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+  await simIam.putRolePolicy(
+    new PutRolePolicyCommand({
+      RoleName: "Administrator",
+      PolicyName: "Administer",
+      PolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+      }),
     }),
-  }),
-  { caller: root },
-);
+  );
+});
 
 const decision = simAws.iam().authorize({
   action: "s3:GetObject",

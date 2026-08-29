@@ -1,4 +1,5 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimAwsAmbientCaller } from "./sim-aws-ambient-caller.js";
 import type {
   SimAwsCaller,
   SimAwsDefaultCaller,
@@ -48,15 +49,25 @@ export interface SimAwsCallerResolverProperties {
    * default caller keeps the Account root fallback.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   *
+   * A `runAs` block says who is making the calls inside it, which is more
+   * specific than what a simulation holds for its unattributed calls
+   * generally, so it is consulted first.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
  * Resolves caller input at a simulated AWS operation boundary.
  *
- * An omitted caller resolves to the simulation's default caller, and to the
- * supplied operation default where there is none. Explicit anonymity is
- * preserved. Credential callers are authenticated before a resolved caller is
- * returned, and a caller already resolved elsewhere is taken as it stands.
+ * An omitted caller resolves to the ambient caller of the `runAs` block the
+ * call is inside, then to the simulation's default caller, and to the supplied
+ * operation default where there is neither. Explicit anonymity is preserved.
+ * Credential callers are authenticated before a resolved caller is returned,
+ * and a caller already resolved elsewhere is taken as it stands.
  */
 export class SimAwsCallerResolver {
   private readonly credentialIdentityResolver?:
@@ -65,23 +76,27 @@ export class SimAwsCallerResolver {
 
   private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
+  private readonly ambientCaller?: SimAwsAmbientCaller | undefined;
+
   constructor(properties: SimAwsCallerResolverProperties = {}) {
     this.credentialIdentityResolver = properties.credentialIdentityResolver;
     this.defaultCaller = properties.defaultCaller;
+    this.ambientCaller = properties.ambientCaller;
   }
 
   /**
    * Resolve and normalize a simulated AWS caller.
    *
    * The request's own caller is used where it has one. A request without one
-   * falls back to the simulation's default caller, and then to the operation
-   * default the call site supplies.
+   * falls back to the ambient `runAs` caller, then to the simulation's default
+   * caller, and then to the operation default the call site supplies.
    */
   resolve(
     caller: SimAwsCaller | undefined,
     defaultPrincipal: SimAwsPrincipal,
   ): SimAwsResolvedCaller {
-    const stated = caller ?? this.defaultCaller;
+    const stated =
+      caller ?? this.ambientCaller?.currentCaller() ?? this.defaultCaller;
 
     if (stated?.kind === "resolved") {
       return this.normalized(stated.principal, stated.identityPolicyPrincipal);
@@ -111,32 +126,24 @@ export class SimAwsCallerResolver {
     principal: SimAwsPrincipal,
     identityPolicyPrincipal: SimAwsPrincipal,
   ): SimAwsResolvedCaller {
-    if (principal.kind === "arn") {
-      const identityPolicyArn =
-        identityPolicyPrincipal.kind === "arn"
-          ? identityPolicyPrincipal.arn
-          : undefined;
-
-      return {
-        principal,
-        identityPolicyPrincipal,
-        arn: principal.arn,
-        identityPolicyArn,
-        accountId: this.accountId(principal.arn),
-      };
-    }
+    const both = { principal, identityPolicyPrincipal };
 
     if (principal.kind === "service") {
-      return {
-        principal,
-        identityPolicyPrincipal,
-        service: principal.service,
-      };
+      return { ...both, service: principal.service };
+    }
+
+    if (principal.kind !== "arn") {
+      return both;
     }
 
     return {
-      principal,
-      identityPolicyPrincipal,
+      ...both,
+      arn: principal.arn,
+      identityPolicyArn:
+        identityPolicyPrincipal.kind === "arn"
+          ? identityPolicyPrincipal.arn
+          : undefined,
+      accountId: this.accountId(principal.arn),
     };
   }
 

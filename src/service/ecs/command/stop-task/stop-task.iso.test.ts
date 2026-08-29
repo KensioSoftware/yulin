@@ -12,6 +12,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 import { simEcsClusterFactory } from "../../cluster/sim-ecs-cluster.factory.js";
 import {
   SimEcsClientException,
@@ -145,10 +146,15 @@ describe("ECS StopTaskCommand", () => {
   });
 
   it("stops the containers a running task has not reached yet", async () => {
-    // Given a task whose first container stops the task while it runs.
+    // Given a task whose first container stops the task while it runs, under
+    // a task Role allowing it that.
     const simAws = new SimAws();
     const ecs = simAws.ecs();
     await simEcsClusterFactory.make({}, simAws);
+    const taskRole = await simIamRoleWithPolicyFactory.make(
+      { roleName: "CheckoutTaskRole", actions: ["ecs:StopTask"] },
+      simAws,
+    );
     let secondRuns = 0;
     let taskArn = "";
     ecs.bindContainer({
@@ -168,6 +174,7 @@ describe("ECS StopTaskCommand", () => {
     await ecs.registerTaskDefinition(
       new RegisterTaskDefinitionCommand({
         family: "checkout",
+        taskRoleArn: taskRole.Arn,
         containerDefinitions: [
           { name: "app", image: "checkout:1" },
           { name: "sidecar", image: "sidecar:1" },

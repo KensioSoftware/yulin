@@ -5,6 +5,7 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAwsDefaultCaller } from "../caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../caller/sim-aws-ambient-caller.js";
 import {
   simAwsEventBridgeDeliveryTargets,
   simAwsRekognitionImages,
@@ -57,6 +58,11 @@ interface SimAwsAccountRegionServiceBuilderProperties {
    * The caller this simulation attributes a request naming none to.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
@@ -90,6 +96,7 @@ export class SimAwsAccountRegionServiceBuilder {
   private readonly accountServices: SimAwsAccountServiceCache;
   private readonly messageLog: SimAwsMessageLog;
   private readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+  private readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 
   constructor(properties: SimAwsAccountRegionServiceBuilderProperties) {
     this.simAws = properties.simAws;
@@ -100,6 +107,7 @@ export class SimAwsAccountRegionServiceBuilder {
     this.accountServices = properties.accountServices;
     this.messageLog = properties.messageLog;
     this.defaultCaller = properties.defaultCaller;
+    this.ambientCaller = properties.ambientCaller;
   }
 
   /** Create simulated ACM for an Account Region scope. */
@@ -327,6 +335,7 @@ export class SimAwsAccountRegionServiceBuilder {
       background: this.background,
       iamResolver: this.iamRegistry,
       defaultCaller: this.defaultCaller,
+      ambientCaller: this.ambientCaller,
     });
   }
 

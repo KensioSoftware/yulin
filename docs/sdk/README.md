@@ -85,7 +85,9 @@ none. See
 [Name the caller a simulation uses by default](https://yulinsim.dev/services/iam/#name-the-caller-a-simulation-uses-by-default).
 
 `runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent during
-the run are attributed to that caller, with no changes to the client or the code under test:
+the run are attributed to that caller, with no changes to the client or the code under test. A
+direct sim service call inside the run is attributed to it too, covered in
+[Run a block of calls as one caller](https://yulinsim.dev/services/iam/#run-a-block-of-calls-as-one-caller):
 
 ```typescript sim-sdk-run-as
 /**

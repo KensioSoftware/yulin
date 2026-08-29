@@ -22,7 +22,9 @@ export interface SimIamRoleWithPolicyInput {
    *
    * A simulation given a default caller attributes these two commands to it,
    * and a Role being created for that caller has no policies to allow them
-   * yet. Naming the Account root here is how such a test bootstraps.
+   * yet. Naming the Account root here is one way for such a test to bootstrap.
+   * Calling inside `simAws.runAs(simAws.account().rootPrincipal, ...)` is the
+   * other, and covers everything else the block does as well.
    */
   readonly caller?: SimAwsCaller | undefined;
 }

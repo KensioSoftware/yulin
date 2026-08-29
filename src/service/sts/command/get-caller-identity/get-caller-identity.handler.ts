@@ -4,6 +4,7 @@ import type {
   SimAwsCaller,
   SimAwsDefaultCaller,
 } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
@@ -22,6 +23,11 @@ interface GetCallerIdentityCommandHandlerProperties {
    * The caller this simulation attributes a request naming none to.
    */
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+
+  /**
+   * Where a request naming no caller looks before the default.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
 }
 
 /**
@@ -47,6 +53,7 @@ export class GetCallerIdentityCommandHandler implements CommandHandler<
     this.iamResolver = properties.iamResolver;
     this.callerResolver = new SimAwsCallerResolver({
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
     });
   }
 

@@ -10,6 +10,7 @@ import type {
 } from "../../aws/caller/sim-aws-caller.js";
 import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
 import type { SimAwsCredentialIdentityResolver } from "../../aws/caller/sim-aws-caller-resolver.js";
+import type { SimAwsAmbientCaller } from "../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamAccountResolver } from "../registry/sim-iam-account-resolver.js";
 import type { SimIamAuthZPolicySource } from "./context/sim-iam-auth-z-context.js";
@@ -23,6 +24,7 @@ interface SimIamAuthorizerProperties {
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
   readonly iamResolver?: SimIamAccountResolver | undefined;
   readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
 }
@@ -46,6 +48,7 @@ export class SimIamAuthorizer implements SimIamAccountIdentityPolicies {
       users: properties.users,
       credentialIdentityResolver: properties.credentialIdentityResolver,
       defaultCaller: properties.defaultCaller,
+      ambientCaller: properties.ambientCaller,
       iamResolver: properties.iamResolver,
       scpResolver: properties.scpResolver,
     });

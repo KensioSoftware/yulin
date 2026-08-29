@@ -5,6 +5,7 @@ import type {
   SimAwsDefaultCaller,
   SimAwsPrincipal,
 } from "../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAmbientCaller } from "../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimIamManagedPolicy } from "../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
@@ -31,6 +32,14 @@ interface SimIamAccountAuthZProperties {
   readonly defaultCaller?: SimAwsDefaultCaller | undefined;
 
   /**
+   * Where a request naming no caller looks before the default.
+   *
+   * A run-as block says who is making the requests inside it, which outranks
+   * what the simulation holds for its unattributed requests generally.
+   */
+  readonly ambientCaller?: SimAwsAmbientCaller | undefined;
+
+  /**
    * Resolves other Accounts' IAM in the same simulation.
    *
    * A cross-Account request is decided in both Accounts, so the caller's own
@@ -52,10 +61,11 @@ interface SimIamAccountAuthZProperties {
  * Evaluates IAM authorization attempts against one simulated Account's IAM
  * state.
  *
- * If the caller is omitted, authorization defaults to the simulation's default
- * caller, and to the root principal of the owning sim Account where the
- * simulation has none. An explicit anonymous caller suppresses both and is
- * evaluated without identity policies.
+ * If the caller is omitted, authorization defaults to the ambient caller of the
+ * run-as block the request is inside, then to the simulation's default caller,
+ * and to the root principal of the owning sim Account where there is neither.
+ * An explicit anonymous caller suppresses all three and is evaluated without
+ * identity policies.
  */
 export class SimIamAccountAuthZ implements SimIamAccountIdentityPolicies {
   private readonly properties: SimIamAccountAuthZProperties;
@@ -95,6 +105,7 @@ export class SimIamAccountAuthZ implements SimIamAccountIdentityPolicies {
       users: this.properties.users,
       credentialIdentityResolver: this.properties.credentialIdentityResolver,
       defaultCaller: this.properties.defaultCaller,
+      ambientCaller: this.properties.ambientCaller,
       iamResolver: this.properties.iamResolver,
       scpResolver: this.properties.scpResolver,
     });

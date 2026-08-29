@@ -62,7 +62,9 @@ export interface SimIamAuthorizationInput {
    * Simulated request caller.
    *
    * If credentials are supplied, they are authenticated before policy
-   * evaluation. If omitted, authorization defaults to the Account root.
+   * evaluation. If omitted, authorization falls back to the ambient caller of
+   * the run-as block the request is inside, then to the simulation's default
+   * caller, and then to the Account root.
    */
   readonly caller?: SimAwsCaller | undefined;
 
