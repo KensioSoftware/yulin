@@ -62,6 +62,8 @@ export interface SimLogsProperties {
  * somewhere it is not competing for room with them.
  */
 export class SimLogsCommands {
+  readonly authorizer: SimLogsAuthorizer;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly groups: SimLogsLogGroupStore;
   readonly logGroups: SimLogsLogGroupCommands;
   readonly retention: SimLogsRetentionCommands;
@@ -99,6 +101,8 @@ export class SimLogsCommands {
       background,
     });
 
+    this.authorizer = authorizer;
+    this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.groups = groups;
     this.fanOut = fanOut;

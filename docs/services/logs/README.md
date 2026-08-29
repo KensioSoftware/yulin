@@ -741,6 +741,14 @@ exactly as on real AWS.
 `DescribeLogGroups` names no particular group. It authorizes against every log group in the account
 and region, and a policy scoped to one group cannot describe them all.
 
+A Stack deploying the three delivery Resource types authorizes the actions CloudFormation names.
+Each handler reads its own resource back before it writes. `AWS::Logs::DeliverySource` therefore
+needs `logs:GetDeliverySource` alongside `logs:PutDeliverySource`, and the destination and the
+delivery need `logs:GetDeliveryDestination` and `logs:GetDelivery` the same way. The `Describe` actions cover
+the three listing operations an SDK caller reaches, and a deployment goes near none of them. A
+CloudFormation execution Role therefore carries the same policy here that a real deploy of the
+template needs.
+
 ```typescript sim-logs-permissions
 /**
  * A simulated IAM policy allowing a Role to write one function's logs.
@@ -852,8 +860,9 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   log group and the three delivery resource types are what simulated CloudFormation deploys here.
 - **Nothing is actually delivered.** A delivery records that a source was joined to a destination
   and how the records would be written. No access log file ever reaches the bucket.
-- **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent. The three `Describe`
-  operations report the same resources.
+- **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent as SDK operations. The
+  three `Describe` operations report the same resources. The three action names are authorized where
+  CloudFormation reads a delivery Resource back.
 - **Delivery resource tags and cross-account delivery.** `PutDeliverySource`,
   `PutDeliveryDestination` and `CreateDelivery` refuse tags outright. `DeliveryDestinationPolicy` in
   a template is recorded and acted on by nothing.
