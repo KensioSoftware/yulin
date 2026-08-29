@@ -1045,6 +1045,77 @@ await simAws.backgroundTasksComplete();
 A request naming no caller is decided as the Account root, which may pass any Role. A test that never
 mentions IAM keeps working.
 
+## A Role for a CloudFormation deployment
+
+`makeDeployRole(...)` creates a Role from a policy document and hands back a caller. Pass it as
+`caller` to `deployTemplate(...)`, `deployTemplateFile(...)` or `deployCdkOut(...)`, and every
+resource the deployment creates is authorized against the document.
+
+```typescript sim-iam-make-deploy-role
+/**
+ * Making a deploy Role from a policy document a project already holds.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const deployer = await simAws.iam().makeDeployRole({
+  roleName: "cdk-exec",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: {
+      Effect: "Allow",
+      Action: ["s3:*", "kms:*"],
+      Resource: "*",
+    },
+  },
+});
+
+console.log(deployer.arn); // "arn:aws:iam::123456789012:role/cdk-exec"
+
+await simAws
+  .cloudFormation()
+  .deployCdkOut({ directoryPath: "cdk.out", caller: deployer });
+```
+
+The Role trusts `cloudformation.amazonaws.com` and holds the document as an inline policy. A
+deployment that asks for something the document leaves out fails the resource, with the Role's ARN in
+the message.
+
+`policyDocument` also takes the JSON a synthesized policy is carried as, and a list of documents for
+a policy split in two to stay under IAM's size cap. Each document goes on the Role as its own inline
+policy, and the Role is allowed the union of them.
+
+```typescript sim-iam-deploy-role-documents
+/**
+ * A deploy Role from a policy split across two documents.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const deployer = await simAws.iam().makeDeployRole({
+  roleName: "cdk-exec",
+  policyDocument: [
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "s3:*", Resource: "*" },
+    }),
+    {
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "kms:*", Resource: "*" },
+    },
+  ],
+});
+
+console.log(deployer.kind); // "arn"
+```
+
+Making the Role is two ordinary IAM commands. A simulation with a restrictive default caller has to
+be allowed them, or the call wrapped in `simAws.runAs(...)`.
+
 ## CloudFormation IAM resources
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
@@ -1448,6 +1519,7 @@ instance when a test should exercise real IAM enforcement.
 
 Sim IAM currently supports:
 
+- `makeDeployRole(...)`, creating a Role for a CloudFormation deployment to run as
 - `CreateRoleCommand`, including trust-policy validation
 - `GetRoleCommand` and `ListRolesCommand`, with pagination
 - `PutRolePolicyCommand`, for inline Role policies

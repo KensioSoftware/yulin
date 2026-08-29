@@ -1520,6 +1520,40 @@ The named principal has to be allowed what the template asks for. IAM allows the
 default and allows a role only what its policies say. A role with no S3 permission leaves the bucket
 above `CREATE_FAILED`, with the role's ARN in the message.
 
+A project that scopes its own deploy permissions has the policy document already.
+`makeDeployRole(...)` turns one into a caller in a single call, creating the role with the trust
+CloudFormation needs and returning its ARN:
+
+```typescript sim-cloudformation-make-deploy-role
+/**
+ * Deploying a cloud assembly as a Role made from a policy document.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultRegionName: "eu-west-2",
+});
+
+const deployer = await simAws.iam().makeDeployRole({
+  roleName: "cdk-exec",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: { Effect: "Allow", Action: "s3:*", Resource: "*" },
+  },
+});
+
+const stacks = await simAws
+  .cloudFormation()
+  .deployCdkOut({ directoryPath: "cdk.out", caller: deployer });
+
+console.log(stacks.size);
+```
+
+See [simulated IAM](https://yulinsim.dev/services/iam/ "Simulated IAM usage docs") for the documents
+it takes.
+
 ### One caller for an assembly, and one per Stack
 
 `deployCdkOut(...)` takes a caller for every Stack in the assembly. A Stack deployed by a different

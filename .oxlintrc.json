@@ -757,6 +757,18 @@
       }
     },
     {
+      // The IAM service facade. It carries one method per SDK command IAM
+      // handles, each a doc comment and a line of delegation, so its length
+      // tracks the size of that command surface rather than the complexity of
+      // anything in it. The work behind the commands already sits in
+      // SimIamAccountParts and the handler classes it builds, and the FTA gate
+      // still holds the file to the same complexity score as every other.
+      "files": ["src/service/iam/sim-iam.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", 400]
+      }
+    },
+    {
       "files": ["scripts/**/*.mts"],
       "rules": {
         "eslint/no-await-in-loop": "off",
