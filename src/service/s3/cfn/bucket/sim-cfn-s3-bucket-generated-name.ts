@@ -10,11 +10,11 @@ const maximumNameLength = 63;
  * The name CloudFormation gives a Bucket whose template does not name it.
  *
  * Sixty-three characters is short for a name made of a stack name and a logical
- * ID, so the trimming `SimCfnGeneratedResourceName` does is the usual case here
- * rather than the exception. It is lower cased afterwards because a bucket name
- * is lowercase and a stack name and a logical ID are usually not. The
- * characters left are ones a bucket name allows: a logical ID is alphanumeric,
- * a stack name adds only hyphens, and the tail is hex.
+ * ID, so `SimCfnGeneratedResourceName` usually has to trim one. It is lower
+ * cased afterwards because a bucket name is lowercase and a stack name and a
+ * logical ID are usually not. Every character left is one a bucket name allows.
+ * A logical ID is alphanumeric, a stack name adds only hyphens, and the tail is
+ * hex.
  */
 export function simCfnS3BucketGeneratedName(resource: SimCfnResource): string {
   return new SimCfnGeneratedResourceName({

@@ -6,7 +6,7 @@ import { simGlueFolded } from "../database/sim-glue-catalog-name.js";
  * The longest name the Data Catalog accepts for a database or a table.
  *
  * Glue states the limit in UTF-8 bytes and `SimCfnGeneratedResourceName` trims
- * by character, which come to the same thing here: a logical ID is
+ * by character. The two come to the same thing here. A logical ID is
  * alphanumeric, a stack name adds only hyphens, and the tail is hex.
  */
 const maximumNameLength = 255;
