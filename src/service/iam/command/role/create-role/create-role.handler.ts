@@ -14,6 +14,7 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { normaliseRolePath } from "../../../role/sim-iam-role-path.js";
 import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
 import { SimIamTrustPolicyDocumentValidator } from "../../../validate/trust/sim-iam-trust-policy-document-validator.js";
+import { assertSimIamTrustPolicyWithinSizeLimit } from "../../../validate/size/sim-iam-policy-document-size.js";
 
 interface CreateRoleCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
@@ -61,9 +62,10 @@ export class CreateRoleCommandHandler implements CommandHandler<
       throw new Error("RoleName is required");
     }
 
-    this.trustPolicyValidator.validateRequired(
-      command.input.AssumeRolePolicyDocument,
-    );
+    const trustPolicyDocument = command.input.AssumeRolePolicyDocument;
+
+    assertSimIamTrustPolicyWithinSizeLimit(trustPolicyDocument, roleName);
+    this.trustPolicyValidator.validateRequired(trustPolicyDocument);
 
     const path = normaliseRolePath(command.input.Path);
     const arn = makeSimRoleArn({

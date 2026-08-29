@@ -10,6 +10,7 @@ import type {
   SimPutRolePolicyCommandOutput,
 } from "./put-role-policy.command.js";
 import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-document-validator.js";
+import { assertSimIamInlinePolicyWithinSizeLimit } from "../../../validate/size/sim-iam-policy-document-size.js";
 
 interface PutRolePolicyCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
@@ -58,6 +59,12 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
     }
 
     const policyDocument = command.input.PolicyDocument;
+
+    assertSimIamInlinePolicyWithinSizeLimit(policyDocument, {
+      kind: "role",
+      name: roleName,
+    });
+
     this.policyDocValidator.validateRequired(policyDocument, {
       attachedTo: "Role",
       name: roleName,

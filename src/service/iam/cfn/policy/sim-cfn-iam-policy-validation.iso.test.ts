@@ -7,6 +7,8 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamMalformedPolicyDocument } from "../../error/sim-iam.error.js";
+import { SimIamLimitExceeded } from "../../error/sim-iam.error.js";
+import { maxSimIamInlinePolicyCharacters } from "../../validate/size/sim-iam-policy-document-size.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
@@ -263,6 +265,59 @@ describe("IAM CloudFormation Policy validation", () => {
         '"QueryRole" policy "RunQueries" statement 1: Resource must be a ' +
         "string or an array of strings, but holds " +
         '{"Fn::GetAtt":["DoesNotExist","Arn"]}',
+    );
+  });
+
+  it("fails the Resource when the PolicyDocument is over IAM's limit", async () => {
+    // Given a CloudFormation template whose inline policy document is past
+    // the 10,240 characters IAM takes.
+    const simAws = new SimAws();
+    const oversizedDocument = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: `arn:aws:s3:::reports-bucket/${"x".repeat(
+            maxSimIamInlinePolicyCharacters,
+          )}`,
+        },
+      ],
+    };
+
+    // When / then deploying the template throws.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "oversized-inline-policy-stack",
+        template: {
+          Resources: {
+            QueryRole: {
+              Type: "AWS::IAM::Role",
+              Properties: {
+                RoleName: "QueryRole",
+                AssumeRolePolicyDocument: assumeRolePolicyDocument,
+              },
+            },
+            QueryPolicy: {
+              Type: "AWS::IAM::Policy",
+              Properties: {
+                PolicyName: "RunQueries",
+                Roles: [{ Ref: "QueryRole" }],
+                PolicyDocument: oversizedDocument,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    // Then the Resource fails on the document, naming the Role it was going
+    // onto.
+    assertInstanceOf(error, SimIamLimitExceeded);
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Resource QueryPolicy creation failed: " +
+        "Maximum policy size of 10240 bytes exceeded for role QueryRole",
     );
   });
 });
