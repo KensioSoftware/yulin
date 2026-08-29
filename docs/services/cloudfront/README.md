@@ -2113,6 +2113,139 @@ Behavior is recorded under its `PathPattern`, the way a skipped Lambda@Edge asso
 `CreateDistribution` and `UpdateDistribution` still refuse the same ID, as real CloudFront refuses
 it.
 
+## Cache policies
+
+A cache policy decides what a cache Behavior keys its cache on and how long an object stays there.
+Declare one as `AWS::CloudFront::CachePolicy` and point a Behavior's `CachePolicyId` at it with a
+`Ref`, which is what CDK's `CachePolicy` construct synthesizes.
+
+```typescript sim-cloudfront-cache-policy
+/**
+ * Reading back the cache policy a Behavior was given.
+ */
+
+import { GetDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "site-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "site-bucket" },
+      },
+      BeaconPolicy: {
+        Type: "AWS::CloudFront::CachePolicy",
+        Properties: {
+          CachePolicyConfig: {
+            Name: "BeaconPolicy",
+            MinTTL: 0,
+            DefaultTTL: 0,
+            MaxTTL: 0,
+            ParametersInCacheKeyAndForwardedToOrigin: {
+              EnableAcceptEncodingGzip: false,
+              CookiesConfig: { CookieBehavior: "none" },
+              HeadersConfig: { HeaderBehavior: "none" },
+              QueryStringsConfig: { QueryStringBehavior: "none" },
+            },
+          },
+        },
+      },
+      SiteDistribution: {
+        Type: "AWS::CloudFront::Distribution",
+        DependsOn: ["SiteBucket", "BeaconPolicy"],
+        Properties: {
+          DistributionConfig: {
+            DefaultRootObject: "index.html",
+            Origins: [
+              {
+                Id: "SiteOrigin",
+                DomainName: "site-bucket.s3.amazonaws.com",
+                S3OriginConfig: {},
+              },
+            ],
+            DefaultCacheBehavior: {
+              TargetOriginId: "SiteOrigin",
+              ViewerProtocolPolicy: "allow-all",
+              // CachingOptimized, one of CloudFront's managed policies.
+              CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            },
+            CacheBehaviors: [
+              {
+                PathPattern: "/beacon",
+                TargetOriginId: "SiteOrigin",
+                ViewerProtocolPolicy: "allow-all",
+                CachePolicyId: { Ref: "BeaconPolicy" },
+              },
+            ],
+          },
+        },
+      },
+    },
+    Outputs: {
+      DistributionId: { Value: { Ref: "SiteDistribution" } },
+      BeaconPolicyId: { Value: { Ref: "BeaconPolicy" } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const read = await simAws
+  .cloudFront()
+  .getDistribution(
+    new GetDistributionCommand({ Id: stack.output("DistributionId") }),
+  );
+const config = read.Distribution?.DistributionConfig;
+
+// The managed ID the default Behavior was given.
+console.log(config?.DefaultCacheBehavior?.CachePolicyId);
+
+// The ID of the policy the template created, which the path Behavior Refs.
+console.log(
+  config?.CacheBehaviors?.Items?.[0]?.CachePolicyId ===
+    stack.output("BeaconPolicyId"),
+);
+```
+
+A Behavior records the ID it was given, and `GetDistribution` reports it back for both the default
+Behavior and a named one. An update changing the policy is reported the same way.
+
+Nothing here reads the policy itself. The TTLs, the cache key and the compression settings need a
+cache, and sim CloudFront holds none. Every request reaches the Origin whatever the policy would
+have cached on real CloudFront.
+
+A policy name is unique within an account, as it is in CloudFront. A second
+`AWS::CloudFront::CachePolicy` claiming a name is refused with `CachePolicyAlreadyExists`.
+`Name` and `Comment` are the parts of `CachePolicyConfig` the policy carries.
+
+### Managed cache policies
+
+CloudFront's seven managed policies are here from the start, under the IDs AWS publishes, and a
+Behavior names one without a template creating anything. `CachingOptimized`
+(`658327ea-f89d-4fab-a63d-7e88639e58f6`), `CachingDisabled` (`4135ea2d-6df8-44a3-9df3-4b5a84be39ad`),
+`CachingOptimizedForUncompressedObjects` (`b2884449-e4de-46a7-ac36-70bc7f1ddd6d`), `Amplify`
+(`2e54312d-136d-493c-8eb9-b001f22f67d2`), `Elemental-MediaPackage`
+(`08627262-05a9-4f76-9ded-b50ca2e3a84f`), `UseOriginCacheControlHeaders`
+(`83da9c7e-98b4-4e11-a168-04f0df8e2c65`) and `UseOriginCacheControlHeaders-QueryStrings`
+(`4cc15a8a-d715-48a4-82b8-cc0b614638fe`) are each held under the name
+[AWS publishes](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html)
+for it. CDK's `CachePolicy.CACHING_OPTIMIZED` and its six siblings synthesize those IDs. A stack
+reaching for one deploys.
+
+The managed policies sit in CloudFront's own namespace. A template may create a policy called
+`CachingDisabled` of its own, and deleting that stack leaves the managed one where it was.
+
+A CloudFormation Distribution whose Behavior names a policy that is neither managed nor created here
+deploys without one. The `CachePolicyId` lands on `stack.ignoredProperties` under that Behavior, the
+way an absent response headers policy does, and the Behavior reports no policy.
+
+`CreateDistribution` and `UpdateDistribution` still refuse the same ID with `NoSuchCachePolicy`, as
+real CloudFront refuses it.
+
 ## Origin access controls
 
 An origin access control is how a Distribution authenticates to a private Origin. The Origin then
@@ -2732,6 +2865,7 @@ Sim CloudFront currently supports:
 - `LambdaFunctionAssociations` on a template's Distribution, and CDK's `edgeLambdas`
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
+- `AWS::CloudFront::CachePolicy`, and a Behavior's `CachePolicyId` read back through `GetDistribution`
 - `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
 - `AWS::CloudFront::OriginAccessControl`, letting an Origin read a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
@@ -2874,7 +3008,12 @@ Where sim CloudFront knowingly behaves differently from AWS:
   share of real responses carry `Server-Timing`. This simulation adds it to every response once
   `Enabled` is true. A test asserting on it never depends on chance. The header's value is a
   fixed placeholder, since nothing here measures an Origin fetch the way CloudFront's edge does.
-- **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront models no
-  edge caching. A Behavior's cache policy, including an AWS managed policy such as
-  `CachingOptimized`, is left unvalidated and unapplied to TTLs and the cache key. Every request
-  reaches the Origin, whatever the policy would have cached on real CloudFront.
+- **A cache policy is recorded and never applied.** Sim CloudFront models no edge caching. A
+  Behavior's `CachePolicyId` is checked against the policies this simulation holds and reported
+  back, and the TTLs, the cache key and the compression settings behind it decide nothing. Every
+  request reaches the Origin, whatever the policy would have cached on real CloudFront.
+- **A cache policy carries its name and its comment, and nothing else.** The TTLs and
+  `ParametersInCacheKeyAndForwardedToOrigin` of an `AWS::CloudFront::CachePolicy` are read past,
+  since nothing here would act on them.
+- **`OriginRequestPolicyId` is accepted and ignored.** A Behavior's origin request policy is left
+  unvalidated, and `AWS::CloudFront::OriginRequestPolicy` is skipped.

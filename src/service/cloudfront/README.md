@@ -254,12 +254,31 @@ header per sub-section, `ServerTimingHeadersConfig` as a fixed header once `Enab
 a test does not depend on chance), and `CorsConfig` into the CORS model above.
 
 A lookup miss at request time is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a
-pass-through. In practice this is defence in depth rather than the common path: `ResponseHeadersPolicyId` is checked eagerly too, by `SimCloudFrontBehaviorConfigurator` when the Distribution is
+pass-through. In practice this is defence in depth rather than the common path: `ResponseHeadersPolicyId` is checked eagerly too, by `SimCfBehaviorPolicies` when the Distribution is
 created or updated, so a Behavior naming an ID nothing created — commonly a managed policy ID, which
 names a policy AWS owns rather than one a template creates — fails there as
 `SimCloudFrontInvalidResponseHeadersPolicyId`, the same as real CloudFront refuses the whole
 CreateDistribution/UpdateDistribution rather than deploying and failing the first request that needs
 it.
+
+## Cache policies
+
+`cache-policy/` holds the model and its registry, laid out the same way as the response headers
+policies above. A `SimCloudFrontCachePolicy` is a name, an ID and an optional comment.
+`sim-cf-managed-cache-policies.ts` builds CloudFront's seven managed policies under the IDs AWS
+publishes, and the registry keeps them in their own namespace, so a template may create a policy of
+its own under a managed name. There is no CreateCachePolicy command, so `cfn/cache-policy/` is the
+only thing that makes one.
+
+The policy carries nothing of `CachePolicyConfig` beyond `Name` and `Comment`. The TTLs and
+`ParametersInCacheKeyAndForwardedToOrigin` decide what a cache holds and how long it holds it, and
+sim CloudFront has no cache for them to decide anything about. Recording the ID is what lets a test
+assert which policy a Behavior was given.
+
+`SimCfBehaviorPolicies` asks both `SimCfBehaviorResponseHeadersPolicy` and
+`SimCfBehaviorCachePolicy` about one Behavior. A `CachePolicyId` naming nothing is
+`SimCloudFrontNoSuchCachePolicy`, which is what real CloudFront answers, and it comes at creation
+and update time as the response headers policy refusal does.
 
 ## Origin access controls
 
@@ -277,8 +296,9 @@ when the Distribution is created, and stores the result on the `SimCloudFrontS3O
 CloudFront refuses the whole CreateDistribution, and so is an origin type that does not match the
 Origin it was named on: `assertSimCfOacOriginType` checks that in both directions, since an origin
 access control for a Bucket signs nothing a Function URL will admit.
-`SimCloudFrontBehaviorConfigurator` resolves a Behavior's `ResponseHeadersPolicyId` the same eager
-way, for the same reason: CloudFront checks both at creation rather than when a request arrives.
+`SimCfBehaviorPolicies` resolves a Behavior's `ResponseHeadersPolicyId` and its `CachePolicyId` the
+same eager way, for the same reason: CloudFront checks them all at creation rather than when a
+request arrives.
 
 `SimCfS3OriginSigner` reads the stored origin access control on every Origin fetch. One whose
 `signs` getter is true makes the read a request from the `cloudfront.amazonaws.com` service

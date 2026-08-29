@@ -171,6 +171,7 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
     | SimCloudFrontLambdaFunctionAssociations
     | undefined;
   readonly ResponseHeadersPolicyId?: string | undefined;
+  readonly CachePolicyId?: string | undefined;
 }
 
 /**

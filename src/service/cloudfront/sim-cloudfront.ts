@@ -37,11 +37,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "./distribution/sim-cloudfront-distribution.js";
-import type {
-  SimCloudFrontResponseHeadersPolicy,
-  SimCloudFrontResponseHeadersPolicyId,
-} from "./response-headers-policy/sim-cf-response-headers-policy.js";
-import { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
+import { SimCloudFrontPolicies } from "./sim-cloudfront-policies.js";
 import type {
   SimCloudFrontOriginAccessControl,
   SimCloudFrontOriginAccessControlId,
@@ -66,11 +62,9 @@ export type {
 /**
  * Simulated CloudFront. Handles SDK commands. Emulates AWS behaviour and state.
  */
-export class SimCloudFront {
+export class SimCloudFront extends SimCloudFrontPolicies {
   private readonly distributions: SimCloudFrontDistributionMap = new Map();
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap = new Map();
-  private readonly responseHeadersPolicies =
-    new SimCloudFrontResponseHeadersPolicyRegistry();
   private readonly originAccessControls =
     new SimCloudFrontOriginAccessControlRegistry();
 
@@ -82,6 +76,7 @@ export class SimCloudFront {
   private readonly sdkRouter = new SimCloudFrontSdkCommandRouter(this);
 
   constructor(properties: SimCloudFrontProperties = {}) {
+    super();
     this.accountRegionScope =
       properties.accountRegionScope ?? simAwsAccountRegionScopeFactory.make();
     this.commands = new SimCloudFrontCommands({
@@ -91,6 +86,7 @@ export class SimCloudFront {
       cloudFrontFunctions: this.cloudFrontFunctions,
       originAccessControls: this.originAccessControls,
       responseHeadersPolicies: this.responseHeadersPolicies,
+      cachePolicies: this.cachePolicies,
     });
   }
 
@@ -215,35 +211,6 @@ export class SimCloudFront {
     return this.cloudFrontFunctions.get(
       cloudFrontFunctionName as SimCloudFrontFunctionName,
     );
-  }
-
-  /**
-   * Store a simulated response headers policy.
-   *
-   * There is no CreateResponseHeadersPolicy command here, so CloudFormation is
-   * the only thing that makes one, and this is how it hands the policy over.
-   * A name another policy already holds is refused, as CloudFront refuses one.
-   */
-  addResponseHeadersPolicy(policy: SimCloudFrontResponseHeadersPolicy): void {
-    this.responseHeadersPolicies.add(policy);
-  }
-
-  /**
-   * Forget a simulated response headers policy.
-   */
-  removeResponseHeadersPolicy(
-    policyId: SimCloudFrontResponseHeadersPolicyId,
-  ): void {
-    this.responseHeadersPolicies.remove(policyId);
-  }
-
-  /**
-   * Get a simulated response headers policy by ID.
-   */
-  getResponseHeadersPolicyById(
-    policyId: SimCloudFrontResponseHeadersPolicyId | string,
-  ): SimCloudFrontResponseHeadersPolicy | undefined {
-    return this.responseHeadersPolicies.byId(policyId);
   }
 
   /**

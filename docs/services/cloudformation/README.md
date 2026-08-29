@@ -3390,8 +3390,8 @@ The resource types it creates are:
   `AWS::ApiGatewayV2::Stage`
 - `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
-- `AWS::CloudFront::Distribution`, `AWS::CloudFront::Function` and
-  `AWS::CloudFront::ResponseHeadersPolicy`
+- `AWS::CloudFront::Distribution`, `AWS::CloudFront::Function`,
+  `AWS::CloudFront::ResponseHeadersPolicy` and `AWS::CloudFront::CachePolicy`
 - `AWS::CloudWatch::Alarm`
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`

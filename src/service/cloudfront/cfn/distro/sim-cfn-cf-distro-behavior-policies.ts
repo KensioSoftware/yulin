@@ -5,6 +5,7 @@ import type {
 } from "../../command/create-distribution/create-distribution.command.js";
 import { normalizeSimCfList } from "../../command/create-distribution/sim-cf-normalize-list.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
+import { SimCfnCfDistroPolicyDrops } from "./sim-cfn-cf-distro-policy-drops.js";
 
 /**
  * The path a dropped policy on the default Behavior is recorded under.
@@ -12,48 +13,8 @@ import type { SimCloudFront } from "../../sim-cloudfront.js";
 const defaultBehaviorPath = "DistributionConfig.DefaultCacheBehavior";
 
 /**
- * Takes a `ResponseHeadersPolicyId` naming a policy this simulation does not
- * hold off the Behavior that named it, and records each one.
- */
-class SimCfnCfDistroPolicyDrops {
-  public count = 0;
-
-  constructor(
-    private readonly resource: SimCfnResource,
-    private readonly cloudFront: SimCloudFront,
-  ) {}
-
-  /**
-   * One Behavior, keeping a policy that is here and dropping one that is not.
-   */
-  heldPolicy(
-    behavior: SimCloudFrontCacheBehaviorConfig,
-    behaviorPath: string,
-  ): SimCloudFrontCacheBehaviorConfig {
-    const policyId = behavior.ResponseHeadersPolicyId;
-
-    if (
-      policyId === undefined ||
-      this.cloudFront.getResponseHeadersPolicyById(policyId) !== undefined
-    ) {
-      return behavior;
-    }
-
-    this.count += 1;
-    this.resource.ignoreProperty(
-      `${behaviorPath}.ResponseHeadersPolicyId`,
-      `response headers policy ${policyId} is not held by this simulation, ` +
-        `so the Behavior is deployed without one and serves every response ` +
-        `without the headers that policy would have set`,
-    );
-
-    return { ...behavior, ResponseHeadersPolicyId: undefined };
-  }
-}
-
-/**
- * The DistributionConfig to deploy, without a `ResponseHeadersPolicyId` naming
- * a response headers policy this simulation does not hold.
+ * The DistributionConfig to deploy, without a policy ID naming a response
+ * headers policy or a cache policy this simulation does not hold.
  *
  * `CreateDistribution` refuses such an ID, as real CloudFront refuses one, and
  * a Distribution deployed from a template is the one place that refusal costs
@@ -64,13 +25,14 @@ class SimCfnCfDistroPolicyDrops {
  * make with it. That is the same reason an absent `WebACLId` is left out here.
  *
  * So the property is left off that Behavior and recorded on
- * `stack.ignoredProperties`. The Behavior deploys and serves every response
- * without the policy's headers. A test that cares reads the record.
+ * `stack.ignoredProperties`. The Behavior deploys, and a test that cares reads
+ * the record. CloudFront's managed policies count as held, so a Behavior
+ * naming one keeps it.
  *
- * One Behavior losing its policy leaves the others holding theirs. CloudFront's
- * managed policies count as held, so a Behavior naming one keeps it.
+ * One Behavior losing a policy leaves the others holding theirs, and a
+ * Behavior losing one kind of policy keeps the other.
  */
-export function simCfnCfDistroWithHeldResponseHeadersPolicies(
+export function simCfnCfDistroWithHeldBehaviorPolicies(
   resource: SimCfnResource,
   distributionConfig: SimCloudFrontDistributionConfig,
   cloudFront: SimCloudFront,
@@ -103,7 +65,7 @@ function distroDefaultBehavior(
     return undefined;
   }
 
-  return drops.heldPolicy(behavior, defaultBehaviorPath);
+  return drops.heldPolicies(behavior, defaultBehaviorPath);
 }
 
 /**
@@ -130,7 +92,7 @@ function distroCacheBehaviors(
   return {
     ...behaviors,
     Items: items.map((behavior, index) =>
-      drops.heldPolicy(
+      drops.heldPolicies(
         behavior,
         `DistributionConfig.CacheBehaviors.${behavior.PathPattern ?? String(index)}`,
       ),

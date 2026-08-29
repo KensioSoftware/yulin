@@ -5,15 +5,13 @@ import type {
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 import { simCfBehaviorProperties } from "./sim-cf-behavior-properties.js";
-import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
+import type { SimCfBehaviorPolicies } from "./sim-cf-behavior-policies.js";
 
 /**
  * Applies Cache Behavior configuration to a sim CloudFront Distribution.
  */
 export class SimCloudFrontBehaviorConfigurator {
-  constructor(
-    private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
-  ) {}
+  constructor(private readonly policies: SimCfBehaviorPolicies) {}
 
   /**
    * Configure the default Cache Behavior on a Distribution.
@@ -24,7 +22,7 @@ export class SimCloudFrontBehaviorConfigurator {
   ): void {
     assertDefined(cacheBehavior, "CloudFront DefaultCacheBehavior");
     distribution.addBehavior(
-      simCfBehaviorProperties(cacheBehavior, this.responseHeadersPolicy),
+      simCfBehaviorProperties(cacheBehavior, this.policies),
     );
   }
 
@@ -41,7 +39,7 @@ export class SimCloudFrontBehaviorConfigurator {
     );
     distribution.addBehavior({
       pathPattern: cacheBehavior.PathPattern,
-      ...simCfBehaviorProperties(cacheBehavior, this.responseHeadersPolicy),
+      ...simCfBehaviorProperties(cacheBehavior, this.policies),
     });
   }
 }

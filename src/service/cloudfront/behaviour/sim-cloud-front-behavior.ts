@@ -13,6 +13,11 @@ export interface SimCloudFrontBehavior {
    * The response headers policy applied to every response this Behavior serves.
    */
   responseHeadersPolicyId?: string | undefined;
+  /**
+   * The cache policy this Behavior was given, whether a template created it or
+   * AWS manages it. The simulated cache does not read it yet.
+   */
+  cachePolicyId?: string | undefined;
   functionAssociations?:
     | undefined
     | {

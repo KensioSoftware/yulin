@@ -1,4 +1,5 @@
 import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
+import type { SimCloudFrontCachePolicyRegistry } from "../cache-policy/sim-cf-cache-policy-registry.js";
 import type { SimCfCustomOriginDispatcher } from "../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontS3OriginResolver } from "../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../origin-access-control/sim-cf-origin-access-control-registry.js";
@@ -12,7 +13,7 @@ import type { SimCfEdgeFunctions } from "../edge/sim-cf-edge-functions.js";
  *
  * A DistributionConfig is mostly references: a Bucket or a hostname per
  * Origin, a certificate, an origin access control, a response headers policy,
- * a web ACL, a Lambda@Edge function version. None of them belongs to
+ * a cache policy, a web ACL, a Lambda@Edge function version. None of them belongs to
  * CloudFront, and creation and update resolve every one of them the same way,
  * so they travel together.
  */
@@ -22,6 +23,7 @@ export interface SimCfDistributionConfigurationState {
   readonly acmRegistry: SimAcmRegistry | undefined;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
+  readonly cachePolicies: SimCloudFrontCachePolicyRegistry;
   readonly webAclResolver: SimCfWebAclResolver | undefined;
   readonly edgeFunctions: SimCfEdgeFunctions | undefined;
 }
