@@ -5,6 +5,21 @@ on:
   push:
     branches:
       - main
+    # This job installs SAM and Terraform and runs the whole suite to move one
+    # number on a badge. A merge touching only the paths below cannot change
+    # that number, and skips the run. A plain filter is safe here because
+    # nothing in this workflow is a required check on main. The pull request
+    # workflow skips its jobs with `if` for that reason.
+    paths-ignore:
+      - README.md
+      - LICENSE
+      - .gitignore
+      - .coderabbit.yaml
+      - .github/pull_request_template.md
+      - .github/dependabot.yml
+      - .idea/**
+      - docs/*.md
+      - docs/**/*.md
 
 defaults:
   run:
