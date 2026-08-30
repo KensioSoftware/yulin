@@ -5,6 +5,7 @@ import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimAthena } from "../athena/index.js";
 import type { SimBedrock } from "../bedrock/index.js";
+import type { SimBackup } from "../backup/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimScheduler } from "../scheduler/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
@@ -99,6 +100,13 @@ export class SimAwsAccountRegionContainer {
   bedrock(): SimBedrock {
     return this.memo.getOrCreate("bedrock", () =>
       this.factory.createBedrock(this),
+    );
+  }
+
+  /** Get simulated AWS Backup for this account and region. */
+  backup(): SimBackup {
+    return this.memo.getOrCreate("backup", () =>
+      this.factory.createBackup(this),
     );
   }
 

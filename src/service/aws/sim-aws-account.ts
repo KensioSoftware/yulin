@@ -20,6 +20,7 @@ import type { SimLambda } from "../lambda/index.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "./caller/sim-aws-account-root-principal.js";
 import type { SimSts } from "../sts/sim-sts.js";
+import type { SimBackup } from "../backup/index.js";
 
 // An Account ID is its own small thing and is defined in its own module. It is
 // re-exported here because this is where the rest of the simulator already
@@ -80,6 +81,11 @@ export class SimAwsAccount {
    */
   acm(): SimAcm {
     return this.region().acm();
+  }
+
+  /** Get simulated AWS Backup for this Account's default Region. */
+  backup(): SimBackup {
+    return this.region().backup();
   }
 
   /**

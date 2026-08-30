@@ -2,6 +2,7 @@ import { acmValueAdapter } from "./acm/sim-acm-cfn-value-adapter.js";
 import { apiGatewayValueAdapter } from "./apigateway/sim-api-gateway-cfn-value-adapter.js";
 import { apiGatewayV2ValueAdapter } from "./apigatewayv2/sim-api-gateway-v2-cfn-value-adapter.js";
 import { athenaValueAdapter } from "./athena/sim-athena-cfn-value-adapter.js";
+import { backupValueAdapter } from "./backup/sim-backup-cfn-value-adapter.js";
 import { cdkCustomResourceValueAdapter } from "./cdk/sim-cdk-custom-resource-value-adapter.js";
 import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
 import { cloudWatchValueAdapter } from "./cloudwatch/sim-cloudwatch-cfn-value-adapter.js";
@@ -52,6 +53,7 @@ export const simCfnServiceValueAdapters: readonly ((
   apiGatewayValueAdapter,
   apiGatewayV2ValueAdapter,
   athenaValueAdapter,
+  backupValueAdapter,
   cdkCustomResourceValueAdapter,
   cloudFrontValueAdapter,
   cloudWatchValueAdapter,

@@ -23,6 +23,7 @@ npm i -D @kensio/yulin
 - [API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/ "Simulated API Gateway HTTP API docs")
 - [API Gateway REST APIs](https://yulinsim.dev/services/apigateway/ "Simulated API Gateway REST API docs")
 - [Athena](https://yulinsim.dev/services/athena/ "Simulated Amazon Athena docs")
+- [AWS Backup](https://yulinsim.dev/services/backup/ "Simulated AWS Backup docs")
 - [Bedrock](https://yulinsim.dev/services/bedrock/ "Simulated Amazon Bedrock docs")
 - [CloudFormation](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation docs")
 - [CloudFront](https://yulinsim.dev/services/cloudfront/ "Simulated CloudFront docs")

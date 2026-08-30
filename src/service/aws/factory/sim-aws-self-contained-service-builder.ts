@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimAthena } from "../../athena/index.js";
 import { SimBedrock } from "../../bedrock/index.js";
+import { SimBackup } from "../../backup/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimFirehose } from "../../firehose/index.js";
 import { SimGlue } from "../../glue/index.js";
@@ -62,6 +63,11 @@ export class SimAwsSelfContainedServiceBuilder {
    */
   createBedrock(scope: SimAwsAccountRegionContainer): SimBedrock {
     return new SimBedrock(this.scoped(scope));
+  }
+
+  /** Create simulated AWS Backup for an Account Region scope. */
+  createBackup(scope: SimAwsAccountRegionContainer): SimBackup {
+    return new SimBackup(this.scoped(scope));
   }
 
   /** Create simulated DynamoDB for an Account Region scope. */
