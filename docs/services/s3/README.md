@@ -1026,10 +1026,11 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 "Disabled"` is taken, and any other value is refused with `InvalidArgument`.
 - A `versionId` in a `CopySource` is still refused with `NotImplemented`. A copy reads the current
   version.
-- `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
-  stored and unread, so a noncurrent version stays until something deletes it by id. An `Expiration`
-  rule expires the current version behind a delete marker, as real S3 does, and raises nothing. See
-  [Lifecycle configuration](#lifecycle-configuration).
+- `NoncurrentVersionTransitions` is stored and unread, because storage classes are left out. An
+  `Expiration` rule expires the current version behind a delete marker, as real S3 does, and raises
+  nothing. A `NoncurrentVersionExpiration` rule bounds the history, and `ExpiredObjectDeleteMarker`
+  removes a marker left bare. See
+  [Bounding the history a versioned Bucket keeps](#bounding-the-history-a-versioned-bucket-keeps).
 - The `?versioning` and `?versions` sub-resources are refused over the served S3 REST endpoint.
   Versioning is reachable through the SDK and through a template.
 - A Bucket mounted on a filesystem directory refuses the deletion a delete marker asks for, the way
@@ -2258,8 +2259,9 @@ them disabled in favour of policies.
 ## Lifecycle configuration
 
 Sim S3 stores a Bucket's lifecycle rules and acts on them. An `Expiration` rule removes the Objects
-it selects once simulated time passes the boundary, and an `AbortIncompleteMultipartUpload` rule
-discards uploads that were started and left unfinished.
+it selects once simulated time passes the boundary, a `NoncurrentVersionExpiration` rule bounds the
+history a versioned Bucket keeps, and an `AbortIncompleteMultipartUpload` rule discards uploads that
+were started and left unfinished.
 
 Retention is otherwise the one property of a log or a backup Bucket a test cannot demonstrate.
 Reading the rules back off a deployed Bucket says the rules arrived. Putting an Object, moving the
@@ -2324,6 +2326,100 @@ Expiry happens when the Bucket is read. What `ListObjectsV2`, `GetObject` and `H
 what the rules leave at that instant, and a Bucket carrying no rules costs one comparison. Moving
 the clock backwards afterwards leaves an expired Object gone, because the rule deleted it on the way
 past.
+
+### Bounding the history a versioned Bucket keeps
+
+A versioned Bucket gains a version on every write and keeps every one of them. A
+`NoncurrentVersionExpiration` rule bounds that. `NoncurrentDays` removes a version once simulated
+time passes it, counted from the moment that version stopped being current rather than from its
+write, which is how real S3 measures it. A version written a year ago and displaced yesterday has
+been noncurrent for a day.
+
+```typescript sim-s3-noncurrent-expiry
+/**
+ * Bounding a reader's history at ninety days of noncurrent versions.
+ */
+
+import {
+  ListObjectVersionsCommand,
+  PutBucketLifecycleConfigurationCommand,
+  PutBucketVersioningCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "history-stack",
+  template: {
+    Resources: {
+      HistoryBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "reader-history" },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+await simS3.putBucketVersioning(
+  new PutBucketVersioningCommand({
+    Bucket: "reader-history",
+    VersioningConfiguration: { Status: "Enabled" },
+  }),
+);
+
+await simS3.putBucketLifecycleConfiguration(
+  new PutBucketLifecycleConfigurationCommand({
+    Bucket: "reader-history",
+    LifecycleConfiguration: {
+      Rules: [
+        {
+          ID: "bound-history",
+          Status: "Enabled",
+          Filter: { Prefix: "snapshots/" },
+          NoncurrentVersionExpiration: { NoncurrentDays: 90 },
+        },
+      ],
+    },
+  }),
+);
+
+const snapshot = {
+  Bucket: "reader-history",
+  Key: "snapshots/reader-1.json",
+};
+
+await simS3.putObject(new PutObjectCommand({ ...snapshot, Body: "before" }));
+await simS3.putObject(new PutObjectCommand({ ...snapshot, Body: "after" }));
+
+await simAws.clock().advanceBy({ days: 91 });
+
+const listed = await simS3.listObjectVersions(
+  new ListObjectVersionsCommand({ Bucket: "reader-history" }),
+);
+
+// The version the second write displaced has gone, and the current one stays
+// however old it is.
+console.log(listed.Versions?.length); // 1
+```
+
+`NewerNoncurrentVersions` holds that many of the most recent noncurrent versions back from the rule,
+whatever their age, so a rule keeping two reaches the third and everything older. Real S3 requires
+`NoncurrentDays` alongside it, and a rule stating the count on its own names no period to measure and
+expires nothing.
+
+`ExpiredObjectDeleteMarker` under `Expiration` removes a delete marker left with no version under it,
+which takes the key out of `ListObjectVersions` altogether. A marker still hiding a version stays,
+since that marker is what a read of the key answers with. The two run in that order in one pass, so a
+marker whose last version expired in the same pass goes with it.
+
+A noncurrent version is removed from the Bucket's history, and a `GetObject` naming its `VersionId`
+answers `NoSuchVersion` afterwards. The current version is beyond every rule of this kind, however
+old it is.
 
 ### What a rule selects
 
@@ -2415,14 +2511,17 @@ all three, and a rule stored here that real S3 would have rejected reads back lo
 CloudFormation spells some rule fields differently from the request. `Id` becomes `ID`,
 `ExpirationInDays` and `ExpirationDate` are gathered under `Expiration`, and a transition's
 `TransitionInDays` becomes `Days`. The singular `Transition` a template may state alongside
-`Transitions` joins the list. Everything else, `Status`, `Prefix`, `AbortIncompleteMultipartUpload`,
-`TagFilters` and the object size bounds among them, is carried across as the template stated it.
+`Transitions` joins the list. `NoncurrentVersionExpirationInDays` becomes the `NoncurrentDays` of a
+`NoncurrentVersionExpiration`, which is what CDK's `noncurrentVersionExpiration` synthesises, and a
+template stating the nested object instead is taken as it stands. Everything else, `Status`,
+`Prefix`, `AbortIncompleteMultipartUpload`, `TagFilters` and the object size bounds among them, is
+carried across as the template stated it.
 
 `LifecycleConfiguration` is one of the properties simulated S3 acts on. It stays out of
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
-The two actions it enforces are `Expiration`, whether the template flattened it onto the rule or
-not, and `AbortIncompleteMultipartUpload`. A `Transitions` rule is stored and read back and goes no
-further. Which Objects an enforced action reaches is decided by the fields listed under
+The three actions it enforces are `Expiration`, whether the template flattened it onto the rule or
+not, `NoncurrentVersionExpiration`, in either of its two spellings, and
+`AbortIncompleteMultipartUpload`. A `Transitions` rule is stored and read back and goes no further. Which Objects an enforced action reaches is decided by the fields listed under
 [What a rule selects](#what-a-rule-selects).
 
 ### Limitations
@@ -2433,10 +2532,11 @@ No Object moves between storage classes. Storage classes are left out of the sim
 Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object. That event family is
 among the ones sim S3 leaves out. An expiry here is silent.
 
-`NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
-stored and unread, so nothing removes a noncurrent version. An `Expiration` rule on a versioned
-Bucket writes a delete marker over the current version and leaves the version itself where it is,
-which is what real S3 does. See [Object versioning](#object-versioning).
+`NoncurrentVersionTransitions` is stored and unread, alongside `Transitions`, because storage classes
+are left out. An `Expiration` rule on a versioned Bucket writes a delete marker over the current
+version and leaves the version itself where it is, which is what real S3 does, and a
+`NoncurrentVersionExpiration` rule is what then removes it. See
+[Object versioning](#object-versioning).
 
 A Bucket mounted on a filesystem directory refuses the deletion an expiry asks for, the way it
 refuses `DeleteObject`, and answers `NotImplemented`. Removing a real file off the mounted directory

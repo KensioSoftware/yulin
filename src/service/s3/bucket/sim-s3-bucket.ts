@@ -133,7 +133,7 @@ export class SimS3Bucket {
 
   /** The versions this Bucket keeps, and whether it keeps any. */
   getVersions(): SimS3BucketVersions {
-    return this.objects.versions;
+    return this.objects.sweptVersions();
   }
 
   /** How this Bucket is locked, and what that does to a write and a delete. */

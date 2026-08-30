@@ -10,7 +10,8 @@ import type {
 import { s3BucketResourceError } from "../error/sim-cfn-s3-bucket-error.js";
 import {
   simCfnS3CarriedRuleFields,
-  simCfnS3LifecycleDate,
+  simCfnS3RuleExpiration,
+  simCfnS3RuleNoncurrentExpiration,
   simCfnS3StatedFields,
 } from "./sim-cfn-s3-bucket-lifecycle-fields.js";
 import { readSimCfnS3LifecycleTransitions } from "./sim-cfn-s3-bucket-lifecycle-transitions.js";
@@ -71,7 +72,8 @@ export class SimCfnS3BucketLifecycleConfiguration {
       ...simCfnS3CarriedRuleFields(rule),
       ...simCfnS3StatedFields({
         ID: rule["Id"],
-        Expiration: this.expiration(rule),
+        Expiration: simCfnS3RuleExpiration(rule),
+        NoncurrentVersionExpiration: simCfnS3RuleNoncurrentExpiration(rule),
         Transitions: readSimCfnS3LifecycleTransitions({
           shape: this.shape,
           listed: rule["Transitions"],
@@ -80,21 +82,5 @@ export class SimCfnS3BucketLifecycleConfiguration {
         }),
       }),
     };
-  }
-
-  /**
-   * The three flattened expiry fields, gathered under the one the request
-   * carries. A rule stating none of them keeps no `Expiration` at all.
-   */
-  private expiration(
-    rule: SimCfnTemplateValueRecord,
-  ): SimCfnTemplateValue | undefined {
-    const expiration = {
-      Date: simCfnS3LifecycleDate(rule["ExpirationDate"]),
-      Days: rule["ExpirationInDays"],
-      ExpiredObjectDeleteMarker: rule["ExpiredObjectDeleteMarker"],
-    };
-
-    return simCfnS3StatedFields(expiration);
   }
 }

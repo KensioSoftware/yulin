@@ -7,7 +7,10 @@ import type {
  * The rule fields CloudFormation and the SDK spell differently.
  *
  * CloudFormation flattens an expiry onto the rule and names a transition's
- * timing after it, where the request nests both. Everything absent from here,
+ * timing after it, where the request nests both. It carries the noncurrent
+ * expiry both ways, as the nested object the request takes and as the older
+ * `NoncurrentVersionExpirationInDays` beside it, which is what CDK's
+ * `noncurrentVersionExpiration` synthesises. Everything absent from here,
  * `Status`, `Prefix`, `AbortIncompleteMultipartUpload`, `TagFilters` and the
  * object size bounds among them, is spelled the same way in both and goes
  * through untouched.
@@ -17,6 +20,8 @@ export const simCfnS3TranslatedLifecycleFields: ReadonlySet<string> = new Set([
   "ExpirationDate",
   "ExpirationInDays",
   "ExpiredObjectDeleteMarker",
+  "NoncurrentVersionExpiration",
+  "NoncurrentVersionExpirationInDays",
   "Transition",
   "Transitions",
 ]);
@@ -69,4 +74,40 @@ export function simCfnS3CarriedRuleFields(
       ([name]) => !simCfnS3TranslatedLifecycleFields.has(name),
     ),
   );
+}
+
+/**
+ * The three flattened expiry fields, gathered under the one the request
+ * carries. A rule stating none of them keeps no `Expiration` at all.
+ */
+export function simCfnS3RuleExpiration(
+  rule: SimCfnTemplateValueRecord,
+): SimCfnTemplateValue | undefined {
+  return simCfnS3StatedFields({
+    Date: simCfnS3LifecycleDate(rule["ExpirationDate"]),
+    Days: rule["ExpirationInDays"],
+    ExpiredObjectDeleteMarker: rule["ExpiredObjectDeleteMarker"],
+  });
+}
+
+/**
+ * The noncurrent expiry, from whichever of the two spellings the rule used.
+ *
+ * The nested object is the one the request takes and wins where a template
+ * states it. `NoncurrentVersionExpirationInDays` is the older flattened field
+ * beside it, and is what CDK synthesises, so a rule carrying only that one
+ * still reaches the versions it names.
+ */
+export function simCfnS3RuleNoncurrentExpiration(
+  rule: SimCfnTemplateValueRecord,
+): SimCfnTemplateValue | undefined {
+  const nested = rule["NoncurrentVersionExpiration"];
+
+  if (nested !== undefined) {
+    return nested;
+  }
+
+  return simCfnS3StatedFields({
+    NoncurrentDays: rule["NoncurrentVersionExpirationInDays"],
+  });
 }

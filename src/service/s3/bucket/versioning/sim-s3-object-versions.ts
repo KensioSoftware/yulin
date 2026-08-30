@@ -15,9 +15,14 @@ export class SimS3ObjectVersions {
 
   /**
    * Put a version at the head of its key, making it the current one.
+   *
+   * Whatever was at the head stops being current at that instant, and is told
+   * so, because a `NoncurrentVersionExpiration` counts from there.
    */
   add(version: SimS3ObjectVersion): void {
     const versions = this.byKey.get(version.key) ?? [];
+
+    versions[0]?.displacedAt(version.lastModified);
     this.byKey.set(version.key, [version, ...versions]);
   }
 
@@ -73,6 +78,12 @@ export class SimS3ObjectVersions {
     if (kept.length === 0) {
       this.byKey.delete(key);
     } else {
+      // Whatever the removal left at the head is current again, and stops
+      // counting towards a noncurrent expiry.
+      if (removed === versions[0]) {
+        kept[0]?.restored();
+      }
+
       this.byKey.set(key, kept);
     }
 

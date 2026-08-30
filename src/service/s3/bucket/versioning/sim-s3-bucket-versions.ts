@@ -157,6 +157,17 @@ export class SimS3BucketVersions {
   }
 
   /**
+   * Take a version a lifecycle rule expired out of the history.
+   *
+   * Storage is left alone, unlike `deleteVersion`. A rule for noncurrent
+   * versions never reaches the current one, and a delete marker holds no
+   * bytes, so nothing this removes was in storage to begin with.
+   */
+  removeExpired(key: string, versionId: string): void {
+    this.history.remove(key, versionId);
+  }
+
+  /**
    * Every version this Bucket holds, in the order a listing reports them.
    */
   list(prefix?: string): readonly SimS3ObjectVersion[] {
