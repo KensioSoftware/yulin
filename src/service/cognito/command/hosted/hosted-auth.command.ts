@@ -55,6 +55,27 @@ export interface SimCognitoAuthorizeInput {
    * issued when the passkey was asked for.
    */
   readonly passkey_session?: string | undefined;
+
+  /**
+   * The subject the identity provider is signing in, as the stand-in page for
+   * that provider posted it.
+   *
+   * Real Cognito redirects the browser to the provider itself here, and the
+   * provider answers with whoever signed in at it. A test says who that is
+   * with `signInAs`, and a browser on a served domain says it on the page the
+   * simulation stands in with. This is that page coming back.
+   */
+  readonly subject?: string | undefined;
+
+  /**
+   * One claim the provider would have asserted, under its own claim name.
+   *
+   * The stand-in page draws a field per claim the provider's `AttributeMapping`
+   * reads, so the names are the pool's rather than this simulation's, and they
+   * are prefixed to keep them apart from the authorize parameters they are
+   * posted beside.
+   */
+  readonly [claim: `claim_${string}`]: string | undefined;
 }
 
 /**

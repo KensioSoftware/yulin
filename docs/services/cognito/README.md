@@ -2036,7 +2036,7 @@ so does one that signed up on the page below.
 
 ### The pages managed login serves
 
-A served domain answers five pages, so a browser in a local development server completes a whole
+A served domain answers six pages, so a browser in a local development server completes a whole
 sign-up, password reset and sign-in without any of it being stubbed out.
 
 `GET /oauth2/authorize` naming no `identity_provider` answers HTML holding the sign-in form. The
@@ -2045,6 +2045,25 @@ posts back to `/oauth2/authorize`. A pool that allows passkeys carries a second 
 The pool's identity providers are links to the same endpoint with `identity_provider` set, so every
 way in is on the one page. Posting the form redirects to the app client's callback URL with the code
 and the `state`, honouring a `code_challenge` the request carried.
+
+Following one of those provider links reaches a page standing in for the provider's own sign-in
+page. Real Cognito sends the browser to Google here, and nothing in this simulation calls Google, so
+the page asks who Google would have said is signing in. It says on its face that it is Yulin rather
+than the provider, twice, because somebody meeting it in a screenshot or a screen recording has to
+be able to tell that no real sign-in happened.
+
+The page asks for the subject and for one field per claim the provider's `AttributeMapping` reads,
+and every field arrives filled in, so the common case is pressing the button. The address it
+pre-fills is on `example.com`, which is reserved, so nothing left unedited reaches a real mailbox.
+Editing the address is what drives a federated sign-up against a pool that already holds one of its
+own users at the same address, which real Cognito keeps as two accounts until
+`AdminLinkProviderForUser` merges them. That operation is unsimulated.
+
+Posting the page carries on into the sign-in the authorize endpoint already runs, ending in the same
+`<ProviderName>_<subject>` user and the same authorization code. Nothing is kept on the provider
+afterwards: a further authorize request asks again, because real Cognito asks the provider afresh
+every time. A provider that `signInAs` has already put somebody at skips the page, which is what
+leaves a test that says who is signing in seeing none of this.
 
 `/signup` is a link from that page. Its form asks for a username, a password and the attributes the
 pool needs, which are the ones its `Schema` made required and the ones its `AutoVerifiedAttributes`
@@ -4678,6 +4697,9 @@ Sim Cognito currently supports:
 - A served sign-in form at `/oauth2/authorize`, a sign-up form at `/signup`, a confirmation form at
   `/confirm`, and the two password reset forms at `/forgotPassword` and `/confirmForgotPassword`,
   each carrying the authorize parameters through to the next
+- A served stand-in for an identity provider's own sign-in page, so a browser completes a federated
+  sign-in on a local development server, with the subject and the mapped claims pre-filled and
+  editable
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
@@ -5062,7 +5084,10 @@ Current documented limitations:
   `userinfo_endpoint`, where real Cognito names one.
 - Nothing calls an external identity provider. A provider's `ProviderDetails` are recorded and
   validated for presence, and never used. The user a simulated provider signs in is the one
-  `signInAs` put there. That accessor is a divergence for the same reason `confirmationCode` is one.
+  `signInAs` put there, or the one the served stand-in page for that provider posted back. Both are
+  divergences for the same reason `confirmationCode` is one.
+- The stand-in page is served, and an authorize request that reaches `hostedAuthorize` directly is
+  refused instead, naming `signInAs`. Only the serving layer can answer a caller with a page.
 - A custom domain answers on its own hostname with no Route53 record of its own, where real AWS
   needs an alias record to the CloudFront distribution Cognito creates. The distribution name a
   domain reports is a name unserved here.

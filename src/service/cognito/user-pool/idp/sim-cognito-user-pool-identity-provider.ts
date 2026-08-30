@@ -120,6 +120,16 @@ export class SimCognitoUserPoolIdentityProvider {
   }
 
   /**
+   * The user signed in at this provider, where anything has put one there.
+   *
+   * A request that presents an external user of its own reads this first, to
+   * find out whether it has to ask for one.
+   */
+  get signedInUser(): SimCognitoExternalUser | undefined {
+    return this.externalUser;
+  }
+
+  /**
    * The user this provider signs in, or a refusal.
    *
    * Real Cognito would show the provider's own sign-in page here, and there is

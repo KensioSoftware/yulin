@@ -147,13 +147,10 @@ describe("The user a sim Cognito pool creates for a federated sign-in", () => {
       .auth.identityProviders.require("Google")
       .signOut();
 
-    // Then a further authorize request is refused rather than signing the same
-    // user in again.
+    // Then a further authorize request asks who is signing in rather than
+    // signing the same user in again.
     const response = await signIn(setUp);
-    assertIdentical(response.status, 400);
-    assertStringIncludes(
-      JSON.stringify(await response.json()),
-      "Nobody is signed in at the Google identity provider",
-    );
+    assertIdentical(response.status, 200);
+    assertStringIncludes(await response.text(), "Simulated Google sign-in");
   });
 });

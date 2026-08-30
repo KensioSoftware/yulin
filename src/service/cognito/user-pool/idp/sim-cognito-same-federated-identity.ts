@@ -1,5 +1,6 @@
 import { SimCognitoUsernameExistsException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUser } from "../user/sim-cognito-user.js";
+import type { SimCognitoExternalUser } from "./sim-cognito-external-user.js";
 import type { SimCognitoUserPoolIdentityProvider } from "./sim-cognito-user-pool-identity-provider.js";
 
 /**
@@ -14,9 +15,9 @@ import type { SimCognitoUserPoolIdentityProvider } from "./sim-cognito-user-pool
 export function requireSimCognitoSameFederatedIdentity(
   existing: SimCognitoUser,
   provider: SimCognitoUserPoolIdentityProvider,
+  externalUser: SimCognitoExternalUser,
 ): void {
   const { identity } = existing;
-  const externalUser = provider.requireSignedInUser();
 
   if (
     identity?.providerName !== provider.name ||

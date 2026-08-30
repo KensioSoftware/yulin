@@ -2,6 +2,7 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-login.error.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
+import { requireSimCognitoSigningInAt } from "../../user-pool/idp/sim-cognito-presented-external-user.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoFirstFactorChallenge } from "../auth/sim-cognito-first-factor-challenge.js";
@@ -82,6 +83,7 @@ export class SimCognitoHostedSignIn {
       pool,
       client,
       provider,
+      externalUser: requireSimCognitoSigningInAt(provider, input),
       now,
     });
 

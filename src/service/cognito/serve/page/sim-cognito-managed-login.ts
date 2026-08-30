@@ -1,6 +1,7 @@
 import {
   isSimCognitoManagedLoginRequired,
   isSimCognitoPasskeyRequired,
+  isSimCognitoProviderSignInRequired,
 } from "../../error/sim-cognito-managed-login.error.js";
 import { isSimCognitoOAuthError } from "../../error/sim-cognito-oauth.error.js";
 import type { SimCognitoDomainRequest } from "../sim-cognito-domain-request.js";
@@ -8,6 +9,7 @@ import { SimCognitoConfirmPage } from "./sim-cognito-confirm-page.js";
 import { SimCognitoForgotPasswordPage } from "./sim-cognito-forgot-password-page.js";
 import { SimCognitoPageForm } from "./sim-cognito-page-form.js";
 import { SimCognitoPasskeyPage } from "./sim-cognito-passkey-page.js";
+import { SimCognitoProviderPage } from "./sim-cognito-provider-page.js";
 import type { SimCognitoPageParameters } from "./sim-cognito-page-markup.js";
 import {
   simCognitoForgotPasswordPath,
@@ -35,6 +37,7 @@ export class SimCognitoManagedLogin {
   private readonly pageRequest = new SimCognitoPageRequest();
   private readonly signInPage = new SimCognitoSignInPage();
   private readonly passkeyPage = new SimCognitoPasskeyPage();
+  private readonly providerPage = new SimCognitoProviderPage();
   private readonly signUpPage = new SimCognitoSignUpPage();
   private readonly confirmPage = new SimCognitoConfirmPage();
   private readonly forgotPasswordPage = new SimCognitoForgotPasswordPage();
@@ -91,6 +94,13 @@ export class SimCognitoManagedLogin {
 
     if (isSimCognitoPasskeyRequired(error)) {
       return this.passkeyPage.render(parameters, error.username, error.session);
+    }
+
+    if (isSimCognitoProviderSignInRequired(error)) {
+      return this.providerPage.render(
+        request.pool.auth.identityProviders.require(error.providerName),
+        parameters,
+      );
     }
 
     if (isSimCognitoOAuthError(error) || !simCognitoIsLocalSignIn(parameters)) {

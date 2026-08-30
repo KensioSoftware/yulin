@@ -78,3 +78,45 @@ export function isSimCognitoPasskeyRequired(
 ): error is SimCognitoPasskeyRequired {
   return error instanceof SimCognitoPasskeyRequired;
 }
+
+/**
+ * An authorize request naming an identity provider that nobody is signed in
+ * at, and presenting no user of its own.
+ *
+ * Real Cognito redirects the browser to the provider's own sign-in page here,
+ * and the provider answers with whoever signed in at it. Nothing in this
+ * simulation calls a provider, so a served domain answers with a page standing
+ * in for that one, and the person says who is signing in. A test skips the
+ * page by saying it with `signInAs` first.
+ *
+ * It is an OAuth error so that every other caller treats it as one, in the
+ * same way `SimCognitoManagedLoginRequired` is.
+ */
+export class SimCognitoProviderSignInRequired extends SimCognitoOAuthError {
+  /** The provider the page stands in for. */
+  public readonly providerName: string;
+
+  constructor(providerName: string) {
+    super({
+      code: "invalid_request",
+      description:
+        `Nobody is signed in at the ${providerName} identity provider. Real ` +
+        `Cognito would send the user to the provider's own sign-in page, ` +
+        `which this simulation has no equivalent of. Say who is signed in ` +
+        `there with signInAs, or post a subject to the page a served domain ` +
+        `answers this request with.`,
+      redirectable: false,
+    });
+    this.providerName = providerName;
+  }
+}
+
+/**
+ * Whether an authorize request was one a provider's own sign-in page would
+ * have answered.
+ */
+export function isSimCognitoProviderSignInRequired(
+  error: unknown,
+): error is SimCognitoProviderSignInRequired {
+  return error instanceof SimCognitoProviderSignInRequired;
+}
