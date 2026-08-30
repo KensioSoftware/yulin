@@ -1,7 +1,9 @@
 import type {
-  SimCognitoPoolMetrics,
-  SimCognitoRequestMetric,
-} from "./sim-cognito-pool-metrics.js";
+  SimCognitoRequestThrottle,
+  SimCognitoThrottledOperation,
+} from "../user-pool/auth/sim-cognito-request-throttle.js";
+import type { SimCognitoPoolMetrics } from "./sim-cognito-pool-metrics.js";
+import { throttledSimCognitoRequest } from "./sim-cognito-throttled-request.js";
 
 /**
  * What an authentication request answers with, as the count reads it.
@@ -17,8 +19,11 @@ interface SimCognitoAuthenticationOutcome {
  * administrator made reaches the pool through no app client and is reported
  * under a fixed name instead.
  */
-interface SimCognitoCountedScope {
-  readonly pool: { readonly id: string };
+export interface SimCognitoCountedScope {
+  readonly pool: {
+    readonly id: string;
+    readonly auth: { readonly throttle: SimCognitoRequestThrottle };
+  };
   readonly client: { readonly id: string };
 }
 
@@ -31,7 +36,7 @@ interface SimCognitoCountedScope {
  */
 async function countedSimCognitoRequest<T>(
   metrics: SimCognitoPoolMetrics,
-  metricName: SimCognitoRequestMetric,
+  operation: SimCognitoThrottledOperation,
   scope: SimCognitoCountedScope,
   run: () => Promise<T>,
   succeeded: (output: T) => boolean,
@@ -39,13 +44,18 @@ async function countedSimCognitoRequest<T>(
   let counted = false;
 
   try {
-    const output = await run();
+    const output = await throttledSimCognitoRequest(
+      metrics,
+      operation,
+      scope,
+      run,
+    );
 
     counted = succeeded(output);
 
     return output;
   } finally {
-    metrics.count(metricName, scope.pool.id, scope.client.id, counted);
+    metrics.count(operation, scope.pool.id, scope.client.id, counted);
   }
 }
 
@@ -60,13 +70,13 @@ export async function countedSimCognitoAuth<
   T extends SimCognitoAuthenticationOutcome,
 >(
   metrics: SimCognitoPoolMetrics,
-  metricName: SimCognitoRequestMetric,
+  operation: SimCognitoThrottledOperation,
   scope: SimCognitoCountedScope,
   run: () => Promise<T>,
 ): Promise<T> {
   return await countedSimCognitoRequest(
     metrics,
-    metricName,
+    operation,
     scope,
     run,
     (output) => output.AuthenticationResult !== undefined,
@@ -81,13 +91,13 @@ export async function countedSimCognitoAuth<
  */
 export async function countedSimCognitoCompletion<T>(
   metrics: SimCognitoPoolMetrics,
-  metricName: SimCognitoRequestMetric,
+  operation: SimCognitoThrottledOperation,
   scope: SimCognitoCountedScope,
   run: () => Promise<T>,
 ): Promise<T> {
   return await countedSimCognitoRequest(
     metrics,
-    metricName,
+    operation,
     scope,
     run,
     () => true,
@@ -111,10 +121,5 @@ export async function countedSimCognitoFederation<T>(
     return await run();
   }
 
-  return await countedSimCognitoCompletion(
-    metrics,
-    "FederationSuccesses",
-    scope,
-    run,
-  );
+  return await countedSimCognitoCompletion(metrics, "Federation", scope, run);
 }

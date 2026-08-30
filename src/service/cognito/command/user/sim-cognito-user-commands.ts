@@ -103,7 +103,7 @@ export class SimCognitoUserCommands {
     // client, and real Cognito reports it under a fixed name in that place.
     return await countedSimCognitoCompletion(
       this.poolMetrics,
-      "SignUpSuccesses",
+      "SignUp",
       { pool, client: { id: simCognitoAdminClientDimension } },
       async () => await this.created(command, pool),
     );

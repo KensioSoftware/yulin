@@ -81,7 +81,7 @@ export class SimCognitoSignUpCommands {
 
     return await countedSimCognitoCompletion(
       this.poolMetrics,
-      "SignUpSuccesses",
+      "SignUp",
       scope,
       async () => await this.registered(command, scope),
     );

@@ -76,7 +76,7 @@ export class SimCognitoAuthResolver {
       // of, reporting a fixed name in the client's place rather than the id
       // the request gave. The request still fails.
       this.poolMetrics.count(
-        "SignInSuccesses",
+        "SignIn",
         pool.id,
         simCognitoInvalidClientDimension,
         false,
