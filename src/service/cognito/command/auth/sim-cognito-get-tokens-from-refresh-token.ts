@@ -64,7 +64,7 @@ export class SimCognitoGetTokensFromRefreshToken {
 
     return await countedSimCognitoAuth(
       this.poolMetrics,
-      "TokenRefreshSuccesses",
+      "TokenRefresh",
       scope,
       async () => await this.renewed(command, scope),
     );

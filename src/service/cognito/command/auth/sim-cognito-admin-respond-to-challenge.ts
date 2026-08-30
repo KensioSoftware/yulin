@@ -60,7 +60,7 @@ export class SimCognitoAdminRespondToChallenge {
     // counts its own.
     return await countedSimCognitoAuth(
       this.poolMetrics,
-      "SignInSuccesses",
+      "SignIn",
       { pool, client },
       async () =>
         await this.responses.handle(input.ChallengeName, {

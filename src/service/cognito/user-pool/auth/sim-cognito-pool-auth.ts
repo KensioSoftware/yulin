@@ -1,4 +1,5 @@
 import { SimCognitoNotAuthorizedException } from "../../error/sim-cognito.error.js";
+import { SimCognitoRequestThrottle } from "./sim-cognito-request-throttle.js";
 import { SimCognitoIdentityProviderStore } from "../idp/sim-cognito-identity-provider-store.js";
 import type { SimCognitoUserPoolDomain } from "../domain/sim-cognito-user-pool-domain.js";
 import type { SimCognitoAuthSession } from "./sim-cognito-auth-session.js";
@@ -35,6 +36,14 @@ export class SimCognitoPoolAuth {
    * The external identity providers this pool federates to.
    */
   public readonly identityProviders = new SimCognitoIdentityProviderStore();
+
+  /**
+   * How many requests of each kind this pool has been told to turn away.
+   *
+   * The simulator's own control rather than anything real Cognito exposes: a
+   * real pool's rate limits belong to the account and no API sets them.
+   */
+  public readonly throttle = new SimCognitoRequestThrottle();
 
   private readonly sessions = new SimCognitoAuthSessionStore();
   private readonly managedLogin = new SimCognitoManagedLoginSessionStore();

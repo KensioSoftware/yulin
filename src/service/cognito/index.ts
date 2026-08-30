@@ -192,6 +192,11 @@ export {
   SimCognitoWebAuthnOriginNotAllowedException,
   SimCognitoWebAuthnRelyingPartyMismatchException,
 } from "./error/sim-cognito-web-authn.error.js";
+export { SimCognitoTooManyRequestsException } from "./error/sim-cognito-throttle.error.js";
+export {
+  SimCognitoRequestThrottle,
+  type SimCognitoThrottledOperation,
+} from "./user-pool/auth/sim-cognito-request-throttle.js";
 export {
   isSimCognitoOAuthError,
   SimCognitoOAuthError,

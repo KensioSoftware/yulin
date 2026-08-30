@@ -3268,6 +3268,77 @@ Two `UserPoolClient` values are fixed names rather than ids. A user an administr
 
 A token refresh stays out of `SignInSuccesses` and lands in `TokenRefreshSuccesses`, whether it arrived as a `REFRESH_TOKEN_AUTH` flow or as `GetTokensFromRefreshToken`. A federated sign-in counts where its tokens are issued, at the token endpoint, rather than at the authorization code the provider sent the browser back with.
 
+### Turning requests away
+
+Real Cognito turns a request away when the account has gone over a rate limit, answering `TooManyRequestsException` and counting a `*Throttles` beside the `*Successes` it counts a 0 in. Those limits belong to the account and are mostly undocumented. Working one out here would be inventing a number, and a test asserting against an invented number proves little about a real pool. A test says how many requests a pool should turn away instead, and the pool turns away that many.
+
+```typescript sim-cognito-throttles
+/**
+ * An alarm on the sign-ins a pool is turning away.
+ */
+
+import {
+  DescribeAlarmsCommand,
+  PutMetricAlarmCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { InitiateAuthCommand } from "@aws-sdk/client-cognito-identity-provider";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+await simAws.cloudWatch().putMetricAlarm(
+  new PutMetricAlarmCommand({
+    AlarmName: "SignInsThrottling",
+    Namespace: "AWS/Cognito",
+    MetricName: "SignInThrottles",
+    Dimensions: [
+      { Name: "UserPool", Value: userPoolId },
+      { Name: "UserPoolClient", Value: clientId },
+    ],
+    Statistic: "Sum",
+    Period: 300,
+    EvaluationPeriods: 3,
+    DatapointsToAlarm: 1,
+    Threshold: 0,
+    ComparisonOperator: "GreaterThanThreshold",
+    TreatMissingData: "notBreaching",
+  }),
+);
+
+const cognito = simAws.cognitoIdentityProvider();
+
+cognito.userPool(userPoolId).auth.throttle.signIns(1);
+
+try {
+  await cognito.initiateAuth(
+    new InitiateAuthCommand({
+      ClientId: clientId,
+      AuthFlow: "USER_PASSWORD_AUTH",
+      AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+    }),
+  );
+} catch {
+  // TooManyRequestsException, counted in SignInThrottles.
+}
+
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const { MetricAlarms } = await simAws
+  .cloudWatch()
+  .describeAlarms(
+    new DescribeAlarmsCommand({ AlarmNames: ["SignInsThrottling"] }),
+  );
+
+// ALARM.
+console.log(MetricAlarms?.[0]?.StateValue);
+```
+
+`signUps`, `tokenRefreshes` and `federations` sit beside `signIns` on the same object, and each turns away only its own kind of request. A pool answers normally until a test asks it to turn requests away, and it goes back to answering normally once it has turned away the number it was given.
+
 ## Pool ARNs and IAM policies
 
 A pool ARN is the pool id after `userpool/`, and the region appears twice:
@@ -4812,11 +4883,10 @@ Sim Cognito currently supports:
 
 Current documented limitations:
 
-- `SignInSuccesses`, `SignUpSuccesses`, `TokenRefreshSuccesses` and `FederationSuccesses` are the
-  `AWS/Cognito` metrics a pool publishes. The `*Throttles` metrics beside them count what a rate
-  limit turned away, and this simulation applies none. A test that needs an alarm on one seeds the
-  datapoint through simulated CloudWatch's service writer. `CallCount` and `ThrottleCount` under
-  `AWS/Usage` are absent for the same reason. A client-side request naming an app client the pool
+- `SignInSuccesses`, `SignUpSuccesses`, `TokenRefreshSuccesses`, `FederationSuccesses` and the four
+  `*Throttles` beside them are the `AWS/Cognito` metrics a pool publishes. No rate limit works
+  itself out here. A pool turns a request away only where a test has told it to. `CallCount` and
+  `ThrottleCount` under `AWS/Usage` are absent. A client-side request naming an app client the pool
   has none of counts nothing at all, because the app client id is what finds the pool and an unknown
   one reaches no pool to report against.
 - Five authentication flows run: `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through

@@ -1,22 +1,9 @@
 import type { SimCloudWatchServiceWriter } from "../../cloudwatch/write/sim-cloudwatch-service-writer.js";
+import type { SimCognitoThrottledOperation } from "../user-pool/auth/sim-cognito-request-throttle.js";
 import {
   simCognitoMetricNamespace,
   simCognitoPoolDimensions,
 } from "./sim-cognito-metrics.js";
-
-/**
- * The counts real Cognito keeps of what a pool was asked to do.
- *
- * Each is published on every request of its kind, as a 1 where the request
- * issued tokens and a 0 where it did not. `Average` over one is therefore a
- * success rate and `SampleCount` is the number of requests, which is how the
- * AWS documentation says to read them.
- */
-export type SimCognitoRequestMetric =
-  | "SignInSuccesses"
-  | "SignUpSuccesses"
-  | "TokenRefreshSuccesses"
-  | "FederationSuccesses";
 
 interface SimCognitoPoolMetricsProperties {
   readonly metrics: SimCloudWatchServiceWriter | undefined;
@@ -43,21 +30,53 @@ export class SimCognitoPoolMetrics {
   /**
    * Count one request against the pool and app client that made it.
    *
-   * A request that was refused before the pool was known counts nothing,
-   * because there is no `UserPool` to report it under.
+   * Real Cognito publishes a `*Successes` on every request of the kind, as a 1
+   * where it issued tokens and a 0 where it did not, so `Average` over one is
+   * a success rate and `SampleCount` is the number of requests. A request that
+   * was refused before the pool was known counts nothing, because there is no
+   * `UserPool` to report it under.
    */
   count(
-    metricName: SimCognitoRequestMetric,
+    operation: SimCognitoThrottledOperation,
     poolId: string,
     clientId: string,
     issuedTokens: boolean,
+  ): void {
+    this.publish(
+      `${operation}Successes`,
+      poolId,
+      clientId,
+      issuedTokens ? 1 : 0,
+    );
+  }
+
+  /**
+   * Count one request the pool turned away for rate limiting.
+   *
+   * Real Cognito counts a throttled request in both places. It is a 1 here and
+   * a 0 in the `*Successes` beside it, because a request that was turned away
+   * issued no tokens.
+   */
+  throttled(
+    operation: SimCognitoThrottledOperation,
+    poolId: string,
+    clientId: string,
+  ): void {
+    this.publish(`${operation}Throttles`, poolId, clientId, 1);
+  }
+
+  private publish(
+    metricName: string,
+    poolId: string,
+    clientId: string,
+    value: number,
   ): void {
     this.#metrics?.publish([
       {
         namespace: simCognitoMetricNamespace,
         metricName,
         dimensions: simCognitoPoolDimensions(poolId, clientId),
-        value: issuedTokens ? 1 : 0,
+        value,
         unit: "Count",
       },
     ]);

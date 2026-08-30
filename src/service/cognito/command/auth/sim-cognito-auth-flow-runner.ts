@@ -56,7 +56,7 @@ export class SimCognitoAuthFlowRunner {
   ): Promise<SimCognitoAuthenticationOutput> {
     return await countedSimCognitoAuth(
       this.poolMetrics,
-      flow.exchangesRefreshToken ? "TokenRefreshSuccesses" : "SignInSuccesses",
+      flow.exchangesRefreshToken ? "TokenRefresh" : "SignIn",
       request,
       async () => await this.ran(flow, request),
     );
