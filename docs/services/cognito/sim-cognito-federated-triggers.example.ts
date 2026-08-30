@@ -2,9 +2,18 @@
  * A PostConfirmation trigger that runs on a federated user's first sign-in.
  */
 
-import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  CreateIdentityProviderCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  CreateUserPoolDomainCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 
-import type { SimAws } from "@kensio/yulin";
+import { SimAws } from "@kensio/yulin";
 import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
 
 /**
@@ -15,32 +24,84 @@ interface PostConfirmationEvent {
   readonly userName: string;
 }
 
-// A pool with a domain, a Google provider and an app client, as
-// [the hosted domain example](#signing-in-through-a-hosted-domain) builds one.
-declare const simAws: SimAws;
-declare const userPoolId: string;
-declare const clientId: string;
-declare const callbackUrl: string;
-
 const written: string[] = [];
 
 // A record is written here. A deployed handler writes it to DynamoDB.
-const handler = (event: PostConfirmationEvent): unknown => {
+const postConfirmation = (event: PostConfirmationEvent): unknown => {
   written.push(`${event.triggerSource} ${event.userName}`);
 
   return event;
 };
 
-// The function the pool's `LambdaConfig` names in its `PostConfirmation`.
-await simAws.lambda().createFunction(
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const lambda = simAws.lambda();
+const cognito = simAws.cognitoIdentityProvider();
+const callbackUrl = "https://www.example.com/user/callback";
+
+// The function comes first, because the pool names it by ARN.
+const functionArn =
+  `arn:aws:lambda:eu-west-2:${simAws.defaultAccountId}` +
+  `:function:post-confirmation`;
+await lambda.createFunction(
   new CreateFunctionCommand({
     FunctionName: "post-confirmation",
-    Role: "arn:aws:iam::123456789012:role/TriggerRole",
-    Code: { ZipFile: makeLambdaZipFileInput(handler) },
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/TriggerRole`,
+    Code: { ZipFile: makeLambdaZipFileInput(postConfirmation) },
   }),
 );
 
-const cognito = simAws.cognitoIdentityProvider();
+const created = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    LambdaConfig: { PostConfirmation: functionArn },
+  }),
+);
+const userPoolId = created.UserPool?.Id ?? "";
+
+// The permission a CDK `addTrigger` emits, which lets Cognito invoke it.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "post-confirmation",
+    StatementId: "AllowCognito",
+    Action: "lambda:InvokeFunction",
+    Principal: "cognito-idp.amazonaws.com",
+    SourceArn: created.UserPool?.Arn,
+  }),
+);
+
+await cognito.createIdentityProvider(
+  new CreateIdentityProviderCommand({
+    UserPoolId: userPoolId,
+    ProviderName: "Google",
+    ProviderType: "Google",
+    ProviderDetails: {
+      client_id: "google-client-id",
+      client_secret: "google-client-secret",
+      authorize_scopes: "openid email",
+    },
+    AttributeMapping: { email: "email" },
+  }),
+);
+
+const client = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    AllowedOAuthFlowsUserPoolClient: true,
+    AllowedOAuthFlows: ["code"],
+    AllowedOAuthScopes: ["openid", "email"],
+    CallbackURLs: [callbackUrl],
+    SupportedIdentityProviders: ["Google"],
+  }),
+);
+
+await cognito.createUserPoolDomain(
+  new CreateUserPoolDomainCommand({
+    UserPoolId: userPoolId,
+    Domain: "myapp-login",
+  }),
+);
+
 const pool = cognito.userPool(userPoolId);
 
 pool.auth.identityProviders.require("Google").signInAs({
@@ -50,7 +111,7 @@ pool.auth.identityProviders.require("Google").signInAs({
 
 const authorize = {
   response_type: "code",
-  client_id: clientId,
+  client_id: client.UserPoolClient?.ClientId ?? "",
   redirect_uri: callbackUrl,
   identity_provider: "Google",
 };

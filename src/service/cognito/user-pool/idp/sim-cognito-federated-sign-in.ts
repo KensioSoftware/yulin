@@ -1,3 +1,4 @@
+import { requireSimCognitoEnabled } from "../auth/sim-cognito-sign-in.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolTriggers } from "../trigger/sim-cognito-user-pool-triggers.js";
@@ -86,6 +87,10 @@ export class SimCognitoFederatedSignIn {
    *
    * `PreAuthentication` runs before the mapped attributes are brought up to
    * date, so a handler that refuses the sign-in leaves the user as it was.
+   *
+   * A disabled user is refused after that trigger and not before it, which is
+   * the order the API sign-ins use: real Cognito hands the trigger the user to
+   * decide about, and a sign-in the pool is going to refuse reaches it too.
    */
   private async returningUser(
     request: SimCognitoFederatedSignInRequest,
@@ -95,6 +100,8 @@ export class SimCognitoFederatedSignIn {
     const { pool, client } = request;
 
     await this.triggers.beforeSignIn({ pool, client, user });
+
+    requireSimCognitoEnabled(user);
 
     user.updateAttributes(attributes);
 

@@ -1,3 +1,4 @@
+import { AdminDisableUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
   assertArrayLength,
@@ -204,6 +205,63 @@ describe("The Lambda triggers a sim Cognito federated sign-in runs", () => {
       .userPool(setUp.userPoolId)
       .requireUser("Google_google-subject-1" as never).attributeValues;
     assertIdentical(attributes.get("email_verified"), "true");
+  });
+});
+
+describe("A disabled sim Cognito federated user", () => {
+  it("is refused the sign-in its provider would otherwise complete", async () => {
+    // Given a subject that has signed in once, disabled since.
+    const setUp = await simCognitoHosted();
+    simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
+      email: "someone@example.com",
+    });
+    await federatedSignIn(setUp);
+    await setUp.cognito.adminDisableUser(
+      new AdminDisableUserCommand({
+        UserPoolId: setUp.userPoolId,
+        Username: "Google_google-subject-1",
+      }),
+    );
+
+    // When it signs in at the provider again.
+    const error = await assertThrowsErrorAsync(async () => {
+      await federatedSignIn(setUp);
+    });
+
+    // Then the pool refuses it the way it refuses every other disabled
+    // sign-in, rather than issuing a code for it.
+    assertStringIncludes(error.message, "User is disabled.");
+  });
+
+  it("reaches PreAuthentication before the pool refuses it", async () => {
+    // Given the same disabled user, in a pool whose PreAuthentication trigger
+    // records what it is given.
+    const events: unknown[] = [];
+    const setUp = await simCognitoHosted({
+      triggers: { PreAuthentication: functionArn },
+      handler: recordingTriggerHandler(events),
+    });
+    simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
+      email: "someone@example.com",
+    });
+    await federatedSignIn(setUp);
+    await setUp.cognito.adminDisableUser(
+      new AdminDisableUserCommand({
+        UserPoolId: setUp.userPoolId,
+        Username: "Google_google-subject-1",
+      }),
+    );
+    events.length = 0;
+
+    // When it signs in again.
+    await assertThrowsErrorAsync(async () => {
+      await federatedSignIn(setUp);
+    });
+
+    // Then the trigger ran first, as it does for an API sign-in the pool is
+    // about to refuse. The handler is given the user to decide about, so it
+    // sees the ones the pool turns away as well.
+    assertArrayEquals(sourcesOf(events), ["PreAuthentication_Authentication"]);
   });
 });
 
