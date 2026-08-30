@@ -54,10 +54,10 @@ export class SimLogsMetricFilterCommands {
    * configuration and publishes nothing is worse than a failure, because the
    * alarm over its metric then reports healthy for ever.
    */
-  async putMetricFilter(
+  putMetricFilter(
     command: SimPutMetricFilterCommand,
     options?: SimLogsRequestOptions,
-  ): Promise<SimPutMetricFilterCommandOutput> {
+  ): SimPutMetricFilterCommandOutput {
     const input = command.input;
     const logGroupName = requiredSimLogsLogGroupName(input.logGroupName);
     const filterName = requiredSimLogsFilterName(input.filterName);
@@ -73,7 +73,7 @@ export class SimLogsMetricFilterCommands {
 
     const group = this.#groups.require(logGroupName);
 
-    await this.#fanOut.checkPublishable();
+    this.#fanOut.checkPublishable();
 
     group.metricFilters.put(
       new SimLogsMetricFilter({

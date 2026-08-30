@@ -118,6 +118,6 @@ describe("an alarm over a metric a CloudWatch Logs metric filter writes", () => 
     // reached its topic.
     assertIdentical(await alarmState(simAws), "ALARM");
     assertArrayLength(simAws.cloudWatch().alarmActionFailures, 0);
-    assertArrayLength(simAws.logs().metricFilterFailures, 0);
+    assertArrayLength(simAws.logs().metricPublicationFailures, 0);
   });
 });

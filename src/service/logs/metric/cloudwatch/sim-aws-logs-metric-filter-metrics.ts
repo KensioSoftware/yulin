@@ -42,17 +42,10 @@ export class SimAwsLogsMetricFilterMetrics implements SimLogsMetricPublications 
    * Publish the datapoints one log event produced.
    *
    * `PutMetricData` carries one namespace per request, so datapoints are
-   * grouped by the namespace their transformation named. One filter writing
-   * into two namespaces is two requests, as it is on real AWS.
-   *
-   * An empty batch reaches nothing. That is a filter about to be put asking
-   * whether this scope can publish at all, and this scope always can.
+   * grouped by the namespace they were published under. One batch writing into
+   * two namespaces is two requests, as it is on real AWS.
    */
   async publish(datapoints: readonly SimLogsMetricDatapoint[]): Promise<void> {
-    if (datapoints.length === 0) {
-      return;
-    }
-
     const scope = this.#accountRegionScope;
     const cloudWatch = this.#simAws
       .accountRegionScope(scope.accountId, scope.regionName)

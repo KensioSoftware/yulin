@@ -32,10 +32,7 @@ import {
   type SimLogsSubscriptionDestinations,
 } from "./subscription/sim-logs-subscription-destinations.js";
 import { SimLogsMetricFanOut } from "./metric/sim-logs-metric-fan-out.js";
-import {
-  SimLogsNoMetricPublications,
-  type SimLogsMetricPublications,
-} from "./metric/sim-logs-metric-publications.js";
+import type { SimLogsMetricPublications } from "./metric/sim-logs-metric-publications.js";
 import { SimLogsSubscriptionFanOut } from "./subscription/sim-logs-subscription-fan-out.js";
 import { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -59,9 +56,10 @@ export interface SimLogsProperties {
   readonly deliverySourceResources?: SimLogsDeliverySourceResources;
 
   /**
-   * Where a metric filter's datapoints are published. A SimLogs built on its
-   * own has no simulated CloudWatch to write into, so it refuses a metric
-   * filter rather than holding one that publishes nowhere.
+   * Where a log group's metric datapoints are published. A SimLogs built on
+   * its own has no simulated CloudWatch to write into. It refuses a metric
+   * filter rather than holding one that publishes nowhere, and it reads no
+   * embedded metrics out of what is written to it.
    */
   readonly metricPublications?: SimLogsMetricPublications;
 }
@@ -103,7 +101,6 @@ export class SimLogsCommands {
       background = new BackgroundTasks(),
       subscriptionDestinations = new SimLogsNoSubscriptionDestinations(),
       deliverySourceResources = new SimLogsUncheckedDeliverySourceResources(),
-      metricPublications = new SimLogsNoMetricPublications(),
     } = properties;
 
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
@@ -117,7 +114,7 @@ export class SimLogsCommands {
       background,
     });
     const metricFanOut = new SimLogsMetricFanOut({
-      publications: metricPublications,
+      publications: properties.metricPublications,
       background,
     });
 

@@ -241,10 +241,10 @@ describe("sim CloudWatch Logs metric filters", () => {
 
     // Then the write succeeded and the publication it could not make is on the
     // ledger, rather than being lost the way it is in an account.
-    const failures = simAws.logs().metricFilterFailures;
+    const failures = simAws.logs().metricPublicationFailures;
 
     assertArrayLength(failures, 1);
-    assertIdentical(failures.at(0)?.filterName, "handler-errors");
+    assertIdentical(failures.at(0)?.source, "handler-errors");
     assertIdentical(failures.at(0)?.metricNamespace, "AWS/Lambda");
     assertStringIncludes(failures.at(0)?.reason ?? "", "reserved");
   });

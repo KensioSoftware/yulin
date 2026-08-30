@@ -806,7 +806,7 @@ console.log(counted.Datapoints?.[0]?.Sum);
 
 Datapoints go in through the same `PutMetricData` an ordinary caller uses, into the CloudWatch of the log group's own Account and Region. A datapoint is stamped from the simulation's clock at the instant the event was written.
 
-A transformation carrying a `defaultValue` publishes that value once for a minute that took log events and matched none of them, which is how real CloudWatch Logs keeps a metric reporting through a quiet stretch. A minute a match landed in publishes the match alone. A transformation with no default value publishes nothing for a minute it matched nothing in, and the metric is then left with no datapoint at all over that stretch.
+A transformation carrying a `defaultValue` publishes that value once for a minute that took log events and matched none of them. That is how real CloudWatch Logs keeps a metric reporting through a quiet stretch. A minute a match landed in publishes the match alone. A transformation with no default value publishes nothing for a minute it matched nothing in, and the metric is then left with no datapoint at all over that stretch.
 
 A transformation carrying dimensions cannot also carry a `defaultValue`, and one carrying both is refused. Real CloudWatch Logs allows one or the other, because a default would have to be reported against every dimension value the filter has ever seen.
 
@@ -816,7 +816,7 @@ A transformation carrying dimensions cannot also carry a `defaultValue`, and one
 
 A `metricValue` or a dimension value naming a field of the matched event (`$.bytes`, `$1`) raises `SimLogsUnsupportedOperationException` at `PutMetricFilter`. Reading one needs the pattern to have been parsed structurally, and the structured pattern syntaxes are absent. A literal value publishes.
 
-A filter whose namespace begins `AWS/` is taken, because CloudWatch Logs takes one. The publication is then refused by `PutMetricData`, which reserves those namespaces exactly as real CloudWatch does. The refusal lands on `simAws.logs().metricFilterFailures` rather than failing the write that produced it, so a filter writing nowhere is something a test can assert on.
+A filter whose namespace begins `AWS/` is taken, because CloudWatch Logs takes one. The publication is then refused by `PutMetricData`, which reserves those namespaces exactly as real CloudWatch does. The refusal lands on `simAws.logs().metricPublicationFailures` rather than failing the write that produced it, so a filter writing nowhere is something a test can assert on.
 
 ### Declaring a metric filter in a template
 
@@ -913,6 +913,89 @@ console.log(MetricAlarms?.[0]?.StateValue);
 ```
 
 `Ref` returns the filter name, and a filter with no `FilterName` is named after the stack and the logical ID. `Dimensions` is a list of `Key` and `Value` pairs in a template and a map through the SDK, and both reach the same filter. Deleting the stack takes the filter with the log group.
+
+## Embedded Metric Format
+
+A log event that is itself an Embedded Metric Format document publishes the metrics it declares. This is how AWS Lambda Powertools counts anything. Its `Metrics` writes an EMF document to the handler's stdout and calls no CloudWatch API at all, and a CDK `NodejsFunction` bundling Powertools does the same in a deployed account.
+
+```typescript sim-logs-embedded-metric-format
+/**
+ * Reading a Powertools style metric out of what a handler printed.
+ */
+
+import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+import {
+  CreateLogGroupCommand,
+  CreateLogStreamCommand,
+  PutLogEventsCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const logGroupName = "/aws/lambda/user";
+const logStreamName = "2026/08/30/[$LATEST]0f7c1a";
+const startedAt = new Date("2026-08-30T09:00:00Z");
+
+await simAws.clock().setTo(startedAt);
+await simAws.logs().createLogGroup(new CreateLogGroupCommand({ logGroupName }));
+await simAws
+  .logs()
+  .createLogStream(new CreateLogStreamCommand({ logGroupName, logStreamName }));
+
+// The document Powertools writes to stdout. The metadata names the namespace,
+// the dimension set and the metric, and the body carries the values.
+const document = JSON.stringify({
+  _aws: {
+    Timestamp: startedAt.getTime(),
+    CloudWatchMetrics: [
+      {
+        Namespace: "ChineseBoost",
+        Dimensions: [["service"]],
+        Metrics: [{ Name: "UserRequestFailed", Unit: "Count" }],
+      },
+    ],
+  },
+  service: "user",
+  UserRequestFailed: 1,
+});
+
+await simAws.logs().putLogEvents(
+  new PutLogEventsCommand({
+    logGroupName,
+    logStreamName,
+    logEvents: [{ timestamp: startedAt.getTime(), message: document }],
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const statistics = new GetMetricStatisticsCommand({
+  Namespace: "ChineseBoost",
+  MetricName: "UserRequestFailed",
+  Dimensions: [{ Name: "service", Value: "user" }],
+  StartTime: startedAt,
+  EndTime: new Date(startedAt.getTime() + 300_000),
+  Period: 300,
+  Statistics: ["Sum"],
+});
+const counted = await simAws.cloudWatch().getMetricStatistics(statistics);
+
+// 1. The metric came out of the log line, with nothing calling PutMetricData.
+console.log(counted.Datapoints?.[0]?.Sum);
+```
+
+A bound Lambda handler needs none of this written by hand. Its output already reaches `/aws/lambda/<name>`. A handler bundling Powertools therefore counts through the same path a deployed one does, and invoking it can drive an alarm over the metric to a state change.
+
+`_aws.CloudWatchMetrics[].Dimensions` is a list of dimension key lists, and each inner list is one whole dimension set. A document declaring two sets publishes each of its metrics once per set, which is what makes them separate identities in CloudWatch. A metric whose value is a list of numbers publishes one datapoint per value.
+
+The timestamp comes from `_aws.Timestamp`, read as milliseconds, and from the instant CloudWatch Logs took the event where the document carries none. A handler running inside a simulated Lambda reads the simulation's clock. A Powertools document therefore stamps itself in simulated time without being told to.
+
+### What is left alone, and what is recorded
+
+A log event is read as a document only where it parses as JSON, comes out as an object, and carries usable `_aws` metadata. Anything else is stored and left alone. A log group is full of lines that were never metrics, and treating a parse failure as an error would make the common case the noisy one.
+
+Two things go on `simAws.logs().metricPublicationFailures` rather than passing quietly. A metric the metadata declares and the document body carries no number under, and a metric asking for `StorageResolution: 1`, which simulated CloudWatch has no period short enough for. A dimension set naming a key the body lacks is dropped whole, because filling in part of a set would publish under an identity no alarm is watching.
 
 ## Permissions
 
@@ -1052,6 +1135,8 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   arrive in time order in a simulation, so this shows up only where a test writes into the past.
 - **Subscription filter destinations other than Lambda**, and `Distribution`. `Distribution` is
   accepted and reported, and with no shards to spread across it has no effect.
+- **EMF arriving by any route other than a log event.** The document has to reach a log group to be
+  read, which is how it reaches CloudWatch in an account.
 - **`AWS::Logs::SubscriptionFilter`.** Recorded as a gap. The log group, the metric filter and the
   three delivery resource types are what simulated CloudFormation deploys here.
 - **`ApplyOnTransformedLogs` and `EmitSystemFieldDimensions` on a metric filter.** Recorded and
