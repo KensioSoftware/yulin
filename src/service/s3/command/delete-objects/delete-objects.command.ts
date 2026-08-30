@@ -44,9 +44,15 @@ export interface SimDeleteObjectsCommandOutput {
 
 /**
  * One Object a DeleteObjects request removed.
+ *
+ * A versioned Bucket hides the Object behind a marker instead of removing it,
+ * and reports the marker it wrote under `DeleteMarker` and
+ * `DeleteMarkerVersionId`. A Bucket without versioning carries neither.
  */
 export interface SimS3DeletedObject {
   readonly Key: string;
+  readonly DeleteMarker?: boolean | undefined;
+  readonly DeleteMarkerVersionId?: string | undefined;
 }
 
 /**

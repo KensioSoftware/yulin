@@ -41,5 +41,7 @@ export interface SimCompleteMultipartUploadCommandOutput {
   readonly Bucket?: string;
   readonly Key?: string;
   readonly ETag?: string;
+  /** The version the assembled Object was written as, if the Bucket keeps them. */
+  readonly VersionId?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

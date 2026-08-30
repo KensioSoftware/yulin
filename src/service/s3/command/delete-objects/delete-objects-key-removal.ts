@@ -4,6 +4,7 @@ import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 import { DeleteObjectAuthorizer } from "../delete-object/delete-object-authorizer.js";
 import { DeleteObjectAttempt } from "./delete-object-attempt.js";
+import { simS3NotifyDeleted } from "../delete-object/sim-s3-notify-deleted.js";
 
 interface DeleteObjectsKeyRemovalProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -37,17 +38,17 @@ export class DeleteObjectsKeyRemoval {
   ): Promise<DeleteObjectAttempt> {
     try {
       const resolvedCaller = this.authorizer.authorize(bucket, key, options);
-      const removed = await bucket.deleteObject(key);
+      const deletion = await bucket.deleteObject(key);
 
-      if (removed) {
-        this.notifications.objectRemoved({
-          bucket,
-          key,
-          caller: resolvedCaller,
-        });
-      }
+      simS3NotifyDeleted({
+        notifications: this.notifications,
+        bucket,
+        key,
+        caller: resolvedCaller,
+        deletion,
+      });
 
-      return new DeleteObjectAttempt(key);
+      return new DeleteObjectAttempt(key, undefined, deletion.deleteMarker);
     } catch (error) {
       return new DeleteObjectAttempt(key, error);
     }

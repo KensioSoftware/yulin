@@ -3,18 +3,22 @@ import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
+import { SimS3BucketObjects } from "./sim-s3-bucket-objects.js";
+import type { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
+import type { SimS3BucketVersioning } from "./versioning/sim-s3-bucket-versioning.js";
+import type { SimS3BucketVersions } from "./versioning/sim-s3-bucket-versions.js";
+import type { SimS3ObjectVersion } from "./versioning/sim-s3-object-version.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
 import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
-import { SimS3LifecycleSweep } from "./lifecycle/sim-s3-lifecycle-sweep.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
 import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
-import { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
+import type { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
@@ -50,15 +54,12 @@ export class SimS3Bucket {
   public readonly creationDate: Date;
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly clock: SimClock;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
-  private readonly multipartUploads = new SimS3MultipartUploads();
-  private storage: SimS3BucketStorage;
+  private readonly objects: SimS3BucketObjects;
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
   private publicAccessBlock: SimS3PublicAccessBlock;
   private notifications: SimS3NotificationConfiguration;
-  private lifecycle: SimS3LifecycleConfiguration;
 
   constructor(properties: SimS3BucketProperties) {
     const {
@@ -78,74 +79,81 @@ export class SimS3Bucket {
 
     this.bucketName = bucketName;
     this.accountRegionScope = accountRegionScope;
-    this.clock = clock;
-    this.storage = storage;
+    this.objects = new SimS3BucketObjects({ storage, lifecycle, clock });
     this.website = website;
     this.policy = policy;
     this.publicAccessBlock = publicAccessBlock;
     this.notifications = notifications;
-    this.lifecycle = lifecycle;
     this.creationDate = creationDate;
   }
 
-  /**
-   * Put a simulated S3 Object into storage.
-   */
-  async putObject(object: SimS3Object): Promise<void> {
-    await this.storage.putObject(object);
+  /** Put an Object into storage, answering the version it was given, if any. */
+  async putObject(
+    object: SimS3Object,
+  ): Promise<SimS3ObjectVersion | undefined> {
+    return await this.objects.put(object);
   }
 
-  /**
-   * Get a simulated S3 Object from storage.
-   *
-   * An Object a lifecycle rule has expired goes on the way past. Every read of
-   * it then finds the key empty.
-   */
+  /** Get a simulated S3 Object from storage. */
   async getObject(key: string): Promise<SimS3Object | undefined> {
-    return await this.sweep().object(await this.storage.getObject(key));
+    return await this.objects.get(key);
   }
 
-  /**
-   * List simulated S3 Objects from storage.
-   */
+  /** List simulated S3 Objects from storage. */
   async listObjects(prefix?: string): Promise<SimS3Object[]> {
-    return await this.sweep().objects(await this.storage.listObjects(prefix));
+    return await this.objects.list(prefix);
   }
 
   /**
-   * Remove a simulated S3 Object from storage.
+   * Delete a key, answering what that did to the Bucket.
    *
    * Real S3 DeleteObject is idempotent, so a key that was not there is not an
-   * error. Whether there was an Object to remove is still reported, because a
-   * deletion that removed nothing is not an event: real S3 raises
-   * `s3:ObjectRemoved:Delete` when an Object was deleted, not when a deletion
-   * was requested.
+   * error. What happened is still reported, because the event notification a
+   * deletion raises depends on it.
    */
-  async deleteObject(key: string): Promise<boolean> {
-    return await this.storage.deleteObject(key);
+  async deleteObject(key: string): Promise<SimS3ObjectDeletion> {
+    return await this.objects.delete(key);
+  }
+
+  /**
+   * Remove one version of a key permanently, answering the version that went.
+   *
+   * Whatever the removal leaves at the head of the key becomes current, so
+   * deleting a delete marker brings the Object under it back.
+   */
+  async deleteObjectVersion(
+    key: string,
+    versionId: string,
+  ): Promise<SimS3ObjectVersion | undefined> {
+    return await this.objects.deleteVersion(key, versionId);
+  }
+
+  /**
+   * The versions this Bucket keeps, and whether it keeps any.
+   */
+  getVersions(): SimS3BucketVersions {
+    return this.objects.versions;
+  }
+
+  /**
+   * Apply a versioning configuration to this Bucket.
+   */
+  async configureVersioning(versioning: SimS3BucketVersioning): Promise<void> {
+    await this.objects.configureVersioning(versioning);
   }
 
   /**
    * The multipart uploads this Bucket has in progress.
-   *
-   * Kept apart from storage because the parts of an unfinished upload are not
-   * Objects: nothing that lists or reads a Bucket can see them, and only
-   * completing the upload puts anything under a key.
    */
   getMultipartUploads(): SimS3MultipartUploads {
-    const now = this.clock.now();
-    this.multipartUploads.discardAbandoned((upload) =>
-      this.lifecycle.abandons(upload, now),
-    );
-
-    return this.multipartUploads;
+    return this.objects.multipartUploads();
   }
 
   /**
    * Change the storage implementation for this simulated S3 Bucket.
    */
   configureSimStorage(storage: SimS3BucketStorage): void {
-    this.storage = storage;
+    this.objects.configureStorage(storage);
   }
 
   /**
@@ -246,14 +254,14 @@ export class SimS3Bucket {
    * this replaces what was there instead of adding to it.
    */
   configureLifecycle(lifecycle: SimS3LifecycleConfiguration): void {
-    this.lifecycle = lifecycle;
+    this.objects.configureLifecycle(lifecycle);
   }
 
   /**
    * Get this Bucket's lifecycle configuration.
    */
   getLifecycle(): SimS3LifecycleConfiguration {
-    return this.lifecycle;
+    return this.objects.getLifecycle();
   }
 
   /**
@@ -263,7 +271,7 @@ export class SimS3Bucket {
    * whether there were rules to remove.
    */
   deleteLifecycle(): void {
-    this.lifecycle = SimS3LifecycleConfiguration.empty();
+    this.objects.deleteLifecycle();
   }
 
   /**
@@ -281,15 +289,6 @@ export class SimS3Bucket {
       this.bucketName,
       this.accountRegionScope,
       this.website,
-    );
-  }
-
-  /** What this Bucket's rules have expired, as they stand at this moment. */
-  private sweep(): SimS3LifecycleSweep {
-    return new SimS3LifecycleSweep(
-      this.storage,
-      this.lifecycle,
-      this.clock.now(),
     );
   }
 }

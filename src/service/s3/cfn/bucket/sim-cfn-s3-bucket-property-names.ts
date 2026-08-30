@@ -6,6 +6,7 @@ export const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "LifecycleConfiguration",
   "NotificationConfiguration",
   "PublicAccessBlockConfiguration",
+  "VersioningConfiguration",
   "WebsiteConfiguration",
 ]);
 
@@ -28,10 +29,9 @@ export const inertPropertyNames: ReadonlySet<string> = new Set([
  * each of them would have changed.
  *
  * The Bucket is created without them and each one is recorded against the
- * Resource. A versioned Bucket, for instance, answers a delete with a delete
- * marker and an `ObjectRemoved:DeleteMarkerCreated` event, where this simulator
- * removes the Object and raises `ObjectRemoved:Delete`, so a test written
- * against versioning needs to find out that it was never configured.
+ * Resource. A Bucket with Object Lock, for instance, refuses a delete inside
+ * an Object's retention period, where this simulator carries it out, so a test
+ * written against Object Lock needs to find out that it was never configured.
  */
 export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["AbacStatus", "attribute-based access control is not simulated"],
@@ -67,9 +67,4 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ],
   ["OwnershipControls", "Object ownership and ACLs are not simulated"],
   ["ReplicationConfiguration", "Bucket replication is not simulated"],
-  [
-    "VersioningConfiguration",
-    "Object versions are not simulated, so a delete removes the Object and " +
-      "raises ObjectRemoved:Delete rather than creating a delete marker",
-  ],
 ]);

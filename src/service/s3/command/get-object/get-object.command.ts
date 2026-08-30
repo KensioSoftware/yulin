@@ -21,6 +21,11 @@ export interface SimGetObjectCommandInput {
    * Object.
    */
   readonly Range?: string | undefined;
+  /**
+   * The version to read. A request naming none reads the current version, and
+   * a Bucket keeping no versions answers the Object under the key.
+   */
+  readonly VersionId?: string | undefined;
 }
 
 /**
@@ -45,5 +50,7 @@ export interface SimGetObjectCommandOutput extends SimS3SystemMetadataOutput {
   readonly LastModified?: Date;
   readonly ContentLength?: number;
   readonly ContentRange?: string;
+  /** The version read, on a Bucket keeping versions. */
+  readonly VersionId?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

@@ -12,12 +12,12 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
-import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
+import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
@@ -74,26 +74,20 @@ export class PutObjectCommandHandler implements CommandHandler<
     command: SimPutObjectCommand,
     options?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
-    assertDefined(command.input.Bucket, "PutObjectCommand.input.Bucket");
-    assertDefined(command.input.Key, "PutObjectCommand.input.Key");
+    const { Bucket, Key } = command.input;
+    assertDefined(Bucket, "PutObjectCommand.input.Bucket");
+    assertDefined(Key, "PutObjectCommand.input.Key");
 
-    const bucketName = command.input.Bucket as SimS3BucketName;
-    const bucket = this.buckets.get(bucketName);
-    if (bucket === undefined) {
-      throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
-    }
+    const bucket = requireSimS3Bucket(this.buckets, Bucket as SimS3BucketName);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const caller = this.authorizer.authorize(
-      bucket,
-      command.input.Key,
-      options,
-    );
+    const caller = this.authorizer.authorize(bucket, Key, options);
 
     const object = this.objectBuilder.build(command);
-    await bucket.putObject(object);
+    const version = await bucket.putObject(object);
+    const versionId = version?.versionId;
 
     // Every write path funnels through here, so this one call covers the SDK,
     // an intercepted SDK client and the REST endpoint alike.
@@ -102,10 +96,12 @@ export class PutObjectCommandHandler implements CommandHandler<
       object,
       caller,
       eventName: "s3:ObjectCreated:Put",
+      versionId,
     });
 
     return {
       ETag: simS3QuotedETag(object.etag),
+      ...(versionId !== undefined && { VersionId: versionId }),
       $metadata: {},
     };
   }

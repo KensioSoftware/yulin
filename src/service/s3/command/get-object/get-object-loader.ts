@@ -6,6 +6,7 @@ import {
   simS3ContentRange,
   simS3ReadObjectRange,
 } from "../../object/s3-object-range.js";
+import { simS3ReadObjectVersion } from "../object/sim-s3-read-object-version.js";
 import type { SimGetObjectCommandOutput } from "./get-object.command.js";
 
 /**
@@ -18,7 +19,8 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  * This class owns both storage lookup and response conversion because the SDK
  * response is a representation of the stored Object:
  *
- * - a missing storage entry becomes the S3 NoSuchKey error;
+ * - a missing storage entry becomes the S3 NoSuchKey error, and a `VersionId`
+ *   naming a version the Bucket never issued becomes NoSuchVersion;
  * - the stored Buffer, or the part of it the read asked for, becomes the
  *   readable response body;
  * - what S3 was told about the Object becomes the response's own fields, and
@@ -37,11 +39,14 @@ export class GetObjectLoader {
     bucket: SimS3Bucket,
     key: string,
     rangeHeader?: string,
+    versionId?: string,
   ): Promise<SimGetObjectCommandOutput> {
-    const object = await bucket.getObject(key);
-    if (object === undefined) {
+    const read = await simS3ReadObjectVersion(bucket, key, versionId);
+    if (read === undefined) {
       throw new SimS3NoSuchKey(`No S3 Object named ${key}`);
     }
+
+    const object = read.object;
 
     const size = object.body.length;
     const range = simS3ReadObjectRange(rangeHeader, size);
@@ -60,6 +65,7 @@ export class GetObjectLoader {
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
       ContentLength: body.length,
+      ...(read.versionId !== undefined && { VersionId: read.versionId }),
       ...(range !== undefined && {
         ContentRange: simS3ContentRange(range, size),
       }),

@@ -21,6 +21,8 @@ familiar AWS SDK command shapes, CloudFormation resources, and local HTTP reques
   simulated AWS instance.
 - `Bucket/` contains the simulated Bucket model, Bucket-name validation, name-availability checks,
   static website configuration, and the event notification configuration.
+- `bucket/versioning/` contains the version history a Bucket keeps, and the configuration deciding
+  whether it keeps one.
 - `notification/` contains event notification delivery: the event, its `Records` serialisation, and
   the destinations S3 pushes to.
 - `object/` contains the simulated S3 Object model.
@@ -88,6 +90,9 @@ Supported command areas currently include:
 - `delete-objects/`
 - `put-bucket-notification-configuration/`
 - `get-bucket-notification-configuration/`
+- `put-bucket-versioning/`
+- `get-bucket-versioning/`
+- `list-object-versions/`
 
 `SimS3Commands` owns the wiring: every handler is built from the same Bucket map, IAM and background
 scheduler, so that construction lives in one place rather than being repeated once per command on
@@ -98,6 +103,7 @@ the service facade. It groups the commands into areas, each a small class under 
 - `SimS3PublicAccessBlockCommands` in `command/public-access-block/`
 - `SimS3ObjectCommands` in `command/object/`
 - `SimS3NotificationCommands` in `command/notification/`
+- `SimS3VersioningCommands` in `command/versioning/`
 
 An area holds the shared `SimS3BucketCommandState` and hands it to the handler it runs, so adding a
 command means adding one method to the area it belongs to. `requireSimS3Bucket` is the shared Bucket lookup
@@ -161,7 +167,7 @@ Bucket-name availability checks use both the local map and the global registry:
 
 - `bucketName`
 - the owning account/region scope
-- a `SimS3BucketStorage` implementation
+- a `SimS3BucketObjects`, holding what the Bucket stores
 - a `SimS3BucketWebsite` configuration
 
 Its public methods are small:
@@ -169,6 +175,11 @@ Its public methods are small:
 - `putObject(object)`
 - `getObject(key)`
 - `listObjects(prefix?)`
+- `deleteObject(key)`
+- `deleteObjectVersion(key, versionId)`
+- `getVersions()`
+- `configureVersioning(versioning)`
+- `getMultipartUploads()`
 - `configureSimStorage(storage)`
 - `configureWebsite(website)`
 - `getWebsite()`
@@ -181,10 +192,41 @@ Its public methods are small:
 - `deletePublicAccessBlock()`
 - `configureNotifications(notifications)`
 - `getNotifications()`
+- `configureLifecycle(lifecycle)`
+- `getLifecycle()`
+- `deleteLifecycle()`
 
 The Bucket resource policy is stored parsed rather than as a JSON string, because that is the shape
 sim IAM evaluates. `GetBucketPolicy` serializes it back on the way out, so the string a caller reads
 is a normalized form of what was applied rather than the original text.
+
+## What a Bucket stores
+
+`SimS3BucketObjects` holds the storage implementation, the version history, the multipart uploads in
+progress and the lifecycle configuration. The Bucket delegates to it rather than owning all four,
+because they are one concern: what is under the Bucket's keys, and what time does to it. Every read
+goes through it, and applying lifecycle rules on the way past is what keeps an untouched Bucket free
+of the cost of having them.
+
+## Object versions
+
+`bucket/versioning/` holds the version model. There are four pieces.
+
+`SimS3BucketVersioning` is the configuration, with three states. A Bucket starts unversioned, and one
+that has been versioned can be suspended but never taken back, because real S3 has no request for it.
+
+`SimS3ObjectVersion` is one version of one key, which is either an Object or a delete marker.
+Modelling the marker as a version holding no Object keeps the ordering in one list, and that ordering
+is what decides which version is current.
+
+`SimS3ObjectVersions` is the history, keyed by Object key with each key's versions newest first. That
+is the order `ListObjectVersions` reports them in.
+
+`SimS3BucketVersions` puts the two together and keeps storage in step with them. The invariant it
+maintains is that **storage holds the current, undeleted Object under each key and nothing else**.
+Writing a delete marker takes the Object out of storage while the history keeps it, and removing a
+version puts back whatever the removal left current. Every existing reader of a Bucket, the website
+endpoint and the REST endpoint among them, therefore needs no knowledge of versions at all.
 
 ## Block Public Access
 

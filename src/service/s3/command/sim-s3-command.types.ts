@@ -60,6 +60,20 @@ export type {
   SimS3LifecycleRule,
 } from "./put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
 export type {
+  SimGetBucketVersioningCommand,
+  SimGetBucketVersioningCommandOutput,
+} from "./get-bucket-versioning/get-bucket-versioning.command.js";
+export type {
+  SimPutBucketVersioningCommand,
+  SimPutBucketVersioningCommandOutput,
+} from "./put-bucket-versioning/put-bucket-versioning.command.js";
+export type {
+  SimListObjectVersionsCommand,
+  SimListObjectVersionsCommandOutput,
+  SimS3DeleteMarkerSummary,
+  SimS3ObjectVersionSummary,
+} from "./list-object-versions/list-object-versions.command.js";
+export type {
   SimGetBucketPolicyCommand,
   SimGetBucketPolicyCommandOutput,
 } from "./get-bucket-policy/get-bucket-policy.command.js";

@@ -60,14 +60,11 @@ export class SimS3ObjectNotifier {
   }
 
   /**
-   * Raise an Object removal.
+   * Raise an Object removal, as whichever kind of removal it was.
    */
   objectRemoved(input: SimS3ObjectRemovedInput): void {
-    this.schedule.matching(
-      input.bucket,
-      "s3:ObjectRemoved:Delete",
-      input.key,
-      () => this.events.forRemoved(input),
+    this.schedule.matching(input.bucket, input.eventName, input.key, () =>
+      this.events.forRemoved(input),
     );
   }
 }

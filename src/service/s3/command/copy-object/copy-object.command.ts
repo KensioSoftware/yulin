@@ -28,10 +28,12 @@ export interface SimCopyObjectCommandInput extends SimS3ObjectWriteMetadata {
  *
  * The copy's own ETag and write time arrive nested in `CopyObjectResult`
  * rather than at the top level, because real S3 sends them in the response
- * body and the top-level headers describe the request.
+ * body and the top-level headers describe the request. `VersionId` is the
+ * version the copy was written as, on a Bucket keeping versions.
  */
 export interface SimCopyObjectCommandOutput {
   readonly CopyObjectResult?: SimCopyObjectResult;
+  readonly VersionId?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

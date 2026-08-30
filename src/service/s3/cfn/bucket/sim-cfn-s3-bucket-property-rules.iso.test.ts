@@ -69,24 +69,28 @@ async function bucketCount(simAws: SimAws): Promise<number> {
 
 describe("AWS::S3::Bucket property rules", () => {
   it("deploys a Bucket without a real property simulated S3 cannot act on", async () => {
-    // Given a template asking for Bucket versioning.
+    // Given a template asking for transfer acceleration, which is a property
+    // read and dropped whole rather than one carrying constraints of its own.
     const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await deployBucket(simAws, {
-      VersioningConfiguration: { Status: "Enabled" },
+      AccelerateConfiguration: { AccelerationStatus: "Enabled" },
     });
 
-    // Then the Bucket is created, unversioned, and the property it was created
-    // without is recorded against the Resource.
+    // Then the Bucket is created, unaccelerated, and the property it was
+    // created without is recorded against the Resource.
     assertIdentical(await bucketCount(simAws), 1);
     assertArrayLength(stack.ignoredProperties, 1);
     const ignored = stack.ignoredProperties[0];
     assertNonNullable(ignored);
     assertIdentical(ignored.logicalId, "Bucket");
     assertIdentical(ignored.resourceType, "AWS::S3::Bucket");
-    assertIdentical(ignored.path, "VersioningConfiguration");
-    assertStringIncludes(ignored.reason, "Object versions are not simulated");
+    assertIdentical(ignored.path, "AccelerateConfiguration");
+    assertStringIncludes(
+      ignored.reason,
+      "transfer acceleration is not simulated",
+    );
   });
 
   it("deploys a Bucket without a name it has never heard of", async () => {
@@ -110,13 +114,13 @@ describe("AWS::S3::Bucket property rules", () => {
   });
 
   it("records every unsimulated property, not only the first", async () => {
-    // Given a template asking for object locking as well as versioning.
+    // Given a template asking for object locking as well as acceleration.
     const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await deployBucket(simAws, {
       ObjectLockEnabled: true,
-      VersioningConfiguration: { Status: "Enabled" },
+      AccelerateConfiguration: { AccelerationStatus: "Enabled" },
     });
 
     // Then the Bucket exists and both omissions are reported.
@@ -124,7 +128,7 @@ describe("AWS::S3::Bucket property rules", () => {
     assertArrayLength(stack.ignoredProperties, 2);
     assertIdentical(
       stack.ignoredProperties.map((entry) => entry.path).join(", "),
-      "ObjectLockEnabled, VersioningConfiguration",
+      "ObjectLockEnabled, AccelerateConfiguration",
     );
   });
 

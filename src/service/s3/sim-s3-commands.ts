@@ -13,6 +13,7 @@ import { SimS3MultipartCommands } from "./command/multipart/sim-s3-multipart-com
 import { SimS3NotificationCommands } from "./command/notification/sim-s3-notification-commands.js";
 import { SimS3ObjectCommands } from "./command/object/sim-s3-object-commands.js";
 import { SimS3PublicAccessBlockCommands } from "./command/public-access-block/sim-s3-public-access-block-commands.js";
+import { SimS3VersioningCommands } from "./command/versioning/sim-s3-versioning-commands.js";
 import type { SimS3BucketCommandState } from "./command/sim-s3-bucket-command-state.js";
 import type { SimS3NotificationDestinations } from "./notification/destination/sim-s3-notification-destination.js";
 import { SimS3NoNotificationDestinations } from "./notification/destination/sim-s3-service-notification-destinations.js";
@@ -62,6 +63,7 @@ export class SimS3Commands {
   public readonly publicAccessBlocks: SimS3PublicAccessBlockCommands;
   public readonly notifications: SimS3NotificationCommands;
   public readonly lifecycles: SimS3LifecycleCommands;
+  public readonly versioning: SimS3VersioningCommands;
   public readonly objects: SimS3ObjectCommands;
   public readonly multipartUploads: SimS3MultipartCommands;
   public readonly objectNotifier: SimS3ObjectNotifier;
@@ -100,6 +102,7 @@ export class SimS3Commands {
     this.publicAccessBlocks = new SimS3PublicAccessBlockCommands(state);
     this.notifications = new SimS3NotificationCommands(state);
     this.lifecycles = new SimS3LifecycleCommands(state);
+    this.versioning = new SimS3VersioningCommands(state);
     this.objects = new SimS3ObjectCommands(state);
     this.multipartUploads = new SimS3MultipartCommands(state);
   }

@@ -28,8 +28,8 @@ describe("SimCfnResource ignored properties", () => {
 
     // When its service reports creating it without a property.
     resource.ignoreProperty(
-      "VersioningConfiguration",
-      "Object versions are not simulated",
+      "ReplicationConfiguration",
+      "Bucket replication is not simulated",
     );
 
     // Then the record names the Resource, its type, the property and why.
@@ -38,8 +38,8 @@ describe("SimCfnResource ignored properties", () => {
     assertNonNullable(ignored);
     assertIdentical(ignored.logicalId, "SiteBucket");
     assertIdentical(ignored.resourceType, "AWS::S3::Bucket");
-    assertIdentical(ignored.path, "VersioningConfiguration");
-    assertIdentical(ignored.reason, "Object versions are not simulated");
+    assertIdentical(ignored.path, "ReplicationConfiguration");
+    assertIdentical(ignored.reason, "Bucket replication is not simulated");
   });
 
   it("keeps one record of a property two levels of a parse both noticed", () => {

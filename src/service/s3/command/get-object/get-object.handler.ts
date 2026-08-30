@@ -88,6 +88,7 @@ export class GetObjectCommandHandler implements CommandHandler<
       bucket,
       command.input.Key,
       command.input.Range,
+      command.input.VersionId,
     );
   }
 }

@@ -59,6 +59,9 @@ export function simS3EventRecordsDocument(
             key: simS3EventObjectKey(event.key),
             ...(event.size !== undefined && { size: event.size }),
             ...(event.eTag !== undefined && { eTag: event.eTag }),
+            ...(event.versionId !== undefined && {
+              versionId: event.versionId,
+            }),
             sequencer: event.sequencer,
           },
         },

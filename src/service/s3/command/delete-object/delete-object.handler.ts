@@ -16,6 +16,8 @@ import type {
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import { DeleteObjectAuthorizer } from "./delete-object-authorizer.js";
+import { DeleteObjectVersionRemoval } from "./delete-object-version-removal.js";
+import { simS3NotifyDeleted } from "./sim-s3-notify-deleted.js";
 import type {
   SimDeleteObjectCommand,
   SimDeleteObjectCommandOutput,
@@ -41,6 +43,7 @@ export class DeleteObjectCommandHandler implements CommandHandler<
   private readonly authorizer: DeleteObjectAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly notifications: SimS3ObjectNotifier;
+  private readonly versionRemoval: DeleteObjectVersionRemoval;
 
   constructor(properties: DeleteObjectCommandHandlerProperties) {
     const {
@@ -53,48 +56,43 @@ export class DeleteObjectCommandHandler implements CommandHandler<
     this.authorizer = new DeleteObjectAuthorizer({ iam });
     this.background = background;
     this.notifications = properties.notifications;
+    this.versionRemoval = new DeleteObjectVersionRemoval(properties);
   }
 
   /**
    * Authorize and remove an Object from a Bucket.
    *
-   * A missing Bucket is reported, but a missing key is not: real S3 answers a
+   * A missing Bucket is reported, but a missing key is not. Real S3 answers a
    * deletion the same way whether or not the Object was there, so code that
    * deletes something twice sees the same success both times.
+   *
+   * A `VersionId` asks for that one version and removes it for good. A request
+   * without one asks for the current version, which a versioned Bucket answers
+   * by writing a delete marker over it.
    */
   async handle(
     command: SimDeleteObjectCommand,
     options?: SimS3RequestOptions,
   ): Promise<SimDeleteObjectCommandOutput> {
-    assertDefined(command.input.Bucket, "DeleteObjectCommand.input.Bucket");
-    assertDefined(command.input.Key, "DeleteObjectCommand.input.Key");
+    const { Bucket, Key, VersionId } = command.input;
+    assertDefined(Bucket, "DeleteObjectCommand.input.Bucket");
+    assertDefined(Key, "DeleteObjectCommand.input.Key");
 
-    const bucketName = command.input.Bucket as SimS3BucketName;
-    const bucket = requireSimS3Bucket(this.buckets, bucketName);
+    const bucket = requireSimS3Bucket(this.buckets, Bucket as SimS3BucketName);
 
     await this.background.sequence();
 
-    const caller = this.authorizer.authorize(
-      bucket,
-      command.input.Key,
-      options,
-    );
+    const caller = this.authorizer.authorize(bucket, Key, options);
 
-    const removed = await bucket.deleteObject(command.input.Key);
-
-    // A deletion that removed nothing is not an event: real S3 raises
-    // ObjectRemoved for an Object that was deleted, not for a request to
-    // delete one.
-    if (removed) {
-      this.notifications.objectRemoved({
-        bucket,
-        key: command.input.Key,
-        caller,
-      });
+    if (VersionId !== undefined) {
+      return await this.versionRemoval.remove(bucket, Key, VersionId, caller);
     }
 
-    return {
-      $metadata: {},
-    };
+    const deletion = await bucket.deleteObject(Key);
+    const notifications = this.notifications;
+
+    simS3NotifyDeleted({ notifications, bucket, key: Key, caller, deletion });
+
+    return { ...deletion.reported, $metadata: {} };
   }
 }

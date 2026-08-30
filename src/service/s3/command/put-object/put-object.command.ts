@@ -27,9 +27,12 @@ export interface SimPutObjectCommandInput extends SimS3ObjectWriteMetadata {
  *
  * `ETag` is the quoted MD5 of the body S3 has just stored, which is what a
  * caller keeps to recognise the same content later without reading it back.
+ * `VersionId` is the version a Bucket keeping versions gave the write, and is
+ * absent on a Bucket without versioning.
  */
 export interface SimPutObjectCommandOutput {
   readonly ETag?: string;
+  readonly VersionId?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
