@@ -34,11 +34,13 @@ export type {
   SimLogsMetricDatapoint,
   SimLogsMetricDimension,
 } from "./metric/sim-logs-metric-datapoint.js";
-export type { SimLogsMetricPublicationFailure } from "./metric/sim-logs-metric-fan-out.js";
 export {
-  SimLogsNoMetricPublications,
-  type SimLogsMetricPublications,
-} from "./metric/sim-logs-metric-publications.js";
+  metricFilterSource,
+  simLogsEmbeddedMetricSource,
+  type SimLogsMetricPublicationFailure,
+  type SimLogsMetricPublicationSource,
+} from "./metric/sim-logs-metric-publication-failure.js";
+export type { SimLogsMetricPublications } from "./metric/sim-logs-metric-publications.js";
 export { simLogsStandardLogGroupClass } from "./command/group/sim-logs-unsimulated-group-input.js";
 export { SimLogsDeliverySource } from "./delivery/sim-logs-delivery-source.js";
 export { SimLogsDeliveryDestination } from "./delivery/sim-logs-delivery-destination.js";
