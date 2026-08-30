@@ -1037,9 +1037,11 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 
 ## Object Lock
 
-Object Lock stops anything deleting a version of an Object, the account root included. A version can
-be held by a retention period, by a legal hold or by both, and a delete naming a held version is
-answered with `AccessDenied`. Turn it on with `PutObjectLockConfigurationCommand`, or with
+Object Lock holds a version of an Object against a delete. A version can be held by a retention
+period, by a legal hold or by both, and a delete naming a held version is answered with
+`AccessDenied`. One way past exists and it is narrow. A `GOVERNANCE` retention period gives way to a
+request carrying `BypassGovernanceRetention` from a caller allowed to use it. A `COMPLIANCE` period
+and a legal hold hold against everyone, the account root included. Turn it on with `PutObjectLockConfigurationCommand`, or with
 `ObjectLockEnabled` on an `AWS::S3::Bucket` resource.
 
 Object Lock holds a version, and versioning has to be on underneath it. Turning it on over a Bucket
@@ -1148,8 +1150,10 @@ needed. Holding the permission and using it are separate. A delete that leaves t
 refused whatever the caller may do.
 
 A compliance period gives way to nobody, the account root included. `PutObjectRetentionCommand`
-follows the same split. A compliance period can be extended and never shortened, and a governance
-period can be shortened by a request that bypasses it.
+follows the same split. A compliance period can be extended in the same mode and that is all, since
+shortening one would end the guarantee early and turning one into a governance period would hand the
+version to the first caller holding the bypass permission. A governance period can be shortened, or
+turned into a compliance one, by a request that bypasses it.
 
 ### Legal holds
 
@@ -1162,7 +1166,8 @@ once, and either one on its own refuses the delete.
 
 A `DefaultRetention` under `Rule` retains every version written after it, counted from the write, so
 two versions of one key written a day apart are held until two different instants. It takes `Days` or
-`Years` and refuses both together, and a year is 365 days. A Bucket with Object Lock on and no
+`Years` and refuses both together, a year is 365 days, and the longest one real S3 takes is a hundred
+years. A Bucket with Object Lock on and no
 default leaves each version to whatever requests name it.
 
 ### From a CloudFormation template
@@ -1186,7 +1191,8 @@ Bucket created around the property would report a default retention it never app
 - The `?object-lock`, `?retention` and `?legal-hold` sub-resources are refused over the served S3
   REST endpoint. Object Lock is reachable through the SDK and through a template.
 - A Bucket policy setting minimum and maximum allowable retention periods is left out. The only
-  bound on a retention is the 1 to 1000 range real S3 puts on a `DefaultRetention` period.
+  bound applied is the hundred years real S3 caps a `DefaultRetention` at. A `RetainUntilDate` on a
+  single version is taken as given, however far ahead it names.
 - `S3 Batch Operations` applying retention across a manifest is left out.
 
 ## Event notifications

@@ -3,6 +3,16 @@ import { SimS3ObjectRetention } from "./sim-s3-object-retention.js";
 import { simS3RetentionMode } from "./sim-s3-default-retention.js";
 
 const millisecondsPerDay = 86_400_000;
+const daysPerYear = 365;
+
+/**
+ * The longest default retention real S3 takes, which is a hundred years.
+ *
+ * An unbounded one would compute a `RetainUntilDate` past the range a
+ * JavaScript Date holds, and a version retained until an instant that reads
+ * back as `NaN` is a version nothing is holding at all.
+ */
+const maximumRetentionDays = 100 * daysPerYear;
 
 /** The one value `ObjectLockEnabled` takes. Real S3 has no way to turn it off. */
 export const simS3ObjectLockEnabled = "Enabled";
@@ -141,5 +151,14 @@ function simS3DefaultRetentionDays(declared: {
     );
   }
 
-  return Days === undefined ? period * 365 : period;
+  const days = Days === undefined ? period * daysPerYear : period;
+
+  if (days > maximumRetentionDays) {
+    throw new SimS3InvalidRequest(
+      `Object Lock DefaultRetention period ${String(period)} is longer than ` +
+        `the hundred years real S3 retains a version for`,
+    );
+  }
+
+  return days;
 }

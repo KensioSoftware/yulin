@@ -259,75 +259,57 @@ describe("S3 Object Lock validation", () => {
     );
   });
 
-  it("extends a compliance retention and refuses to shorten one", async () => {
-    // Given a version retained for two hours in compliance mode.
-    const simAws = new SimAws();
-    const { s3, versionId } = await bucketHoldingOneVersion(simAws, true);
-    const now = simAws.clock().now().getTime();
-
-    async function retainFor(hours: number): Promise<void> {
-      await s3.putObjectRetention(
-        new PutObjectRetentionCommand({
-          Bucket: bucketName,
-          Key: key,
-          VersionId: versionId,
-          Retention: {
-            Mode: "COMPLIANCE",
-            RetainUntilDate: new Date(now + hours * anHour),
-          },
-          BypassGovernanceRetention: true,
-        }),
-      );
-    }
-
-    await retainFor(2);
-
-    // When it is extended, that is allowed.
-    await retainFor(3);
-
-    // And when it is shortened, that is refused, whoever asks and whatever
-    // they bypass.
-    const error = await assertThrowsErrorAsync(async () => {
-      await retainFor(1);
+  it("refuses a default retention longer than real S3 keeps one", async () => {
+    // Given a default retention of a thousand years, which would compute a
+    // RetainUntilDate past the range a Date holds.
+    const error = await lockRefusal({
+      ObjectLockEnabled: "Enabled",
+      Rule: { DefaultRetention: { Mode: "COMPLIANCE", Years: 1000 } },
     });
 
     assertStringIncludes(
       error.message,
-      "COMPLIANCE retention period can be extended and never shortened",
+      "longer than the hundred years real S3 retains a version for",
     );
   });
 
-  it("shortens a governance retention only for a request that bypasses", async () => {
-    // Given a version retained for two hours in governance mode.
+  it("takes the hundred years real S3 keeps a version for", async () => {
+    // Given the longest default retention real S3 accepts.
     const simAws = new SimAws();
-    const { s3, versionId } = await bucketHoldingOneVersion(simAws, true);
-    const now = simAws.clock().now().getTime();
+    const s3 = simAws.s3();
 
-    async function retainFor(hours: number, bypass = false): Promise<void> {
-      await s3.putObjectRetention(
-        new PutObjectRetentionCommand({
+    await s3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await s3.putBucketVersioning(
+      new PutBucketVersioningCommand({
+        Bucket: bucketName,
+        VersioningConfiguration: { Status: "Enabled" },
+      }),
+    );
+
+    // When it is applied, then it is taken, and the day either side of the
+    // boundary is what the refusal is measured against.
+    await s3.putObjectLockConfiguration(
+      new PutObjectLockConfigurationCommand({
+        Bucket: bucketName,
+        ObjectLockConfiguration: {
+          ObjectLockEnabled: "Enabled",
+          Rule: { DefaultRetention: { Mode: "COMPLIANCE", Days: 36_500 } },
+        },
+      }),
+    );
+
+    const tooLong = await assertThrowsErrorAsync(async () => {
+      return await s3.putObjectLockConfiguration(
+        new PutObjectLockConfigurationCommand({
           Bucket: bucketName,
-          Key: key,
-          VersionId: versionId,
-          Retention: {
-            Mode: "GOVERNANCE",
-            RetainUntilDate: new Date(now + hours * anHour),
+          ObjectLockConfiguration: {
+            ObjectLockEnabled: "Enabled",
+            Rule: { DefaultRetention: { Mode: "COMPLIANCE", Days: 36_501 } },
           },
-          BypassGovernanceRetention: bypass,
         }),
       );
-    }
-
-    await retainFor(2);
-
-    // When it is shortened without a bypass, then it is refused.
-    const error = await assertThrowsErrorAsync(async () => {
-      await retainFor(1);
     });
 
-    assertStringIncludes(error.message, "requires BypassGovernanceRetention");
-
-    // And with one, it goes through.
-    await retainFor(1, true);
+    assertStringIncludes(tooLong.message, "longer than the hundred years");
   });
 });

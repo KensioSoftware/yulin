@@ -51,7 +51,7 @@ export class SimS3BucketObjects {
 
     return this.objectLock.withDefaultRetention(
       this.versions.recordPut(object),
-      this.clock.now(),
+      object.lastModified,
     );
   }
 

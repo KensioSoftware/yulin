@@ -39,29 +39,37 @@ export class SimS3ObjectLock {
    * Put a retention on this version, refusing one real S3 refuses.
    *
    * Object Lock is a guarantee rather than a setting, so the ways out of one
-   * are the point. A compliance retention can be extended and never shortened,
-   * by anyone, including the account root. A governance retention can be
-   * shortened or dropped by a caller who names `BypassGovernanceRetention`,
-   * and the caller's permission to do that is checked before this is reached.
+   * are the point. A compliance period can be extended in the same mode, by
+   * anyone, and that is all that can be done to it. Shortening one would end
+   * the guarantee early, and turning one into a governance period would hand
+   * it to the first caller holding the bypass permission, so both are refused
+   * whoever asks and whatever they bypass.
+   *
+   * A governance period can be shortened, or turned into a compliance one, by
+   * a caller who names `BypassGovernanceRetention`, and the caller's
+   * permission to do that is checked before this is reached.
    */
   applyRetention(retention: SimS3ObjectRetention, bypassed: boolean): void {
     const held = this.retention;
 
-    if (held === undefined || retention.isAtLeast(held)) {
+    if (held === undefined) {
       this.retention = retention;
       return;
     }
 
-    if (bypassed && held.mode === simS3GovernanceMode) {
+    const extending = retention.mode === held.mode && retention.isAtLeast(held);
+
+    if (extending || (bypassed && held.mode === simS3GovernanceMode)) {
       this.retention = retention;
       return;
     }
 
     throw new SimS3InvalidRequest(
       held.mode === simS3ComplianceMode
-        ? "A COMPLIANCE retention period can be extended and never shortened"
-        : "Shortening a GOVERNANCE retention period requires " +
-            "BypassGovernanceRetention",
+        ? "A COMPLIANCE retention period can only be extended in the same " +
+            "mode, and never shortened or turned into a GOVERNANCE one"
+        : "Shortening a GOVERNANCE retention period, or changing its mode, " +
+            "requires BypassGovernanceRetention",
     );
   }
 
