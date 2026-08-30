@@ -65,6 +65,12 @@ export class SimCfnSkippedProperties {
     return typeof rule === "string" ? rule : rule?.reason;
   }
 
+  /**
+   * What a property's value has to satisfy, where the service stated it.
+   *
+   * A rule that is a bare reason states nothing, which is the common case and
+   * the reason both shapes share one map.
+   */
   private constraintOn(
     name: string,
   ): SimCfnSkippedPropertyConstraint | undefined {

@@ -19,6 +19,7 @@ import type {
 const refusal = (reason: string): Error =>
   new Error(`Invalid Test::Service::Thing Resource Thing: ${reason}`);
 
+/** The seam, built the way a service builds one for its own Resource. */
 function skipped(
   properties: SimCfnTemplateValueRecord,
   rules: ReadonlyMap<string, SimCfnSkippedPropertyRule | string>,
