@@ -190,4 +190,33 @@ describe("sim CloudWatch Logs metric filter refusals", () => {
     assertInstanceOf(error, SimLogsUnsupportedOperationException);
     assertStringIncludes(error.message, "SimAws Account Region scope");
   });
+
+  it("refuses a default value on a transformation that has dimensions", async () => {
+    // Given a log group.
+    const simAws = await simAwsWithLogGroup();
+
+    // When a filter would carry both.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.logs().putMetricFilter(
+          new PutMetricFilterCommand({
+            logGroupName,
+            filterName: "handler-errors",
+            filterPattern: "ERROR",
+            metricTransformations: [
+              countErrors({
+                defaultValue: 0,
+                dimensions: { service: "orders" },
+              }),
+            ],
+          }),
+        ),
+    );
+
+    // Then it is refused. CloudWatch Logs allows one or the other, because a
+    // default would have to be reported against every dimension value the
+    // filter has ever seen.
+    assertInstanceOf(error, SimLogsInvalidParameterException);
+    assertStringIncludes(error.message, "defaultValue");
+  });
 });

@@ -10,6 +10,12 @@ export const unsimulatedPropertyReasons = new Map<string, string>([
       "written",
   ],
   [
+    "FieldSelectionCriteria",
+    "it selects events by system field, such as the source account or the " +
+      "source Region of a cross-account log group, and neither is carried on " +
+      "an event here",
+  ],
+  [
     "EmitSystemFieldDimensions",
     "the system fields a log event carries in an account are absent here, so " +
       "there is nothing to emit them from",

@@ -806,7 +806,9 @@ console.log(counted.Datapoints?.[0]?.Sum);
 
 Datapoints go in through the same `PutMetricData` an ordinary caller uses, into the CloudWatch of the log group's own Account and Region. A datapoint is stamped from the simulation's clock at the instant the event was written.
 
-A transformation carrying a `defaultValue` publishes that value for an event its pattern did not match, which is how real CloudWatch Logs keeps a metric reporting through a period where the term never appeared. A transformation without one publishes nothing for an event that missed, and a filter that matched nothing over a whole period leaves the metric with no datapoint at all.
+A transformation carrying a `defaultValue` publishes that value once for a minute that took log events and matched none of them, which is how real CloudWatch Logs keeps a metric reporting through a quiet stretch. A minute a match landed in publishes the match alone. A transformation with no default value publishes nothing for a minute it matched nothing in, and the metric is then left with no datapoint at all over that stretch.
+
+A transformation carrying dimensions cannot also carry a `defaultValue`, and one carrying both is refused. Real CloudWatch Logs allows one or the other, because a default would have to be reported against every dimension value the filter has ever seen.
 
 `DescribeLogGroups` reports how many filters a group has as `metricFilterCount`. `DescribeMetricFilters` takes an optional `logGroupName`. A request naming none, and giving a `metricNamespace` and `metricName`, finds every filter in the Region writing to that metric.
 
@@ -1041,8 +1043,13 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 ## Limitations
 
 - **Events never expire.** Retention is stored and reported, never acted on.
-- **A metric filter reading a field of the log event.** A `metricValue` or a dimension value beginning `$` is refused where the filter is put. Both need a structured filter pattern, and neither structured syntax is simulated.
-- **`defaultValue` per event rather than per period.** A transformation carrying one publishes it for every event its pattern did not match, which is what the API documents. Real CloudWatch reports the default over a period with no matching event, so `Sum` and `Maximum` agree here and `SampleCount` and `Average` can differ.
+- **A metric filter reading a field of the log event.** A `metricValue` or a dimension value
+  beginning `$` is refused where the filter is put. Both need a structured filter pattern, and
+  neither structured syntax is simulated.
+- **How far back a `defaultValue` looks.** A filter remembers the most recent minute it matched
+  something in. A later write into that same minute publishes no default over the top, and a write
+  landing in an earlier minute a match was already seen in does publish one. Events
+  arrive in time order in a simulation, so this shows up only where a test writes into the past.
 - **Subscription filter destinations other than Lambda**, and `Distribution`. `Distribution` is
   accepted and reported, and with no shards to spread across it has no effect.
 - **`AWS::Logs::SubscriptionFilter`.** Recorded as a gap. The log group, the metric filter and the

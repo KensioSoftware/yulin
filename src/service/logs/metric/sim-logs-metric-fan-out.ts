@@ -65,12 +65,13 @@ export class SimLogsMetricFanOut {
   /**
    * Schedule the datapoints every metric filter on the group wants from these
    * events.
+   *
+   * The whole batch goes to each filter at once, because a filter aggregates
+   * its default value over a period rather than over one event.
    */
   written(group: SimLogsLogGroup, events: readonly SimLogsStoredEvent[]): void {
     for (const filter of group.metricFilters.all) {
-      const datapoints = events.flatMap((event) =>
-        filter.datapoints(event.message),
-      );
+      const datapoints = filter.datapoints(events);
 
       if (datapoints.length > 0) {
         this.schedule(group.logGroupName, filter.filterName, datapoints);

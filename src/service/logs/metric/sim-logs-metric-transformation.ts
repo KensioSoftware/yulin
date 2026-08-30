@@ -56,34 +56,37 @@ export class SimLogsMetricTransformation {
     this.unit = properties.unit;
     this.dimensions = refuseFieldDimensions(properties.dimensions);
     this.#matchedValue = literalMetricValue(properties.metricValue);
+
+    refuseDefaultValueWithDimensions(properties);
   }
 
   /**
    * The datapoint one matching log event publishes.
    */
-  matched(): SimLogsMetricDatapoint {
-    return this.datapoint(this.#matchedValue);
+  matched(timestamp: number): SimLogsMetricDatapoint {
+    return this.datapoint(this.#matchedValue, timestamp);
   }
 
   /**
-   * The datapoint one log event that matched nothing publishes, where the
+   * The datapoint one period that matched nothing publishes, where the
    * transformation sets a default value.
    *
-   * A transformation with no default value publishes nothing for an event it
-   * did not match, which is what leaves the metric with no datapoint at all
-   * over a quiet period.
+   * A transformation with no default value publishes nothing for a period it
+   * matched nothing in, which is what leaves the metric with no datapoint at
+   * all over a quiet stretch.
    */
-  unmatched(): SimLogsMetricDatapoint | undefined {
+  unmatched(timestamp: number): SimLogsMetricDatapoint | undefined {
     return this.defaultValue === undefined
       ? undefined
-      : this.datapoint(this.defaultValue);
+      : this.datapoint(this.defaultValue, timestamp);
   }
 
-  private datapoint(value: number): SimLogsMetricDatapoint {
+  private datapoint(value: number, timestamp: number): SimLogsMetricDatapoint {
     return {
       namespace: this.metricNamespace,
       metricName: this.metricName,
       value,
+      timestamp,
       unit: this.unit,
       dimensions: this.dimensions,
     };
@@ -119,6 +122,27 @@ function literalMetricValue(metricValue: string): number {
   }
 
   return value;
+}
+
+/**
+ * Refuse a default value on a transformation that also has dimensions.
+ *
+ * Real CloudWatch Logs allows one or the other. A metric a filter gives
+ * dimensions to cannot have a default value, because the default would have to
+ * be reported against every dimension value the filter has ever seen.
+ */
+function refuseDefaultValueWithDimensions(
+  properties: SimLogsMetricTransformationProperties,
+): void {
+  if (
+    properties.defaultValue !== undefined &&
+    properties.dimensions.length > 0
+  ) {
+    throw new SimLogsInvalidParameterException(
+      "A metric filter transformation carrying dimensions cannot also carry " +
+        "a defaultValue. CloudWatch Logs allows one or the other.",
+    );
+  }
 }
 
 /**

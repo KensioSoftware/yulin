@@ -149,7 +149,6 @@ describe("AWS::Logs::MetricFilter", () => {
         {
           ...countErrors,
           Unit: "Count",
-          DefaultValue: 0,
           Dimensions: [{ Key: "service", Value: "orders" }],
         },
       ],
@@ -166,7 +165,22 @@ describe("AWS::Logs::MetricFilter", () => {
     assertNonNullable(transformation);
     assertIdentical(transformation.dimensions?.["service"], "orders");
     assertIdentical(transformation.unit, "Count");
-    assertIdentical(transformation.defaultValue, 0);
+  });
+
+  it("fails the Resource where Dimensions is an empty list", async () => {
+    // When a template gives Dimensions with nothing in it, which
+    // CloudFormation refuses because the list takes one to three entries.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await deployMetricFilter({
+          FilterName: "handler-errors",
+          FilterPattern: "ERROR",
+          MetricTransformations: [{ ...countErrors, Dimensions: [] }],
+        }),
+    );
+
+    // Then the Resource fails rather than deploying an undimensioned filter.
+    assertStringIncludes(error.message, "at least one entry");
   });
 
   it("takes the filter down with the stack", async () => {
@@ -193,20 +207,25 @@ describe("AWS::Logs::MetricFilter", () => {
       FilterName: "handler-errors",
       FilterPattern: "ERROR",
       ApplyOnTransformedLogs: true,
+      FieldSelectionCriteria: '@aws.account = "888888888888"',
       MetricTransformations: [countErrors],
     });
 
-    // Then it deployed, and the property it stepped over is recorded so a
-    // reader can see what the filter is not doing.
+    // Then it deployed, and each real property it stepped over is recorded as
+    // one, so a reader can see what the filter is not doing.
     const resource = stack.resources.find(
       (deployed) => deployed.logicalId === "OrdersErrors",
     );
 
     assertNonNullable(resource);
-    assertArrayLength(resource.ignoredProperties, 1);
+    assertArrayLength(resource.ignoredProperties, 2);
     assertStringIncludes(
       resource.ignoredProperties.at(0)?.reason ?? "",
       "log transformers are absent",
+    );
+    assertStringIncludes(
+      resource.ignoredProperties.at(1)?.reason ?? "",
+      "real AWS::Logs::MetricFilter property",
     );
   });
 

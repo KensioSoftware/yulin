@@ -91,8 +91,10 @@ function byNamespace(
 /**
  * One datapoint as PutMetricData takes it.
  *
- * The timestamp is left off so simulated CloudWatch stamps it from the
- * simulation's clock, which is the same instant the event was written.
+ * The timestamp is the instant CloudWatch Logs took the event, rather than the
+ * instant this runs. Publication happens on the background scheduler, and a
+ * clock that moved in between would otherwise file the datapoint under a later
+ * period than the log line it counts.
  */
 function metricDatum(
   datapoint: SimLogsMetricDatapoint,
@@ -100,6 +102,7 @@ function metricDatum(
   return {
     MetricName: datapoint.metricName,
     Value: datapoint.value,
+    Timestamp: new Date(datapoint.timestamp),
     Unit: datapoint.unit,
     Dimensions: datapoint.dimensions.map((dimension) => ({
       Name: dimension.name,

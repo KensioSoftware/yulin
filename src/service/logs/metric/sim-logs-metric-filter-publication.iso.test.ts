@@ -140,11 +140,28 @@ describe("sim CloudWatch Logs metric filter publication", () => {
     assertArrayLength(Metrics ?? [], 0);
   });
 
-  it("publishes a default value for an event that matched nothing", async () => {
+  it("publishes a default value once for a period that matched nothing", async () => {
     // Given a filter whose transformation carries a default value.
     const simAws = await simAwsWithMetricFilter({ defaultValue: 0 });
 
-    // When one matching line and two that do not match are written.
+    // When two lines it does not match are written in the same minute.
+    await write(simAws, "INFO order handled", "INFO order handled again");
+
+    // Then the period reports the default once, rather than once per line.
+    // Real CloudWatch Logs reports the default for a minute that took records
+    // and matched none, which is what keeps a metric reporting through a quiet
+    // stretch without inflating its sample count.
+    const { sum, samples } = await counted(simAws);
+
+    assertIdentical(sum, 0);
+    assertIdentical(samples, 1);
+  });
+
+  it("publishes no default for a period a match landed in", async () => {
+    // Given the same filter.
+    const simAws = await simAwsWithMetricFilter({ defaultValue: 0 });
+
+    // When one matching line and two that do not match share a minute.
     await write(
       simAws,
       "ERROR order failed",
@@ -152,13 +169,28 @@ describe("sim CloudWatch Logs metric filter publication", () => {
       "INFO order handled again",
     );
 
-    // Then the sum is the one match, over three samples: real CloudWatch Logs
-    // emits the default value for an event a pattern did not match, which is
-    // what keeps the metric reporting through a quiet period.
+    // Then the minute counts the one match alone. Publishing a default beside
+    // it would inflate the sample count and change what an alarm decides.
     const { sum, samples } = await counted(simAws);
 
     assertIdentical(sum, 1);
-    assertIdentical(samples, 3);
+    assertIdentical(samples, 1);
+  });
+
+  it("publishes no default over a write that follows a match in its minute", async () => {
+    // Given the same filter, with a match already written this minute.
+    const simAws = await simAwsWithMetricFilter({ defaultValue: 0 });
+
+    await write(simAws, "ERROR order failed");
+
+    // When a second write in the same minute matches nothing.
+    await write(simAws, "INFO order handled");
+
+    // Then the minute still counts the one match, as it does in an account.
+    const { sum, samples } = await counted(simAws);
+
+    assertIdentical(sum, 1);
+    assertIdentical(samples, 1);
   });
 
   it("publishes under the transformation's dimensions and unit", async () => {
@@ -195,7 +227,7 @@ describe("sim CloudWatch Logs metric filter publication", () => {
     );
   });
 
-  it("stamps the datapoint from the simulation's clock", async () => {
+  it("stamps the datapoint with the instant the line was written", async () => {
     // Given the filter, with the clock stopped.
     const simAws = await simAwsWithMetricFilter();
 
@@ -205,6 +237,32 @@ describe("sim CloudWatch Logs metric filter publication", () => {
 
     // Then the datapoint sits in the minute the line was written, rather than
     // the minute the assertion reads it in.
+    const { sum } = await counted(simAws);
+
+    assertIdentical(sum, 1);
+  });
+
+  it("keeps the write's minute when the clock moves before publication", async () => {
+    // Given the filter, and a matching line written but not yet published.
+    const simAws = await simAwsWithMetricFilter();
+
+    await simAws.logs().putLogEvents(
+      new PutLogEventsCommand({
+        logGroupName,
+        logStreamName,
+        logEvents: [
+          { message: "ERROR order failed", timestamp: startedAt.getTime() },
+        ],
+      }),
+    );
+
+    // When the clock advances past the period before the publication runs.
+    await simAws.clock().advanceBy({ minutes: 10 });
+    await simAws.backgroundTasksComplete();
+
+    // Then the datapoint is still in the minute of the write. Publication
+    // happens on the background scheduler, and stamping it when it runs would
+    // file a log line under a period it never happened in.
     const { sum } = await counted(simAws);
 
     assertIdentical(sum, 1);
