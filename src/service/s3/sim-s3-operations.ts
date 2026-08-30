@@ -1,17 +1,17 @@
 import type * as simS3Commands from "./command/sim-s3-command.types.js";
 import type { SimS3RequestOptions } from "./command/sim-s3-request-options.js";
-import type { SimS3Commands } from "./sim-s3-commands.js";
+import { SimS3VersionOperations } from "./sim-s3-version-operations.js";
 
 /**
  * The AWS operations simulated S3 answers. One delegation per SDK Command,
  * onto the handler in `SimS3Commands` that runs it.
  *
  * `SimS3` extends this. A caller reaches every operation on the one service
- * object, alongside the simulator-only controls `SimS3` holds itself.
+ * object, alongside the simulator-only controls `SimS3` holds itself. The
+ * operations that make a Bucket keep what it held are on
+ * `SimS3VersionOperations`, which this extends.
  */
-export abstract class SimS3Operations {
-  protected constructor(protected readonly commands: SimS3Commands) {}
-
+export abstract class SimS3Operations extends SimS3VersionOperations {
   /** Handle a Create Bucket Command from the SDK. */
   async createBucket(
     command: simS3Commands.SimCreateBucketCommand,
@@ -138,30 +138,6 @@ export abstract class SimS3Operations {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimGetBucketLifecycleConfigurationCommandOutput> {
     return await this.commands.lifecycles.get(command, options);
-  }
-
-  /** Handle a Put Bucket Versioning Command from the SDK. */
-  async putBucketVersioning(
-    command: simS3Commands.SimPutBucketVersioningCommand,
-    options?: SimS3RequestOptions,
-  ): Promise<simS3Commands.SimPutBucketVersioningCommandOutput> {
-    return await this.commands.versioning.put(command, options);
-  }
-
-  /** Handle a Get Bucket Versioning Command from the SDK. */
-  async getBucketVersioning(
-    command: simS3Commands.SimGetBucketVersioningCommand,
-    options?: SimS3RequestOptions,
-  ): Promise<simS3Commands.SimGetBucketVersioningCommandOutput> {
-    return await this.commands.versioning.get(command, options);
-  }
-
-  /** Handle a List Object Versions Command from the SDK. */
-  async listObjectVersions(
-    command: simS3Commands.SimListObjectVersionsCommand,
-    options?: SimS3RequestOptions,
-  ): Promise<simS3Commands.SimListObjectVersionsCommandOutput> {
-    return await this.commands.versioning.list(command, options);
   }
 
   /** Handle a Delete Bucket Lifecycle Command from the SDK. */

@@ -1035,6 +1035,166 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 - A Bucket mounted on a filesystem directory refuses the deletion a delete marker asks for, the way
   it refuses `DeleteObject`. See [Filesystem-backed Bucket storage](#filesystem-backed-bucket-storage).
 
+## Object Lock
+
+Object Lock holds a version of an Object against a delete. A version can be held by a retention
+period, by a legal hold or by both, and a delete naming a held version is answered with
+`AccessDenied`. One way past exists and it is narrow. A `GOVERNANCE` retention period gives way to a
+request carrying `BypassGovernanceRetention` from a caller allowed to use it. A `COMPLIANCE` period
+and a legal hold hold against everyone, the account root included. Turn it on with `PutObjectLockConfigurationCommand`, or with
+`ObjectLockEnabled` on an `AWS::S3::Bucket` resource.
+
+Object Lock holds a version, and versioning has to be on underneath it. Turning it on over a Bucket
+with versioning off is refused with `InvalidBucketState`, as real S3 refuses it, and a template
+declaring Object Lock without `VersioningConfiguration` fails the stack. See
+[Object versioning](#object-versioning) for what versioning itself changes.
+
+```typescript sim-s3-object-lock
+/**
+ * A reader's history in a Bucket nothing in the account can delete from.
+ */
+
+import {
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+// Versioning goes on underneath Object Lock. Every version written into this
+// Bucket is then retained for seven days from the write.
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "history-stack",
+  template: {
+    Resources: {
+      HistoryBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "reader-history",
+          VersioningConfiguration: { Status: "Enabled" },
+          ObjectLockEnabled: true,
+          ObjectLockConfiguration: {
+            ObjectLockEnabled: "Enabled",
+            Rule: { DefaultRetention: { Mode: "COMPLIANCE", Days: 7 } },
+          },
+        },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+const written = await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "reader-history",
+    Key: "events/reader-1.json",
+    Body: JSON.stringify({ words: ["好"] }),
+  }),
+);
+
+const held = await simS3.headObject(
+  new HeadObjectCommand({
+    Bucket: "reader-history",
+    Key: "events/reader-1.json",
+    VersionId: written.VersionId,
+  }),
+);
+
+console.log(held.ObjectLockMode); // "COMPLIANCE"
+
+try {
+  await simS3.deleteObject(
+    new DeleteObjectCommand({
+      Bucket: "reader-history",
+      Key: "events/reader-1.json",
+      VersionId: written.VersionId,
+      BypassGovernanceRetention: true,
+    }),
+  );
+} catch (error) {
+  // AccessDenied. A compliance period gives way to nobody, and naming the
+  // bypass changes nothing.
+  console.log((error as Error).name);
+}
+
+// The period lapses because simulated time passed it.
+await simAws.clock().advanceBy({ days: 8 });
+
+await simS3.deleteObject(
+  new DeleteObjectCommand({
+    Bucket: "reader-history",
+    Key: "events/reader-1.json",
+    VersionId: written.VersionId,
+  }),
+);
+```
+
+The retention boundary is a pure function of simulated time, read off the clock every time a delete
+asks. Advancing the clock past `RetainUntilDate` is all a test does to watch a held version become
+deletable. See [Controlling time](https://yulinsim.dev/time/ "Controlling time").
+
+`GetObject` and `HeadObject` report `ObjectLockMode` and `ObjectLockRetainUntilDate` for a version
+under a retention period, and `ObjectLockLegalHoldStatus` for one under a hold. A version free of
+both leaves all three out.
+
+### Retention modes
+
+`GOVERNANCE` and `COMPLIANCE` differ over who can get out of them. A governance period gives way to a
+delete carrying `BypassGovernanceRetention` from a caller holding `s3:BypassGovernanceRetention`,
+which sim IAM authorizes as a decision of its own alongside the `s3:DeleteObject` the delete already
+needed. Holding the permission and using it are separate. A delete that leaves the flag off is
+refused whatever the caller may do.
+
+A compliance period gives way to nobody, the account root included. `PutObjectRetentionCommand`
+follows the same split. A compliance period can be extended in the same mode and that is all, since
+shortening one would end the guarantee early and turning one into a governance period would hand the
+version to the first caller holding the bypass permission. A governance period can be shortened, or
+turned into a compliance one, by a request that bypasses it.
+
+### Legal holds
+
+`PutObjectLegalHoldCommand` turns the hold on a version on and off. A hold has no period to wait out.
+Only a `Status: "OFF"` takes one off, which is what makes a hold the thing to reach for when the end
+of the retention is unknowable in advance. A version can carry a hold and a retention period at
+once, and either one on its own refuses the delete.
+
+### Default retention
+
+A `DefaultRetention` under `Rule` retains every version written after it, counted from the write, so
+two versions of one key written a day apart are held until two different instants. It takes `Days` or
+`Years` and refuses both together, a year is 365 days, and the longest one real S3 takes is a hundred
+years. A Bucket with Object Lock on and no
+default leaves each version to whatever requests name it.
+
+### From a CloudFormation template
+
+`ObjectLockEnabled` and `ObjectLockConfiguration` are applied through
+`PutObjectLockConfigurationCommand`, so a template and an SDK caller are validated identically. CDK's
+`objectLockEnabled` and `objectLockDefaultRetention` synthesise both. `ObjectLockConfiguration`
+without `ObjectLockEnabled: true` fails the resource, as real CloudFormation refuses it, because a
+Bucket created around the property would report a default retention it never applied.
+
+### Limitations
+
+- `GetObjectRetentionCommand` and `GetObjectLegalHoldCommand` are absent. A version reports both
+  through `GetObject` and `HeadObject`.
+- `PutObjectCommand` takes no `ObjectLockMode`, `ObjectLockRetainUntilDate` or
+  `ObjectLockLegalHoldStatus`. A version is held by the Bucket's default retention and by
+  `PutObjectRetentionCommand` and `PutObjectLegalHoldCommand` afterwards.
+- `CreateBucketCommand` takes no `ObjectLockEnabledForBucket`. Turn versioning on, then Object Lock.
+- `DeleteObjectsCommand` names keys and no versions, so a batch delete writes delete markers and
+  reaches no held version. See [Deleting Objects](#deleting-objects).
+- The `?object-lock`, `?retention` and `?legal-hold` sub-resources are refused over the served S3
+  REST endpoint. Object Lock is reachable through the SDK and through a template.
+- A Bucket policy setting minimum and maximum allowable retention periods is left out. The only
+  bound applied is the hundred years real S3 caps a `DefaultRetention` at. A `RetainUntilDate` on a
+  single version is taken as given, however far ahead it names.
+- `S3 Batch Operations` applying retention across a manifest is left out.
+
 ## Event notifications
 
 A simulated S3 Bucket can notify a simulated Lambda function, a simulated SQS queue or a simulated
@@ -1860,11 +2020,12 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 
 ## Buckets from CloudFormation
 
-An `AWS::S3::Bucket` resource carries six properties simulated S3 acts on. Those are `BucketName`,
-`LifecycleConfiguration`, `NotificationConfiguration`, `PublicAccessBlockConfiguration`,
-`VersioningConfiguration` and `WebsiteConfiguration`. See
-[Lifecycle configuration](#lifecycle-configuration) for the parts of a rule that are read, and
-[Object versioning](#object-versioning) for what versioning a Bucket changes.
+An `AWS::S3::Bucket` resource carries eight properties simulated S3 acts on. Those are `BucketName`,
+`LifecycleConfiguration`, `NotificationConfiguration`, `ObjectLockConfiguration`,
+`ObjectLockEnabled`, `PublicAccessBlockConfiguration`, `VersioningConfiguration` and
+`WebsiteConfiguration`. See [Lifecycle configuration](#lifecycle-configuration) for the parts of a
+rule that are read, [Object versioning](#object-versioning) for what versioning a Bucket changes, and
+[Object Lock](#object-lock) for what holds a version once it is written.
 
 A Bucket with no `BucketName` is named from the stack name, the logical ID and a tail derived from
 both, lower cased as a bucket name has to be. A `SiteBucket` in `orders-stack` becomes
@@ -1875,12 +2036,12 @@ cover how the stack name and the logical ID share what is left.
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 and the Bucket is created and the stack carries on. That matters because a Bucket deployed without
-the Object Lock, replication or CORS configuration its template asked for looks configured and
+the replication or CORS configuration its template asked for looks configured and
 behaves as though it were bare, and the failure that causes turns up somewhere else entirely. The
 record is where a test checks which of those it is standing on. A property name `AWS::S3::Bucket`
 never had is recorded the same way, and a typo leaves the stack standing.
 
-One of the six given in the wrong shape still fails the stack, and so does a `BucketName` that is
+One of the eight given in the wrong shape still fails the stack, and so does a `BucketName` that is
 something other than a string. There is no Bucket to create under a name nothing else in the
 template refers to.
 
@@ -3196,8 +3357,6 @@ needs them to model the requested behaviour.
 
 These apply across the page. The sections above each list what is specific to them.
 
-- Object Lock is left out. A Bucket declaring it deploys without it, and an Object inside a
-  retention period can still be deleted.
 - A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
   left out, and every Object is in that one.
 - `EncodingType` is ignored on a listing, and keys come back unencoded.

@@ -5,6 +5,7 @@ import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketObjects } from "./sim-s3-bucket-objects.js";
 import type { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
+import type { SimS3BucketObjectLock } from "./lock/sim-s3-bucket-object-lock.js";
 import type { SimS3BucketVersioning } from "./versioning/sim-s3-bucket-versioning.js";
 import type { SimS3BucketVersions } from "./versioning/sim-s3-bucket-versions.js";
 import type { SimS3ObjectVersion } from "./versioning/sim-s3-object-version.js";
@@ -119,20 +120,25 @@ export class SimS3Bucket {
    * Remove one version of a key permanently, answering the version that went.
    *
    * Whatever the removal leaves at the head of the key becomes current, so
-   * deleting a delete marker brings the Object under it back.
+   * deleting a delete marker brings the Object under it back. Object Lock
+   * refuses the removal of a version it is holding.
    */
   async deleteObjectVersion(
     key: string,
     versionId: string,
+    bypassGovernance = false,
   ): Promise<SimS3ObjectVersion | undefined> {
-    return await this.objects.deleteVersion(key, versionId);
+    return await this.objects.deleteVersion(key, versionId, bypassGovernance);
   }
 
-  /**
-   * The versions this Bucket keeps, and whether it keeps any.
-   */
+  /** The versions this Bucket keeps, and whether it keeps any. */
   getVersions(): SimS3BucketVersions {
     return this.objects.versions;
+  }
+
+  /** How this Bucket is locked, and what that does to a write and a delete. */
+  getObjectLock(): SimS3BucketObjectLock {
+    return this.objects.objectLock;
   }
 
   /**

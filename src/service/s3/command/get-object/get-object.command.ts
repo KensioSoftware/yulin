@@ -1,5 +1,6 @@
 import type { Readable } from "node:stream";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3ObjectLockOutput } from "../../bucket/lock/sim-s3-object-lock-output.js";
 import type { SimS3SystemMetadataOutput } from "../../object/s3-system-metadata-read.js";
 
 /**
@@ -43,7 +44,8 @@ export interface SimGetObjectCommandInput {
  * when it was written. `Metadata` is what the caller attached to it, and holds
  * nothing else.
  */
-export interface SimGetObjectCommandOutput extends SimS3SystemMetadataOutput {
+export interface SimGetObjectCommandOutput
+  extends SimS3SystemMetadataOutput, SimS3ObjectLockOutput {
   readonly Body?: Readable;
   readonly Metadata?: Record<string, string>;
   readonly ETag?: string;

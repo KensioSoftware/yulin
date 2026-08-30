@@ -35,6 +35,7 @@ export class HeadObjectLoader {
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
       ...(read.versionId !== undefined && { VersionId: read.versionId }),
+      ...read.lock?.reported,
       $metadata: {},
     };
   }

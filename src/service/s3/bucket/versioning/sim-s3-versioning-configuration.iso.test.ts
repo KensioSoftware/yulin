@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetBucketVersioningCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   ListObjectVersionsCommand,
   PutBucketVersioningCommand,
@@ -212,6 +213,44 @@ describe("Configuring versioning on a simulated S3 Bucket", () => {
     // gives it, and any other id names a version that was never there.
     assertArrayLength(emptied.Contents ?? [], 0);
     assertArrayLength(kept.Contents ?? [], 1);
+  });
+
+  it("reads the null version of an Object in an unversioned Bucket", async () => {
+    // Given a Bucket nobody turned versioning on for
+    const simAws = new SimAws();
+    const s3 = simAws.s3();
+    await s3.createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+    await s3.putObject(
+      new PutObjectCommand({ Bucket: "uploads", Key: "a.txt", Body: "a" }),
+    );
+
+    // When the Object is read by the null version id
+    const read = await s3.headObject(
+      new HeadObjectCommand({
+        Bucket: "uploads",
+        Key: "a.txt",
+        VersionId: "null",
+      }),
+    );
+
+    // Then it answers with the Object, since that is the id real S3 gives
+    // every Object in such a Bucket, and reports no version of its own
+    assertIdentical(read.ContentLength, 1);
+    assertUndefined(read.VersionId);
+
+    // And the same read of a key holding nothing finds nothing, rather than
+    // an empty Object under the id every Object there answers to
+    const missing = await assertThrowsErrorAsync(async () =>
+      s3.headObject(
+        new HeadObjectCommand({
+          Bucket: "uploads",
+          Key: "b.txt",
+          VersionId: "null",
+        }),
+      ),
+    );
+
+    assertIdentical(missing.name, "NotFound");
   });
 
   it("refuses a versioning status S3 does not take", async () => {

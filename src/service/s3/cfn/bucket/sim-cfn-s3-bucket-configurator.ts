@@ -46,15 +46,17 @@ export class SimCfnS3BucketConfigurator {
   /**
    * Apply every configuration the Resource declares.
    *
-   * Versioning goes before the lifecycle rules, because a rule acting on
-   * noncurrent versions describes a Bucket that keeps them. Notifications go
-   * last, because S3 checks every destination the configuration names, and the
-   * Resources those destinations live on have to exist by then.
+   * Versioning goes before Object Lock and before the lifecycle rules,
+   * because both describe a Bucket that keeps versions and Object Lock refuses
+   * one that does not. Notifications go last, because S3 checks every
+   * destination the configuration names, and the Resources those destinations
+   * live on have to exist by then.
    */
   async configure(): Promise<void> {
     await this.declared.applyWebsite();
     await this.declared.applyPublicAccess();
     await this.declared.applyVersioning();
+    await this.declared.applyObjectLock();
     await this.declared.applyLifecycle();
     await this.configureNotifications();
   }

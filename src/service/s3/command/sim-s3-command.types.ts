@@ -149,3 +149,23 @@ export type {
   SimUploadPartCommand,
   SimUploadPartCommandOutput,
 } from "./upload-part/upload-part.command.js";
+export type {
+  SimPutObjectLockConfigurationCommand,
+  SimPutObjectLockConfigurationCommandInput,
+  SimPutObjectLockConfigurationCommandOutput,
+} from "./put-object-lock-configuration/put-object-lock-configuration.command.js";
+export type {
+  SimGetObjectLockConfigurationCommand,
+  SimGetObjectLockConfigurationCommandInput,
+  SimGetObjectLockConfigurationCommandOutput,
+} from "./get-object-lock-configuration/get-object-lock-configuration.command.js";
+export type {
+  SimPutObjectRetentionCommand,
+  SimPutObjectRetentionCommandInput,
+  SimPutObjectRetentionCommandOutput,
+} from "./put-object-retention/put-object-retention.command.js";
+export type {
+  SimPutObjectLegalHoldCommand,
+  SimPutObjectLegalHoldCommandInput,
+  SimPutObjectLegalHoldCommandOutput,
+} from "./put-object-legal-hold/put-object-legal-hold.command.js";

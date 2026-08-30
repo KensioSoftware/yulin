@@ -4,6 +4,8 @@
 export const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "BucketName",
   "LifecycleConfiguration",
+  "ObjectLockConfiguration",
+  "ObjectLockEnabled",
   "NotificationConfiguration",
   "PublicAccessBlockConfiguration",
   "VersioningConfiguration",
@@ -29,9 +31,9 @@ export const inertPropertyNames: ReadonlySet<string> = new Set([
  * each of them would have changed.
  *
  * The Bucket is created without them and each one is recorded against the
- * Resource. A Bucket with Object Lock, for instance, refuses a delete inside
- * an Object's retention period, where this simulator carries it out, so a test
- * written against Object Lock needs to find out that it was never configured.
+ * Resource. A Bucket declaring replication, for instance, copies nothing to
+ * the Bucket it names, so a test expecting an Object to arrive there needs to
+ * find out that nothing was ever going to send it.
  */
 export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["AbacStatus", "attribute-based access control is not simulated"],
@@ -57,14 +59,6 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["MetadataConfiguration", "Bucket metadata tables are not simulated"],
   ["MetadataTableConfiguration", "Bucket metadata tables are not simulated"],
   ["MetricsConfigurations", "CloudWatch request metrics are not simulated"],
-  [
-    "ObjectLockConfiguration",
-    "Object Lock is not simulated, so a retained Object can still be deleted",
-  ],
-  [
-    "ObjectLockEnabled",
-    "Object Lock is not simulated, so a retained Object can still be deleted",
-  ],
   ["OwnershipControls", "Object ownership and ACLs are not simulated"],
   ["ReplicationConfiguration", "Bucket replication is not simulated"],
 ]);

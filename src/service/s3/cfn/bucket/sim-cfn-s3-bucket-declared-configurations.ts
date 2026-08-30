@@ -2,6 +2,7 @@ import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resour
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimS3 } from "../../sim-s3.js";
 import { SimCfnS3BucketLifecycleConfiguration } from "./lifecycle/sim-cfn-s3-bucket-lifecycle-configuration.js";
+import { SimCfnS3BucketObjectLockConfiguration } from "./lock/sim-cfn-s3-bucket-object-lock-configuration.js";
 import { SimCfnS3BucketPublicAccessConfiguration } from "./public-access/sim-cfn-s3-bucket-public-access-configuration.js";
 import { SimCfnS3BucketVersioningConfiguration } from "./versioning/sim-cfn-s3-bucket-versioning-configuration.js";
 import { SimCfnS3BucketWebsiteConfiguration } from "./website/sim-cfn-s3-bucket-website-configuration.js";
@@ -18,7 +19,7 @@ interface SimCfnS3BucketDeclaredConfigurationsProperties {
  * The AWS::S3::Bucket properties that are read straight off the Resource and
  * handed to a command.
  *
- * Four properties with one shape between them. Each is read from the Resource,
+ * Five properties with one shape between them. Each is read from the Resource,
  * left alone where the Resource omitted it, and otherwise applied through the
  * command an SDK caller would reach, so a template and an SDK caller are
  * validated identically. The event notification configuration is the one that
@@ -81,6 +82,27 @@ export class SimCfnS3BucketDeclaredConfigurations {
     if (VersioningConfiguration !== undefined) {
       await this.simS3.putBucketVersioning(
         { input: { Bucket: this.bucketName, VersioningConfiguration } },
+        this.options,
+      );
+    }
+  }
+
+  /**
+   * Apply the Object Lock configuration the Resource declares.
+   *
+   * This goes after versioning, because Object Lock holds a version and
+   * PutObjectLockConfiguration refuses a Bucket that keeps none. A template
+   * declaring Object Lock without versioning therefore fails the Resource, in
+   * the words an SDK caller is refused in.
+   */
+  async applyObjectLock(): Promise<void> {
+    const ObjectLockConfiguration = this.read(
+      SimCfnS3BucketObjectLockConfiguration,
+    );
+
+    if (ObjectLockConfiguration !== undefined) {
+      await this.simS3.putObjectLockConfiguration(
+        { input: { Bucket: this.bucketName, ObjectLockConfiguration } },
         this.options,
       );
     }
