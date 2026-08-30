@@ -36,10 +36,15 @@ export async function createSimBackupVault(
       );
       const lock = properties.vaultLockConfiguration();
       if (lock !== undefined) {
-        await backup.putBackupVaultLockConfiguration(
-          { input: { BackupVaultName: name, ...lock } },
-          options,
-        );
+        try {
+          await backup.putBackupVaultLockConfiguration(
+            { input: { BackupVaultName: name, ...lock } },
+            options,
+          );
+        } catch (error) {
+          backup.removeBackupVault(name);
+          throw error;
+        }
       }
       const vault = backup.findBackupVault(name);
       assertDefined(

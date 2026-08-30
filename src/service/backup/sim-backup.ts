@@ -246,6 +246,10 @@ export class SimBackup {
     return this.store.selection(id);
   }
 
+  removeBackupVault(name: string): void {
+    this.store.removeVault(name);
+  }
+
   removeBackupPlan(id: string): void {
     this.store.removePlan(id);
   }

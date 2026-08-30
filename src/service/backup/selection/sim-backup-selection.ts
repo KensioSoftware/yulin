@@ -13,9 +13,7 @@ interface SimBackupSelectionProperties {
   readonly selection: SimBackupSelectionInput;
 }
 
-/**
- *
- */
+/** Stored configuration for one selection in a backup plan. */
 export class SimBackupSelection {
   public readonly id: string;
   public readonly planId: string;

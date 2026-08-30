@@ -36,6 +36,7 @@ export function readBackupRules(
   return input.map((rule) => readBackupRule(rule));
 }
 
+/** Validates and normalizes one backup plan rule for storage. */
 function readBackupRule(input: SimBackupRuleInput): SimBackupRule {
   const schedule = input.ScheduleExpression ?? defaultBackupScheduleExpression;
   validateSchedule(schedule);
@@ -54,6 +55,7 @@ function readBackupRule(input: SimBackupRuleInput): SimBackupRule {
   };
 }
 
+/** Rejects expressions outside the AWS Backup schedule dialect. */
 function validateSchedule(schedule: string): void {
   try {
     SimSchedule.of(schedule, backupScheduleDialect);
@@ -65,10 +67,13 @@ function validateSchedule(schedule: string): void {
   }
 }
 
+/** Enforces the relationship between cold storage and deletion. */
 function validateLifecycle(input: SimBackupRuleInput): void {
   const coldAfter = input.Lifecycle?.MoveToColdStorageAfterDays;
   const deleteAfter = input.Lifecycle?.DeleteAfterDays;
+  const retainedIndefinitely = coldAfter === -1 && deleteAfter === -1;
   if (
+    !retainedIndefinitely &&
     coldAfter !== undefined &&
     deleteAfter !== undefined &&
     deleteAfter < coldAfter + 90

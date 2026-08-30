@@ -19,6 +19,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimFixedClock } from "../../../../util/clock/sim-clock.js";
 import type { SimS3 } from "../../sim-s3.js";
 
 const bucketName = "reader-history";
@@ -299,9 +300,9 @@ describe("S3 Object Lock", () => {
 
   it("retains a version the Bucket's default retention covers", async () => {
     // Given a Bucket with a thirty day default retention.
-    const simAws = new SimAws();
+    const writtenAt = new Date("2026-08-30T09:00:00.000Z");
+    const simAws = new SimAws({ clock: new SimFixedClock(writtenAt) });
     const s3 = await lockedBucket(simAws, 30);
-    const writtenAt = simAws.clock().now();
 
     // When a version is written.
     const VersionId = await putEvent(s3);

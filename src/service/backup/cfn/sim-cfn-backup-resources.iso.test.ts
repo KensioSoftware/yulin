@@ -2,6 +2,8 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -166,5 +168,37 @@ describe("AWS Backup CloudFormation resources", () => {
     assertUndefined(simAws.backup().findBackupVault("ephemeral-backups"));
     assertUndefined(simAws.backup().findBackupPlan(planId));
     assertUndefined(simAws.backup().findBackupSelection(selectionId));
+  });
+
+  it("leaves no vault behind when its lock configuration fails", async () => {
+    // Given a vault Resource with a lock configuration AWS Backup refuses.
+    const simAws = new SimAws();
+
+    // When the template is deployed, then the deployment fails.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "invalid-backup-stack",
+        template: {
+          Resources: {
+            Vault: {
+              Type: "AWS::Backup::BackupVault",
+              Properties: {
+                BackupVaultName: "invalid-backups",
+                LockConfiguration: {
+                  MinRetentionDays: 30,
+                  MaxRetentionDays: 7,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Then the failed Resource leaves no vault to block another deployment.
+    assertStringIncludes(error.message, "MinRetentionDays must not exceed");
+    assertUndefined(simAws.backup().findBackupVault("invalid-backups"));
+
+    await simAws.backgroundTasksComplete();
   });
 });

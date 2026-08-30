@@ -197,4 +197,45 @@ describe("simulated AWS Backup commands", () => {
       .listBackupVaults(new ListBackupVaultsCommand({}));
     assertArrayLength(vaults.BackupVaultList ?? [], 0);
   });
+
+  it("stores an indefinite-retention lifecycle", async () => {
+    // Given a backup vault for an indefinite-retention plan.
+    const simAws = new SimAws();
+    const vaultName = `vault-${faker.string.uuid()}`;
+    await simAws
+      .backup()
+      .createBackupVault(
+        new CreateBackupVaultCommand({ BackupVaultName: vaultName }),
+      );
+
+    // When a plan uses the paired AWS indefinite-retention values.
+    const created = await simAws.backup().createBackupPlan(
+      new CreateBackupPlanCommand({
+        BackupPlan: {
+          BackupPlanName: `plan-${faker.string.uuid()}`,
+          Rules: [
+            {
+              RuleName: "indefinite",
+              TargetBackupVaultName: vaultName,
+              Lifecycle: {
+                MoveToColdStorageAfterDays: -1,
+                DeleteAfterDays: -1,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    // Then the plan keeps both sentinel values.
+    const plan = await simAws
+      .backup()
+      .getBackupPlan(
+        new GetBackupPlanCommand({ BackupPlanId: created.BackupPlanId }),
+      );
+    const lifecycle = plan.BackupPlan?.Rules?.[0]?.Lifecycle;
+    assertNonNullable(lifecycle);
+    assertIdentical(lifecycle.MoveToColdStorageAfterDays, -1);
+    assertIdentical(lifecycle.DeleteAfterDays, -1);
+  });
 });

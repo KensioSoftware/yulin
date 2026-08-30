@@ -6,9 +6,7 @@ import {
 import type * as commands from "../command/sim-backup-command.types.js";
 import type { SimBackup } from "../sim-backup.js";
 
-/**
- *
- */
+/** Routes supported BackupClient commands to simulated AWS Backup. */
 export class SimBackupSdkCommandRouter implements SimSdkCommandRouter {
   private readonly routes: ReadonlyMap<string, SimSdkCommandRoute>;
 
@@ -86,6 +84,7 @@ export class SimBackupSdkCommandRouter implements SimSdkCommandRouter {
   }
 }
 
+/** Builds one route with caller options from the interception context. */
 function route(
   name: string,
   handle: (
