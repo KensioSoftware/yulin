@@ -1,6 +1,6 @@
 import type * as simLogsCommands from "./command/sim-logs-command.types.js";
 import type { SimLogsRequestOptions } from "./command/sim-logs-request-options.js";
-import type { SimLogsMetricPublicationFailure } from "./metric/sim-logs-metric-fan-out.js";
+import type { SimLogsMetricPublicationFailure } from "./metric/sim-logs-metric-publication-failure.js";
 import { SimLogsDeliveryOperations } from "./sim-logs-delivery-operations.js";
 import type { SimLogsCommands } from "./sim-logs-commands.js";
 

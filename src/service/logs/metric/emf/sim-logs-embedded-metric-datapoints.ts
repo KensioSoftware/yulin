@@ -1,4 +1,7 @@
-import type { SimLogsMetricDatapoint } from "../sim-logs-metric-datapoint.js";
+import type {
+  SimLogsMetricDatapoint,
+  SimLogsMetricDimension,
+} from "../sim-logs-metric-datapoint.js";
 import {
   simLogsEmbeddedMetricDocument,
   type SimLogsEmbeddedMetricDirective,
@@ -63,6 +66,20 @@ export function simLogsEmbeddedMetricReading(
   return { datapoints, skipped };
 }
 
+/**
+ * Why a directive that asked for dimensions can publish none of its metrics.
+ */
+function unusableDimensions(
+  directive: SimLogsEmbeddedMetricDirective,
+  dimensionSets: readonly (readonly SimLogsMetricDimension[])[],
+): string | undefined {
+  return directive.declaresDimensions && dimensionSets.length === 0
+    ? `The document declares dimensions for ${directive.namespace} and ` +
+        `carries no usable set of them, so there is no identity to publish ` +
+        `under.`
+    : undefined;
+}
+
 function readDirective(
   document: SimLogsEmbeddedMetricDocument,
   directive: SimLogsEmbeddedMetricDirective,
@@ -70,24 +87,32 @@ function readDirective(
 ): SimLogsEmbeddedMetricReading {
   const datapoints: SimLogsMetricDatapoint[] = [];
   const skipped: SimLogsEmbeddedMetricSkip[] = [];
-  const declared = directive.dimensionSets
+  const resolved = directive.dimensionSets
     .map((keys) => embeddedMetricDimensions(document, keys))
     .filter((dimensions) => dimensions !== undefined);
 
-  // A directive naming no dimension set still publishes, undimensioned, which
-  // is what an EMF document with an empty Dimensions list asks for.
-  const dimensionSets = declared.length > 0 ? declared : [[]];
+  // A directive asking for no dimensions publishes undimensioned. One that
+  // asked and got nothing usable publishes nothing at all.
+  const dimensionSets = directive.declaresDimensions ? resolved : [[]];
+  const noIdentity = unusableDimensions(directive, dimensionSets);
+  const skip = (metricName: string, reason: string): void => {
+    skipped.push({
+      metricNamespace: directive.namespace,
+      metricName,
+      reason,
+    });
+  };
 
   for (const metric of directive.metrics) {
     const values = embeddedMetricValues(document, metric);
 
     if (typeof values === "string") {
-      skipped.push({
-        metricNamespace: directive.namespace,
-        metricName: metric.name,
-        reason: values,
-      });
+      skip(metric.name, values);
+      continue;
+    }
 
+    if (noIdentity !== undefined) {
+      skip(metric.name, noIdentity);
       continue;
     }
 

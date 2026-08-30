@@ -32,6 +32,17 @@ export interface SimLogsEmbeddedMetricDeclaration {
  */
 export interface SimLogsEmbeddedMetricDirective {
   readonly namespace: string;
+
+  /**
+   * Whether the directive asked for dimensions at all.
+   *
+   * A directive that asked for none publishes undimensioned. One that asked
+   * and whose sets all turn out to be unusable publishes nothing, because
+   * falling back to no dimensions would put the datapoint on a metric the
+   * document never named.
+   */
+  readonly declaresDimensions: boolean;
+
   readonly dimensionSets: readonly (readonly string[])[];
   readonly metrics: readonly SimLogsEmbeddedMetricDeclaration[];
 }
@@ -102,17 +113,35 @@ function directiveOf(
     return undefined;
   }
 
+  const dimensions = entry.get("Dimensions");
+
+  if (dimensions !== undefined && !Array.isArray(dimensions)) {
+    return undefined;
+  }
+
   return {
     namespace,
-    dimensionSets: embeddedMetricList(entry.get("Dimensions"), dimensionSetOf),
+    declaresDimensions: Array.isArray(dimensions) && dimensions.length > 0,
+    dimensionSets: embeddedMetricList(dimensions, dimensionSetOf),
     metrics: embeddedMetricList(entry.get("Metrics"), metricOf),
   };
 }
 
+/**
+ * One dimension set, or undefined where it is not a list of names.
+ *
+ * A member that is not a string takes the whole set with it. Keeping the ones
+ * that were strings would publish under a narrower identity than the document
+ * asked for, which is the same trouble as dropping a single dimension.
+ */
 function dimensionSetOf(value: unknown): readonly string[] | undefined {
-  return Array.isArray(value)
-    ? embeddedMetricList(value, embeddedMetricString)
-    : undefined;
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const names = value.map((name) => embeddedMetricString(name));
+
+  return names.every((name) => name !== undefined) ? names : undefined;
 }
 
 function metricOf(

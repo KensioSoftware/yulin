@@ -4,29 +4,13 @@ import type { SimLogsStoredEvent } from "../event/sim-logs-event.js";
 import type { SimLogsLogGroup } from "../group/sim-logs-log-group.js";
 import { simLogsEmbeddedMetricReading } from "./emf/sim-logs-embedded-metric-datapoints.js";
 import type { SimLogsMetricDatapoint } from "./sim-logs-metric-datapoint.js";
+import {
+  metricFilterSource,
+  simLogsEmbeddedMetricSource,
+  type SimLogsMetricPublicationFailure,
+  type SimLogsMetricPublicationSource,
+} from "./sim-logs-metric-publication-failure.js";
 import type { SimLogsMetricPublications } from "./sim-logs-metric-publications.js";
-
-/**
- * What the ledger calls a datapoint an EMF document produced.
- *
- * A metric filter has a name to be known by and an embedded document has none,
- * so the two are told apart by this.
- */
-export const simLogsEmbeddedMetricSource = "embedded metric format";
-
-/**
- * One datapoint a log group could not turn into a metric.
- *
- * `source` is the name of the metric filter that asked for it, or
- * `simLogsEmbeddedMetricSource` where the log event carried its own metrics.
- */
-export interface SimLogsMetricPublicationFailure {
-  readonly logGroupName: string;
-  readonly source: string;
-  readonly metricNamespace: string;
-  readonly metricName: string;
-  readonly reason: string;
-}
 
 interface SimLogsMetricFanOutProperties {
   readonly publications: SimLogsMetricPublications | undefined;
@@ -106,7 +90,11 @@ export class SimLogsMetricFanOut {
       const datapoints = filter.datapoints(events);
 
       if (datapoints.length > 0) {
-        this.schedule(group.logGroupName, filter.filterName, datapoints);
+        this.schedule(
+          group.logGroupName,
+          metricFilterSource(filter.filterName),
+          datapoints,
+        );
       }
     }
 
@@ -146,7 +134,7 @@ export class SimLogsMetricFanOut {
 
   private schedule(
     logGroupName: string,
-    source: string,
+    source: SimLogsMetricPublicationSource,
     datapoints: readonly SimLogsMetricDatapoint[],
   ): void {
     this.#background.schedule(async () => {
@@ -160,7 +148,7 @@ export class SimLogsMetricFanOut {
 
   private recordFailure(
     logGroupName: string,
-    source: string,
+    source: SimLogsMetricPublicationSource,
     datapoints: readonly SimLogsMetricDatapoint[],
     error: unknown,
   ): void {

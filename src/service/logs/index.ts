@@ -35,9 +35,11 @@ export type {
   SimLogsMetricDimension,
 } from "./metric/sim-logs-metric-datapoint.js";
 export {
+  metricFilterSource,
   simLogsEmbeddedMetricSource,
   type SimLogsMetricPublicationFailure,
-} from "./metric/sim-logs-metric-fan-out.js";
+  type SimLogsMetricPublicationSource,
+} from "./metric/sim-logs-metric-publication-failure.js";
 export type { SimLogsMetricPublications } from "./metric/sim-logs-metric-publications.js";
 export { simLogsStandardLogGroupClass } from "./command/group/sim-logs-unsimulated-group-input.js";
 export { SimLogsDeliverySource } from "./delivery/sim-logs-delivery-source.js";

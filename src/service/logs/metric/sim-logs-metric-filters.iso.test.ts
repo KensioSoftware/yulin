@@ -244,7 +244,12 @@ describe("sim CloudWatch Logs metric filters", () => {
     const failures = simAws.logs().metricPublicationFailures;
 
     assertArrayLength(failures, 1);
-    assertIdentical(failures.at(0)?.source, "handler-errors");
+
+    const source = failures.at(0)?.source;
+
+    assertNonNullable(source);
+    assertIdentical(source.kind, "metricFilter");
+    assertIdentical(source.filterName, "handler-errors");
     assertIdentical(failures.at(0)?.metricNamespace, "AWS/Lambda");
     assertStringIncludes(failures.at(0)?.reason ?? "", "reserved");
   });

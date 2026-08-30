@@ -995,7 +995,11 @@ The timestamp comes from `_aws.Timestamp`, read as milliseconds, and from the in
 
 A log event is read as a document only where it parses as JSON, comes out as an object, and carries usable `_aws` metadata. Anything else is stored and left alone. A log group is full of lines that were never metrics, and treating a parse failure as an error would make the common case the noisy one.
 
-Two things go on `simAws.logs().metricPublicationFailures` rather than passing quietly. A metric the metadata declares and the document body carries no number under, and a metric asking for `StorageResolution: 1`, which simulated CloudWatch has no period short enough for. A dimension set naming a key the body lacks is dropped whole, because filling in part of a set would publish under an identity no alarm is watching.
+Three things go on `simAws.logs().metricPublicationFailures` rather than passing quietly. A metric the metadata declares and the document body carries no number under, a metric asking for `StorageResolution: 1`, which simulated CloudWatch has no period short enough for, and a directive that asked for dimensions and got no usable set of them.
+
+A dimension set is taken whole or dropped whole. One naming a key the body lacks, and one carrying anything but strings, are both dropped, because publishing part of a set would put the datapoint under a narrower identity than the document declared. A directive left with no usable set publishes nothing at all. Falling back to no dimensions would land the datapoint on the undimensioned metric, and that is one an alarm may well be watching.
+
+Each entry on the ledger names its `source`, which is `{ kind: "metricFilter", filterName }` or `{ kind: "embeddedMetricFormat" }`. The two are told apart by kind rather than by name, because a metric filter may be called anything.
 
 ## Permissions
 
