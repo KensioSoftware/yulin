@@ -1,8 +1,13 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { requireSimCognitoRefreshTokenInput } from "../../user-pool/auth/sim-cognito-refresh-token-input.js";
 import { requireSimCognitoClientSecret } from "../../user-pool/client/sim-cognito-client-secret.js";
+import { countedSimCognitoAuth } from "../../metric/sim-cognito-counted-request.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
-import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
+import type {
+  SimCognitoAuthenticatingClient,
+  SimCognitoAuthResolver,
+} from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoRefreshedTokens } from "./sim-cognito-refreshed-tokens.js";
 import type {
   SimGetTokensFromRefreshTokenCommand,
@@ -10,6 +15,7 @@ import type {
 } from "./auth.command.js";
 
 interface SimCognitoGetTokensFromRefreshTokenProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly authResolver: SimCognitoAuthResolver;
   readonly refreshedTokens: SimCognitoRefreshedTokens;
   readonly clock: SimClock;
@@ -29,6 +35,7 @@ interface SimCognitoGetTokensFromRefreshTokenProperties {
  * than a hash computed over a username it does not have.
  */
 export class SimCognitoGetTokensFromRefreshToken {
+  private readonly poolMetrics: SimCognitoPoolMetrics;
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly refreshedTokens: SimCognitoRefreshedTokens;
   private readonly clock: SimClock;
@@ -37,6 +44,7 @@ export class SimCognitoGetTokensFromRefreshToken {
   );
 
   constructor(properties: SimCognitoGetTokensFromRefreshTokenProperties) {
+    this.poolMetrics = properties.poolMetrics;
     this.authResolver = properties.authResolver;
     this.refreshedTokens = properties.refreshedTokens;
     this.clock = properties.clock;
@@ -44,12 +52,29 @@ export class SimCognitoGetTokensFromRefreshToken {
 
   /**
    * Renew a session from the refresh token it holds.
+   *
+   * Real Cognito counts this under `TokenRefreshSuccesses`, the same metric an
+   * `InitiateAuth` running `REFRESH_TOKEN_AUTH` lands in.
    */
   async handle(
     command: SimGetTokensFromRefreshTokenCommand,
   ): Promise<SimGetTokensFromRefreshTokenCommandOutput> {
     const { input } = command;
-    const { pool, client } = this.authResolver.client(input.ClientId);
+    const scope = this.authResolver.client(input.ClientId);
+
+    return await countedSimCognitoAuth(
+      this.poolMetrics,
+      "TokenRefreshSuccesses",
+      scope,
+      async () => await this.renewed(command, scope),
+    );
+  }
+
+  private async renewed(
+    command: SimGetTokensFromRefreshTokenCommand,
+    { pool, client }: SimCognitoAuthenticatingClient,
+  ): Promise<SimGetTokensFromRefreshTokenCommandOutput> {
+    const { input } = command;
 
     this.unsimulated.refuse(
       "DeviceKey",

@@ -4,6 +4,10 @@ import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-t
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
 import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
+import { countedSimCognitoCompletion } from "../../metric/sim-cognito-counted-request.js";
+import { simCognitoAdminClientDimension } from "../../metric/sim-cognito-metrics.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
+import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { simCognitoValidationData } from "../sim-cognito-validation-data.js";
@@ -23,6 +27,7 @@ import type {
 } from "./user.command.js";
 
 interface SimCognitoUserCommandsProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly resolver: SimCognitoRequestResolver;
   readonly tokenUser: SimCognitoTokenUser;
   readonly userFactory: SimCognitoUserFactory;
@@ -41,6 +46,7 @@ interface SimCognitoCommandOptions {
  * own.
  */
 export class SimCognitoUserCommands {
+  private readonly poolMetrics: SimCognitoPoolMetrics;
   private readonly resolver: SimCognitoRequestResolver;
   private readonly tokenUser: SimCognitoTokenUser;
   private readonly userFactory: SimCognitoUserFactory;
@@ -50,6 +56,7 @@ export class SimCognitoUserCommands {
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();
 
   constructor(properties: SimCognitoUserCommandsProperties) {
+    this.poolMetrics = properties.poolMetrics;
     this.resolver = properties.resolver;
     this.tokenUser = properties.tokenUser;
     this.userFactory = properties.userFactory;
@@ -86,55 +93,20 @@ export class SimCognitoUserCommands {
     command: SimAdminCreateUserCommand,
     options?: SimCognitoCommandOptions,
   ): Promise<SimAdminCreateUserCommandOutput> {
-    const { input } = command;
     const pool = this.resolver.pool(
       "cognito-idp:AdminCreateUser",
-      input.UserPoolId,
+      command.input.UserPoolId,
       options,
     );
-    const requested = requireSimCognitoUsername(input.Username);
 
-    this.unsimulatedOptions.refuseInCreate(input);
-
-    // A pool signing users in by email or phone number stores a generated
-    // UUID as the username here too, so an admin-created user and one that
-    // signed itself up are identified the same way.
-    const identity = pool.settings.usernameAttributes.identify(
-      requested,
-      input.UserAttributes,
+    // A user an administrator registers reaches the pool through no app
+    // client, and real Cognito reports it under a fixed name in that place.
+    return await countedSimCognitoCompletion(
+      this.poolMetrics,
+      "SignUpSuccesses",
+      { pool, client: { id: simCognitoAdminClientDimension } },
+      async () => await this.created(command, pool),
     );
-
-    const user = this.userFactory.make({
-      username: identity.username,
-      attributes: identity.attributes,
-      schema: pool.settings.schema,
-      temporaryPassword: input.TemporaryPassword,
-      passwordPolicy: pool.settings.passwordPolicy,
-    });
-
-    await this.triggers.preSignUp(SimCognitoTriggerOccasion.adminCreateUser, {
-      pool,
-      user,
-      clientMetadata: input.ClientMetadata,
-      validationData: simCognitoValidationData(
-        input.ValidationData,
-        "AdminCreateUser",
-      ),
-    });
-
-    pool.addUser(user);
-
-    if (input.MessageAction !== "SUPPRESS") {
-      await this.messenger.send({
-        pool,
-        user,
-        occasion: "AdminCreateUser",
-        code: input.TemporaryPassword,
-        clientMetadata: input.ClientMetadata,
-      });
-    }
-
-    return { $metadata: {}, User: this.view.entry(user) };
   }
 
   /**
@@ -187,5 +159,55 @@ export class SimCognitoUserCommands {
     pool.removeUser(user);
 
     return { $metadata: {} };
+  }
+
+  private async created(
+    command: SimAdminCreateUserCommand,
+    pool: SimCognitoUserPool,
+  ): Promise<SimAdminCreateUserCommandOutput> {
+    const { input } = command;
+    const requested = requireSimCognitoUsername(input.Username);
+
+    this.unsimulatedOptions.refuseInCreate(input);
+
+    // A pool signing users in by email or phone number stores a generated
+    // UUID as the username here too, so an admin-created user and one that
+    // signed itself up are identified the same way.
+    const identity = pool.settings.usernameAttributes.identify(
+      requested,
+      input.UserAttributes,
+    );
+
+    const user = this.userFactory.make({
+      username: identity.username,
+      attributes: identity.attributes,
+      schema: pool.settings.schema,
+      temporaryPassword: input.TemporaryPassword,
+      passwordPolicy: pool.settings.passwordPolicy,
+    });
+
+    await this.triggers.preSignUp(SimCognitoTriggerOccasion.adminCreateUser, {
+      pool,
+      user,
+      clientMetadata: input.ClientMetadata,
+      validationData: simCognitoValidationData(
+        input.ValidationData,
+        "AdminCreateUser",
+      ),
+    });
+
+    pool.addUser(user);
+
+    if (input.MessageAction !== "SUPPRESS") {
+      await this.messenger.send({
+        pool,
+        user,
+        occasion: "AdminCreateUser",
+        code: input.TemporaryPassword,
+        clientMetadata: input.ClientMetadata,
+      });
+    }
+
+    return { $metadata: {}, User: this.view.entry(user) };
   }
 }

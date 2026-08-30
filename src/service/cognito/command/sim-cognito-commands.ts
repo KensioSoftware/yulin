@@ -7,6 +7,8 @@ import { SimCognitoRegistrations } from "../user-pool/sim-cognito-registrations.
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
 import type { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
+import type { SimCloudWatchServiceWriter } from "../../cloudwatch/write/sim-cloudwatch-service-writer.js";
+import { SimCognitoPoolMetrics } from "../metric/sim-cognito-pool-metrics.js";
 import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoEmailSenders } from "../user-pool/message/sim-cognito-email-senders.js";
 import { SimCognitoPoolEmailDelivery } from "../user-pool/message/sim-cognito-pool-email-delivery.js";
@@ -30,6 +32,7 @@ import { SimCognitoListGroups } from "./group/sim-cognito-list-groups.js";
 import { SimCognitoUserPoolClientCommands } from "./client/sim-cognito-user-pool-client-commands.js";
 import { SimCognitoListUsers } from "./user/sim-cognito-list-users.js";
 import { SimCognitoPasswordResetCommands } from "./user/sim-cognito-password-reset-commands.js";
+import { SimCognitoConfirmSignUpCommands } from "./user/sim-cognito-confirm-sign-up-commands.js";
 import { SimCognitoSignUpCommands } from "./user/sim-cognito-sign-up-commands.js";
 import { SimCognitoTokenUser } from "./user/sim-cognito-token-user.js";
 import { SimCognitoUserCommands } from "./user/sim-cognito-user-commands.js";
@@ -51,6 +54,9 @@ interface SimCognitoCommandsProperties {
   readonly emailSenders: SimCognitoEmailSenders;
   readonly webAcls: SimWafProtection;
   readonly messageLog: SimAwsMessageLog;
+
+  /** Where this scope's `AWS/Cognito` metrics go, if anywhere. */
+  readonly metrics?: SimCloudWatchServiceWriter | undefined;
 }
 
 /**
@@ -70,6 +76,7 @@ export class SimCognitoCommands {
   public readonly userMfa: SimCognitoUserMfaCommands;
   public readonly webAuthn: SimCognitoWebAuthnCommands;
   public readonly signUp: SimCognitoSignUpCommands;
+  public readonly confirmSignUp: SimCognitoConfirmSignUpCommands;
   public readonly passwordReset: SimCognitoPasswordResetCommands;
   public readonly userUpdates: SimCognitoUserUpdateCommands;
   public readonly listUsers: SimCognitoListUsers;
@@ -109,7 +116,14 @@ export class SimCognitoCommands {
 
     const authorizer = new SimCognitoAuthorizer({ iam, accountRegionScope });
     const resolver = new SimCognitoRequestResolver({ pools, authorizer });
-    const authResolver = new SimCognitoAuthResolver({ resolver, pools });
+    const poolMetrics = new SimCognitoPoolMetrics({
+      metrics: properties.metrics,
+    });
+    const authResolver = new SimCognitoAuthResolver({
+      resolver,
+      pools,
+      poolMetrics,
+    });
     const userFactory = new SimCognitoUserFactory({ clock });
     // One trigger runner serves every command, because a pool's LambdaConfig
     // is one set of functions whichever operation reaches it.
@@ -164,6 +178,7 @@ export class SimCognitoCommands {
     });
     this.listClients = new SimCognitoListUserPoolClients({ pools, authorizer });
     this.users = new SimCognitoUserCommands({
+      poolMetrics,
       resolver,
       tokenUser,
       userFactory,
@@ -177,9 +192,15 @@ export class SimCognitoCommands {
     });
     this.webAuthn = new SimCognitoWebAuthnCommands({ tokenUser, clock });
     this.signUp = new SimCognitoSignUpCommands({
+      poolMetrics,
+      authResolver,
+      userFactory,
+      triggers,
+      messenger,
+    });
+    this.confirmSignUp = new SimCognitoConfirmSignUpCommands({
       authResolver,
       resolver,
-      userFactory,
       triggers,
       messenger,
     });
@@ -206,6 +227,7 @@ export class SimCognitoCommands {
       tokenIssuer,
       messenger,
       firstFactor,
+      poolMetrics,
     });
     this.domains = new SimCognitoDomainCommands({
       pools,
@@ -221,6 +243,7 @@ export class SimCognitoCommands {
     // create pool users the same way a sign-up does, so they are given the
     // same collaborators rather than ones of their own.
     this.hosted = new SimCognitoHostedCommands({
+      poolMetrics,
       tokenIssuer,
       userFactory,
       triggers,

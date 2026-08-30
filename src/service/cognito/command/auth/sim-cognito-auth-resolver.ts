@@ -6,12 +6,15 @@ import type {
   SimCognitoClientInPool,
   SimCognitoUserPoolStore,
 } from "../../user-pool/sim-cognito-user-pool-store.js";
+import { simCognitoInvalidClientDimension } from "../../metric/sim-cognito-metrics.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import type { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 
 interface SimCognitoAuthResolverProperties {
   readonly resolver: SimCognitoRequestResolver;
   readonly pools: SimCognitoUserPoolStore;
+  readonly poolMetrics: SimCognitoPoolMetrics;
 }
 
 interface SimCognitoCommandOptions {
@@ -39,10 +42,12 @@ export type SimCognitoAuthenticatingClient = SimCognitoClientInPool;
 export class SimCognitoAuthResolver {
   private readonly resolver: SimCognitoRequestResolver;
   private readonly pools: SimCognitoUserPoolStore;
+  private readonly poolMetrics: SimCognitoPoolMetrics;
 
   constructor(properties: SimCognitoAuthResolverProperties) {
     this.resolver = properties.resolver;
     this.pools = properties.pools;
+    this.poolMetrics = properties.poolMetrics;
   }
 
   /**
@@ -59,12 +64,26 @@ export class SimCognitoAuthResolver {
   ): SimCognitoAuthenticatingClient {
     const pool = this.resolver.pool(action, input.UserPoolId, options);
 
-    return {
-      pool,
-      client: pool.requireClient(
-        requireSimCognitoUserPoolClientId(input.ClientId),
-      ),
-    };
+    try {
+      return {
+        pool,
+        client: pool.requireClient(
+          requireSimCognitoUserPoolClientId(input.ClientId),
+        ),
+      };
+    } catch (error) {
+      // Real Cognito counts a request naming an app client the pool has none
+      // of, reporting a fixed name in the client's place rather than the id
+      // the request gave. The request still fails.
+      this.poolMetrics.count(
+        "SignInSuccesses",
+        pool.id,
+        simCognitoInvalidClientDimension,
+        false,
+      );
+
+      throw error;
+    }
   }
 
   /**

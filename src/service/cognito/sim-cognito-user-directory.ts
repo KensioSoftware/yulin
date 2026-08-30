@@ -57,7 +57,7 @@ export abstract class SimCognitoUserDirectory extends SimCognitoUserFactors {
     command: simCognitoCommands.SimConfirmSignUpCommand,
   ): Promise<simCognitoCommands.SimConfirmSignUpCommandOutput> {
     await this.background.sequence();
-    return this.commands.signUp.confirmSignUp(command);
+    return this.commands.confirmSignUp.confirmSignUp(command);
   }
 
   /**
@@ -67,7 +67,7 @@ export abstract class SimCognitoUserDirectory extends SimCognitoUserFactors {
     command: simCognitoCommands.SimResendConfirmationCodeCommand,
   ): Promise<simCognitoCommands.SimResendConfirmationCodeCommandOutput> {
     await this.background.sequence();
-    return this.commands.signUp.resendConfirmationCode(command);
+    return this.commands.confirmSignUp.resendConfirmationCode(command);
   }
 
   /**
@@ -78,7 +78,7 @@ export abstract class SimCognitoUserDirectory extends SimCognitoUserFactors {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimAdminConfirmSignUpCommandOutput> {
     await this.background.sequence();
-    return this.commands.signUp.adminConfirmSignUp(command, options);
+    return this.commands.confirmSignUp.adminConfirmSignUp(command, options);
   }
 
   /**

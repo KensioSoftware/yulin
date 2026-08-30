@@ -1,4 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { countedSimCognitoAuth } from "../../metric/sim-cognito-counted-request.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoChallengeResponses } from "./sim-cognito-challenge-responses.js";
@@ -9,6 +11,7 @@ import type {
 } from "./auth.command.js";
 
 interface SimCognitoAdminRespondToChallengeProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly authResolver: SimCognitoAuthResolver;
   readonly responses: SimCognitoChallengeResponses;
 }
@@ -25,11 +28,13 @@ interface SimCognitoCommandOptions {
  * pool.
  */
 export class SimCognitoAdminRespondToChallenge {
+  private readonly poolMetrics: SimCognitoPoolMetrics;
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly responses: SimCognitoChallengeResponses;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedAuthOptions();
 
   constructor(properties: SimCognitoAdminRespondToChallengeProperties) {
+    this.poolMetrics = properties.poolMetrics;
     this.authResolver = properties.authResolver;
     this.responses = properties.responses;
   }
@@ -49,15 +54,25 @@ export class SimCognitoAdminRespondToChallenge {
     );
 
     this.unsimulatedOptions.refuseInAdminResponse(input);
-    return await this.responses.handle(input.ChallengeName, {
-      pool,
-      client,
-      parameters: new SimCognitoAuthParameters(
-        "ChallengeResponses",
-        input.ChallengeResponses,
-      ),
-      session: input.Session,
-      clientMetadata: input.ClientMetadata,
-    });
+
+    // Counted here rather than in the shared responder, so that a response
+    // counts as the one request it is, the way `RespondToAuthChallenge`
+    // counts its own.
+    return await countedSimCognitoAuth(
+      this.poolMetrics,
+      "SignInSuccesses",
+      { pool, client },
+      async () =>
+        await this.responses.handle(input.ChallengeName, {
+          pool,
+          client,
+          parameters: new SimCognitoAuthParameters(
+            "ChallengeResponses",
+            input.ChallengeResponses,
+          ),
+          session: input.Session,
+          clientMetadata: input.ClientMetadata,
+        }),
+    );
   }
 }

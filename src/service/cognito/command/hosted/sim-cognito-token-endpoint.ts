@@ -1,3 +1,4 @@
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoOAuthError } from "../../error/sim-cognito-oauth.error.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
@@ -17,6 +18,7 @@ const refreshTokenGrant = "refresh_token";
 const clientCredentialsGrant = "client_credentials";
 
 interface SimCognitoTokenEndpointProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly tokenIssuer: SimCognitoTokenIssuer;
   readonly clock: SimClock;
 }

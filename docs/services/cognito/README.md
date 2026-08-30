@@ -3194,6 +3194,80 @@ and the timestamps on tokens issued after it, but a verifier reading the host cl
 token it already holds by host time. Signing in in the past is what produces a token such a verifier
 refuses.
 
+## What a pool counts in CloudWatch
+
+A pool publishes into `AWS/Cognito` what real Cognito publishes about the requests it handles, dimensioned by `UserPool` and `UserPoolClient`. Nothing has to be turned on for it, and no caller needs a permission. Real Cognito behaves the same way.
+
+Four counts are kept. `SignInSuccesses` counts every authentication request, `SignUpSuccesses` every registration, `TokenRefreshSuccesses` every renewal from a refresh token, and `FederationSuccesses` every sign-in through an identity provider. Each is a 1 where the request issued tokens and a 0 where it did not, so `Sum` is how many succeeded, `SampleCount` is how many were made, and `Average` between them is the success rate. That is how the AWS documentation says to read them.
+
+```typescript sim-cognito-metrics
+/**
+ * An alarm on the rate at which a pool is turning sign-ins away.
+ */
+
+import {
+  DescribeAlarmsCommand,
+  PutMetricAlarmCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { InitiateAuthCommand } from "@aws-sdk/client-cognito-identity-provider";
+
+import type { SimAws } from "@kensio/yulin";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+
+await simAws.cloudWatch().putMetricAlarm(
+  new PutMetricAlarmCommand({
+    AlarmName: "SignInsFailing",
+    Namespace: "AWS/Cognito",
+    MetricName: "SignInSuccesses",
+    Dimensions: [
+      { Name: "UserPool", Value: userPoolId },
+      { Name: "UserPoolClient", Value: clientId },
+    ],
+    Statistic: "Average",
+    Period: 300,
+    EvaluationPeriods: 3,
+    DatapointsToAlarm: 1,
+    Threshold: 0.5,
+    ComparisonOperator: "LessThanThreshold",
+    TreatMissingData: "notBreaching",
+  }),
+);
+
+// Two of these three fail, so the average falls under the threshold.
+for (const password of ["Wr0ng!", "AlsoWr0ng!", "Sup3rSecret!"]) {
+  const attempt = new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: password },
+  });
+
+  try {
+    await simAws.cognitoIdentityProvider().initiateAuth(attempt);
+  } catch {
+    // A refused sign-in is counted as a zero rather than going uncounted.
+  }
+}
+
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const { MetricAlarms } = await simAws
+  .cloudWatch()
+  .describeAlarms(
+    new DescribeAlarmsCommand({ AlarmNames: ["SignInsFailing"] }),
+  );
+
+// ALARM.
+console.log(MetricAlarms?.[0]?.StateValue);
+```
+
+Two `UserPoolClient` values are fixed names rather than ids. A user an administrator registers through `AdminCreateUser` reaches the pool through no app client and counts against `Admin`. An admin authentication request naming a client the pool has none of counts against `Invalid`, and the id it gave is left out.
+
+A token refresh stays out of `SignInSuccesses` and lands in `TokenRefreshSuccesses`, whether it arrived as a `REFRESH_TOKEN_AUTH` flow or as `GetTokensFromRefreshToken`. A federated sign-in counts where its tokens are issued, at the token endpoint, rather than at the authorization code the provider sent the browser back with.
+
 ## Pool ARNs and IAM policies
 
 A pool ARN is the pool id after `userpool/`, and the region appears twice:
@@ -4738,6 +4812,13 @@ Sim Cognito currently supports:
 
 Current documented limitations:
 
+- `SignInSuccesses`, `SignUpSuccesses`, `TokenRefreshSuccesses` and `FederationSuccesses` are the
+  `AWS/Cognito` metrics a pool publishes. The `*Throttles` metrics beside them count what a rate
+  limit turned away, and this simulation applies none. A test that needs an alarm on one seeds the
+  datapoint through simulated CloudWatch's service writer. `CallCount` and `ThrottleCount` under
+  `AWS/Usage` are absent for the same reason. A client-side request naming an app client the pool
+  has none of counts nothing at all, because the app client id is what finds the pool and an unknown
+  one reaches no pool to report against.
 - Five authentication flows run: `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through
   `AdminInitiateAuth`, `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` through `InitiateAuth`, and
   `USER_AUTH` through either. SRP, custom authentication and device tracking are outside the

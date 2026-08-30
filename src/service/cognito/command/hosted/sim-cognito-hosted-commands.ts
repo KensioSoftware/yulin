@@ -1,3 +1,4 @@
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
@@ -10,6 +11,7 @@ import { SimCognitoLogoutEndpoint } from "./sim-cognito-logout-endpoint.js";
 import { SimCognitoTokenEndpoint } from "./sim-cognito-token-endpoint.js";
 
 interface SimCognitoHostedCommandsProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly tokenIssuer: SimCognitoTokenIssuer;
   readonly userFactory: SimCognitoUserFactory;
 
@@ -56,6 +58,10 @@ export class SimCognitoHostedCommands {
       }),
       clock,
     });
-    this.token = new SimCognitoTokenEndpoint({ tokenIssuer, clock });
+    this.token = new SimCognitoTokenEndpoint({
+      poolMetrics: properties.poolMetrics,
+      tokenIssuer,
+      clock,
+    });
   }
 }
