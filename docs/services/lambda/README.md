@@ -2748,6 +2748,27 @@ otherwise. A time read at module scope is therefore read too early, exactly as i
 variables. See [simulated time](https://yulinsim.dev/time/) for the whole picture, including where real
 AWS puts the time on the event.
 
+## What an invocation counts in CloudWatch
+
+Every invocation publishes `Invocations` and a `Duration` into `AWS/Lambda`, dimensioned by
+`FunctionName`. One whose handler threw publishes an `Errors` beside them. Real Lambda counts a
+failed invocation under both, so an alarm reading one against the other gets a failure rate.
+
+Nothing has to be turned on for it, and the execution Role needs no permission, which is how real
+Lambda behaves. An alarm on `AWS/Lambda` `Errors` can therefore be driven to a state change by
+invoking a function that fails, rather than by publishing a datapoint by hand. `PutMetricData` still
+refuses the `AWS/Lambda` namespace, exactly as an account does. See the
+[CloudWatch docs](../cloudwatch/README.md) for an alarm reading these.
+
+`Duration` is measured on the simulation's clock. A handler that moves the clock reports the time it
+moved, and one that returns without touching it reports nothing spent.
+
+`Throttles` and `ConcurrentExecutions` are absent. Both count what a concurrency limit turned away,
+and this simulation applies none.
+
+A function built outside a `SimAws` instance has no simulated CloudWatch to publish into. It runs and
+counts nothing.
+
 ## CloudFormation functions
 
 Sim CloudFormation can create Lambda functions from `AWS::Lambda::Function`, typically alongside a

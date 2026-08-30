@@ -22,6 +22,7 @@ import { SimCloudWatchGetMetricData } from "./command/query/sim-cloudwatch-get-m
 import { SimCloudWatchGetMetricStatistics } from "./command/query/sim-cloudwatch-get-metric-statistics.js";
 import { SimCloudWatchListMetrics } from "./command/query/sim-cloudwatch-list-metrics.js";
 import { SimCloudWatchMetricStore } from "./metric/sim-cloudwatch-metric-store.js";
+import { SimCloudWatchServiceWriter } from "./write/sim-cloudwatch-service-writer.js";
 
 export interface SimCloudWatchProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -45,6 +46,7 @@ export interface SimCloudWatchProperties {
  */
 export class SimCloudWatchCommands {
   readonly metrics: SimCloudWatchMetricStore;
+  readonly serviceWriter: SimCloudWatchServiceWriter;
   readonly putMetricData: SimCloudWatchPutMetricData;
   readonly listMetrics: SimCloudWatchListMetrics;
   readonly getMetricStatistics: SimCloudWatchGetMetricStatistics;
@@ -67,6 +69,11 @@ export class SimCloudWatchCommands {
 
     const authorizer = new SimCloudWatchAuthorizer({ iam, accountRegionScope });
     const metrics = new SimCloudWatchMetricStore();
+
+    this.serviceWriter = new SimCloudWatchServiceWriter({
+      metrics,
+      clock: background,
+    });
     const alarms = new SimCloudWatchAlarmStore();
     const alarmActions = new SimCloudWatchAlarmActions({
       targets: alarmTargets,

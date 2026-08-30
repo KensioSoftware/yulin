@@ -9,8 +9,10 @@ Code that publishes a business metric is code teams already have, and until now 
 it was to assert that the SDK client had been called. That proves the call was made. What it
 measured goes untested.
 
-Only custom metrics live here. This simulation publishes into no `AWS/` namespace. A query for
-`AWS/Lambda` `Invocations` comes back empty, in place of a number that was never measured.
+Most of what lives here is custom metrics. Simulated Lambda publishes its own `AWS/Lambda`
+`Invocations`, `Errors` and `Duration`, and no other simulated service publishes into an `AWS/`
+namespace yet. A query for one nothing measures comes back empty, in place of a number that was
+never taken.
 
 A custom metric's datapoints arrive either from `PutMetricData` or from a CloudWatch Logs metric
 filter counting matching log events. See the [CloudWatch Logs docs](../logs/README.md) for the
@@ -146,6 +148,74 @@ console.log(read.MetricDataResults?.at(0)?.Values);
 
 `ListMetrics` reads `RecentlyActive: "PT3H"` against the same clock, so advancing time past the
 window drops a metric out of the listing without anything having to expire it.
+
+## Metrics a simulated service publishes
+
+Real CloudWatch holds two kinds of metric. A caller publishes a custom one through `PutMetricData`, and AWS publishes its own under a namespace beginning `AWS/` that no caller may write into. Both kinds are read the same way.
+
+Simulated Lambda publishes three of its own. Every invocation counts `Invocations` and a `Duration`, and one whose handler threw counts an `Errors` alongside them, all under `AWS/Lambda` and dimensioned by `FunctionName`. Nothing has to be turned on, and no execution Role needs a permission for it, which is how real Lambda behaves.
+
+```typescript sim-cloudwatch-lambda-errors
+/**
+ * An alarm firing on the errors a failing function counted.
+ */
+
+import {
+  DescribeAlarmsCommand,
+  PutMetricAlarmCommand,
+} from "@aws-sdk/client-cloudwatch";
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.clock().setTo(new Date("2026-08-30T09:00:00Z"));
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        throw new Error("order has no items");
+      }),
+    },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await simAws.cloudWatch().putMetricAlarm(
+  new PutMetricAlarmCommand({
+    AlarmName: "OrdersFailing",
+    Namespace: "AWS/Lambda",
+    MetricName: "Errors",
+    Dimensions: [{ Name: "FunctionName", Value: "orders" }],
+    Statistic: "Sum",
+    Period: 300,
+    EvaluationPeriods: 3,
+    DatapointsToAlarm: 1,
+    Threshold: 0,
+    ComparisonOperator: "GreaterThanThreshold",
+    TreatMissingData: "notBreaching",
+  }),
+);
+
+await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "orders" }));
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const { MetricAlarms } = await simAws
+  .cloudWatch()
+  .describeAlarms(new DescribeAlarmsCommand({ AlarmNames: ["OrdersFailing"] }));
+
+// ALARM. The invocation counted its own error.
+console.log(MetricAlarms?.[0]?.StateValue);
+```
+
+`PutMetricData` still refuses a namespace beginning `AWS/`, exactly as an account does, so a test cannot seed these by hand. A simulated service reaches the metric store by a route a caller has none of.
+
+`Duration` is measured on the simulation's clock rather than the host's, so it is a number a test can assert on. A handler that moves the clock reports the time it moved, and one that returns without touching it reports nothing spent.
 
 ## Alarms
 
@@ -396,6 +466,8 @@ await simAws.cloudWatch().putMetricData(
   with evaluation on the simulation's clock and SNS notifications on a state change.
 - IAM authorization on each action, including the `cloudwatch:namespace` condition key and
   alarm-ARN resources.
+- `AWS/Lambda` `Invocations`, `Errors` and `Duration`, published by simulated Lambda itself and read
+  back the way a custom metric is.
 - `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
   down with the stack.
 
@@ -417,9 +489,11 @@ test still passes and no longer means what it says.
   comes back at the period its query asked for.
 - **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused. There is no
   monitoring account.
-- **Metrics AWS publishes.** No simulated service writes its own `AWS/` metrics. A CloudWatch Logs
-  metric filter naming a reserved namespace is refused here when it publishes, as `PutMetricData`
-  refuses a caller naming one.
+- **Most metrics AWS publishes.** `AWS/Lambda` `Invocations`, `Errors` and `Duration` are the only
+  ones a simulated service writes. `Throttles` and `ConcurrentExecutions` need concurrency limits,
+  which simulated Lambda has none of, and every other `AWS/` namespace needs a source event built
+  before a metric can come from one. A CloudWatch Logs metric filter naming a reserved namespace is
+  refused when it publishes, as `PutMetricData` refuses a caller naming one.
 
 Two divergences are deliberate, and not refusals. Real CloudWatch rejects a datapoint more than two
 weeks old or more than two hours in the future, and this accepts any timestamp, letting a test seed

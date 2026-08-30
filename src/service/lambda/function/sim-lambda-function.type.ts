@@ -2,6 +2,7 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsRunAsOwner } from "../../aws/caller/sim-aws-run-as-context.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimCloudWatchServiceWriter } from "../../cloudwatch/write/sim-cloudwatch-service-writer.js";
 import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaExecutableCode } from "./code/sim-lambda-executable-code.js";
 import type { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
@@ -53,6 +54,12 @@ export interface SimLambdaFunctionProperties {
    * only to the host streams.
    */
   logs?: SimLogsServiceWriter | undefined;
+  /**
+   * Where this function's invocations are counted. A function built
+   * standalone, outside a SimAws instance, has no simulated CloudWatch to
+   * publish `AWS/Lambda` metrics into and counts nothing.
+   */
+  metrics?: SimCloudWatchServiceWriter | undefined;
   /**
    * Where the HTTP requests this function's code makes to hostnames the
    * simulation serves are answered. A function built standalone, outside a

@@ -16,6 +16,7 @@ import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resol
 import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimCloudWatchServiceWriter } from "../../../cloudwatch/write/sim-cloudwatch-service-writer.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
@@ -50,6 +51,7 @@ interface CreateFunctionCommandHandlerProperties {
   vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
   environmentConflicts?: SimLambdaEnvironmentConflicts;
   logs?: SimLogsServiceWriter | undefined;
+  metrics?: SimCloudWatchServiceWriter | undefined;
   outboundHttp?: SimLambdaOutboundHttp | undefined;
 }
 
@@ -74,6 +76,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly codeResolver: SimLambdaCodeResolver;
   private readonly environmentConflicts: SimLambdaEnvironmentConflicts;
   private readonly logs: SimLogsServiceWriter | undefined;
+  private readonly metrics: SimCloudWatchServiceWriter | undefined;
   private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
@@ -88,6 +91,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       vmSdkModuleProvider,
       environmentConflicts = new SimLambdaEnvironmentConflicts(),
       logs,
+      metrics,
       outboundHttp,
     } = properties;
     this.accountRegionScope = accountRegionScope;
@@ -106,6 +110,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     });
     this.environmentConflicts = environmentConflicts;
     this.logs = logs;
+    this.metrics = metrics;
     this.outboundHttp = outboundHttp;
   }
 
@@ -152,6 +157,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       runAsOwner: this.runAsOwner,
       clock: this.background,
       logs: this.logs,
+      metrics: this.metrics,
       outboundHttp: this.outboundHttp,
     });
 

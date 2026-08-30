@@ -29,6 +29,7 @@ import {
 } from "./function/code/image/sim-lambda-container-images.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimCloudWatchServiceWriter } from "../cloudwatch/write/sim-cloudwatch-service-writer.js";
 import type { SimLogsServiceWriter } from "../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "./function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
@@ -56,6 +57,7 @@ export interface SimLambdaProperties {
   readonly containerImages?: SimLambdaContainerImages;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
   readonly logs?: SimLogsServiceWriter | undefined;
+  readonly metrics?: SimCloudWatchServiceWriter | undefined;
   /**
    * Where the HTTP requests this simulated Lambda's function code makes to
    * hostnames the simulation serves are answered. A standalone SimLambda has
@@ -118,6 +120,7 @@ export class SimLambdaCommands {
       codeStore,
       vmSdkModuleProvider,
       logs,
+      metrics,
       outboundHttp,
       // A standalone SimLambda is not reachable over HTTP, so its own registry
       // is enough; a SimAws-created one shares the environment-wide registry
@@ -216,6 +219,7 @@ export class SimLambdaCommands {
       containerImages,
       vmSdkModuleProvider,
       logs,
+      metrics,
       outboundHttp,
     });
   }
