@@ -20,7 +20,7 @@ import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
-import { SimLambdaInvocationMetrics } from "../metric/sim-lambda-invocation-metrics.js";
+import { SimLambdaFunctionMetrics } from "../metric/sim-lambda-function-metrics.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
@@ -80,6 +80,9 @@ export class SimLambdaFunction {
    */
   public readonly resourcePolicy = new SimLambdaFunctionPolicy();
 
+  /** What this function publishes about its own work into `AWS/Lambda`. */
+  public readonly metrics: SimLambdaFunctionMetrics;
+
   #state: SimLambdaFunctionState;
   #code: SimLambdaExecutableCode;
   private readonly properties: SimLambdaFunctionProperties;
@@ -88,7 +91,6 @@ export class SimLambdaFunction {
   private readonly clock: SimClock;
   private readonly logging: SimLambdaFunctionLogging;
   private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
-  private readonly metrics: SimLambdaInvocationMetrics;
 
   constructor(properties: SimLambdaFunctionProperties) {
     const {
@@ -135,7 +137,7 @@ export class SimLambdaFunction {
     this.deadLetterTargetArn = deadLetterTargetArn;
     this.runAsOwner = runAsOwner;
     this.outboundHttp = outboundHttp;
-    this.metrics = new SimLambdaInvocationMetrics({ metrics, clock });
+    this.metrics = new SimLambdaFunctionMetrics({ metrics, clock });
     this.logging = new SimLambdaFunctionLogging({
       functionName: name,
       logs,

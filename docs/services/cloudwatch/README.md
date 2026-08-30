@@ -10,9 +10,10 @@ it was to assert that the SDK client had been called. That proves the call was m
 measured goes untested.
 
 Most of what lives here is custom metrics. Simulated Lambda publishes its own `AWS/Lambda`
-`Invocations`, `Errors` and `Duration`, and no other simulated service publishes into an `AWS/`
-namespace yet. A query for one nothing measures comes back empty, in place of a number that was
-never taken.
+`Invocations`, `Errors`, `Duration` and `IteratorAge`, and no other simulated service publishes into
+an `AWS/` namespace yet. A query for one nothing measures comes back empty, in place of a number
+that was never taken. A test can stand a datapoint up for one of those itself, which is what drives
+an alarm on a service metric to a state change.
 
 A custom metric's datapoints arrive either from `PutMetricData` or from a CloudWatch Logs metric
 filter counting matching log events. See the [CloudWatch Logs docs](../logs/README.md) for the
@@ -213,9 +214,76 @@ const { MetricAlarms } = await simAws
 console.log(MetricAlarms?.[0]?.StateValue);
 ```
 
-`PutMetricData` still refuses a namespace beginning `AWS/`, exactly as an account does, so a test cannot seed these by hand. A simulated service reaches the metric store by a route a caller has none of.
+`Duration` is measured on the simulation's clock rather than the host's, so it is a number a test can assert on. A handler that moves the clock reports the time it moved, and one that returns without touching it reports nothing spent. `IteratorAge` is measured the same way, and the Lambda documentation covers what a stream event source mapping reports.
 
-`Duration` is measured on the simulation's clock rather than the host's, so it is a number a test can assert on. A handler that moves the clock reports the time it moved, and one that returns without touching it reports nothing spent.
+## Seeding a metric AWS publishes
+
+`PutMetricData` refuses a namespace beginning `AWS/`, exactly as an account does. An alarm watching a metric no simulated service publishes therefore sits in `INSUFFICIENT_DATA`, and its arithmetic goes untested however carefully the alarm itself is declared.
+
+The service writer is the way in. It is the same route simulated Lambda's own metrics take, reached from a test through `cloudWatch().serviceWriter()`, and it stands a datapoint up in any namespace.
+
+```typescript sim-cloudwatch-seed-service-metric
+/**
+ * Driving an alarm on a metric nothing in the simulation publishes.
+ */
+
+import {
+  DescribeAlarmsCommand,
+  PutMetricAlarmCommand,
+} from "@aws-sdk/client-cloudwatch";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.clock().setTo(new Date("2026-08-30T09:00:00Z"));
+
+await simAws.cloudWatch().putMetricAlarm(
+  new PutMetricAlarmCommand({
+    AlarmName: "SignInsThrottling",
+    Namespace: "AWS/Cognito",
+    MetricName: "SignInThrottles",
+    Dimensions: [{ Name: "UserPool", Value: "eu-west-1_pool" }],
+    Statistic: "Sum",
+    Period: 300,
+    EvaluationPeriods: 3,
+    DatapointsToAlarm: 1,
+    Threshold: 0,
+    ComparisonOperator: "GreaterThanThreshold",
+    TreatMissingData: "notBreaching",
+  }),
+);
+
+// The pool would have published this. Nothing here does, so the test does.
+simAws
+  .cloudWatch()
+  .serviceWriter()
+  .publish([
+    {
+      namespace: "AWS/Cognito",
+      metricName: "SignInThrottles",
+      dimensions: [{ Name: "UserPool", Value: "eu-west-1_pool" }],
+      value: 4,
+      unit: "Count",
+    },
+  ]);
+
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 6 });
+
+const { MetricAlarms } = await simAws
+  .cloudWatch()
+  .describeAlarms(
+    new DescribeAlarmsCommand({ AlarmNames: ["SignInsThrottling"] }),
+  );
+
+// ALARM.
+console.log(MetricAlarms?.[0]?.StateValue);
+```
+
+A datapoint arriving without a `timestamp` is stamped with the simulation's clock. One carrying its own lands where it says, which fills a window without the clock having to be walked through it.
+
+`PutMetricData` is untouched by any of this. A caller naming a reserved namespace is refused exactly as before, and only the account's own machinery and a test reach the store this way.
 
 ## Alarms
 
@@ -466,8 +534,10 @@ await simAws.cloudWatch().putMetricData(
   with evaluation on the simulation's clock and SNS notifications on a state change.
 - IAM authorization on each action, including the `cloudwatch:namespace` condition key and
   alarm-ARN resources.
-- `AWS/Lambda` `Invocations`, `Errors` and `Duration`, published by simulated Lambda itself and read
-  back the way a custom metric is.
+- `AWS/Lambda` `Invocations`, `Errors`, `Duration` and `IteratorAge`, published by simulated Lambda
+  itself and read back the way a custom metric is.
+- Seeding a metric AWS publishes, through `cloudWatch().serviceWriter()`, so an alarm on one can be
+  driven to a state change from a test.
 - `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
   down with the stack.
 
@@ -489,11 +559,12 @@ test still passes and no longer means what it says.
   comes back at the period its query asked for.
 - **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused. There is no
   monitoring account.
-- **Most metrics AWS publishes.** `AWS/Lambda` `Invocations`, `Errors` and `Duration` are the only
-  ones a simulated service writes. `Throttles` and `ConcurrentExecutions` need concurrency limits,
-  which simulated Lambda has none of, and every other `AWS/` namespace needs a source event built
-  before a metric can come from one. A CloudWatch Logs metric filter naming a reserved namespace is
-  refused when it publishes, as `PutMetricData` refuses a caller naming one.
+- **Most metrics AWS publishes.** `AWS/Lambda` `Invocations`, `Errors`, `Duration` and `IteratorAge`
+  are the only ones a simulated service writes. `Throttles` and `ConcurrentExecutions` need
+  concurrency limits, which simulated Lambda has none of, and every other `AWS/` namespace needs a
+  source event built before a metric can come from one. A test seeds what it needs from one of those
+  through the service writer. A CloudWatch Logs metric filter naming a reserved namespace is refused
+  when it publishes, as `PutMetricData` refuses a caller naming one.
 
 Two divergences are deliberate, and not refusals. Real CloudWatch rejects a datapoint more than two
 weeks old or more than two hours in the future, and this accepts any timestamp, letting a test seed
