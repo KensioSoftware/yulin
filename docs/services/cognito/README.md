@@ -2752,6 +2752,18 @@ try {
 Cognito. Neither fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito, where
 `PreTokenGeneration` does.
 
+A sign-in at the hosted domain runs `PreAuthentication` too, under the same
+`PreAuthentication_Authentication` source real Cognito reports it from `/login`. It runs for a
+password and for a passkey, once per sign-in, before the password is checked. A handler that throws
+refuses the sign-in, and a served domain draws that refusal on the sign-in form the way it draws a
+wrong password. A browser coming back on the managed login session it already holds runs nothing,
+because the `PreAuthentication` docs say the trigger does not activate on the renewal of a session
+that already exists.
+
+`PostAuthentication` stays unfired at the hosted domain. AWS names it for a federated sign-in and
+leaves it out of the table for a local user at managed login, and what real Cognito does there was
+not checked against a live account.
+
 ### Federated sign-in triggers
 
 A user arriving from an identity provider runs the pool's triggers too, and which ones it runs
@@ -4672,6 +4684,8 @@ Sim Cognito currently supports:
 - The triggers a federated sign-in runs, being `PreSignUp` and `PostConfirmation` on a first
   sign-in, `PreAuthentication` and `PostAuthentication` on every one after it, and
   `PreTokenGeneration` under `TokenGeneration_HostedAuth` when the code is exchanged
+- The `PreAuthentication` trigger a local user's managed login sign-in runs, for a password and for
+  a passkey alike, with a handler's refusal drawn on the sign-in form
 - A `REGIONAL` web ACL in front of the pool, attached by `AssociateWebACL` on simulated WAFv2 and
   evaluated against every request the hosted domain and the two `.well-known` documents answer
 - App client OAuth settings: `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
@@ -4931,6 +4945,11 @@ Current documented limitations:
   `EXTERNAL_PROVIDER` and never passes through `UNCONFIRMED`, so there is no confirmation for a
   handler to skip. `autoVerifyEmail` and `autoVerifyPhone` are applied there as they are for a
   sign-up.
+- A local user signing in at managed login runs `PreAuthentication` and leaves `PostAuthentication`
+  unfired. The documented table names the first for `/login` and the second only for a federated
+  sign-in, and what real Cognito does with the second there was not checked against a live account.
+- A browser signed in from the managed login session it was already holding runs no sign-in trigger,
+  which is what the `PreAuthentication` docs say of a renewed session.
 - A code exchanged at the token endpoint reports `TokenGeneration_HostedAuth` where the sign-in
   happened at an identity provider, and `TokenGeneration_Authentication` where the pool signed in
   one of its own users. Real Cognito reports the same two. A browser signed in from the managed
