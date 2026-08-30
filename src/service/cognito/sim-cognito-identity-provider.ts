@@ -4,6 +4,7 @@ import {
 } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import type { SimCloudWatchServiceWriter } from "../cloudwatch/write/sim-cloudwatch-service-writer.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
@@ -44,6 +45,13 @@ export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-use
 
 interface SimCognitoIdentityProviderProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+
+  /**
+   * Where this pool's own `AWS/Cognito` metrics go. A provider built on its
+   * own has none, and counts nothing.
+   */
+  readonly metrics?: SimCloudWatchServiceWriter;
+
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 
@@ -145,6 +153,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserPools {
         emailSenders,
         webAcls,
         messageLog,
+        metrics: properties.metrics,
       }),
       background,
     });

@@ -6,6 +6,7 @@ import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cog
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { SimCognitoAdminInitiateAuth } from "./sim-cognito-admin-initiate-auth.js";
 import { SimCognitoAdminRespondToChallenge } from "./sim-cognito-admin-respond-to-challenge.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
 import { SimCognitoGetTokensFromRefreshToken } from "./sim-cognito-get-tokens-from-refresh-token.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
@@ -52,6 +53,9 @@ interface SimCognitoAuthCommandsProperties {
    * a passkey presented at either answers the same kind of challenge.
    */
   readonly firstFactor: SimCognitoFirstFactorChallenge;
+
+  /** What counts this pool's requests into `AWS/Cognito`. */
+  readonly poolMetrics: SimCognitoPoolMetrics;
 }
 
 /**
@@ -103,6 +107,7 @@ export class SimCognitoAuthCommands {
       triggers,
     });
     const flowRunner = new SimCognitoAuthFlowRunner({
+      poolMetrics: properties.poolMetrics,
       passwordSignIn,
       refreshSignIn: new SimCognitoRefreshSignIn({ refreshedTokens, clock }),
       userAuthSignIn: new SimCognitoUserAuthSignIn({
@@ -133,6 +138,7 @@ export class SimCognitoAuthCommands {
       flowRunner,
     });
     this.adminRespondToChallenge = new SimCognitoAdminRespondToChallenge({
+      poolMetrics: properties.poolMetrics,
       authResolver,
       responses,
     });
@@ -141,10 +147,12 @@ export class SimCognitoAuthCommands {
       flowRunner,
     });
     this.respondToChallenge = new SimCognitoRespondToChallenge({
+      poolMetrics: properties.poolMetrics,
       authResolver,
       responses,
     });
     this.getTokensFromRefreshToken = new SimCognitoGetTokensFromRefreshToken({
+      poolMetrics: properties.poolMetrics,
       authResolver,
       refreshedTokens,
       clock,

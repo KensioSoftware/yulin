@@ -1,3 +1,5 @@
+import { countedSimCognitoFederation } from "../../metric/sim-cognito-counted-request.js";
+import type { SimCognitoPoolMetrics } from "../../metric/sim-cognito-pool-metrics.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
@@ -11,6 +13,7 @@ import type {
 } from "./hosted-auth.command.js";
 
 interface SimCognitoTokenGrantsProperties {
+  readonly poolMetrics: SimCognitoPoolMetrics;
   readonly tokenIssuer: SimCognitoTokenIssuer;
   readonly clock: SimClock;
 }
@@ -24,12 +27,14 @@ interface SimCognitoTokenGrantsProperties {
  * pool the same way.
  */
 export class SimCognitoTokenGrants {
+  private readonly poolMetrics: SimCognitoPoolMetrics;
   private readonly tokenIssuer: SimCognitoTokenIssuer;
   private readonly clock: SimClock;
   private readonly presented = new SimCognitoPresentedGrant();
   private readonly granted = new SimCognitoGrantedTokens();
 
   constructor(properties: SimCognitoTokenGrantsProperties) {
+    this.poolMetrics = properties.poolMetrics;
     this.tokenIssuer = properties.tokenIssuer;
     this.clock = properties.clock;
   }
@@ -58,17 +63,25 @@ export class SimCognitoTokenGrants {
       now: this.clock.now(),
     });
     const user = this.presented.user(pool, code.username);
-    const issued = await this.tokenIssuer.issue({
-      pool,
-      client,
-      user,
-      occasion: code.federated
-        ? SimCognitoTriggerOccasion.hostedTokenGeneration
-        : SimCognitoTriggerOccasion.tokenGeneration,
-      scopes: code.scopes,
-    });
 
-    return this.granted.body(issued, code.scopes);
+    return await countedSimCognitoFederation(
+      this.poolMetrics,
+      { pool, client },
+      code.federated,
+      async () =>
+        this.granted.body(
+          await this.tokenIssuer.issue({
+            pool,
+            client,
+            user,
+            occasion: code.federated
+              ? SimCognitoTriggerOccasion.hostedTokenGeneration
+              : SimCognitoTriggerOccasion.tokenGeneration,
+            scopes: code.scopes,
+          }),
+          code.scopes,
+        ),
+    );
   }
 
   /**

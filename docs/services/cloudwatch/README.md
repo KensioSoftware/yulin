@@ -10,10 +10,11 @@ it was to assert that the SDK client had been called. That proves the call was m
 measured goes untested.
 
 Most of what lives here is custom metrics. Simulated Lambda publishes its own `AWS/Lambda`
-`Invocations`, `Errors`, `Duration` and `IteratorAge`, and no other simulated service publishes into
-an `AWS/` namespace yet. A query for one nothing measures comes back empty, in place of a number
-that was never taken. A test can stand a datapoint up for one of those itself, which is what drives
-an alarm on a service metric to a state change.
+`Invocations`, `Errors`, `Duration` and `IteratorAge`, simulated Cognito publishes a pool's
+`AWS/Cognito` counts, and no other simulated service publishes into an `AWS/` namespace yet. A
+query for one nothing measures comes back empty, in place of a number that was never taken. A test
+can stand a datapoint up for one of those itself, which is what drives an alarm on a service metric
+to a state change.
 
 A custom metric's datapoints arrive either from `PutMetricData` or from a CloudWatch Logs metric
 filter counting matching log events. See the [CloudWatch Logs docs](../logs/README.md) for the
@@ -153,6 +154,8 @@ window drops a metric out of the listing without anything having to expire it.
 ## Metrics a simulated service publishes
 
 Real CloudWatch holds two kinds of metric. A caller publishes a custom one through `PutMetricData`, and AWS publishes its own under a namespace beginning `AWS/` that no caller may write into. Both kinds are read the same way.
+
+Two services publish their own. Simulated Cognito counts what a user pool was asked to do, under `AWS/Cognito` and dimensioned by `UserPool` and `UserPoolClient`, which the [Cognito docs](../cognito/README.md) cover.
 
 Simulated Lambda publishes three of its own. Every invocation counts `Invocations` and a `Duration`, and one whose handler threw counts an `Errors` alongside them, all under `AWS/Lambda` and dimensioned by `FunctionName`. Nothing has to be turned on, and no execution Role needs a permission for it, which is how real Lambda behaves.
 
@@ -536,6 +539,8 @@ await simAws.cloudWatch().putMetricData(
   alarm-ARN resources.
 - `AWS/Lambda` `Invocations`, `Errors`, `Duration` and `IteratorAge`, published by simulated Lambda
   itself and read back the way a custom metric is.
+- `AWS/Cognito` `SignInSuccesses`, `SignUpSuccesses`, `TokenRefreshSuccesses` and
+  `FederationSuccesses`, published by a simulated user pool.
 - Seeding a metric AWS publishes, through `cloudWatch().serviceWriter()`, so an alarm on one can be
   driven to a state change from a test.
 - `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
@@ -559,10 +564,10 @@ test still passes and no longer means what it says.
   comes back at the period its query asked for.
 - **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused. There is no
   monitoring account.
-- **Most metrics AWS publishes.** `AWS/Lambda` `Invocations`, `Errors`, `Duration` and `IteratorAge`
-  are the only ones a simulated service writes. `Throttles` and `ConcurrentExecutions` need
-  concurrency limits, which simulated Lambda has none of, and every other `AWS/` namespace needs a
-  source event built before a metric can come from one. A test seeds what it needs from one of those
+- **Most metrics AWS publishes.** The `AWS/Lambda` and `AWS/Cognito` metrics above are the only ones
+  a simulated service writes. `Throttles` and `ConcurrentExecutions` need concurrency limits, which
+  simulated Lambda has none of, and every other `AWS/` namespace needs a source event built before a
+  metric can come from one. A test seeds what it needs from one of those
   through the service writer. A CloudWatch Logs metric filter naming a reserved namespace is refused
   when it publishes, as `PutMetricData` refuses a caller naming one.
 

@@ -156,6 +156,9 @@ export class SimAwsAccountRegionServiceBuilder {
       // A web ACL protecting a pool is in the same Account and Region as the
       // pool, as it is on AWS, so this scope's own WAFv2 is the one to ask.
       webAcls: scope.wafV2().protection(),
+      // A pool's AWS/Cognito metrics belong to the Account and Region it is
+      // in, the way every metric does.
+      metrics: scope.cloudWatch().serviceWriter(),
     });
   }
 
