@@ -3,11 +3,11 @@ import type {
   SimCloudWatchServiceDatum,
   SimCloudWatchServiceWriter,
 } from "../../cloudwatch/write/sim-cloudwatch-service-writer.js";
-
-/**
- * The namespace real Lambda publishes what it counts about a function under.
- */
-export const simLambdaMetricNamespace = "AWS/Lambda";
+import { SimLambdaIteratorAge } from "./sim-lambda-iterator-age.js";
+import {
+  simLambdaFunctionDimensions,
+  simLambdaMetricNamespace,
+} from "./sim-lambda-metrics.js";
 
 /**
  * How one invocation went, as the metrics read it.
@@ -22,13 +22,13 @@ export interface SimLambdaInvocationOutcome {
   readonly failed: boolean;
 }
 
-interface SimLambdaInvocationMetricsProperties {
+interface SimLambdaFunctionMetricsProperties {
   readonly metrics: SimCloudWatchServiceWriter | undefined;
   readonly clock: SimClock;
 }
 
 /**
- * What a simulated Lambda function publishes about its own invocations.
+ * What a simulated Lambda function publishes about its own work.
  *
  * Real Lambda publishes these without being asked and without a caller needing
  * any permission, so they go in through simulated CloudWatch's service writer
@@ -38,13 +38,17 @@ interface SimLambdaInvocationMetricsProperties {
  * A function built on its own, outside a `SimAws` instance, has no CloudWatch
  * to publish into and counts nothing.
  */
-export class SimLambdaInvocationMetrics {
+export class SimLambdaFunctionMetrics {
+  /** How far behind its stream a finished batch left this function. */
+  readonly iteratorAge: SimLambdaIteratorAge;
+
   readonly #metrics: SimCloudWatchServiceWriter | undefined;
   readonly #clock: SimClock;
 
-  constructor(properties: SimLambdaInvocationMetricsProperties) {
+  constructor(properties: SimLambdaFunctionMetricsProperties) {
     this.#metrics = properties.metrics;
     this.#clock = properties.clock;
+    this.iteratorAge = new SimLambdaIteratorAge(properties);
   }
 
   /**
@@ -86,7 +90,7 @@ export class SimLambdaInvocationMetrics {
 function invocationData(
   outcome: SimLambdaInvocationOutcome,
 ): readonly SimCloudWatchServiceDatum[] {
-  const dimensions = [{ name: "FunctionName", value: outcome.functionName }];
+  const dimensions = simLambdaFunctionDimensions(outcome.functionName);
   const data: SimCloudWatchServiceDatum[] = [
     {
       namespace: simLambdaMetricNamespace,

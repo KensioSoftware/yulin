@@ -3,6 +3,8 @@ import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-
 import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
 import { SimLambdaStreamCascadeGuard } from "../../stream/sim-lambda-stream-cascade-guard.js";
+import { countSimLambdaKinesisIteratorAge } from "../sim-lambda-stream-iterator-age.js";
+import { simLambdaStreamSequenceNumbers } from "../sim-lambda-stream-sequence-numbers.js";
 import type { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamBatchResponse } from "../sim-lambda-stream-batch-response.js";
 import { SimLambdaKinesisStreamEventBuilder } from "./sim-lambda-kinesis-stream-event.js";
@@ -85,26 +87,19 @@ export class SimLambdaKinesisStreamDelivery {
       // As on real Lambda, the handler error goes to the function's logs. What
       // the stream sees is the batch being tried again.
       return this.batchResponse.failed();
+    } finally {
+      countSimLambdaKinesisIteratorAge(simFunction, records);
     }
   }
 }
 
 /**
- * The sequence numbers a batch's records can be named by, in stream order.
- *
- * A Kinesis batch item failure names a record by its sequence number, the way a
- * DynamoDB one does, rather than by the `eventID` the event carried.
+ * The sequence numbers this batch's records can be named by.
  */
 function sequenceNumbersOf(
   records: readonly SimLambdaKinesisStreamRecord[],
 ): readonly string[] {
-  return records.flatMap((record) => {
-    const sequenceNumber = record.SequenceNumber;
-
-    if (sequenceNumber === undefined || sequenceNumber === "") {
-      return [];
-    }
-
-    return [sequenceNumber];
-  });
+  return simLambdaStreamSequenceNumbers(
+    records.map((one) => one.SequenceNumber),
+  );
 }

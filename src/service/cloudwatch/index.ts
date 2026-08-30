@@ -106,6 +106,10 @@ export {
   type SimCloudWatchTimeRange,
 } from "./metric/sim-cloudwatch-time-range.js";
 export {
+  SimCloudWatchServiceWriter,
+  type SimCloudWatchServiceDatum,
+} from "./write/sim-cloudwatch-service-writer.js";
+export {
   SimCloudWatchError,
   type SimCloudWatchErrorMetadata,
   SimCloudWatchInvalidParameterCombinationException,

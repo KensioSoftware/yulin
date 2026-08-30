@@ -2763,6 +2763,13 @@ refuses the `AWS/Lambda` namespace, exactly as an account does. See the
 `Duration` is measured on the simulation's clock. A handler that moves the clock reports the time it
 moved, and one that returns without touching it reports nothing spent.
 
+A stream event source mapping publishes `IteratorAge` as well, in milliseconds, once a batch of
+DynamoDB Streams or Kinesis records has been handled. It is the distance between the newest record
+in the batch and the moment the batch finished, measured on the simulation's clock. A test that lets
+records age before anything reads them gets back the interval it let pass. A batch whose handler
+threw is counted too, because the retry leaves the function further behind rather than caught up. A
+queue mapping publishes none of it, and neither does a direct invocation.
+
 `Throttles` and `ConcurrentExecutions` are absent. Both count what a concurrency limit turned away,
 and this simulation applies none.
 

@@ -4,6 +4,8 @@ import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda
 import type { SimLambdaEventSourceStreamRecord } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaStreamCascadeGuard } from "../stream/sim-lambda-stream-cascade-guard.js";
 import { SimLambdaDynamoDbStreamEventBuilder } from "./sim-lambda-dynamodb-stream-event.js";
+import { countSimLambdaDynamoDbIteratorAge } from "./sim-lambda-stream-iterator-age.js";
+import { simLambdaStreamSequenceNumbers } from "./sim-lambda-stream-sequence-numbers.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamBatchResponse } from "./sim-lambda-stream-batch-response.js";
 
@@ -83,23 +85,19 @@ export class SimLambdaDynamoDbStreamDelivery {
       // As on real Lambda, the handler error goes to the function's logs. What
       // the table sees is the batch being tried again.
       return this.batchResponse.failed();
+    } finally {
+      countSimLambdaDynamoDbIteratorAge(simFunction, records);
     }
   }
 }
 
 /**
- * The sequence numbers a batch's records can be named by, in stream order.
+ * The sequence numbers this batch's records can be named by.
  */
 function sequenceNumbersOf(
   records: readonly SimLambdaEventSourceStreamRecord[],
 ): readonly string[] {
-  return records.flatMap((record) => {
-    const sequenceNumber = record.dynamodb?.SequenceNumber;
-
-    if (sequenceNumber === undefined || sequenceNumber === "") {
-      return [];
-    }
-
-    return [sequenceNumber];
-  });
+  return simLambdaStreamSequenceNumbers(
+    records.map((one) => one.dynamodb?.SequenceNumber),
+  );
 }
