@@ -52,6 +52,7 @@ export class SimCognitoHostedCommands {
         }),
         challenge,
         clock,
+        triggers,
       }),
       clock,
     });

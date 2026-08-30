@@ -7,6 +7,7 @@ import {
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
 import { simCognitoChallengeFactor } from "../auth/sim-cognito-mfa-factor-choice.js";
 import type { SimCognitoHostedCredentials } from "./sim-cognito-hosted-credentials.js";
@@ -26,16 +27,29 @@ import type { SimCognitoHostedCredentials } from "./sim-cognito-hosted-credentia
  * reach one is refused here with a message saying which.
  */
 export class SimCognitoHostedPasswordSignIn {
+  private readonly triggers: SimCognitoUserPoolTriggers;
+
+  constructor(properties: { readonly triggers: SimCognitoUserPoolTriggers }) {
+    this.triggers = properties.triggers;
+  }
+
   /**
    * The user these credentials sign in, having checked the password.
+   *
+   * `PreAuthentication` runs once the user is known and before the password is
+   * checked, which is where the API sign-ins run it and where real managed
+   * login reports it from `/login`. A wrong password reaches the handler too,
+   * because the trigger is given the user to decide about.
    */
-  signIn(
+  async signIn(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     credentials: SimCognitoHostedCredentials,
-  ): SimCognitoUser {
+  ): Promise<SimCognitoUser> {
     const { username, password } = credentials;
     const user = requireSimCognitoSignInUser(pool, client, username);
+
+    await this.triggers.preAuthentication({ pool, client, user });
 
     requireSimCognitoSignIn(user, password);
     requireSimCognitoConfirmed(user);

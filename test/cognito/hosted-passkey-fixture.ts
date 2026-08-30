@@ -24,6 +24,7 @@ import {
 import { assertTypeString } from "@kensio/smartass";
 
 import { SimAwsHttp } from "../../src/serve/http/sim-aws-http.js";
+import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
 import {
   simCognitoCallbackUrl,
   simCognitoHosted,
@@ -49,6 +50,12 @@ export interface SimCognitoHostedPasskeyOptions {
 
   /** The name the user is created and signs in by, `alice` by default. */
   readonly username?: string;
+
+  /** The `LambdaConfig` the pool is created with, none by default. */
+  readonly triggers?: Readonly<Record<string, string>>;
+
+  /** What the function behind those triggers does. */
+  readonly handler?: SimLambdaHandler;
 }
 
 /**
@@ -62,6 +69,8 @@ export async function simCognitoWithHostedPasskey(
   const byAttribute = usernameAttributes !== undefined;
   const setUp = await simCognitoHosted({
     ...(byAttribute && { usernameAttributes }),
+    ...(options.triggers !== undefined && { triggers: options.triggers }),
+    ...(options.handler !== undefined && { handler: options.handler }),
   });
 
   // A pool signing users in by an attribute puts the name a user is created
@@ -70,12 +79,16 @@ export async function simCognitoWithHostedPasskey(
     username,
     ...(byAttribute && { attributes: [] }),
   });
+  // The LambdaConfig goes back in because an update replaces the pool's
+  // settings whole, here and on real Cognito, so a request that left it out
+  // would take the pool's triggers off it.
   await setUp.cognito.updateUserPool(
     new UpdateUserPoolCommand({
       UserPoolId: setUp.userPoolId,
       Policies: {
         SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD", "WEB_AUTHN"] },
       },
+      ...(options.triggers !== undefined && { LambdaConfig: options.triggers }),
     }),
   );
 

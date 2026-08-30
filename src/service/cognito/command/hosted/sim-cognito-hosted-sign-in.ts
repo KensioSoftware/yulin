@@ -3,6 +3,7 @@ import { SimCognitoManagedLoginRequired } from "../../error/sim-cognito-managed-
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoFederatedSignIn } from "../../user-pool/idp/sim-cognito-federated-sign-in.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoFirstFactorChallenge } from "../auth/sim-cognito-first-factor-challenge.js";
 import { SimCognitoAuthorizeRequest } from "./sim-cognito-authorize-request.js";
 import { SimCognitoBrowserSession } from "./sim-cognito-browser-session.js";
@@ -21,6 +22,12 @@ interface SimCognitoHostedSignInProperties {
    */
   readonly challenge: SimCognitoFirstFactorChallenge;
   readonly clock: SimClock;
+
+  /**
+   * The trigger runner the API sign-ins use, which a sign-in at this endpoint
+   * runs the pool's `PreAuthentication` through.
+   */
+  readonly triggers: SimCognitoUserPoolTriggers;
 }
 
 /**
@@ -37,16 +44,20 @@ export class SimCognitoHostedSignIn {
   private readonly federatedSignIn: SimCognitoFederatedSignIn;
   private readonly clock: SimClock;
   private readonly request = new SimCognitoAuthorizeRequest();
-  private readonly passwordSignIn = new SimCognitoHostedPasswordSignIn();
+  private readonly passwordSignIn: SimCognitoHostedPasswordSignIn;
   private readonly passkeySignIn: SimCognitoHostedPasskeySignIn;
   private readonly browserSession = new SimCognitoBrowserSession();
 
   constructor(properties: SimCognitoHostedSignInProperties) {
     this.federatedSignIn = properties.federatedSignIn;
     this.clock = properties.clock;
+    this.passwordSignIn = new SimCognitoHostedPasswordSignIn({
+      triggers: properties.triggers,
+    });
     this.passkeySignIn = new SimCognitoHostedPasskeySignIn({
       challenge: properties.challenge,
       clock: properties.clock,
+      triggers: properties.triggers,
     });
   }
 
@@ -89,12 +100,12 @@ export class SimCognitoHostedSignIn {
    * the sign-in form is shown for. The serving layer answers with that page,
    * from this refusal.
    */
-  private localSignIn(
+  private async localSignIn(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     input: SimCognitoAuthorizeInput,
     presentedSession: string | undefined,
-  ): SimCognitoHostedSignedIn {
+  ): Promise<SimCognitoHostedSignedIn> {
     const now = this.clock.now();
 
     const { username, credential } = input;
@@ -112,7 +123,7 @@ export class SimCognitoHostedSignIn {
     }
 
     if (username !== undefined && input.passkey !== undefined) {
-      this.passkeySignIn.ask(pool, client, username);
+      await this.passkeySignIn.ask(pool, client, username);
     }
 
     const credentials = SimCognitoHostedCredentials.in(input);
@@ -127,7 +138,7 @@ export class SimCognitoHostedSignIn {
       return returning;
     }
 
-    const user = this.passwordSignIn.signIn(pool, client, credentials);
+    const user = await this.passwordSignIn.signIn(pool, client, credentials);
 
     return this.browserSession.start(pool, user, now);
   }

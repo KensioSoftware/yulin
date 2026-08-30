@@ -4,6 +4,7 @@ import {
   requireSimCognitoReadyToSignIn,
   requireSimCognitoSignInUser,
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
@@ -33,6 +34,7 @@ interface SimCognitoHostedPasskeySignInProperties {
    */
   readonly challenge: SimCognitoFirstFactorChallenge;
   readonly clock: SimClock;
+  readonly triggers: SimCognitoUserPoolTriggers;
 }
 
 /**
@@ -58,22 +60,36 @@ interface SimCognitoHostedPasskeySignInProperties {
 export class SimCognitoHostedPasskeySignIn {
   private readonly challenge: SimCognitoFirstFactorChallenge;
   private readonly clock: SimClock;
+  private readonly triggers: SimCognitoUserPoolTriggers;
 
   constructor(properties: SimCognitoHostedPasskeySignInProperties) {
     this.challenge = properties.challenge;
     this.clock = properties.clock;
+    this.triggers = properties.triggers;
   }
 
   /**
    * Ask this user for a passkey, or refuse where the pool allows none and
    * where the user has registered none.
+   *
+   * `PreAuthentication` runs here rather than where the credential comes back,
+   * because this is the request that starts the sign-in. A `USER_AUTH`
+   * sign-in runs it in the same place, on the `InitiateAuth` that asks for a
+   * factor, and the challenge response that answers runs it no second time.
+   * Only a request that has been asked holds a session to answer with, so
+   * every passkey sign-in passes through here exactly once.
    */
-  ask(
+  async ask(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     username: string,
-  ): never {
-    const user = this.signingIn(pool, client, username);
+  ): Promise<never> {
+    const user = requireSimCognitoSignInUser(pool, client, username);
+
+    await this.triggers.preAuthentication({ pool, client, user });
+
+    requireSimCognitoReadyToSignIn(user);
+
     const asked = this.challenge.issue(
       { pool, client, user },
       simCognitoWebAuthnChallenge,
