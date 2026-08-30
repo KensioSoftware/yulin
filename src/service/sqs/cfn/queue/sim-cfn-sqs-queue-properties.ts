@@ -1,9 +1,12 @@
+import { jsonStringify } from "../../../../util/type-guard/json.js";
+import { isRecord } from "../../../../util/type-guard/record.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSqsQueueAttributeInput } from "../../queue/sim-sqs-queue-attributes.js";
+import { simSqsJsonQueueAttributeNames } from "../../queue/sim-sqs-queue-attribute-specs.js";
 import { SimCfnSqsQueueName } from "./sim-cfn-sqs-queue-name.js";
 import {
   SimCfnSqsQueuePropertyRules,
@@ -71,8 +74,42 @@ export class SimCfnSqsQueueProperties {
     return Object.fromEntries(
       Object.entries(this.properties)
         .filter(([name]) => this.rules.isAttributeProperty(name))
-        .map(([name, value]) => [name, this.numberValue(value, name)]),
+        .map(([name, value]) => [name, this.attributeValue(value, name)]),
     );
+  }
+
+  /**
+   * Read one property as the string the attribute of that name carries.
+   *
+   * Five of these properties are amounts and `RedrivePolicy` is a JSON
+   * document, so the two are read differently.
+   */
+  private attributeValue(value: SimCfnTemplateValue, name: string): string {
+    if (simSqsJsonQueueAttributeNames.has(name)) {
+      return this.documentValue(value, name);
+    }
+
+    return this.numberValue(value, name);
+  }
+
+  /**
+   * Read a JSON document property as the string an SQS attribute carries.
+   *
+   * CloudFormation carries the document as an object, and as a string when it
+   * came from a template Parameter or from a Terraform plan holding it as one.
+   * What the document has to say is left to SQS, which refuses a bad redrive
+   * policy in its own words.
+   */
+  private documentValue(value: SimCfnTemplateValue, name: string): string {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (isRecord(value)) {
+      return jsonStringify(value);
+    }
+
+    throw this.propertyError(`${name} must be a JSON document`);
   }
 
   /**

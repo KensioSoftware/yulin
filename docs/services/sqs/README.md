@@ -1049,8 +1049,39 @@ console.log(stack.output("OrdersQueueArn"));
 ```
 
 The properties applied to the queue are `VisibilityTimeout`, `DelaySeconds`,
-`MessageRetentionPeriod`, `MaximumMessageSize` and `ReceiveMessageWaitTimeSeconds`. Each is passed to
-`CreateQueue`, and a value outside the range real SQS accepts fails the resource.
+`MessageRetentionPeriod`, `MaximumMessageSize`, `ReceiveMessageWaitTimeSeconds` and
+`RedrivePolicy`. Each is passed to `CreateQueue`, and a value outside the range real SQS accepts
+fails the resource.
+
+`RedrivePolicy` is the same attribute [dead-letter queues](#dead-letter-queues) covers, and a
+template goes through the validation an SDK caller goes through. CloudFormation carries the policy
+as an object where SQS carries it as a JSON string, and both spellings arrive at `CreateQueue` the
+same way. The `deadLetterTargetArn` has to name a queue that already exists. Naming the dead-letter
+queue with `Fn::GetAtt` also puts the two queues in the order they have to be created in.
+
+```typescript
+{
+  OrdersDlq: {
+    Type: "AWS::SQS::Queue",
+    Properties: { QueueName: "orders-dlq" },
+  },
+  OrdersQueue: {
+    Type: "AWS::SQS::Queue",
+    Properties: {
+      QueueName: "orders",
+      RedrivePolicy: {
+        deadLetterTargetArn: { "Fn::GetAtt": ["OrdersDlq", "Arn"] },
+        maxReceiveCount: 3,
+      },
+    },
+  },
+}
+```
+
+A message the queue gives up on reaches `orders-dlq`, and `GetQueueAttributes` on `orders` reports
+the policy back. A policy real SQS would refuse fails the resource, in the words it refuses an SDK
+caller with. Terraform's `redrive_policy` and its `aws_sqs_queue_redrive_policy` resource both map
+onto this property. A plan carrying either deploys a working dead-letter queue.
 
 A queue with no `QueueName` is named from the stack name, the logical ID and a tail derived from
 both. The queue above with its name left out would be `orders-stack-OrdersQueue-` and twelve more
@@ -1065,10 +1096,10 @@ under the name the template gave it.
 The properties this simulation has no behaviour for are a different case. The queue is created without
 them and each one is recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
-A stack full of queues still deploys. Those properties are `RedrivePolicy`, `RedriveAllowPolicy`,
-`KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`,
-`ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property
-outside the `AWS::SQS::Queue` schema is recorded the same way.
+A stack full of queues still deploys. Those properties are `RedriveAllowPolicy`, `KmsMasterKeyId`,
+`KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`, `ContentBasedDeduplication`,
+`DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property outside the `AWS::SQS::Queue`
+schema is recorded the same way.
 
 `AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
 `SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
@@ -1123,7 +1154,8 @@ Sim SQS currently supports:
 - Lambda event source mappings, delivering messages to a simulated function and deleting the batches
   it handles
 - `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` in a CloudFormation or CDK template, with `Ref`
-  giving the queue URL and `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`
+  giving the queue URL and `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`, and a
+  `RedrivePolicy` on a queue naming its dead-letter queue
 
 ## Limitations
 
@@ -1152,9 +1184,6 @@ Current documented limitations:
   reading of SQS, and AWS documents no answer either way. A receive count counts receives from one
   queue, and the moved message has not been received from the dead-letter queue yet. `SentTimestamp`
   being unchanged by the move is documented AWS behaviour, and is simulated as such.
-- The `RedrivePolicy` property on `AWS::SQS::Queue` is left out, and an SDK call is what configures a
-  dead-letter queue. The queue is created without the property and the omission is recorded in
-  `stack.ignoredProperties`.
 - A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
   shorthands for writing one statement of it, are absent.
 - `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
