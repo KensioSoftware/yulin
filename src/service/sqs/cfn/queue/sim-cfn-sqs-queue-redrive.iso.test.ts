@@ -199,6 +199,34 @@ describe("AWS::SQS::Queue RedrivePolicy", () => {
     assertUndefined(simAws.sqs().findQueue("orders"));
   });
 
+  it("refuses a policy that is neither an object nor a string", async () => {
+    // Given a RedrivePolicy carrying something no document could be read out
+    // of, which real CloudFormation refuses against its own schema.
+    const simAws = new SimAws();
+
+    // When the template is deployed, then it is refused rather than handed to
+    // SQS as the text of a number.
+    const error = await assertThrowsErrorAsync(async () => {
+      return await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: {
+          Resources: {
+            OrdersQueue: {
+              Type: "AWS::SQS::Queue",
+              Properties: { QueueName: "orders", RedrivePolicy: 3 },
+            },
+          },
+        },
+      });
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::SQS::Queue Resource OrdersQueue: RedrivePolicy must be a " +
+        "JSON document",
+    );
+  });
+
   it("takes a policy a template Parameter carries as a string", async () => {
     // Given a template taking the whole policy from a Parameter, which
     // resolves to the JSON string SQS carries the attribute as.
