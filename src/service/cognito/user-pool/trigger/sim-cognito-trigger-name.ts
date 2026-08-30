@@ -3,8 +3,9 @@
  *
  * These are the ones that fire around a sign-up, around a sign-in, around a
  * message, and over the tokens a sign-in hands out, which is the part of a
- * user's life this simulation has. A pool federates with nobody, so the
- * federation triggers would never run whatever a pool named for them.
+ * user's life this simulation has. A federated sign-in reaches four of them,
+ * under the sources real Cognito reports for a user arriving from an identity
+ * provider.
  */
 export const simCognitoTriggerNames = [
   "PreSignUp",

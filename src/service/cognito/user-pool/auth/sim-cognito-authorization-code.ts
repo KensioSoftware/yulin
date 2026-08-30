@@ -24,6 +24,15 @@ interface SimCognitoAuthorizationCodeProperties {
    * has to produce the verifier for.
    */
   readonly codeChallenge?: string | undefined;
+
+  /**
+   * Whether the sign-in this code came from happened at an identity provider.
+   *
+   * The token endpoint reads it to pick the `PreTokenGeneration` source, which
+   * real Cognito reports as `TokenGeneration_HostedAuth` for a federated grant
+   * and `TokenGeneration_Authentication` for a local one.
+   */
+  readonly federated?: boolean | undefined;
 }
 
 /**
@@ -41,6 +50,7 @@ export class SimCognitoAuthorizationCode {
   public readonly redirectUri: string;
   public readonly scopes: readonly string[];
   public readonly issuedAt: Date;
+  public readonly federated: boolean;
 
   private readonly codeChallenge: string | undefined;
 
@@ -51,6 +61,7 @@ export class SimCognitoAuthorizationCode {
     this.redirectUri = properties.redirectUri;
     this.scopes = properties.scopes;
     this.issuedAt = properties.issuedAt;
+    this.federated = properties.federated ?? false;
     this.codeChallenge = properties.codeChallenge;
   }
 

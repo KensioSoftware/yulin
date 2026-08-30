@@ -223,6 +223,7 @@ export class SimCognitoCommands {
     this.hosted = new SimCognitoHostedCommands({
       tokenIssuer,
       userFactory,
+      triggers,
       challenge: firstFactor,
       clock,
     });
