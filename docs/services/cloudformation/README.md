@@ -3393,7 +3393,7 @@ A property name AWS has never had is recorded the same way, and never fails the 
 property AWS added after this simulator read the docs look identical from here, and a Resource that
 deploys with the unread name reported is more useful than a stack that fails over either.
 
-Two things are still refused outright, and fail the Resource:
+Three things are still refused outright, and fail the Resource:
 
 - A property that leaves nothing coherent to create, such as an `AWS::S3::Bucket` whose `BucketName`
   is some type other than a string, or an `AWS::DynamoDB::GlobalTable` whose replica list omits the
@@ -3401,6 +3401,12 @@ Two things are still refused outright, and fail the Resource:
 - A value the simulated service itself refuses, in the same words an SDK caller gets. An
   `AWS::SQS::Queue` with `FifoQueue: true` is one. A FIFO queue is named `<name>.fifo`, which
   simulated SQS refuses, leaving no queue to create under the name the template gave it.
+- A value real AWS answers with a 400, on a property that is skipped. Nothing acts on the property
+  either way, and what it says is read far enough to catch a template CloudFormation will reject. A
+  value that passes is recorded like any other skipped property. One that fails takes the Resource
+  with it, before anything is recorded against it. An `AWS::S3::Bucket` `ReplicationConfiguration`
+  is the one that does this today. See
+  [Buckets from CloudFormation](https://yulinsim.dev/services/s3/#buckets-from-cloudformation "Buckets from CloudFormation").
 
 Properties nothing simulated could tell apart are left off the list. There is no simulated KMS and
 Object bytes are stored as they arrive. An `AWS::S3::Bucket` carrying `BucketEncryption` and `Tags`,

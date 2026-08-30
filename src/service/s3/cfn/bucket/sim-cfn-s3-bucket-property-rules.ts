@@ -1,6 +1,7 @@
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
 import { s3BucketResourceError } from "./error/sim-cfn-s3-bucket-error.js";
+import { validateSimCfnS3BucketReplication } from "./replication/sim-cfn-s3-bucket-replication-rules.js";
 import {
   inertPropertyNames,
   simulatedPropertyNames,
@@ -18,9 +19,12 @@ interface SimCfnS3BucketPropertyRulesProperties {
  *
  * Simulated CloudFormation deploys what it can, so a property this simulation
  * cannot act on does not stop the Bucket being created. It is left out and
- * recorded against the Resource, where a test can find it. Refusing is kept for
- * the one case where there is nothing coherent to create: a BucketName that is
- * not a name.
+ * recorded against the Resource, where a test can find it.
+ *
+ * Refusing is kept for two cases. There is nothing coherent to create, as a
+ * BucketName that is not a name leaves. Or the value is one real S3 answers
+ * with a 400, which a skipped property can carry as readily as a simulated
+ * one, and deploying it here would report a template AWS refuses as working.
  *
  * A property this simulation has never heard of is treated the same way. It may
  * be a typo, or a property AWS added since this list was written, and a Bucket
@@ -39,11 +43,12 @@ export class SimCfnS3BucketPropertyRules {
   }
 
   /**
-   * Record everything about this Resource that is not simulated, refusing only
-   * what leaves nothing to create.
+   * Record everything about this Resource that is not simulated, refusing
+   * what leaves nothing to create and what real S3 answers with a 400.
    */
   apply(): void {
     this.refuseUnusableBucketName();
+    validateSimCfnS3BucketReplication(this.logicalId, this.properties);
 
     for (const name of Object.keys(this.properties)) {
       this.applyToProperty(name);

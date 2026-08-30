@@ -1717,6 +1717,18 @@ One of the five given in the wrong shape still fails the stack, and so does a `B
 something other than a string. There is no Bucket to create under a name nothing else in the
 template refers to.
 
+A `ReplicationConfiguration` fails the stack as well, for a different reason. Replication is not
+simulated and nothing acts on the property, and the value is still read for the constraints real S3
+enforces on it. Those are a `Metrics.EventThreshold` with no `ReplicationTime` at `Status: Enabled`,
+a rule stating a `Filter` without the `DeleteMarkerReplication`, `Priority` and `Status` that S3
+requires alongside one, and a source Bucket whose template never enabled versioning. Real S3 answers
+each of them with a 400 and CloudFormation rolls the stack back, and the CloudFormation resource
+schema states none of them, so cfn-lint passes a template carrying any one. A deploy here that
+reported them as working would be the last check between a repository and that rollback.
+
+A configuration passing all three is recorded like any other skipped property. One that fails takes
+the Bucket with it and is never recorded, because the Resource is refused before it is created.
+
 `BucketEncryption` and `Tags` are read, ignored and left out of the record, because nothing this
 simulator models can tell the difference. There is no simulated KMS, Object bytes are stored as they
 arrive, and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it synthesizes, and
