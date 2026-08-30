@@ -8,6 +8,7 @@ import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/
 import { makeSimLambdaOutboundHttp } from "../../lambda/function/outbound/sim-lambda-outbound-http.factory.js";
 import type { SimLambdaOutboundHttp } from "../../lambda/function/outbound/sim-lambda-outbound-http.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
+import type { SimCloudWatchServiceWriter } from "../../cloudwatch/write/sim-cloudwatch-service-writer.js";
 import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
@@ -34,6 +35,7 @@ interface SimAwsLambdaCollaborators {
   readonly vmSdkModuleProvider: SimSdkLambdaVmModuleProvider;
   readonly outboundHttp: SimLambdaOutboundHttp;
   readonly logs: SimLogsServiceWriter;
+  readonly metrics: SimCloudWatchServiceWriter;
   readonly destinations: SimAwsLambdaDestinations;
 }
 
@@ -82,6 +84,9 @@ export function simAwsLambdaCollaborators(
     runAsOwner: simAws,
     destinations: new SimAwsLambdaDestinations({ simAws }),
     logs: scope.logs().serviceWriter(),
+    // A function's AWS/Lambda metrics belong to the Account and Region it is
+    // in, which real Lambda gives no way to point elsewhere.
+    metrics: scope.cloudWatch().serviceWriter(),
     urlRegistry: properties.urlRegistry,
     codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
     containerImages: new SimEcrLambdaContainerImages({

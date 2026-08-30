@@ -20,6 +20,7 @@ import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
+import { SimLambdaInvocationMetrics } from "../metric/sim-lambda-invocation-metrics.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
@@ -87,6 +88,7 @@ export class SimLambdaFunction {
   private readonly clock: SimClock;
   private readonly logging: SimLambdaFunctionLogging;
   private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
+  private readonly metrics: SimLambdaInvocationMetrics;
 
   constructor(properties: SimLambdaFunctionProperties) {
     const {
@@ -107,6 +109,7 @@ export class SimLambdaFunction {
       version = SIM_LAMBDA_LATEST_VERSION,
       clock = new SimRealClock(),
       logs,
+      metrics,
       outboundHttp,
     } = properties;
     this.properties = properties;
@@ -132,6 +135,7 @@ export class SimLambdaFunction {
     this.deadLetterTargetArn = deadLetterTargetArn;
     this.runAsOwner = runAsOwner;
     this.outboundHttp = outboundHttp;
+    this.metrics = new SimLambdaInvocationMetrics({ metrics, clock });
     this.logging = new SimLambdaFunctionLogging({
       functionName: name,
       logs,
@@ -253,24 +257,26 @@ export class SimLambdaFunction {
 
     this.logging.recordFrom(this.#code);
 
-    return await simAwsRunAsContext.run(
-      this.runAsOwner,
-      { kind: "arn", arn: this.roleArn },
-      async () =>
-        await this.environment.runWith(
-          async () =>
-            await this.runInHostScope(
-              async () =>
-                await this.logging.around(
-                  async () =>
-                    await this.runner.run(
-                      this.#code.handlerFunction(),
-                      event,
-                      contextBuilder,
-                    ),
-                ),
-            ),
-        ),
+    return await this.metrics.around(String(this.name), async () =>
+      simAwsRunAsContext.run(
+        this.runAsOwner,
+        { kind: "arn", arn: this.roleArn },
+        async () =>
+          await this.environment.runWith(
+            async () =>
+              await this.runInHostScope(
+                async () =>
+                  await this.logging.around(
+                    async () =>
+                      await this.runner.run(
+                        this.#code.handlerFunction(),
+                        event,
+                        contextBuilder,
+                      ),
+                  ),
+              ),
+          ),
+      ),
     );
   }
 

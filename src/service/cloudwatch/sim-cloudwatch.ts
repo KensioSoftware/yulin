@@ -6,6 +6,7 @@ import type { SimCloudWatchAlarmActionFailure } from "./alarm/action/sim-cloudwa
 import type { SimCloudWatchAlarm } from "./alarm/sim-cloudwatch-alarm.js";
 import type { SimCloudWatchMetric } from "./metric/sim-cloudwatch-metric.js";
 import { SimCloudWatchSdkCommandRouter } from "./sdk/sim-cloudwatch-sdk-command-router.js";
+import type { SimCloudWatchServiceWriter } from "./write/sim-cloudwatch-service-writer.js";
 import {
   SimCloudWatchCommands,
   type SimCloudWatchProperties,
@@ -42,6 +43,17 @@ export class SimCloudWatch {
    */
   allMetrics(): readonly SimCloudWatchMetric[] {
     return this.#commands.metrics.all;
+  }
+
+  /**
+   * How the rest of the simulation publishes the metrics AWS publishes.
+   *
+   * A simulated service counting its own work reaches the metric store through
+   * here rather than through `PutMetricData`, which refuses a reserved `AWS/`
+   * namespace exactly as an account does.
+   */
+  serviceWriter(): SimCloudWatchServiceWriter {
+    return this.#commands.serviceWriter;
   }
 
   /**
