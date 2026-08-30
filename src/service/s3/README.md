@@ -884,6 +884,12 @@ as the Resource's simulated object, because a Bucket policy has no existence of 
 A `Bucket` naming a Bucket that does not exist fails the Stack with `SimS3NoSuchBucket` rather than
 being skipped.
 
+`ReplicationConfiguration` is read on the way to being recorded, unlike the other skipped
+properties. `validateSimCfnS3BucketReplication` states the constraints the S3 API documents and the
+CloudFormation Resource schema leaves out, and hangs off the property in
+`unsimulatedPropertyReasons` through the shared `SimCfnSkippedProperties` seam rather than off a
+call site of its own. See the CloudFormation service README for what the seam is for.
+
 Bucket resource creation flow:
 
 1. determine the Bucket name

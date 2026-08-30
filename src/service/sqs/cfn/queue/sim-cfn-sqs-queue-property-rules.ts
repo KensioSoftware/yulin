@@ -1,5 +1,6 @@
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
+import { SimCfnSkippedProperties } from "../../../cloudformation/resource/ignore/sim-cfn-skipped-properties.js";
 import {
   attributePropertyNames,
   fifoQueueValues,
@@ -41,11 +42,17 @@ export class SimCfnSqsQueuePropertyRules {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
   private readonly ignorer: SimCfnPropertyIgnorer;
+  private readonly skipped: SimCfnSkippedProperties;
 
   constructor(properties: SimCfnSqsQueuePropertyRulesProperties) {
     this.logicalId = properties.logicalId;
     this.properties = properties.properties;
     this.ignorer = properties.ignorer;
+    this.skipped = new SimCfnSkippedProperties({
+      rules: unsimulatedPropertyReasons,
+      properties: this.properties,
+      error: (reason): Error => sqsQueuePropertyError(this.logicalId, reason),
+    });
   }
 
   /**
@@ -60,6 +67,7 @@ export class SimCfnSqsQueuePropertyRules {
    */
   apply(): void {
     this.applyToFifoQueue();
+    this.skipped.assertConstraints();
 
     for (const name of Object.keys(this.properties)) {
       this.applyToProperty(name);
@@ -104,7 +112,7 @@ export class SimCfnSqsQueuePropertyRules {
   }
 
   private applyToProperty(name: string): void {
-    const unsimulatedReason = unsimulatedPropertyReasons.get(name);
+    const unsimulatedReason = this.skipped.reasonFor(name);
 
     if (unsimulatedReason !== undefined) {
       this.ignorer.ignoreProperty(

@@ -248,6 +248,32 @@ describe("AWS::S3::Bucket ReplicationConfiguration rules", () => {
     assertStringIncludes(error.message, "Versioning must be Enabled");
   });
 
+  it("deploys a Bucket whose replication is misshapen further down", async () => {
+    // Given configurations misshapen at each level below the property itself,
+    // which are template errors these rules have no opinion about.
+    const misshapen: readonly SimCfnTemplateValueRecord[] = [
+      { Role: replicationRole, Rules: "every-object" },
+      { Role: replicationRole, Rules: ["replicate-everything"] },
+      {
+        Role: replicationRole,
+        Rules: [replicationRule({ Destination: "the-other-bucket" })],
+      },
+    ];
+
+    // When each is deployed, then the Bucket is still created and the
+    // property recorded. Reading further than the shape allows would refuse a
+    // template over the reading rather than over what it said.
+    const stacks = await Promise.all(
+      misshapen.map(async (configuration) =>
+        deployBucket(bucketProperties(configuration)),
+      ),
+    );
+
+    for (const stack of stacks) {
+      assertArrayLength(stack.ignoredProperties, 1);
+    }
+  });
+
   it("deploys a Bucket whose ReplicationConfiguration is not an object", async () => {
     // Given a misshapen configuration, which is a template error this rule has
     // no opinion about.

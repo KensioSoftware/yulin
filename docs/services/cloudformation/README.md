@@ -3404,9 +3404,13 @@ Three things are still refused outright, and fail the Resource:
 - A value real AWS answers with a 400, on a property that is skipped. Nothing acts on the property
   either way, and what it says is read far enough to catch a template CloudFormation will reject. A
   value that passes is recorded like any other skipped property. One that fails takes the Resource
-  with it, before anything is recorded against it. An `AWS::S3::Bucket` `ReplicationConfiguration`
-  is the one that does this today. See
-  [Buckets from CloudFormation](https://yulinsim.dev/services/s3/#buckets-from-cloudformation "Buckets from CloudFormation").
+  with it, before anything is recorded against it. Two properties do this today. An
+  `AWS::S3::Bucket` `ReplicationConfiguration` is checked against the constraints the S3 API
+  documents, covered under
+  [Buckets from CloudFormation](https://yulinsim.dev/services/s3/#buckets-from-cloudformation "Buckets from CloudFormation"),
+  and an `AWS::SQS::Queue` `KmsDataKeyReusePeriodSeconds` against the minute to a day real SQS
+  accepts, covered under
+  [Deploying a queue from CloudFormation](https://yulinsim.dev/services/sqs/#deploying-a-queue-from-cloudformation "Deploying a queue from CloudFormation").
 
 Properties nothing simulated could tell apart are left off the list. There is no simulated KMS and
 Object bytes are stored as they arrive. An `AWS::S3::Bucket` carrying `BucketEncryption` and `Tags`,

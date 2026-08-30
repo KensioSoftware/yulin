@@ -1101,6 +1101,12 @@ A stack full of queues still deploys. Those properties are `RedriveAllowPolicy`,
 `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property outside the `AWS::SQS::Queue`
 schema is recorded the same way.
 
+`KmsDataKeyReusePeriodSeconds` is read for one thing before being recorded. Real SQS takes a period
+between 60 seconds and 86,400, and answers anything else with `InvalidAttributeValue`, which fails
+the stack at `CreateQueue`. Nothing here encrypts a message either way, and a queue that deployed
+with a period outside that range would report a template CloudFormation rejects as working. A period
+inside it is recorded like any other skipped property.
+
 `AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
 `SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
 one set through the SDK, and a document SQS would refuse fails the resource. `Queues` carries queue
@@ -1194,6 +1200,8 @@ Current documented limitations:
 - Encryption is left out. `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds` and
   `SqsManagedSseEnabled` are recorded on an `AWS::SQS::Queue` and applied to nothing, and message
   bodies are held in process memory as they were sent. Anything sharing the process can read them.
+  The one thing read off them is the range on `KmsDataKeyReusePeriodSeconds`, so a template real
+  SQS refuses does not deploy here.
 - Tags are left out. `TagQueue`, `UntagQueue` and `ListQueueTags` are absent, and `CreateQueue`
   refuses a `tags` parameter rather than dropping it.
 - `SenderId` is left out, because a simulated caller has no user or role id to report it as.

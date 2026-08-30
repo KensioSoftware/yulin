@@ -197,7 +197,14 @@ resource's simulated object is the first queue it named. `Ref` on an `AWS::SQS::
 which is what `Queues` carries and what `SetQueueAttributes` takes.
 
 A property this simulation has no behaviour for is recorded against the Resource and the queue is
-created without it. `FifoQueue: true` fails the resource instead. A FIFO queue is named
+created without it. `KmsDataKeyReusePeriodSeconds` is read on the way past all the same.
+`validateSimCfnSqsKmsDataKeyReusePeriod` holds it to the minute-to-a-day range real SQS accepts, and
+hangs off the property in `unsimulatedPropertyReasons` through the shared
+`SimCfnSkippedProperties` seam rather than off a call site of its own. Nothing here encrypts a
+message either way, and a period outside that range fails the stack at `CreateQueue` on real AWS.
+See the CloudFormation service README for what the seam is for.
+
+`FifoQueue: true` fails the resource instead. A FIFO queue is named
 `<name>.fifo`, a name simulated SQS refuses, leaving no queue to create under the name the template
 gave it. The failures are worded as an invalid resource rather than an unsupported one, because sim
 CloudFormation skips a resource whose error reads as unsupported, and skipping is the wrong answer
