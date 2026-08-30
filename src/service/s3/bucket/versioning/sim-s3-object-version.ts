@@ -36,6 +36,8 @@ export class SimS3ObjectVersion {
    */
   public readonly lock = new SimS3ObjectLock();
 
+  private displaced: Date | undefined;
+
   private readonly createdAt: Date;
   private readonly stored: SimS3Object | undefined;
 
@@ -92,5 +94,37 @@ export class SimS3ObjectVersion {
    */
   get lastModified(): Date {
     return new Date(this.createdAt);
+  }
+
+  /**
+   * When this version stopped being the current one, if it has.
+   *
+   * A `NoncurrentVersionExpiration` counts from here rather than from the
+   * write, because a version written a year ago and displaced yesterday has
+   * been noncurrent for a day. Real S3 measures it the same way.
+   */
+  get noncurrentSince(): Date | undefined {
+    const displaced = this.displaced;
+
+    return displaced === undefined ? undefined : new Date(displaced);
+  }
+
+  /**
+   * Record that a newer version has taken this one's place.
+   *
+   * Only the first displacement counts. Removing the version that displaced
+   * this one makes it current again, and a later write displaces it a second
+   * time, which real S3 measures from the later of the two.
+   */
+  displacedAt(instant: Date): void {
+    this.displaced = new Date(instant);
+  }
+
+  /**
+   * Record that this version is current again, which is what removing the
+   * version above it does.
+   */
+  restored(): void {
+    this.displaced = undefined;
   }
 }

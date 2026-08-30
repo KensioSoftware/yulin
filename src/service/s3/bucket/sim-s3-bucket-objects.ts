@@ -4,6 +4,7 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
 import { SimS3BucketObjectLock } from "./lock/sim-s3-bucket-object-lock.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
+import { SimS3NoncurrentSweep } from "./lifecycle/sim-s3-noncurrent-sweep.js";
 import { SimS3LifecycleSweep } from "./lifecycle/sim-s3-lifecycle-sweep.js";
 import { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
 import type { SimS3BucketVersioning } from "./versioning/sim-s3-bucket-versioning.js";
@@ -107,6 +108,7 @@ export class SimS3BucketObjects {
     versionId: string,
     bypassGovernance = false,
   ): Promise<SimS3ObjectVersion | undefined> {
+    this.sweptVersions();
     this.objectLock.assertDeletable(
       this.versions.find(key, versionId),
       this.clock.now(),
@@ -114,6 +116,22 @@ export class SimS3BucketObjects {
     );
 
     return await this.versions.deleteVersion(this.storage, key, versionId);
+  }
+
+  /**
+   * The versions this Bucket keeps, with whatever the rules have expired gone.
+   *
+   * Every read of the history goes through here, the way every read of an
+   * Object goes through the Object sweep. A noncurrent version and a bare
+   * delete marker are both invisible to storage, so this removes them without
+   * touching it.
+   */
+  sweptVersions(): SimS3BucketVersions {
+    new SimS3NoncurrentSweep(this.lifecycle, this.clock.now()).sweep(
+      this.versions,
+    );
+
+    return this.versions;
   }
 
   /**

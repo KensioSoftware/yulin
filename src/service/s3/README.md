@@ -212,9 +212,12 @@ is a normalized form of what was applied rather than the original text.
 `SimS3BucketObjects` holds the storage implementation, the version history, the Object Lock, the
 multipart uploads in progress and the lifecycle configuration. The Bucket delegates to it rather than
 owning all five, because they are one concern: what is under the Bucket's keys, and what time does to
-it. Every read
-goes through it, and applying lifecycle rules on the way past is what keeps an untouched Bucket free
-of the cost of having them.
+it. Every read goes through it, and applying lifecycle rules on the way past is what keeps an
+untouched Bucket free of the cost of having them. There are two such passes.
+`SimS3LifecycleSweep` works on storage, which is where an `Expiration` reaches, and it has to be
+asynchronous because storage is. `SimS3NoncurrentSweep` works on the version history, which is where
+a `NoncurrentVersionExpiration` and an `ExpiredObjectDeleteMarker` reach, and it is synchronous
+because nothing it removes was ever in storage.
 
 ## Object versions
 
@@ -225,7 +228,10 @@ that has been versioned can be suspended but never taken back, because real S3 h
 
 `SimS3ObjectVersion` is one version of one key, which is either an Object or a delete marker.
 Modelling the marker as a version holding no Object keeps the ordering in one list, and that ordering
-is what decides which version is current.
+is what decides which version is current. A version also records when it stopped being current,
+which `SimS3ObjectVersions.add` writes onto whatever it displaces. A
+`NoncurrentVersionExpiration` counts from there rather than from the write, because a version
+written a year ago and displaced yesterday has been noncurrent for a day.
 
 `SimS3ObjectVersions` is the history, keyed by Object key with each key's versions newest first. That
 is the order `ListObjectVersions` reports them in.
@@ -235,6 +241,12 @@ maintains is that **storage holds the current, undeleted Object under each key a
 Writing a delete marker takes the Object out of storage while the history keeps it, and removing a
 version puts back whatever the removal left current. Every existing reader of a Bucket, the website
 endpoint and the REST endpoint among them, therefore needs no knowledge of versions at all.
+
+That invariant is what makes the noncurrent sweep cheap. A noncurrent version and a bare delete
+marker are both outside storage, so `removeExpired` takes them straight out of the history and
+leaves storage alone, where `deleteVersion` has to put back whatever the removal left current.
+`SimS3Bucket.getVersions()` runs that sweep before handing the history out, which is the one place
+every version read goes through.
 
 ## Object Lock
 

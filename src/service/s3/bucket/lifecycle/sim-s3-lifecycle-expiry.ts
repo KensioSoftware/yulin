@@ -1,6 +1,7 @@
 import type {
   SimS3LifecycleAbortIncompleteMultipartUpload,
   SimS3LifecycleExpiration,
+  SimS3LifecycleNoncurrentVersionExpiration,
 } from "../../command/put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
@@ -15,7 +16,8 @@ const millisecondsPerDay = 24 * 60 * 60 * 1000;
  *
  * `Days` wins over `Date` when a rule carries both, though real S3 refuses to
  * store such a rule. An `Expiration` carrying only `ExpiredObjectDeleteMarker`
- * has no boundary at all, since Object versions are left out.
+ * has no boundary at all, because it names a delete marker to remove rather
+ * than a period to wait out.
  */
 export function simS3ObjectExpiryInstant(
   expiration: SimS3LifecycleExpiration,
@@ -30,6 +32,29 @@ export function simS3ObjectExpiryInstant(
   }
 
   return undefined;
+}
+
+/**
+ * The instant a `NoncurrentVersionExpiration` puts a version past, counted
+ * from when that version stopped being the current one.
+ *
+ * A version that is still current has no such instant, and neither has one
+ * under a rule stating only `NewerNoncurrentVersions`. Real S3 requires
+ * `NoncurrentDays` alongside that count, and a rule without it names no period
+ * to measure.
+ */
+export function simS3NoncurrentExpiryInstant(
+  expiration: SimS3LifecycleNoncurrentVersionExpiration,
+  noncurrentSince: Date | undefined,
+): Date | undefined {
+  if (
+    noncurrentSince === undefined ||
+    expiration.NoncurrentDays === undefined
+  ) {
+    return undefined;
+  }
+
+  return afterDays(noncurrentSince, expiration.NoncurrentDays);
 }
 
 /**

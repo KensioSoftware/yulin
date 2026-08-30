@@ -4,6 +4,7 @@ import type {
 } from "../../command/put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
 import {
   simS3LifecycleReached,
+  simS3NoncurrentExpiryInstant,
   simS3ObjectExpiryInstant,
   simS3UploadAbortInstant,
 } from "./sim-s3-lifecycle-expiry.js";
@@ -20,6 +21,21 @@ export interface SimS3LifecycleObject {
   readonly key: string;
   readonly size: number;
   readonly lastModified: Date;
+}
+
+/**
+ * A noncurrent version as a lifecycle rule reads it.
+ *
+ * `newerVersionsAhead` is how many noncurrent versions of the same key are
+ * newer than this one, which is what `NewerNoncurrentVersions` counts. The
+ * current version is not one of them, since a rule for noncurrent versions
+ * never reaches it.
+ */
+export interface SimS3LifecycleNoncurrentVersion {
+  readonly key: string;
+  readonly size: number;
+  readonly noncurrentSince: Date | undefined;
+  readonly newerVersionsAhead: number;
 }
 
 /**
@@ -106,6 +122,50 @@ export class SimS3LifecycleConfiguration {
           simS3ObjectExpiryInstant(rule.Expiration, object.lastModified),
           now,
         ),
+    );
+  }
+
+  /**
+   * Whether an enabled rule has expired a noncurrent version by the given
+   * instant.
+   *
+   * `NewerNoncurrentVersions` holds that many of the most recent noncurrent
+   * versions back from the rule, whatever their age, so a rule keeping two
+   * reaches the third and everything older.
+   */
+  expiresNoncurrent(
+    version: SimS3LifecycleNoncurrentVersion,
+    now: Date,
+  ): boolean {
+    return this.enabledRules().some((rule) => {
+      const expiration = rule.NoncurrentVersionExpiration;
+
+      return (
+        expiration !== undefined &&
+        version.newerVersionsAhead >=
+          (expiration.NewerNoncurrentVersions ?? 0) &&
+        simS3LifecycleRuleSelects(rule, version) &&
+        simS3LifecycleReached(
+          simS3NoncurrentExpiryInstant(expiration, version.noncurrentSince),
+          now,
+        )
+      );
+    });
+  }
+
+  /**
+   * Whether an enabled rule removes a delete marker with nothing left under
+   * it.
+   *
+   * Real S3 calls that an expired object delete marker and takes it away on
+   * its next pass, with no period to wait out. The marker is what keeps the
+   * key in a listing once its last version has gone.
+   */
+  expiresDeleteMarker(key: string): boolean {
+    return this.enabledRules().some(
+      (rule) =>
+        rule.Expiration?.ExpiredObjectDeleteMarker === true &&
+        simS3LifecycleRuleSelects(rule, { key }),
     );
   }
 
