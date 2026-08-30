@@ -40,6 +40,11 @@ export class SimCognitoTokenGrants {
    * The code is spent whether or not the rest of the request turns out to be
    * right, as real Cognito spends one, so nothing can be retried with a code
    * that has already been presented.
+   *
+   * The `PreTokenGeneration` source says which sign-in the grant came from.
+   * A code from an identity provider reports `TokenGeneration_HostedAuth`, and
+   * one from the pool's own sign-in form reports the
+   * `TokenGeneration_Authentication` its API sign-in reports.
    */
   async exchangeCode(
     pool: SimCognitoUserPool,
@@ -57,7 +62,9 @@ export class SimCognitoTokenGrants {
       pool,
       client,
       user,
-      occasion: SimCognitoTriggerOccasion.tokenGeneration,
+      occasion: code.federated
+        ? SimCognitoTriggerOccasion.hostedTokenGeneration
+        : SimCognitoTriggerOccasion.tokenGeneration,
       scopes: code.scopes,
     });
 

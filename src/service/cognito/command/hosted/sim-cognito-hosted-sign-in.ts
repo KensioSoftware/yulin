@@ -54,12 +54,12 @@ export class SimCognitoHostedSignIn {
    * The user this request signs in, at a provider, in the pool itself, or from
    * the managed login session the browser presented.
    */
-  signIn(
+  async signIn(
     pool: SimCognitoUserPool,
     client: SimCognitoUserPoolClient,
     input: SimCognitoAuthorizeInput,
     presentedSession: string | undefined,
-  ): SimCognitoHostedSignedIn {
+  ): Promise<SimCognitoHostedSignedIn> {
     const provider = this.request.signInProvider(pool, client, input);
 
     if (provider === undefined) {
@@ -67,9 +67,14 @@ export class SimCognitoHostedSignIn {
     }
 
     const now = this.clock.now();
-    const user = this.federatedSignIn.signIn({ pool, provider, now });
+    const user = await this.federatedSignIn.signIn({
+      pool,
+      client,
+      provider,
+      now,
+    });
 
-    return this.browserSession.start(pool, user, now);
+    return this.browserSession.start(pool, user, now).asFederated();
   }
 
   /**

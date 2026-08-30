@@ -35,6 +35,19 @@ export class SimCognitoTriggerOccasion {
   );
 
   /**
+   * An external subject signing in at an identity provider for the first time.
+   *
+   * Real Cognito builds the pool's own user for a federated subject through
+   * the sign-up path, so the trigger that guards a sign-up guards this too.
+   * The attributes it carries are the ones the provider's `AttributeMapping`
+   * produced, which is what the handler has to decide on.
+   */
+  public static readonly externalProviderSignUp = new SimCognitoTriggerOccasion(
+    "PreSignUp",
+    "PreSignUp_ExternalProvider",
+  );
+
+  /**
    * A signed-up user reaching `CONFIRMED`.
    *
    * `ConfirmSignUp`, `AdminConfirmSignUp` and a `PreSignUp` handler that
@@ -80,6 +93,18 @@ export class SimCognitoTriggerOccasion {
   public static readonly tokenGeneration = new SimCognitoTriggerOccasion(
     "PreTokenGeneration",
     "TokenGeneration_Authentication",
+  );
+
+  /**
+   * The tokens a sign-in at an identity provider hands out.
+   *
+   * Real Cognito reports this source for a federated grant alone. A local
+   * user signing in at managed login reports `TokenGeneration_Authentication`,
+   * the same source its API sign-in reports.
+   */
+  public static readonly hostedTokenGeneration = new SimCognitoTriggerOccasion(
+    "PreTokenGeneration",
+    "TokenGeneration_HostedAuth",
   );
 
   /**
@@ -163,29 +188,32 @@ export class SimCognitoTriggerOccasion {
   /**
    * The `CustomMessage` occasion a message is being sent on.
    *
-   * One trigger covers all three, and the source is the only thing telling a
+   * One trigger covers all five, and the source is the only thing telling a
    * handler which it is firing for, so an application customising one message
    * and not another branches on it.
    */
   static customMessage(
     occasion: SimCognitoMessageOccasion,
   ): SimCognitoTriggerOccasion {
-    switch (occasion) {
-      case "SignUp": {
-        return this.customMessageSignUp;
-      }
-      case "ResendCode": {
-        return this.customMessageResendCode;
-      }
-      case "AdminCreateUser": {
-        return this.customMessageAdminCreateUser;
-      }
-      case "Authentication": {
-        return this.customMessageAuthentication;
-      }
-      case "ForgotPassword": {
-        return this.customMessageForgotPassword;
-      }
-    }
+    // The key is one of a closed union, so the record has an entry for it and
+    // the type checker is what says so.
+    // oxlint-disable-next-line security/detect-object-injection
+    return simCognitoMessageOccasions[occasion];
   }
 }
+
+/**
+ * The `CustomMessage` occasion each message occasion fires under.
+ *
+ * A record rather than a switch, so that adding a message occasion is a line
+ * here and the type checker names every gap.
+ */
+const simCognitoMessageOccasions: Readonly<
+  Record<SimCognitoMessageOccasion, SimCognitoTriggerOccasion>
+> = {
+  SignUp: SimCognitoTriggerOccasion.customMessageSignUp,
+  ResendCode: SimCognitoTriggerOccasion.customMessageResendCode,
+  AdminCreateUser: SimCognitoTriggerOccasion.customMessageAdminCreateUser,
+  Authentication: SimCognitoTriggerOccasion.customMessageAuthentication,
+  ForgotPassword: SimCognitoTriggerOccasion.customMessageForgotPassword,
+};

@@ -2752,6 +2752,98 @@ try {
 Cognito. Neither fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito, where
 `PreTokenGeneration` does.
 
+### Federated sign-in triggers
+
+A user arriving from an identity provider runs the pool's triggers too, and which ones it runs
+depends on whether the pool has met the subject before. AWS documents the split, and this is what it
+comes to:
+
+| Sign-in event  | Trigger              | Source                              |
+| -------------- | -------------------- | ----------------------------------- |
+| First sign-in  | `PreSignUp`          | `PreSignUp_ExternalProvider`        |
+|                | `PostConfirmation`   | `PostConfirmation_ConfirmSignUp`    |
+|                | `PreTokenGeneration` | `TokenGeneration_HostedAuth`        |
+| Later sign-ins | `PreAuthentication`  | `PreAuthentication_Authentication`  |
+|                | `PostAuthentication` | `PostAuthentication_Authentication` |
+|                | `PreTokenGeneration` | `TokenGeneration_HostedAuth`        |
+
+That split is what an application hangs its own user record off. `PostConfirmation` runs the first
+time a Google user arrives and never again, which is the same place a local sign-up's record is
+written from, so one handler covers both ways in.
+
+```typescript sim-cognito-federated-triggers
+/**
+ * A PostConfirmation trigger that runs on a federated user's first sign-in.
+ */
+
+import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+
+import type { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+/**
+ * The part of the PostConfirmation event this handler reads.
+ */
+interface PostConfirmationEvent {
+  readonly triggerSource: string;
+  readonly userName: string;
+}
+
+// A pool with a domain, a Google provider and an app client, as
+// [the hosted domain example](#signing-in-through-a-hosted-domain) builds one.
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+declare const callbackUrl: string;
+
+const written: string[] = [];
+
+// A record is written here. A deployed handler writes it to DynamoDB.
+const handler = (event: PostConfirmationEvent): unknown => {
+  written.push(`${event.triggerSource} ${event.userName}`);
+
+  return event;
+};
+
+// The function the pool's `LambdaConfig` names in its `PostConfirmation`.
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "post-confirmation",
+    Role: "arn:aws:iam::123456789012:role/TriggerRole",
+    Code: { ZipFile: makeLambdaZipFileInput(handler) },
+  }),
+);
+
+const cognito = simAws.cognitoIdentityProvider();
+const pool = cognito.userPool(userPoolId);
+
+pool.auth.identityProviders.require("Google").signInAs({
+  Subject: "108412093487519382745",
+  Claims: { email: "someone@example.com" },
+});
+
+const authorize = {
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: callbackUrl,
+  identity_provider: "Google",
+};
+
+// The first sign-in creates the pool's user for the subject.
+await cognito.hostedAuthorize(pool, authorize);
+console.log(written);
+// ["PostConfirmation_ConfirmSignUp Google_108412093487519382745"]
+
+// The second reaches the same user, and the sign-up triggers stay unfired.
+await cognito.hostedAuthorize(pool, authorize);
+console.log(written.length); // 1
+```
+
+A handler that throws from `PreSignUp` refuses the sign-in, and the pool is left without the user,
+because that trigger runs before the user is added. `autoVerifyEmail` and `autoVerifyPhone` are
+applied the way they are for a sign-up. `autoConfirmUser` has nothing to do, as a federated user is
+created in `EXTERNAL_PROVIDER` and never passes through `UNCONFIRMED`.
+
 ### The event, and what a failure gets back
 
 Every event carries `version`, `region`, `userPoolId`, `userName`, the `triggerSource` naming the
@@ -4516,6 +4608,9 @@ Sim Cognito currently supports:
 - The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
   `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
   provider's `AttributeMapping` named
+- The triggers a federated sign-in runs, being `PreSignUp` and `PostConfirmation` on a first
+  sign-in, `PreAuthentication` and `PostAuthentication` on every one after it, and
+  `PreTokenGeneration` under `TokenGeneration_HostedAuth` when the code is exchanged
 - A `REGIONAL` web ACL in front of the pool, attached by `AssociateWebACL` on simulated WAFv2 and
   evaluated against every request the hosted domain and the two `.well-known` documents answer
 - App client OAuth settings: `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
@@ -4754,9 +4849,9 @@ Current documented limitations:
   and `CustomMessage` are the only Lambda triggers that run. Every other `LambdaConfig` key is
   refused when the pool is created or updated, naming the trigger, because a pool that accepted one
   would never call the function the template named. The custom challenge triggers would need a
-  challenge loop this simulation lacks, and the migration and federation triggers have no external
-  directory to reach. A simulated identity provider answers with the user `signInAs` put there,
-  beyond the reach of a trigger.
+  challenge loop this simulation lacks, and the migration and inbound federation triggers have no
+  external directory to reach. A simulated identity provider answers with the user `signInAs` put
+  there, beyond the reach of a trigger.
 - `AdminCreateUser` leaves `PostConfirmation` unfired, here and on real Cognito. It is the tempting
   place to hang the trigger and the wrong one. A project relying on it would pass here and write no
   record in production.
@@ -4766,8 +4861,20 @@ Current documented limitations:
 - A `PreSignUp` handler asking to verify an attribute the sign-up did not carry refuses the sign-up
   with `InvalidParameterException`. Real Cognito refuses it too, and what it names the error has not
   been checked against a live account.
-- `PreSignUp_ExternalProvider` goes unreached too. A federated sign-in creates the pool's user
-  directly rather than through the sign-up path a trigger hangs off.
+- A federated first sign-in reports `PreSignUp_ExternalProvider` and then
+  `PostConfirmation_ConfirmSignUp`, and every sign-in after it reports
+  `PreAuthentication_Authentication` and `PostAuthentication_Authentication`. That is the split AWS
+  documents for a federated user, and it is what makes a handler that hangs a profile record off a
+  first sign-in run once for a Google user.
+- `autoConfirmUser` has nothing to do on a federated sign-in. The user is created in
+  `EXTERNAL_PROVIDER` and never passes through `UNCONFIRMED`, so there is no confirmation for a
+  handler to skip. `autoVerifyEmail` and `autoVerifyPhone` are applied there as they are for a
+  sign-up.
+- A code exchanged at the token endpoint reports `TokenGeneration_HostedAuth` where the sign-in
+  happened at an identity provider, and `TokenGeneration_Authentication` where the pool signed in
+  one of its own users. Real Cognito reports the same two. A browser signed in from the managed
+  login session it was already holding reports the local source whichever way that session started,
+  because the session records nothing about the method that began it.
 - A `PostConfirmation` or `PostAuthentication` handler that throws fails the request, and what it
   ran after stands. A confirmed user stays confirmed and the tokens a pool issued stay issued, as
   they do on real Cognito.

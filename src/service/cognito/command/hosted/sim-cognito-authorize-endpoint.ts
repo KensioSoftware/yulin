@@ -50,11 +50,11 @@ export class SimCognitoAuthorizeEndpoint {
    * `presentedSession` is the managed login session the browser carried, which
    * the serving layer reads out of the `cognito` cookie.
    */
-  handle(
+  async handle(
     pool: SimCognitoUserPool,
     input: SimCognitoAuthorizeInput,
     presentedSession?: string,
-  ): SimCognitoHostedRedirect {
+  ): Promise<SimCognitoHostedRedirect> {
     const client = this.hostedClient.forAuthorize(pool, input.client_id);
     const redirectUri = this.hostedClient.requiredRedirectUri(
       client,
@@ -69,7 +69,12 @@ export class SimCognitoAuthorizeEndpoint {
     this.request.requireChallengeMethod(input);
 
     const scopes = new SimCognitoGrantedScopes(client, input.scope);
-    const signedIn = this.signIn.signIn(pool, client, input, presentedSession);
+    const signedIn = await this.signIn.signIn(
+      pool,
+      client,
+      input,
+      presentedSession,
+    );
     const { user } = signedIn;
 
     const code = new SimCognitoAuthorizationCode({
@@ -79,6 +84,7 @@ export class SimCognitoAuthorizeEndpoint {
       scopes: scopes.values,
       issuedAt: this.clock.now(),
       codeChallenge: input.code_challenge,
+      federated: signedIn.federated,
     });
 
     pool.auth.addAuthorizationCode(code);

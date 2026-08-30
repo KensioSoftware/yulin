@@ -19,25 +19,25 @@ import {
   type UserPoolMfaType,
   type VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
-import {
-  AddPermissionCommand,
-  CreateFunctionCommand,
-} from "@aws-sdk/client-lambda";
 import { assertNonNullable } from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
-import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../src/service/aws/sim-aws-account.js";
-import { DEFAULT_SIM_AWS_REGION_NAME } from "../../src/service/aws/sim-aws-region.js";
 import type { SimSignUpCommandOutput } from "../../src/service/cognito/command/user/sign-up.command.js";
 import type { SimCognitoIdentityProvider } from "../../src/service/cognito/index.js";
-import { makeLambdaZipFileInput } from "../../src/service/lambda/function/code/lambda-zip-file-input.js";
-import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
+import {
+  makeTriggerFunction,
+  permitCognitoTrigger,
+  triggerFunctionArn,
+  type SimCognitoTriggerFunctionInput,
+} from "./trigger-function-fixture.js";
 
-/**
- * A trigger handler that hands the event back untouched, which is what a
- * handler with nothing to say has to do.
- */
-const passThroughHandler: SimLambdaHandler = (event: unknown) => event;
+export {
+  makeTriggerFunction,
+  permitCognitoTrigger,
+  triggerFunctionArn,
+  triggerFunctionArnIn,
+  triggerFunctionName,
+} from "./trigger-function-fixture.js";
 
 /** The user every suite in the fixture signs up, creates or signs in. */
 export const triggerUsername = "alice";
@@ -45,13 +45,10 @@ export const triggerUsername = "alice";
 /** The password the fixture's user signs in with. */
 export const triggerPassword = "Sup3rSecret!";
 
-/** The name of the function every trigger in the fixture points at. */
-export const triggerFunctionName = "auth-trigger";
-
 /**
  * What a test asks for when it wants a pool with a Lambda trigger on it.
  */
-export interface SimCognitoTriggerPoolInput {
+export interface SimCognitoTriggerPoolInput extends SimCognitoTriggerFunctionInput {
   /** The `LambdaConfig` the pool is created with. */
   readonly triggers: Readonly<Record<string, string>>;
 
@@ -63,26 +60,6 @@ export interface SimCognitoTriggerPoolInput {
    * takes a fresh one.
    */
   readonly simAws?: SimAws | undefined;
-
-  /**
-   * What the function does when a trigger invokes it, as a handler function.
-   *
-   * This is the quick way to say what a trigger does, and it is ignored when
-   * `code` is given as well: the two are alternatives, and the archive wins.
-   */
-  readonly handler?: SimLambdaHandler | undefined;
-
-  /**
-   * A real code archive to run instead of a handler function.
-   *
-   * Function code that calls another simulated service has to be an archive,
-   * because that is what runs in the Lambda vm with the runtime's own AWS SDK
-   * provided to it.
-   */
-  readonly code?: Uint8Array | undefined;
-
-  /** The execution Role the function runs as, and its SDK calls are made as. */
-  readonly roleArn?: string | undefined;
 
   /**
    * Whether the function's resource policy admits `cognito-idp.amazonaws.com`
@@ -113,17 +90,6 @@ export interface SimCognitoTriggerPool {
 }
 
 /**
- * The ARN the fixture's trigger function has.
- *
- * A `LambdaConfig` names the function before the pool exists, so the ARN has to
- * be known before anything is created, which is why it is stated rather than
- * read back off the created function.
- */
-export const triggerFunctionArn =
-  `arn:aws:lambda:${DEFAULT_SIM_AWS_REGION_NAME}:${DEFAULT_SIM_AWS_ACCOUNT_ID}` +
-  `:function:${triggerFunctionName}`;
-
-/**
  * Build a pool running the triggers a test named.
  *
  * The order is the one a real deployment has to use: the function first,
@@ -135,23 +101,7 @@ export async function makeTriggerPool(
 ): Promise<SimCognitoTriggerPool> {
   const simAws = input.simAws ?? new SimAws();
 
-  await simAws.lambda().createFunction(
-    new CreateFunctionCommand({
-      FunctionName: triggerFunctionName,
-      Role:
-        input.roleArn ??
-        `arn:aws:iam::${simAws.defaultAccountId}:role/TriggerRole`,
-      // A real archive needs the handler naming the module and export the way
-      // a deployed function does. A stowed handler function is its own entry
-      // point and needs none.
-      ...(input.code !== undefined && { Handler: "index.handler" }),
-      Code: {
-        ZipFile:
-          input.code ??
-          makeLambdaZipFileInput(input.handler ?? passThroughHandler),
-      },
-    }),
-  );
+  await makeTriggerFunction(simAws, input);
 
   const cognito = simAws.cognitoIdentityProvider();
   const pool = await cognito.createUserPool(
@@ -174,15 +124,7 @@ export async function makeTriggerPool(
   const userPoolArn = pool.UserPool.Arn;
 
   if (input.permitted ?? true) {
-    await simAws.lambda().addPermission(
-      new AddPermissionCommand({
-        FunctionName: triggerFunctionName,
-        StatementId: "AllowCognito",
-        Action: "lambda:InvokeFunction",
-        Principal: "cognito-idp.amazonaws.com",
-        SourceArn: userPoolArn,
-      }),
-    );
+    await permitCognitoTrigger(simAws, userPoolArn);
   }
 
   return {

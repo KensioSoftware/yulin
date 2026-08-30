@@ -10,7 +10,6 @@
  */
 
 import type {
-  AttributeType,
   PreventUserExistenceErrorTypes,
   SchemaAttributeType,
   UsernameAttributeType,
@@ -18,8 +17,6 @@ import type {
   VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  AdminCreateUserCommand,
-  AdminSetUserPasswordCommand,
   CreateIdentityProviderCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
@@ -27,7 +24,19 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { assertNonNullable } from "@kensio/smartass";
 
+export {
+  simCognitoLocalPassword,
+  simCognitoLocalUser,
+  simCognitoLocalUsername,
+  type SimCognitoLocalUserOptions,
+} from "./federation-local-user-fixture.js";
+
 import { SimAws } from "../../src/service/aws/sim-aws.js";
+import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
+import {
+  makeTriggerFunction,
+  permitCognitoTrigger,
+} from "./trigger-fixture.js";
 import { SimAwsHttp } from "../../src/serve/http/sim-aws-http.js";
 import type { SimCognitoIdentityProvider } from "../../src/service/cognito/index.js";
 
@@ -102,27 +111,17 @@ export interface SimCognitoHostedSetUpOptions {
    * the attribute instead.
    */
   readonly usernameAttributes?: readonly UsernameAttributeType[];
-}
 
-/**
- * The username the pool's own user in these tests holds.
- */
-export const simCognitoLocalUsername = "alice";
+  /**
+   * The `LambdaConfig` the pool is created with, none by default.
+   *
+   * A pool given one gets the fixture's trigger function created first and
+   * permitted afterwards, in the order a real deployment needs.
+   */
+  readonly triggers?: Readonly<Record<string, string>>;
 
-/**
- * The password that user signs in with.
- */
-export const simCognitoLocalPassword = "Sup3rSecret!";
-
-export interface SimCognitoLocalUserOptions {
-  /** The username the user holds, `alice` by default. */
-  readonly username?: string;
-
-  /** The password it signs in with. */
-  readonly password?: string;
-
-  /** The attributes it is created with, an email address by default. */
-  readonly attributes?: AttributeType[];
+  /** What that function does when a trigger invokes it. */
+  readonly handler?: SimLambdaHandler;
 }
 
 /**
@@ -141,9 +140,14 @@ export async function simCognitoHosted(
   const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
   const cognito = simAws.cognitoIdentityProvider();
 
+  if (options.triggers !== undefined) {
+    await makeTriggerFunction(simAws, { handler: options.handler });
+  }
+
   const pool = await cognito.createUserPool(
     new CreateUserPoolCommand({
       PoolName: "myapp-users",
+      ...(options.triggers !== undefined && { LambdaConfig: options.triggers }),
       ...(options.mfaConfiguration !== undefined && {
         MfaConfiguration: options.mfaConfiguration,
       }),
@@ -157,7 +161,12 @@ export async function simCognitoHosted(
     }),
   );
   assertNonNullable(pool.UserPool?.Id);
+  assertNonNullable(pool.UserPool.Arn);
   const userPoolId = pool.UserPool.Id;
+
+  if (options.triggers !== undefined) {
+    await permitCognitoTrigger(simAws, pool.UserPool.Arn);
+  }
 
   await cognito.createIdentityProvider(
     new CreateIdentityProviderCommand({
@@ -248,40 +257,6 @@ export async function simCognitoAuthorizationCode(
   assertNonNullable(code);
 
   return code;
-}
-
-/**
- * A confirmed user of the pool's own, holding a password it signs in with.
- *
- * An admin creates it and sets a permanent password on it, which is the
- * shortest route to a user in `CONFIRMED`. The sign-up route to the same place
- * is what the sign-up tests drive.
- */
-export async function simCognitoLocalUser(
-  setUp: SimCognitoHostedSetUp,
-  options: SimCognitoLocalUserOptions = {},
-): Promise<void> {
-  const {
-    username = simCognitoLocalUsername,
-    password = simCognitoLocalPassword,
-    attributes = [{ Name: "email", Value: `${username}@example.com` }],
-  } = options;
-
-  await setUp.cognito.adminCreateUser(
-    new AdminCreateUserCommand({
-      UserPoolId: setUp.userPoolId,
-      Username: username,
-      UserAttributes: attributes,
-    }),
-  );
-  await setUp.cognito.adminSetUserPassword(
-    new AdminSetUserPasswordCommand({
-      UserPoolId: setUp.userPoolId,
-      Username: username,
-      Password: password,
-      Permanent: true,
-    }),
-  );
 }
 
 /**
