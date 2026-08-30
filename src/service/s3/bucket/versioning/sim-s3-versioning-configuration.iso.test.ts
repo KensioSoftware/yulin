@@ -1,7 +1,9 @@
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetBucketVersioningCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   ListObjectVersionsCommand,
   PutBucketVersioningCommand,
   PutObjectCommand,
@@ -171,6 +173,47 @@ describe("Configuring versioning on a simulated S3 Bucket", () => {
     assertIdentical(error.name, "NoSuchVersion");
   });
 
+  it("deletes the null version of a Bucket that keeps no versions", async () => {
+    // Given a Bucket nobody has versioned, holding one Object
+    const simAws = new SimAws();
+    const s3 = simAws.s3();
+    await s3.createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+    await s3.putObject(
+      new PutObjectCommand({ Bucket: "uploads", Key: "a.txt", Body: "a" }),
+    );
+
+    // When a delete names the null version, and then a version that Bucket
+    // never issued
+    await s3.deleteObject(
+      new DeleteObjectCommand({
+        Bucket: "uploads",
+        Key: "a.txt",
+        VersionId: "null",
+      }),
+    );
+    const emptied = await s3.listObjectsV2(
+      new ListObjectsV2Command({ Bucket: "uploads" }),
+    );
+    await s3.putObject(
+      new PutObjectCommand({ Bucket: "uploads", Key: "a.txt", Body: "a" }),
+    );
+    await s3.deleteObject(
+      new DeleteObjectCommand({
+        Bucket: "uploads",
+        Key: "a.txt",
+        VersionId: "made-up",
+      }),
+    );
+    const kept = await s3.listObjectsV2(
+      new ListObjectsV2Command({ Bucket: "uploads" }),
+    );
+
+    // Then the null id removes the Object, because that is the id real S3
+    // gives it, and any other id names a version that was never there.
+    assertArrayLength(emptied.Contents ?? [], 0);
+    assertArrayLength(kept.Contents ?? [], 1);
+  });
+
   it("refuses a versioning status S3 does not take", async () => {
     // Given a Bucket
     const simAws = new SimAws();
@@ -191,6 +234,53 @@ describe("Configuring versioning on a simulated S3 Bucket", () => {
     // takes a Bucket back to unversioned.
     assertIdentical(error.name, "InvalidArgument");
     assertStringIncludes(error.message, "Enabled or Suspended");
+  });
+
+  it("refuses an MFA delete status S3 does not take", async () => {
+    // Given a Bucket
+    const simAws = new SimAws();
+    const s3 = simAws.s3();
+    await s3.createBucket(new CreateBucketCommand({ Bucket: "snapshots" }));
+
+    // When versioning is asked for with an MFA delete value that is neither
+    // Enabled nor Disabled
+    const error = await assertThrowsErrorAsync(async () =>
+      s3.putBucketVersioning(
+        new PutBucketVersioningCommand({
+          Bucket: "snapshots",
+          VersioningConfiguration: {
+            Status: "Enabled",
+            MFADelete: "Off" as "Disabled",
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused rather than ignored, because a value real S3 would
+    // have rejected reads back looking configured.
+    assertIdentical(error.name, "InvalidArgument");
+    assertStringIncludes(error.message, "Enabled or Disabled");
+  });
+
+  it("takes MFA delete stated as disabled", async () => {
+    // Given a Bucket
+    const simAws = new SimAws();
+    const s3 = simAws.s3();
+    await s3.createBucket(new CreateBucketCommand({ Bucket: "snapshots" }));
+
+    // When versioning is enabled with MFA delete explicitly off
+    await s3.putBucketVersioning(
+      new PutBucketVersioningCommand({
+        Bucket: "snapshots",
+        VersioningConfiguration: { Status: "Enabled", MFADelete: "Disabled" },
+      }),
+    );
+    const status = await s3.getBucketVersioning(
+      new GetBucketVersioningCommand({ Bucket: "snapshots" }),
+    );
+
+    // Then the Bucket is versioned, because off is the state it was already in.
+    assertIdentical(status.Status, "Enabled");
   });
 
   it("refuses MFA delete rather than reporting it enabled", async () => {

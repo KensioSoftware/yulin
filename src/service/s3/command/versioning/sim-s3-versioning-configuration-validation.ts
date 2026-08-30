@@ -7,10 +7,13 @@ import {
 /**
  * Refuse a versioning configuration this simulator cannot carry out.
  *
- * Real S3 takes `Enabled` and `Suspended` and nothing else, and there is no
- * request that takes a Bucket back to unversioned. MFA delete is refused
- * rather than accepted quietly, because a Bucket that reported it on and did
- * not enforce it would be the wrong answer to the question a test asks.
+ * Real S3 takes `Enabled` and `Suspended` for the status and nothing else, and
+ * there is no request that takes a Bucket back to unversioned. MFA delete
+ * takes `Enabled` and `Disabled`, and a value that is neither is refused here
+ * rather than ignored, because a status S3 would have rejected reads back
+ * looking configured. Asking for it enabled is refused too, since a Bucket
+ * reporting a protection it does not enforce is the wrong answer to the
+ * question a test is asking.
  */
 export function validateSimS3VersioningConfiguration(
   configuration: SimS3VersioningConfiguration,
@@ -20,6 +23,16 @@ export function validateSimS3VersioningConfiguration(
     throw new SimS3NotImplemented(
       `Simulated S3 does not enforce MFA delete, so it refuses to report it ` +
         `enabled on Bucket ${bucketName}.`,
+    );
+  }
+
+  if (
+    configuration.MFADelete !== undefined &&
+    configuration.MFADelete !== "Disabled"
+  ) {
+    throw new SimS3InvalidArgument(
+      `The MFA delete status ${configuration.MFADelete} is not one S3 ` +
+        `accepts. It takes Enabled or Disabled.`,
     );
   }
 

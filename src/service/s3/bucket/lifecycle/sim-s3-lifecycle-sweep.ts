@@ -1,5 +1,6 @@
 import type { SimS3Object } from "../../object/s3-object.js";
 import type { SimS3BucketStorage } from "../../storage/s3-bucket-storage.js";
+import type { SimS3BucketVersions } from "../versioning/sim-s3-bucket-versions.js";
 import type {
   SimS3LifecycleConfiguration,
   SimS3LifecycleObject,
@@ -19,12 +20,19 @@ import type {
  *
  * Nothing is announced. Real S3 raises `s3:LifecycleExpiration:Delete` for an
  * expiry, and that event family is among the ones simulated S3 leaves out.
+ *
+ * What an expiry does depends on whether the Bucket keeps versions. Real S3
+ * expires the current version of a key on a versioned Bucket by writing a
+ * delete marker over it, leaving the version itself for a
+ * `NoncurrentVersionExpiration` rule to remove later, so that is what happens
+ * here too. A Bucket keeping no versions loses the Object outright.
  */
 export class SimS3LifecycleSweep {
   constructor(
     private readonly storage: SimS3BucketStorage,
     private readonly lifecycle: SimS3LifecycleConfiguration,
     private readonly now: Date,
+    private readonly versions: SimS3BucketVersions,
   ) {}
 
   /**
@@ -40,7 +48,7 @@ export class SimS3LifecycleSweep {
       return object;
     }
 
-    await this.storage.deleteObject(object.key);
+    await this.expire(object.key);
 
     return undefined;
   }
@@ -59,10 +67,28 @@ export class SimS3LifecycleSweep {
     );
 
     await Promise.all(
-      expiredKeys.values().map(async (key) => this.storage.deleteObject(key)),
+      expiredKeys.values().map(async (key) => {
+        await this.expire(key);
+      }),
     );
 
     return objects.filter((object) => !expiredKeys.has(object.key));
+  }
+
+  /**
+   * Take one expired key out of what a read of the Bucket can see.
+   *
+   * A versioned Bucket keeps the bytes and hides them behind a marker, which
+   * is what leaves the version there for `NoncurrentVersionExpiration` to
+   * find. Everything else loses the Object.
+   */
+  private async expire(key: string): Promise<void> {
+    if (this.versions.keepsVersions) {
+      await this.versions.markDeleted(this.storage, key, this.now);
+      return;
+    }
+
+    await this.storage.deleteObject(key);
   }
 
   private expires(object: SimS3Object): boolean {

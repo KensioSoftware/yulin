@@ -16,29 +16,27 @@ await simAws.cloudFormation().deployTemplate({
     Resources: {
       HistoryBucket: {
         Type: "AWS::S3::Bucket",
-        Properties: {
-          BucketName: "history",
-          VersioningConfiguration: { Status: "Enabled" },
-        },
+        Properties: { BucketName: "history" },
       },
     },
   },
 });
 
-// A Bucket already holding Objects can be versioned afterwards. Those Objects
-// take the null version id, as they do in real S3.
-await simS3.putBucketVersioning(
-  new PutBucketVersioningCommand({
-    Bucket: "history",
-    VersioningConfiguration: { Status: "Enabled" },
-  }),
-);
-
-const first = await simS3.putObject(
+// Written before the Bucket was versioned, so this one takes the null version
+// id, as it does in real S3. A template declaring VersioningConfiguration
+// gives even the first write a version id of its own instead.
+await simS3.putObject(
   new PutObjectCommand({
     Bucket: "history",
     Key: "snapshots/reader-1.json",
     Body: JSON.stringify({ words: ["好"] }),
+  }),
+);
+
+await simS3.putBucketVersioning(
+  new PutBucketVersioningCommand({
+    Bucket: "history",
+    VersioningConfiguration: { Status: "Enabled" },
   }),
 );
 
@@ -56,14 +54,15 @@ const listed = await simS3.listObjectVersions(
   new ListObjectVersionsCommand({ Bucket: "history", Prefix: "snapshots/" }),
 );
 
-console.log(listed.Versions?.map((version) => version.IsLatest));
+console.log(listed.Versions?.map((version) => version.VersionId));
+// [ "<a version id>", "null" ]
 
 // Recovery is a read of the earlier version and a write of it back.
 const earlier = await simS3.getObject(
   new GetObjectCommand({
     Bucket: "history",
     Key: "snapshots/reader-1.json",
-    VersionId: first.VersionId,
+    VersionId: "null",
   }),
 );
 

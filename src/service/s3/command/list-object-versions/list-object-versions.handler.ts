@@ -13,6 +13,7 @@ import type {
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { simS3VersionPage } from "../../bucket/versioning/sim-s3-version-page.js";
+import { simS3EffectiveMaxKeys } from "../../object/s3-object-listing.js";
 import { SimS3ObjectListingLimits } from "../../object/s3-object-listing-limits.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
@@ -82,7 +83,10 @@ export class ListObjectVersionsCommandHandler implements CommandHandler<
     this.authorizer.authorizeList(bucket, options);
 
     const listing = new ListObjectVersionsListing(bucket);
-    const maxKeys = this.pageSize(command.input.MaxKeys);
+    const maxKeys = simS3EffectiveMaxKeys(
+      command.input.MaxKeys,
+      this.limits.maxKeysPerPage,
+    );
     const page = simS3VersionPage({
       versions: await listing.versions(command.input.Prefix),
       maxKeys,
@@ -103,19 +107,5 @@ export class ListObjectVersionsCommandHandler implements CommandHandler<
       NextVersionIdMarker: page.nextVersionIdMarker,
       $metadata: {},
     };
-  }
-
-  /**
-   * How many entries this page holds.
-   *
-   * A caller asking for more than the Bucket's page size gets the page size,
-   * which is the whole reason a listing has to be continued at all.
-   */
-  private pageSize(requested: number | undefined): number {
-    const ceiling = this.limits.maxKeysPerPage;
-
-    return requested === undefined
-      ? ceiling
-      : Math.min(Math.max(0, requested), ceiling);
   }
 }

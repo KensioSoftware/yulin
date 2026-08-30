@@ -129,6 +129,10 @@ export class SimS3BucketVersions {
     key: string,
     versionId: string,
   ): Promise<SimS3ObjectVersion | undefined> {
+    if (!this.versioning.keepsVersions) {
+      return await this.removeNullVersion(storage, key, versionId);
+    }
+
     const removed = this.history.remove(key, versionId);
 
     if (removed !== undefined) {
@@ -157,6 +161,32 @@ export class SimS3BucketVersions {
    */
   list(prefix?: string): readonly SimS3ObjectVersion[] {
     return this.history.list(prefix);
+  }
+
+  /**
+   * Remove the null version from a Bucket that keeps no history.
+   *
+   * Real S3 gives every Object in such a Bucket the null version id, so a
+   * delete naming that id removes the Object rather than doing nothing. Any
+   * other id names a version the Bucket never issued.
+   */
+  private async removeNullVersion(
+    storage: SimS3BucketStorage,
+    key: string,
+    versionId: string,
+  ): Promise<SimS3ObjectVersion | undefined> {
+    const stored =
+      versionId === simS3NullVersionId
+        ? await storage.getObject(key)
+        : undefined;
+
+    if (stored === undefined) {
+      return undefined;
+    }
+
+    await storage.deleteObject(key);
+
+    return SimS3ObjectVersion.nullVersionOf(stored);
   }
 
   /**

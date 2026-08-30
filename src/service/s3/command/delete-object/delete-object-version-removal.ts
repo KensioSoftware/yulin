@@ -44,7 +44,9 @@ export class DeleteObjectVersionRemoval {
         key,
         caller,
         eventName: "s3:ObjectRemoved:Delete",
-        versionId,
+        // A Bucket keeping no versions raises a record without one, as real S3
+        // does, even where the request named the null version to get here.
+        ...(bucket.getVersions().keepsVersions && { versionId }),
       });
     }
 

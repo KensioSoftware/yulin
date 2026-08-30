@@ -1,4 +1,5 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import { compareSimS3Keys } from "../../bucket/versioning/sim-s3-compare-keys.js";
 import { SimS3ObjectVersion } from "../../bucket/versioning/sim-s3-object-version.js";
 import type {
   SimS3DeleteMarkerSummary,
@@ -28,15 +29,19 @@ export class ListObjectVersionsListing {
    * Every version under a prefix, in the order a listing reports them.
    */
   async versions(prefix?: string): Promise<readonly SimS3ObjectVersion[]> {
+    // Read the Objects first either way. That is what applies the lifecycle
+    // rules, and on a versioned Bucket it writes the delete marker an expiry
+    // leaves behind. Reading the history without it would report a version the
+    // rules have already expired as the current one.
+    const objects = await this.bucket.listObjects(prefix);
+
     if (this.bucket.getVersions().keepsVersions) {
       return this.bucket.getVersions().list(prefix);
     }
 
-    const objects = await this.bucket.listObjects(prefix);
-
     return objects
-      .map((object) => SimS3ObjectVersion.nullVersionOf(object))
-      .toSorted((left, right) => left.key.localeCompare(right.key));
+      .toSorted((left, right) => compareSimS3Keys(left.key, right.key))
+      .map((object) => SimS3ObjectVersion.nullVersionOf(object));
   }
 
   /**

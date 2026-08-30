@@ -896,29 +896,27 @@ await simAws.cloudFormation().deployTemplate({
     Resources: {
       HistoryBucket: {
         Type: "AWS::S3::Bucket",
-        Properties: {
-          BucketName: "history",
-          VersioningConfiguration: { Status: "Enabled" },
-        },
+        Properties: { BucketName: "history" },
       },
     },
   },
 });
 
-// A Bucket already holding Objects can be versioned afterwards. Those Objects
-// take the null version id, as they do in real S3.
-await simS3.putBucketVersioning(
-  new PutBucketVersioningCommand({
-    Bucket: "history",
-    VersioningConfiguration: { Status: "Enabled" },
-  }),
-);
-
-const first = await simS3.putObject(
+// Written before the Bucket was versioned, so this one takes the null version
+// id, as it does in real S3. A template declaring VersioningConfiguration
+// gives even the first write a version id of its own instead.
+await simS3.putObject(
   new PutObjectCommand({
     Bucket: "history",
     Key: "snapshots/reader-1.json",
     Body: JSON.stringify({ words: ["好"] }),
+  }),
+);
+
+await simS3.putBucketVersioning(
+  new PutBucketVersioningCommand({
+    Bucket: "history",
+    VersioningConfiguration: { Status: "Enabled" },
   }),
 );
 
@@ -936,14 +934,15 @@ const listed = await simS3.listObjectVersions(
   new ListObjectVersionsCommand({ Bucket: "history", Prefix: "snapshots/" }),
 );
 
-console.log(listed.Versions?.map((version) => version.IsLatest));
+console.log(listed.Versions?.map((version) => version.VersionId));
+// [ "<a version id>", "null" ]
 
 // Recovery is a read of the earlier version and a write of it back.
 const earlier = await simS3.getObject(
   new GetObjectCommand({
     Bucket: "history",
     Key: "snapshots/reader-1.json",
-    VersionId: first.VersionId,
+    VersionId: "null",
   }),
 );
 
@@ -1023,11 +1022,14 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 ### Limitations
 
 - MFA delete is refused with `NotImplemented` rather than stored. Nothing here could enforce it, and
-  a Bucket reporting a protection it does not apply is worse than one that says so.
+  a Bucket reporting a protection it does not apply is worse than one that says so. `MFADelete:
+"Disabled"` is taken, and any other value is refused with `InvalidArgument`.
 - A `versionId` in a `CopySource` is still refused with `NotImplemented`. A copy reads the current
   version.
 - `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
-  stored and unread. See [Lifecycle configuration](#lifecycle-configuration).
+  stored and unread, so a noncurrent version stays until something deletes it by id. An `Expiration`
+  rule expires the current version behind a delete marker, as real S3 does, and raises nothing. See
+  [Lifecycle configuration](#lifecycle-configuration).
 - The `?versioning` and `?versions` sub-resources are refused over the served S3 REST endpoint.
   Versioning is reachable through the SDK and through a template.
 - A Bucket mounted on a filesystem directory refuses the deletion a delete marker asks for, the way
@@ -2271,8 +2273,9 @@ Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object. Th
 among the ones sim S3 leaves out. An expiry here is silent.
 
 `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
-stored and unread. A versioned Bucket keeps every version it is given, and nothing expires one. See
-[Object versioning](#object-versioning).
+stored and unread, so nothing removes a noncurrent version. An `Expiration` rule on a versioned
+Bucket writes a delete marker over the current version and leaves the version itself where it is,
+which is what real S3 does. See [Object versioning](#object-versioning).
 
 A Bucket mounted on a filesystem directory refuses the deletion an expiry asks for, the way it
 refuses `DeleteObject`, and answers `NotImplemented`. Removing a real file off the mounted directory

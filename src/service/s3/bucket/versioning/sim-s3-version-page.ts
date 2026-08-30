@@ -39,14 +39,19 @@ export function simS3VersionPage(
   // A negative page size would slice versions off the end rather than take
   // none, so a page with no room is empty rather than backwards.
   const page = remaining.slice(0, Math.max(0, request.maxKeys));
-  const isTruncated = page.length < remaining.length;
   const last = page.at(-1);
+
+  // A page that returned nothing has nowhere for a caller to carry on from, so
+  // it is complete however much the Bucket still holds. Reporting it truncated
+  // would offer a continuation that cannot exist, and a caller looping until
+  // the listing is complete would never stop. `simS3ObjectPage` says the same.
+  const isTruncated = last !== undefined && page.length < remaining.length;
 
   return {
     versions: page,
     isTruncated,
-    nextKeyMarker: isTruncated ? last?.key : undefined,
-    nextVersionIdMarker: isTruncated ? last?.versionId : undefined,
+    nextKeyMarker: isTruncated ? last.key : undefined,
+    nextVersionIdMarker: isTruncated ? last.versionId : undefined,
   };
 }
 

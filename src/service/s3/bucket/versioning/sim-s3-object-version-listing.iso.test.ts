@@ -2,7 +2,9 @@ import {
   CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   ListObjectVersionsCommand,
+  PutBucketLifecycleConfigurationCommand,
   PutBucketVersioningCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
@@ -94,6 +96,63 @@ describe("Listing the versions a simulated S3 Bucket holds", () => {
     const first = versions[0];
     assertNonNullable(first);
     assertIdentical(first.Key, "b.txt");
+  });
+
+  it("reports an empty page as complete rather than truncated", async () => {
+    // Given a versioned Bucket holding three keys
+    const simAws = await bucketHolding(["a.txt", "b.txt", "c.txt"]);
+
+    // When a listing asks for no keys at all
+    const listed = await simAws
+      .s3()
+      .listObjectVersions(
+        new ListObjectVersionsCommand({ Bucket: "history", MaxKeys: 0 }),
+      );
+
+    // Then it is complete, because a page with nothing on it offers nowhere to
+    // carry on from and a caller looping until completion would never stop.
+    assertArrayLength(listed.Versions ?? [], 0);
+    assertFalse(listed.IsTruncated);
+    assertUndefined(listed.NextKeyMarker);
+  });
+
+  it("expires the current version behind a delete marker", async () => {
+    // Given a versioned Bucket whose rule expires everything after thirty days
+    const simAws = await bucketHolding(["raw/a.gz"]);
+    const s3 = simAws.s3();
+    await s3.putBucketLifecycleConfiguration(
+      new PutBucketLifecycleConfigurationCommand({
+        Bucket: "history",
+        LifecycleConfiguration: {
+          Rules: [
+            {
+              ID: "expire",
+              Status: "Enabled",
+              Filter: { Prefix: "" },
+              Expiration: { Days: 30 },
+            },
+          ],
+        },
+      }),
+    );
+
+    // When simulated time moves past the boundary
+    await simAws.clock().advanceBy({ days: 400 });
+    const objects = await s3.listObjectsV2(
+      new ListObjectsV2Command({ Bucket: "history" }),
+    );
+    const listed = await s3.listObjectVersions(
+      new ListObjectVersionsCommand({ Bucket: "history" }),
+    );
+
+    // Then the expiry wrote a marker over the current version rather than
+    // taking the version away, which is what real S3 does on a versioned
+    // Bucket. Removing the version itself is a NoncurrentVersionExpiration.
+    assertArrayLength(objects.Contents ?? [], 0);
+    assertArrayLength(listed.DeleteMarkers ?? [], 1);
+    const version = (listed.Versions ?? [])[0];
+    assertNonNullable(version);
+    assertFalse(version.IsLatest);
   });
 
   it("refuses a read of a delete marker by its own version id", async () => {

@@ -1,3 +1,4 @@
+import { compareSimS3Keys } from "./sim-s3-compare-keys.js";
 import type { SimS3ObjectVersion } from "./sim-s3-object-version.js";
 
 /**
@@ -86,7 +87,7 @@ export class SimS3ObjectVersions {
       .keys()
       .filter((key) => prefix === undefined || key.startsWith(prefix))
       .toArray()
-      .toSorted((left, right) => left.localeCompare(right))
+      .toSorted(compareSimS3Keys)
       .flatMap((key) => this.forKey(key));
   }
 }

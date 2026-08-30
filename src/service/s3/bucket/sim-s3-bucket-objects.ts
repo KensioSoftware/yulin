@@ -166,6 +166,7 @@ export class SimS3BucketObjects {
       this.storage,
       this.lifecycle,
       this.clock.now(),
+      this.versions,
     );
   }
 }
