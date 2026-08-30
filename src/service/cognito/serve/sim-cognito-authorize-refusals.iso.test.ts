@@ -2,6 +2,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -264,19 +265,26 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     );
   });
 
-  it("refuses a provider with nobody signed in at it", async () => {
+  it("refuses a provider with nobody signed in at it, off the served domain", async () => {
     // Given a pool whose Google provider has nobody signed in at it.
     const setUp = await simCognitoHosted();
 
-    // When an authorize request tries to sign in through it.
-    const response = await authorize(setUp, authorizeParameters(setUp));
+    // When the authorize endpoint is called directly, with no browser for a
+    // page to be drawn for.
+    const error = await assertThrowsErrorAsync(async () => {
+      await setUp.cognito.hostedAuthorize(
+        setUp.cognito.userPool(setUp.userPoolId),
+        authorizeParameters(setUp),
+      );
+    });
 
     // Then it says what to do about it, rather than signing in a user nothing
-    // put there.
-    assertIdentical(response.status, 400);
+    // put there. A served domain answers the same request with the page that
+    // asks, which `The page a sim Cognito domain stands in for an identity
+    // provider with` covers.
     assertStringIncludes(
-      await refusedBody(response),
-      "Say who is signed in there with signInAs first",
+      error.message,
+      "Say who is signed in there with signInAs",
     );
   });
 

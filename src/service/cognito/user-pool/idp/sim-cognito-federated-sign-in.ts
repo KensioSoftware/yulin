@@ -9,6 +9,7 @@ import {
   requireSimCognitoUsername,
   type SimCognitoUsername,
 } from "../user/sim-cognito-username.js";
+import type { SimCognitoExternalUser } from "./sim-cognito-external-user.js";
 import { SimCognitoFederatedIdentity } from "./sim-cognito-federated-identity.js";
 import { SimCognitoFederatedTriggers } from "./sim-cognito-federated-triggers.js";
 import { requireSimCognitoSameFederatedIdentity } from "./sim-cognito-same-federated-identity.js";
@@ -23,6 +24,13 @@ interface SimCognitoFederatedSignInRequest {
   readonly pool: SimCognitoUserPool;
   readonly client: SimCognitoUserPoolClient;
   readonly provider: SimCognitoUserPoolIdentityProvider;
+
+  /**
+   * Who the provider is signing in, which the caller settled before getting
+   * here: the user `signInAs` put at the provider, or the one the stand-in
+   * page for it posted back.
+   */
+  readonly externalUser: SimCognitoExternalUser;
   readonly now: Date;
 }
 
@@ -65,8 +73,7 @@ export class SimCognitoFederatedSignIn {
   async signIn(
     request: SimCognitoFederatedSignInRequest,
   ): Promise<SimCognitoUser> {
-    const { pool, provider } = request;
-    const externalUser = provider.requireSignedInUser();
+    const { pool, provider, externalUser } = request;
     const username = requireSimCognitoUsername(
       `${provider.name}_${externalUser.subject}`,
     );
@@ -74,7 +81,7 @@ export class SimCognitoFederatedSignIn {
     const existing = pool.findUser(username);
 
     if (existing !== undefined) {
-      requireSimCognitoSameFederatedIdentity(existing, provider);
+      requireSimCognitoSameFederatedIdentity(existing, provider, externalUser);
 
       return this.returningUser(request, existing, attributes);
     }
@@ -127,8 +134,7 @@ export class SimCognitoFederatedSignIn {
     username: SimCognitoUsername,
     attributes: readonly SimCognitoAttributeType[],
   ): Promise<SimCognitoUser> {
-    const { pool, client, provider, now } = request;
-    const externalUser = provider.requireSignedInUser();
+    const { pool, client, provider, externalUser, now } = request;
 
     const user = this.userFactory.federated({
       username,

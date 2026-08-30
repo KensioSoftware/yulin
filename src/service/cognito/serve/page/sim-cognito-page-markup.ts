@@ -76,14 +76,18 @@ export class SimCognitoPageMarkup {
 
   /**
    * One labelled input, with the label naming the field it is for.
+   *
+   * A field given a value arrives filled in, which is what lets a page a
+   * person only has to press the button on still carry what it needs.
    */
-  field(name: string, label: string, type = "text"): string {
+  field(name: string, label: string, type = "text", value = ""): string {
     const escapedName = this.escaped(name);
 
     return (
       `<p><label for="${escapedName}">${this.escaped(label)}</label>\n` +
       `<input id="${escapedName}" name="${escapedName}" ` +
-      `type="${this.escaped(type)}" required></p>\n`
+      `type="${this.escaped(type)}" value="${this.escaped(value)}" ` +
+      `required></p>\n`
     );
   }
 
