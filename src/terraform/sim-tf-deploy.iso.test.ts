@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
 import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { GetQueueAttributesCommand } from "@aws-sdk/client-sqs";
 import {
   assertArrayEquals,
   assertIdentical,
@@ -37,6 +38,54 @@ describe("deploying a Terraform plan into simulated AWS", () => {
     assertNonNullable(simAws.s3().getSimBucketByName("orders-uploads"));
     assertNonNullable(simAws.sqs().findQueue("orders-processing"));
     assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("configures the dead-letter queue a redrive policy names", async () => {
+    // Given a plan declaring a queue that redrives to another queue the plan
+    // creates, with the policy resolved to the JSON string Terraform holds it
+    // in
+    const deadLetterTargetArn = "arn:aws:sqs:us-east-1:888888888888:orders-dlq";
+    const planPath = await planFile({
+      resources: [
+        terraformPlanResourceFactory.make({
+          name: "dlq",
+          values: { name: "orders-dlq" },
+        }),
+        terraformPlanResourceFactory.make({
+          values: {
+            name: "orders",
+            redrive_policy: JSON.stringify({
+              deadLetterTargetArn,
+              maxReceiveCount: 3,
+            }),
+          },
+          references: {
+            redrive_policy: ["aws_sqs_queue.dlq.arn", "aws_sqs_queue.dlq"],
+          },
+        }),
+      ],
+    });
+
+    // When the plan is deployed
+    const simAws = new SimAws();
+    await new TerraformAdapter(simAws).deployPlan(planPath);
+
+    // Then the queue reports the policy back, having reached CreateQueue
+    // through the AWS::SQS::Queue property the plan is mapped onto
+    const queue = simAws.sqs().findQueue("orders");
+    assertNonNullable(queue);
+
+    const read = await simAws.sqs().getQueueAttributes(
+      new GetQueueAttributesCommand({
+        QueueUrl: queue.url,
+        AttributeNames: ["RedrivePolicy"],
+      }),
+    );
+
+    assertIdentical(
+      read.Attributes?.["RedrivePolicy"],
+      JSON.stringify({ deadLetterTargetArn, maxReceiveCount: 3 }),
+    );
   });
 
   it("names the Stack after the plan file", async () => {

@@ -5,13 +5,17 @@ import type { SimCfnTemplateValue } from "../../../cloudformation/template/value
  *
  * CloudFormation names these exactly as the SQS API names the attributes, so
  * they are handed to CreateQueue rather than applied here. That leaves the
- * ranges and defaults in one place: the ones simulated SQS already validates.
+ * ranges and defaults in one place, the ones simulated SQS already validates.
+ *
+ * Five of them are amounts. `RedrivePolicy` is a JSON document, and
+ * CloudFormation carries it as an object where SQS carries it as a string.
  */
 export const attributePropertyNames: ReadonlySet<string> = new Set([
   "DelaySeconds",
   "MaximumMessageSize",
   "MessageRetentionPeriod",
   "ReceiveMessageWaitTimeSeconds",
+  "RedrivePolicy",
   "VisibilityTimeout",
 ]);
 
@@ -20,10 +24,8 @@ export const attributePropertyNames: ReadonlySet<string> = new Set([
  * each of them would have changed.
  *
  * The queue is created without them and each one is recorded against the
- * Resource. A queue deployed without its redrive policy looks like a queue with
- * a dead-letter queue to the template that wrote it and has none, so a test
- * expecting a failed message to end up somewhere needs to find out that it
- * never will.
+ * Resource. A test reads the record to find out what the queue it deployed
+ * behaves differently to AWS about.
  */
 export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["ContentBasedDeduplication", "only standard queues are simulated"],
@@ -36,13 +38,8 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["KmsMasterKeyId", "simulated SQS does not encrypt message bodies"],
   [
     "RedriveAllowPolicy",
-    "dead-letter queues are not simulated, so nothing enforces which queues " +
-      "may name this one as theirs",
-  ],
-  [
-    "RedrivePolicy",
-    "dead-letter queues are not simulated, so a message that is received " +
-      "past maxReceiveCount stays on this queue rather than moving",
+    "nothing enforces which queues may name this one as their dead-letter " +
+      "queue, and setting the attribute through the SQS API is refused",
   ],
   ["SqsManagedSseEnabled", "simulated SQS does not encrypt message bodies"],
   ["Tags", "no simulated service reads a queue tag"],

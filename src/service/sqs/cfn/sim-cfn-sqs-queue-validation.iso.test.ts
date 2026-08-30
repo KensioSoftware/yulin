@@ -143,16 +143,16 @@ describe("SQS CloudFormation Queue validation", () => {
     // simulated.
     // When each Resource is created, then each queue exists with the property
     // it behaves differently to AWS without recorded by name.
-    const redrive = await createdQueueResource({
+    const redriveAllow = await createdQueueResource({
       QueueName: "orders",
-      RedrivePolicy: { maxReceiveCount: 3 },
+      RedriveAllowPolicy: { redrivePermission: "allowAll" },
     });
     assertIdentical(
-      redrive[0]?.reason,
-      "RedrivePolicy is a real AWS::SQS::Queue property simulated SQS does " +
-        "not act on: dead-letter queues are not simulated, so a message that " +
-        "is received past maxReceiveCount stays on this queue rather than " +
-        "moving",
+      redriveAllow[0]?.reason,
+      "RedriveAllowPolicy is a real AWS::SQS::Queue property simulated SQS " +
+        "does not act on: nothing enforces which queues may name this one as " +
+        "their dead-letter queue, and setting the attribute through the SQS " +
+        "API is refused",
     );
 
     const encryption = await createdQueueResource({

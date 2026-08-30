@@ -61,9 +61,10 @@ export function jsonDocument(
  *
  * Each names its queue in a `queue_url` attribute, which the queue resolves to
  * whether or not the URL itself was known at plan time. CloudFormation carries
- * both as properties of the `AWS::SQS::Queue`, and simulated SQS records each
- * one against the Resource: no message moves to a dead-letter queue here, and
- * nothing enforces which queues may name one as theirs.
+ * both as properties of the `AWS::SQS::Queue`. `RedrivePolicy` reaches
+ * CreateQueue from there and moves a message that has run out of receives.
+ * `RedriveAllowPolicy` is recorded against the Resource, since nothing
+ * enforces which queues may name this one as their dead-letter queue.
  */
 export const sqsRedriveFolds: ReadonlyMap<string, TerraformResourceFold> =
   new Map([

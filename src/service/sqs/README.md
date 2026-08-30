@@ -196,11 +196,12 @@ has no existence of its own in SQS: it is the `Policy` attribute of the queues i
 resource's simulated object is the first queue it named. `Ref` on an `AWS::SQS::Queue` gives its URL,
 which is what `Queues` carries and what `SetQueueAttributes` takes.
 
-The properties this simulation has no behaviour for fail the resource rather than being dropped,
-including `FifoQueue: true`. A queue deployed without its redrive policy would look to the template
-like a queue with a dead-letter queue and have none. The failures are worded as an invalid resource
-rather than an unsupported one, because sim CloudFormation skips a resource whose error reads as
-unsupported, and skipping is the wrong answer for a queue that cannot be created as asked.
+A property this simulation has no behaviour for is recorded against the Resource and the queue is
+created without it. `FifoQueue: true` fails the resource instead. A FIFO queue is named
+`<name>.fifo`, a name simulated SQS refuses, leaving no queue to create under the name the template
+gave it. The failures are worded as an invalid resource rather than an unsupported one, because sim
+CloudFormation skips a resource whose error reads as unsupported, and skipping is the wrong answer
+for a queue that cannot be created as asked.
 
 `SimCfnSqsQueueName` generates the name for a queue the template does not name, from the stack name
 and the logical ID. It applies the 80 characters a queue name allows through the shared
@@ -258,9 +259,8 @@ here, it does not make another Account's queues reachable through this one.
   The 60 second hold on a deleted queue's name is simulated.
 - A queue name ending in `.fifo` is refused, as are the FIFO-only request fields.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
-- Tags, `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored, whether a
-  request or a CloudFormation template asks for them. So is `RedrivePolicy` on a CloudFormation
-  resource, where it is not simulated, unlike the queue attribute of the same name.
+- Tags, `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored when a
+  request sets them, and recorded against the Resource when a CloudFormation template declares them.
 - A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
   which are shorthands for writing one statement of it, are not implemented.
 - `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
