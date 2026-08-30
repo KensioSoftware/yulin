@@ -862,12 +862,178 @@ failures come back.
 
 ### Limitations
 
-- Object versioning is left out. Deletion removes the Object rather than writing a delete marker,
-  and `VersionId` and `MFA` are both ignored on the request.
+- `VersionId` and `MFA` are ignored on a `DeleteObjects` request. A versioned Bucket writes a delete
+  marker over each key and reports it per key under `DeleteMarker` and `DeleteMarkerVersionId`, and
+  removing a named version needs `DeleteObjectCommand`. See
+  [Object versioning](#object-versioning).
 - A request naming no Objects, or more than the thousand S3 accepts, is refused with `MalformedXML`
   before anything is deleted.
 - A Bucket using filesystem-backed storage refuses deletion. See
   [Filesystem-backed Bucket storage](#filesystem-backed-bucket-storage).
+
+## Object versioning
+
+A versioned Bucket keeps every write of a key instead of overwriting it, and answers a delete with a
+marker rather than removing anything. Turn it on with `PutBucketVersioningCommand`, or with
+`VersioningConfiguration` on an `AWS::S3::Bucket` resource.
+
+```typescript sim-s3-object-versioning
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectVersionsCommand,
+  PutBucketVersioningCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "history-stack",
+  template: {
+    Resources: {
+      HistoryBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "history" },
+      },
+    },
+  },
+});
+
+// Written before the Bucket was versioned, so this one takes the null version
+// id, as it does in real S3. A template declaring VersioningConfiguration
+// gives even the first write a version id of its own instead.
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+    Body: JSON.stringify({ words: ["好"] }),
+  }),
+);
+
+await simS3.putBucketVersioning(
+  new PutBucketVersioningCommand({
+    Bucket: "history",
+    VersioningConfiguration: { Status: "Enabled" },
+  }),
+);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+    Body: JSON.stringify({ words: [] }),
+  }),
+);
+
+// The write did not overwrite anything. Both versions are listed, newest
+// first, with IsLatest on the one a plain read answers with.
+const listed = await simS3.listObjectVersions(
+  new ListObjectVersionsCommand({ Bucket: "history", Prefix: "snapshots/" }),
+);
+
+console.log(listed.Versions?.map((version) => version.VersionId));
+// [ "<a version id>", "null" ]
+
+// Recovery is a read of the earlier version and a write of it back.
+const earlier = await simS3.getObject(
+  new GetObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+    VersionId: "null",
+  }),
+);
+
+const recovered = await Array.fromAsync(earlier.Body ?? []);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+    Body: Buffer.concat(recovered),
+  }),
+);
+
+// A delete writes a marker over the key rather than removing anything, and
+// deleting the marker by its own id brings the Object back.
+const deleted = await simS3.deleteObject(
+  new DeleteObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+  }),
+);
+
+console.log(deleted.DeleteMarker); // true
+
+await simS3.deleteObject(
+  new DeleteObjectCommand({
+    Bucket: "history",
+    Key: "snapshots/reader-1.json",
+    VersionId: deleted.VersionId,
+  }),
+);
+```
+
+`PutObjectCommand`, `CopyObjectCommand` and `CompleteMultipartUploadCommand` each report the
+`VersionId` they wrote under. `GetObjectCommand` and `HeadObjectCommand` take one and read that
+version, and report the version they read. `DeleteObjectCommand` takes one and removes that version
+for good.
+
+`ListObjectVersionsCommand` reports the Objects under `Versions` and the delete markers under
+`DeleteMarkers`, keys in ascending order and each key's versions newest first. `IsLatest` marks the
+version a read without a `VersionId` answers with. `ListObjectsV2Command` reports the current
+version of each key alone, and a key hidden behind a delete marker is absent from it.
+
+Both lists are paged together, so `MaxKeys` counts an Object and a marker alike. A truncated listing
+carries `NextKeyMarker` and `NextVersionIdMarker`, which the next request sends back as `KeyMarker`
+and `VersionIdMarker`. See [Walking a truncated listing](#walking-a-truncated-listing) for the page
+size and how to lower it.
+
+### Enabling versioning over a Bucket that already holds Objects
+
+Real S3 gives an Object written before the configuration arrived the version id `null`, and
+simulated S3 does the same. That Object is the current version of its key, reads back under the
+literal string `null`, and stays where it is when a later write pushes it out of being current.
+
+A Bucket keeping no versions still answers `ListObjectVersionsCommand`, reporting each Object once
+under the null version id and marked latest. That is what real S3 answers for an unversioned Bucket,
+and it means the operation is safe to call before deciding whether the Bucket is versioned.
+
+### Suspending versioning
+
+`Status: "Suspended"` stops new versions being made and discards none of the ones already there. An
+Object written while suspended takes the null version id and replaces whatever else holds it, so a
+run of writes shares one version between them. Every version written while versioning was enabled
+stays readable by its own id.
+
+There is no way back to unversioned. Real S3 has no request for it, and
+`GetBucketVersioningCommand` reports no status at all for a Bucket nobody has configured, which is
+what separates one from a Bucket whose versioning was suspended.
+
+### Event notifications
+
+A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rather than
+`s3:ObjectRemoved:Delete`, carrying the marker's version id. Removing a version by its own id raises
+`s3:ObjectRemoved:Delete` with that version id. A record from a versioned Bucket carries
+`s3.object.versionId`, and one from a Bucket without versioning leaves the field out.
+
+### Limitations
+
+- MFA delete is refused with `NotImplemented` rather than stored. Nothing here could enforce it, and
+  a Bucket reporting a protection it does not apply is worse than one that says so. `MFADelete:
+"Disabled"` is taken, and any other value is refused with `InvalidArgument`.
+- A `versionId` in a `CopySource` is still refused with `NotImplemented`. A copy reads the current
+  version.
+- `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
+  stored and unread, so a noncurrent version stays until something deletes it by id. An `Expiration`
+  rule expires the current version behind a delete marker, as real S3 does, and raises nothing. See
+  [Lifecycle configuration](#lifecycle-configuration).
+- The `?versioning` and `?versions` sub-resources are refused over the served S3 REST endpoint.
+  Versioning is reachable through the SDK and through a template.
+- A Bucket mounted on a filesystem directory refuses the deletion a delete marker asks for, the way
+  it refuses `DeleteObject`. See [Filesystem-backed Bucket storage](#filesystem-backed-bucket-storage).
 
 ## Event notifications
 
@@ -1667,8 +1833,8 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 - `eventVersion` is the version the S3 event message structure page documents now. AWS increments the
   minor version whenever it adds a field, so compare the major for equality and leave the whole
   string alone.
-- `versionId` is absent from every record, as it is on real S3 for a Bucket without versioning.
-  Versioning is left out.
+- `versionId` is absent from a record raised by a Bucket without versioning, as it is on real S3,
+  and carried by one from a versioned Bucket. See [Object versioning](#object-versioning).
 - A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
   notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
   simulated S3 through `SimAws` instead.
@@ -1694,10 +1860,11 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 
 ## Buckets from CloudFormation
 
-An `AWS::S3::Bucket` resource carries five properties simulated S3 acts on. Those are `BucketName`,
-`LifecycleConfiguration`, `NotificationConfiguration`, `PublicAccessBlockConfiguration` and
-`WebsiteConfiguration`. See [Lifecycle configuration](#lifecycle-configuration) for the parts of a
-rule that are read.
+An `AWS::S3::Bucket` resource carries six properties simulated S3 acts on. Those are `BucketName`,
+`LifecycleConfiguration`, `NotificationConfiguration`, `PublicAccessBlockConfiguration`,
+`VersioningConfiguration` and `WebsiteConfiguration`. See
+[Lifecycle configuration](#lifecycle-configuration) for the parts of a rule that are read, and
+[Object versioning](#object-versioning) for what versioning a Bucket changes.
 
 A Bucket with no `BucketName` is named from the stack name, the logical ID and a tail derived from
 both, lower cased as a bucket name has to be. A `SiteBucket` in `orders-stack` becomes
@@ -1708,12 +1875,12 @@ cover how the stack name and the logical ID share what is left.
 Any other property is left out and recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
 and the Bucket is created and the stack carries on. That matters because a Bucket deployed without
-the versioning, replication or CORS configuration its template asked for looks configured and
+the Object Lock, replication or CORS configuration its template asked for looks configured and
 behaves as though it were bare, and the failure that causes turns up somewhere else entirely. The
 record is where a test checks which of those it is standing on. A property name `AWS::S3::Bucket`
 never had is recorded the same way, and a typo leaves the stack standing.
 
-One of the five given in the wrong shape still fails the stack, and so does a `BucketName` that is
+One of the six given in the wrong shape still fails the stack, and so does a `BucketName` that is
 something other than a string. There is no Bucket to create under a name nothing else in the
 template refers to.
 
@@ -2106,7 +2273,9 @@ Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object. Th
 among the ones sim S3 leaves out. An expiry here is silent.
 
 `NoncurrentVersionExpiration`, `NoncurrentVersionTransitions` and `ExpiredObjectDeleteMarker` are
-stored and unread, because Object versions are left out.
+stored and unread, so nothing removes a noncurrent version. An `Expiration` rule on a versioned
+Bucket writes a delete marker over the current version and leaves the version itself where it is,
+which is what real S3 does. See [Object versioning](#object-versioning).
 
 A Bucket mounted on a filesystem directory refuses the deletion an expiry asks for, the way it
 refuses `DeleteObject`, and answers `NotImplemented`. Removing a real file off the mounted directory
@@ -2992,6 +3161,9 @@ Sim S3 currently supports:
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS
   topic
+- `PutBucketVersioningCommand`, `GetBucketVersioningCommand` and `ListObjectVersionsCommand`, with
+  every write of a key kept, a delete writing a marker over it, and a named version readable and
+  removable on its own
 - `PutBucketWebsiteCommand`, for static website hosting
 - `PutBucketLifecycleConfigurationCommand`, `GetBucketLifecycleConfigurationCommand` and
   `DeleteBucketLifecycleCommand`, storing a Bucket's lifecycle rules and handing them back without
@@ -3024,8 +3196,8 @@ needs them to model the requested behaviour.
 
 These apply across the page. The sections above each list what is specific to them.
 
-- Object versioning is left out. There are no version ids, no delete markers and no `VersionId` on
-  any request or response.
+- Object Lock is left out. A Bucket declaring it deploys without it, and an Object inside a
+  retention period can still be deleted.
 - A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
   left out, and every Object is in that one.
 - `EncodingType` is ignored on a listing, and keys come back unencoded.

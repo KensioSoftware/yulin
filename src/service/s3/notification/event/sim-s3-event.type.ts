@@ -77,13 +77,15 @@ export interface SimS3EventBucket {
  * The Object an event is about.
  *
  * `size` and `eTag` describe an Object that exists, so a removal record
- * carries neither, as a real S3 removal record does not. The key is
- * form-URL-encoded, as the record carries it: a space is a plus sign, while
- * the slashes of a key prefix stay as they are.
+ * carries neither, as a real S3 removal record does not. `versionId` is
+ * carried by a Bucket keeping versions and left out by one that is not. The
+ * key is form-URL-encoded, as the record carries it: a space is a plus sign,
+ * while the slashes of a key prefix stay as they are.
  */
 export interface SimS3EventObject {
   readonly key: string;
   readonly size?: number | undefined;
   readonly eTag?: string | undefined;
+  readonly versionId?: string | undefined;
   readonly sequencer: string;
 }

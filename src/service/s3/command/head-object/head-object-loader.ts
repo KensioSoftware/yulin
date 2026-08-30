@@ -1,6 +1,7 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NotFound } from "../../error/sim-s3.error.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
+import { simS3ReadObjectVersion } from "../object/sim-s3-read-object-version.js";
 import type { SimHeadObjectCommandOutput } from "./head-object.command.js";
 
 /**
@@ -18,11 +19,14 @@ export class HeadObjectLoader {
   async describe(
     bucket: SimS3Bucket,
     key: string,
+    versionId?: string,
   ): Promise<SimHeadObjectCommandOutput> {
-    const object = await bucket.getObject(key);
-    if (object === undefined) {
+    const read = await simS3ReadObjectVersion(bucket, key, versionId);
+    if (read === undefined) {
       throw new SimS3NotFound(`No S3 Object named ${key}`);
     }
+
+    const object = read.object;
 
     return {
       ...object.metadata.system,
@@ -30,6 +34,7 @@ export class HeadObjectLoader {
       Metadata: object.metadata.userDefined,
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
+      ...(read.versionId !== undefined && { VersionId: read.versionId }),
       $metadata: {},
     };
   }

@@ -83,6 +83,10 @@ export class HeadObjectCommandHandler implements CommandHandler<
     // cannot learn whether an Object exists.
     this.authorizer.authorize(bucket, command.input.Key, options);
 
-    return await this.loader.describe(bucket, command.input.Key);
+    return await this.loader.describe(
+      bucket,
+      command.input.Key,
+      command.input.VersionId,
+    );
   }
 }

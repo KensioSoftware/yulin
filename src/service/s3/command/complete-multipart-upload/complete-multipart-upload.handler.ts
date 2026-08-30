@@ -65,7 +65,7 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
       completedAt: this.access.now(),
     });
 
-    await bucket.putObject(object);
+    const version = await bucket.putObject(object);
     bucket.getMultipartUploads().discard(UploadId);
 
     this.notifications.objectCreated({
@@ -73,6 +73,7 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
       object,
       caller,
       eventName: "s3:ObjectCreated:CompleteMultipartUpload",
+      versionId: version?.versionId,
     });
 
     return {
@@ -80,6 +81,7 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
       Bucket: bucket.bucketName,
       Key: object.key,
       ETag: simS3QuotedETag(object.etag),
+      ...(version !== undefined && { VersionId: version.versionId }),
       $metadata: {},
     };
   }

@@ -81,14 +81,14 @@ describe("AWS::S3::Bucket ReplicationConfiguration rules", () => {
       }),
     );
 
-    // Then the Bucket is created, replicating nothing, and both properties it
-    // was created without are recorded against the Resource.
+    // Then the Bucket is created, versioned as the template asked and
+    // replicating nothing, with replication alone recorded against the
+    // Resource.
     assertTrue(stack.getResource("SiteBucket")?.deployed);
-    assertArrayLength(stack.ignoredProperties, 2);
-    assertIdentical(
-      stack.ignoredProperties.map((entry) => entry.path).join(", "),
-      "VersioningConfiguration, ReplicationConfiguration",
-    );
+    assertArrayLength(stack.ignoredProperties, 1);
+    const ignored = stack.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "ReplicationConfiguration");
   });
 
   it("refuses a metrics event threshold with no Replication Time Control", async () => {

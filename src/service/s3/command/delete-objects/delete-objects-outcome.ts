@@ -43,7 +43,15 @@ export class DeleteObjectsOutcome {
    */
   private record(attempt: DeleteObjectAttempt): void {
     if (attempt.error === undefined) {
-      this.deleted.push({ Key: attempt.key });
+      this.deleted.push({
+        Key: attempt.key,
+        // Reported per key, as real S3 does, so a caller can tell which keys
+        // of the batch were hidden behind a marker rather than removed.
+        ...(attempt.deleteMarker !== undefined && {
+          DeleteMarker: true,
+          DeleteMarkerVersionId: attempt.deleteMarker.versionId,
+        }),
+      });
       return;
     }
 

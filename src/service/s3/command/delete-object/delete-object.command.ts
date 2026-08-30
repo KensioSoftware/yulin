@@ -13,14 +13,23 @@ export interface SimDeleteObjectCommand {
 export interface SimDeleteObjectCommandInput {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
+  /**
+   * The version to remove permanently.
+   *
+   * A request naming none asks for the current version, which a versioned
+   * Bucket answers by writing a delete marker rather than removing anything.
+   */
+  readonly VersionId?: string | undefined;
 }
 
 /**
  * Minimal structural sim S3 DeleteObject output.
  *
- * Real S3 reports `DeleteMarker` and `VersionId` on a versioned Bucket. Sim S3
- * does not model versioning, so neither appears here.
+ * `DeleteMarker` and `VersionId` describe what a versioned Bucket did. A
+ * Bucket without versioning carries neither, as real S3 does.
  */
 export interface SimDeleteObjectCommandOutput {
+  readonly DeleteMarker?: boolean | undefined;
+  readonly VersionId?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

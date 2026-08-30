@@ -4,7 +4,7 @@
  * Listed so an unsimulated event type is refused as unsimulated rather than as
  * a typo, which are different problems with different fixes. Everything here
  * either describes an S3 feature the simulator has no model of, such as
- * versioning, replication or lifecycle rules, or a way of creating an Object
+ * replication or storage class transitions, or a way of creating an Object
  * that it has no command for.
  *
  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html
@@ -18,7 +18,6 @@ export const SIM_S3_UNSIMULATED_NOTIFICATION_EVENTS: ReadonlySet<string> =
     "s3:LifecycleTransition",
     "s3:ObjectAcl:Put",
     "s3:ObjectCreated:Post",
-    "s3:ObjectRemoved:DeleteMarkerCreated",
     "s3:ObjectRestore:*",
     "s3:ObjectRestore:Completed",
     "s3:ObjectRestore:Delete",

@@ -115,13 +115,14 @@ export class CopyObjectCommandHandler implements CommandHandler<
 
     const stored = await simS3CopySourceObject(source, from.key);
     const object = this.objectBuilder.build(command.input, key, stored);
-    await destination.putObject(object);
+    const version = await destination.putObject(object);
 
     this.notifications.objectCreated({
       bucket: destination,
       object,
       caller,
       eventName: "s3:ObjectCreated:Copy",
+      versionId: version?.versionId,
     });
 
     return {
@@ -129,6 +130,7 @@ export class CopyObjectCommandHandler implements CommandHandler<
         ETag: simS3QuotedETag(object.etag),
         LastModified: object.lastModified,
       },
+      ...(version !== undefined && { VersionId: version.versionId }),
       $metadata: {},
     };
   }

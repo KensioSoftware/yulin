@@ -14,7 +14,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         Type: "AWS::S3::Bucket",
         Properties: {
           BucketName: "uploads",
-          VersioningConfiguration: { Status: "Enabled" },
+          AccelerateConfiguration: { AccelerationStatus: "Enabled" },
         },
       },
     },
@@ -23,13 +23,13 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 await stack.waitForDeployComplete();
 
-// The Bucket exists and is usable, unversioned.
+// The Bucket exists and is usable, without transfer acceleration.
 console.log(stack.getResource("UploadsBucket")?.deployed);
 // true
 
 for (const ignored of stack.ignoredProperties) {
   console.log(ignored.logicalId, ignored.path, ignored.reason);
-  // "UploadsBucket VersioningConfiguration VersioningConfiguration is a real
-  //  AWS::S3::Bucket property simulated S3 does not act on: Object versions
-  //  are not simulated, ..."
+  // "UploadsBucket AccelerateConfiguration AccelerateConfiguration is a real
+  //  AWS::S3::Bucket property simulated S3 does not act on: transfer
+  //  acceleration is not simulated"
 }

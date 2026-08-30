@@ -21,6 +21,8 @@ export interface SimS3ObjectCreatedInput {
    * rather than as a Put.
    */
   readonly eventName: SimS3ObjectCreatedEvent;
+  /** The version the write was given, on a Bucket keeping versions. */
+  readonly versionId?: string | undefined;
 }
 
 /**
@@ -32,12 +34,28 @@ export type SimS3ObjectCreatedEvent = Extract<
 >;
 
 /**
+ * The ways an Object can be removed that simulated S3 raises an event for.
+ */
+export type SimS3ObjectRemovedEvent = Extract<
+  SimS3NotificationEvent,
+  `s3:ObjectRemoved:${string}`
+>;
+
+/**
  * An Object key a command has just removed.
  */
 export interface SimS3ObjectRemovedInput {
   readonly bucket: SimS3Bucket;
   readonly key: string;
   readonly caller: SimAwsResolvedCaller;
+  /**
+   * How the key came to be removed, which real S3 distinguishes. A delete on a
+   * versioned Bucket hides the Object behind a marker and arrives as
+   * `s3:ObjectRemoved:DeleteMarkerCreated` rather than as a Delete.
+   */
+  readonly eventName: SimS3ObjectRemovedEvent;
+  /** The version removed, or the marker written, on a Bucket keeping versions. */
+  readonly versionId?: string | undefined;
 }
 
 /**
@@ -51,6 +69,7 @@ export interface SimS3RaisedObjectEvent {
   readonly caller: SimAwsResolvedCaller;
   readonly size?: number | undefined;
   readonly eTag?: string | undefined;
+  readonly versionId?: string | undefined;
 }
 
 interface SimS3ObjectEventBuilderProperties {
@@ -85,6 +104,7 @@ export class SimS3ObjectEventBuilder {
       caller: input.caller,
       size: input.object.body.length,
       eTag: input.object.etag,
+      versionId: input.versionId,
     });
   }
 
@@ -95,9 +115,10 @@ export class SimS3ObjectEventBuilder {
   forRemoved(input: SimS3ObjectRemovedInput): SimS3ObjectEvent {
     return this.build({
       bucket: input.bucket,
-      eventName: "s3:ObjectRemoved:Delete",
+      eventName: input.eventName,
       key: input.key,
       caller: input.caller,
+      versionId: input.versionId,
     });
   }
 
@@ -118,6 +139,7 @@ export class SimS3ObjectEventBuilder {
       sequencer: this.sequencers.next(bucketName, raised.key),
       size: raised.size,
       eTag: raised.eTag,
+      versionId: raised.versionId,
     });
   }
 }

@@ -56,6 +56,36 @@ export class SimS3NotFound extends SimS3Error {
 }
 
 /**
+ * Simulated S3 NoSuchVersion error.
+ *
+ * What real S3 answers when a request names a version id that no version of
+ * that key was ever given. A key that exists with a version id that does not
+ * is this rather than NoSuchKey.
+ */
+export class SimS3NoSuchVersion extends SimS3Error {
+  public override readonly name = "NoSuchVersion";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated S3 MethodNotAllowed error.
+ *
+ * What real S3 answers to a read of a delete marker by its own version id. The
+ * marker exists, so it is not a missing version, and it holds no bytes to
+ * send.
+ */
+export class SimS3MethodNotAllowed extends SimS3Error {
+  public override readonly name = "MethodNotAllowed";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 405 });
+  }
+}
+
+/**
  * Simulated S3 NoSuchBucketPolicy error.
  *
  * Real S3 distinguishes a Bucket that does not exist from a Bucket that exists

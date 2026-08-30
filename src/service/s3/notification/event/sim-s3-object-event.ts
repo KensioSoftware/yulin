@@ -13,6 +13,11 @@ interface SimS3ObjectEventProperties {
   readonly sequencer: string;
   readonly size?: number | undefined;
   readonly eTag?: string | undefined;
+  /**
+   * The version this event happened to, on a Bucket keeping versions. A Bucket
+   * without versioning has none, and real S3 leaves the field out for one.
+   */
+  readonly versionId?: string | undefined;
 }
 
 /**
@@ -38,6 +43,7 @@ export class SimS3ObjectEvent {
   public readonly sequencer: string;
   public readonly size: number | undefined;
   public readonly eTag: string | undefined;
+  public readonly versionId: string | undefined;
 
   constructor(properties: SimS3ObjectEventProperties) {
     this.eventName = properties.eventName;
@@ -51,5 +57,6 @@ export class SimS3ObjectEvent {
     this.sequencer = properties.sequencer;
     this.size = properties.size;
     this.eTag = properties.eTag;
+    this.versionId = properties.versionId;
   }
 }
