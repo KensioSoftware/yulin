@@ -13,6 +13,7 @@ import { SimCfnDeliveryCreator } from "./delivery/sim-cfn-delivery-creator.js";
 import { SimCfnDeliveryDestinationCreator } from "./delivery/sim-cfn-delivery-destination-creator.js";
 import { SimCfnDeliverySourceCreator } from "./delivery/sim-cfn-delivery-source-creator.js";
 import { SimCfnLogGroupCreator } from "./group/sim-cfn-log-group-creator.js";
+import { SimCfnMetricFilterCreator } from "./metric/sim-cfn-metric-filter-creator.js";
 import { SimLogsCfnResourceDeleter } from "./sim-logs-cfn-resource-deleter.js";
 import { unsupportedSimLogsResourceType } from "./sim-logs-cfn-unsupported-resource.js";
 
@@ -30,12 +31,15 @@ interface SimLogsCfnResourceFactoryProperties {
  * logging property of its own, and a stack that turns logging on is made of
  * those three Resources and nothing else.
  *
- * Subscription filters and metric filters are not created here. Both need
- * machinery this simulation does not have yet, and a stack declaring one
- * records it as a skip.
+ * Metric filters are created here too, and publish into the simulated
+ * CloudWatch of the log group's own Account and Region.
+ *
+ * Subscription filters are not. `PutSubscriptionFilter` holds one, and a stack
+ * declaring `AWS::Logs::SubscriptionFilter` records it as a skip.
  */
 export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
   readonly #logGroups: SimCfnLogGroupCreator;
+  readonly #metricFilters: SimCfnMetricFilterCreator;
   readonly #deliverySources: SimCfnDeliverySourceCreator;
   readonly #deliveryDestinations: SimCfnDeliveryDestinationCreator;
   readonly #deliveries: SimCfnDeliveryCreator;
@@ -48,11 +52,13 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
     };
 
     this.#logGroups = new SimCfnLogGroupCreator(properties);
+    this.#metricFilters = new SimCfnMetricFilterCreator(properties);
     this.#deliverySources = new SimCfnDeliverySourceCreator(delivery);
     this.#deliveryDestinations = new SimCfnDeliveryDestinationCreator(delivery);
     this.#deliveries = new SimCfnDeliveryCreator(delivery);
     this.#deleter = new SimLogsCfnResourceDeleter({
       logGroups: this.#logGroups,
+      metricFilters: this.#metricFilters,
       deliverySources: this.#deliverySources,
       deliveryDestinations: this.#deliveryDestinations,
       deliveries: this.#deliveries,
@@ -74,6 +80,9 @@ export class SimLogsCfnResourceFactory implements SimCfnServiceResourceFactory {
     switch (resourceTypeName) {
       case "LogGroup": {
         return await this.#logGroups.create(resource, values, options);
+      }
+      case "MetricFilter": {
+        return await this.#metricFilters.create(resource, values, options);
       }
       case "DeliverySource": {
         return await this.#deliverySources.create(resource, values, options);

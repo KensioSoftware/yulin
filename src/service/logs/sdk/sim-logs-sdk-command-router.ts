@@ -35,6 +35,11 @@ import type {
   SimDescribeDeliveriesCommand,
 } from "../command/delivery/delivery.command.js";
 import type {
+  SimDeleteMetricFilterCommand,
+  SimDescribeMetricFiltersCommand,
+  SimPutMetricFilterCommand,
+} from "../command/metric/metric-filter.command.js";
+import type {
   SimDeleteSubscriptionFilterCommand,
   SimDescribeSubscriptionFiltersCommand,
   SimPutSubscriptionFilterCommand,
@@ -142,6 +147,30 @@ export class SimLogsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLogs.deleteSubscriptionFilter(
             command as SimDeleteSubscriptionFilterCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutMetricFilterCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.putMetricFilter(
+            command as SimPutMetricFilterCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeMetricFiltersCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.describeMetricFilters(
+            command as SimDescribeMetricFiltersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteMetricFilterCommand",
+        async (command, context): Promise<unknown> =>
+          await simLogs.deleteMetricFilter(
+            command as SimDeleteMetricFilterCommand,
             simSdkCallerOptions(context),
           ),
       ],

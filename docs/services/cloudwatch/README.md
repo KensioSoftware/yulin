@@ -12,6 +12,10 @@ measured goes untested.
 Only custom metrics live here. This simulation publishes into no `AWS/` namespace. A query for
 `AWS/Lambda` `Invocations` comes back empty, in place of a number that was never measured.
 
+A custom metric's datapoints arrive either from `PutMetricData` or from a CloudWatch Logs metric
+filter counting matching log events. See the [CloudWatch Logs docs](../logs/README.md) for the
+second route.
+
 CloudWatch specific types are imported from the `@kensio/yulin/cloudwatch` subpath.
 
 ## Publishing and reading back a metric
@@ -413,7 +417,9 @@ test still passes and no longer means what it says.
   comes back at the period its query asked for.
 - **Cross-account metrics.** `IncludeLinkedAccounts` and `OwningAccount` are refused. There is no
   monitoring account.
-- **Metrics AWS publishes.** No simulated service writes its own `AWS/` metrics.
+- **Metrics AWS publishes.** No simulated service writes its own `AWS/` metrics. A CloudWatch Logs
+  metric filter naming a reserved namespace is refused here when it publishes, as `PutMetricData`
+  refuses a caller naming one.
 
 Two divergences are deliberate, and not refusals. Real CloudWatch rejects a datapoint more than two
 weeks old or more than two hours in the future, and this accepts any timestamp, letting a test seed

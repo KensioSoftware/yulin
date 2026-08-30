@@ -6,6 +6,7 @@ import type { SimLogsLogGroupStore } from "../../group/sim-logs-log-group-store.
 import { requiredSimLogsLogStreamName } from "../../stream/sim-logs-log-stream-name.js";
 import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
 import type { SimLogsRequestOptions } from "../sim-logs-request-options.js";
+import type { SimLogsMetricFanOut } from "../../metric/sim-logs-metric-fan-out.js";
 import type { SimLogsSubscriptionFanOut } from "../../subscription/sim-logs-subscription-fan-out.js";
 import type {
   SimPutLogEventsCommand,
@@ -20,6 +21,9 @@ interface SimLogsPutLogEventsProperties {
 
   /** Where written events are handed on to subscription filters. */
   readonly fanOut: SimLogsSubscriptionFanOut;
+
+  /** Where written events are handed on to metric filters. */
+  readonly metricFanOut: SimLogsMetricFanOut;
 }
 
 /**
@@ -31,6 +35,7 @@ export class SimLogsPutLogEvents {
   readonly #eventIds: SimLogsEventIds;
   readonly #clock: SimClock;
   readonly #fanOut: SimLogsSubscriptionFanOut;
+  readonly #metricFanOut: SimLogsMetricFanOut;
 
   constructor(properties: SimLogsPutLogEventsProperties) {
     this.#groups = properties.groups;
@@ -38,6 +43,7 @@ export class SimLogsPutLogEvents {
     this.#eventIds = properties.eventIds;
     this.#clock = properties.clock;
     this.#fanOut = properties.fanOut;
+    this.#metricFanOut = properties.metricFanOut;
   }
 
   /**
@@ -74,6 +80,7 @@ export class SimLogsPutLogEvents {
 
     stream.append(batch.events, ingestionTime);
     this.#fanOut.written(group, logStreamName, batch.events);
+    this.#metricFanOut.written(group, batch.events);
 
     return { $metadata: {}, nextSequenceToken: stream.uploadSequenceToken };
   }

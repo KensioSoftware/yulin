@@ -730,6 +730,190 @@ await simAws.backgroundTasksComplete();
 A qualifier naming no version and no alias is refused where the filter is put, the way a missing
 function is. `UpdateAlias` moves what the filter reaches, and the filter stays as it is.
 
+## Metric filters
+
+A metric filter turns matching log events into CloudWatch metric datapoints. It is how a log line becomes something an alarm can watch, with no handler publishing a metric of its own.
+
+```typescript sim-logs-metric-filter
+/**
+ * Counting matching log lines into a CloudWatch metric.
+ */
+
+import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+import {
+  CreateLogGroupCommand,
+  CreateLogStreamCommand,
+  PutLogEventsCommand,
+  PutMetricFilterCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const logGroupName = "/aws/lambda/orders";
+const logStreamName = "2026/08/30/[$LATEST]0f7c1a";
+const startedAt = new Date("2026-08-30T09:00:00Z");
+
+await simAws.clock().setTo(startedAt);
+await simAws.logs().createLogGroup(new CreateLogGroupCommand({ logGroupName }));
+await simAws
+  .logs()
+  .createLogStream(new CreateLogStreamCommand({ logGroupName, logStreamName }));
+
+await simAws.logs().putMetricFilter(
+  new PutMetricFilterCommand({
+    logGroupName,
+    filterName: "handler-errors",
+    filterPattern: "ERROR",
+    metricTransformations: [
+      {
+        metricNamespace: "Orders",
+        metricName: "HandlerErrors",
+        metricValue: "1",
+        unit: "Count",
+      },
+    ],
+  }),
+);
+
+await simAws.logs().putLogEvents(
+  new PutLogEventsCommand({
+    logGroupName,
+    logStreamName,
+    logEvents: [
+      { timestamp: startedAt.getTime(), message: "INFO starting" },
+      { timestamp: startedAt.getTime(), message: "ERROR order has no items" },
+    ],
+  }),
+);
+
+// Publication happens after the write is answered, as it does in an account.
+await simAws.backgroundTasksComplete();
+
+const statistics = new GetMetricStatisticsCommand({
+  Namespace: "Orders",
+  MetricName: "HandlerErrors",
+  StartTime: startedAt,
+  EndTime: new Date(startedAt.getTime() + 60_000),
+  Period: 60,
+  Statistics: ["Sum"],
+});
+const counted = await simAws.cloudWatch().getMetricStatistics(statistics);
+
+// 1. The ERROR line counted and the INFO line did not.
+console.log(counted.Datapoints?.[0]?.Sum);
+```
+
+Datapoints go in through the same `PutMetricData` an ordinary caller uses, into the CloudWatch of the log group's own Account and Region. A datapoint is stamped from the simulation's clock at the instant the event was written.
+
+A transformation carrying a `defaultValue` publishes that value once for a minute that took log events and matched none of them, which is how real CloudWatch Logs keeps a metric reporting through a quiet stretch. A minute a match landed in publishes the match alone. A transformation with no default value publishes nothing for a minute it matched nothing in, and the metric is then left with no datapoint at all over that stretch.
+
+A transformation carrying dimensions cannot also carry a `defaultValue`, and one carrying both is refused. Real CloudWatch Logs allows one or the other, because a default would have to be reported against every dimension value the filter has ever seen.
+
+`DescribeLogGroups` reports how many filters a group has as `metricFilterCount`. `DescribeMetricFilters` takes an optional `logGroupName`. A request naming none, and giving a `metricNamespace` and `metricName`, finds every filter in the Region writing to that metric.
+
+### Values a filter cannot read out of the event
+
+A `metricValue` or a dimension value naming a field of the matched event (`$.bytes`, `$1`) raises `SimLogsUnsupportedOperationException` at `PutMetricFilter`. Reading one needs the pattern to have been parsed structurally, and the structured pattern syntaxes are absent. A literal value publishes.
+
+A filter whose namespace begins `AWS/` is taken, because CloudWatch Logs takes one. The publication is then refused by `PutMetricData`, which reserves those namespaces exactly as real CloudWatch does. The refusal lands on `simAws.logs().metricFilterFailures` rather than failing the write that produced it, so a filter writing nowhere is something a test can assert on.
+
+### Declaring a metric filter in a template
+
+`AWS::Logs::MetricFilter` deploys through the same `PutMetricFilter`, so a stack's own alarm reads a metric its own log group produced.
+
+```typescript sim-cfn-logs-metric-filter
+/**
+ * Deploying a metric filter and an alarm over the metric it writes.
+ */
+
+import { DescribeAlarmsCommand } from "@aws-sdk/client-cloudwatch";
+import {
+  CreateLogStreamCommand,
+  PutLogEventsCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const logGroupName = "/aws/lambda/orders";
+const logStreamName = "2026/08/30/[$LATEST]0f7c1a";
+
+await simAws.clock().setTo(new Date("2026-08-30T09:00:00Z"));
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      OrdersLogs: {
+        Type: "AWS::Logs::LogGroup",
+        Properties: { LogGroupName: logGroupName },
+      },
+      OrdersErrors: {
+        Type: "AWS::Logs::MetricFilter",
+        Properties: {
+          LogGroupName: { Ref: "OrdersLogs" },
+          FilterName: "handler-errors",
+          FilterPattern: "ERROR",
+          MetricTransformations: [
+            {
+              MetricNamespace: "Orders",
+              MetricName: "HandlerErrors",
+              MetricValue: "1",
+              Dimensions: [{ Key: "service", Value: "orders" }],
+            },
+          ],
+        },
+      },
+      OrdersFailing: {
+        Type: "AWS::CloudWatch::Alarm",
+        Properties: {
+          AlarmName: "OrdersFailing",
+          Namespace: "Orders",
+          MetricName: "HandlerErrors",
+          Dimensions: [{ Name: "service", Value: "orders" }],
+          Statistic: "Sum",
+          Period: 60,
+          EvaluationPeriods: 3,
+          DatapointsToAlarm: 1,
+          Threshold: 0,
+          ComparisonOperator: "GreaterThanThreshold",
+          TreatMissingData: "notBreaching",
+        },
+      },
+    },
+  },
+});
+
+await simAws
+  .logs()
+  .createLogStream(new CreateLogStreamCommand({ logGroupName, logStreamName }));
+await simAws.logs().putLogEvents(
+  new PutLogEventsCommand({
+    logGroupName,
+    logStreamName,
+    logEvents: [
+      {
+        timestamp: simAws.clock().now().getTime(),
+        message: "ERROR order has no items",
+      },
+    ],
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+await simAws.clock().advanceBy({ minutes: 2 });
+
+const { MetricAlarms } = await simAws
+  .cloudWatch()
+  .describeAlarms(new DescribeAlarmsCommand({ AlarmNames: ["OrdersFailing"] }));
+
+// ALARM. One log line drove it, with nothing publishing a metric by hand.
+console.log(MetricAlarms?.[0]?.StateValue);
+```
+
+`Ref` returns the filter name, and a filter with no `FilterName` is named after the stack and the logical ID. `Dimensions` is a list of `Key` and `Value` pairs in a template and a map through the SDK, and both reach the same filter. Deleting the stack takes the filter with the log group.
+
 ## Permissions
 
 Every operation goes through simulated IAM. An operation on a named log group authorizes against
@@ -859,11 +1043,19 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 ## Limitations
 
 - **Events never expire.** Retention is stored and reported, never acted on.
-- **Metric filters.** Absent, so `metricFilterCount` is always zero.
+- **A metric filter reading a field of the log event.** A `metricValue` or a dimension value
+  beginning `$` is refused where the filter is put. Both need a structured filter pattern, and
+  neither structured syntax is simulated.
+- **How far back a `defaultValue` looks.** A filter remembers the most recent minute it matched
+  something in. A later write into that same minute publishes no default over the top, and a write
+  landing in an earlier minute a match was already seen in does publish one. Events
+  arrive in time order in a simulation, so this shows up only where a test writes into the past.
 - **Subscription filter destinations other than Lambda**, and `Distribution`. `Distribution` is
   accepted and reported, and with no shards to spread across it has no effect.
-- **`AWS::Logs::SubscriptionFilter` and `AWS::Logs::MetricFilter`.** Both are recorded as gaps. The
-  log group and the three delivery resource types are what simulated CloudFormation deploys here.
+- **`AWS::Logs::SubscriptionFilter`.** Recorded as a gap. The log group, the metric filter and the
+  three delivery resource types are what simulated CloudFormation deploys here.
+- **`ApplyOnTransformedLogs` and `EmitSystemFieldDimensions` on a metric filter.** Recorded and
+  acted on by nothing. Log transformers are absent, so there is no transformed event to read.
 - **Nothing is actually delivered.** A delivery records that a source was joined to a destination
   and how the records would be written. No access log file ever reaches the bucket.
 - **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent as SDK operations. The

@@ -43,6 +43,19 @@ export type {
   SimPutLogEventsCommandOutput,
 } from "./event/event.command.js";
 export type {
+  SimDeleteMetricFilterCommand,
+  SimDeleteMetricFilterCommandInput,
+  SimDeleteMetricFilterCommandOutput,
+  SimDescribeMetricFiltersCommand,
+  SimDescribeMetricFiltersCommandInput,
+  SimDescribeMetricFiltersCommandOutput,
+  SimLogsMetricFilterDetail,
+  SimLogsMetricTransformationInput,
+  SimPutMetricFilterCommand,
+  SimPutMetricFilterCommandInput,
+  SimPutMetricFilterCommandOutput,
+} from "./metric/metric-filter.command.js";
+export type {
   SimDeleteSubscriptionFilterCommand,
   SimDeleteSubscriptionFilterCommandInput,
   SimDeleteSubscriptionFilterCommandOutput,

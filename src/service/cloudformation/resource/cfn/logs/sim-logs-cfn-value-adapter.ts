@@ -2,6 +2,7 @@ import { SimLogsDeliveryDestination } from "../../../../logs/delivery/sim-logs-d
 import { SimLogsDeliverySource } from "../../../../logs/delivery/sim-logs-delivery-source.js";
 import { SimLogsDelivery } from "../../../../logs/delivery/sim-logs-delivery.js";
 import { SimLogsLogGroup } from "../../../../logs/group/sim-logs-log-group.js";
+import { SimLogsMetricFilter } from "../../../../logs/metric/sim-logs-metric-filter.js";
 import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
@@ -10,6 +11,7 @@ import { SimLogsDeliveryDestinationCfn } from "./sim-logs-delivery-destination-c
 import { SimLogsDeliverySourceCfn } from "./sim-logs-delivery-source-cfn.js";
 import { SimLogsDeliveryCfn } from "./sim-logs-delivery-cfn.js";
 import { SimLogsLogGroupCfn } from "./sim-logs-log-group-cfn.js";
+import { SimLogsMetricFilterCfn } from "./sim-logs-metric-filter-cfn.js";
 
 /**
  * The CloudFormation-facing value adapter for a simulated CloudWatch Logs
@@ -25,6 +27,13 @@ export function logsValueAdapter(
     simResource instanceof SimLogsLogGroup
   ) {
     return new SimLogsLogGroupCfn({ group: simResource });
+  }
+
+  if (
+    type === "AWS::Logs::MetricFilter" &&
+    simResource instanceof SimLogsMetricFilter
+  ) {
+    return new SimLogsMetricFilterCfn({ filter: simResource });
   }
 
   if (

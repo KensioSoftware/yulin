@@ -214,10 +214,15 @@ shares.
 
 ## What is not simulated
 
-Nothing expires, as above. Metric filters, Logs Insights queries, export tasks, tagging, encryption
-and data protection policies are all absent, and `metricFilterCount` is always zero. A stream's
-`storedBytes` is always zero too, which matches real CloudWatch Logs: it stopped reporting the
-figure per stream in 2019.
+Nothing expires, as above. Logs Insights queries, export tasks, tagging, encryption and data
+protection policies are all absent. A stream's `storedBytes` is always zero too, which matches
+real CloudWatch Logs: it stopped reporting the figure per stream in 2019.
+
+Metric filters are here, in `metric/`, and publish into the simulated CloudWatch of the log
+group's own Account and Region. What they cannot do is read a value out of the matched event. A
+`metricValue` or a dimension value beginning `$` needs the pattern to have been parsed
+structurally, and `SimLogsFilterPattern` refuses both structured syntaxes, so such a filter is
+refused where it is put.
 
 No log file is ever delivered. A delivery records that a source was joined to a destination and how
 the records would be written, which is what a test of a construct that sets logging up has to assert
