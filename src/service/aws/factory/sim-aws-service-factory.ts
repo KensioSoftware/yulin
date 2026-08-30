@@ -19,6 +19,7 @@ import type { SimEcr } from "../../ecr/index.js";
 import type { SimEcs } from "../../ecs/index.js";
 import type { SimAthena } from "../../athena/index.js";
 import type { SimBedrock } from "../../bedrock/index.js";
+import type { SimBackup } from "../../backup/index.js";
 import type { SimPersonalize } from "../../personalize/index.js";
 import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
@@ -303,6 +304,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Bedrock for an Account Region scope. */
   createBedrock(scope: SimAwsAccountRegionContainer): SimBedrock {
     return this.selfContainedServices.createBedrock(scope);
+  }
+
+  /** Create simulated AWS Backup for an Account Region scope. */
+  createBackup(scope: SimAwsAccountRegionContainer): SimBackup {
+    return this.selfContainedServices.createBackup(scope);
   }
 
   /** Create simulated Personalize for an Account Region scope. */

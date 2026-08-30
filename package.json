@@ -65,6 +65,10 @@
       "import": "./dist/service/bedrock/index.js",
       "types": "./dist/service/bedrock/index.d.ts"
     },
+    "./backup": {
+      "import": "./dist/service/backup/index.js",
+      "types": "./dist/service/backup/index.d.ts"
+    },
     "./cloudformation": {
       "import": "./dist/service/cloudformation/index.js",
       "types": "./dist/service/cloudformation/index.d.ts"
@@ -231,6 +235,7 @@
     "@aws-sdk/client-api-gateway": "^3.1112.0",
     "@aws-sdk/client-apigatewayv2": "^3.1101.0",
     "@aws-sdk/client-athena": "^3.1115.0",
+    "@aws-sdk/client-backup": "^3.1121.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1115.0",
     "@aws-sdk/client-cloudformation": "^3.1101.0",
     "@aws-sdk/client-cloudfront": "^3.1101.0",

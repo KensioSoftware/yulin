@@ -2,6 +2,7 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimAthena } from "../athena/index.js";
 import type { SimBedrock } from "../bedrock/index.js";
+import type { SimBackup } from "../backup/index.js";
 import type { SimApiGateway } from "../apigateway/index.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
@@ -79,6 +80,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated Bedrock in the default Account Region scope. */
   bedrock(): SimBedrock {
     return this.defaultAccountRegionScope().bedrock();
+  }
+
+  /** Get simulated AWS Backup in the default Account Region scope. */
+  backup(): SimBackup {
+    return this.defaultAccountRegionScope().backup();
   }
 
   /** Get simulated CloudFormation in the default Account Region scope. */

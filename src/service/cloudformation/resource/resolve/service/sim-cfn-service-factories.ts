@@ -42,6 +42,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.athena().cfnResourceFactory(),
   ],
   [
+    "Backup",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.backup().cfnResourceFactory(),
+  ],
+  [
     "ApiGateway",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.apiGateway().cfnResourceFactory(),

@@ -45,6 +45,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     (scoped): SimSdkCommandRouter => scoped.bedrock().sdkCommandRouter(),
   ],
   [
+    "Backup",
+    (scoped): SimSdkCommandRouter => scoped.backup().sdkCommandRouter(),
+  ],
+  [
     "CloudFormation",
     (scoped): SimSdkCommandRouter => scoped.cloudFormation().sdkCommandRouter(),
   ],

@@ -16,6 +16,7 @@ import type { SimKinesis } from "../kinesis/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimRoute53 } from "../route53/index.js";
+import type { SimBackup } from "../backup/index.js";
 
 export const AWS_REGION_NAMES = [
   "us-east-1",
@@ -134,6 +135,11 @@ export class SimAwsRegion {
    */
   acm(): SimAcm {
     return this.account().acm();
+  }
+
+  /** Get simulated AWS Backup for this Region's default Account. */
+  backup(): SimBackup {
+    return this.account().backup();
   }
 
   /**
