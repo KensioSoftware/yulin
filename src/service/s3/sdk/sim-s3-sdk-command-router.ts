@@ -4,6 +4,7 @@ import type {
 } from "../../../sdk/index.js";
 import type { SimS3 } from "../sim-s3.js";
 import { simS3SdkBucketRoutes } from "./sim-s3-sdk-bucket-routes.js";
+import { simS3SdkObjectLockRoutes } from "./sim-s3-sdk-object-lock-routes.js";
 import { simS3SdkObjectRoutes } from "./sim-s3-sdk-object-routes.js";
 
 /**
@@ -16,6 +17,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       ...simS3SdkBucketRoutes(simS3),
       ...simS3SdkObjectRoutes(simS3),
+      ...simS3SdkObjectLockRoutes(simS3),
     ]);
   }
 

@@ -23,6 +23,8 @@ familiar AWS SDK command shapes, CloudFormation resources, and local HTTP reques
   static website configuration, and the event notification configuration.
 - `bucket/versioning/` contains the version history a Bucket keeps, and the configuration deciding
   whether it keeps one.
+- `bucket/lock/` contains Object Lock, the retention periods and legal holds that hold a version
+  against a delete, and the Bucket configuration putting a default on every new one.
 - `notification/` contains event notification delivery: the event, its `Records` serialisation, and
   the destinations S3 pushes to.
 - `object/` contains the simulated S3 Object model.
@@ -93,6 +95,10 @@ Supported command areas currently include:
 - `put-bucket-versioning/`
 - `get-bucket-versioning/`
 - `list-object-versions/`
+- `put-object-lock-configuration/`
+- `get-object-lock-configuration/`
+- `put-object-retention/`
+- `put-object-legal-hold/`
 
 `SimS3Commands` owns the wiring: every handler is built from the same Bucket map, IAM and background
 scheduler, so that construction lives in one place rather than being repeated once per command on
@@ -104,6 +110,7 @@ the service facade. It groups the commands into areas, each a small class under 
 - `SimS3ObjectCommands` in `command/object/`
 - `SimS3NotificationCommands` in `command/notification/`
 - `SimS3VersioningCommands` in `command/versioning/`
+- `SimS3ObjectLockCommands` in `command/object-lock/`
 
 An area holds the shared `SimS3BucketCommandState` and hands it to the handler it runs, so adding a
 command means adding one method to the area it belongs to. `requireSimS3Bucket` is the shared Bucket lookup
@@ -202,9 +209,10 @@ is a normalized form of what was applied rather than the original text.
 
 ## What a Bucket stores
 
-`SimS3BucketObjects` holds the storage implementation, the version history, the multipart uploads in
-progress and the lifecycle configuration. The Bucket delegates to it rather than owning all four,
-because they are one concern: what is under the Bucket's keys, and what time does to it. Every read
+`SimS3BucketObjects` holds the storage implementation, the version history, the Object Lock, the
+multipart uploads in progress and the lifecycle configuration. The Bucket delegates to it rather than
+owning all five, because they are one concern: what is under the Bucket's keys, and what time does to
+it. Every read
 goes through it, and applying lifecycle rules on the way past is what keeps an untouched Bucket free
 of the cost of having them.
 
@@ -227,6 +235,34 @@ maintains is that **storage holds the current, undeleted Object under each key a
 Writing a delete marker takes the Object out of storage while the history keeps it, and removing a
 version puts back whatever the removal left current. Every existing reader of a Bucket, the website
 endpoint and the REST endpoint among them, therefore needs no knowledge of versions at all.
+
+## Object Lock
+
+`bucket/lock/` holds the Object Lock model, which sits on top of the version model and is meaningless
+without it. There are four pieces.
+
+`SimS3ObjectRetention` is a mode and an instant. It answers whether it still holds at an instant of
+simulated time and whether it runs at least as long as another one, which is the comparison that
+decides whether a `PutObjectRetention` is extending a period or shortening it.
+
+`SimS3ObjectLock` is what one version carries. Every `SimS3ObjectVersion` holds one, empty until
+something is put on it, which lets the delete path ask the same question of a locked Bucket and an
+unlocked one. It is mutable where the version around it is fixed, because real S3 changes a retention
+and a hold through requests of their own against a version that is already there.
+
+`SimS3ObjectLockConfiguration` is the Bucket configuration. Its one job beyond reporting itself back
+is `retentionAt(instant)`, which turns a `DefaultRetention` of so many days into the instant a
+version written now is held until.
+
+`SimS3BucketObjectLock` is what the Bucket holds. It applies the default to a new version and refuses
+a delete of a held one, which are the two places `SimS3BucketObjects` reaches it from. Both take the
+instant from the Bucket's clock. That keeps the boundary a pure function of simulated time, crossed
+by the clock moving and by nothing else, the same approach lifecycle expiry takes.
+
+`s3:BypassGovernanceRetention` is authorized as a decision of its own in
+`SimS3ObjectLockAuthorizer`, alongside the `s3:DeleteObject` the delete already needed, because real
+S3 evaluates the two separately. A request that leaves the flag off skips the decision entirely, so
+lacking the permission costs a caller who never wanted it nothing.
 
 ## Block Public Access
 
@@ -857,11 +893,18 @@ Bucket resource creation flow:
 1. apply website configuration through the normal simulated `putBucketWebsite` command path
 1. return the simulated Bucket as the CloudFormation-backed resource
 
+`SimCfnS3BucketDeclaredConfigurations` reads the other declared properties and applies each through
+the command an SDK caller would reach. Order matters twice over. Versioning goes before Object Lock
+and before the lifecycle rules, because both describe a Bucket that keeps versions and
+`PutObjectLockConfiguration` refuses a Bucket without them. Notifications go last, because S3 checks
+every destination the configuration names and the Resources behind them have to exist by then.
+
 Unsupported S3 CloudFormation resource types throw a diagnostic error.
 
 ## Error model
 
-S3-specific errors live in `error/sim-s3.error.ts`.
+S3-specific errors live in `error/sim-s3.error.ts`, apart from the Object Lock ones, which are in
+`error/sim-s3-object-lock.error.ts` alongside them.
 
 Handlers throw AWS-like errors for supported failure cases, including:
 
@@ -877,6 +920,9 @@ Handlers throw AWS-like errors for supported failure cases, including:
 - malformed XML, for a `DeleteObjects` request naming no Objects or more than 1000 of them
 - not implemented, for something the simulator refuses rather than approximates, such as deleting an
   Object out of filesystem-backed storage
+- invalid Bucket state, for turning Object Lock on over a Bucket that keeps no versions
+- Object Lock configuration not found, for reading the Object Lock of a Bucket that has never had
+  one
 
 These errors carry AWS-style names and HTTP status metadata where implemented. Tests should assert
 the specific simulator error when behaviour depends on AWS-compatible failure semantics.

@@ -114,12 +114,12 @@ describe("AWS::S3::Bucket property rules", () => {
   });
 
   it("records every unsimulated property, not only the first", async () => {
-    // Given a template asking for object locking as well as acceleration.
+    // Given a template asking for access logging as well as acceleration.
     const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await deployBucket(simAws, {
-      ObjectLockEnabled: true,
+      LoggingConfiguration: { LogFilePrefix: "access/" },
       AccelerateConfiguration: { AccelerationStatus: "Enabled" },
     });
 
@@ -128,7 +128,7 @@ describe("AWS::S3::Bucket property rules", () => {
     assertArrayLength(stack.ignoredProperties, 2);
     assertIdentical(
       stack.ignoredProperties.map((entry) => entry.path).join(", "),
-      "ObjectLockEnabled, AccelerateConfiguration",
+      "LoggingConfiguration, AccelerateConfiguration",
     );
   });
 

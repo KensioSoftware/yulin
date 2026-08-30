@@ -20,6 +20,14 @@ export interface SimDeleteObjectCommandInput {
    * Bucket answers by writing a delete marker rather than removing anything.
    */
   readonly VersionId?: string | undefined;
+  /**
+   * Whether to get past a governance retention period holding the named
+   * version, which the caller also needs `s3:BypassGovernanceRetention` for.
+   *
+   * A compliance period and a legal hold have no bypass, so this changes
+   * nothing for either.
+   */
+  readonly BypassGovernanceRetention?: boolean | undefined;
 }
 
 /**

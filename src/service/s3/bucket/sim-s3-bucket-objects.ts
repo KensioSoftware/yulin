@@ -2,6 +2,7 @@ import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
+import { SimS3BucketObjectLock } from "./lock/sim-s3-bucket-object-lock.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
 import { SimS3LifecycleSweep } from "./lifecycle/sim-s3-lifecycle-sweep.js";
 import { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
@@ -25,6 +26,7 @@ interface SimS3BucketObjectsProperties {
  */
 export class SimS3BucketObjects {
   public readonly versions = new SimS3BucketVersions();
+  public readonly objectLock = new SimS3BucketObjectLock();
 
   private readonly clock: SimClock;
   private readonly uploads = new SimS3MultipartUploads();
@@ -41,12 +43,16 @@ export class SimS3BucketObjects {
    * Put an Object into storage, answering the version it was given.
    *
    * A Bucket that keeps no versions answers with nothing, which is what tells
-   * a caller there is no `VersionId` to report.
+   * a caller there is no `VersionId` to report. A version the Bucket did keep
+   * starts under whatever default retention Object Lock puts on it.
    */
   async put(object: SimS3Object): Promise<SimS3ObjectVersion | undefined> {
     await this.storage.putObject(object);
 
-    return this.versions.recordPut(object);
+    return this.objectLock.withDefaultRetention(
+      this.versions.recordPut(object),
+      this.clock.now(),
+    );
   }
 
   /**
@@ -93,12 +99,20 @@ export class SimS3BucketObjects {
    * Remove one version permanently, answering the version that went.
    *
    * Whatever the removal leaves at the head of the key becomes current, so
-   * deleting a delete marker brings the Object under it back.
+   * deleting a delete marker brings the Object under it back. A version Object
+   * Lock is holding never gets that far.
    */
   async deleteVersion(
     key: string,
     versionId: string,
+    bypassGovernance = false,
   ): Promise<SimS3ObjectVersion | undefined> {
+    this.objectLock.assertDeletable(
+      this.versions.find(key, versionId),
+      this.clock.now(),
+      bypassGovernance,
+    );
+
     return await this.versions.deleteVersion(this.storage, key, versionId);
   }
 

@@ -1,4 +1,5 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { SimS3ObjectLock } from "../lock/sim-s3-object-lock.js";
 import type { SimS3Object } from "../../object/s3-object.js";
 import { simS3NullVersionId } from "./sim-s3-bucket-versioning.js";
 
@@ -25,6 +26,15 @@ interface SimS3ObjectVersionProperties {
 export class SimS3ObjectVersion {
   public readonly versionId: string;
   public readonly key: string;
+
+  /**
+   * What Object Lock holds against this version.
+   *
+   * Every version carries one, empty until something is put on it. A Bucket
+   * without Object Lock leaves every one of them empty, and an empty lock
+   * refuses nothing, so the delete path asks the same question either way.
+   */
+  public readonly lock = new SimS3ObjectLock();
 
   private readonly createdAt: Date;
   private readonly stored: SimS3Object | undefined;

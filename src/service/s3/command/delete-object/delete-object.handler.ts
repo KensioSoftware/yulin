@@ -56,7 +56,10 @@ export class DeleteObjectCommandHandler implements CommandHandler<
     this.authorizer = new DeleteObjectAuthorizer({ iam });
     this.background = background;
     this.notifications = properties.notifications;
-    this.versionRemoval = new DeleteObjectVersionRemoval(properties);
+    this.versionRemoval = new DeleteObjectVersionRemoval({
+      notifications: properties.notifications,
+      iam,
+    });
   }
 
   /**
@@ -68,13 +71,14 @@ export class DeleteObjectCommandHandler implements CommandHandler<
    *
    * A `VersionId` asks for that one version and removes it for good. A request
    * without one asks for the current version, which a versioned Bucket answers
-   * by writing a delete marker over it.
+   * by writing a delete marker over it. Object Lock holds a named version and
+   * never the marker, since a marker hides an Object without losing it.
    */
   async handle(
     command: SimDeleteObjectCommand,
     options?: SimS3RequestOptions,
   ): Promise<SimDeleteObjectCommandOutput> {
-    const { Bucket, Key, VersionId } = command.input;
+    const { Bucket, Key, VersionId, BypassGovernanceRetention } = command.input;
     assertDefined(Bucket, "DeleteObjectCommand.input.Bucket");
     assertDefined(Key, "DeleteObjectCommand.input.Key");
 
@@ -85,7 +89,14 @@ export class DeleteObjectCommandHandler implements CommandHandler<
     const caller = this.authorizer.authorize(bucket, Key, options);
 
     if (VersionId !== undefined) {
-      return await this.versionRemoval.remove(bucket, Key, VersionId, caller);
+      return await this.versionRemoval.remove({
+        bucket,
+        key: Key,
+        versionId: VersionId,
+        caller,
+        bypassGovernance: BypassGovernanceRetention,
+        options,
+      });
     }
 
     const deletion = await bucket.deleteObject(Key);

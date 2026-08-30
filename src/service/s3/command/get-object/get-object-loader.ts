@@ -66,6 +66,7 @@ export class GetObjectLoader {
       LastModified: object.lastModified,
       ContentLength: body.length,
       ...(read.versionId !== undefined && { VersionId: read.versionId }),
+      ...read.lock?.reported,
       ...(range !== undefined && {
         ContentRange: simS3ContentRange(range, size),
       }),

@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3ObjectLockOutput } from "../../bucket/lock/sim-s3-object-lock-output.js";
 import type { SimS3SystemMetadataOutput } from "../../object/s3-system-metadata-read.js";
 
 /**
@@ -28,7 +29,8 @@ export interface SimHeadObjectCommandInput {
  * the Object itself, so this is a GetObject output without its body and with
  * the length that body would have had.
  */
-export interface SimHeadObjectCommandOutput extends SimS3SystemMetadataOutput {
+export interface SimHeadObjectCommandOutput
+  extends SimS3SystemMetadataOutput, SimS3ObjectLockOutput {
   readonly ContentLength?: number;
   readonly Metadata?: Record<string, string>;
   readonly ETag?: string;

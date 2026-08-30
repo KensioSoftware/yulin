@@ -4,6 +4,7 @@ import {
   SimS3MethodNotAllowed,
   SimS3NoSuchVersion,
 } from "../../error/sim-s3.error.js";
+import type { SimS3ObjectLock } from "../../bucket/lock/sim-s3-object-lock.js";
 import type { SimS3Object } from "../../object/s3-object.js";
 
 /**
@@ -15,6 +16,13 @@ import type { SimS3Object } from "../../object/s3-object.js";
 export interface SimS3ReadObjectVersion {
   readonly object: SimS3Object;
   readonly versionId: string | undefined;
+  /**
+   * What Object Lock holds against the version read.
+   *
+   * A Bucket keeping no versions has none, and a Bucket that keeps them but
+   * has never been locked has an empty one. Both report nothing.
+   */
+  readonly lock: SimS3ObjectLock | undefined;
 }
 
 /**
@@ -40,9 +48,13 @@ export async function simS3ReadObjectVersion(
   if (versionId === undefined) {
     const object = await bucket.getObject(key);
 
-    return object === undefined
-      ? undefined
-      : { object, versionId: versions.current(key)?.versionId };
+    if (object === undefined) {
+      return undefined;
+    }
+
+    const current = versions.current(key);
+
+    return { object, versionId: current?.versionId, lock: current?.lock };
   }
 
   if (!versions.keepsVersions) {
@@ -61,7 +73,7 @@ export async function simS3ReadObjectVersion(
     );
   }
 
-  return { object: version.object, versionId };
+  return { object: version.object, versionId, lock: version.lock };
 }
 
 /**
@@ -81,5 +93,7 @@ async function simS3ReadUnversioned(
 
   const object = await bucket.getObject(key);
 
-  return object === undefined ? undefined : { object, versionId: undefined };
+  return object === undefined
+    ? undefined
+    : { object, versionId: undefined, lock: undefined };
 }
