@@ -22,6 +22,7 @@ import { SimLogsGetLogEvents } from "./command/event/sim-logs-get-log-events.js"
 import { SimLogsPutLogEvents } from "./command/event/sim-logs-put-log-events.js";
 import { SimLogsLogGroupCommands } from "./command/group/sim-logs-log-group-commands.js";
 import { SimLogsRetentionCommands } from "./command/group/sim-logs-retention-commands.js";
+import { SimLogsMetricFilterCommands } from "./command/metric/sim-logs-metric-filter-commands.js";
 import { SimLogsLogStreamCommands } from "./command/stream/sim-logs-log-stream-commands.js";
 import { SimLogsSubscriptionCommands } from "./command/subscription/sim-logs-subscription-commands.js";
 import { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
@@ -30,6 +31,11 @@ import {
   SimLogsNoSubscriptionDestinations,
   type SimLogsSubscriptionDestinations,
 } from "./subscription/sim-logs-subscription-destinations.js";
+import { SimLogsMetricFanOut } from "./metric/sim-logs-metric-fan-out.js";
+import {
+  SimLogsNoMetricPublications,
+  type SimLogsMetricPublications,
+} from "./metric/sim-logs-metric-publications.js";
 import { SimLogsSubscriptionFanOut } from "./subscription/sim-logs-subscription-fan-out.js";
 import { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -51,6 +57,13 @@ export interface SimLogsProperties {
    * takes any ARN, the way it always did.
    */
   readonly deliverySourceResources?: SimLogsDeliverySourceResources;
+
+  /**
+   * Where a metric filter's datapoints are published. A SimLogs built on its
+   * own has no simulated CloudWatch to write into, so it refuses a metric
+   * filter rather than holding one that publishes nowhere.
+   */
+  readonly metricPublications?: SimLogsMetricPublications;
 }
 
 /**
@@ -74,6 +87,8 @@ export class SimLogsCommands {
   readonly subscriptions: SimLogsSubscriptionCommands;
   readonly serviceWriter: SimLogsServiceWriter;
   readonly fanOut: SimLogsSubscriptionFanOut;
+  readonly metricFanOut: SimLogsMetricFanOut;
+  readonly metricFilters: SimLogsMetricFilterCommands;
   readonly deliverySourceStore: SimLogsDeliverySourceStore;
   readonly deliveryDestinationStore: SimLogsDeliveryDestinationStore;
   readonly deliveryStore: SimLogsDeliveryStore;
@@ -88,6 +103,7 @@ export class SimLogsCommands {
       background = new BackgroundTasks(),
       subscriptionDestinations = new SimLogsNoSubscriptionDestinations(),
       deliverySourceResources = new SimLogsUncheckedDeliverySourceResources(),
+      metricPublications = new SimLogsNoMetricPublications(),
     } = properties;
 
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
@@ -100,12 +116,17 @@ export class SimLogsCommands {
       accountRegionScope,
       background,
     });
+    const metricFanOut = new SimLogsMetricFanOut({
+      publications: metricPublications,
+      background,
+    });
 
     this.authorizer = authorizer;
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.groups = groups;
     this.fanOut = fanOut;
+    this.metricFanOut = metricFanOut;
     this.logGroups = new SimLogsLogGroupCommands({
       groups,
       authorizer,
@@ -123,6 +144,7 @@ export class SimLogsCommands {
       eventIds,
       clock: background,
       fanOut,
+      metricFanOut,
     });
     this.getLogEvents = new SimLogsGetLogEvents({ groups, authorizer });
     this.filterLogEvents = new SimLogsFilterLogEvents({ groups, authorizer });
@@ -132,11 +154,18 @@ export class SimLogsCommands {
       destinations: subscriptionDestinations,
       clock: background,
     });
+    this.metricFilters = new SimLogsMetricFilterCommands({
+      groups,
+      authorizer,
+      fanOut: metricFanOut,
+      clock: background,
+    });
     this.serviceWriter = new SimLogsServiceWriter({
       groups,
       eventIds,
       clock: background,
       fanOut,
+      metricFanOut,
     });
 
     const deliverySources = new SimLogsDeliverySourceStore();

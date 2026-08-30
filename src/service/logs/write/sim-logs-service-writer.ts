@@ -4,6 +4,7 @@ import type { SimLogsEventIds } from "../event/sim-logs-event-ids.js";
 import type { SimLogsLogGroup } from "../group/sim-logs-log-group.js";
 import type { SimLogsLogGroupStore } from "../group/sim-logs-log-group-store.js";
 import type { SimLogsLogStream } from "../stream/sim-logs-log-stream.js";
+import type { SimLogsMetricFanOut } from "../metric/sim-logs-metric-fan-out.js";
 import type { SimLogsSubscriptionFanOut } from "../subscription/sim-logs-subscription-fan-out.js";
 
 interface SimLogsServiceWriterProperties {
@@ -13,6 +14,9 @@ interface SimLogsServiceWriterProperties {
 
   /** Where events written here are handed on to subscription filters. */
   readonly fanOut: SimLogsSubscriptionFanOut;
+
+  /** Where events written here are handed on to metric filters. */
+  readonly metricFanOut: SimLogsMetricFanOut;
 }
 
 /**
@@ -34,12 +38,14 @@ export class SimLogsServiceWriter {
   readonly #eventIds: SimLogsEventIds;
   readonly #clock: SimClock;
   readonly #fanOut: SimLogsSubscriptionFanOut;
+  readonly #metricFanOut: SimLogsMetricFanOut;
 
   constructor(properties: SimLogsServiceWriterProperties) {
     this.#groups = properties.groups;
     this.#eventIds = properties.eventIds;
     this.#clock = properties.clock;
     this.#fanOut = properties.fanOut;
+    this.#metricFanOut = properties.metricFanOut;
   }
 
   /**
@@ -98,7 +104,10 @@ export class SimLogsServiceWriter {
       message,
     }));
 
+    const group = this.logGroup(logGroupName);
+
     stream.append(events, now);
-    this.#fanOut.written(this.logGroup(logGroupName), logStreamName, events);
+    this.#fanOut.written(group, logStreamName, events);
+    this.#metricFanOut.written(group, events);
   }
 }

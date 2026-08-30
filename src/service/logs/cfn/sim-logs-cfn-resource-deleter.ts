@@ -4,15 +4,18 @@ import type { SimLogsDeliveryDestination } from "../delivery/sim-logs-delivery-d
 import type { SimLogsDeliverySource } from "../delivery/sim-logs-delivery-source.js";
 import type { SimLogsDelivery } from "../delivery/sim-logs-delivery.js";
 import type { SimLogsLogGroup } from "../group/sim-logs-log-group.js";
+import type { SimLogsMetricFilter } from "../metric/sim-logs-metric-filter.js";
 import type { SimCfnDeliveryCreator } from "./delivery/sim-cfn-delivery-creator.js";
 import type { SimCfnDeliveryDestinationCreator } from "./delivery/sim-cfn-delivery-destination-creator.js";
 import type { SimCfnDeliverySourceCreator } from "./delivery/sim-cfn-delivery-source-creator.js";
 import type { SimCfnLogGroupCreator } from "./group/sim-cfn-log-group-creator.js";
+import type { SimCfnMetricFilterCreator } from "./metric/sim-cfn-metric-filter-creator.js";
 import { unsupportedSimLogsResourceType } from "./sim-logs-cfn-unsupported-resource.js";
 import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimLogsCfnResourceDeleterProperties {
   readonly logGroups: SimCfnLogGroupCreator;
+  readonly metricFilters: SimCfnMetricFilterCreator;
   readonly deliverySources: SimCfnDeliverySourceCreator;
   readonly deliveryDestinations: SimCfnDeliveryDestinationCreator;
   readonly deliveries: SimCfnDeliveryCreator;
@@ -43,6 +46,14 @@ export class SimLogsCfnResourceDeleter {
       case "LogGroup": {
         await this.#creators.logGroups.delete(
           created<SimLogsLogGroup>(resource),
+          options,
+        );
+
+        return;
+      }
+      case "MetricFilter": {
+        await this.#creators.metricFilters.delete(
+          created<SimLogsMetricFilter>(resource),
           options,
         );
 

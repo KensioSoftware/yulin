@@ -123,15 +123,15 @@ export class SimLogsLogGroupCommands {
 /**
  * What DescribeLogGroups reports about one log group.
  *
- * `metricFilterCount` is always zero: metric filters are a CloudWatch metrics
- * feature, and no simulated CloudWatch Logs operation here creates one.
+ * `metricFilterCount` is how many metric filters `PutMetricFilter` has put on
+ * the group.
  */
 function logGroupDetail(group: SimLogsLogGroup): SimLogsLogGroupDetail {
   return {
     logGroupName: group.logGroupName,
     creationTime: group.creationTime,
     retentionInDays: group.retentionInDays,
-    metricFilterCount: 0,
+    metricFilterCount: group.metricFilters.count,
     storedBytes: group.storedBytes,
     arn: group.arn,
     logGroupArn: group.logGroupArn,

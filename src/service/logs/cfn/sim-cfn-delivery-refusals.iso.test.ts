@@ -268,7 +268,7 @@ describe("AWS::Logs delivery Resource refusals", () => {
   });
 
   it("still records a CloudWatch Logs Resource type it has none for", async () => {
-    // Given a template declaring a delivery source and a metric filter.
+    // Given a template declaring a delivery source and a subscription filter.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "site-logging",
@@ -279,20 +279,27 @@ describe("AWS::Logs delivery Resource refusals", () => {
             Type: "AWS::Logs::DeliverySource",
             Properties: sourceProperties,
           },
-          SiteMetrics: {
-            Type: "AWS::Logs::MetricFilter",
-            Properties: { LogGroupName: "/site", FilterPattern: "ERROR" },
+          SiteErrors: {
+            Type: "AWS::Logs::SubscriptionFilter",
+            Properties: {
+              LogGroupName: "/site",
+              FilterPattern: "ERROR",
+              DestinationArn:
+                "arn:aws:lambda:eu-west-2:123456789012:function:t",
+            },
           },
         },
       },
     });
 
-    // Then the delivery source deploys and the metric filter is recorded as a
-    // gap, which is what adding delivery to this factory must not change.
+    // Then the delivery source deploys and the subscription filter is
+    // recorded as a gap, which is what adding delivery to this factory must
+    // not change.
     assertArrayLength(stack.skippedResources, 1);
     assertStringIncludes(
       stack.skippedResources.at(0)?.skippedReason ?? "",
-      "Unsupported sim CloudWatch Logs CloudFormation Resource MetricFilter",
+      "Unsupported sim CloudWatch Logs CloudFormation Resource " +
+        "SubscriptionFilter",
     );
   });
 });

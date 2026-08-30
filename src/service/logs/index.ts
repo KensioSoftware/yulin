@@ -24,6 +24,21 @@ export {
 } from "./event/sim-logs-event.js";
 export { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
 export { SimLogsFilterPattern } from "./event/sim-logs-filter-pattern.js";
+export { SimLogsMetricFilter } from "./metric/sim-logs-metric-filter.js";
+export { SimLogsMetricFilterStore } from "./metric/sim-logs-metric-filter-store.js";
+export {
+  SimLogsMetricTransformation,
+  simLogsMaximumMetricDimensions,
+} from "./metric/sim-logs-metric-transformation.js";
+export type {
+  SimLogsMetricDatapoint,
+  SimLogsMetricDimension,
+} from "./metric/sim-logs-metric-datapoint.js";
+export type { SimLogsMetricPublicationFailure } from "./metric/sim-logs-metric-fan-out.js";
+export {
+  SimLogsNoMetricPublications,
+  type SimLogsMetricPublications,
+} from "./metric/sim-logs-metric-publications.js";
 export { simLogsStandardLogGroupClass } from "./command/group/sim-logs-unsimulated-group-input.js";
 export { SimLogsDeliverySource } from "./delivery/sim-logs-delivery-source.js";
 export { SimLogsDeliveryDestination } from "./delivery/sim-logs-delivery-destination.js";

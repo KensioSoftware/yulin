@@ -13,6 +13,9 @@ import {
   PutSubscriptionFilterCommand,
   DescribeSubscriptionFiltersCommand,
   DeleteSubscriptionFilterCommand,
+  PutMetricFilterCommand,
+  DescribeMetricFiltersCommand,
+  DeleteMetricFilterCommand,
   CreateDeliveryCommand,
   DeleteDeliveryCommand,
   DeleteDeliveryDestinationCommand,
@@ -68,6 +71,9 @@ describe("SimLogsSdkCommandRouter", () => {
       "PutSubscriptionFilterCommand",
       "DescribeSubscriptionFiltersCommand",
       "DeleteSubscriptionFilterCommand",
+      "PutMetricFilterCommand",
+      "DescribeMetricFiltersCommand",
+      "DeleteMetricFilterCommand",
       "PutDeliverySourceCommand",
       "DescribeDeliverySourcesCommand",
       "DeleteDeliverySourceCommand",
@@ -213,11 +219,47 @@ describe("CloudWatch Logs SDK interception", () => {
       }),
     );
 
+    await client.send(
+      new PutMetricFilterCommand({
+        logGroupName: "/aws/lambda/billing",
+        filterName: "billing-errors",
+        filterPattern: "ERROR",
+        metricTransformations: [
+          {
+            metricNamespace: "Billing",
+            metricName: "Errors",
+            metricValue: "1",
+          },
+        ],
+      }),
+    );
+    const metricFilters = await client.send(
+      new DescribeMetricFiltersCommand({
+        logGroupName: "/aws/lambda/billing",
+      }),
+    );
+    await client.send(
+      new DeleteMetricFilterCommand({
+        logGroupName: "/aws/lambda/billing",
+        filterName: "billing-errors",
+      }),
+    );
+    const afterDeleteMetricFilters = await client.send(
+      new DescribeMetricFiltersCommand({
+        logGroupName: "/aws/lambda/billing",
+      }),
+    );
+
     assertArrayEquals(
       filters.subscriptionFilters?.map((filter) => filter.filterName),
       ["errors"],
     );
     assertArrayLength(afterDeleteFilters.subscriptionFilters ?? [], 0);
+    assertArrayEquals(
+      metricFilters.metricFilters?.map((filter) => filter.filterName),
+      ["billing-errors"],
+    );
+    assertArrayLength(afterDeleteMetricFilters.metricFilters ?? [], 0);
 
     // Then each one reached simulated CloudWatch Logs.
     assertIdentical(withRetention.logGroups?.at(0)?.retentionInDays, 14);

@@ -9,6 +9,7 @@ import {
   type SimLogsProperties,
 } from "./sim-logs-commands.js";
 import { SimLogsDeliveryOperations } from "./sim-logs-delivery-operations.js";
+import type { SimLogsMetricPublicationFailure } from "./metric/sim-logs-metric-fan-out.js";
 import type { SimLogsSubscriptionFailure } from "./subscription/sim-logs-subscription-fan-out.js";
 import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -237,6 +238,50 @@ export class SimLogs extends SimLogsDeliveryOperations {
       command,
       options,
     );
+  }
+
+  /**
+   * Every metric filter publication this scope could not make.
+   *
+   * A failed publication is invisible in an account, where it becomes a metric
+   * nobody is watching. Keeping it is what lets a test find out that the
+   * metric filter it set up never wrote a datapoint.
+   */
+  get metricFilterFailures(): readonly SimLogsMetricPublicationFailure[] {
+    return this.commands.metricFanOut.failures;
+  }
+
+  /**
+   * Handle a PutMetricFilter Command from the SDK.
+   */
+  async putMetricFilter(
+    command: simLogsCommands.SimPutMetricFilterCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimPutMetricFilterCommandOutput> {
+    await this.commands.background.sequence();
+    return await this.commands.metricFilters.putMetricFilter(command, options);
+  }
+
+  /**
+   * Handle a DescribeMetricFilters Command from the SDK.
+   */
+  async describeMetricFilters(
+    command: simLogsCommands.SimDescribeMetricFiltersCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimDescribeMetricFiltersCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.metricFilters.describeMetricFilters(command, options);
+  }
+
+  /**
+   * Handle a DeleteMetricFilter Command from the SDK.
+   */
+  async deleteMetricFilter(
+    command: simLogsCommands.SimDeleteMetricFilterCommand,
+    options?: SimLogsRequestOptions,
+  ): Promise<simLogsCommands.SimDeleteMetricFilterCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.metricFilters.deleteMetricFilter(command, options);
   }
 
   /**

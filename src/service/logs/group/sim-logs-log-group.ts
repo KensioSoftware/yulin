@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimLogsLogStream } from "../stream/sim-logs-log-stream.js";
 import { SimLogsLogStreamStore } from "../stream/sim-logs-log-stream-store.js";
+import { SimLogsMetricFilterStore } from "../metric/sim-logs-metric-filter-store.js";
 import { SimLogsSubscriptionFilterStore } from "../subscription/sim-logs-subscription-filter-store.js";
 import {
   simLogsLogGroupArn,
@@ -33,6 +34,12 @@ export class SimLogsLogGroup {
    * written to it onward.
    */
   readonly subscriptionFilters = new SimLogsSubscriptionFilterStore();
+
+  /**
+   * The metric filters watching this group, which turn what is written to it
+   * into CloudWatch metric datapoints.
+   */
+  readonly metricFilters = new SimLogsMetricFilterStore();
 
   readonly #streams: SimLogsLogStreamStore;
   #retentionInDays: number | undefined;

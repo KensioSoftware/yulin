@@ -188,22 +188,23 @@ describe("AWS::Logs::LogGroup", () => {
 
     // When a Resource type this simulation has none for is created or deleted.
     const created = await assertThrowsErrorAsync(async () =>
-      factory.create("MetricFilter", {} as never, {} as never),
+      factory.create("SubscriptionFilter", {} as never, {} as never),
     );
     const deleted = await assertThrowsErrorAsync(async () =>
-      factory.delete("MetricFilter", {} as never, {} as never),
+      factory.delete("SubscriptionFilter", {} as never, {} as never),
     );
 
     // Then both are reported as unsupported, which the Stack records as a
     // skip rather than a failure.
     assertIdentical(
       created.message,
-      "Unsupported sim CloudWatch Logs CloudFormation Resource MetricFilter",
+      "Unsupported sim CloudWatch Logs CloudFormation Resource " +
+        "SubscriptionFilter",
     );
     assertIdentical(
       deleted.message,
-      "Unsupported sim CloudWatch Logs CloudFormation Resource MetricFilter " +
-        "deletion",
+      "Unsupported sim CloudWatch Logs CloudFormation Resource " +
+        "SubscriptionFilter deletion",
     );
   });
 
