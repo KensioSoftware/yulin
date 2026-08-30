@@ -3401,9 +3401,11 @@ Three things are still refused outright, and fail the Resource:
 - A value the simulated service itself refuses, in the same words an SDK caller gets. An
   `AWS::SQS::Queue` with `FifoQueue: true` is one. A FIFO queue is named `<name>.fifo`, which
   simulated SQS refuses, leaving no queue to create under the name the template gave it.
-- A value real AWS answers with a 400, on a property that is skipped. The property is still recorded
-  and nothing acts on it, and what it says is read far enough to catch a template CloudFormation
-  will reject. An `AWS::S3::Bucket` `ReplicationConfiguration` is the one that does this today. See
+- A value real AWS answers with a 400, on a property that is skipped. Nothing acts on the property
+  either way, and what it says is read far enough to catch a template CloudFormation will reject. A
+  value that passes is recorded like any other skipped property. One that fails takes the Resource
+  with it, before anything is recorded against it. An `AWS::S3::Bucket` `ReplicationConfiguration`
+  is the one that does this today. See
   [Buckets from CloudFormation](https://yulinsim.dev/services/s3/#buckets-from-cloudformation "Buckets from CloudFormation").
 
 Properties nothing simulated could tell apart are left off the list. There is no simulated KMS and
