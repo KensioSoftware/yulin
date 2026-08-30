@@ -1,4 +1,9 @@
+import type {
+  SimCfnSkippedPropertyRule,
+  SimCfnSkippedPropertyRules,
+} from "../../../cloudformation/resource/ignore/sim-cfn-skipped-property.type.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { validateSimCfnSqsKmsDataKeyReusePeriod } from "./sim-cfn-sqs-queue-encryption-rules.js";
 
 /**
  * The AWS::SQS::Queue properties carrying a queue attribute of the same name.
@@ -26,14 +31,24 @@ export const attributePropertyNames: ReadonlySet<string> = new Set([
  * The queue is created without them and each one is recorded against the
  * Resource. A test reads the record to find out what the queue it deployed
  * behaves differently to AWS about.
+ *
+ * A property whose value real SQS answers with a 400 states what it has to
+ * satisfy here as well. Nothing acts on the value either way, and reading it
+ * this far is what keeps a template AWS refuses from deploying.
  */
-export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
+export const unsimulatedPropertyReasons: SimCfnSkippedPropertyRules = new Map<
+  string,
+  SimCfnSkippedPropertyRule | string
+>([
   ["ContentBasedDeduplication", "only standard queues are simulated"],
   ["DeduplicationScope", "only standard queues are simulated"],
   ["FifoThroughputLimit", "only standard queues are simulated"],
   [
     "KmsDataKeyReusePeriodSeconds",
-    "simulated SQS does not encrypt message bodies",
+    {
+      reason: "simulated SQS does not encrypt message bodies",
+      constraint: validateSimCfnSqsKmsDataKeyReusePeriod,
+    },
   ],
   ["KmsMasterKeyId", "simulated SQS does not encrypt message bodies"],
   [

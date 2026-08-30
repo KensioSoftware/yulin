@@ -1,7 +1,7 @@
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
+import { SimCfnSkippedProperties } from "../../../cloudformation/resource/ignore/sim-cfn-skipped-properties.js";
 import { s3BucketResourceError } from "./error/sim-cfn-s3-bucket-error.js";
-import { validateSimCfnS3BucketReplication } from "./replication/sim-cfn-s3-bucket-replication-rules.js";
 import {
   inertPropertyNames,
   simulatedPropertyNames,
@@ -35,11 +35,17 @@ export class SimCfnS3BucketPropertyRules {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
   private readonly ignorer: SimCfnPropertyIgnorer;
+  private readonly skipped: SimCfnSkippedProperties;
 
   constructor(properties: SimCfnS3BucketPropertyRulesProperties) {
     this.logicalId = properties.logicalId;
     this.properties = properties.properties;
     this.ignorer = properties.ignorer;
+    this.skipped = new SimCfnSkippedProperties({
+      rules: unsimulatedPropertyReasons,
+      properties: this.properties,
+      error: (reason): Error => s3BucketResourceError(this.logicalId, reason),
+    });
   }
 
   /**
@@ -48,7 +54,7 @@ export class SimCfnS3BucketPropertyRules {
    */
   apply(): void {
     this.refuseUnusableBucketName();
-    validateSimCfnS3BucketReplication(this.logicalId, this.properties);
+    this.skipped.assertConstraints();
 
     for (const name of Object.keys(this.properties)) {
       this.applyToProperty(name);
@@ -81,7 +87,7 @@ export class SimCfnS3BucketPropertyRules {
       return;
     }
 
-    const unsimulatedReason = unsimulatedPropertyReasons.get(name);
+    const unsimulatedReason = this.skipped.reasonFor(name);
 
     if (unsimulatedReason !== undefined) {
       this.ignorer.ignoreProperty(

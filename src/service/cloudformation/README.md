@@ -594,6 +594,38 @@ shared provider's `Layers`, which is why a Layer is recognised on being a Layer 
 Keeping the two lists apart is the whole point. `stack.skippedResources` is what a test would find
 missing; running the deliberate omissions in with the gaps is how the gaps stop being findable.
 
+## Properties a Resource was created without
+
+`resource/ignore/` holds the level below a skipped Resource. A service that cannot act on one
+property of a Resource it otherwise creates records the omission through `SimCfnPropertyIgnorer`,
+and `SimCfnIgnoredProperties` collects them for the Resource and the stack. The Resource still
+deploys, because a Bucket without its access logging is a usable Bucket, and the record is what
+lets a test find out that the setting was never applied.
+
+`SimCfnSkippedProperties` is the seam a service reaches that through. It is built from the map a
+service already keeps of the properties it skips, the Resource's declared properties, and the error
+builder that service refuses its own Resources with. Two things come off it. `reasonFor(name)` is
+the lookup the recording loop already did, and `assertConstraints()` is the part worth adding.
+
+A skipped property can carry a value real AWS answers with a 400 as readily as a simulated one can.
+Deploying it here reports a template AWS refuses as working, which is the one failure a local deploy
+of a real template exists to catch. So a service states what such a value has to satisfy beside the
+reason it skips it. That entry becomes a `SimCfnSkippedPropertyRule`, and the constraint on it runs
+wherever the property is recorded. Both shapes live in the one map, so a service with nothing to
+check keeps its plain strings.
+
+A constraint reads the whole Resource rather than its own value alone, because the constraints AWS
+enforces on a property it is not acting on are usually about a second one. It refuses through the
+`refuse` handed to it, which keeps the wording the service's. That matters here more than it looks.
+Sim CloudFormation downgrades a failure reading as an unsupported Resource type into a skip, and a
+skipped Resource would deploy the very template the constraint exists to refuse.
+
+Every constraint runs before anything is recorded, so a Resource failing one leaves no half-written
+list of what it was created without.
+
+`AWS::S3::Bucket` `ReplicationConfiguration` and `AWS::SQS::Queue` `KmsDataKeyReusePeriodSeconds`
+are the two through the seam today.
+
 ## Resource teardown loop
 
 `SimCfnStackResourceDeleter` owns the reverse-dependency-ordered deletion loop, and mirrors

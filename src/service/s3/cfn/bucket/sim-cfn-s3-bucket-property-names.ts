@@ -26,6 +26,12 @@ export const inertPropertyNames: ReadonlySet<string> = new Set([
   "Tags",
 ]);
 
+import type {
+  SimCfnSkippedPropertyRule,
+  SimCfnSkippedPropertyRules,
+} from "../../../cloudformation/resource/ignore/sim-cfn-skipped-property.type.js";
+import { validateSimCfnS3BucketReplication } from "./replication/sim-cfn-s3-bucket-replication-rules.js";
+
 /**
  * Real AWS::S3::Bucket properties this simulation does not model, with what
  * each of them would have changed.
@@ -34,8 +40,15 @@ export const inertPropertyNames: ReadonlySet<string> = new Set([
  * Resource. A Bucket declaring replication, for instance, copies nothing to
  * the Bucket it names, so a test expecting an Object to arrive there needs to
  * find out that nothing was ever going to send it.
+ *
+ * A property whose value real S3 answers with a 400 states what it has to
+ * satisfy here as well. Nothing acts on the value either way, and reading it
+ * this far is what keeps a template AWS refuses from deploying.
  */
-export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
+export const unsimulatedPropertyReasons: SimCfnSkippedPropertyRules = new Map<
+  string,
+  SimCfnSkippedPropertyRule | string
+>([
   ["AbacStatus", "attribute-based access control is not simulated"],
   ["AccelerateConfiguration", "transfer acceleration is not simulated"],
   [
@@ -60,5 +73,11 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["MetadataTableConfiguration", "Bucket metadata tables are not simulated"],
   ["MetricsConfigurations", "CloudWatch request metrics are not simulated"],
   ["OwnershipControls", "Object ownership and ACLs are not simulated"],
-  ["ReplicationConfiguration", "Bucket replication is not simulated"],
+  [
+    "ReplicationConfiguration",
+    {
+      reason: "Bucket replication is not simulated",
+      constraint: validateSimCfnS3BucketReplication,
+    },
+  ],
 ]);

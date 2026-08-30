@@ -1,9 +1,6 @@
 import { isRecord } from "../../../../../util/type-guard/record.js";
-import type {
-  SimCfnTemplateValue,
-  SimCfnTemplateValueRecord,
-} from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { s3BucketResourceError } from "../error/sim-cfn-s3-bucket-error.js";
+import type { SimCfnSkippedPropertyValue } from "../../../../cloudformation/resource/ignore/sim-cfn-skipped-property.type.js";
+import type { SimCfnTemplateValue } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
  * The AWS::S3::Bucket ReplicationConfiguration constraints real S3 enforces.
@@ -18,27 +15,30 @@ import { s3BucketResourceError } from "../error/sim-cfn-s3-bucket-error.js";
  * These are the constraints the S3 API documents and the CloudFormation
  * Resource schema leaves out, so cfn-lint passes a template failing any of
  * them.
+ *
+ * Attached to the property in `unsimulatedPropertyReasons`, so it runs
+ * wherever a skipped AWS::S3::Bucket property is recorded rather than from a
+ * call site of its own.
  */
 export function validateSimCfnS3BucketReplication(
-  logicalId: string,
-  properties: SimCfnTemplateValueRecord,
+  declared: SimCfnSkippedPropertyValue,
 ): void {
-  const declared = properties["ReplicationConfiguration"];
+  const configuration = declared.value;
 
-  if (!isRecord(declared)) {
+  if (!isRecord(configuration)) {
     return;
   }
 
-  refuseUnversionedSource(logicalId, properties);
+  refuseUnversionedSource(declared);
 
-  const rules = declared["Rules"];
+  const rules = configuration["Rules"];
 
   if (!Array.isArray(rules)) {
     return;
   }
 
   rules.forEach((rule, index) => {
-    validateRule(logicalId, rule, `ReplicationConfiguration Rules[${index}]`);
+    validateRule(declared, rule, `ReplicationConfiguration Rules[${index}]`);
   });
 }
 
@@ -52,34 +52,30 @@ export function validateSimCfnS3BucketReplication(
  * Bucket ARN that may belong to another Stack or another Account, so there is
  * nothing here to read it from at all.
  */
-function refuseUnversionedSource(
-  logicalId: string,
-  properties: SimCfnTemplateValueRecord,
-): void {
-  const versioning = properties["VersioningConfiguration"];
+function refuseUnversionedSource(declared: SimCfnSkippedPropertyValue): void {
+  const versioning = declared.properties["VersioningConfiguration"];
 
   if (isRecord(versioning) && versioning["Status"] === "Enabled") {
     return;
   }
 
-  throw s3BucketResourceError(
-    logicalId,
+  declared.refuse(
     "Versioning must be Enabled on the Bucket to apply a " +
       "ReplicationConfiguration",
   );
 }
 
 function validateRule(
-  logicalId: string,
-  declared: SimCfnTemplateValue,
+  declared: SimCfnSkippedPropertyValue,
+  rule: SimCfnTemplateValue,
   path: string,
 ): void {
-  if (!isRecord(declared)) {
+  if (!isRecord(rule)) {
     return;
   }
 
-  refuseEventThresholdWithoutReplicationTime(logicalId, declared, path);
-  refuseFilterWithoutItsCompanions(logicalId, declared, path);
+  refuseEventThresholdWithoutReplicationTime(declared, rule, path);
+  refuseFilterWithoutItsCompanions(declared, rule, path);
 }
 
 /**
@@ -93,8 +89,8 @@ function validateRule(
  * an ordinary L2 call.
  */
 function refuseEventThresholdWithoutReplicationTime(
-  logicalId: string,
-  rule: SimCfnTemplateValueRecord,
+  declared: SimCfnSkippedPropertyValue,
+  rule: Readonly<Record<string, SimCfnTemplateValue>>,
   path: string,
 ): void {
   const destination = rule["Destination"];
@@ -115,8 +111,7 @@ function refuseEventThresholdWithoutReplicationTime(
     return;
   }
 
-  throw s3BucketResourceError(
-    logicalId,
+  declared.refuse(
     `${path} Destination Metrics cannot contain an event threshold when ` +
       "ReplicationTime is not specified or Disabled",
   );
@@ -130,8 +125,8 @@ function refuseEventThresholdWithoutReplicationTime(
  * none of them, so the check is on `Filter` rather than on the rule.
  */
 function refuseFilterWithoutItsCompanions(
-  logicalId: string,
-  rule: SimCfnTemplateValueRecord,
+  declared: SimCfnSkippedPropertyValue,
+  rule: Readonly<Record<string, SimCfnTemplateValue>>,
   path: string,
 ): void {
   if (rule["Filter"] === undefined) {
@@ -150,8 +145,7 @@ function refuseFilterWithoutItsCompanions(
     return;
   }
 
-  throw s3BucketResourceError(
-    logicalId,
+  declared.refuse(
     `${path} states a Filter, which requires ${missing.join(", ")} as well`,
   );
 }
