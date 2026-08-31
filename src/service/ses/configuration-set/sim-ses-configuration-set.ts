@@ -73,7 +73,8 @@ export class SimSesConfigurationSet {
    *
    * Undefined where the set declares no `SuppressionOptions`, which makes a
    * send fall back to the account setting. An empty list is an explicit
-   * override that disables suppression for a send through this set.
+   * override that disables suppression for feedback recorded for a message
+   * sent through this set.
    */
   public readonly suppressedReasons:
     | readonly SimSesSuppressedReason[]
