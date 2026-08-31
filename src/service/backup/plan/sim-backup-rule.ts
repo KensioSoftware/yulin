@@ -40,7 +40,7 @@ export function readBackupRules(
 function readBackupRule(input: SimBackupRuleInput): SimBackupRule {
   const schedule = input.ScheduleExpression ?? defaultBackupScheduleExpression;
   validateSchedule(schedule);
-  validateLifecycle(input);
+  const lifecycle = readBackupLifecycle(input.Lifecycle);
 
   return {
     RuleId: randomUUID(),
@@ -50,8 +50,7 @@ function readBackupRule(input: SimBackupRuleInput): SimBackupRule {
       "TargetBackupVaultName",
     ),
     ScheduleExpression: schedule,
-    Lifecycle:
-      input.Lifecycle === undefined ? undefined : { ...input.Lifecycle },
+    Lifecycle: lifecycle,
   };
 }
 
@@ -68,10 +67,34 @@ function validateSchedule(schedule: string): void {
 }
 
 /** Enforces the relationship between cold storage and deletion. */
-function validateLifecycle(input: SimBackupRuleInput): void {
-  const coldAfter = input.Lifecycle?.MoveToColdStorageAfterDays;
-  const deleteAfter = input.Lifecycle?.DeleteAfterDays;
+export function readBackupLifecycle(
+  lifecycle: SimBackupRuleInput["Lifecycle"],
+): SimBackupRuleInput["Lifecycle"] {
+  const coldAfter = lifecycle?.MoveToColdStorageAfterDays;
+  const deleteAfter = lifecycle?.DeleteAfterDays;
   const retainedIndefinitely = coldAfter === -1 && deleteAfter === -1;
+
+  for (const [name, days] of [
+    ["MoveToColdStorageAfterDays", coldAfter],
+    ["DeleteAfterDays", deleteAfter],
+  ] as const) {
+    if (
+      days !== undefined &&
+      days !== -1 &&
+      (!Number.isSafeInteger(days) || days < 1 || days > 36_500)
+    ) {
+      throw new SimBackupInvalidParameterValueException(
+        `${name} must be between 1 and 36500`,
+      );
+    }
+  }
+
+  if (!retainedIndefinitely && (coldAfter === -1 || deleteAfter === -1)) {
+    throw new SimBackupInvalidParameterValueException(
+      "MoveToColdStorageAfterDays and DeleteAfterDays must both be -1",
+    );
+  }
+
   if (
     !retainedIndefinitely &&
     coldAfter !== undefined &&
@@ -82,4 +105,6 @@ function validateLifecycle(input: SimBackupRuleInput): void {
       "DeleteAfterDays must be at least 90 days after MoveToColdStorageAfterDays",
     );
   }
+
+  return lifecycle === undefined ? undefined : { ...lifecycle };
 }

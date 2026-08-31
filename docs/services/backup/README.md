@@ -1,8 +1,7 @@
 # Simulated AWS Backup
 
-Yulin includes simulated AWS Backup vaults, plans and selections for tests and local development.
-The simulation stores backup configuration. Backup jobs and recovery points are outside it.
-AWS Backup types are imported from the `@kensio/yulin/backup` subpath.
+Yulin includes simulated AWS Backup vaults, plans, selections, backup jobs and recovery points for
+tests and local development. AWS Backup types are imported from the `@kensio/yulin/backup` subpath.
 
 ## Creating a vault, plan and selection
 
@@ -86,6 +85,137 @@ are validated when the plan is created. A one-time `at(...)` expression is refus
 `MoveToColdStorageAfterDays` can be combined with `DeleteAfterDays`. The deletion must be at least
 90 days after the move to cold storage. A shorter lifecycle raises
 `InvalidParameterValueException`. Set both values to `-1` to retain recovery points indefinitely.
+
+## Running scheduled backups
+
+Each plan rule runs on the simulated clock. A due rule creates one recovery point for each distinct
+resource ARN in the plan's selections. The recovery point records the rule, resource ARN, lifecycle
+and creation time. The simulation completes backup jobs at the scheduled instant.
+
+```typescript sim-backup-run-schedule
+/**
+ * Advancing a plan through its next scheduled backup.
+ */
+
+import {
+  CreateBackupPlanCommand,
+  CreateBackupSelectionCommand,
+  CreateBackupVaultCommand,
+  ListBackupJobsCommand,
+  ListRecoveryPointsByBackupVaultCommand,
+} from "@aws-sdk/client-backup";
+import { assertArrayLength, assertNonNullable } from "@kensio/smartass";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-08-31T09:30:00.000Z")),
+});
+const backup = simAws.backup();
+
+await backup.createBackupVault(
+  new CreateBackupVaultCommand({ BackupVaultName: "application-backups" }),
+);
+const createdPlan = await backup.createBackupPlan(
+  new CreateBackupPlanCommand({
+    BackupPlan: {
+      BackupPlanName: "application-plan",
+      Rules: [
+        {
+          RuleName: "hourly",
+          TargetBackupVaultName: "application-backups",
+          ScheduleExpression: "rate(1 hour)",
+          Lifecycle: { DeleteAfterDays: 35 },
+        },
+      ],
+    },
+  }),
+);
+assertNonNullable(createdPlan.BackupPlanId);
+await backup.createBackupSelection(
+  new CreateBackupSelectionCommand({
+    BackupPlanId: createdPlan.BackupPlanId,
+    BackupSelection: {
+      SelectionName: "orders",
+      IamRoleArn: "arn:aws:iam::888888888888:role/BackupRole",
+      Resources: ["arn:aws:dynamodb:us-east-1:888888888888:table/orders"],
+    },
+  }),
+);
+
+await simAws.clock().advanceBy({ hours: 1 });
+
+const stored = backup.vault("application-backups").recoveryPoints();
+assertArrayLength(stored, 1);
+console.log(stored[0].creationDate.toISOString());
+// "2026-08-31T10:30:00.000Z"
+
+const points = await backup.listRecoveryPointsByBackupVault(
+  new ListRecoveryPointsByBackupVaultCommand({
+    BackupVaultName: "application-backups",
+  }),
+);
+const jobs = await backup.listBackupJobs(new ListBackupJobsCommand({}));
+console.log(points.RecoveryPoints?.[0]?.ResourceArn);
+// "arn:aws:dynamodb:us-east-1:888888888888:table/orders"
+console.log(jobs.BackupJobs?.[0]?.State); // "COMPLETED"
+```
+
+`DeleteAfterDays` removes a recovery point when the clock reaches its deletion time. Vault reads,
+`ListRecoveryPointsByBackupVault` and `DescribeRecoveryPoint` apply the expiry before returning.
+Repeated schedules keep every unexpired recovery point.
+
+Vault Lock bounds apply when a backup starts. A lifecycle shorter than `MinRetentionDays`, longer
+than `MaxRetentionDays` or indefinite under a finite maximum produces a `FAILED` backup job. The
+vault receives no recovery point for that job. Use `ListBackupJobs` or `DescribeBackupJob` to read
+the failure and its `StatusMessage`.
+
+## Starting an on-demand backup
+
+`StartBackupJob` completes an on-demand job at the current simulated time. It applies the same
+lifecycle validation and Vault Lock bounds as a scheduled rule.
+
+```typescript sim-backup-start-job
+/**
+ * Creating an on-demand recovery point.
+ */
+
+import {
+  CreateBackupVaultCommand,
+  DescribeRecoveryPointCommand,
+  StartBackupJobCommand,
+} from "@aws-sdk/client-backup";
+import { assertNonNullable } from "@kensio/smartass";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-08-31T12:00:00.000Z")),
+});
+const backup = simAws.backup();
+await backup.createBackupVault(
+  new CreateBackupVaultCommand({ BackupVaultName: "manual-backups" }),
+);
+
+const started = await backup.startBackupJob(
+  new StartBackupJobCommand({
+    BackupVaultName: "manual-backups",
+    ResourceArn: "arn:aws:s3:::application-files",
+    IamRoleArn: "arn:aws:iam::888888888888:role/BackupRole",
+    Lifecycle: { DeleteAfterDays: 14 },
+  }),
+);
+assertNonNullable(started.RecoveryPointArn);
+
+const point = await backup.describeRecoveryPoint(
+  new DescribeRecoveryPointCommand({
+    BackupVaultName: "manual-backups",
+    RecoveryPointArn: started.RecoveryPointArn,
+  }),
+);
+console.log(point.CreationDate?.toISOString());
+// "2026-08-31T12:00:00.000Z"
+```
 
 ## Vault Lock
 
@@ -248,7 +378,8 @@ Stack teardown removes all three resource types from the simulation.
 
 Every supported operation is authorized by simulated IAM. Vault operations use the vault ARN. Plan
 and selection operations use the plan ARN. `ListBackupVaults` has no resource in its request and is
-authorized against `*`.
+authorized against `*`. `StartBackupJob` and `ListRecoveryPointsByBackupVault` use the vault ARN.
+`DescribeRecoveryPoint` uses the recovery point ARN. Backup job reads use `*`.
 
 ```typescript sim-backup-iam-policy
 /**
@@ -388,6 +519,11 @@ console.log(inVirginia.BackupVaultList?.length); // 0
   time.
 - `CreateBackupPlan` and `GetBackupPlan`, with rule schedule and lifecycle validation.
 - `CreateBackupSelection`, `GetBackupSelection` and `ListBackupSelections`.
+- Scheduled backup jobs driven by `simAws.clock()` and the plan rule schedule.
+- `StartBackupJob`, `ListBackupJobs` and `DescribeBackupJob`.
+- `ListRecoveryPointsByBackupVault`, `DescribeRecoveryPoint` and
+  `simAws.backup().vault(name).recoveryPoints()`.
+- Recovery point expiry from `DeleteAfterDays` and Vault Lock retention checks.
 - IAM authorization for every supported command.
 - SDK interception of `BackupClient`.
 - Account and Region scoped state, ARNs and timestamps.
@@ -396,10 +532,13 @@ console.log(inVirginia.BackupVaultList?.length); // 0
 
 ## Limitations
 
-- Backup jobs, recovery point copies, restores and expiry are outside the simulation.
-- A vault always reports `NumberOfRecoveryPoints` as zero. Vault deletion always sees an empty
-  vault.
-- A plan schedule is parsed and stored. Advancing simulated time leaves it unchanged.
+- Recovery point copies and restores are outside the simulation.
+- Backup jobs complete immediately at their scheduled or requested simulated instant. Start and
+  completion windows are accepted by the SDK types and ignored by the simulation.
+- Cold-storage lifecycle values are recorded. Recovery points stay in one storage state.
+- Overlapping plan rules are evaluated independently. AWS Backup's overlapping-window optimisation
+  is outside the simulation.
+- Vault deletion removes the vault and its recovery points.
 - A selection stores its `Resources`. `Conditions`, `ListOfTags` and wildcard resource matching are
   outside the selection model.
 - The selection's `IamRoleArn` is stored. No backup job assumes it, and creating a selection does

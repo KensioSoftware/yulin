@@ -72,6 +72,36 @@ export class SimBackupSdkCommandRouter implements SimSdkCommandRouter {
           options,
         ),
       ),
+      route("StartBackupJobCommand", (command, options) =>
+        backup.startBackupJob(
+          command as commands.SimStartBackupJobCommand,
+          options,
+        ),
+      ),
+      route("DescribeBackupJobCommand", (command, options) =>
+        backup.describeBackupJob(
+          command as commands.SimDescribeBackupJobCommand,
+          options,
+        ),
+      ),
+      route("ListBackupJobsCommand", (command, options) =>
+        backup.listBackupJobs(
+          command as commands.SimListBackupJobsCommand,
+          options,
+        ),
+      ),
+      route("ListRecoveryPointsByBackupVaultCommand", (command, options) =>
+        backup.listRecoveryPointsByBackupVault(
+          command as commands.SimListRecoveryPointsByBackupVaultCommand,
+          options,
+        ),
+      ),
+      route("DescribeRecoveryPointCommand", (command, options) =>
+        backup.describeRecoveryPoint(
+          command as commands.SimDescribeRecoveryPointCommand,
+          options,
+        ),
+      ),
     ]);
   }
 
