@@ -17,6 +17,7 @@ export {
   SimBackupAlreadyExistsException,
   SimBackupError,
   SimBackupInvalidParameterValueException,
+  SimBackupInvalidRequestException,
   SimBackupMissingParameterValueException,
   SimBackupResourceNotFoundException,
 } from "./error/sim-backup.error.js";

@@ -4,6 +4,7 @@ import type {
 } from "../command/sim-backup-command.types.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimBackupLifecycle } from "../command/sim-backup-command.types.js";
+import { SimBackupInvalidRequestException } from "../error/sim-backup.error.js";
 import type { SimBackupRecoveryPoint } from "../recovery-point/sim-backup-recovery-point.js";
 import { describeBackupVault } from "./sim-backup-vault-description.js";
 import {
@@ -74,6 +75,14 @@ export class SimBackupVault {
 
   recoveryPoint(arn: string): SimBackupRecoveryPoint | undefined {
     return this.points.find(arn);
+  }
+
+  assertEmpty(): void {
+    if (this.recoveryPoints().length > 0) {
+      throw new SimBackupInvalidRequestException(
+        `Backup vault ${this.name} cannot be deleted while it contains recovery points`,
+      );
+    }
   }
 
   lifecycleRefusal(

@@ -12,6 +12,7 @@ export class SimBackupStore {
   private readonly plans = new Map<string, SimBackupPlan>();
   private readonly selections = new Map<string, SimBackupSelection>();
   private readonly jobs = new Map<string, SimBackupJob>();
+  private readonly jobsByIdempotencyToken = new Map<string, SimBackupJob>();
 
   addVault(vault: SimBackupVault): void {
     if (this.vaults.has(vault.name)) {
@@ -88,12 +89,19 @@ export class SimBackupStore {
     this.selections.delete(id);
   }
 
-  addJob(job: SimBackupJob): void {
+  addJob(job: SimBackupJob, idempotencyToken?: string): void {
     this.jobs.set(job.id, job);
+    if (idempotencyToken !== undefined) {
+      this.jobsByIdempotencyToken.set(idempotencyToken, job);
+    }
   }
 
   job(id: string): SimBackupJob | undefined {
     return this.jobs.get(id);
+  }
+
+  jobByIdempotencyToken(token: string): SimBackupJob | undefined {
+    return this.jobsByIdempotencyToken.get(token);
   }
 
   allJobs(): MapIterator<SimBackupJob> {

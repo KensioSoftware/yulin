@@ -83,6 +83,7 @@ export class SimBackupConfigurationCommands {
       command.input.BackupVaultName,
       options,
     );
+    vault.assertEmpty();
     store.removeVault(vault.name);
     return {};
   }

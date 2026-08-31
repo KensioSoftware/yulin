@@ -9,6 +9,7 @@ export interface StartSimBackupJob {
   readonly resourceArn: string;
   readonly iamRoleArn: string;
   readonly at: Date;
+  readonly idempotencyToken?: string | undefined;
   readonly lifecycle?: SimBackupLifecycle | undefined;
   readonly createdBy?: SimRecoveryPointCreator | undefined;
 }

@@ -23,6 +23,11 @@ export class SimBackupJobs {
   }
 
   start(input: StartSimBackupJob): SimBackupJob {
+    const previous = this.previous(input.idempotencyToken);
+    if (previous !== undefined) {
+      return previous;
+    }
+
     const failure = input.vault.lifecycleRefusal(input.lifecycle);
     const recoveryPoint =
       failure === undefined ? this.pointFactory.make(input) : undefined;
@@ -32,7 +37,16 @@ export class SimBackupJobs {
     }
 
     const job = this.jobFactory.make(input, recoveryPoint, failure);
-    this.store.addJob(job);
+    this.store.addJob(job, input.idempotencyToken);
     return job;
+  }
+
+  private previous(
+    idempotencyKey: string | undefined,
+  ): SimBackupJob | undefined {
+    if (idempotencyKey === undefined) {
+      return undefined;
+    }
+    return this.store.jobByIdempotencyToken(idempotencyKey);
   }
 }

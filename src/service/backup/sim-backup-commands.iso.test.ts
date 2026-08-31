@@ -11,6 +11,7 @@ import {
   ListBackupSelectionsCommand,
   ListBackupVaultsCommand,
   PutBackupVaultLockConfigurationCommand,
+  StartBackupJobCommand,
 } from "@aws-sdk/client-backup";
 import {
   assertArrayLength,
@@ -20,11 +21,12 @@ import {
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SimSdk } from "../../sdk/sim-sdk.js";
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
 import { SimAws } from "../aws/sim-aws.js";
+import { SimBackupInvalidRequestException } from "./error/sim-backup.error.js";
 
 describe("simulated AWS Backup commands", () => {
   it("stores a vault, a multi-rule plan and a resource selection", async () => {
@@ -195,6 +197,42 @@ describe("simulated AWS Backup commands", () => {
     const vaults = await simAws
       .backup()
       .listBackupVaults(new ListBackupVaultsCommand({}));
+    assertArrayLength(vaults.BackupVaultList ?? [], 0);
+  });
+
+  it("deletes a vault only after its recovery points expire", async () => {
+    // Given a vault containing a recovery point with one day of retention.
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2026-08-31T10:00:00.000Z")),
+    });
+    const backup = simAws.backup();
+    const vaultName = `vault-${faker.string.uuid()}`;
+    await backup.createBackupVault(
+      new CreateBackupVaultCommand({ BackupVaultName: vaultName }),
+    );
+    await backup.startBackupJob(
+      new StartBackupJobCommand({
+        BackupVaultName: vaultName,
+        ResourceArn: `arn:aws:s3:::${faker.string.uuid()}`,
+        IamRoleArn: "arn:aws:iam::888888888888:role/BackupRole",
+        Lifecycle: { DeleteAfterDays: 1 },
+      }),
+    );
+
+    // When deletion is requested before and after the expiry instant.
+    // Then the live point prevents deletion, while the expired point does not.
+    await expect(
+      backup.deleteBackupVault(
+        new DeleteBackupVaultCommand({ BackupVaultName: vaultName }),
+      ),
+    ).rejects.toBeInstanceOf(SimBackupInvalidRequestException);
+    await simAws.clock().advanceBy({ days: 1 });
+    await backup.deleteBackupVault(
+      new DeleteBackupVaultCommand({ BackupVaultName: vaultName }),
+    );
+    const vaults = await backup.listBackupVaults(
+      new ListBackupVaultsCommand({}),
+    );
     assertArrayLength(vaults.BackupVaultList ?? [], 0);
   });
 
