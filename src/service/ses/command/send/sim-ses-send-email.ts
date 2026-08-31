@@ -118,6 +118,7 @@ export class SimSesSendEmail {
         replyToAddresses: [...(input.ReplyToAddresses ?? [])],
         subject: content.subject,
         body: content.body,
+        attachments: content.attachments,
         templateName: content.templateName,
         templateData: content.templateData,
         configurationSetName,

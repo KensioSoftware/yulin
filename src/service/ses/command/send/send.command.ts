@@ -14,11 +14,25 @@ export interface SimSesBody {
   readonly Html?: SimSesContent | undefined;
 }
 
+export interface SimSesAttachment {
+  readonly RawContent: Uint8Array | undefined;
+  readonly ContentDisposition?: "ATTACHMENT" | "INLINE" | undefined;
+  readonly FileName: string | undefined;
+  readonly ContentDescription?: string | undefined;
+  readonly ContentId?: string | undefined;
+  readonly ContentTransferEncoding?:
+    | "BASE64"
+    | "QUOTED_PRINTABLE"
+    | "SEVEN_BIT"
+    | undefined;
+  readonly ContentType?: string | undefined;
+}
+
 export interface SimSesMessage {
   readonly Subject?: SimSesContent | undefined;
   readonly Body?: SimSesBody | undefined;
   readonly Headers?: readonly unknown[] | undefined;
-  readonly Attachments?: readonly unknown[] | undefined;
+  readonly Attachments?: readonly SimSesAttachment[] | undefined;
 }
 
 export interface SimSesRawMessage {

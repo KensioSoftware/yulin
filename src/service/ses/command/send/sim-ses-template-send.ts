@@ -56,6 +56,7 @@ export class SimSesTemplateSendReader {
         text: renderOptional(content.text, data),
         html: renderOptional(content.html, data),
       },
+      attachments: [],
       templateName: template.TemplateName,
       templateData: data,
     };

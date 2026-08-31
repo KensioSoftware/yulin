@@ -22,6 +22,26 @@ export interface SimSesSentEmailBody {
 }
 
 /**
+ * One structured attachment on a simple message.
+ *
+ * The bytes and metadata use the values from the SendEmail request. SES would
+ * use them to assemble MIME content after accepting the request.
+ */
+export interface SimSesSentEmailAttachment {
+  readonly rawContent: Uint8Array;
+  readonly fileName: string;
+  readonly contentType: string | undefined;
+  readonly contentDisposition: "ATTACHMENT" | "INLINE" | undefined;
+  readonly contentDescription: string | undefined;
+  readonly contentId: string | undefined;
+  readonly contentTransferEncoding:
+    | "BASE64"
+    | "QUOTED_PRINTABLE"
+    | "SEVEN_BIT"
+    | undefined;
+}
+
+/**
  * A recipient the account's suppression list held back.
  *
  * The address is kept as the message wrote it, which is what a test asserting
@@ -40,6 +60,7 @@ interface SimSesSentEmailProperties {
   readonly replyToAddresses: readonly string[];
   readonly subject: string;
   readonly body: SimSesSentEmailBody;
+  readonly attachments: readonly SimSesSentEmailAttachment[];
   readonly templateName: string | undefined;
   readonly templateData: Readonly<Record<string, unknown>> | undefined;
   readonly configurationSetName: string | undefined;
@@ -73,6 +94,9 @@ export class SimSesSentEmail {
   public readonly subject: string;
 
   public readonly body: SimSesSentEmailBody;
+
+  /** Structured attachments in request order. */
+  public readonly attachments: readonly SimSesSentEmailAttachment[];
 
   /**
    * The template this message was rendered from, if it was rendered from a
@@ -111,6 +135,7 @@ export class SimSesSentEmail {
     this.replyToAddresses = properties.replyToAddresses;
     this.subject = properties.subject;
     this.body = properties.body;
+    this.attachments = properties.attachments;
     this.templateName = properties.templateName;
     this.templateData = properties.templateData;
     this.configurationSetName = properties.configurationSetName;

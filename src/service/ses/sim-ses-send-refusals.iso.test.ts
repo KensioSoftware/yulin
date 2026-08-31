@@ -143,11 +143,35 @@ describe("SimSesV2 SendEmail refusals", () => {
     assertStringIncludes(error.message, "Content.Raw");
   });
 
-  it("refuses a message with attachments", async () => {
+  it("refuses an attachment with no raw content", async () => {
     // Given a simulated SES that would otherwise accept the message.
     const ses = await sendingSes();
 
-    // When a message carries an attachment.
+    // When a message carries an attachment with no bytes.
+    const error = await assertThrowsErrorAsync(async () => {
+      await ses.sendEmail(
+        new SendEmailCommand({
+          ...welcome,
+          Content: {
+            Simple: {
+              Subject: { Data: "Welcome" },
+              Body: { Text: { Data: "Hi there" } },
+              Attachments: [{ FileName: "terms.pdf", RawContent: undefined }],
+            },
+          },
+        }),
+      );
+    });
+
+    assertInstanceOf(error, SimSesBadRequestException);
+    assertStringIncludes(error.message, "rawContent");
+  });
+
+  it("refuses an attachment with no file name", async () => {
+    // Given a simulated SES that would otherwise accept the message.
+    const ses = await sendingSes();
+
+    // When a message carries attachment bytes with no file name.
     const error = await assertThrowsErrorAsync(async () => {
       await ses.sendEmail(
         new SendEmailCommand({
@@ -157,7 +181,7 @@ describe("SimSesV2 SendEmail refusals", () => {
               Subject: { Data: "Welcome" },
               Body: { Text: { Data: "Hi there" } },
               Attachments: [
-                { FileName: "terms.pdf", RawContent: new Uint8Array([1]) },
+                { FileName: undefined, RawContent: new Uint8Array([1]) },
               ],
             },
           },
@@ -165,7 +189,8 @@ describe("SimSesV2 SendEmail refusals", () => {
       );
     });
 
-    assertInstanceOf(error, SimSesUnsupportedOperationException);
+    assertInstanceOf(error, SimSesBadRequestException);
+    assertStringIncludes(error.message, "fileName");
   });
 
   it("refuses message tags, which are not simulated", async () => {

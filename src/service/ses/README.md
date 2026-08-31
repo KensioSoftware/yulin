@@ -71,6 +71,10 @@ reported one at a time, because real SES names every identity that failed in a s
 asserting a bcc was a bcc still can, and the body keeps text and HTML apart so a test asserting on
 the text of an HTML-only message finds nothing rather than the markup.
 
+Attachments on a simple message stay structured on the record in request order. The record copies
+their raw bytes and keeps the supplied metadata. SES would use those values to assemble MIME content
+after accepting the request.
+
 `SimSesContentReader` dispatches the three kinds of content. `Simple` and `Template` are both read;
 `Raw` is refused by name, since a raw MIME message would have to be parsed to say anything about its
 subject or body and a recorded message with nothing in it would make a test pass for a reason

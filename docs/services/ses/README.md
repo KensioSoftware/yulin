@@ -14,7 +14,7 @@ SES specific types are imported from the `@kensio/yulin/ses` subpath.
 ## Asserting on a message that was sent
 
 `sentEmails()` hands over the record. Each message carries who it was from, the three recipient
-lists, the subject, the body and the message id SES answered with.
+lists, the subject, the body, its attachments and the message id SES answered with.
 
 ```typescript sim-ses-send-and-assert
 /**
@@ -58,6 +58,60 @@ read. The three recipient lists stay apart, leaving a test free to assert that a
 
 `body` keeps `text` and `html` apart too. A message sent with only an HTML body reports `undefined`
 for its text, and never the markup.
+
+### Asserting on an attachment
+
+A simple message may carry structured attachments. The record keeps them in request order.
+`rawContent` contains a copy of the bytes from the request, and the other fields contain the supplied
+SES attachment metadata.
+
+```typescript sim-ses-attachments
+/**
+ * Sending a generated CSV and reading it from the simulated SES record.
+ */
+
+import { SendEmailCommand } from "@aws-sdk/client-sesv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ses = simAws.sesV2();
+
+ses.verifyIdentity("hello@example.com");
+ses.verifyIdentity("someone@example.org");
+
+const csv = new TextEncoder().encode("word,meaning\n你好,hello\n");
+
+await ses.sendEmail(
+  new SendEmailCommand({
+    FromEmailAddress: "hello@example.com",
+    Destination: { ToAddresses: ["someone@example.org"] },
+    Content: {
+      Simple: {
+        Subject: { Data: "Your vocabulary backup" },
+        Body: { Text: { Data: "Your backup is attached." } },
+        Attachments: [
+          {
+            RawContent: csv,
+            FileName: "vocabulary.csv",
+            ContentType: "text/csv; charset=utf-8",
+            ContentDisposition: "ATTACHMENT",
+          },
+        ],
+      },
+    },
+  }),
+);
+
+const [email] = ses.sentEmails();
+const [attachment] = email?.attachments ?? [];
+
+// vocabulary.csv "word,meaning\n你好,hello\n"
+console.log(
+  attachment?.fileName,
+  new TextDecoder().decode(attachment?.rawContent),
+);
+```
 
 ## Verifying identities
 
@@ -938,29 +992,29 @@ time forward past the window sees the count fall the way an account's would.
 
 ## Simulated commands
 
-| Command                           | Notes                                                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `SendEmail`                       | `Content.Simple` and `Content.Template`. Recorded rather than delivered.                                  |
-| `CreateEmailIdentity`             | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back. |
-| `GetEmailIdentity`                | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.             |
-| `ListEmailIdentities`             | Paged with `PageSize` and `NextToken`.                                                                    |
-| `DeleteEmailIdentity`             |                                                                                                           |
-| `CreateEmailTemplate`             | Substitution only. `Tags` are refused.                                                                    |
-| `GetEmailTemplate`                | Reports the wording with its placeholders unrendered.                                                     |
-| `UpdateEmailTemplate`             | Replaces the wording outright, keeping the creation time.                                                 |
-| `ListEmailTemplates`              | Names and creation times only, paged.                                                                     |
-| `DeleteEmailTemplate`             |                                                                                                           |
-| `CreateConfigurationSet`          | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                                   |
-| `GetConfigurationSet`             | Reports the defaults it applied as well as what was declared.                                             |
-| `ListConfigurationSets`           | Names only, paged with `PageSize` and `NextToken`.                                                        |
-| `DeleteConfigurationSet`          |                                                                                                           |
-| `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                      |
-| `PutAccountDetails`               | `MailType` and `WebsiteURL` are required, as on real SES.                                                 |
-| `PutAccountSuppressionAttributes` | No reasons at all turns the suppression list off.                                                         |
-| `PutSuppressedDestination`        | Accepted in the sandbox, which real SES refuses.                                                          |
-| `GetSuppressedDestination`        |                                                                                                           |
-| `ListSuppressedDestinations`      | Paged, and narrowed by `Reasons`, `StartDate` and `EndDate`.                                              |
-| `DeleteSuppressedDestination`     | Removing an address that is not on the list succeeds.                                                     |
+| Command                           | Notes                                                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `SendEmail`                       | `Content.Simple`, including structured attachments, and `Content.Template`. Recorded rather than delivered. |
+| `CreateEmailIdentity`             | Starts unverified. `Tags`, `DkimSigningAttributes` and `ConfigurationSetName` are held and reported back.   |
+| `GetEmailIdentity`                | Reports the DKIM, MAIL FROM, feedback, configuration set and tag settings the identity holds.               |
+| `ListEmailIdentities`             | Paged with `PageSize` and `NextToken`.                                                                      |
+| `DeleteEmailIdentity`             |                                                                                                             |
+| `CreateEmailTemplate`             | Substitution only. `Tags` are refused.                                                                      |
+| `GetEmailTemplate`                | Reports the wording with its placeholders unrendered.                                                       |
+| `UpdateEmailTemplate`             | Replaces the wording outright, keeping the creation time.                                                   |
+| `ListEmailTemplates`              | Names and creation times only, paged.                                                                       |
+| `DeleteEmailTemplate`             |                                                                                                             |
+| `CreateConfigurationSet`          | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                                     |
+| `GetConfigurationSet`             | Reports the defaults it applied as well as what was declared.                                               |
+| `ListConfigurationSets`           | Names only, paged with `PageSize` and `NextToken`.                                                          |
+| `DeleteConfigurationSet`          |                                                                                                             |
+| `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                        |
+| `PutAccountDetails`               | `MailType` and `WebsiteURL` are required, as on real SES.                                                   |
+| `PutAccountSuppressionAttributes` | No reasons at all turns the suppression list off.                                                           |
+| `PutSuppressedDestination`        | Accepted in the sandbox, which real SES refuses.                                                            |
+| `GetSuppressedDestination`        |                                                                                                             |
+| `ListSuppressedDestinations`      | Paged, and narrowed by `Reasons`, `StartDate` and `EndDate`.                                                |
+| `DeleteSuppressedDestination`     | Removing an address that is not on the list succeeds.                                                       |
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 

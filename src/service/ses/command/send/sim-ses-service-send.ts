@@ -115,6 +115,7 @@ export class SimSesServiceSend {
         replyToAddresses: [...request.replyToAddresses],
         subject: request.subject,
         body: { text: request.body, html: undefined },
+        attachments: [],
         templateName: undefined,
         templateData: undefined,
         configurationSetName,
