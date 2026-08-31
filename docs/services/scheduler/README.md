@@ -238,6 +238,12 @@ console.log(failure?.message);
 `JSON.stringify` on a failure carries the message alongside the schedule, the target, the role and
 the instant it names.
 
+A Lambda target has another boundary. Scheduler records a failure when it cannot assume the role,
+the role cannot invoke the function, the function is missing or Lambda refuses the request. Once
+Lambda accepts the asynchronous invocation, its event invoke config applies. Handler errors follow
+Lambda's retry, destination and function dead-letter queue settings and do not appear in
+`deliveryFailures`.
+
 ### One-time schedules and what happens after
 
 An `at(...)` schedule fires once and then stops. By default it stays in the Account afterwards, which
@@ -759,7 +765,7 @@ Resources of the same stack.
 - `at(...)`, `rate(...)` and six-field `cron(...)` expressions, fired by advancing the simulation's
   clock.
 - Lambda, SQS and SNS targets, with a target `Input`, invoked as the target's execution role and
-  authorized against that role's own policies.
+  authorized against that role's own policies. Lambda targets use asynchronous Event invocation.
 - ECS targets, running a simulated task as the execution role, with the task definition and
   `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
 - `ActionAfterCompletion`, and `deliveryFailures` for invocations that did not happen.
@@ -779,9 +785,10 @@ Resources of the same stack.
   of it, and a simulation left alone in real time never fires however long it is left.
 - Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time, and its
   promise is at-least-once.
-- An invocation is attempted once. There is no retry and no dead letter queue. A target that throws
-  is recorded as a failure, and never redelivered. A failed invocation never rejects
-  `advanceBy(...)`, and is read from `deliveryFailures`.
+- Scheduler attempts each target delivery once. Target `RetryPolicy` and `DeadLetterConfig` are
+  unsupported. A failure before target acceptance is recorded in `deliveryFailures` and is never
+  redelivered. A Lambda handler failure uses Lambda's asynchronous retry, destination and function
+  dead-letter queue settings.
 - A schedule group carries no tags. `CreateScheduleGroup` refuses `Tags`, since the simulation
   stores them nowhere. A template's `Tags` are recorded as an ignored property and the group still
   deploys.
