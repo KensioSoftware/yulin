@@ -15,7 +15,7 @@ interface SimAwsSchedulerDeadLettersProperties {
 }
 
 /**
- * Routes Scheduler dead letters to the Account and Region their queue names.
+ * Routes Scheduler dead letters to the Account and Region named by their queue ARNs.
  */
 export class SimAwsSchedulerDeadLetters {
   private readonly simAws: SimAws;
@@ -53,9 +53,10 @@ export class SimAwsSchedulerDeadLetters {
       regionName,
     );
 
-    await new SimSchedulerDeadLetterQueue({ scope }).deliver(
-      { request: deadLetter.delivery, caller },
-      deadLetter,
-    );
+    await new SimSchedulerDeadLetterQueue({
+      scope,
+      queueArn,
+      queueName: queue.name,
+    }).deliver({ request: deadLetter.delivery, caller }, deadLetter);
   }
 }

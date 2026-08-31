@@ -147,7 +147,7 @@ event invoke retries, destinations and the function's dead-letter queue.
 
 `SimSchedulerDeliveryAttempt` owns failures before a target accepts the request. An explicit retry
 policy schedules another attempt on `BackgroundScheduler` after one second, then two, four and so
-on. It stops at the configured attempt count or event age. A missing target or an IAM refusal is
+on. It stops at the configured retry limit or event age. A missing target or an IAM refusal is
 permanent and skips retries because the same request cannot change that answer.
 
 `SimSchedulerDeadLetterQueue` sends an abandoned target's original input to the configured standard

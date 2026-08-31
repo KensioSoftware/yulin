@@ -260,16 +260,16 @@ Scheduler does not retry a failure that cannot clear by trying the same request.
 a missing execution role, an execution role that does not trust Scheduler and an IAM denial are
 permanent failures. They are abandoned after the initial attempt.
 
-Set `Target.DeadLetterConfig.Arn` to a standard SQS queue ARN to keep an input Scheduler abandons.
+Set `Target.DeadLetterConfig.Arn` to a standard SQS queue ARN to keep an input that Scheduler abandons.
 The execution role needs `sqs:SendMessage` on this queue as well as permission to invoke the target.
 The message body is the target's original `Input`. Its string message attributes follow Scheduler's
 shape and include the error, schedule ARN, target ARN, scheduled time and retry count.
 `EXHAUSTED_RETRY_CONDITION` is `MaximumRetryAttempts` or `MaximumEventAgeInSeconds` for an exhausted
 retryable failure. A permanent failure leaves that attribute out.
 
-A successful DLQ send removes the failure from `deliveryFailures`, since the configured destination
-received it. A missing queue or denied `sqs:SendMessage` is recorded there instead. This keeps a
-misconfigured DLQ visible to a test.
+A successful DLQ send does not add an entry to `deliveryFailures`, since the configured destination
+received the input. A missing queue or denied `sqs:SendMessage` is recorded there instead. This keeps
+a misconfigured DLQ visible to a test.
 
 ### One-time schedules and what happens after
 

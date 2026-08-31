@@ -16,6 +16,8 @@ const sendAction = "sqs:SendMessage";
 
 interface SimSchedulerDeadLetterQueueProperties {
   readonly scope: SimAwsAccountRegionContainer;
+  readonly queueArn: string;
+  readonly queueName: string;
 }
 
 /**
@@ -23,9 +25,13 @@ interface SimSchedulerDeadLetterQueueProperties {
  */
 export class SimSchedulerDeadLetterQueue {
   private readonly scope: SimAwsAccountRegionContainer;
+  private readonly queueArn: string;
+  private readonly queueName: string;
 
   constructor(properties: SimSchedulerDeadLetterQueueProperties) {
     this.scope = properties.scope;
+    this.queueArn = properties.queueArn;
+    this.queueName = properties.queueName;
   }
 
   /**
@@ -36,28 +42,23 @@ export class SimSchedulerDeadLetterQueue {
     deadLetter: SimSchedulerDeadLetterRequest,
   ): Promise<void> {
     const target = deadLetter.delivery.schedule.target;
-    const queueArn = target.deadLetterConfig?.arn;
-    const queue =
-      queueArn === undefined
-        ? undefined
-        : this.scope.sqs().findQueue(queueArn.split(":").at(-1) ?? "");
+    const queue = this.scope.sqs().findQueue(this.queueName);
 
-    if (queue === undefined || queueArn === undefined) {
+    if (queue === undefined) {
       throw new SimSchedulerTargetNotFound(
-        `${queueArn ?? "The configured dead-letter queue"} is not a ` +
-          `simulated SQS queue.`,
+        `${this.queueArn} is not a simulated SQS queue.`,
       );
     }
 
     const decision = simScopeIamAuthZ(this.scope).authorize({
       action: sendAction,
-      resource: queueArn,
+      resource: this.queueArn,
       caller: assumed.caller,
     });
 
     if (decision.isDenied) {
       throw new SimSchedulerDeliveryNotPermitted(
-        `${target.roleArn} is not allowed to ${sendAction} on ${queueArn}. ` +
+        `${target.roleArn} is not allowed to ${sendAction} on ${this.queueArn}. ` +
           `Grant it in a policy on the execution role.`,
       );
     }
