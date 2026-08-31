@@ -2,15 +2,18 @@ import type {
   SimBackupVaultListMember,
   SimDescribeBackupVaultCommandOutput,
 } from "../command/sim-backup-command.types.js";
-import { SimBackupInvalidParameterValueException } from "../error/sim-backup.error.js";
+import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimBackupLifecycle } from "../command/sim-backup-command.types.js";
+import { SimBackupInvalidRequestException } from "../error/sim-backup.error.js";
+import type { SimBackupRecoveryPoint } from "../recovery-point/sim-backup-recovery-point.js";
+import { describeBackupVault } from "./sim-backup-vault-description.js";
+import {
+  SimBackupVaultLock,
+  type SimBackupVaultLockConfiguration,
+} from "./sim-backup-vault-lock.js";
+import { SimBackupVaultRecoveryPoints } from "./sim-backup-vault-recovery-points.js";
 
-const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-export interface SimBackupVaultLockConfiguration {
-  readonly MinRetentionDays?: number | undefined;
-  readonly MaxRetentionDays?: number | undefined;
-  readonly ChangeableForDays?: number | undefined;
-}
+export type { SimBackupVaultLockConfiguration } from "./sim-backup-vault-lock.js";
 
 interface SimBackupVaultProperties {
   readonly name: string;
@@ -18,6 +21,7 @@ interface SimBackupVaultProperties {
   readonly creationDate: Date;
   readonly encryptionKeyArn?: string | undefined;
   readonly creatorRequestId?: string | undefined;
+  readonly background: BackgroundScheduler;
 }
 
 /** Stores one simulated AWS Backup vault. */
@@ -28,8 +32,8 @@ export class SimBackupVault {
   public readonly encryptionKeyArn?: string | undefined;
   public readonly creatorRequestId?: string | undefined;
 
-  private lockConfiguration?: SimBackupVaultLockConfiguration | undefined;
-  private lockDate?: Date | undefined;
+  private readonly lock: SimBackupVaultLock;
+  private readonly points: SimBackupVaultRecoveryPoints;
 
   constructor(properties: SimBackupVaultProperties) {
     this.name = properties.name;
@@ -37,99 +41,53 @@ export class SimBackupVault {
     this.creationDate = new Date(properties.creationDate);
     this.encryptionKeyArn = properties.encryptionKeyArn;
     this.creatorRequestId = properties.creatorRequestId;
+    this.lock = new SimBackupVaultLock(this.name);
+    this.points = new SimBackupVaultRecoveryPoints(properties.background);
   }
 
   configureLock(
     configuration: SimBackupVaultLockConfiguration,
     now: Date,
   ): void {
-    if (this.isComplianceLocked(now)) {
-      throw new SimBackupInvalidParameterValueException(
-        `The lock configuration for backup vault ${this.name} is immutable`,
-      );
-    }
-
-    validateLockConfiguration(configuration);
-    this.lockConfiguration = { ...configuration };
-    this.lockDate = lockDate(configuration.ChangeableForDays, now);
+    this.lock.configure(configuration, now);
   }
 
   describe(): SimDescribeBackupVaultCommandOutput {
-    const configuration = this.lockConfiguration;
-
-    return {
-      BackupVaultName: this.name,
-      BackupVaultArn: this.arn,
-      EncryptionKeyArn: this.encryptionKeyArn,
-      CreationDate: new Date(this.creationDate),
-      CreatorRequestId: this.creatorRequestId,
-      NumberOfRecoveryPoints: 0,
-      Locked: configuration !== undefined,
-      MinRetentionDays: configuration?.MinRetentionDays,
-      MaxRetentionDays: configuration?.MaxRetentionDays,
-      LockDate:
-        this.lockDate === undefined ? undefined : new Date(this.lockDate),
-    };
+    return describeBackupVault(
+      this,
+      this.lock.configuration,
+      this.lock.lockDate,
+      this.recoveryPoints().length,
+    );
   }
 
   listMember(): SimBackupVaultListMember {
     return this.describe();
   }
 
-  private isComplianceLocked(now: Date): boolean {
-    return this.lockDate !== undefined && now >= this.lockDate;
-  }
-}
-
-function lockDate(
-  changeableForDays: number | undefined,
-  now: Date,
-): Date | undefined {
-  if (changeableForDays === undefined) {
-    return undefined;
+  addRecoveryPoint(recoveryPoint: SimBackupRecoveryPoint): void {
+    this.points.add(recoveryPoint);
   }
 
-  return new Date(now.getTime() + changeableForDays * millisecondsPerDay);
-}
-
-function validateLockConfiguration(
-  configuration: SimBackupVaultLockConfiguration,
-): void {
-  const { MinRetentionDays: minimum, MaxRetentionDays: maximum } =
-    configuration;
-
-  if (
-    minimum !== undefined &&
-    (!Number.isSafeInteger(minimum) || minimum < 1)
-  ) {
-    throw new SimBackupInvalidParameterValueException(
-      "MinRetentionDays must be a positive whole number",
-    );
+  recoveryPoints(): readonly SimBackupRecoveryPoint[] {
+    return this.points.all();
   }
 
-  if (
-    maximum !== undefined &&
-    (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 36_500)
-  ) {
-    throw new SimBackupInvalidParameterValueException(
-      "MaxRetentionDays must be between 1 and 36500",
-    );
+  recoveryPoint(arn: string): SimBackupRecoveryPoint | undefined {
+    return this.points.find(arn);
   }
 
-  if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
-    throw new SimBackupInvalidParameterValueException(
-      "MinRetentionDays must not exceed MaxRetentionDays",
-    );
+  assertEmpty(): void {
+    if (this.recoveryPoints().length > 0) {
+      throw new SimBackupInvalidRequestException(
+        `Backup vault ${this.name} cannot be deleted while it contains recovery points`,
+      );
+    }
   }
 
-  const grace = configuration.ChangeableForDays;
-
-  if (
-    grace !== undefined &&
-    (!Number.isSafeInteger(grace) || grace < 3 || grace > 36_500)
-  ) {
-    throw new SimBackupInvalidParameterValueException(
-      "ChangeableForDays must be between 3 and 36500",
-    );
+  lifecycleRefusal(
+    lifecycle: SimBackupLifecycle | undefined,
+  ): string | undefined {
+    return this.lock.lifecycleRefusal(lifecycle);
   }
 }

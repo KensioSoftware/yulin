@@ -1,4 +1,5 @@
 import { SimBackupAlreadyExistsException } from "./error/sim-backup.error.js";
+import type { SimBackupJob } from "./job/sim-backup-job.js";
 import type { SimBackupPlan } from "./plan/sim-backup-plan.js";
 import type { SimBackupSelection } from "./selection/sim-backup-selection.js";
 import type { SimBackupVault } from "./vault/sim-backup-vault.js";
@@ -10,6 +11,8 @@ export class SimBackupStore {
   private readonly vaults = new Map<string, SimBackupVault>();
   private readonly plans = new Map<string, SimBackupPlan>();
   private readonly selections = new Map<string, SimBackupSelection>();
+  private readonly jobs = new Map<string, SimBackupJob>();
+  private readonly jobsByIdempotencyToken = new Map<string, SimBackupJob>();
 
   addVault(vault: SimBackupVault): void {
     if (this.vaults.has(vault.name)) {
@@ -84,5 +87,24 @@ export class SimBackupStore {
 
   removeSelection(id: string): void {
     this.selections.delete(id);
+  }
+
+  addJob(job: SimBackupJob, idempotencyToken?: string): void {
+    this.jobs.set(job.id, job);
+    if (idempotencyToken !== undefined) {
+      this.jobsByIdempotencyToken.set(idempotencyToken, job);
+    }
+  }
+
+  job(id: string): SimBackupJob | undefined {
+    return this.jobs.get(id);
+  }
+
+  jobByIdempotencyToken(token: string): SimBackupJob | undefined {
+    return this.jobsByIdempotencyToken.get(token);
+  }
+
+  allJobs(): MapIterator<SimBackupJob> {
+    return this.jobs.values();
   }
 }
