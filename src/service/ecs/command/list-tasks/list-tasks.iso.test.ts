@@ -1,11 +1,12 @@
 import { ListTasksCommand, RunTaskCommand } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
-  assertUndefined,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -49,7 +50,7 @@ describe("ECS ListTasksCommand", () => {
     const running = await simAws.ecs().listTasks(new ListTasksCommand({}));
 
     // Then the stopped task is not one of them.
-    assertArrayLength(running.taskArns, 0);
+    assertArrayEmpty(running.taskArns);
 
     // And it is there when the stopped ones are asked for.
     const stopped = await simAws

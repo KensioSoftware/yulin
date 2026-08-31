@@ -1,5 +1,6 @@
 import { CreateClusterCommand, ListClustersCommand } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -51,7 +52,7 @@ describe("ECS ListClustersCommand", () => {
     const listed = await simEcs.listClusters(new ListClustersCommand({}));
 
     // Then the listing is empty rather than absent.
-    assertArrayLength(listed.clusterArns, 0);
+    assertArrayEmpty(listed.clusterArns);
   });
 
   it("pages a listing at the size the request asked for", async () => {

@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -193,7 +193,7 @@ describe("Simulated Organizations CloudFormation properties", () => {
     });
 
     // Then nothing was placed in the organization on the way to failing.
-    assertArrayLength(organizationAccountIds(simAws), 0);
+    assertArrayEmpty(organizationAccountIds(simAws));
   });
 
   it("reads an Organization that names no feature set", async () => {

@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertNonNullable,
@@ -276,6 +276,6 @@ describe("Simulated WAFv2 CloudFormation values", () => {
       "DELETE_COMPLETE",
     );
     assertFalse(simAws.wafV2().protection().protects(stageArn));
-    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
+    assertArrayEmpty(simAws.wafV2().allWebAcls("REGIONAL"));
   });
 });

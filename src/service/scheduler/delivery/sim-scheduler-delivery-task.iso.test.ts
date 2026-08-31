@@ -6,6 +6,7 @@ import {
   type Target,
 } from "@aws-sdk/client-scheduler";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -149,7 +150,7 @@ describe("Scheduler ECS target", () => {
       .listTasks({ input: { desiredStatus: "STOPPED" } });
 
     assertArrayLength(tasks.taskArns ?? [], 1);
-    assertArrayLength(simAws.scheduler().deliveryFailures, 0);
+    assertArrayEmpty(simAws.scheduler().deliveryFailures);
   });
 
   it("puts the target's container overrides in the container", async () => {
@@ -246,7 +247,7 @@ describe("Scheduler ECS target", () => {
 
     // Then the schedule invoked without failing, and the task says nothing
     // started, which is what makes a binding that matches nothing visible.
-    assertArrayLength(simAws.scheduler().deliveryFailures, 0);
+    assertArrayEmpty(simAws.scheduler().deliveryFailures);
 
     const tasks = await simAws
       .ecs()

@@ -1,5 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -125,7 +130,11 @@ app.synth();
       const grantedRole = await invokeAs(
         `arn:aws:iam::${accountId}:role/ReporterCaller`,
       );
-      assertIdentical(grantedRole.status, 200);
+      assertResponseStatus(
+        grantedRole,
+        200,
+        await describeResponse(grantedRole),
+      );
       assertIdentical(await grantedRole.text(), "reported");
 
       // And so does a principal in the Account granted by the deployed
@@ -133,13 +142,17 @@ app.synth();
       const grantedAccount = await invokeAs(
         `arn:aws:iam::${otherAccountId}:role/Anything`,
       );
-      assertIdentical(grantedAccount.status, 200);
+      assertResponseStatus(
+        grantedAccount,
+        200,
+        await describeResponse(grantedAccount),
+      );
 
       // And a principal the app did not grant does not.
       const ungranted = await invokeAs(
         `arn:aws:iam::${accountId}:role/NotGranted`,
       );
-      assertIdentical(ungranted.status, 403);
+      assertResponseStatus(ungranted, 403, await describeResponse(ungranted));
     } finally {
       await srv.close();
     }

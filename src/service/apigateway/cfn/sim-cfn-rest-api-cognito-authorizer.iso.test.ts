@@ -1,7 +1,8 @@
 import {
-  assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -116,8 +117,8 @@ describe("Deploying a REST API Cognito authorizer from CloudFormation", () => {
 
     // Then the deployed authorizer decides both, and the token's claims reach
     // the handler
-    assertIdentical(admitted.status, 200);
-    assertIdentical(refused.status, 401);
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
+    assertResponseStatus(refused, 401, await describeResponse(refused));
     assertObjectMatches(await admitted.json(), {
       claims: { iss: signedIn.issuerUrl, username: signedIn.username },
     });
@@ -136,7 +137,7 @@ describe("Deploying a REST API Cognito authorizer from CloudFormation", () => {
 
     // Then the deployed scopes decided it, with the 403 an accepted token
     // that allows nothing here gets
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("serves a method whose deployed scope the token claims", async () => {
@@ -151,6 +152,6 @@ describe("Deploying a REST API Cognito authorizer from CloudFormation", () => {
     });
 
     // Then the method is reached, because one method scope matched
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

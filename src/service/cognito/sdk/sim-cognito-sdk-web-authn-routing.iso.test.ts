@@ -12,6 +12,7 @@ import {
   StartWebAuthnRegistrationCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -109,6 +110,6 @@ describe("Cognito passkey SDK interception", () => {
     assertNonNullable(started.CredentialCreationOptions);
     assertArrayLength(listed.Credentials ?? [], 1);
     assertIdentical(listed.Credentials?.[0]?.CredentialId, credential.id);
-    assertArrayLength(emptied.Credentials ?? [], 0);
+    assertArrayEmpty(emptied.Credentials ?? []);
   });
 });

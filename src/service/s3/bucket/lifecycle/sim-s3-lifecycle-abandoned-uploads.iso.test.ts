@@ -8,7 +8,7 @@ import {
   type LifecycleRule,
 } from "@aws-sdk/client-s3";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -111,7 +111,7 @@ describe("Simulated S3 lifecycle abandoned uploads", () => {
 
     // Then the upload has already gone, because it is abandoned on the
     // boundary rather than some time after it.
-    assertArrayLength(await uploadsInProgress(simAws), 0);
+    assertArrayEmpty(await uploadsInProgress(simAws));
   });
 
   it("takes the abandoned upload's parts with it", async () => {

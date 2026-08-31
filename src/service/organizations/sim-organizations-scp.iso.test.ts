@@ -1,5 +1,6 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -134,7 +135,7 @@ describe("Simulated Organizations service control policies", () => {
     // Then the Account boundary denies it without any statement matching.
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
     assertTrue(decision.serviceControlPolicy.isDenied);
-    assertArrayLength(decision.serviceControlPolicy.denyStatements, 0);
+    assertArrayEmpty(decision.serviceControlPolicy.denyStatements);
     assertArrayLength(decision.identityAllowStatements, 1);
     assertStringIncludes(
       decision.denialReason ?? "",
@@ -165,9 +166,8 @@ describe("Simulated Organizations service control policies", () => {
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
     assertTrue(decision.serviceControlPolicy.isApplied);
     assertTrue(decision.serviceControlPolicy.isDenied);
-    assertArrayLength(
+    assertArrayEmpty(
       simAws.organizations().serviceControlPoliciesFor(accountId),
-      0,
     );
   });
 
@@ -256,9 +256,8 @@ describe("Simulated Organizations service control policies", () => {
       });
 
     assertTrue(decision.isAllowed);
-    assertArrayLength(
+    assertArrayEmpty(
       simAws.organizations().serviceControlPoliciesFor(accountId),
-      0,
     );
   });
 });

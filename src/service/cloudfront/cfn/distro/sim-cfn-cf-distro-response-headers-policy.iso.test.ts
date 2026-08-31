@@ -1,11 +1,14 @@
 import { describe, it } from "vitest";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -144,7 +147,7 @@ describe("CloudFormation Distribution on an absent response headers policy", () 
     // over a set of headers.
     const home = await simCfSiteRequest(simAws, distributionId, "/");
 
-    assertIdentical(home.status, 200);
+    assertResponseStatus(home, 200, await describeResponse(home));
     assertIdentical(home.headers.get("x-site"), null);
   });
 
@@ -227,7 +230,7 @@ describe("CloudFormation Distribution on an absent response headers policy", () 
     });
 
     // Then nothing is dropped and the policy is applied.
-    assertArrayLength(ignoredPaths, 0);
+    assertArrayEmpty(ignoredPaths);
 
     const home = await simCfSiteRequest(simAws, distributionId, "/");
 

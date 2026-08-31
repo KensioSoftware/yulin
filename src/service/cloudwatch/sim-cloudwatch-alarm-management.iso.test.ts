@@ -5,6 +5,7 @@ import {
   SetAlarmStateCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -130,7 +131,7 @@ describe("SimCloudWatch alarm management", () => {
 
     // Then it is gone and nothing kept evaluating it, which is what stops a
     // deleted alarm holding the simulation open.
-    assertArrayLength(simAws.cloudWatch().allAlarms(), 0);
+    assertArrayEmpty(simAws.cloudWatch().allAlarms());
   });
 
   it("refuses to set the state of an alarm that is not there", async () => {

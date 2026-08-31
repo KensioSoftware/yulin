@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -209,7 +210,7 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
     // Then nothing is recorded against the Resource. The Bucket expires an
     // Object once the clock passes the rule, so the deployed rules are the
     // behaviour the template asked for.
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("expires an Object against the rule the template declared", async () => {
@@ -241,7 +242,7 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
     const listing = await simAws
       .s3()
       .listObjectsV2(new ListObjectsV2Command({ Bucket: "logs" }));
-    assertArrayLength(listing.Contents ?? [], 0);
+    assertArrayEmpty(listing.Contents ?? []);
   });
 
   it("leaves a Bucket declaring no rules unconfigured", async () => {
@@ -267,7 +268,7 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
     const error = await assertThrowsErrorAsync(async () => readRules(simAws));
 
     assertInstanceOf(error, SimS3NoSuchLifecycleConfiguration);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("fails the Resource over a configuration in the wrong shape", async () => {

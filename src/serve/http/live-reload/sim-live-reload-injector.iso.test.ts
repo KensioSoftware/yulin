@@ -1,7 +1,9 @@
 import {
   assertIdentical,
+  assertResponseStatus,
   assertStringEndsWith,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimLiveReloadInjector } from "./sim-live-reload-injector.js";
@@ -133,7 +135,7 @@ describe("SimLiveReloadInjector", () => {
     const injected = await injector.injectInto(browserRequest(), response);
 
     // Then it is still the same error
-    assertIdentical(injected.status, 404);
+    assertResponseStatus(injected, 404, await describeResponse(injected));
   });
 });
 

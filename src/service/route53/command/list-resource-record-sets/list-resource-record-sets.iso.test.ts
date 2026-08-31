@@ -4,6 +4,7 @@ import {
   ListResourceRecordSetsCommand,
 } from "@aws-sdk/client-route-53";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -223,7 +224,7 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     );
 
     // Then the listing is empty and not truncated.
-    assertArrayLength(output.ResourceRecordSets, 0);
+    assertArrayEmpty(output.ResourceRecordSets);
     assertFalse(output.IsTruncated);
   });
 

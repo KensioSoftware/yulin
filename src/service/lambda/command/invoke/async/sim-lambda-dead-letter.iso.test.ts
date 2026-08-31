@@ -4,6 +4,7 @@ import {
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -57,7 +58,7 @@ describe("Lambda dead-letter config", () => {
     await invokeAsyncAndSettle(simAws);
 
     // Then nothing was dead-lettered.
-    assertArrayLength(await receivedBodies(simAws, queueUrl), 0);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
   });
 
   it("tells both a failure destination and a dead-letter target", async () => {

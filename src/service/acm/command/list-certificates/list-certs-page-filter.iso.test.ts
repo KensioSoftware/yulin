@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -159,7 +160,7 @@ describe("ACM ListCertificatesCommand pagination and filters", () => {
     );
 
     // Then an empty page is returned.
-    assertArrayLength(listOutput.CertificateSummaryList, 0);
+    assertArrayEmpty(listOutput.CertificateSummaryList);
     assertUndefined(listOutput.NextToken);
   });
 

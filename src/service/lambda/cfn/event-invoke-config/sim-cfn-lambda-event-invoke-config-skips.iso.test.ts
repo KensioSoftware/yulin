@@ -1,5 +1,6 @@
 import { DeleteFunctionEventInvokeConfigCommand } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -45,7 +46,7 @@ describe("Lambda CloudFormation event invoke config best effort", () => {
     const [ignored, ...rest] = stack.ignoredProperties;
 
     assertNonNullable(ignored, "a recorded destination");
-    assertArrayLength(rest, 0, "no second record");
+    assertArrayEmpty(rest, "no second record");
     assertIdentical(ignored.logicalId, "OrdersInvokeConfig");
     assertIdentical(ignored.path, "DestinationConfig.OnFailure.Destination");
     assertStringIncludes(ignored.reason, "kinesis");

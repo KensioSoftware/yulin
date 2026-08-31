@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -144,7 +145,7 @@ describe("Route53 CloudFormation RecordSets with an unmodelled record type", () 
       stack.getResource("DelegationSigner")?.status,
       "DELETE_COMPLETE",
     );
-    assertArrayLength(stack.skippedResourceDeletions, 0);
+    assertArrayEmpty(stack.skippedResourceDeletions);
     assertArrayLength(stack.skippedResources, 1);
   });
 

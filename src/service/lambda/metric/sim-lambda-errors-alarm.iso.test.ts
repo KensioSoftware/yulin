@@ -10,6 +10,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -111,7 +112,7 @@ describe("an alarm over the AWS/Lambda Errors a function publishes", () => {
       .describeAlarms(new DescribeAlarmsCommand({ AlarmNames: [alarmName] }));
 
     assertIdentical(MetricAlarms?.at(0)?.StateValue, "ALARM");
-    assertArrayLength(simAws.cloudWatch().alarmActionFailures, 0);
+    assertArrayEmpty(simAws.cloudWatch().alarmActionFailures);
 
     const received = await simAws
       .sqs()

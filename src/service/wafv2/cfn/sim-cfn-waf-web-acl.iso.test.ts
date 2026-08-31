@@ -3,6 +3,7 @@ import {
   UpdateStackCommand,
 } from "@aws-sdk/client-cloudformation";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -156,7 +157,7 @@ describe("AWS::WAFv2::WebACL", () => {
 
     // Then nothing was left out of the web ACL, and the rule limits what the
     // template said it would.
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
 
     const decisions = Array.from({ length: 11 }, () =>
       decisionFor(simAws, stack, "/signup"),
@@ -197,7 +198,7 @@ describe("AWS::WAFv2::WebACL", () => {
     assertNonNullable(dropped);
     assertIdentical(dropped.path, "Rules.forwarded-rate");
     assertStringIncludes(dropped.reason, "FORWARDED_IP");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertIdentical(decisionFor(simAws, stack, "/admin/users"), "BLOCK");
   });
 
@@ -317,7 +318,7 @@ describe("AWS::WAFv2::WebACL", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the web ACL went with it.
-    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 0);
+    assertArrayEmpty(simAws.wafV2().allWebAcls("REGIONAL"));
   });
 
   it("deploys a web ACL without the rule it cannot evaluate", async () => {

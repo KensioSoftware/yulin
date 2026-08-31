@@ -1,4 +1,4 @@
-import { assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { BackgroundTasks } from "../../../../../util/background/background.js";
@@ -101,7 +101,7 @@ describe("the shard pollers of a Kinesis stream mapping", () => {
 
     // Then the pollers the call would have made are dropped, so nothing is
     // left polling a mapping that has gone.
-    assertArrayLength(await polling, 0);
-    assertArrayLength(shardPollers.made, 0);
+    assertArrayEmpty(await polling);
+    assertArrayEmpty(shardPollers.made);
   });
 });

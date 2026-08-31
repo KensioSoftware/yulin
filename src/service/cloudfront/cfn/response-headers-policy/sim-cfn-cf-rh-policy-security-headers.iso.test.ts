@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -101,14 +102,11 @@ describe("simCfnCfResponseHeadersPolicySecurityHeaders", () => {
   });
 
   it("reads a section with no sub-sections as setting nothing", () => {
-    assertArrayLength(headersFrom({}), 0);
+    assertArrayEmpty(headersFrom({}));
   });
 
   it("sets nothing when the section is absent", () => {
-    assertArrayLength(
-      simCfnCfResponseHeadersPolicySecurityHeaders({}, refuse),
-      0,
-    );
+    assertArrayEmpty(simCfnCfResponseHeadersPolicySecurityHeaders({}, refuse));
   });
 
   it("names the Resource and the field missing from a sub-section", () => {

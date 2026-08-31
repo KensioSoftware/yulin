@@ -4,7 +4,7 @@ import {
   GetRestApisCommand,
 } from "@aws-sdk/client-api-gateway";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import { assertArrayEmpty, assertIdentical } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
@@ -91,7 +91,7 @@ describe("Simulated IAM for API Gateway REST API commands", () => {
     const listed = await simAws
       .apiGateway()
       .getRestApis(new GetRestApisCommand({}), { caller });
-    assertArrayLength(listed.items, 0);
+    assertArrayEmpty(listed.items);
   });
 
   it("authorizes a child collection against its own path", async () => {

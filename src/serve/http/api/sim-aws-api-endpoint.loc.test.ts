@@ -24,8 +24,10 @@ import {
 } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -286,6 +288,6 @@ describe("Serving the general AWS API on one endpoint", () => {
 
     // Then the endpoint declines it, because an unsigned request names no
     // service to route to
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
   });
 });

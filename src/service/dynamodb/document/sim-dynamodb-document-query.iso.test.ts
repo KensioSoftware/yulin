@@ -10,6 +10,7 @@ import {
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertObjectEquals,
@@ -141,7 +142,7 @@ describe("simulated DynamoDB document client Query", () => {
       new QueryCommand({ ...page, ExclusiveStartKey: second.LastEvaluatedKey }),
     );
 
-    assertArrayLength(third.Items ?? [], 0);
+    assertArrayEmpty(third.Items ?? []);
     assertUndefined(third.LastEvaluatedKey);
   });
 

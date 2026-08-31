@@ -12,8 +12,8 @@ import {
   PutMetricFilterCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertUndefined,
@@ -137,7 +137,7 @@ describe("sim CloudWatch Logs metric filter publication", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({ Namespace: "Orders" }));
 
-    assertArrayLength(Metrics ?? [], 0);
+    assertArrayEmpty(Metrics ?? []);
   });
 
   it("publishes a default value once for a period that matched nothing", async () => {

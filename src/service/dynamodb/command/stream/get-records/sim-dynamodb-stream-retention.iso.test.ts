@@ -7,6 +7,7 @@ import {
   type ShardIteratorType,
 } from "@aws-sdk/client-dynamodb-streams";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -123,7 +124,7 @@ describe("DynamoDB Streams 24 hour retention", () => {
     // Then the stream is still there and still readable, with nothing on it.
     assertArrayLength(listed.Streams, 1);
     assertIdentical(listed.Streams[0].StreamArn, aged.stream.arn);
-    assertArrayLength(output.Records, 0);
+    assertArrayEmpty(output.Records);
     assertNonNullable(output.NextShardIterator);
   });
 

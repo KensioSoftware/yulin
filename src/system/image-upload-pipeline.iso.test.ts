@@ -1,7 +1,7 @@
 import { GetObjectCommand, ListObjectsCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertBufferEqual,
   assertFalse,
   assertIdentical,
@@ -138,17 +138,17 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
     const upload = await client.getUpload(requested.uploadId);
 
     assertIdentical(upload.status, "REJECTED");
-    assertArrayLength(upload.renditions, 0);
+    assertArrayEmpty(upload.renditions);
 
     // And it never reached the screened prefix the queue is notified for, so
     // the rest of the pipeline was never asked to do anything
-    assertArrayLength(await keysUnder(simAws, screenedPrefix), 0);
+    assertArrayEmpty(await keysUnder(simAws, screenedPrefix));
 
     // And there is nothing to publish
     const refused = await client.publish(requested.uploadId, widestWidth);
 
     assertResponseStatus(refused, 409);
-    assertArrayLength(await keysUnder(simAws, publishedKey(userId)), 0);
+    assertArrayEmpty(await keysUnder(simAws, publishedKey(userId)));
   });
 
   it("refuses a request that carries no token", async () => {

@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringEndsWith,
@@ -111,7 +112,7 @@ describe("Simulated S3 upload through lib-storage", () => {
     const inProgress = await client.send(
       new ListMultipartUploadsCommand({ Bucket: "lib-storage" }),
     );
-    assertArrayLength(inProgress.Uploads ?? [], 0);
+    assertArrayEmpty(inProgress.Uploads ?? []);
   });
 
   it("uploads a body smaller than the part size in one request", async () => {

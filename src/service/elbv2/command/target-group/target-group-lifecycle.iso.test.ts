@@ -5,6 +5,7 @@ import {
   ModifyTargetGroupCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -203,10 +204,10 @@ describe("ELBv2 target group lifecycle", () => {
 
     // Then the group survived the load balancer and is deletable afterwards.
     assertArrayLength(surviving.TargetGroups, 1);
-    assertArrayLength(surviving.TargetGroups[0].LoadBalancerArns, 0);
+    assertArrayEmpty(surviving.TargetGroups[0].LoadBalancerArns);
 
     const remaining = await elbV2.describeTargetGroups({ input: {} });
-    assertArrayLength(remaining.TargetGroups, 0);
+    assertArrayEmpty(remaining.TargetGroups);
   });
 
   it("refuses a delete naming no target group, or one that is gone", async () => {

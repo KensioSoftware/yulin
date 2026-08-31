@@ -1,8 +1,8 @@
 import { CreateKeyValueStoreCommand } from "@aws-sdk/client-cloudfront";
 import {
-  assertArrayLength,
-  assertStringIncludes,
+  assertArrayEmpty,
   assertIdentical,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -39,13 +39,12 @@ describe("Deleting a key value store something still uses", () => {
     // CloudFront with no Function map gets
     // When it is asked what uses a store
     // Then nothing does
-    assertArrayLength(
+    assertArrayEmpty(
       noKeyValueStoreUsers.functionsUsing(
         "any-store-id" as Parameters<
           SimCfKeyValueStoreUsers["functionsUsing"]
         >[0],
       ),
-      0,
     );
   });
 

@@ -2,8 +2,10 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -28,7 +30,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
 
     // When the sign-up form is fetched and posted.
     const form = await simCognitoGetPage(setUp, "/signup", parameters);
-    assertIdentical(form.status, 200);
+    assertResponseStatus(form, 200, await describeResponse(form));
     assertStringIncludes(await form.text(), 'name="username"');
 
     const signedUp = await simCognitoPostForm(setUp, "/signup", {
@@ -39,7 +41,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
 
     // Then the user is in the pool unconfirmed, and the browser is sent on to
     // the page that asks for the code.
-    assertIdentical(signedUp.status, 303);
+    assertResponseStatus(signedUp, 303, await describeResponse(signedUp));
     assertIdentical(simCognitoRedirectedTo(signedUp).pathname, "/confirm");
     assertTrue(
       pool.requireUser(simCognitoLocalUsername as never).status.isUnconfirmed,
@@ -55,7 +57,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
       code,
     });
 
-    assertIdentical(confirmed.status, 303);
+    assertResponseStatus(confirmed, 303, await describeResponse(confirmed));
     assertIdentical(
       simCognitoRedirectedTo(confirmed).pathname,
       "/oauth2/authorize",
@@ -68,7 +70,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
       password: simCognitoLocalPassword,
     });
 
-    assertIdentical(signedIn.status, 302);
+    assertResponseStatus(signedIn, 302, await describeResponse(signedIn));
     assertNonNullable(
       simCognitoRedirectedTo(signedIn).searchParams.get("code"),
     );
@@ -95,7 +97,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
     });
 
     // Then the pool has issued a fresh code, and the page asks for it.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), "Another code has been sent");
 
     const second = pool.confirmationCode(simCognitoLocalUsername);
@@ -115,7 +117,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
     });
 
     // Then the form comes back saying why, and the pool gained no user.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), "Password did not conform");
     assertIdentical(setUp.cognito.userPool(setUp.userPoolId).userCount, 0);
   });
@@ -139,7 +141,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
     });
 
     // Then the user carries it.
-    assertIdentical(signedUp.status, 303);
+    assertResponseStatus(signedUp, 303, await describeResponse(signedUp));
     assertIdentical(
       setUp.cognito
         .userPool(setUp.userPoolId)

@@ -5,6 +5,7 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertInstanceOf,
   assertStringIncludes,
@@ -104,7 +105,7 @@ describe("SES template IAM authorization", () => {
       .sesV2()
       .listEmailTemplates(new ListEmailTemplatesCommand({}), asRole);
 
-    assertArrayLength(listed.TemplatesMetadata ?? [], 0);
+    assertArrayEmpty(listed.TemplatesMetadata ?? []);
   });
 
   it("refuses a listing to a policy naming template ARNs", async () => {

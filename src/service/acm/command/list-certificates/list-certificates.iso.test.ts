@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -25,7 +26,7 @@ describe("ACM ListCertificatesCommand", () => {
     );
 
     // Then an empty certificate summary list is returned.
-    assertArrayLength(listOutput.CertificateSummaryList, 0);
+    assertArrayEmpty(listOutput.CertificateSummaryList);
     assertUndefined(listOutput.NextToken);
   });
 

@@ -13,6 +13,7 @@ import {
   StartBackupJobCommand,
 } from "@aws-sdk/client-backup";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -128,13 +129,13 @@ describe("simulated AWS Backup recovery points", () => {
     await simAws.clock().advanceBy({ days: 2 });
 
     // Then vault reads sweep the expired point from both access paths.
-    assertArrayLength(backup.vault(vaultName).recoveryPoints(), 0);
+    assertArrayEmpty(backup.vault(vaultName).recoveryPoints());
     const listed = await backup.listRecoveryPointsByBackupVault(
       new ListRecoveryPointsByBackupVaultCommand({
         BackupVaultName: vaultName,
       }),
     );
-    assertArrayLength(listed.RecoveryPoints ?? [], 0);
+    assertArrayEmpty(listed.RecoveryPoints ?? []);
     await expect(
       backup.describeRecoveryPoint(
         new DescribeRecoveryPointCommand({
@@ -191,7 +192,7 @@ describe("simulated AWS Backup recovery points", () => {
     await simAws.clock().advanceBy({ hours: 1 });
 
     // Then it leaves a readable failed job and no recovery point.
-    assertArrayLength(backup.vault(vaultName).recoveryPoints(), 0);
+    assertArrayEmpty(backup.vault(vaultName).recoveryPoints());
     const listed = await backup.listBackupJobs(new ListBackupJobsCommand({}));
     assertArrayLength(listed.BackupJobs ?? [], 1);
     const jobId = listed.BackupJobs?.[0]?.BackupJobId;

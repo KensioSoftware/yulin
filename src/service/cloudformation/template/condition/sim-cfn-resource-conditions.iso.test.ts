@@ -1,10 +1,10 @@
 import {
-  assertArrayLength,
-  assertUndefined,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
   assertTrue,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -24,7 +24,7 @@ describe("SimCfnStack Resource Condition", () => {
 
     // Then that Resource is not in the Stack at all, unlike a skipped one.
     assertUndefined(stack.getResource("Backups"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And the Resource the Condition kept is created and named for dev.
     const site = stack.getResource("Site");

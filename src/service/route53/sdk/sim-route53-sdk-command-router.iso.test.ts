@@ -10,7 +10,7 @@ import {
   Route53Client,
 } from "@aws-sdk/client-route-53";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -48,7 +48,7 @@ describe("simulated Route53 SDK Command routing", () => {
     const listAfterDelete = await client.send(
       new ListHostedZonesByNameCommand({ DNSName: "example.com" }),
     );
-    assertArrayLength(listAfterDelete.HostedZones ?? [], 0);
+    assertArrayEmpty(listAfterDelete.HostedZones ?? []);
   });
 
   it("routes ChangeResourceRecordSetsCommand through an intercepted client", async () => {

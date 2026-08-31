@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -111,7 +112,7 @@ describe("DynamoDB QueryCommand paging", () => {
     // And the next page is empty, with nothing left to resume for.
     const next = await queryPage(simDynamoDb, 3, output.LastEvaluatedKey);
 
-    assertArrayLength(next.Items ?? [], 0);
+    assertArrayEmpty(next.Items ?? []);
     assertUndefined(next.LastEvaluatedKey);
   });
 
@@ -156,6 +157,6 @@ describe("DynamoDB QueryCommand paging", () => {
 
     // Then there is nothing after it: a collection with no sort key holds one
     // item.
-    assertArrayLength(output.Items ?? [], 0);
+    assertArrayEmpty(output.Items ?? []);
   });
 });

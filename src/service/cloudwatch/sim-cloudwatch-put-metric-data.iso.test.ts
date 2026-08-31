@@ -3,7 +3,7 @@ import {
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -160,7 +160,7 @@ describe("SimCloudWatch PutMetricData", () => {
     // Then it is refused, as real CloudWatch refuses it.
     assertInstanceOf(error, SimCloudWatchInvalidParameterValueException);
     assertIdentical(error.name, "InvalidParameterValueException");
-    assertArrayLength(metrics.allMetrics(), 0);
+    assertArrayEmpty(metrics.allMetrics());
   });
 
   it("refuses a datum stating its values in no way, or in two", async () => {
@@ -233,7 +233,7 @@ describe("SimCloudWatch PutMetricData", () => {
     );
 
     // Then neither was stored, as real CloudWatch validates the whole request.
-    assertArrayLength(metrics.allMetrics(), 0);
+    assertArrayEmpty(metrics.allMetrics());
   });
 
   it("counts each value once when a datum lists values without counts", async () => {

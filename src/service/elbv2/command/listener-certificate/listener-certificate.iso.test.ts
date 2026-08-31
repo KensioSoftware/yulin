@@ -4,6 +4,7 @@ import {
   RemoveListenerCertificatesCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -260,7 +261,7 @@ describe("ELBv2 listener certificates", () => {
     );
 
     // Then it carries none.
-    assertArrayLength(output.Certificates, 0);
+    assertArrayEmpty(output.Certificates);
   });
 
   it("refuses a request naming no listener or no certificate", async () => {

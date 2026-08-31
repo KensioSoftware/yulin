@@ -9,8 +9,8 @@ import {
 } from "@aws-sdk/client-cloudwatch-logs";
 import { DeleteWebACLCommand } from "@aws-sdk/client-wafv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertResponseStatus,
@@ -229,7 +229,7 @@ describe("A request to a sim CloudFront Distribution behind a web ACL", () => {
     // never asked for anything.
     assertResponseStatus(response, 403);
     assertStringIncludes(await response.text(), "Request blocked by AWS WAF");
-    assertArrayLength(await servedByOrigin(simAws), 0);
+    assertArrayEmpty(await servedByOrigin(simAws));
   });
 
   it("reaches the Origin unchanged when the web ACL allows it", async () => {
@@ -376,6 +376,6 @@ describe("A request to a sim CloudFront Distribution behind a web ACL", () => {
 
     assertResponseStatus(response, 400);
     assertStringIncludes(await response.text(), webAclArn);
-    assertArrayLength(await servedByOrigin(simAws), 0);
+    assertArrayEmpty(await servedByOrigin(simAws));
   });
 });

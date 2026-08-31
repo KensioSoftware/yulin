@@ -10,6 +10,7 @@ import {
   ListCampaignsCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -226,7 +227,7 @@ describe("Personalize DeleteCampaign", () => {
     const listed = await simAws
       .personalize()
       .listCampaigns(new ListCampaignsCommand({}));
-    assertArrayLength(listed.campaigns ?? [], 0);
+    assertArrayEmpty(listed.campaigns ?? []);
   });
 });
 

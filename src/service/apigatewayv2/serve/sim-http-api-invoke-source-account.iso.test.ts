@@ -2,7 +2,11 @@ import {
   AddPermissionCommand,
   RemovePermissionCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -40,7 +44,7 @@ describe("The source Account an HTTP API invokes its function with", () => {
     );
 
     // Then the API supplies that Account, so the condition matches
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a permission naming another Account", async () => {
@@ -75,7 +79,7 @@ describe("The source Account an HTTP API invokes its function with", () => {
 
     // Then the grant belongs to another Account's API, so this one is answered
     // the way a missing permission is
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertIdentical(invocations, 0);
   });
 
@@ -126,7 +130,7 @@ describe("The source Account an HTTP API invokes its function with", () => {
 
     // Then the source Account is the one the request arrives in, which is the
     // API's rather than the function's
-    assertIdentical(ownAccount.status, 500);
-    assertIdentical(apiAccount.status, 200);
+    assertResponseStatus(ownAccount, 500, await describeResponse(ownAccount));
+    assertResponseStatus(apiAccount, 200, await describeResponse(apiAccount));
   });
 });

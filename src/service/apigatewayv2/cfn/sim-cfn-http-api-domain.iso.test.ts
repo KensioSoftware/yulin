@@ -1,10 +1,12 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
   assertTypeString,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -99,7 +101,7 @@ describe("HTTP API custom domain CloudFormation Resources", () => {
     );
 
     // Then the deployed API served it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "/orders");
   });
 
@@ -122,7 +124,7 @@ describe("HTTP API custom domain CloudFormation Resources", () => {
 
     // Then the route matched what was left, and the base path is gone from
     // the event, as AWS documents rawPath
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "/orders");
   });
 
@@ -266,7 +268,7 @@ describe("HTTP API custom domain CloudFormation Resources", () => {
     );
 
     // Then the Origin resolved to the domain and the API behind it answered
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "/orders");
   });
 

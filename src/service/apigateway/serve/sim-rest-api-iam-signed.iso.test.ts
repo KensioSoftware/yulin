@@ -3,7 +3,11 @@ import {
   CreateUserCommand,
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
@@ -112,7 +116,7 @@ describe("Calling an AWS_IAM sim REST API method with a signed request", () => {
     const context = (await response.json()) as SimPayload1RequestContext;
 
     // Then the signature identified them, and the handler was told who called
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get(simAwsAuthHeaderName), "sigv4");
     assertIdentical(
       context.identity.userArn,
@@ -139,6 +143,6 @@ describe("Calling an AWS_IAM sim REST API method with a signed request", () => {
 
     // Then a valid signature is authentication rather than authorization, and
     // the method stays closed to them
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 });

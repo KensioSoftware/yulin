@@ -4,6 +4,7 @@ import {
   ListFunctionUrlConfigsCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -66,7 +67,7 @@ describe("Lambda ListFunctionUrlConfigsCommand", () => {
     );
 
     // Then the list is empty rather than an error.
-    assertArrayLength(output.FunctionUrlConfigs, 0);
+    assertArrayEmpty(output.FunctionUrlConfigs);
   });
 
   it("throws on a function that does not exist", async () => {

@@ -11,6 +11,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -155,7 +156,7 @@ describe("Notifying a simulated Lambda function of a delete marker", () => {
 
     // Then nothing is notified, because the two removals are separate events
     // and only one of them happened.
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 
   it("raises Delete when a version is removed for good", async () => {

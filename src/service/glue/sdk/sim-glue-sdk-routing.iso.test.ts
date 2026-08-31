@@ -16,9 +16,9 @@ import {
   GlueClient,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludesAll,
-  assertArrayLength,
   assertIdentical,
   assertUndefined,
 } from "@kensio/smartass";
@@ -163,7 +163,7 @@ describe("Glue SDK interception", () => {
 
     const remaining = await client.send(new GetDatabasesCommand({}));
 
-    assertArrayLength(remaining.DatabaseList ?? [], 0);
+    assertArrayEmpty(remaining.DatabaseList ?? []);
   });
 
   it("registers and reads partitions through an intercepted client", async () => {

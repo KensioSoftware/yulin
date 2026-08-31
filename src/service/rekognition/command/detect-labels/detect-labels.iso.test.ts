@@ -1,6 +1,7 @@
 import { DetectLabelsCommand } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -111,9 +112,9 @@ describe("Detecting labels in a simulated image", () => {
     );
     // Nothing is filled in from the label name, so what was not declared is
     // empty rather than guessed at from an ontology Yulin does not have.
-    assertArrayLength(cat.Aliases, 0);
-    assertArrayLength(cat.Categories, 0);
-    assertArrayLength(cat.Instances, 0);
+    assertArrayEmpty(cat.Aliases);
+    assertArrayEmpty(cat.Categories);
+    assertArrayEmpty(cat.Instances);
   });
 
   it("reports a label declared as a bare name", async () => {
@@ -188,7 +189,7 @@ describe("Detecting labels in a simulated image", () => {
 
     // Then it is filtered out, because label detection defaults to 55 rather
     // than to the 50 moderation uses.
-    assertArrayLength(detected.Labels, 0);
+    assertArrayEmpty(detected.Labels);
   });
 
   it("returns every label when the request asks for a confidence of zero", async () => {
@@ -269,7 +270,7 @@ describe("Detecting labels in a simulated image", () => {
 
     // Then no labels come back: an explicit 0 is a request for none, not an
     // unset value to be read as uncapped.
-    assertArrayLength(detected.Labels, 0);
+    assertArrayEmpty(detected.Labels);
   });
 
   it("reports the instances a label was declared with", async () => {

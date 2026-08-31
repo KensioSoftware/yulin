@@ -9,6 +9,7 @@ import {
   ListSolutionsCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -247,6 +248,6 @@ describe("Personalize DeleteSolution", () => {
     const listed = await simAws
       .personalize()
       .listSolutionVersions(new ListSolutionVersionsCommand({}));
-    assertArrayLength(listed.solutionVersions ?? [], 0);
+    assertArrayEmpty(listed.solutionVersions ?? []);
   });
 });

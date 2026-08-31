@@ -7,7 +7,7 @@ import {
   PutRecordCommand,
 } from "@aws-sdk/client-kinesis";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -113,7 +113,7 @@ describe("Changing how long a simulated Kinesis stream keeps a record", () => {
     // Then the record is gone from the next read, since retention is applied
     // when a stream is read rather than when it is changed.
     assertIdentical(await retentionOf(simAws), 24);
-    assertArrayLength(await readFromTrimHorizon(simAws), 0);
+    assertArrayEmpty(await readFromTrimHorizon(simAws));
   });
 
   it("refuses a change that goes the other way from the command", async () => {

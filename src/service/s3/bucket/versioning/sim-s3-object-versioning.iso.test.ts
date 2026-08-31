@@ -9,6 +9,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -195,7 +196,7 @@ describe("Versioning a simulated S3 Bucket", () => {
     // Then the delete wrote a marker rather than removing anything, and
     // removing the marker exposed the Object underneath it again.
     assertTrue(deleted.DeleteMarker);
-    assertArrayLength(hidden.Contents ?? [], 0);
+    assertArrayEmpty(hidden.Contents ?? []);
     assertIdentical(reading.name, "NoSuchKey");
     assertIdentical(await readBody(restored.Body), "before");
   });

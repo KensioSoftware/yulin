@@ -25,6 +25,7 @@ import {
   CreateRestApiCommand,
 } from "@aws-sdk/client-api-gateway";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludesAll,
   assertArrayLength,
@@ -232,7 +233,7 @@ describe("WAFv2 SDK interception", () => {
       "sqlmap",
     );
     assertArrayLength(listedPatternSets.RegexPatternSets ?? [], 1);
-    assertArrayLength(afterDelete.WebACLs ?? [], 0);
+    assertArrayEmpty(afterDelete.WebACLs ?? []);
   });
 
   it("routes the association Commands through the intercepted client", async () => {
@@ -280,7 +281,7 @@ describe("WAFv2 SDK interception", () => {
     // Then each one reached simulated WAFv2.
     assertIdentical(forResource.WebACL?.Name, "api-acl");
     assertArrayEquals(listed.ResourceArns ?? [], [stageArn]);
-    assertArrayLength(afterDisassociate.ResourceArns ?? [], 0);
+    assertArrayEmpty(afterDisassociate.ResourceArns ?? []);
   });
 
   it("refuses a Command simulated WAFv2 does not handle", async () => {

@@ -3,6 +3,7 @@ import {
   UpdateStackCommand,
 } from "@aws-sdk/client-cloudformation";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -126,7 +127,7 @@ describe("AWS::Personalize Resources a template declares", () => {
     // Resource the stack stepped over.
     const personalize = simAws.personalize();
 
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertNonNullable(personalize.findDatasetGroup("catalogue"));
     assertNonNullable(personalize.findSolution("related-items"));
 
@@ -316,10 +317,10 @@ describe("AWS::Personalize Resources a template declares", () => {
     const solutions = await personalize.listSolutions({ input: {} });
     const trackers = await personalize.listEventTrackers({ input: {} });
 
-    assertArrayLength(groups.datasetGroups, 0);
-    assertArrayLength(schemas.schemas, 0);
-    assertArrayLength(datasets.datasets, 0);
-    assertArrayLength(solutions.solutions, 0);
-    assertArrayLength(trackers.eventTrackers, 0);
+    assertArrayEmpty(groups.datasetGroups);
+    assertArrayEmpty(schemas.schemas);
+    assertArrayEmpty(datasets.datasets);
+    assertArrayEmpty(solutions.solutions);
+    assertArrayEmpty(trackers.eventTrackers);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -66,7 +67,7 @@ describe("SimCfnResource ignored properties", () => {
 
     // Then the record is of this attempt only, rather than every attempt so
     // far.
-    assertArrayLength(resource.ignoredProperties, 0);
+    assertArrayEmpty(resource.ignoredProperties);
   });
 
   it("records an empty type for a Resource that declares none", () => {

@@ -29,10 +29,11 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
+  assertArrayIncludes,
   assertArrayLength,
   assertFalse,
   assertIdentical,
-  assertArrayIncludes,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -262,7 +263,7 @@ describe("Serving simulated SNS on an endpoint URL", () => {
     const remaining = await client.send(
       new ListSubscriptionsByTopicCommand({ TopicArn: topicArn }),
     );
-    assertArrayLength(remaining.Subscriptions ?? [], 0);
+    assertArrayEmpty(remaining.Subscriptions ?? []);
   });
 
   it("publishes a batch and reports each entry by its id", async () => {

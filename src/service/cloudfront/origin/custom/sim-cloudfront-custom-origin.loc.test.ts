@@ -3,7 +3,12 @@ import {
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { serveSimAws } from "../../../../serve/index.js";
@@ -85,7 +90,7 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
       );
 
       // Then the Origin served it, over the same request path and body.
-      assertIdentical(response.status, 200);
+      assertResponseStatus(response, 200, await describeResponse(response));
       assertIdentical(await response.text(), "/greet Yulin");
     } finally {
       await srv.close();

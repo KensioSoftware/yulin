@@ -1,6 +1,7 @@
 import { ListMetricsCommand } from "@aws-sdk/client-cloudwatch";
 import { PutMetricFilterCommand } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayIncludes,
   assertArrayLength,
   assertIdentical,
@@ -36,8 +37,8 @@ describe("Embedded Metric Format documents this cannot publish", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({}));
 
-    assertArrayLength(Metrics ?? [], 0);
-    assertArrayLength(simAws.logs().metricPublicationFailures, 0);
+    assertArrayEmpty(Metrics ?? []);
+    assertArrayEmpty(simAws.logs().metricPublicationFailures);
   });
 
   it("records a metric the document declared and carries no value for", async () => {
@@ -144,8 +145,8 @@ describe("Embedded Metric Format documents this cannot publish", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({}));
 
-    assertArrayLength(Metrics ?? [], 0);
-    assertArrayLength(simAws.logs().metricPublicationFailures, 0);
+    assertArrayEmpty(Metrics ?? []);
+    assertArrayEmpty(simAws.logs().metricPublicationFailures);
   });
 
   it("publishes nothing where the only dimension set cannot be filled in", async () => {
@@ -176,7 +177,7 @@ describe("Embedded Metric Format documents this cannot publish", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({}));
 
-    assertArrayLength(Metrics ?? [], 0);
+    assertArrayEmpty(Metrics ?? []);
     assertArrayLength(simAws.logs().metricPublicationFailures, 1);
   });
 
@@ -206,7 +207,7 @@ describe("Embedded Metric Format documents this cannot publish", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({}));
 
-    assertArrayLength(Metrics ?? [], 0);
+    assertArrayEmpty(Metrics ?? []);
   });
 
   it("tells its failures apart from a filter named after it", async () => {
@@ -288,6 +289,6 @@ describe("Embedded Metric Format documents this cannot publish", () => {
       .cloudWatch()
       .listMetrics(new ListMetricsCommand({}));
 
-    assertArrayLength(Metrics ?? [], 0);
+    assertArrayEmpty(Metrics ?? []);
   });
 });

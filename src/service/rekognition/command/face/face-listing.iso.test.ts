@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -73,7 +74,7 @@ describe("Reading and removing the faces of a simulated Rekognition collection",
       staff.Faces.map((face) => face.FaceId),
       indexed.FaceRecords.map((record) => record.Face.FaceId),
     );
-    assertArrayLength(visitors.Faces, 0);
+    assertArrayEmpty(visitors.Faces);
   });
 
   it("narrows a listing to the face ids it names", async () => {

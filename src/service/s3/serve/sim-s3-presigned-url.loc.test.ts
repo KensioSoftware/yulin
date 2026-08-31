@@ -1,6 +1,10 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 import {
@@ -57,7 +61,7 @@ describe("Presigned simulated S3 URLs over a local server", () => {
     const response = await fetch(url);
 
     // Then the Object comes back
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 
@@ -81,7 +85,7 @@ describe("Presigned simulated S3 URLs over a local server", () => {
     const response = await fetch(url);
 
     // Then the Object comes back, with no hostname naming the service
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 
@@ -103,7 +107,7 @@ describe("Presigned simulated S3 URLs over a local server", () => {
     });
 
     // Then it is stored in the simulated Bucket
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const stored = await simulation.simAws
       .s3()
       .getSimBucketByName(presignBucketName)

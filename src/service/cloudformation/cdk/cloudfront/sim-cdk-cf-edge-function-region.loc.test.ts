@@ -1,7 +1,7 @@
 import path from "node:path";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertResponseStatus,
@@ -63,7 +63,7 @@ describe("Sim CDK CloudFront EdgeFunction across Regions local integration", () 
 
     // And nothing was reported as a gap. CDK's provider function for the
     // reader is left inert, because the read has already happened.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("serves the site without the function when the support Stack is left out", async () => {

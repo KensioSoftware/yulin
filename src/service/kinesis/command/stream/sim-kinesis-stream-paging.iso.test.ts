@@ -3,7 +3,7 @@ import {
   ListStreamsCommand,
 } from "@aws-sdk/client-kinesis";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertTrue,
@@ -68,7 +68,7 @@ describe("Paging a simulated Kinesis stream listing", () => {
       .listStreams(new ListStreamsCommand({ NextToken: "zzz" }));
 
     // Then the page is empty and says there is no more.
-    assertArrayLength(listed.StreamNames, 0);
+    assertArrayEmpty(listed.StreamNames);
     assertFalse(listed.HasMoreStreams);
   });
 });

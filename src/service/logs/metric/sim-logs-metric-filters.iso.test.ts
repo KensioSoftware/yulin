@@ -9,6 +9,7 @@ import {
   PutMetricFilterCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -94,7 +95,7 @@ describe("sim CloudWatch Logs metric filters", () => {
         new DescribeMetricFiltersCommand({ logGroupName }),
       );
 
-    assertArrayLength(remaining ?? [], 0);
+    assertArrayEmpty(remaining ?? []);
   });
 
   it("reports how many filters a log group has", async () => {

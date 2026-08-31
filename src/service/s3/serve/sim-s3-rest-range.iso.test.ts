@@ -1,6 +1,10 @@
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import type { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -49,7 +53,7 @@ describe("A ranged read at the simulated S3 REST endpoint", () => {
 
     // Then those bytes come back as a partial response, saying which of the
     // Object's bytes they are
-    assertIdentical(response.status, 206);
+    assertResponseStatus(response, 206, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody.slice(0, 9));
     assertIdentical(response.headers.get("content-length"), "9");
     assertIdentical(
@@ -66,7 +70,7 @@ describe("A ranged read at the simulated S3 REST endpoint", () => {
     const response = await http.fetch(url);
 
     // Then the whole Object comes back, describing no range
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
     assertIdentical(response.headers.get("content-range"), null);
   });
@@ -82,7 +86,7 @@ describe("A ranged read at the simulated S3 REST endpoint", () => {
 
     // Then the read is refused, in the XML shape a client reads the code out
     // of, rather than answered with bytes it did not ask for
-    assertIdentical(response.status, 416);
+    assertResponseStatus(response, 416, await describeResponse(response));
     expect(await response.text()).toMatch(/<Code>InvalidRange<\/Code>/);
   });
 
@@ -108,7 +112,7 @@ describe("A ranged read at the simulated S3 REST endpoint", () => {
     // Then the answer describes the Object rather than the range, which is
     // what HeadObject tells an in-process caller too: simulated S3 does not
     // answer a ranged HEAD as real S3 does
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-length"),
       String(presignObjectBody.length),

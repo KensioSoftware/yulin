@@ -1,4 +1,8 @@
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -132,7 +136,7 @@ describe("Throttling a sim HTTP API stage", () => {
 
     // Then it is refused by the entry that names it, while the route drawing
     // on the stage default is served from a bucket of its own
-    assertIdentical(refused.status, 429);
+    assertResponseStatus(refused, 429, await describeResponse(refused));
     assertIdentical(await status(simAws, api, profile), 200);
   });
 
@@ -149,8 +153,8 @@ describe("Throttling a sim HTTP API stage", () => {
     const refused = await request(simAws, api, profile);
 
     // Then the second is refused on the stage default
-    assertIdentical(served.status, 200);
-    assertIdentical(refused.status, 429);
+    assertResponseStatus(served, 200, await describeResponse(served));
+    assertResponseStatus(refused, 429, await describeResponse(refused));
   });
 
   it("counts every client against the one bucket", async () => {

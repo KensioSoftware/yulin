@@ -11,6 +11,7 @@ import {
   UpdateAliasCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -88,6 +89,6 @@ describe("simulated Lambda version and alias SDK Command routing", () => {
     const remaining = await client.send(
       new ListAliasesCommand({ FunctionName: "intercepted" }),
     );
-    assertArrayLength(remaining.Aliases ?? [], 0);
+    assertArrayEmpty(remaining.Aliases ?? []);
   });
 });

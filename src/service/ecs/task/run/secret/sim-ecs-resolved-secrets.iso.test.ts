@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertStringIncludes,
@@ -20,7 +20,7 @@ describe("The secrets a simulated ECS task's containers run with", () => {
     // Then it gets them, and a container that declared none gets none.
     assertTrue(secrets.isResolved);
     assertIdentical(secrets.forContainer("app")["DB_PASSWORD"], "hunter2");
-    assertArrayLength(Object.keys(secrets.forContainer("logs")), 0);
+    assertArrayEmpty(Object.keys(secrets.forContainer("logs")));
   });
 
   it("carries the reason a task could not start", () => {

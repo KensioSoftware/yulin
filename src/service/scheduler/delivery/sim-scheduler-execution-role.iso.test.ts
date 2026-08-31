@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-scheduler";
 import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -132,7 +133,7 @@ describe("Scheduler execution role source", () => {
     const messages = await delivered(simAws);
 
     assertIdentical(messages[0], "reports");
-    assertArrayLength(simAws.scheduler().deliveryFailures, 0);
+    assertArrayEmpty(simAws.scheduler().deliveryFailures);
   });
 
   it("assumes a role scoped to a named group's ARN", async () => {
@@ -173,7 +174,7 @@ describe("Scheduler execution role source", () => {
 
     // Then nothing was delivered and the firing is a recorded failure, which is
     // the confused deputy guard doing its job rather than a simulator gap.
-    assertArrayLength(await delivered(simAws), 0);
+    assertArrayEmpty(await delivered(simAws));
     assertArrayLength(simAws.scheduler().deliveryFailures, 1);
     assertStringIncludes(
       String(simAws.scheduler().deliveryFailures[0]?.error),

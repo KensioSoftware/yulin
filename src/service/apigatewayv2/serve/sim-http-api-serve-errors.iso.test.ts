@@ -6,7 +6,7 @@ import {
   DeleteApiCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
-import { assertIdentical } from "@kensio/smartass";
+import { assertResponseStatus, describeResponse } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -31,7 +31,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
 
     // Then the endpoint reports it the way real API Gateway does, with the
     // lower-case message field an HTTP API uses
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 
@@ -41,7 +41,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
     const api = await simHttpApiLambdaProxyFactory.make({}, simAws);
     const http = new SimAwsHttp({ simAws });
     const served = await http.fetch(localUrl(api.apiEndpoint));
-    assertIdentical(served.status, 200);
+    assertResponseStatus(served, 200, await describeResponse(served));
 
     // When it is deleted
     await simAws
@@ -50,7 +50,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
 
     // Then its endpoint stops resolving, id and all
     const response = await http.fetch(localUrl(api.apiEndpoint));
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("answers 404 for an API with no route or stage yet", async () => {
@@ -68,7 +68,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
     );
 
     // Then there is nothing to route the request to
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("answers 403 when the generated endpoint is disabled", async () => {
@@ -86,7 +86,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
     );
 
     // Then it refuses the request rather than proxying it
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
   });
 
@@ -109,7 +109,7 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
 
     // Then the failure is reported as the endpoint's own error, with nothing
     // of the handler's error in it
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Internal Server Error",
     });
@@ -163,6 +163,6 @@ describe("What a served sim HTTP API answers when it cannot proxy", () => {
 
     // Then the missing function surfaces where real API Gateway finds it too,
     // at the invocation rather than at the integration that named it
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 });

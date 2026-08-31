@@ -1,4 +1,4 @@
-import { assertArrayIncludes, assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty, assertArrayIncludes } from "@kensio/smartass";
 import { ESLint } from "eslint";
 import tseslint from "typescript-eslint";
 import { describe, it } from "vitest";
@@ -58,7 +58,7 @@ describe("Linting a CloudFront Functions JS2 file", () => {
 
     // Then nothing is reported, including by the rules a modern-JavaScript
     // config would otherwise apply to it
-    assertArrayLength(reported, 0);
+    assertArrayEmpty(reported);
   });
 
   for (const supported of supportedCffJs2Cases) {
@@ -71,7 +71,7 @@ describe("Linting a CloudFront Functions JS2 file", () => {
 
       // Then no restriction reports it. Each of these was refused by an
       // earlier version of this config, against what the runtime documents.
-      assertArrayLength(reported, 0);
+      assertArrayEmpty(reported);
     });
   }
 
@@ -86,9 +86,6 @@ describe("Linting a CloudFront Functions JS2 file", () => {
 
     // Then no rule ships without one, which is what stops a rule being added
     // and never exercised
-    assertArrayLength(
-      published.filter((rule) => !covered.has(rule)),
-      0,
-    );
+    assertArrayEmpty(published.filter((rule) => !covered.has(rule)));
   });
 });

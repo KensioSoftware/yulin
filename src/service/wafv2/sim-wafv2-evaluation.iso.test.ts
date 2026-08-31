@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -277,7 +277,7 @@ describe("SimWafV2 rule evaluation", () => {
     const decision = await decide(rules, "/admin");
 
     // Then nothing is inserted, because nothing is forwarded.
-    assertArrayLength(decision.insertedHeaders, 0);
+    assertArrayEmpty(decision.insertedHeaders);
   });
 
   it("names the web ACL that decided", async () => {

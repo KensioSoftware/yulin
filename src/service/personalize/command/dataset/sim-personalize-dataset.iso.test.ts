@@ -7,6 +7,7 @@ import {
   ListDatasetsCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -284,6 +285,6 @@ describe("Personalize DeleteDataset", () => {
     const listed = await simAws
       .personalize()
       .listDatasets(new ListDatasetsCommand({}));
-    assertArrayLength(listed.datasets ?? [], 0);
+    assertArrayEmpty(listed.datasets ?? []);
   });
 });

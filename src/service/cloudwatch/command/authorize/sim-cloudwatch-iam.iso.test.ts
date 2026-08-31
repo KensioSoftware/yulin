@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -195,7 +196,7 @@ describe("CloudWatch alarm IAM authorization", () => {
     // Then it is denied, and nothing was created.
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.action, "cloudwatch:PutMetricAlarm");
-    assertArrayLength(simAws.cloudWatch().allAlarms(), 0);
+    assertArrayEmpty(simAws.cloudWatch().allAlarms());
   });
 
   it("denies deleting an alarm the policy does not cover, and describing needs no resource", async () => {

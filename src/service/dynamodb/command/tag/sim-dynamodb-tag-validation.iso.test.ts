@@ -4,6 +4,7 @@ import {
   TagResourceCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertInstanceOf,
   assertObjectEquals,
@@ -268,6 +269,6 @@ describe("DynamoDB tag validation", () => {
     assertInstanceOf(error, SimDynamoDbValidationException);
 
     const listed = await simAws.dynamoDb().listTables({ input: {} });
-    assertArrayLength(listed.TableNames, 0);
+    assertArrayEmpty(listed.TableNames);
   });
 });

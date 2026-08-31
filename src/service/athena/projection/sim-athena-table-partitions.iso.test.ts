@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertStringIncludes,
@@ -231,7 +232,7 @@ describe("the S3 prefixes a query reads for one table", () => {
 
     // When its partitions are read.
     // Then there are none. Nothing said where the data is.
-    assertArrayLength(partitionsOf(table), 0);
+    assertArrayEmpty(partitionsOf(table));
   });
 
   it("refuses a query leaving an injected column unconstrained", () => {

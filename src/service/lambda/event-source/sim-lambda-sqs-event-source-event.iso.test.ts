@@ -2,6 +2,7 @@ import { CreateEventSourceMappingCommand } from "@aws-sdk/client-lambda";
 import { PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -53,7 +54,7 @@ describe("sim Lambda SQS event source event records", () => {
       attributes["signature"]?.binaryValue,
       Buffer.from("sig").toString("base64"),
     );
-    assertArrayLength(attributes["signature"].stringListValues, 0);
+    assertArrayEmpty(attributes["signature"].stringListValues);
   });
 
   it("waits for a delayed message to become receivable", async () => {
@@ -104,7 +105,7 @@ describe("sim Lambda SQS event source event records", () => {
     await simAws.backgroundTasksComplete();
 
     // Then nothing was delivered, and the mapping says why.
-    assertArrayLength(events, 0);
+    assertArrayEmpty(events);
     assertIdentical(
       simAws.lambda().getSimEventSourceMapping(mapping.UUID)?.state,
       "Disabled",

@@ -4,6 +4,7 @@ import {
   ListConfigurationSetsCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertInstanceOf,
   assertStringIncludes,
@@ -101,7 +102,7 @@ describe("SES configuration set IAM authorization", () => {
       .sesV2()
       .listConfigurationSets(new ListConfigurationSetsCommand({}), asRole);
 
-    assertArrayLength(listed.ConfigurationSets ?? [], 0);
+    assertArrayEmpty(listed.ConfigurationSets ?? []);
   });
 
   it("refuses a listing to a policy naming set ARNs", async () => {

@@ -1,6 +1,6 @@
 import { ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -152,7 +152,7 @@ describe("DynamoDB ScanCommand segment validation", () => {
       );
 
       // Then it is read, and holds nothing since the table does.
-      assertArrayLength(output.Items ?? [], 0);
+      assertArrayEmpty(output.Items ?? []);
     },
   );
 });

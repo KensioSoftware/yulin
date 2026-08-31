@@ -1,6 +1,6 @@
 import { PutRecordCommand } from "@aws-sdk/client-kinesis";
 import { DeleteEventSourceMappingCommand } from "@aws-sdk/client-lambda";
-import { assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty, assertArrayLength } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { simAwsWithKinesisEventSource } from "../../../../test/lambda/kinesis-event-source-fixture.js";
@@ -80,6 +80,6 @@ describe("the life of a sim Lambda Kinesis stream event source mapping", () => {
     await putOrder(simAws, "order-1");
 
     // Then nothing reached the function.
-    assertArrayLength(events, 0);
+    assertArrayEmpty(events);
   });
 });

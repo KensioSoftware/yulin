@@ -4,7 +4,7 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertObjectEquals,
   assertStringIncludes,
@@ -84,7 +84,7 @@ describe("Cognito CloudFormation user pool schema", () => {
     const clientId = stack.outputs.get("ClientId")?.value;
     assertTypeString(userPoolId);
     assertTypeString(clientId);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
 
     // And the pool reports the attributes the template declared, under the
     // names Cognito gives them.

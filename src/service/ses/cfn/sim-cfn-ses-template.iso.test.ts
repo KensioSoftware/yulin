@@ -1,7 +1,7 @@
 import { DeleteStackCommand } from "@aws-sdk/client-cloudformation";
 import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -140,7 +140,7 @@ describe("AWS::SES::Template", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the template went with it.
-    assertArrayLength(simAws.sesV2().allTemplates(), 0);
+    assertArrayEmpty(simAws.sesV2().allTemplates());
   });
 
   it("fails the deploy on Handlebars this simulation cannot render", async () => {

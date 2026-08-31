@@ -4,7 +4,7 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -44,8 +44,8 @@ describe("sim Cognito user pool email SES failures", () => {
     assertStringIncludes(error.message, "example.com");
 
     // And neither SES nor the pool recorded a message that never went.
-    assertArrayLength(sesIn(pool, "us-east-1").sentEmails(), 0);
-    assertArrayLength(pool.cognito.userPool(pool.userPoolId).sentMessages(), 0);
+    assertArrayEmpty(sesIn(pool, "us-east-1").sentEmails());
+    assertArrayEmpty(pool.cognito.userPool(pool.userPoolId).sentMessages());
   });
 
   it("fails the sign-up where the SourceArn identity is unverified", async () => {
@@ -87,7 +87,7 @@ describe("sim Cognito user pool email SES failures", () => {
     assertInstanceOf(error, SimCognitoCodeDeliveryFailureException);
     assertIdentical(error.name, "CodeDeliveryFailureException");
     assertStringIncludes(error.message, applicant);
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("says so where the simulated Cognito was built without SES", async () => {

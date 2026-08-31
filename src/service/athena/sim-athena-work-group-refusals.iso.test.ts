@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -228,7 +228,7 @@ describe("simulated Athena workgroup refusals", () => {
     });
 
     // Then the named query went with it.
-    assertArrayLength(simAws.athena().namedQueries(), 0);
+    assertArrayEmpty(simAws.athena().namedQueries());
   });
 
   it("refuses a page size outside the range Athena takes", async () => {

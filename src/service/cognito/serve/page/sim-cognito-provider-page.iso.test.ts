@@ -2,9 +2,11 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertStringNotIncludes,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -46,7 +48,7 @@ async function providerPage(setUp: SimCognitoHostedSetUp): Promise<string> {
     federatedParameters(setUp),
   );
 
-  assertIdentical(response.status, 200);
+  assertResponseStatus(response, 200, await describeResponse(response));
 
   return await response.text();
 }
@@ -121,7 +123,7 @@ describe("The page a sim Cognito domain stands in for an identity provider with"
 
     // Then the browser goes to the app client's callback URL with a code and
     // the state the application started with.
-    assertIdentical(posted.status, 302);
+    assertResponseStatus(posted, 302, await describeResponse(posted));
 
     const callback = simCognitoRedirectedTo(posted);
     assertIdentical(callback.origin + callback.pathname, simCognitoCallbackUrl);
@@ -183,7 +185,7 @@ describe("The page a sim Cognito domain stands in for an identity provider with"
 
     // Then the sign-in completes without the page being drawn, which is what
     // leaves every test written before this one unchanged.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertNonNullable(
       simCognitoRedirectedTo(response).searchParams.get("code"),
     );

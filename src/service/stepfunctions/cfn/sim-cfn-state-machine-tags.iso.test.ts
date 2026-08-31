@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertStringIncludes,
@@ -100,7 +101,7 @@ describe("Tags on a deployed AWS::StepFunctions::StateMachine", () => {
 
     // Then the property landed on the state machine, and nothing about it was
     // recorded as unsimulated.
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
 
     const listed = await simAws
       .stepFunctions()

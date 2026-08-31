@@ -5,7 +5,7 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -207,7 +207,7 @@ describe("SimSesV2 sending through a configuration set", () => {
     // switch is a declaration the caller wrote deliberately.
     assertInstanceOf(error, SimSesSendingPausedException);
     assertStringIncludes(error.message, "paused");
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("refuses a send the identity's own set has switched off", async () => {
@@ -229,7 +229,7 @@ describe("SimSesV2 sending through a configuration set", () => {
 
     // Then it is refused just the same, since it went through that set.
     assertInstanceOf(error, SimSesSendingPausedException);
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("sends a service message through the identity's set", async () => {
@@ -285,6 +285,6 @@ describe("SimSesV2 sending through a configuration set", () => {
     // vocabulary, and nothing is recorded.
     assertNonNullable(result.refusedBecause);
     assertStringIncludes(result.refusedBecause, "paused");
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 });

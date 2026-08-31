@@ -3,7 +3,11 @@ import {
   CreateFunctionUrlConfigCommand,
   DeleteFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
+import {
+  assertObjectEquals,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -29,7 +33,7 @@ describe("Serving sim Lambda Function URL failures", () => {
     );
 
     // Then the endpoint reports it as not found, AWS-style.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertObjectEquals(await response.json(), { Message: "Not Found" });
   });
 
@@ -65,7 +69,7 @@ describe("Serving sim Lambda Function URL failures", () => {
     );
 
     // Then the hostname no longer serves anything.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("returns 404 when the host names a different region", async () => {
@@ -95,7 +99,7 @@ describe("Serving sim Lambda Function URL failures", () => {
     );
 
     // Then it does not resolve, because Function URLs are region-scoped.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("refuses an AWS_IAM Function URL request", async () => {
@@ -125,7 +129,7 @@ describe("Serving sim Lambda Function URL failures", () => {
     );
 
     // Then the request is forbidden, as an unsigned request is on AWS.
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertObjectEquals(await response.json(), {
       Message: simLambdaUrlForbiddenMessage,
     });
@@ -163,7 +167,7 @@ describe("Serving sim Lambda Function URL failures", () => {
 
     // Then the endpoint reports a bad gateway, keeping the error out of the
     // response body as real Lambda does.
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
     assertObjectEquals(await response.json(), {
       Message: "Internal Server Error",
     });

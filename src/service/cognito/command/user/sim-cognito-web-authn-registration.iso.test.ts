@@ -6,6 +6,7 @@ import {
   StartWebAuthnRegistrationCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -176,10 +177,7 @@ describe("sim Cognito passkey registration", () => {
     );
 
     // Then the passkey is registered with no transports at all.
-    assertArrayLength(
-      listed.Credentials?.[0]?.AuthenticatorTransports ?? [],
-      0,
-    );
+    assertArrayEmpty(listed.Credentials?.[0]?.AuthenticatorTransports ?? []);
   });
 
   it("registers against the pool's hosted domain where it names no relying party", async () => {

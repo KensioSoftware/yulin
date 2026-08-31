@@ -6,8 +6,8 @@ import {
 } from "@aws-sdk/client-personalize";
 import { GetRecommendationsCommand } from "@aws-sdk/client-personalize-runtime";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -206,7 +206,7 @@ describe("Personalize GetRecommendations", () => {
       );
 
     // Then the item list is empty rather than invented.
-    assertArrayLength(recommended.itemList ?? [], 0);
+    assertArrayEmpty(recommended.itemList ?? []);
     assertUndefined(recommended.recommendationId);
   });
 

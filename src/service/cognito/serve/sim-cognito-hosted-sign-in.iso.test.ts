@@ -3,8 +3,10 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -87,14 +89,14 @@ describe("Signing in through a sim Cognito hosted domain", () => {
 
     // Then it is redirected back to the app client's callback URL with a code
     // and the state it was given.
-    assertIdentical(authorized.status, 302);
+    assertResponseStatus(authorized, 302, await describeResponse(authorized));
     const location = new URL(authorized.headers.get("location") ?? "");
     assertIdentical(location.origin + location.pathname, simCognitoCallbackUrl);
     assertIdentical(location.searchParams.get("state"), "csrf-token");
 
     // And the application's own server exchanges that code for tokens.
     const exchanged = await exchangeCode(http, setUp, codeIn(authorized));
-    assertIdentical(exchanged.status, 200);
+    assertResponseStatus(exchanged, 200, await describeResponse(exchanged));
 
     const tokens = (await exchanged.json()) as Record<string, string>;
     assertObjectMatches(tokens, { token_type: "Bearer", expires_in: 3600 });
@@ -169,7 +171,7 @@ describe("Signing in through a sim Cognito hosted domain", () => {
 
     // Then fresh tokens come back, with no new refresh token, as none comes
     // back from real Cognito with refresh token rotation off.
-    assertIdentical(refreshed.status, 200);
+    assertResponseStatus(refreshed, 200, await describeResponse(refreshed));
     const refreshedTokens = (await refreshed.json()) as Record<string, string>;
     assertNonNullable(refreshedTokens["access_token"]);
     assertNonNullable(refreshedTokens["id_token"]);
@@ -190,7 +192,7 @@ describe("Signing in through a sim Cognito hosted domain", () => {
     );
 
     // Then it is redirected to the sign-out URL.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertIdentical(
       response.headers.get("location"),
       "https://www.example.com/",
@@ -218,7 +220,7 @@ describe("Signing in through a sim Cognito hosted domain", () => {
     );
 
     // Then the domain answers, so the URL under test is the URL in production.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertStringIncludes(
       response.headers.get("location") ?? "",
       simCognitoCallbackUrl,
@@ -247,7 +249,7 @@ describe("Signing in through a sim Cognito hosted domain", () => {
     );
 
     // Then the domain answers, as it does on its Cognito hostname.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertStringIncludes(
       response.headers.get("location") ?? "",
       simCognitoCallbackUrl,

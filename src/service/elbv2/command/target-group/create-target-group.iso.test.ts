@@ -1,6 +1,6 @@
 import { CreateTargetGroupCommand } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -45,7 +45,7 @@ describe("ELBv2 CreateTargetGroupCommand", () => {
     assertIdentical(targetGroup.TargetType, "lambda");
     assertUndefined(targetGroup.Protocol);
     assertFalse(targetGroup.HealthCheckEnabled);
-    assertArrayLength(targetGroup.LoadBalancerArns, 0);
+    assertArrayEmpty(targetGroup.LoadBalancerArns);
   });
 
   it("creates an ip target group with the protocol and port a target is reached on", async () => {

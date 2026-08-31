@@ -25,6 +25,7 @@ import {
   PersonalizeClient,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -179,7 +180,7 @@ describe("Personalize SDK interception", () => {
       assertArrayLength(campaigns.campaigns ?? [], 1);
 
       const remaining = await client.send(new ListDatasetGroupsCommand({}));
-      assertArrayLength(remaining.datasetGroups ?? [], 0);
+      assertArrayEmpty(remaining.datasetGroups ?? []);
     } finally {
       simSdk.restoreAll();
     }

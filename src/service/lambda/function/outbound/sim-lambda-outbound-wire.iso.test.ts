@@ -1,4 +1,9 @@
-import { assertIdentical, assertTrue } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTrue,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import {
   simLambdaOutboundWireRequest,
@@ -44,7 +49,7 @@ describe("sim Lambda outbound requests on the wire", () => {
     });
 
     // Then it reads back as the response it was.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "application/x-amz-json-1.0",
@@ -55,7 +60,7 @@ describe("sim Lambda outbound requests on the wire", () => {
     );
   });
 
-  it("presents an answer carrying nothing as a response with no body", () => {
+  it("presents an answer carrying nothing as a response with no body", async () => {
     // Given an answer with an empty body, as the statuses that carry none
     // have.
     const response = simLambdaOutboundWireResponse({
@@ -65,7 +70,7 @@ describe("sim Lambda outbound requests on the wire", () => {
     });
 
     // Then the response is built without one rather than refused.
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertTrue(response.body === null);
   });
 });

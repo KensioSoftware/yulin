@@ -13,6 +13,7 @@ import {
   PutRecordsCommand,
 } from "@aws-sdk/client-kinesis";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertTrue,
@@ -130,7 +131,7 @@ describe("Kinesis SDK interception", () => {
 
     // Then nothing is left to list.
     const listed = await kinesis.send(new ListStreamsCommand({}));
-    assertArrayLength(listed.StreamNames ?? [], 0);
+    assertArrayEmpty(listed.StreamNames ?? []);
   });
 
   it("names the commands it can handle", () => {

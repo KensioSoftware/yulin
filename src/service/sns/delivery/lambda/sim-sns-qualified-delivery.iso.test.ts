@@ -1,7 +1,7 @@
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertNonNullable,
   assertStringIncludes,
 } from "@kensio/smartass";
@@ -45,7 +45,7 @@ describe("SNS delivery to a Lambda alias", () => {
 
     // Then the version behind the alias ran, rather than `$LATEST`.
     assertArrayEquals(consumer.ranAs, [consumer.version]);
-    assertArrayLength(simAws.sns().deliveryFailures, 0);
+    assertArrayEmpty(simAws.sns().deliveryFailures);
   });
 
   it("reports an endpoint naming no version or alias", async () => {
@@ -67,7 +67,7 @@ describe("SNS delivery to a Lambda alias", () => {
     // Real SNS checks no endpoint at `Subscribe` time, so this is where a
     // subscription pointing at nothing is found, as it is for a function that
     // is not there.
-    assertArrayLength(consumer.ranAs, 0);
+    assertArrayEmpty(consumer.ranAs);
 
     const [failure] = simAws.sns().deliveryFailures;
 

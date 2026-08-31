@@ -1,5 +1,6 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -59,7 +60,7 @@ describe("sim IAM cross-Account authorization", () => {
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
     assertTrue(decision.isDenied);
     assertArrayLength(decision.resourceAllowStatements, 1);
-    assertArrayLength(decision.identityAllowStatements, 0);
+    assertArrayEmpty(decision.identityAllowStatements);
   });
 
   it("allows a caller both Accounts allow", async () => {

@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
@@ -95,7 +95,7 @@ describe("AWS::Glue::Database and AWS::Glue::Table", () => {
     await stack.waitForDeployComplete();
 
     // Then neither Resource was skipped, and both answer Ref with their name.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertIdentical(stack.outputs.get("DatabaseRef")?.value, "site_logs");
     assertIdentical(stack.outputs.get("TableRef")?.value, "access_logs");
 

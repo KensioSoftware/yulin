@@ -1,5 +1,10 @@
 import { AddPermissionCommand } from "@aws-sdk/client-lambda";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -66,7 +71,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
 
     // Then the caller is told nothing about it, as with a failed integration,
     // and the integration never ran
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertIdentical(
       await response.text(),
       '{"message":"Internal Server Error"}',
@@ -87,7 +92,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
 
     // Then API Gateway could not read the answer either, so it is a 500
     // rather than a refusal the caller could act on
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for a policy response from a simple-response authorizer", async () => {
@@ -111,7 +116,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
 
     // Then the configured shape is the only one read: an authorizer answering
     // the other one is a 500 rather than quietly allowing the request
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for a policy response missing its policy", async () => {
@@ -126,7 +131,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
     const response = await get(simAws, api);
 
     // Then the response is not the shape the authorizer was configured for
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for a policy document IAM cannot read", async () => {
@@ -145,7 +150,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
 
     // Then the malformed document is the authorizer failing rather than the
     // authorizer saying no
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for an authorizer returning nothing at all", async () => {
@@ -159,7 +164,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
     const response = await get(simAws, api);
 
     // Then there is nothing to read, which is neither response format
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for an authorizer naming a function that is not there", async () => {
@@ -174,7 +179,7 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
 
     // Then it is discovered the way real API Gateway discovers it, when it
     // tries to invoke it
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("needs an invoke permission of the authorizer's own", async () => {
@@ -216,9 +221,17 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
     // Then only the grant naming the authorizer opens it: an authorizer is
     // invoked under an ARN of its own rather than under the route's, and the
     // integration ran only once, behind the request that got through
-    assertIdentical(ungranted.status, 500);
-    assertIdentical(routeGranted.status, 500);
-    assertIdentical(authorizerGranted.status, 200);
+    assertResponseStatus(ungranted, 500, await describeResponse(ungranted));
+    assertResponseStatus(
+      routeGranted,
+      500,
+      await describeResponse(routeGranted),
+    );
+    assertResponseStatus(
+      authorizerGranted,
+      200,
+      await describeResponse(authorizerGranted),
+    );
     assertIdentical(invocations(), 1);
   });
 });

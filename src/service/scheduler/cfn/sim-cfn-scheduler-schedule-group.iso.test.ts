@@ -1,5 +1,6 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -237,7 +238,7 @@ describe("Scheduler CloudFormation ScheduleGroup deployment", () => {
     // Then the teardown finished rather than failing on a schedule that had
     // already gone with its group.
     assertUndefined(simAws.scheduler().findScheduleGroup("analytics"));
-    assertArrayLength(simAws.scheduler().allSchedules, 0);
+    assertArrayEmpty(simAws.scheduler().allSchedules);
   });
 
   it("removes the group and its schedules when the stack comes down", async () => {
@@ -263,6 +264,6 @@ describe("Scheduler CloudFormation ScheduleGroup deployment", () => {
 
     await simAws.clock().advanceBy({ hours: 3 });
 
-    assertArrayLength(runs, 0);
+    assertArrayEmpty(runs);
   });
 });

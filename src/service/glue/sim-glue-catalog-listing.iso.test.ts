@@ -8,6 +8,7 @@ import {
   GetTablesCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -83,7 +84,7 @@ describe("SimGlue listings", () => {
     glue.deleteDatabase(new DeleteDatabaseCommand({ Name: "site_logs" }));
 
     // Then its table goes with it, and the other database is untouched.
-    assertArrayLength(glue.tablesInDatabase("site_logs"), 0);
+    assertArrayEmpty(glue.tablesInDatabase("site_logs"));
     assertArrayLength(glue.tablesInDatabase("app_logs"), 1);
   });
 

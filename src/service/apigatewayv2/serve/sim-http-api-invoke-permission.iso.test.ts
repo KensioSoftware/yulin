@@ -1,5 +1,9 @@
 import { AddPermissionCommand } from "@aws-sdk/client-lambda";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -60,7 +64,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
 
     // Then the API answers as real API Gateway does when the invoke
     // permission is missing, and the handler never ran
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Internal Server Error",
     });
@@ -83,7 +87,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
     );
 
     // Then the unconditioned grant admits it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a permission naming a different route", async () => {
@@ -109,7 +113,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
     );
 
     // Then the source ARN of the request does not match the grant
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertIdentical(invocations, 0);
   });
 
@@ -134,7 +138,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
 
     // Then the source ARN is built from the route key rather than from the
     // path asked for, so the grant matches
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("names the request's own method in the source ARN", async () => {
@@ -162,8 +166,8 @@ describe("Invoking a sim HTTP API integration's function", () => {
     );
 
     // Then the method in the ARN is the request's, not the route key's `ANY`
-    assertIdentical(posted.status, 200);
-    assertIdentical(fetched.status, 500);
+    assertResponseStatus(posted, 200, await describeResponse(posted));
+    assertResponseStatus(fetched, 500, await describeResponse(fetched));
   });
 
   it("collapses the catch-all route to $default in the source ARN", async () => {
@@ -183,7 +187,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
 
     // Then the ARN is `<apiId>/<stage>/$default`, which those two wildcards
     // match
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("asks the function's own Account, not the API's", async () => {
@@ -217,8 +221,8 @@ describe("Invoking a sim HTTP API integration's function", () => {
 
     // Then the grant on the function decides, and the source ARN still names
     // the API's Account rather than the function's
-    assertIdentical(ungranted.status, 500);
-    assertIdentical(granted.status, 200);
+    assertResponseStatus(ungranted, 500, await describeResponse(ungranted));
+    assertResponseStatus(granted, 200, await describeResponse(granted));
   });
 
   it("names the stage that served the request", async () => {
@@ -241,7 +245,7 @@ describe("Invoking a sim HTTP API integration's function", () => {
     const production = await simAwsHttp.fetch(localUrl(api, "/prod/orders"));
 
     // Then only the stage the grant names may invoke the function
-    assertIdentical(development.status, 200);
-    assertIdentical(production.status, 500);
+    assertResponseStatus(development, 200, await describeResponse(development));
+    assertResponseStatus(production, 500, await describeResponse(production));
   });
 });

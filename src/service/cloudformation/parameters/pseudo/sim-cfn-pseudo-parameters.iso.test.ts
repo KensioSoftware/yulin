@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
 } from "@kensio/smartass";
@@ -68,7 +68,7 @@ describe("sim CloudFormation pseudo parameters", () => {
 
     const notificationARNs = resource.properties["NotificationARNs"];
 
-    assertArrayLength(notificationARNs, 0);
+    assertArrayEmpty(notificationARNs);
   });
 
   it("resolves pseudo parameters in deployed Stack Outputs", async () => {
@@ -153,7 +153,7 @@ describe("sim CloudFormation pseudo parameters", () => {
 
     const notificationARNs = stack.outputs.get("NotificationARNs")?.value;
 
-    assertArrayLength(notificationARNs, 0);
+    assertArrayEmpty(notificationARNs);
   });
 
   it("uses default account and region pseudo parameters from the top-level SimAws CloudFormation service", async () => {

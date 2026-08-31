@@ -3,6 +3,7 @@ import {
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -147,7 +148,7 @@ describe("SimCloudWatch GetMetricStatistics", () => {
 
     // Then it answers with no datapoints rather than failing, since a metric
     // only exists on real CloudWatch once something publishes to it.
-    assertArrayLength(read.Datapoints ?? [], 0);
+    assertArrayEmpty(read.Datapoints ?? []);
   });
 
   it("refuses a period, a statistic and a range real CloudWatch would refuse", async () => {

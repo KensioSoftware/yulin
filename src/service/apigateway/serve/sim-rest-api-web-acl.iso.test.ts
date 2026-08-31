@@ -5,7 +5,9 @@ import {
 import {
   assertFalse,
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -98,7 +100,7 @@ describe("A web ACL in front of a sim REST API stage", () => {
     );
 
     // Then WAF answered it and the integration never ran
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertStringIncludes(await response.text(), "Request blocked by AWS WAF");
     assertIdentical(invocations, 0);
   });
@@ -118,7 +120,7 @@ describe("A web ACL in front of a sim REST API stage", () => {
     );
 
     // Then the integration answered it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "orders");
   });
 
@@ -146,7 +148,7 @@ describe("A web ACL in front of a sim REST API stage", () => {
     );
 
     // Then the web ACL decided it and the authorizer was never invoked
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertStringIncludes(await response.text(), "Request blocked by AWS WAF");
     assertIdentical(authorizations, 0);
   });
@@ -169,7 +171,7 @@ describe("A web ACL in front of a sim REST API stage", () => {
     );
 
     // Then it is WAF's answer rather than the one IAM would have given
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertStringIncludes(await response.text(), "Request blocked by AWS WAF");
   });
 
@@ -286,7 +288,7 @@ describe("A web ACL in front of a sim REST API stage", () => {
     );
 
     // Then nothing is in front of the new stage
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("stops protecting the stages of an API that is deleted", async () => {

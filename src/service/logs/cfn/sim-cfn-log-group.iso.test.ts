@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-cloudformation";
 import { DescribeLogGroupsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -320,7 +321,7 @@ describe("AWS::Logs::LogGroup", () => {
 
     assertNonNullable(group);
     assertIdentical(group.retentionInDays, 30);
-    assertArrayLength(group.streams, 0);
+    assertArrayEmpty(group.streams);
   });
 
   it("takes the log group down with the stack", async () => {
@@ -334,6 +335,6 @@ describe("AWS::Logs::LogGroup", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the group and everything in it went with it, as in an account.
-    assertArrayLength(simAws.logs().allLogGroups(), 0);
+    assertArrayEmpty(simAws.logs().allLogGroups());
   });
 });

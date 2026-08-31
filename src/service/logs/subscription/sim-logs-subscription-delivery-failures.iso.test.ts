@@ -7,6 +7,7 @@ import {
   RemovePermissionCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -102,7 +103,7 @@ describe("CloudWatch Logs subscription filter delivery failures", () => {
 
     // Then nothing was delivered, because the resource policy is consulted on
     // every delivery rather than remembered from when the filter was put.
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
     assertArrayLength(simAws.logs().subscriptionFailures, 1);
   });
 
@@ -177,8 +178,8 @@ describe("CloudWatch Logs subscription filter delivery failures", () => {
 
     // Then nothing was delivered and nothing failed: a filter that matches no
     // event is not a delivery that went wrong.
-    assertArrayLength(received, 0);
-    assertArrayLength(simAws.logs().subscriptionFailures, 0);
+    assertArrayEmpty(received);
+    assertArrayEmpty(simAws.logs().subscriptionFailures);
   });
 
   it("records a destination function that is not there", async () => {

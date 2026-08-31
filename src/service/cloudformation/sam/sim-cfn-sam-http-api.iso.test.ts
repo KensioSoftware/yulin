@@ -1,10 +1,13 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertResponseStatus,
   assertTypeString,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -83,12 +86,12 @@ describe("SAM Serverless HttpApi expansion", () => {
     const stageResource = stack.getResource(samHttpApiTemplateStageLogicalId);
     assertNonNullable(stageResource);
     assertIdentical(stageResource.type, "AWS::ApiGatewayV2::Stage");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And the route the template declared against it is served from that stage
     const response = await requestApi(simAws, stack, "/orders");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders $default");
   });
 
@@ -115,7 +118,7 @@ describe("SAM Serverless HttpApi expansion", () => {
 
     // And the API the routes named by ApiId is that one, since it served them
     const response = await requestApi(simAws, stack, "/orders");
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("imports the API from the OpenAPI document it declares", async () => {
@@ -147,7 +150,7 @@ describe("SAM Serverless HttpApi expansion", () => {
     // Then the document's routes are the API's, and its title named the API
     const response = await requestApi(simAws, stack, "/orders/YL-1");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders/{orderId} $default");
 
     const httpApi = stack.getResource(samHttpApiTemplateLogicalId)
@@ -182,7 +185,7 @@ describe("SAM Serverless HttpApi expansion", () => {
     // And it serves the API's routes under its own path segment
     const response = await requestApi(simAws, stack, "/prod/orders");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders prod");
   });
 
@@ -233,7 +236,7 @@ describe("SAM Serverless HttpApi expansion", () => {
 
     const response = await requestApi(simAws, stack, "/orders-dev/orders");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders orders-dev");
   });
 
@@ -310,7 +313,7 @@ exports.handler = async (event) => ({
     // Then the event's route is served from the expanded API's stage
     const response = await requestApi(simAws, stack, "/orders");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders $default");
   });
 });

@@ -1,8 +1,10 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -152,8 +154,8 @@ describe("Deploying a REST API authorizer from CloudFormation", () => {
 
     // Then the deployed authorizer decides both, rather than the method
     // answering everything, and what it passed on reaches the handler
-    assertIdentical(admitted.status, 200);
-    assertIdentical(refused.status, 401);
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
+    assertResponseStatus(refused, 401, await describeResponse(refused));
     expect(await admitted.json()).toStrictEqual({
       principalId: "user-6",
       tenantId: "acme",

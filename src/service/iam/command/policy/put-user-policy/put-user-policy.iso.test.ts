@@ -4,7 +4,7 @@ import {
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -65,7 +65,7 @@ describe("IAM PutUserPolicyCommand", () => {
 
     // And the inline policy is not exposed as a managed policy.
     const listOutput = await simIam.listPolicies(new ListPoliciesCommand({}));
-    assertArrayLength(listOutput.Policies, 0);
+    assertArrayEmpty(listOutput.Policies);
   });
 
   it("replaces an existing inline User policy with the same name", async () => {

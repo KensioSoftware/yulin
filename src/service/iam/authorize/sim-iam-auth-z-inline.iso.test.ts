@@ -1,5 +1,6 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -63,7 +64,7 @@ describe("Sim IAM inline identity policy authorization", () => {
     assertFalse(decision.isImplicitDeny);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("implicitly denies when no inline identity policy statement matches", async () => {
@@ -112,8 +113,8 @@ describe("Sim IAM inline identity policy authorization", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("allows an inline identity policy statement with a non-matching NotAction", async () => {
@@ -163,7 +164,7 @@ describe("Sim IAM inline identity policy authorization", () => {
     assertFalse(decision.isImplicitDeny);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("allows an inline identity policy statement with a non-matching NotResource", async () => {
@@ -213,7 +214,7 @@ describe("Sim IAM inline identity policy authorization", () => {
     assertFalse(decision.isImplicitDeny);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("explicitly denies a role through an inline identity policy", async () => {
@@ -262,7 +263,7 @@ describe("Sim IAM inline identity policy authorization", () => {
     assertTrue(decision.isExplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isImplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
     assertArrayLength(decision.explicitDenyStatements, 1);
   });
 

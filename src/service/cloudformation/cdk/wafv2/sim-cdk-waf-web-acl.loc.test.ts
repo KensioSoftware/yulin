@@ -2,8 +2,10 @@ import path from "node:path";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -160,9 +162,9 @@ describe("Sim CDK WAFv2 web ACL local integration", () => {
 
     // Then the request the web ACL claims got WAF's 403 from the stage, and
     // the one it did not reached the function behind it.
-    assertIdentical(blocked.status, 403);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertStringIncludes(await blocked.text(), "Request blocked by AWS WAF");
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertIdentical(await allowed.text(), "order orders/YL-1");
 
     // And the rate limit the same template wrote counts the requests it
@@ -178,8 +180,12 @@ describe("Sim CDK WAFv2 web ACL local integration", () => {
       rated.push(await request("orders/YL-1"));
     }
 
-    assertIdentical(rated[8]?.status, 200);
-    assertIdentical(rated[9]?.status, 403);
+    const ninth = rated[8];
+    const tenth = rated[9];
+    assertNonNullable(ninth);
+    assertNonNullable(tenth);
+    assertResponseStatus(ninth, 200, await describeResponse(ninth));
+    assertResponseStatus(tenth, 403, await describeResponse(tenth));
 
     // And the attributes CDK reads off the L1 resolved to the deployed web
     // ACL's own, rather than to a token nothing filled in.

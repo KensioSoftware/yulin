@@ -1,4 +1,8 @@
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { assertDefined } from "../../../util/type-guard/defined.js";
@@ -54,7 +58,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
 
     // Then the load balancer wrote the response itself, with no function
     // invoked and no target group named by the action at all
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/json");
     assertIdentical(await response.text(), '{"ok":true}');
   });
@@ -75,7 +79,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
     );
 
     // Then nothing is invented to go with the status
-    assertIdentical(response.status, 410);
+    assertResponseStatus(response, 410, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), null);
     assertIdentical(await response.text(), "");
   });
@@ -96,7 +100,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
     );
 
     // Then the message body is dropped, as a 204 has to have none
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(response.body, null);
   });
 
@@ -129,7 +133,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
     );
 
     // Then the default action answered it, with no target involved
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertIdentical(await response.text(), "no route");
   });
 
@@ -156,7 +160,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
     // Then the host, path and query came through untouched, and the port is in
     // the Location even though it is the protocol's own, which is what real
     // ELB sends
-    assertIdentical(response.status, 301);
+    assertResponseStatus(response, 301, await describeResponse(response));
     assertIdentical(
       response.headers.get("location"),
       "https://shop.example.com:443/orders?ref=email",
@@ -190,7 +194,7 @@ describe("Answering a sim ELBv2 request without a target", () => {
     // Then each keyword was replaced with the request's own value, and
     // #{path} came without its leading slash, which is why the path a redirect
     // keeps is written as /#{path}
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertIdentical(
       response.headers.get("location"),
       "http://new.shop.example.com:80/moved/orders/42?ref=email&moved=1",

@@ -3,6 +3,8 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -146,7 +148,7 @@ app.synth();
       { redirect: "manual" },
     );
 
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     assertIdentical(
       response.headers.get("location"),
       "https://example.test/from-embedded-source.html",

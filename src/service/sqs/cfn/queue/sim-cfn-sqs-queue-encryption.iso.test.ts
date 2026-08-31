@@ -1,5 +1,6 @@
 import { GetQueueAttributesCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -85,7 +86,7 @@ describe("AWS::SQS::Queue KmsDataKeyReusePeriodSeconds", () => {
     // And nothing was recorded against a Resource that never existed.
     const stack = simAws.cloudFormation().getStackByName("orders-stack");
     assertNonNullable(stack);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
     assertIdentical(stack.getResource("OrdersQueue")?.status, "CREATE_FAILED");
     assertUndefined(simAws.sqs().findQueue("orders"));
   });

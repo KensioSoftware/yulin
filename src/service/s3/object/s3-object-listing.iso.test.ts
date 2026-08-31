@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -89,7 +89,7 @@ describe("simS3ObjectPage", () => {
     const page = simS3ObjectPage({ objects, startAfter: "z.txt", maxKeys: 10 });
 
     // Then it is empty and complete, with nothing to resume after.
-    assertArrayLength(page.objects, 0);
+    assertArrayEmpty(page.objects);
     assertFalse(page.isTruncated);
     assertUndefined(page.resumeAfter);
   });
@@ -104,7 +104,7 @@ describe("simS3ObjectPage", () => {
     // Then nothing comes back, and the listing is complete rather than
     // truncated: a page that returned no keys has none to carry on after, so
     // calling it truncated would leave a caller looping on the same request.
-    assertArrayLength(page.objects, 0);
+    assertArrayEmpty(page.objects);
     assertFalse(page.isTruncated);
     assertUndefined(page.resumeAfter);
   });
@@ -117,7 +117,7 @@ describe("simS3ObjectPage", () => {
     const page = simS3ObjectPage({ objects, maxKeys: -1 });
 
     // Then it holds nothing, rather than everything but the last key.
-    assertArrayLength(page.objects, 0);
+    assertArrayEmpty(page.objects);
     assertFalse(page.isTruncated);
   });
 });
@@ -198,7 +198,7 @@ describe("simS3ObjectPage under a delimiter", () => {
     // Then the folder's own keys are behind the listing rather than rolled up
     // into the same folder again, which is what a marker compared against the
     // key would do.
-    assertArrayLength(second.commonPrefixes, 0);
+    assertArrayEmpty(second.commonPrefixes);
     assertIdentical(keysOf(second.objects).join(","), "index.html");
     assertFalse(second.isTruncated);
   });
@@ -264,7 +264,7 @@ describe("simS3ObjectPage under a delimiter", () => {
     const page = simS3ObjectPage({ objects, delimiter: "", maxKeys: 10 });
 
     // Then every key comes back, and nothing is rolled up.
-    assertArrayLength(page.commonPrefixes, 0);
+    assertArrayEmpty(page.commonPrefixes);
     assertIdentical(keysOf(page.objects).join(","), "img/a.png,index.html");
   });
 });

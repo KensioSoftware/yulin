@@ -1,4 +1,8 @@
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -37,7 +41,7 @@ describe("Serving a request through a sim ELBv2 load balancer", () => {
 
     // Then the handler's response is what the client gets, with the status
     // description as the reason phrase rather than repeated in the status line
-    assertIdentical(response.status, 201);
+    assertResponseStatus(response, 201, await describeResponse(response));
     assertIdentical(response.statusText, "Created");
     assertIdentical(response.headers.get("content-type"), "application/json");
     expect(await response.json()).toStrictEqual({ ordered: true });
@@ -58,7 +62,7 @@ describe("Serving a request through a sim ELBv2 load balancer", () => {
     );
 
     // Then the response carries none, which is what a 204 has to be
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(response.body, null);
   });
 
@@ -140,7 +144,7 @@ describe("Serving a request through a sim ELBv2 load balancer", () => {
     );
 
     // Then that listener took it, and told the handler which port it was
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "8080");
   });
 

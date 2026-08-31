@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import {
+  assertArrayEmpty,
   assertArrayIncludes,
-  assertArrayLength,
   assertNonNullable,
   assertObjectEquals,
   assertObjectHasProperty,
@@ -40,7 +40,7 @@ describe("deploying a plan Terraform itself produced", () => {
     assertNonNullable(simAws.s3().getSimBucketByName("orders-uploads"));
     assertNonNullable(simAws.dynamoDb().findTable("orders-orders"));
     assertNonNullable(simAws.sqs().findQueue("orders-processing"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("deploys a configuration built out of community modules", async () => {
@@ -61,7 +61,7 @@ describe("deploying a plan Terraform itself produced", () => {
       simAws.s3().getSimBucketByName("orders-uploads-independent"),
     );
     assertNonNullable(simAws.dynamoDb().findTable("orders-independent"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("folds the aws_s3_bucket_ resources into the bucket they configure", async () => {
@@ -155,11 +155,10 @@ describe("deploying a plan Terraform itself produced", () => {
       { TABLE_NAME: "orders-orders", STAGE: "test" },
     );
 
-    assertArrayLength(
+    assertArrayEmpty(
       report.lost.filter((entry) =>
         ["environment.variables", "policy"].includes(entry.attribute),
       ),
-      0,
     );
   });
 });

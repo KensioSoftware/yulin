@@ -7,6 +7,7 @@ import {
   UpdateScheduleCommand,
 } from "@aws-sdk/client-scheduler";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -197,7 +198,7 @@ describe("Scheduler firing on the clock", () => {
 
     await simAws.clock().advanceBy({ hours: 3 });
 
-    assertArrayLength(invocations, 0);
+    assertArrayEmpty(invocations);
 
     // When an update enables it and one more hour passes.
     await simAws

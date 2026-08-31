@@ -6,7 +6,12 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { AssumeRoleCommand } from "@aws-sdk/client-sts";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -96,7 +101,7 @@ describe("Presigning simulated S3 with temporary credentials", () => {
       credentials.SessionToken,
     );
     const response = await new SimAwsHttp({ simAws }).fetch(url);
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "signed by a session");
   });
 });

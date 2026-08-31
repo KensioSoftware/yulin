@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -106,6 +107,6 @@ describe("SAM transform", () => {
     // Then the function deployed, and the malformed Resource was carried
     // through the expansion for the template body to answer for
     assertNonNullable(simAws.lambda().getSimFunctionByName("rates"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

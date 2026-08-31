@@ -7,6 +7,7 @@ import {
   RemoveTargetsCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -115,7 +116,7 @@ describe("EventBridge target commands", () => {
     // a failed request.
     assertIdentical(removed.FailedEntryCount, 1);
     assertIdentical(removed.FailedEntries?.[0]?.TargetId, "ghost");
-    assertArrayLength(simAws.eventBridge().ruleTargets("orders"), 0);
+    assertArrayEmpty(simAws.eventBridge().ruleTargets("orders"));
   });
 
   it("lists the rules that send to a target", async () => {
@@ -180,7 +181,7 @@ describe("EventBridge target commands", () => {
       );
 
     // Then the new rule has no targets, rather than inheriting the old ones.
-    assertArrayLength(simAws.eventBridge().ruleTargets("orders"), 0);
+    assertArrayEmpty(simAws.eventBridge().ruleTargets("orders"));
   });
 
   it("keeps the targets of two buses' rules of the same name apart", async () => {
@@ -234,7 +235,7 @@ describe("EventBridge target commands", () => {
       );
 
     // Then both are answered rather than refused.
-    assertArrayLength(listed.Targets ?? [], 0);
+    assertArrayEmpty(listed.Targets ?? []);
     assertIdentical(removed.FailedEntryCount, 0);
   });
 

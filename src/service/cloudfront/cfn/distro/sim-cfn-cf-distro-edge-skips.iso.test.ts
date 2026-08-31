@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -121,7 +121,7 @@ describe("CloudFormation Distribution Lambda@Edge skips", () => {
 
     assertResponseStatus(response, 200);
     assertIdentical(await response.text(), "<h1>Edge</h1>");
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("fails the stack over an event type CloudFront has no such event for", async () => {

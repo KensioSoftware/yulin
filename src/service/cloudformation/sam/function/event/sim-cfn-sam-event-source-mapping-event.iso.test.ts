@@ -1,6 +1,7 @@
 import { PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -272,7 +273,7 @@ describe("SAM SQS and DynamoDB event expansion", () => {
     // Then the mapping was deployed polling nothing, and the message sat on
     // the queue
     assertIdentical(deployedMapping(stack).state, "Disabled");
-    assertArrayLength(events, 0);
+    assertArrayEmpty(events);
   });
 
   it("adds the permission to poll beside the policies the function stated", async () => {
@@ -390,6 +391,6 @@ describe("SAM SQS and DynamoDB event expansion", () => {
     // Then the function deployed with nothing polling for it, rather than the
     // deployment failing over a mapping with nothing to poll
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

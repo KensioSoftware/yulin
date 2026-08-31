@@ -3,10 +3,12 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -150,7 +152,7 @@ describe("The user a sim Cognito pool creates for a federated sign-in", () => {
     // Then a further authorize request asks who is signing in rather than
     // signing the same user in again.
     const response = await signIn(setUp);
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), "Simulated Google sign-in");
   });
 });

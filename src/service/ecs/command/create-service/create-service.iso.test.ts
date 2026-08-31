@@ -6,6 +6,7 @@ import {
   RegisterTaskDefinitionCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertSetSize,
@@ -198,7 +199,7 @@ describe("ECS CreateServiceCommand", () => {
       new ListTasksCommand({ serviceName: "checkout" }),
     );
 
-    assertArrayLength(listed.taskArns, 0);
+    assertArrayEmpty(listed.taskArns);
   });
 
   it("reports the launch type the service was created with", async () => {
@@ -320,7 +321,7 @@ describe("ECS CreateServiceCommand", () => {
       new DescribeServicesCommand({ services: ["checkout"] }),
     );
 
-    assertArrayLength(described.services, 0);
+    assertArrayEmpty(described.services);
     assertArrayLength(described.failures, 1);
   });
 });

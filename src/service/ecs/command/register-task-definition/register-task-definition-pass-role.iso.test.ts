@@ -3,7 +3,7 @@ import {
   RegisterTaskDefinitionCommand,
 } from "@aws-sdk/client-ecs";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -77,7 +77,7 @@ describe("passing Roles to ECS RegisterTaskDefinition", () => {
       .ecs()
       .listTaskDefinitions(new ListTaskDefinitionsCommand({}));
 
-    assertArrayLength(listed.taskDefinitionArns, 0);
+    assertArrayEmpty(listed.taskDefinitionArns);
   });
 
   it("refuses a caller allowed only one of the two Roles", async () => {

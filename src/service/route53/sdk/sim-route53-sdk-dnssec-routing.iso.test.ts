@@ -10,6 +10,7 @@ import {
   Route53Client,
 } from "@aws-sdk/client-route-53";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -76,6 +77,6 @@ describe("simulated Route53 DNSSEC SDK Command routing", () => {
     assertIdentical(signing.Status?.ServeSignature, "SIGNING");
     assertArrayLength(signing.KeySigningKeys ?? [], 1);
     assertIdentical(unsigned.Status?.ServeSignature, "NOT_SIGNING");
-    assertArrayLength(unsigned.KeySigningKeys ?? [], 0);
+    assertArrayEmpty(unsigned.KeySigningKeys ?? []);
   });
 });

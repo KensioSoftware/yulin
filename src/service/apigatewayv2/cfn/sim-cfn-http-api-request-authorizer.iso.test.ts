@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -161,8 +163,8 @@ describe("Deploying an AWS::ApiGatewayV2::Authorizer of type REQUEST", () => {
 
     // Then the deployed authorizer decided both, and the context it returned
     // reached the handler
-    assertIdentical(refused.status, 403);
-    assertIdentical(admitted.status, 200);
+    assertResponseStatus(refused, 403, await describeResponse(refused));
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
     assertIdentical(await admitted.text(), "acme");
   });
 
@@ -253,6 +255,6 @@ describe("Deploying an AWS::ApiGatewayV2::Authorizer of type REQUEST", () => {
 
     // Then API Gateway could not invoke it, as on AWS: the integration's own
     // grant names the route rather than the authorizer
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 });

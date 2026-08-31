@@ -1,6 +1,10 @@
 import { PutItemCommand, UpdateTableCommand } from "@aws-sdk/client-dynamodb";
 import { DeleteEventSourceMappingCommand } from "@aws-sdk/client-lambda";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { simAwsWithStreamEventSource } from "../../../../test/lambda/stream-event-source-fixture.js";
@@ -29,7 +33,7 @@ describe("sim Lambda DynamoDB stream event source mapping lifecycle", () => {
     await simAws.backgroundTasksComplete();
 
     // Then nothing was delivered: the mapping stopped watching the stream.
-    assertArrayLength(events, 0);
+    assertArrayEmpty(events);
   });
 
   it("stops reading once the table's stream is switched off", async () => {

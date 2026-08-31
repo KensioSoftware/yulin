@@ -1,5 +1,6 @@
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -337,6 +338,6 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     // Then the bus, the rule and the targets are all gone.
     assertUndefined(simAws.eventBridge().findEventBus("orders"));
     assertUndefined(simAws.eventBridge().findRule("orders", "orders"));
-    assertArrayLength(simAws.eventBridge().ruleTargets("orders", "orders"), 0);
+    assertArrayEmpty(simAws.eventBridge().ruleTargets("orders", "orders"));
   });
 });

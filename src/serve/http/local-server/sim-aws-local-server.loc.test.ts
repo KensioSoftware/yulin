@@ -3,8 +3,10 @@ import http from "node:http";
 import {
   assertIdentical,
   assertInstanceOf,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
+  describeResponse,
 } from "@kensio/smartass";
 import { serveSimAws, SimAwsLocalServer } from "./sim-aws-local-server.js";
 
@@ -45,7 +47,7 @@ describe("Simulated AWS local HTTP server", () => {
       `http://foobar.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(
       responseBody,
@@ -58,7 +60,7 @@ describe("Simulated AWS local HTTP server", () => {
       `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foobar-object.html`,
     );
 
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "S3 bucket named my-site not found");
   });
@@ -95,7 +97,7 @@ describe("Simulated AWS local HTTP server", () => {
       `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${server.port}/foobar-object.html`,
     );
 
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "S3 bucket named my-site not found");
 

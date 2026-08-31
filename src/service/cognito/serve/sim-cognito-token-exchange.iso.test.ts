@@ -3,7 +3,9 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -71,7 +73,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
 
     // Then the tokens come back, and the response says a browser may read it,
     // as real Cognito's does.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("access-control-allow-origin"), "*");
     assertObjectMatches(await response.json(), { token_type: "Bearer" });
   });
@@ -91,7 +93,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
     });
 
     // Then the client authentication fails rather than the grant.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     const failure = await errorIn(response);
     assertIdentical(failure["error"], "invalid_client");
   });
@@ -116,7 +118,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
     });
 
     // Then the tokens come back.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a grant made with PKCE and no verifier", async () => {
@@ -252,7 +254,7 @@ describe("Exchanging a code at a sim Cognito token endpoint", () => {
     );
 
     // Then it says which method it answers.
-    assertIdentical(response.status, 405);
+    assertResponseStatus(response, 405, await describeResponse(response));
     assertIdentical(response.headers.get("allow"), "POST");
   });
 });

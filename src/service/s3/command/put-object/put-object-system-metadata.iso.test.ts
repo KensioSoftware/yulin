@@ -8,7 +8,9 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   assertIdentical,
   assertObjectEquals,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -217,7 +219,7 @@ describe("S3 PutObjectCommand system metadata", () => {
 
     // Then the write and the read agree: bytes stored as brotli are served with
     // the encoding a client needs to decode them.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("cache-control"),
       "public, max-age=60",

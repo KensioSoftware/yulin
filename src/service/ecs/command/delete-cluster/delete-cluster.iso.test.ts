@@ -5,6 +5,7 @@ import {
   ListClustersCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -60,7 +61,7 @@ describe("ECS DeleteClusterCommand", () => {
     const listed = await simEcs.listClusters(new ListClustersCommand({}));
 
     // Then the deleted one is not among them.
-    assertArrayLength(listed.clusterArns, 0);
+    assertArrayEmpty(listed.clusterArns);
   });
 
   it("deletes a cluster named by its ARN", async () => {

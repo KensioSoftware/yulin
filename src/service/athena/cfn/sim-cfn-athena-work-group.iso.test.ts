@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -54,7 +54,7 @@ describe("AWS::Athena::WorkGroup", () => {
 
     // Then nothing was skipped, the workgroup is readable through the SDK
     // with the settings the template set, and Ref answers with its name.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     const read = await simAws
       .athena()

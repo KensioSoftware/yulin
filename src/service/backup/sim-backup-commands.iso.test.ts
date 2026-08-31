@@ -14,6 +14,7 @@ import {
   StartBackupJobCommand,
 } from "@aws-sdk/client-backup";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -172,8 +173,8 @@ describe("simulated AWS Backup commands", () => {
       new ListBackupVaultsCommand({}),
     );
     assertArrayLength(sameVaults.BackupVaultList ?? [], 1);
-    assertArrayLength(otherRegionVaults.BackupVaultList ?? [], 0);
-    assertArrayLength(otherAccountVaults.BackupVaultList ?? [], 0);
+    assertArrayEmpty(otherRegionVaults.BackupVaultList ?? []);
+    assertArrayEmpty(otherAccountVaults.BackupVaultList ?? []);
   });
 
   it("deletes a vault through its SDK command", async () => {
@@ -197,7 +198,7 @@ describe("simulated AWS Backup commands", () => {
     const vaults = await simAws
       .backup()
       .listBackupVaults(new ListBackupVaultsCommand({}));
-    assertArrayLength(vaults.BackupVaultList ?? [], 0);
+    assertArrayEmpty(vaults.BackupVaultList ?? []);
   });
 
   it("deletes a vault only after its recovery points expire", async () => {
@@ -233,7 +234,7 @@ describe("simulated AWS Backup commands", () => {
     const vaults = await backup.listBackupVaults(
       new ListBackupVaultsCommand({}),
     );
-    assertArrayLength(vaults.BackupVaultList ?? [], 0);
+    assertArrayEmpty(vaults.BackupVaultList ?? []);
   });
 
   it("stores an indefinite-retention lifecycle", async () => {

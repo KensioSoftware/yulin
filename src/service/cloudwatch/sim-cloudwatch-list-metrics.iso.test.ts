@@ -3,6 +3,7 @@ import {
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertInstanceOf,
@@ -132,7 +133,7 @@ describe("SimCloudWatch ListMetrics", () => {
 
     // Then they drop out of the listing without anything having expired them.
     assertArrayLength(before, 3);
-    assertArrayLength(after, 0);
+    assertArrayEmpty(after);
   });
 
   it("refuses a recency window and an account reach it cannot honour", async () => {

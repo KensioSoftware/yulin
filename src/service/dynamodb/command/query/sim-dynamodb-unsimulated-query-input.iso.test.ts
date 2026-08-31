@@ -1,6 +1,6 @@
 import { QueryCommand } from "@aws-sdk/client-dynamodb";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -95,6 +95,6 @@ describe("DynamoDB QueryCommand unsimulated input", () => {
     );
 
     // Then it is let through.
-    assertArrayLength(output.Items ?? [], 0);
+    assertArrayEmpty(output.Items ?? []);
   });
 });

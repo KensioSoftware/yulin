@@ -1,4 +1,9 @@
-import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -91,8 +96,8 @@ describe("Caching a sim HTTP API Lambda authorizer's decision", () => {
 
     // Then the authorizer ran once, and both requests were served by that one
     // decision, context and all
-    assertIdentical(first.status, 200);
-    assertIdentical(second.status, 200);
+    assertResponseStatus(first, 200, await describeResponse(first));
+    assertResponseStatus(second, 200, await describeResponse(second));
     assertObjectMatches(await first.json(), { invocations: 1 });
     assertObjectMatches(await second.json(), { invocations: 1 });
   });
@@ -154,8 +159,8 @@ describe("Caching a sim HTTP API Lambda authorizer's decision", () => {
 
     // Then both answer 500 and the function was asked each time: there is no
     // answer to hold, and the next request may find it working
-    assertIdentical(first.status, 500);
-    assertIdentical(second.status, 500);
+    assertResponseStatus(first, 500, await describeResponse(first));
+    assertResponseStatus(second, 500, await describeResponse(second));
     assertIdentical(invocations, 2);
   });
 
@@ -192,8 +197,8 @@ describe("Caching a sim HTTP API Lambda authorizer's decision", () => {
 
     // Then both are refused, and the authorizer was asked once: AWS holds
     // whatever answer it got
-    assertIdentical(first.status, 403);
-    assertIdentical(second.status, 403);
+    assertResponseStatus(first, 403, await describeResponse(first));
+    assertResponseStatus(second, 403, await describeResponse(second));
     assertIdentical(invocations, 1);
   });
 

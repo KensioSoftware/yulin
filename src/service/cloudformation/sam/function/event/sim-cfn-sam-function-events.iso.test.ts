@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertNonNullable,
   assertUndefined,
 } from "@kensio/smartass";
@@ -45,7 +45,7 @@ describe("SAM function events the expansion cannot read", () => {
     // Then the function deployed with nothing in front of it, rather than the
     // deployment failing over an event nothing can read
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("leaves the function as it is for an event naming no Type", async () => {
@@ -56,7 +56,7 @@ describe("SAM function events the expansion cannot read", () => {
 
     // Then the function deployed on its own
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("leaves the function as it is for an event stating no Properties", async () => {
@@ -72,7 +72,7 @@ describe("SAM function events the expansion cannot read", () => {
         `${samFunctionTemplateLogicalId}WorkEventSourceMapping`,
       ),
     );
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("changes nothing for an event naming a Resource the template lacks", async () => {
@@ -90,6 +90,6 @@ describe("SAM function events the expansion cannot read", () => {
       stack.getResource(`${samFunctionTemplateLogicalId}UploadS3Permission`),
     );
     assertUndefined(stack.getResource("Missing"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

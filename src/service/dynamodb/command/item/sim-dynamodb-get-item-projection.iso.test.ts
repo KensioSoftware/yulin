@@ -4,6 +4,7 @@ import {
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -212,7 +213,7 @@ describe("DynamoDB GetItemCommand projection", () => {
 
     // Then neither comes back: the item does not have what was asked for.
     assertNonNullable(item);
-    assertArrayLength(Object.keys(item), 0);
+    assertArrayEmpty(Object.keys(item));
   });
 
   it("answers with an empty item when the projection finds nothing", async () => {
@@ -232,7 +233,7 @@ describe("DynamoDB GetItemCommand projection", () => {
     // Then there is an Item with nothing in it, rather than no Item: the key
     // was there, and nothing the request asked for was.
     assertNonNullable(output.Item);
-    assertArrayLength(Object.keys(output.Item), 0);
+    assertArrayEmpty(Object.keys(output.Item));
   });
 
   it("answers with no item at all for a key holding nothing", async () => {

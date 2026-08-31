@@ -5,8 +5,8 @@ import {
   ListConfigurationSetsCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertNonNullable,
@@ -72,7 +72,7 @@ describe("simulated SES configuration sets", () => {
     assertTrue(configurationSet.sendingEnabled);
     assertIdentical(configurationSet.deliveryOptions.tlsPolicy, "OPTIONAL");
     assertFalse(configurationSet.reputationOptions.reputationMetricsEnabled);
-    assertArrayLength(configurationSet.suppressedReasons, 0);
+    assertArrayEmpty(configurationSet.suppressedReasons);
     assertUndefined(configurationSet.deliveryOptions.sendingPoolName);
   });
 
@@ -171,7 +171,7 @@ describe("simulated SES configuration sets", () => {
 
     // Then nothing is left holding the name.
     assertUndefined(ses.findConfigurationSet("transactional"));
-    assertArrayLength(ses.allConfigurationSets(), 0);
+    assertArrayEmpty(ses.allConfigurationSets());
   });
 
   it("keeps a set in one Region out of another", async () => {

@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -159,7 +160,7 @@ describe("reading the tables an Athena query names", () => {
     // Then none of them is readable, and nothing is resolved for one.
     for (const sql of unreadable) {
       assertFalse(simAthenaTableReferences(sql).readable, sql);
-      assertArrayLength(simAthenaTableReferences(sql).references, 0, sql);
+      assertArrayEmpty(simAthenaTableReferences(sql).references, sql);
     }
   });
 
@@ -170,6 +171,6 @@ describe("reading the tables an Athena query names", () => {
 
     // Then it is readable and names nothing.
     assertTrue(read.readable);
-    assertArrayLength(read.references, 0);
+    assertArrayEmpty(read.references);
   });
 });

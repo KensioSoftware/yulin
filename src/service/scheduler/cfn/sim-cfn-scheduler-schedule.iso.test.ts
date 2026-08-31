@@ -1,5 +1,6 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -219,6 +220,6 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
 
     await simAws.clock().advanceBy({ hours: 3 });
 
-    assertArrayLength(runs, 0);
+    assertArrayEmpty(runs);
   });
 });

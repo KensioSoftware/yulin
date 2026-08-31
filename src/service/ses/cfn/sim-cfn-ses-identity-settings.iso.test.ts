@@ -3,6 +3,7 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -201,7 +202,7 @@ describe("AWS::SES::EmailIdentity settings", () => {
 
     assertNonNullable(email);
     assertIdentical(email.configurationSetName, "transactional");
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("records a property this Resource type does not have", async () => {

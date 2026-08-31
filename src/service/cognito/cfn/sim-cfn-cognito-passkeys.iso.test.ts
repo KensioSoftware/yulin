@@ -6,10 +6,10 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
-  assertObjectMatches,
   assertNonNullable,
+  assertObjectMatches,
   assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -81,7 +81,7 @@ describe("Cognito CloudFormation user pool passkeys", () => {
     const clientId = stack.outputs.get("ClientId")?.value;
     assertTypeString(userPoolId);
     assertTypeString(clientId);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
 
     // And the pool reports the factors it allows at the first prompt.
     const cognito = simAws.cognitoIdentityProvider();

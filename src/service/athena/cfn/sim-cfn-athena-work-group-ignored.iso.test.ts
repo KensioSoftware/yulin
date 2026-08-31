@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
   assertTrue,
@@ -54,7 +54,7 @@ describe("AWS::Athena::WorkGroup unread properties", () => {
 
     // Then the workgroup deploys with the cutoff it does model, and each
     // setting it does not is recorded rather than failing the stack.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertIdentical(
       simAws.athena().findWorkGroup("with-a-runner")
         ?.bytesScannedCutoffPerQuery,
@@ -78,7 +78,7 @@ describe("AWS::Athena::WorkGroup unread properties", () => {
 
     // Then the workgroup is still created, and the property is recorded as one
     // this simulation knows nothing about.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertTrue(simAws.athena().findWorkGroup("with-nonsense") !== undefined);
     assertStringIncludes(
       ignoredReason(stack, "Nonsense"),

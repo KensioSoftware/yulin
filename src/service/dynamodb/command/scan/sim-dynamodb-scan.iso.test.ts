@@ -1,5 +1,6 @@
 import { PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -105,7 +106,7 @@ describe("DynamoDB ScanCommand", () => {
 
     // Then the page is empty rather than missing, and there is nothing to
     // resume from.
-    assertArrayLength(output.Items ?? [], 0);
+    assertArrayEmpty(output.Items ?? []);
     assertIdentical(output.Count, 0);
     assertUndefined(output.LastEvaluatedKey);
   });

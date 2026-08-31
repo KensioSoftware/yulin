@@ -1,6 +1,7 @@
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import { ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -156,7 +157,7 @@ describe("Lambda CloudFormation Function DeadLetterConfig", () => {
     const [ignored, ...rest] = stack.ignoredProperties;
 
     assertNonNullable(ignored, "a recorded dead-letter target");
-    assertArrayLength(rest, 0, "no second record");
+    assertArrayEmpty(rest, "no second record");
     assertIdentical(ignored.logicalId, "OrdersFunction");
     assertIdentical(ignored.path, "DeadLetterConfig.TargetArn");
     assertStringIncludes(ignored.reason, "kinesis");

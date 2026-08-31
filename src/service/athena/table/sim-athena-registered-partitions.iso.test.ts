@@ -1,4 +1,4 @@
-import { assertArrayEquals, assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty, assertArrayEquals } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -141,6 +141,6 @@ describe("the S3 prefixes a query reads for registered partitions", () => {
 
     // Then there is nowhere to read, and the query reads nothing rather than
     // reading the wrong place.
-    assertArrayLength(prefixes, 0);
+    assertArrayEmpty(prefixes);
   });
 });

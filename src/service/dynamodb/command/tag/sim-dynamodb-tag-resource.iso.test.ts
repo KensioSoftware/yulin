@@ -5,6 +5,7 @@ import {
   UntagResourceCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -167,7 +168,7 @@ describe("DynamoDB resource tagging", () => {
     );
 
     // Then it answers with an empty list rather than refusing.
-    assertArrayLength(output.Tags, 0);
+    assertArrayEmpty(output.Tags);
     assertUndefined(output.NextToken);
   });
 
@@ -223,6 +224,6 @@ describe("DynamoDB resource tagging", () => {
     const output = await simDynamoDb.listTagsOfResource(
       new ListTagsOfResourceCommand({ ResourceArn: customers.arn }),
     );
-    assertArrayLength(output.Tags, 0);
+    assertArrayEmpty(output.Tags);
   });
 });

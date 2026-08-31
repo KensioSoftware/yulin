@@ -10,7 +10,7 @@ import {
 } from "@aws-sdk/client-cloudwatch-logs";
 import { CreateTopicCommand } from "@aws-sdk/client-sns";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
 } from "@kensio/smartass";
@@ -117,7 +117,7 @@ describe("an alarm over a metric a CloudWatch Logs metric filter writes", () => 
     // Then the alarm fired on a datapoint nothing published by hand, and it
     // reached its topic.
     assertIdentical(await alarmState(simAws), "ALARM");
-    assertArrayLength(simAws.cloudWatch().alarmActionFailures, 0);
-    assertArrayLength(simAws.logs().metricPublicationFailures, 0);
+    assertArrayEmpty(simAws.cloudWatch().alarmActionFailures);
+    assertArrayEmpty(simAws.logs().metricPublicationFailures);
   });
 });

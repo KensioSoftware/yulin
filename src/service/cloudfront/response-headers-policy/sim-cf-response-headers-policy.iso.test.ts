@@ -1,4 +1,10 @@
-import { assertIdentical, assertTrue, assertUuidV4 } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTrue,
+  assertUuidV4,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCloudFrontResponseHeader } from "./sim-cf-response-header.js";
 import { SimCloudFrontResponseHeadersPolicy } from "./sim-cf-response-headers-policy.js";
@@ -97,7 +103,7 @@ describe("SimCloudFrontResponseHeadersPolicy", () => {
     );
 
     // Then only the headers change: a policy does not decide what is served.
-    assertIdentical(applied.status, 404);
+    assertResponseStatus(applied, 404, await describeResponse(applied));
     assertIdentical(applied.statusText, "Not Found");
     assertIdentical(await applied.text(), "not found");
   });
@@ -146,7 +152,7 @@ describe("SimCloudFrontResponseHeadersPolicy", () => {
     );
   });
 
-  it("passes a response through when it sets and removes nothing", () => {
+  it("passes a response through when it sets and removes nothing", async () => {
     // Given a policy with no headers configured either way.
     const applied = policy().apply(
       new Response("body", { headers: { "content-type": "text/plain" } }),
@@ -154,6 +160,6 @@ describe("SimCloudFrontResponseHeadersPolicy", () => {
 
     // Then the response is unchanged.
     assertIdentical(applied.headers.get("content-type"), "text/plain");
-    assertIdentical(applied.status, 200);
+    assertResponseStatus(applied, 200, await describeResponse(applied));
   });
 });

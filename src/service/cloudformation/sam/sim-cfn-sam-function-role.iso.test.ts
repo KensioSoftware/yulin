@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertMapSize,
   assertNonNullable,
@@ -121,7 +121,7 @@ describe("SAM Serverless Function execution Role", () => {
     const role = stack.getResource("RatesRole")?.simResource as SimIamRole;
     assertNonNullable(role);
     assertMapSize(role.inlinePolicies, 0);
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("expands no Role for a function naming the Role it runs as", async () => {

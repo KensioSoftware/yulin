@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertTrue,
@@ -122,7 +123,7 @@ describe("Sim IAM statements it could not evaluate", () => {
 
     // Then the decision was reached over everything the policy said.
     assertTrue(decision.isAllowed);
-    assertArrayLength(decision.unevaluatedStatements, 0);
+    assertArrayEmpty(decision.unevaluatedStatements);
   });
 
   it("says nothing about a statement another operator ruled out", () => {
@@ -165,7 +166,7 @@ describe("Sim IAM statements it could not evaluate", () => {
     // Then nothing is reported, because the statement would not have applied
     // to this request whatever the unread operator said.
     assertTrue(decision.isDenied);
-    assertArrayLength(decision.unevaluatedStatements, 0);
+    assertArrayEmpty(decision.unevaluatedStatements);
   });
 
   it("says nothing about a statement the request never reached", () => {
@@ -203,7 +204,7 @@ describe("Sim IAM statements it could not evaluate", () => {
       });
 
     // Then the condition was beside the point, and nothing is reported.
-    assertArrayLength(decision.unevaluatedStatements, 0);
+    assertArrayEmpty(decision.unevaluatedStatements);
   });
 
   it("names an unnamed resource policy by the resource holding it", () => {

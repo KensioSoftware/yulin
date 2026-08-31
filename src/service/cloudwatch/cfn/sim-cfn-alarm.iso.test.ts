@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import { ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -366,7 +367,7 @@ describe("AWS::CloudWatch::Alarm", () => {
     // Then the alarm went with it and nothing is left waiting on the clock,
     // which is what lets the simulation settle rather than keeping an alarm
     // waking up to read a metric nothing watches.
-    assertArrayLength(simAws.cloudWatch().allAlarms(), 0);
+    assertArrayEmpty(simAws.cloudWatch().allAlarms());
     assertIdentical(background.dueTaskCount, 0);
   });
 });

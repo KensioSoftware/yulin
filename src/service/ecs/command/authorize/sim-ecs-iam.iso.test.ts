@@ -9,6 +9,7 @@ import {
   RegisterTaskDefinitionCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -93,7 +94,7 @@ describe("Authorizing simulated ECS requests", () => {
       .listTaskDefinitions(new ListTaskDefinitionsCommand({}));
 
     // Then the refused registration left no revision behind.
-    assertArrayLength(listed.taskDefinitionArns, 0);
+    assertArrayEmpty(listed.taskDefinitionArns);
   });
 
   it("refuses a task definition policy naming an ARN", async () => {

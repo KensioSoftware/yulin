@@ -8,6 +8,7 @@ import {
   GetTableCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -225,7 +226,7 @@ describe("SimGlue authorization", () => {
       });
 
     // Then it goes, and takes its table with it.
-    assertArrayLength(simAws.glue().allDatabases(), 0);
+    assertArrayEmpty(simAws.glue().allDatabases());
   });
 
   it("lets a partition command through on the table's own ARN", async () => {

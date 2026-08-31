@@ -5,7 +5,7 @@ import {
   RequestCertificateCommand,
 } from "@aws-sdk/client-acm";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -52,7 +52,7 @@ describe("ACM DeleteCertificateCommand", () => {
     const listed = await simAcm.listCertificates(
       new ListCertificatesCommand({}),
     );
-    assertArrayLength(listed.CertificateSummaryList, 0);
+    assertArrayEmpty(listed.CertificateSummaryList);
   });
 
   it("rejects a Certificate that does not exist", async () => {

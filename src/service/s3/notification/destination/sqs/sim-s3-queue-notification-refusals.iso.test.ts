@@ -10,6 +10,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -73,7 +74,7 @@ describe("What a simulated SQS notification destination refuses", () => {
       .getBucketNotificationConfiguration(
         new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
       );
-    assertArrayLength(stored.QueueConfigurations ?? [], 0);
+    assertArrayEmpty(stored.QueueConfigurations ?? []);
   });
 
   it("refuses a queue whose policy admits another Bucket", async () => {
@@ -271,7 +272,7 @@ describe("What a simulated SQS notification destination refuses", () => {
       .receiveMessage(
         new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
       );
-    assertArrayLength(received.Messages ?? [], 0);
+    assertArrayEmpty(received.Messages ?? []);
 
     const failures = simAws.s3().getNotificationDeliveryFailures();
     assertArrayLength(failures, 1);

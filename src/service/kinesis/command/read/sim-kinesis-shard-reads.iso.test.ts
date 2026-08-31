@@ -6,6 +6,7 @@ import {
   type ShardIteratorType,
 } from "@aws-sdk/client-kinesis";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -231,7 +232,7 @@ describe("Reading records off a simulated Kinesis shard", () => {
     const read = await readFrom(simAws, { ShardIteratorType: "TRIM_HORIZON" });
 
     // Then nothing comes back, which is an ordinary answer.
-    assertArrayLength(read, 0);
+    assertArrayEmpty(read);
   });
 
   it("refuses a shard iterator it never issued", async () => {
@@ -295,7 +296,7 @@ describe("Reading records off a simulated Kinesis shard", () => {
     });
 
     // Then both come back empty rather than wrapping round to the start.
-    assertArrayLength(afterEverything, 0);
-    assertArrayLength(laterThanEverything, 0);
+    assertArrayEmpty(afterEverything);
+    assertArrayEmpty(laterThanEverything);
   });
 });

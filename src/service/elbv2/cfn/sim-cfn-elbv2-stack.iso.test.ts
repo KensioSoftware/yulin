@@ -2,7 +2,9 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -137,7 +139,7 @@ describe("An ELBv2 routing stack", () => {
     // Then the function answered it, so every hop the template declared is
     // connected: the rule, the forward action, the registered target and the
     // invoke permission.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       await response.text(),
       JSON.stringify({ path: "/checkout/42", host: dnsName }),
@@ -177,7 +179,7 @@ describe("An ELBv2 routing stack", () => {
       { headers: { host: "shop.example.test" } },
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       await response.text(),
       JSON.stringify({ path: "/checkout/42", host: "shop.example.test" }),

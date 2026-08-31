@@ -3,8 +3,10 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
@@ -113,14 +115,18 @@ describe("Sim CDK HTTP API deployment local integration", () => {
 
     try {
       const fromCdkUrl = await fetch(srv.localUrl(`${apiUrl}orders/YL-1`));
-      assertIdentical(fromCdkUrl.status, 200);
+      assertResponseStatus(fromCdkUrl, 200, await describeResponse(fromCdkUrl));
       assertIdentical(fromCdkUrl.headers.get("content-type"), "text/plain");
       assertIdentical(await fromCdkUrl.text(), "order YL-1");
 
       const fromApiEndpoint = await fetch(
         srv.localUrl(`${apiEndpoint}/orders/YL-2`),
       );
-      assertIdentical(fromApiEndpoint.status, 200);
+      assertResponseStatus(
+        fromApiEndpoint,
+        200,
+        await describeResponse(fromApiEndpoint),
+      );
       assertIdentical(await fromApiEndpoint.text(), "order YL-2");
     } finally {
       await srv.close();

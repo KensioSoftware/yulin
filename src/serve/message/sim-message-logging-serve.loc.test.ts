@@ -1,6 +1,10 @@
 import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { PublishCommand } from "@aws-sdk/client-sns";
-import { assertArrayLength, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertStringIncludes,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { recordingConsole } from "../../../test/serve/recording-console.js";
@@ -92,7 +96,7 @@ describe("Message logging on a served simulated AWS environment", () => {
     await srv.close();
 
     // Then nothing was printed, and the SMS was recorded as it always is.
-    assertArrayLength(messageConsole.lines, 0);
+    assertArrayEmpty(messageConsole.lines);
     assertArrayLength(simAws.sns().sentSmsMessages(), 1);
   });
 
@@ -107,6 +111,6 @@ describe("Message logging on a served simulated AWS environment", () => {
     await textACode(simAws);
 
     // Then the console the server was printing to is left alone.
-    assertArrayLength(messageConsole.lines, 0);
+    assertArrayEmpty(messageConsole.lines);
   });
 });

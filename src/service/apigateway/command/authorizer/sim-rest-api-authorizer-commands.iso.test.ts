@@ -5,7 +5,11 @@ import {
   GetAuthorizerCommand,
   GetAuthorizersCommand,
 } from "@aws-sdk/client-api-gateway";
-import { assertIdentical, assertArrayLength } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -141,7 +145,7 @@ describe("Sim API Gateway REST API authorizer commands", () => {
     const listed = await apiGateway.getAuthorizers(
       new GetAuthorizersCommand({ restApiId }),
     );
-    assertArrayLength(listed.items, 0);
+    assertArrayEmpty(listed.items);
   });
 
   it("refuses to read an authorizer the API has not got", async () => {

@@ -15,6 +15,7 @@ import {
   SetRulePrioritiesCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayIncludes,
   assertArrayLength,
   assertIdentical,
@@ -122,7 +123,7 @@ describe("Serving simulated ELBv2 routing on an endpoint URL", () => {
     const left = await client.send(
       new DescribeListenersCommand({ LoadBalancerArn: loadBalancerArn }),
     );
-    assertArrayLength(left.Listeners ?? [], 0);
+    assertArrayEmpty(left.Listeners ?? []);
   });
 
   it("adds a certificate to an HTTPS listener and takes it off", async () => {

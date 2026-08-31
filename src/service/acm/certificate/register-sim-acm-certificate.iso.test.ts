@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -60,7 +61,7 @@ describe("Registering a simulated ACM Certificate", () => {
     ]);
     assertIdentical(describeOutput.Certificate.Status, "ISSUED");
     assertNonNullable(describeOutput.Certificate.IssuedAt);
-    assertArrayLength(describeOutput.Certificate.DomainValidationOptions, 0);
+    assertArrayEmpty(describeOutput.Certificate.DomainValidationOptions);
   });
 
   it("lists the registered Certificate under an issued status filter", async () => {

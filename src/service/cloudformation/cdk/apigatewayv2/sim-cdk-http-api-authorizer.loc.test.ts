@@ -3,7 +3,12 @@ import {
   AdminInitiateAuthCommand,
   AdminSetUserPasswordCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -145,7 +150,7 @@ describe("Sim CDK HTTP API JWT authorizer local integration", () => {
 
       // Then the deployed route is closed to a request carrying no token.
       const anonymous = await fetch(url);
-      assertIdentical(anonymous.status, 401);
+      assertResponseStatus(anonymous, 401, await describeResponse(anonymous));
       assertIdentical(anonymous.headers.get("www-authenticate"), "Bearer");
       assertIdentical(await anonymous.text(), '{"message":"Unauthorized"}');
 
@@ -154,7 +159,7 @@ describe("Sim CDK HTTP API JWT authorizer local integration", () => {
       const authorized = await fetch(url, {
         headers: { authorization: `Bearer ${accessToken}` },
       });
-      assertIdentical(authorized.status, 200);
+      assertResponseStatus(authorized, 200, await describeResponse(authorized));
       assertIdentical(await authorized.text(), "ada");
 
       // And advancing the simulation's clock past the token's expiry closes
@@ -164,7 +169,7 @@ describe("Sim CDK HTTP API JWT authorizer local integration", () => {
       const expired = await fetch(url, {
         headers: { authorization: `Bearer ${accessToken}` },
       });
-      assertIdentical(expired.status, 401);
+      assertResponseStatus(expired, 401, await describeResponse(expired));
     } finally {
       await srv.close();
     }

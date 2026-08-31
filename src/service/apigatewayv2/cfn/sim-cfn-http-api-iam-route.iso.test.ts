@@ -1,5 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -72,8 +77,8 @@ describe("Deploying an IAM-authorized AWS::ApiGatewayV2::Route", () => {
     });
 
     // Then the stack deployed, and the route it deployed is one IAM decides
-    assertIdentical(anonymous.status, 403);
-    assertIdentical(reporter.status, 200);
+    assertResponseStatus(anonymous, 403, await describeResponse(anonymous));
+    assertResponseStatus(reporter, 200, await describeResponse(reporter));
     assertIdentical(await reporter.text(), '"orders"');
   });
 });

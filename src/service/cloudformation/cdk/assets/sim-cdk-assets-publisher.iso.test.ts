@@ -1,6 +1,7 @@
 import path from "node:path";
 import { buffer } from "node:stream/consumers";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -198,7 +199,7 @@ describe("SimCdkAssetsPublisher", () => {
     // Then publishing declines rather than failing the Stack deployment with
     // an invalid Bucket name.
     const listed = await simAws.s3().listBuckets({ input: {} });
-    assertArrayLength(listed.Buckets ?? [], 0);
+    assertArrayEmpty(listed.Buckets ?? []);
   });
 
   it("does nothing without a cloud assembly", async () => {
@@ -214,7 +215,7 @@ describe("SimCdkAssetsPublisher", () => {
 
     // Then no staging Bucket is created.
     const listed = await simAws.s3().listBuckets({ input: {} });
-    assertArrayLength(listed.Buckets ?? [], 0);
+    assertArrayEmpty(listed.Buckets ?? []);
   });
 
   it("skips assets the cloud assembly does not describe or contain", async () => {

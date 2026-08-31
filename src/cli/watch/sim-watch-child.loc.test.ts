@@ -1,7 +1,7 @@
 import {
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
-  assertArrayLength,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -70,7 +70,7 @@ describe("SimWatchChild over a real process", () => {
     await child.stop();
 
     // Then that is not reported as a process that stopped on its own
-    assertArrayLength(exits, 0);
+    assertArrayEmpty(exits);
   });
 
   it("kills a process that will not go on being asked", async () => {

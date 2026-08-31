@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -75,7 +76,7 @@ describe("SAM ScheduleV2 event expansion", () => {
 
     // Then the schedule invoked the function once an hour as the execution
     // role it was expanded with, and no rule was made for it
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertNonNullable(stack.getResource("RatesReportSchedule"));
     assertUndefined(stack.getResource("RatesReportRule"));
     assertArrayLength(received, 3);

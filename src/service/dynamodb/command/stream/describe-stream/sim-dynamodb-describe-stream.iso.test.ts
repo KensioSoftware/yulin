@@ -2,6 +2,7 @@ import { PutItemCommand, UpdateTableCommand } from "@aws-sdk/client-dynamodb";
 import { DescribeStreamCommand } from "@aws-sdk/client-dynamodb-streams";
 import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -159,7 +160,7 @@ describe("DynamoDB Streams DescribeStream", () => {
 
     // Then there is nothing left to report, rather than the same shard over
     // again.
-    assertArrayLength(second.StreamDescription?.Shards, 0);
+    assertArrayEmpty(second.StreamDescription?.Shards);
 
     // And a page size DynamoDB would not take is refused.
     const error = await assertThrowsErrorAsync(async () =>

@@ -74,6 +74,7 @@ describe("SimLiveReload", () => {
     liveReload.connect(response.asNodeResponse());
 
     // Then it is told how soon to come back, and what it has reached
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- this Node response double is not a Fetch Response
     assertIdentical(response.status, 200);
     assertIdentical(response.headers["content-type"], "text/event-stream");
     assertStringIncludes(

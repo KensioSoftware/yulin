@@ -1,4 +1,4 @@
-import { assertArrayLength, assertUndefined } from "@kensio/smartass";
+import { assertArrayEmpty, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimLogsLogStream } from "./sim-logs-log-stream.js";
@@ -17,7 +17,7 @@ describe("SimLogsLogStream", () => {
 
     // Then the stream is left as it was, rather than looking like it took a
     // batch it has nothing from.
-    assertArrayLength(stream.events, 0);
+    assertArrayEmpty(stream.events);
     assertUndefined(stream.lastIngestionTime);
     assertUndefined(stream.uploadSequenceToken);
   });

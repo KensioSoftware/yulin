@@ -3,6 +3,7 @@ import { PutRuleCommand, PutTargetsCommand } from "@aws-sdk/client-eventbridge";
 import { CreateTopicCommand } from "@aws-sdk/client-sns";
 import { SetQueueAttributesCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -201,7 +202,7 @@ describe("Lambda asynchronous invocation destinations", () => {
     // Then the caller was told about the failure and the queue holds nothing,
     // because destinations belong to asynchronous invocation alone.
     assertIdentical(output.FunctionError, "Unhandled");
-    assertArrayLength(await receivedBodies(simAws, queueUrl), 0);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
   });
 
   it("abandons an event that outlives its maximum age", async () => {

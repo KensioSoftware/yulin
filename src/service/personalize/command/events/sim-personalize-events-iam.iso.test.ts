@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-personalize";
 import { PutEventsCommand } from "@aws-sdk/client-personalize-events";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -131,7 +132,7 @@ describe("Personalize Events IAM authorization", () => {
     // Then Personalize reports it in its own terms, and records nothing.
     assertIdentical(error.name, "AccessDeniedException");
     assertStringIncludes(error.message, "personalize:PutEvents");
-    assertArrayLength(simAws.personalize().recordedEvents(), 0);
+    assertArrayEmpty(simAws.personalize().recordedEvents());
   });
 
   it("tells a denied caller nothing about a tracking ID nothing holds", async () => {

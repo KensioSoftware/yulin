@@ -4,6 +4,7 @@ import {
   UntagResourceCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -114,7 +115,7 @@ describe("DynamoDB tag command IAM authorization", () => {
       new ListTagsOfResourceCommand({ ResourceArn: table.arn }),
       caller,
     );
-    assertArrayLength(output.Tags, 0);
+    assertArrayEmpty(output.Tags);
   });
 
   it("denies a Role that may change tags but not read them", async () => {

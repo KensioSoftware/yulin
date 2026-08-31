@@ -1,4 +1,8 @@
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -63,10 +67,10 @@ describe("Throttling a deployed sim REST API stage", () => {
 
     // Then the deployed limits are the ones the stage serves at, and the
     // method on the stage default is untouched by the other method's burst
-    assertIdentical(served.status, 200);
-    assertIdentical(refused.status, 429);
+    assertResponseStatus(served, 200, await describeResponse(served));
+    assertResponseStatus(refused, 429, await describeResponse(refused));
 
     const other = await http.fetch(localUrl(apiUrl, "orders"));
-    assertIdentical(other.status, 200);
+    assertResponseStatus(other, 200, await describeResponse(other));
   });
 });

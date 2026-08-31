@@ -3,6 +3,7 @@ import {
   DescribeLoadBalancersCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -174,7 +175,7 @@ describe("ELBv2 DescribeLoadBalancersCommand", () => {
 
     // Then nothing is left to describe.
     const output = await elbV2.describeLoadBalancers({ input: {} });
-    assertArrayLength(output.LoadBalancers, 0);
+    assertArrayEmpty(output.LoadBalancers);
   });
 
   it("refuses a delete naming no load balancer, or one that is gone", async () => {

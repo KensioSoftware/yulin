@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -116,7 +117,7 @@ describe("Detecting faces in a simulated image", () => {
 
     // Then the detection found nothing, which is a result rather than a
     // missing rule.
-    assertArrayLength(detected.FaceDetails, 0);
+    assertArrayEmpty(detected.FaceDetails);
   });
 
   it("declares an empty image and a crowded one from the built-in results", async () => {
@@ -138,7 +139,7 @@ describe("Detecting faces in a simulated image", () => {
     const crowd = await detect(simAws, "crowd.jpg");
 
     // Then a test that only counts faces needs to declare nothing of its own.
-    assertArrayLength(empty.FaceDetails, 0);
+    assertArrayEmpty(empty.FaceDetails);
     assertArrayLength(crowd.FaceDetails, 3);
     assertIdentical(crowd.FaceDetails[2].Confidence, Math.fround(98.62));
   });
@@ -180,7 +181,7 @@ describe("Detecting faces in a simulated image", () => {
 
     // Then the hash rule answers, which is what makes a system that generates
     // its own object keys testable.
-    assertArrayLength(detected.FaceDetails, 0);
+    assertArrayEmpty(detected.FaceDetails);
   });
 
   it("consults hash rules and the default for an image passed as bytes", async () => {
@@ -201,7 +202,7 @@ describe("Detecting faces in a simulated image", () => {
 
     // Then the hash rule matches and the default answers for the rest, since
     // bytes have no name for a name rule to match.
-    assertArrayLength(hashed.FaceDetails, 0);
+    assertArrayEmpty(hashed.FaceDetails);
     assertArrayLength(unknown.FaceDetails, 3);
   });
 
@@ -222,7 +223,7 @@ describe("Detecting faces in a simulated image", () => {
 
     // Then each operation answers from its own rules, since each owns the
     // result shape it answers with.
-    assertArrayLength(faces.FaceDetails, 0);
+    assertArrayEmpty(faces.FaceDetails);
     assertArrayEquals(
       labels.Labels.map((label) => label.Name),
       ["Cat"],

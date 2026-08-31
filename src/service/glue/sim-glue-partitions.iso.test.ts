@@ -8,6 +8,7 @@ import {
   GetPartitionsCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -330,9 +331,8 @@ describe("SimGlue partitions", () => {
     assertUndefined(
       glue.findPartition(table.databaseName, table.tableName, ["2026-08-26"]),
     );
-    assertArrayLength(
+    assertArrayEmpty(
       glue.partitionsInTable(table.databaseName, table.tableName),
-      0,
     );
   });
 
@@ -349,9 +349,8 @@ describe("SimGlue partitions", () => {
     );
 
     // Then the partitions go with the tables that went with it.
-    assertArrayLength(
+    assertArrayEmpty(
       glue.partitionsInTable(table.databaseName, table.tableName),
-      0,
     );
   });
 });

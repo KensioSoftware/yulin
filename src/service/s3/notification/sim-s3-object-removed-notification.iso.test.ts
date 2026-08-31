@@ -10,6 +10,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -164,7 +165,7 @@ describe("Notifying a simulated Lambda function of a removed Object", () => {
     await simAws.backgroundTasksComplete();
 
     // Then nothing is notified: no deletion happened
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 
   it("raises one event per Object a batch deletion removed", async () => {

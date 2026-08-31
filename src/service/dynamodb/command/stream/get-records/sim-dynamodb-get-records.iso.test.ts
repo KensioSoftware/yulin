@@ -4,6 +4,7 @@ import {
   GetShardIteratorCommand,
 } from "@aws-sdk/client-dynamodb-streams";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -84,7 +85,7 @@ describe("DynamoDB Streams GetRecords", () => {
       );
 
     // Then the empty batch is the ordinary answer, and the reader can go on.
-    assertArrayLength(second.Records, 0);
+    assertArrayEmpty(second.Records);
     assertNonNullable(second.NextShardIterator);
 
     // And a record written afterwards is read from that same iterator.

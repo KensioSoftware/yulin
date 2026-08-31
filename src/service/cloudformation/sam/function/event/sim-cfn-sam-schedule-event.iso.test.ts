@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -81,7 +82,7 @@ describe("SAM Schedule event expansion", () => {
 
     // Then the rule the event made invoked the function once an hour, so the
     // permission it was expanded with admitted EventBridge
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertArrayLength(received, 3);
   });
 
@@ -146,7 +147,7 @@ describe("SAM Schedule event expansion", () => {
 
     assertNonNullable(rule);
     assertIdentical(rule.state.value, "DISABLED");
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 
   it("refuses an event stating no schedule rather than guessing one", async () => {

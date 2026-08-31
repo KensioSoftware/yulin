@@ -10,8 +10,8 @@ import {
 } from "@aws-sdk/client-firehose";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -252,7 +252,7 @@ describe("Simulated Firehose delivery stream lifecycle", () => {
     );
 
     // Then nothing matches.
-    assertArrayLength(listed.DeliveryStreamNames, 0);
+    assertArrayEmpty(listed.DeliveryStreamNames);
   });
 
   it("refuses a request naming no delivery stream", async () => {

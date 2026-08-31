@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -152,7 +153,7 @@ describe("EventBridge target role source", () => {
     // Then the task ran. The rule's ARN and Account were supplied, so the
     // condition matched.
     assertIdentical(runs(), 1);
-    assertArrayLength(simAws.eventBridge().deliveryFailures, 0);
+    assertArrayEmpty(simAws.eventBridge().deliveryFailures);
   });
 
   it("refuses a role scoped to a different rule's ARN", async () => {

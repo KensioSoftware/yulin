@@ -1,6 +1,7 @@
 import { AdminCreateUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -104,7 +105,7 @@ describe("sim Cognito user pool email through simulated SES", () => {
 
     // Then the message went through eu-west-2, and us-east-1 has none of it.
     assertArrayLength(other.sentEmails(), 1);
-    assertArrayLength(sesIn(pool, "us-east-1").sentEmails(), 0);
+    assertArrayEmpty(sesIn(pool, "us-east-1").sentEmails());
   });
 
   it("sends to an unverified recipient once the account has left the sandbox", async () => {
@@ -197,7 +198,7 @@ describe("sim Cognito user pool email through simulated SES", () => {
     const [message] = pool.cognito.userPool(pool.userPoolId).sentMessages();
     assertNonNullable(message);
     assertIdentical(message.medium, "SMS");
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("keeps a COGNITO_DEFAULT pool's messages off SES", async () => {
@@ -213,6 +214,6 @@ describe("sim Cognito user pool email through simulated SES", () => {
     // Then the pool recorded the message and SES saw nothing, because
     // Cognito's own sending reaches no other service.
     assertArrayLength(pool.cognito.userPool(pool.userPoolId).sentMessages(), 1);
-    assertArrayLength(sesIn(pool, "us-east-1").sentEmails(), 0);
+    assertArrayEmpty(sesIn(pool, "us-east-1").sentEmails());
   });
 });

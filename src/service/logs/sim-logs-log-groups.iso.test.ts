@@ -4,7 +4,7 @@ import {
   DescribeLogGroupsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -148,7 +148,7 @@ describe("SimLogs log groups", () => {
     );
 
     // Then the first went, and the second failed as an unknown group.
-    assertArrayLength(logs.allLogGroups(), 0);
+    assertArrayEmpty(logs.allLogGroups());
     assertInstanceOf(error, SimLogsResourceNotFoundException);
   });
 });

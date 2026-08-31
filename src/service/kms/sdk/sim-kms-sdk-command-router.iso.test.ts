@@ -17,11 +17,12 @@ import {
   ScheduleKeyDeletionCommand,
 } from "@aws-sdk/client-kms";
 import {
+  assertArrayEmpty,
   assertArrayIncludesAll,
   assertArrayLength,
   assertIdentical,
-  assertUndefined,
   assertNonNullable,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimSdk } from "../../../sdk/index.js";
@@ -132,7 +133,7 @@ describe("SimKmsSdkCommandRouter", () => {
     assertIdentical(described.KeyMetadata?.Description, "Router key");
     assertArrayLength(keys.Keys ?? [], 1);
     assertArrayLength(aliases.Aliases ?? [], 1);
-    assertArrayLength(aliasesAfterDelete.Aliases ?? [], 0);
+    assertArrayEmpty(aliasesAfterDelete.Aliases ?? []);
     assertIdentical(cancelled.KeyId, keyArn);
 
     simSdk.restoreAll();

@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -87,7 +88,7 @@ describe("sim IAM authorization principal", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("allows caller context principal to resolve identity policies", async () => {
@@ -141,7 +142,7 @@ describe("sim IAM authorization principal", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("allows the service a resource policy names", () => {

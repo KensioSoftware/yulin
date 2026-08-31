@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { SendMessageBatchCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -46,7 +46,7 @@ describe("SQS SendMessageBatch", () => {
       first.MD5OfMessageBody,
       createHash("md5").update("order-1", "utf8").digest("hex"),
     );
-    assertArrayLength(sent.Failed ?? [], 0);
+    assertArrayEmpty(sent.Failed ?? []);
   });
 
   it("reports one failed entry while the rest of the batch goes through", async () => {

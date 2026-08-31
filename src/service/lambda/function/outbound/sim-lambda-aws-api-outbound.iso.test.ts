@@ -1,9 +1,10 @@
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertFalse,
-  assertIdentical,
   assertObjectMatches,
+  assertResponseStatus,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -134,7 +135,7 @@ describe("The AWS service API a sim Lambda's requests reach", () => {
     );
 
     // Then the simulated operation answered it, in the response the SDK reads.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       Item: { total: { N: "42" } },
     });

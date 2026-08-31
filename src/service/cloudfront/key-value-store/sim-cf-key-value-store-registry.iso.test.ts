@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertThrowsError,
@@ -104,6 +105,6 @@ describe("Sim CloudFront key value store registry", () => {
     assertUndefined(registry.byId("nope"));
     assertUndefined(registry.byName("nope"));
     assertUndefined(registry.byArn("nope"));
-    assertArrayLength(registry.all(), 0);
+    assertArrayEmpty(registry.all());
   });
 });

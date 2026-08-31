@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertNonNullable,
   assertStringIncludes,
@@ -134,7 +135,7 @@ describe("the principal an AWS::Logs delivery Resource is created as", () => {
     // Then all three Resources deployed. This is the policy a real
     // CloudFormation refusal sends someone to write, and it has to be enough
     // here.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertNonNullable(simAws.logs().findDeliverySource(sourceName));
     assertNonNullable(simAws.logs().findDeliveryDestination(sourceName));
     assertArrayLength(simAws.logs().allDeliveries(), 1);
@@ -208,7 +209,7 @@ describe("the principal an AWS::Logs delivery Resource is created as", () => {
     // joins already deployed.
     assertStringIncludes(error.message, "logs:GetDelivery");
     assertNonNullable(simAws.logs().findDeliveryDestination(sourceName));
-    assertArrayLength(simAws.logs().allDeliveries(), 0);
+    assertArrayEmpty(simAws.logs().allDeliveries());
   });
 
   it("tears the delivery source down under the delete action AWS names", async () => {

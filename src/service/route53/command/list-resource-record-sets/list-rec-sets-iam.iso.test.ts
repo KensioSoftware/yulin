@@ -4,7 +4,7 @@ import {
 } from "@aws-sdk/client-route-53";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -74,7 +74,7 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     );
 
     // Then IAM defaults to Account root and Route53 returns the listing.
-    assertArrayLength(output.ResourceRecordSets, 0);
+    assertArrayEmpty(output.ResourceRecordSets);
   });
 
   it("allows a Role granted the specific Hosted Zone ARN", async () => {
@@ -113,7 +113,7 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     );
 
     // Then IAM permits the request.
-    assertArrayLength(output.ResourceRecordSets, 0);
+    assertArrayEmpty(output.ResourceRecordSets);
   });
 
   it("denies a Role granted a different Hosted Zone ARN", async () => {
@@ -206,6 +206,6 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     );
 
     // Then the allow-all fallback permits the request.
-    assertArrayLength(output.ResourceRecordSets, 0);
+    assertArrayEmpty(output.ResourceRecordSets);
   });
 });

@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import path from "node:path";
 import { symlink, utimes } from "node:fs/promises";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertBufferEqual,
   assertIdentical,
@@ -79,7 +80,7 @@ describe("Filesystem simulated S3 storage", () => {
     const storage = await makeFilesystemStorage();
     const objects = await storage.listObjects();
 
-    assertArrayLength(objects, 0);
+    assertArrayEmpty(objects);
   });
 
   it("lists Objects from the filesystem", async () => {

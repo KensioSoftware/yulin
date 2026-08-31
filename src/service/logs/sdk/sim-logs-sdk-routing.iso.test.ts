@@ -31,6 +31,7 @@ import {
   CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludesAll,
   assertArrayLength,
@@ -254,12 +255,12 @@ describe("CloudWatch Logs SDK interception", () => {
       filters.subscriptionFilters?.map((filter) => filter.filterName),
       ["errors"],
     );
-    assertArrayLength(afterDeleteFilters.subscriptionFilters ?? [], 0);
+    assertArrayEmpty(afterDeleteFilters.subscriptionFilters ?? []);
     assertArrayEquals(
       metricFilters.metricFilters?.map((filter) => filter.filterName),
       ["billing-errors"],
     );
-    assertArrayLength(afterDeleteMetricFilters.metricFilters ?? [], 0);
+    assertArrayEmpty(afterDeleteMetricFilters.metricFilters ?? []);
 
     // Then each one reached simulated CloudWatch Logs.
     assertIdentical(withRetention.logGroups?.at(0)?.retentionInDays, 14);
@@ -271,7 +272,7 @@ describe("CloudWatch Logs SDK interception", () => {
       events.events?.map((event) => event.message),
       ["starting"],
     );
-    assertArrayLength(afterDelete.logGroups ?? [], 0);
+    assertArrayEmpty(afterDelete.logGroups ?? []);
   });
 });
 
@@ -335,6 +336,6 @@ describe("CloudWatch Logs delivery SDK interception", () => {
 
     const remaining = await client.send(new DescribeDeliveriesCommand({}));
 
-    assertArrayLength(remaining.deliveries ?? [], 0);
+    assertArrayEmpty(remaining.deliveries ?? []);
   });
 });

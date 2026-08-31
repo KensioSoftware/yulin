@@ -1,6 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { AssumeRoleCommand } from "@aws-sdk/client-sts";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
@@ -89,7 +93,7 @@ describe("Calling an AWS_IAM sim HTTP API route from another Account", () => {
 
     // Then it is refused: a cross-Account request needs an Allow from the
     // resource side too, and an HTTP API has nowhere to put one
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("admits the same caller once it assumes a Role in the API's Account", async () => {
@@ -146,6 +150,6 @@ describe("Calling an AWS_IAM sim HTTP API route from another Account", () => {
 
     // Then the request is now made by a principal of the API's own Account,
     // which is the way through on AWS as well
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

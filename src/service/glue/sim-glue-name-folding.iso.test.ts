@@ -9,6 +9,7 @@ import {
   GetTablesCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -138,7 +139,7 @@ describe("folding Glue catalog names", () => {
       TableList.map((table) => table.Name),
       ["access_logs"],
     );
-    assertArrayLength(glue.tablesInDatabase("rainlytics"), 0);
+    assertArrayEmpty(glue.tablesInDatabase("rainlytics"));
   });
 
   it("reaches a partition under either spelling of its table", () => {

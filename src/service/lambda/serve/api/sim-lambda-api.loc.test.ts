@@ -18,8 +18,9 @@ import {
   ListFunctionUrlConfigsCommand,
 } from "@aws-sdk/client-lambda";
 import {
-  assertIdentical,
+  assertArrayEmpty,
   assertArrayLength,
+  assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -256,7 +257,7 @@ describe("Serving the simulated Lambda control plane on an endpoint URL", () => 
     const gone = await client.send(
       new ListFunctionUrlConfigsCommand({ FunctionName: "public" }),
     );
-    assertArrayLength(gone.FunctionUrlConfigs ?? [], 0);
+    assertArrayEmpty(gone.FunctionUrlConfigs ?? []);
   });
 
   it("lists the event source mappings of a function", async () => {
@@ -269,7 +270,7 @@ describe("Serving the simulated Lambda control plane on an endpoint URL", () => 
     );
 
     // Then the listing is empty rather than absent
-    assertArrayLength(listed.EventSourceMappings ?? [], 0);
+    assertArrayEmpty(listed.EventSourceMappings ?? []);
   });
 
   it("deletes a function", async () => {

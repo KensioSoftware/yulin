@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -133,6 +134,6 @@ describe("SimCloudWatch alarm action failures", () => {
       .deleteAlarms({ input: { AlarmNames: ["never-existed"] } });
 
     // Then it is a no-op, as real DeleteAlarms is for an unknown name.
-    assertArrayLength(simAws.cloudWatch().allAlarms(), 0);
+    assertArrayEmpty(simAws.cloudWatch().allAlarms());
   });
 });

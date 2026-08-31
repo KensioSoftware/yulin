@@ -4,7 +4,9 @@ import {
   assertArrayIncludes,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { SimAws } from "../service/aws/sim-aws.js";
 import {
@@ -156,7 +158,7 @@ describe("deploying a plan into the services it names", () => {
       });
 
       // Then it reached the function the routes variable named
-      assertIdentical(response.status, 201);
+      assertResponseStatus(response, 201, await describeResponse(response));
       assertIdentical(await response.text(), "ordered");
       assertArrayEquals(received, ["/orders"]);
     } finally {

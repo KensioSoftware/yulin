@@ -8,6 +8,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -335,6 +336,6 @@ describe("AWS::S3::Bucket NotificationConfiguration", () => {
         new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
       );
 
-    assertArrayLength(output.LambdaFunctionConfigurations ?? [], 0);
+    assertArrayEmpty(output.LambdaFunctionConfigurations ?? []);
   });
 });

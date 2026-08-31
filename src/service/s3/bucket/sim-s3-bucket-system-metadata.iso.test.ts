@@ -1,4 +1,8 @@
-import { assertArrayLength, assertObjectEquals } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertObjectEquals,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3KeyPrefixDeclaration } from "../object/s3-key-prefix-metadata.js";
 import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
@@ -80,6 +84,6 @@ describe("SimS3BucketSystemMetadata", () => {
     const declarations = systemMetadata.declarations();
 
     // Then it says nothing, and a mount over it is on its own.
-    assertArrayLength(declarations, 0);
+    assertArrayEmpty(declarations);
   });
 });

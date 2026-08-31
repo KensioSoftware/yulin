@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -61,7 +62,7 @@ describe("sim Lambda outbound fetch", () => {
     assertIdentical(await request.text(), "grant_type=authorization_code");
 
     // And nothing reached the network.
-    assertArrayLength(calls, 0);
+    assertArrayEmpty(calls);
   });
 
   it("reads the hostname from every way a request is addressed", async () => {

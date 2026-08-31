@@ -9,6 +9,7 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertInstanceOf,
@@ -120,7 +121,7 @@ describe("SES IAM authorization", () => {
     // Then IAM refuses it, naming the identity ARN it authorized against.
     assertInstanceOf(error, SimIamAccessDenied);
     assertStringIncludes(error.message, "ses:SendEmail");
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("prefers the address identity over the domain one", async () => {
