@@ -53,10 +53,11 @@ export class SimAwsSchedulerDeadLetters {
       regionName,
     );
 
-    await new SimSchedulerDeadLetterQueue({
-      scope,
+    await new SimSchedulerDeadLetterQueue({ scope }).deliver(
+      { request: deadLetter.delivery, caller },
+      deadLetter,
       queueArn,
-      queueName: queue.name,
-    }).deliver({ request: deadLetter.delivery, caller }, deadLetter);
+      queue.name,
+    );
   }
 }
