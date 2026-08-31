@@ -15,9 +15,9 @@ export interface SimSesBody {
 }
 
 export interface SimSesAttachment {
-  readonly RawContent: Uint8Array | undefined;
+  readonly RawContent?: Uint8Array | undefined;
   readonly ContentDisposition?: "ATTACHMENT" | "INLINE" | undefined;
-  readonly FileName: string | undefined;
+  readonly FileName?: string | undefined;
   readonly ContentDescription?: string | undefined;
   readonly ContentId?: string | undefined;
   readonly ContentTransferEncoding?:

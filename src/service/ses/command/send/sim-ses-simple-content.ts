@@ -44,6 +44,7 @@ export function readSimSesSimpleMessage(
   };
 }
 
+/** Read and validate one attachment from a simple message. */
 function readAttachment(
   attachment: SimSesAttachment,
   index: number,
@@ -67,6 +68,7 @@ function readAttachment(
   };
 }
 
+/** Build the SES validation error for a missing attachment member. */
 function missingAttachmentMember(
   index: number,
   member: "fileName" | "rawContent",
