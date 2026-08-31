@@ -9,6 +9,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { SimFixedClock } from "../../../util/clock/sim-clock.js";
 import { SimAws } from "../../aws/sim-aws.js";
 
 describe("AWS Backup CloudFormation resources", () => {
@@ -168,6 +169,65 @@ describe("AWS Backup CloudFormation resources", () => {
     assertUndefined(simAws.backup().findBackupVault("ephemeral-backups"));
     assertUndefined(simAws.backup().findBackupPlan(planId));
     assertUndefined(simAws.backup().findBackupSelection(selectionId));
+  });
+
+  it("runs a backup rule deployed through CloudFormation", async () => {
+    // Given a deployed vault, hourly plan and resource selection.
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2026-08-31T09:30:00.000Z")),
+    });
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "scheduled-backup-stack",
+      template: {
+        Resources: {
+          Vault: {
+            Type: "AWS::Backup::BackupVault",
+            Properties: { BackupVaultName: "scheduled-backups" },
+          },
+          Plan: {
+            Type: "AWS::Backup::BackupPlan",
+            Properties: {
+              BackupPlan: {
+                BackupPlanName: "scheduled-plan",
+                BackupPlanRule: [
+                  {
+                    RuleName: "hourly",
+                    TargetBackupVault: { Ref: "Vault" },
+                    ScheduleExpression: "rate(1 hour)",
+                    Lifecycle: { DeleteAfterDays: 30 },
+                  },
+                ],
+              },
+            },
+          },
+          Selection: {
+            Type: "AWS::Backup::BackupSelection",
+            Properties: {
+              BackupPlanId: { Ref: "Plan" },
+              BackupSelection: {
+                SelectionName: "orders",
+                IamRoleArn: "arn:aws:iam::888888888888:role/BackupRole",
+                Resources: [
+                  "arn:aws:dynamodb:us-east-1:888888888888:table/orders",
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    // When the simulated clock reaches the rule's first occurrence.
+    await simAws.clock().advanceBy({ hours: 1 });
+
+    // Then the deployed configuration creates a recovery point.
+    const points = simAws.backup().vault("scheduled-backups").recoveryPoints();
+    assertArrayLength(points, 1);
+    assertIdentical(
+      points[0].resourceArn,
+      "arn:aws:dynamodb:us-east-1:888888888888:table/orders",
+    );
   });
 
   it("leaves no vault behind when its lock configuration fails", async () => {

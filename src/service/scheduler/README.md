@@ -141,6 +141,10 @@ The two failures are reported apart from each other, because they are fixed in d
 trust policy is on the role's `AssumeRolePolicyDocument`, and the permission is in a policy attached
 to it. Telling a reader which one it was saves the whole diagnosis.
 
+`SimSchedulerDeliveryFunction` asks Lambda for an asynchronous Event invocation after those checks.
+Scheduler has completed its delivery once Lambda accepts the event. Lambda then owns handler errors,
+event invoke retries, destinations and the function's dead-letter queue.
+
 `SimAwsSchedulerDeliveryTargets` assumes the role in the role's own Account and reaches the target in
 the target's, which need not be the same one. A `SimScheduler` built outside SimAws gets
 `SimSchedulerNoDeliveryTargets`, which records every invocation as a failure saying why there was

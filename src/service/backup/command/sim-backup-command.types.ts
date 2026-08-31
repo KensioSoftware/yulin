@@ -11,7 +11,24 @@ export interface SimBackupRuleInput {
 }
 
 export interface SimBackupRule extends SimBackupRuleInput {
-  readonly RuleId?: string | undefined;
+  readonly RuleId: string;
+  readonly RuleName: string;
+  readonly TargetBackupVaultName: string;
+  readonly ScheduleExpression: string;
+}
+
+export interface SimRecoveryPointCreator {
+  readonly BackupPlanId?: string | undefined;
+  readonly BackupPlanArn?: string | undefined;
+  readonly BackupPlanName?: string | undefined;
+  readonly BackupPlanVersion?: string | undefined;
+  readonly BackupRuleId?: string | undefined;
+  readonly BackupRuleName?: string | undefined;
+}
+
+export interface SimCalculatedLifecycle {
+  readonly MoveToColdStorageAt?: Date | undefined;
+  readonly DeleteAt?: Date | undefined;
 }
 
 export interface SimBackupPlanInput {
@@ -168,3 +185,95 @@ export interface SimListBackupSelectionsCommandOutput {
     | undefined;
   readonly NextToken?: string | undefined;
 }
+
+export type SimStartBackupJobCommand = SimBackupCommand<{
+  readonly BackupVaultName?: string | undefined;
+  readonly ResourceArn?: string | undefined;
+  readonly IamRoleArn?: string | undefined;
+  readonly IdempotencyToken?: string | undefined;
+  readonly Lifecycle?: SimBackupLifecycle | undefined;
+}>;
+
+export interface SimStartBackupJobCommandOutput {
+  readonly BackupJobId?: string | undefined;
+  readonly RecoveryPointArn?: string | undefined;
+  readonly CreationDate?: Date | undefined;
+  readonly IsParent?: boolean | undefined;
+}
+
+export type SimDescribeBackupJobCommand = SimBackupCommand<{
+  readonly BackupJobId?: string | undefined;
+}>;
+
+export interface SimBackupJobOutput {
+  readonly AccountId?: string | undefined;
+  readonly BackupJobId?: string | undefined;
+  readonly BackupVaultName?: string | undefined;
+  readonly BackupVaultArn?: string | undefined;
+  readonly RecoveryPointArn?: string | undefined;
+  readonly ResourceArn?: string | undefined;
+  readonly CreationDate?: Date | undefined;
+  readonly InitiationDate?: Date | undefined;
+  readonly CompletionDate?: Date | undefined;
+  readonly State?: string | undefined;
+  readonly StatusMessage?: string | undefined;
+  readonly PercentDone?: string | undefined;
+  readonly IamRoleArn?: string | undefined;
+  readonly CreatedBy?: SimRecoveryPointCreator | undefined;
+  readonly RecoveryPointLifecycle?: SimBackupLifecycle | undefined;
+  readonly IsParent?: boolean | undefined;
+  readonly MessageCategory?: string | undefined;
+}
+
+export type SimDescribeBackupJobCommandOutput = SimBackupJobOutput;
+
+export type SimListBackupJobsCommand = SimBackupCommand<{
+  readonly ByResourceArn?: string | undefined;
+  readonly ByState?: string | undefined;
+  readonly ByBackupVaultName?: string | undefined;
+  readonly MaxResults?: number | undefined;
+  readonly NextToken?: string | undefined;
+}>;
+
+export interface SimListBackupJobsCommandOutput {
+  readonly BackupJobs?: readonly SimBackupJobOutput[] | undefined;
+  readonly NextToken?: string | undefined;
+}
+
+export interface SimRecoveryPointOutput {
+  readonly RecoveryPointArn?: string | undefined;
+  readonly BackupVaultName?: string | undefined;
+  readonly BackupVaultArn?: string | undefined;
+  readonly ResourceArn?: string | undefined;
+  readonly CreatedBy?: SimRecoveryPointCreator | undefined;
+  readonly IamRoleArn?: string | undefined;
+  readonly Status?: string | undefined;
+  readonly CreationDate?: Date | undefined;
+  readonly InitiationDate?: Date | undefined;
+  readonly CompletionDate?: Date | undefined;
+  readonly CalculatedLifecycle?: SimCalculatedLifecycle | undefined;
+  readonly Lifecycle?: SimBackupLifecycle | undefined;
+  readonly EncryptionKeyArn?: string | undefined;
+  readonly IsEncrypted?: boolean | undefined;
+  readonly VaultType?: string | undefined;
+}
+
+export type SimListRecoveryPointsByBackupVaultCommand = SimBackupCommand<{
+  readonly BackupVaultName?: string | undefined;
+  readonly ByResourceArn?: string | undefined;
+  readonly ByBackupPlanId?: string | undefined;
+  readonly MaxResults?: number | undefined;
+  readonly NextToken?: string | undefined;
+}>;
+
+export interface SimListRecoveryPointsByBackupVaultCommandOutput {
+  readonly RecoveryPoints?: readonly SimRecoveryPointOutput[] | undefined;
+  readonly NextToken?: string | undefined;
+}
+
+export type SimDescribeRecoveryPointCommand = SimBackupCommand<{
+  readonly BackupVaultName?: string | undefined;
+  readonly RecoveryPointArn?: string | undefined;
+}>;
+
+export type SimDescribeRecoveryPointCommandOutput = SimRecoveryPointOutput;

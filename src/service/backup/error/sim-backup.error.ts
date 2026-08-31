@@ -2,9 +2,7 @@ export interface SimBackupErrorMetadata {
   readonly httpStatusCode?: number | undefined;
 }
 
-/**
- *
- */
+/** Base class for AWS Backup service errors. */
 export class SimBackupError extends Error {
   constructor(
     message: string,
@@ -14,9 +12,7 @@ export class SimBackupError extends Error {
   }
 }
 
-/**
- *
- */
+/** AWS Backup refused the caller's permissions. */
 export class SimBackupAccessDeniedException extends SimBackupError {
   override readonly name = "AccessDeniedException";
 
@@ -25,9 +21,7 @@ export class SimBackupAccessDeniedException extends SimBackupError {
   }
 }
 
-/**
- *
- */
+/** AWS Backup found a resource with the requested identity. */
 export class SimBackupAlreadyExistsException extends SimBackupError {
   override readonly name = "AlreadyExistsException";
 
@@ -36,9 +30,7 @@ export class SimBackupAlreadyExistsException extends SimBackupError {
   }
 }
 
-/**
- *
- */
+/** AWS Backup refused a parameter value. */
 export class SimBackupInvalidParameterValueException extends SimBackupError {
   override readonly name = "InvalidParameterValueException";
 
@@ -47,9 +39,16 @@ export class SimBackupInvalidParameterValueException extends SimBackupError {
   }
 }
 
-/**
- *
- */
+/** AWS Backup refused a request that is invalid for the resource state. */
+export class SimBackupInvalidRequestException extends SimBackupError {
+  override readonly name = "InvalidRequestException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/** AWS Backup found a required parameter missing. */
 export class SimBackupMissingParameterValueException extends SimBackupError {
   override readonly name = "MissingParameterValueException";
 
@@ -58,9 +57,7 @@ export class SimBackupMissingParameterValueException extends SimBackupError {
   }
 }
 
-/**
- *
- */
+/** AWS Backup could not find the requested resource. */
 export class SimBackupResourceNotFoundException extends SimBackupError {
   override readonly name = "ResourceNotFoundException";
 

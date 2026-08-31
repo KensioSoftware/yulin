@@ -15,3 +15,11 @@ export function backupPlanArn(
 ): string {
   return `arn:aws:backup:${scope.regionName}:${scope.accountId}:backup-plan:${id}`;
 }
+
+/** Builds the ARN of a recovery point in the supplied scope. */
+export function recoveryPointArn(
+  id: string,
+  scope: SimAwsAccountRegionScope,
+): string {
+  return `arn:aws:backup:${scope.regionName}:${scope.accountId}:recovery-point:${id}`;
+}
