@@ -49,6 +49,10 @@ export {
 } from "./email/sim-ses-sent-email.js";
 export { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
 export {
+  type SimSesFeedback,
+  SimSesFeedbackRecorder,
+} from "./feedback/sim-ses-feedback-recorder.js";
+export {
   requiredSimSesFromAddress,
   simSesBareAddress,
 } from "./email/sim-ses-address.js";
@@ -67,6 +71,7 @@ export {
   SimSesAlreadyExistsException,
   SimSesBadRequestException,
   SimSesError,
+  SimSesFeedbackError,
   type SimSesErrorMetadata,
   SimSesMessageRejected,
   SimSesNotFoundException,

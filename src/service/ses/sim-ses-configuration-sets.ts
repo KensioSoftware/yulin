@@ -11,10 +11,10 @@ import { SimSesSuppression } from "./sim-ses-suppression.js";
  * separate classes because one class holding every SES operation grows by a
  * method with each one added.
  *
- * A configuration set here is state and no behaviour. Its suppression reasons,
- * sending switch, delivery options and reputation switch are all held and read
- * back, and nothing acts on any of them. A send naming a set keeps the name on
- * its record and goes no further.
+ * A configuration set holds suppression reasons, the sending switch, delivery
+ * options and the reputation switch. The sending switch acts on acceptance.
+ * Suppression reasons act when feedback is recorded for an accepted message.
+ * The remaining options are held for a test to read back.
  */
 export abstract class SimSesConfigurationSets extends SimSesSuppression {
   /**

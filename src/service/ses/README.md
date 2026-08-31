@@ -86,9 +86,13 @@ Configuration set state lives under `configuration-set/`, and the send-side reso
 `command/send/sim-ses-configuration-set-check.ts`.
 
 `SimSesConfigurationSet` holds the suppression reasons, the sending switch, the delivery options and
-the reputation options a set was created with. The sending switch is the only one of them a send
-acts on. The others have nothing here to act on, because no message is delivered and no bounce is
-recorded.
+the reputation options a set was created with. The sending switch acts when a message is accepted.
+Suppression reasons act when a test records bounce or complaint feedback. Delivery and reputation
+options are held for a test to read.
+
+An absent `SuppressionOptions` group leaves `suppressedReasons` undefined. Feedback for a message
+sent through that set falls back to the account reasons. A present group with no reasons stores an
+empty list and disables suppression for that feedback.
 
 `SimSesConfigurationSetCheck` answers two questions about a send. Which set it goes through, and
 whether that set will carry it. The set is the one the send names, or the one the sending identity
@@ -180,3 +184,18 @@ messages started failing for a reason unrelated to what it asserts, and simulati
 rate would mean tests that take real time to run. The numbers `GetAccount` reports are the real
 sandbox and production ones, and `SentLast24Hours` counts what was actually sent, on the simulated
 clock, so moving time forward past the window drops the count the way an account's would.
+
+## Suppression and feedback
+
+Suppression list state lives under `suppression/`. `SimSesSuppressionList` stores account entries
+and applies the case rules of the SES API. Suppression commands manage addresses by exact case, while
+sending matches a listed address without regard to case.
+
+Feedback handling lives under `feedback/`. `SimSesFeedbackRecorder` finds an accepted message by id
+and checks that the supplied address was one of its recipients. It then resolves the active reasons
+from the message's configuration set. A set with no override falls back to
+`SimSesAccount.suppressedReasons`. Active feedback puts the recipient on the account list with the
+simulated clock's current time. Inactive feedback leaves the list unchanged.
+
+This operation models hard bounces and complaints only. It does not deliver mail, create automatic
+feedback, or publish to an SES event destination.

@@ -9,10 +9,9 @@ interface SimSesSuppressedDestinationProperties {
 /**
  * One address on an account's suppression list.
  *
- * Real SES also reports a `MessageId` and a `FeedbackId` on the address it put
- * there itself, describing the bounce or complaint that did it. Nothing
- * bounces here, so every address on this list was put there by hand and there
- * is no feedback event to point at.
+ * Real SES also reports a `MessageId` and a `FeedbackId` on an address added by
+ * delivery feedback. This simulation records the reason and time only. It
+ * does not publish or retain a feedback event.
  */
 export class SimSesSuppressedDestination {
   /** The address as it was given, case and all. */

@@ -3,6 +3,8 @@ import type * as simSesCommands from "./command/sim-ses-command.types.js";
 import type { SimSesRequestOptions } from "./command/sim-ses-request-options.js";
 import type * as simSesServiceSend from "./command/send/sim-ses-service-send.js";
 import type { SimSesSentEmail } from "./email/sim-ses-sent-email.js";
+import type { SimSesFeedback } from "./feedback/sim-ses-feedback-recorder.js";
+import type { SimSesSuppressedDestination } from "./suppression/sim-ses-suppressed-destination.js";
 import type { SimSesIdentity } from "./identity/sim-ses-identity.js";
 import type { SimSesTemplate } from "./template/sim-ses-template.js";
 import { SimSesCfnResourceFactory } from "./cfn/sim-ses-cfn-resource-factory.js";
@@ -47,6 +49,22 @@ export class SimSesV2 extends SimSesConfigurationSets {
    */
   sentEmails(): readonly SimSesSentEmail[] {
     return this.commands.sent.all;
+  }
+
+  /**
+   * Record a hard bounce or complaint for one recipient of an accepted
+   * message.
+   *
+   * Real feedback happens after SES hands a message to a mail system. A test
+   * process cannot observe that exchange, so this simulator-side operation
+   * supplies the feedback explicitly. Active feedback adds or updates the
+   * account suppression entry at the current simulated time. Inactive
+   * feedback returns undefined and leaves the list unchanged.
+   */
+  recordFeedback(
+    feedback: SimSesFeedback,
+  ): SimSesSuppressedDestination | undefined {
+    return this.commands.feedback.record(feedback);
   }
 
   /**

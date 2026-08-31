@@ -21,6 +21,7 @@ import { SimSesVerifiedIdentityCheck } from "./command/send/sim-ses-verified-ide
 import { SimSesSuppressionCommands } from "./command/suppression/sim-ses-suppression-commands.js";
 import { SimSesSuppressionList } from "./suppression/sim-ses-suppression-list.js";
 import { SimSesSentEmailStore } from "./email/sim-ses-sent-email-store.js";
+import { SimSesFeedbackRecorder } from "./feedback/sim-ses-feedback-recorder.js";
 import { SimSesConfigurationSetStore } from "./configuration-set/sim-ses-configuration-set-store.js";
 import { SimSesIdentityStore } from "./identity/sim-ses-identity-store.js";
 import { SimSesTemplateCommands } from "./command/template/sim-ses-template-commands.js";
@@ -56,6 +57,7 @@ export class SimSesCommands {
   readonly templateCommands: SimSesTemplateCommands;
   readonly configurationSetCommands: SimSesConfigurationSetCommands;
   readonly sendEmail: SimSesSendEmail;
+  readonly feedback: SimSesFeedbackRecorder;
 
   /**
    * The way another simulated service reaches this SES, which is the send
@@ -131,6 +133,13 @@ export class SimSesCommands {
       configurationSetCheck,
       suppressionCheck,
       authorizer,
+      clock: background,
+    });
+    this.feedback = new SimSesFeedbackRecorder({
+      sent,
+      configurationSets,
+      account,
+      suppression,
       clock: background,
     });
     this.serviceSend = new SimSesServiceSend({

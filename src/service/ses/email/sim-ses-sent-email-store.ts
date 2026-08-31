@@ -1,4 +1,5 @@
 import { SimAwsMessageLog } from "../../aws/message/sim-aws-message-log.js";
+import { SimSesFeedbackError } from "../error/sim-ses.error.js";
 import type { SimSesSentEmail } from "./sim-ses-sent-email.js";
 
 const hoursInADay = 24;
@@ -37,6 +38,28 @@ export class SimSesSentEmailStore {
    */
   get all(): readonly SimSesSentEmail[] {
     return [...this.#sent];
+  }
+
+  /**
+   * Find an accepted message by the id SES returned for it.
+   */
+  find(messageId: string): SimSesSentEmail | undefined {
+    return this.#sent.find((email) => email.messageId === messageId);
+  }
+
+  /**
+   * Get an accepted message by id, refusing an id this scope never issued.
+   */
+  require(messageId: string): SimSesSentEmail {
+    const email = this.find(messageId);
+
+    if (email === undefined) {
+      throw new SimSesFeedbackError(
+        `No accepted sim SES message has id ${messageId}.`,
+      );
+    }
+
+    return email;
   }
 
   /**

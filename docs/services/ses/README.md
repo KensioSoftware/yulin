@@ -357,8 +357,9 @@ sending switch, the delivery options and the reputation switch are all declared 
 SES holds a set as state. A test can then assert what a stack declared, with no AWS account to read
 it back from.
 
-A set is attached to an identity, or named on a send. `SendingEnabled` is the one option a send acts
-on. The rest are held for a test to read back.
+A set is attached to an identity, or named on a send. `SendingEnabled` acts during acceptance.
+Suppression options decide whether explicit bounce or complaint feedback adds the recipient to the
+account suppression list. The rest are held for a test to read back.
 
 ```typescript sim-ses-configuration-sets
 /**
@@ -404,8 +405,13 @@ console.log(ses.allConfigurationSets().map((set) => set.configurationSetName));
 ```
 
 A set declaring only its name gets the defaults real SES applies. Sending is on, TLS is optional,
-reputation metrics are off and no reason is suppressed. `GetConfigurationSet` reports those defaults
-back rather than leaving the groups out of the answer.
+reputation metrics are off and suppression falls back to the account reasons.
+`GetConfigurationSet` reports the sending, delivery and reputation defaults. It leaves suppression
+options absent where the set has no override.
+
+An explicit empty override is different. `SuppressionOptions: { SuppressedReasons: [] }` disables
+suppression for feedback on messages sent through that set. Simulated SES retains the empty list so
+it does not fall back to the account reasons.
 
 `findConfigurationSet` reaches one set by name and `allConfigurationSets` hands over every set in
 the scope, oldest first.
@@ -490,9 +496,9 @@ set at a time.
 domain and the events that report a click. The Virtual Deliverability Manager reports on engagement,
 which this simulation never measures.
 
-A set's suppression reasons are held and read back, and that is all they do. On real SES they decide
-what a bounce or a complaint would add to the account suppression list. Both are absent here. The
-list itself is a separate thing, filled by hand.
+A set's suppression reasons override the account reasons when `recordFeedback` records a hard bounce
+or complaint for a message sent through it. A set with no suppression options falls back to the
+account reasons. The feedback entry goes onto the account suppression list.
 
 `TlsPolicy` accepts `REQUIRE` and `OPTIONAL` and refuses anything else, and a `SuppressedReasons`
 entry that is neither `BOUNCE` nor `COMPLAINT` is refused too. `MaxDeliverySeconds` takes whole
@@ -698,9 +704,9 @@ review is beyond what a test can assert on anyway.
 ## The suppression list
 
 Real SES holds an account-level suppression list and fills it from hard bounces and complaints.
-Nothing bounces here, so every address on this one was put there by a caller. That is what makes it
-worth having in a test. The support tool that lists suppressed addresses, the form that removes one
-and the script that seeds the list all have somewhere to run.
+Tests supply that feedback explicitly with `recordFeedback`. Suppression commands manage the same
+list. The support tool that lists suppressed addresses, the form that removes one and the script
+that seeds the list all have somewhere to run.
 
 `PutSuppressedDestination`, `GetSuppressedDestination`, `ListSuppressedDestinations` and
 `DeleteSuppressedDestination` manage it.
@@ -758,6 +764,70 @@ recipient, and counts it toward the daily sending quota. The send succeeds here 
 carries the answer. `suppressedRecipients` names who was held back and why,
 and `isFullySuppressed` is the narrower question of whether the message reached nobody. A message to
 two recipients with one of them suppressed went to the other.
+
+### Recording a hard bounce or complaint
+
+`recordFeedback` takes the message id of an accepted message, one of its recipient addresses and a
+`BOUNCE` or `COMPLAINT` reason. Active feedback adds or updates the account suppression entry at the
+current simulated time. The existing suppression commands and `suppressedDestinations()` read the
+result.
+
+```typescript sim-ses-feedback-suppression
+/**
+ * Recording a hard bounce and observing the next send being suppressed.
+ */
+
+import { SendEmailCommand } from "@aws-sdk/client-sesv2";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-08-31T09:00:00.000Z")),
+});
+const ses = simAws.sesV2();
+
+ses.verifyIdentity("hello@example.com");
+ses.verifyIdentity("someone@example.org");
+
+const message = new SendEmailCommand({
+  FromEmailAddress: "hello@example.com",
+  Destination: { ToAddresses: ["someone@example.org"] },
+  Content: {
+    Simple: {
+      Subject: { Data: "Welcome" },
+      Body: { Text: { Data: "Hi there" } },
+    },
+  },
+});
+
+const accepted = await ses.sendEmail(message);
+
+ses.recordFeedback({
+  messageId: accepted.MessageId!,
+  emailAddress: "someone@example.org",
+  reason: "BOUNCE",
+});
+
+await ses.sendEmail(message);
+
+const suppressed = ses.suppressedDestinations()[0];
+const later = ses.sentEmails()[1];
+
+// "BOUNCE" "2026-08-31T09:00:00.000Z" true
+console.log(
+  suppressed?.reason,
+  suppressed?.lastUpdateTime.toISOString(),
+  later?.isFullySuppressed,
+);
+```
+
+The operation refuses a message id this SES scope did not issue and an address that was not a
+recipient of that message. Recipient matching ignores case and a display name, while the suppression
+entry keeps the address spelling from the accepted message.
+
+Without a configuration-set override, the account's `SuppressedReasons` decide whether feedback is
+active. A configuration set with suppression options replaces those reasons for messages sent
+through it. An empty override leaves the suppression list unchanged.
 
 `ListSuppressedDestinations` pages with `PageSize` and `NextToken`, and narrows with `Reasons`,
 `StartDate` and `EndDate`. Removing an address that was never on the list succeeds, so a form that
@@ -1005,7 +1075,7 @@ time forward past the window sees the count fall the way an account's would.
 | `ListEmailTemplates`              | Names and creation times only, paged.                                                                       |
 | `DeleteEmailTemplate`             |                                                                                                             |
 | `CreateConfigurationSet`          | `TrackingOptions`, `VdmOptions` and `Tags` are refused.                                                     |
-| `GetConfigurationSet`             | Reports the defaults it applied as well as what was declared.                                               |
+| `GetConfigurationSet`             | Reports applied defaults and preserves whether suppression options were absent.                             |
 | `ListConfigurationSets`           | Names only, paged with `PageSize` and `NextToken`.                                                          |
 | `DeleteConfigurationSet`          |                                                                                                             |
 | `GetAccount`                      | Reports `SuppressionAttributes` alongside the quota.                                                        |
@@ -1032,19 +1102,18 @@ Anything else refuses on send with `SimSdkUnsupportedCommandError`.
   the template. Template data holding an object where the template wants a value is refused too,
   where real Handlebars would render `[object Object]`.
 - **`SendBulkEmail` is absent**, along with its per-recipient replacement data.
-- **Nothing is delivered, and nothing bounces.** There are no bounce or complaint events and no
-  event destinations.
+- **Nothing is delivered.** A test supplies a hard bounce or complaint through `recordFeedback`.
+  Feedback is never generated automatically, and there are no event destinations.
 - **A configuration set acts on one send.** `SendingEnabled` refuses a send made through the set.
-  The suppression reasons, delivery options and reputation switch are held and read back, and
-  nothing acts on those.
+  Suppression reasons act on explicit feedback. Delivery options and the reputation switch are held
+  and read back.
 - **A set name nothing created is still accepted.** Real SES refuses one on an identity and on a
   send. Both stand here and the name is recorded, because a test failing over a set missing from a
   local setup fails for a reason unrelated to what it asserts.
 - **A configuration set holds what it was created with.** The `Put` commands that change one group
   of options are absent. A set cannot be changed once it exists.
-- **The suppression list fills only by hand.** Every address on it was put there by a caller,
-  because no message here ever bounces. A configuration set's `SuppressedReasons` name what a bounce
-  or a complaint would suppress for, and both are absent.
+- **Feedback is explicit.** Hard bounces and complaints update the suppression list only when a test
+  calls `recordFeedback`. Soft bounces are absent.
 - **Tenant-level suppression lists are left out.** A suppression command carrying `TenantName` is
   refused rather than answered from the account-level list.
 - **`PutSuppressedDestination` works in the sandbox.** Real SES refuses it until an account has

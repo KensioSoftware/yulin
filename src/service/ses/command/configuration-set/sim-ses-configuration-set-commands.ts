@@ -156,17 +156,15 @@ export class SimSesConfigurationSetCommands {
 /**
  * What GetConfigurationSet answers with.
  *
- * Every group is reported, including the ones the set never declared, because
- * real SES answers with the defaults it applied rather than leaving them out.
+ * Sending, delivery and reputation options report their applied defaults.
+ * Suppression options stay absent unless the set declared an override.
  */
 function reported(
   configurationSet: SimSesConfigurationSet,
 ): Omit<SimGetConfigurationSetCommandOutput, "$metadata"> {
   return {
     ConfigurationSetName: configurationSet.configurationSetName,
-    SuppressionOptions: {
-      SuppressedReasons: configurationSet.suppressedReasons,
-    },
+    ...reportedSuppressionOptions(configurationSet),
     SendingOptions: { SendingEnabled: configurationSet.sendingEnabled },
     DeliveryOptions: {
       TlsPolicy: configurationSet.deliveryOptions.tlsPolicy,
@@ -176,6 +174,20 @@ function reported(
     ReputationOptions: {
       ReputationMetricsEnabled:
         configurationSet.reputationOptions.reputationMetricsEnabled,
+    },
+  };
+}
+
+function reportedSuppressionOptions(
+  configurationSet: SimSesConfigurationSet,
+): Pick<SimGetConfigurationSetCommandOutput, "SuppressionOptions"> {
+  if (configurationSet.suppressedReasons === undefined) {
+    return {};
+  }
+
+  return {
+    SuppressionOptions: {
+      SuppressedReasons: configurationSet.suppressedReasons,
     },
   };
 }
