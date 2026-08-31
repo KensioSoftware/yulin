@@ -1,9 +1,7 @@
-import {
-  SimSesBadRequestException,
-  SimSesUnsupportedOperationException,
-} from "../../error/sim-ses.error.js";
+import { SimSesBadRequestException } from "../../error/sim-ses.error.js";
+import type { SimSesSentEmailAttachment } from "../../email/sim-ses-sent-email.js";
 import type { SimSesReadContent } from "./sim-ses-read-content.js";
-import type { SimSesMessage } from "./send.command.js";
+import type { SimSesAttachment, SimSesMessage } from "./send.command.js";
 
 /**
  * Read a message a send wrote out in full, refusing what real SES refuses and
@@ -16,13 +14,6 @@ import type { SimSesMessage } from "./send.command.js";
 export function readSimSesSimpleMessage(
   message: SimSesMessage,
 ): SimSesReadContent {
-  if (message.Attachments !== undefined) {
-    throw new SimSesUnsupportedOperationException(
-      "Attachments are not simulated, so SendEmail refuses them rather than " +
-        "recording a message without them",
-    );
-  }
-
   const subject = message.Subject?.Data;
 
   if (subject === undefined) {
@@ -45,7 +36,46 @@ export function readSimSesSimpleMessage(
   return {
     subject,
     body: { text, html },
+    attachments: (message.Attachments ?? []).map((attachment, index) =>
+      readAttachment(attachment, index),
+    ),
     templateName: undefined,
     templateData: undefined,
   };
+}
+
+/** Read and validate one attachment from a simple message. */
+function readAttachment(
+  attachment: SimSesAttachment,
+  index: number,
+): SimSesSentEmailAttachment {
+  if (attachment.RawContent === undefined) {
+    throw missingAttachmentMember(index, "rawContent");
+  }
+
+  if (attachment.FileName === undefined) {
+    throw missingAttachmentMember(index, "fileName");
+  }
+
+  return {
+    rawContent: Uint8Array.from(attachment.RawContent),
+    fileName: attachment.FileName,
+    contentType: attachment.ContentType,
+    contentDisposition: attachment.ContentDisposition,
+    contentDescription: attachment.ContentDescription,
+    contentId: attachment.ContentId,
+    contentTransferEncoding: attachment.ContentTransferEncoding,
+  };
+}
+
+/** Build the SES validation error for a missing attachment member. */
+function missingAttachmentMember(
+  index: number,
+  member: "fileName" | "rawContent",
+): SimSesBadRequestException {
+  return new SimSesBadRequestException(
+    "1 validation error detected: Value at " +
+      `'content.simple.attachments.${String(index)}.${member}' failed to ` +
+      "satisfy constraint: Member must not be null",
+  );
 }

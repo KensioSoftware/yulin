@@ -7,6 +7,7 @@ import {
   assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
+  assertBufferEqual,
   assertFalse,
   assertIdentical,
   assertNonNullable,
@@ -64,7 +65,73 @@ describe("SimSesV2 SendEmail", () => {
     assertArrayEquals(email.destination.toAddresses, ["someone@example.org"]);
     assertIdentical(email.subject, "Welcome");
     assertIdentical(email.body.text, "Hi there");
+    assertArrayEmpty(email.attachments);
     assertIdentical(email.sentDate.getTime(), sentAt.getTime());
+  });
+
+  it("records simple-message attachments in request order", async () => {
+    // Given a simulated SES out of the sandbox and a generated CSV.
+    const ses = sendingSes();
+    const csv = new TextEncoder().encode("word,meaning\n你好,hello\n");
+    const notes = new TextEncoder().encode("Generated on request\n");
+
+    await leaveTheSandbox(ses);
+
+    // When a simple message sends the CSV and a second attachment.
+    const sent = await ses.sendEmail(
+      new SendEmailCommand({
+        ...welcome,
+        Content: {
+          Simple: {
+            Subject: { Data: "Your vocabulary backup" },
+            Body: { Text: { Data: "Your backup is attached." } },
+            Attachments: [
+              {
+                RawContent: csv,
+                FileName: "vocabulary.csv",
+                ContentType: "text/csv; charset=utf-8",
+                ContentDisposition: "ATTACHMENT",
+                ContentDescription: "Vocabulary backup",
+                ContentId: "vocabulary-backup",
+                ContentTransferEncoding: "BASE64",
+              },
+              { RawContent: notes, FileName: "notes.txt" },
+            ],
+          },
+        },
+      }),
+    );
+
+    // Then the send succeeds and the record keeps the bytes and metadata.
+    const [email] = ses.sentEmails();
+
+    assertNonNullable(sent.MessageId);
+    assertNonNullable(email);
+    assertIdentical(email.messageId, sent.MessageId);
+    assertArrayLength(email.attachments, 2);
+
+    const [csvAttachment, notesAttachment] = email.attachments;
+
+    assertNonNullable(csvAttachment);
+    assertNonNullable(notesAttachment);
+    assertIdentical(csvAttachment.fileName, "vocabulary.csv");
+    assertBufferEqual(csvAttachment.rawContent, csv);
+    assertIdentical(
+      new TextDecoder().decode(csvAttachment.rawContent),
+      "word,meaning\n你好,hello\n",
+    );
+    assertIdentical(csvAttachment.contentType, "text/csv; charset=utf-8");
+    assertIdentical(csvAttachment.contentDisposition, "ATTACHMENT");
+    assertIdentical(csvAttachment.contentDescription, "Vocabulary backup");
+    assertIdentical(csvAttachment.contentId, "vocabulary-backup");
+    assertIdentical(csvAttachment.contentTransferEncoding, "BASE64");
+    assertIdentical(notesAttachment.fileName, "notes.txt");
+    assertBufferEqual(notesAttachment.rawContent, notes);
+    assertUndefined(notesAttachment.contentType);
+    assertUndefined(notesAttachment.contentDisposition);
+    assertUndefined(notesAttachment.contentDescription);
+    assertUndefined(notesAttachment.contentId);
+    assertUndefined(notesAttachment.contentTransferEncoding);
   });
 
   it("keeps the to, cc and bcc lists apart", async () => {

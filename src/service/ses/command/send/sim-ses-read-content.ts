@@ -1,4 +1,7 @@
-import type { SimSesSentEmailBody } from "../../email/sim-ses-sent-email.js";
+import type {
+  SimSesSentEmailAttachment,
+  SimSesSentEmailBody,
+} from "../../email/sim-ses-sent-email.js";
 
 /**
  * What a message says, read out of the content of a send.
@@ -12,6 +15,7 @@ import type { SimSesSentEmailBody } from "../../email/sim-ses-sent-email.js";
 export interface SimSesReadContent {
   readonly subject: string;
   readonly body: SimSesSentEmailBody;
+  readonly attachments: readonly SimSesSentEmailAttachment[];
 
   /** The template this was rendered from, if it was rendered from a stored one. */
   readonly templateName: string | undefined;

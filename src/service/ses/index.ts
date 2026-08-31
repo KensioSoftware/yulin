@@ -42,6 +42,7 @@ export {
 export { SimSesConfigurationSetStore } from "./configuration-set/sim-ses-configuration-set-store.js";
 export {
   SimSesSentEmail,
+  type SimSesSentEmailAttachment,
   type SimSesSentEmailBody,
   type SimSesSentEmailDestination,
   type SimSesSuppressedRecipient,
