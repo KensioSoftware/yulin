@@ -56,6 +56,7 @@ export class SimSchedulerCommands {
     this.delivery = new SimSchedulerTargetDelivery({
       endpoints:
         properties.deliveryTargets ?? new SimSchedulerNoDeliveryTargets(),
+      background,
     });
     this.firing = new SimSchedulerSchedules({
       schedules,

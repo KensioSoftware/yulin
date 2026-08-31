@@ -147,6 +147,51 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
     );
   });
 
+  it("resolves a dead-letter queue ARN and preserves a retry policy", async () => {
+    // Given a template whose schedule names its dead-letter queue by GetAtt.
+    const { simAws } = await simAwsWithRole();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "reporting-stack",
+      template: {
+        Resources: {
+          FailedSchedules: {
+            Type: "AWS::SQS::Queue",
+            Properties: { QueueName: "failed-schedules" },
+          },
+          HourlyReport: scheduleResource({
+            Target: {
+              Arn: functionArn,
+              RoleArn: roleArn,
+              DeadLetterConfig: {
+                Arn: { "Fn::GetAtt": ["FailedSchedules", "Arn"] },
+              },
+              RetryPolicy: {
+                MaximumEventAgeInSeconds: 300,
+                MaximumRetryAttempts: 4,
+              },
+            },
+          }),
+        },
+      },
+    });
+
+    await stack.waitForDeployComplete();
+
+    // Then both nested target settings reached the stored schedule resolved.
+    const schedule = simAws.scheduler().findSchedule("hourly-report");
+
+    assertNonNullable(schedule);
+    assertNonNullable(schedule.target.deadLetterConfig);
+    assertNonNullable(schedule.target.retryPolicy);
+    assertIdentical(
+      schedule.target.deadLetterConfig.arn,
+      "arn:aws:sqs:us-east-1:888888888888:failed-schedules",
+    );
+    assertIdentical(schedule.target.retryPolicy.maximumRetryAttempts, 4);
+    assertIdentical(schedule.target.retryPolicy.maximumEventAgeInSeconds, 300);
+  });
+
   it("names an unnamed schedule after the stack and logical id", async () => {
     const { simAws } = await simAwsWithRole();
 

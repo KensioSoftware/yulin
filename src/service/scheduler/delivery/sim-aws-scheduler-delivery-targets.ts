@@ -2,10 +2,12 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimSchedulerTargetService } from "../target/sim-scheduler-target-arn.js";
 import type {
   SimSchedulerAssumedDelivery,
+  SimSchedulerDeadLetterRequest,
   SimSchedulerDeliveryRequest,
   SimSchedulerDeliveryTargets,
 } from "./sim-scheduler-delivery.js";
 import { SimSchedulerDeliveryFunction } from "./sim-scheduler-delivery-function.js";
+import { SimAwsSchedulerDeadLetters } from "./sim-aws-scheduler-dead-letters.js";
 import { SimSchedulerDeliveryQueue } from "./sim-scheduler-delivery-queue.js";
 import { SimSchedulerDeliveryTask } from "./sim-scheduler-delivery-task.js";
 import { SimSchedulerDeliveryTopic } from "./sim-scheduler-delivery-topic.js";
@@ -31,9 +33,11 @@ interface SimAwsSchedulerDeliveryTargetsProperties {
  */
 export class SimAwsSchedulerDeliveryTargets implements SimSchedulerDeliveryTargets {
   private readonly simAws: SimAws;
+  private readonly deadLetters: SimAwsSchedulerDeadLetters;
 
   constructor(properties: SimAwsSchedulerDeliveryTargetsProperties) {
     this.simAws = properties.simAws;
+    this.deadLetters = new SimAwsSchedulerDeadLetters(properties);
   }
 
   /**
@@ -57,6 +61,13 @@ export class SimAwsSchedulerDeliveryTargets implements SimSchedulerDeliveryTarge
     );
 
     await this.invoke(arn.service, { request, caller });
+  }
+
+  /**
+   * Send an exhausted or permanent failure to the configured queue.
+   */
+  async deadLetter(deadLetter: SimSchedulerDeadLetterRequest): Promise<void> {
+    await this.deadLetters.deliver(deadLetter);
   }
 
   /**

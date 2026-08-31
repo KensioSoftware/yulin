@@ -29,6 +29,8 @@ export function describedSchedule(
       RoleArn: schedule.target.roleArn,
       Input: schedule.target.input,
       EcsParameters: schedule.target.task?.parameters.declared,
+      DeadLetterConfig: schedule.target.deadLetterConfig?.declared,
+      RetryPolicy: schedule.target.retryPolicy?.declared,
     },
     CreationDate: schedule.creationDate,
     LastModificationDate: schedule.lastModificationDate,
