@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -69,8 +70,8 @@ describe("SimCfnResource", () => {
 
     // Then invalid optional fields are treated as absent.
     assertUndefined(resource.type);
-    assertArrayLength(Object.keys(properties), 0);
-    assertArrayLength(dependencies, 0);
+    assertArrayEmpty(Object.keys(properties));
+    assertArrayEmpty(dependencies);
   });
 
   it("supports a single string dependency", () => {

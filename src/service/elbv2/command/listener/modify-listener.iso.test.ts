@@ -3,6 +3,7 @@ import {
   ModifyListenerCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -154,7 +155,7 @@ describe("ELBv2 ModifyListenerCommand", () => {
     // request contradicting itself was refused.
     assertArrayLength(output.Listeners, 1);
     assertIdentical(output.Listeners[0].Protocol, "HTTP");
-    assertArrayLength(output.Listeners[0].Certificates, 0);
+    assertArrayEmpty(output.Listeners[0].Certificates);
     assertUndefined(output.Listeners[0].SslPolicy);
     assertStringIncludes(error.message, "HTTPS listener");
   });

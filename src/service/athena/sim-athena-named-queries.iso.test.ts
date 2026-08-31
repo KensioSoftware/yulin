@@ -1,5 +1,6 @@
 import { faker } from "@faker-js/faker";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -239,7 +240,7 @@ describe("simulated Athena named queries", () => {
 
     // Then nothing comes back, and no token comes with it, since a page of no
     // items could never reach the next one.
-    assertArrayLength(listed.NamedQueryIds ?? [], 0);
+    assertArrayEmpty(listed.NamedQueryIds ?? []);
     assertUndefined(listed.NextToken);
   });
 

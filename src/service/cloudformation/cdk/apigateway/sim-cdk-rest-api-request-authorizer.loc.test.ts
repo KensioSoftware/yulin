@@ -1,4 +1,9 @@
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -136,16 +141,16 @@ describe("Sim CDK REST API REQUEST authorizer local integration", () => {
       // Then a request the authorizer admits reaches the handler, with the
       // context the authorizer read out of the request itself
       const admitted = await fetch(`${url}?plan=gold`, { headers });
-      assertIdentical(admitted.status, 200);
+      assertResponseStatus(admitted, 200, await describeResponse(admitted));
       assertIdentical(await admitted.text(), "acme GET");
 
       // And one the authorizer refuses gets a 401
       const refused = await fetch(`${url}?plan=free`, { headers });
-      assertIdentical(refused.status, 401);
+      assertResponseStatus(refused, 401, await describeResponse(refused));
 
       // And one missing an identity source never reaches the authorizer at all
       const anonymous = await fetch(`${url}?plan=gold`);
-      assertIdentical(anonymous.status, 401);
+      assertResponseStatus(anonymous, 401, await describeResponse(anonymous));
     } finally {
       await srv.close();
     }

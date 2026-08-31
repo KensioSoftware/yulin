@@ -1,5 +1,6 @@
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertObjectEquals,
@@ -38,7 +39,7 @@ describe("Lambda InvokeCommand asynchronous invocation types", () => {
     // The caller gets an accepted response before the handler has run.
     assertIdentical(output.StatusCode, 202);
     assertUndefined(output.Payload);
-    assertArrayLength(handledEvents, 0);
+    assertArrayEmpty(handledEvents);
 
     await simAws.backgroundTasksComplete();
 

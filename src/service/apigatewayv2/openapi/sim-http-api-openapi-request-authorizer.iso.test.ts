@@ -11,7 +11,9 @@ import {
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -227,8 +229,8 @@ describe("Importing a sim HTTP API's Lambda REQUEST authorizers", () => {
 
     // Then the imported authorizer decided both, and the context it returned
     // reached the handler
-    assertIdentical(refused.status, 403);
-    assertIdentical(admitted.status, 200);
+    assertResponseStatus(refused, 403, await describeResponse(refused));
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
     assertIdentical(await admitted.text(), "acme");
   });
 });

@@ -3,6 +3,7 @@ import {
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -171,7 +172,7 @@ describe("SimCloudWatch GetMetricData", () => {
 
     // Then there is a result for the query, holding nothing.
     assertArrayLength(read.MetricDataResults ?? [], 1);
-    assertArrayLength(read.MetricDataResults?.at(0)?.Values ?? [], 0);
+    assertArrayEmpty(read.MetricDataResults?.at(0)?.Values ?? []);
   });
 
   it("refuses metric math rather than answering from one of its metrics", async () => {

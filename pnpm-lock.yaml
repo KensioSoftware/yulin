@@ -157,8 +157,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.9.0(jiti@2.7.0)(supports-color@7.2.0))
       '@kensio/smartass':
-        specifier: ^1.37.0
-        version: 1.37.6
+        specifier: ^1.37.7
+        version: 1.37.7
       '@semantic-release/exec':
         specifier: 7.1.0
         version: 7.1.0(semantic-release@25.0.9(@typescript/typescript6@6.0.2)(supports-color@7.2.0))(supports-color@7.2.0)
@@ -878,8 +878,8 @@ packages:
     resolution: {integrity: sha512-P/qUVhAaMF98uZ4NsSfiEp5WhfCRSN44nGQDgGY8MA6w9CkCVs4IdxguPGfK7+qNBCViK/xXN/gpj099YiSf1A==}
     engines: {node: '>=22.0.0'}
 
-  '@kensio/smartass@1.37.6':
-    resolution: {integrity: sha512-qaCsowK5YbHPpOOuqHXQt18sUCSKtRC7hCvRLot6S97S0s74wlkqz2FInra9C9w9r6HYkwmtMwxQwQ//Erb/yQ==}
+  '@kensio/smartass@1.37.7':
+    resolution: {integrity: sha512-Av75D4u76k4LjZ1o4VPHu/7iWQcHCP20qKnv0qw/ElMKoY3XXqw7IzTmhdN2tXplqfT/TAAgzH9OD/TJaAdPFQ==}
     engines: {node: '>=24.0.0'}
 
   '@napi-rs/wasm-runtime@1.1.6':
@@ -4518,7 +4518,7 @@ snapshots:
 
   '@kensio/part-factory@1.10.1': {}
 
-  '@kensio/smartass@1.37.6': {}
+  '@kensio/smartass@1.37.7': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:

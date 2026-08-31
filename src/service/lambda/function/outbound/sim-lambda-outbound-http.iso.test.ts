@@ -1,9 +1,11 @@
 import {
   assertFalse,
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -50,7 +52,7 @@ describe("What a simulated environment answers its functions for", () => {
     // Then the simulated domain answered it, as it answers a browser: the
     // request named no app client, so it is refused rather than routed
     // somewhere else.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertIdentical(
       ((await response.json()) as { error: string }).error,
       "invalid_client",
@@ -71,7 +73,7 @@ describe("What a simulated environment answers its functions for", () => {
     );
 
     // Then the pool published it, as it publishes it to a browser.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("leaves a signed request to a service endpoint to be routed as a Command", async () => {
@@ -138,7 +140,7 @@ describe("What a simulated environment answers its functions for", () => {
 
     // Then the load balancer answered, because the hostname it resolves to is
     // the more specific answer to what serves it.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), '{"ordered":true}');
   });
 });

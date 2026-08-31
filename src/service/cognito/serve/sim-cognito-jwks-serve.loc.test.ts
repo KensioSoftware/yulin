@@ -5,7 +5,12 @@ import {
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { type Jwks, SimpleJwksCache } from "aws-jwt-verify/jwk";
 import { describe, it } from "vitest";
@@ -158,9 +163,9 @@ describe("Serving a sim Cognito JWKS on localhost", () => {
       };
 
       // Then the JWKS URI it advertises is one that answers.
-      assertIdentical(response.status, 200);
+      assertResponseStatus(response, 200, await describeResponse(response));
       const jwks = await fetch(document.jwks_uri);
-      assertIdentical(jwks.status, 200);
+      assertResponseStatus(jwks, 200, await describeResponse(jwks));
     } finally {
       await srv.close();
     }

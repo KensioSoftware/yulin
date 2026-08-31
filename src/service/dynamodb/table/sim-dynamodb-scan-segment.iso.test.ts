@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayIncludes,
-  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -42,10 +42,7 @@ describe("SimDynamoDbScanSegment", () => {
 
     // Then exactly one segment holds it, so the segments together cover the
     // whole table and none of them overlap.
-    assertArrayLength(
-      holders.filter((count) => count !== 1),
-      0,
-    );
+    assertArrayEmpty(holders.filter((count) => count !== 1));
   });
 
   it("holds one partition key in the same segment every time", () => {

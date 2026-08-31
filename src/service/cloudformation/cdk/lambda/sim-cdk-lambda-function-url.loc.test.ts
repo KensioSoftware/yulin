@@ -3,8 +3,10 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
@@ -94,7 +96,7 @@ app.synth();
         srv.localUrl(`${functionUrl}greet?name=CDK`),
       );
 
-      assertIdentical(response.status, 200);
+      assertResponseStatus(response, 200, await describeResponse(response));
       assertIdentical(response.headers.get("content-type"), "text/plain");
       assertIdentical(await response.text(), "Hello CDK");
     } finally {

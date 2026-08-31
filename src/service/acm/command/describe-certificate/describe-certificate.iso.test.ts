@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -43,7 +44,7 @@ describe("ACM DescribeCertificateCommand", () => {
       "arn:aws:acm:eu-west-1:555555555555:certificate/00000001",
     );
     assertIdentical(describeOutput.Certificate.DomainName, "example.com");
-    assertArrayLength(describeOutput.Certificate.SubjectAlternativeNames, 0);
+    assertArrayEmpty(describeOutput.Certificate.SubjectAlternativeNames);
     assertIdentical(describeOutput.Certificate.Status, "PENDING_VALIDATION");
     assertIdentical(describeOutput.Certificate.Type, "AMAZON_ISSUED");
     assertIdentical(describeOutput.Certificate.KeyAlgorithm, "RSA-2048");
@@ -51,7 +52,7 @@ describe("ACM DescribeCertificateCommand", () => {
       describeOutput.Certificate.SignatureAlgorithm,
       "SHA256WITHRSA",
     );
-    assertArrayLength(describeOutput.Certificate.InUseBy, 0);
+    assertArrayEmpty(describeOutput.Certificate.InUseBy);
     assertNonNullable(describeOutput.Certificate.CreatedAt);
     assertUndefined(describeOutput.Certificate.IssuedAt);
   });

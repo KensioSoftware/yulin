@@ -1,4 +1,9 @@
-import { assertIdentical, assertThrowsError } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertThrowsError,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimS3InvalidBucketName } from "../error/sim-s3.error.js";
@@ -17,7 +22,7 @@ describe("The error document a refused S3 REST request gets", () => {
     );
 
     // Then the document is still well formed, so a client can parse it
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     const body = await response.text();
     expect(body).toMatch(/<Key>q3 &amp; q4.pdf<\/Key>/);
     expect(body).toMatch(/<Message>Bucket name &lt;bad&gt; is not valid/);

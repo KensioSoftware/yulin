@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -106,7 +107,7 @@ describe("SimCfnResource deletion", () => {
 
     // Then nothing was asked to delete it, and it is delete-complete anyway,
     // so a partly deployed Stack can still be torn down.
-    assertArrayLength(factory.deleted, 0);
+    assertArrayEmpty(factory.deleted);
     assertIdentical(resource.status, "DELETE_COMPLETE");
   });
 

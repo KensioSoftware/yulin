@@ -4,8 +4,8 @@ import {
 } from "@aws-sdk/client-personalize";
 import { PutEventsCommand } from "@aws-sdk/client-personalize-events";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -232,7 +232,7 @@ describe("Personalize PutEvents", () => {
 
     // Then Personalize reports the tracker as missing, and records nothing.
     assertIdentical(error.name, "ResourceNotFoundException");
-    assertArrayLength(simAws.personalize().recordedEvents(), 0);
+    assertArrayEmpty(simAws.personalize().recordedEvents());
   });
 
   it("refuses more events than one request may carry", async () => {

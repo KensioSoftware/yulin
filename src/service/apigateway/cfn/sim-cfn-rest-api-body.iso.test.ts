@@ -4,8 +4,13 @@ import {
   GetResourcesCommand,
   GetRestApiCommand,
 } from "@aws-sdk/client-api-gateway";
-import { assertNonNullable } from "@kensio/smartass";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -78,7 +83,7 @@ describe("Deploying a sim REST API from an AWS::ApiGateway::RestApi Body", () =>
 
     // Then the method the document declared served it, and the document's
     // title named the API
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), '/pets/{petId} {"petId":"YL-1"}');
     const restApi = await simAws
       .apiGateway()

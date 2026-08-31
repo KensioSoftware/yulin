@@ -1,8 +1,9 @@
 import { DescribeUserPoolDomainCommand } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -54,7 +55,7 @@ describe("How long a sim Cognito hosted grant lasts", () => {
     const response = await exchange(setUp, code);
 
     // Then it is refused, as an expired code is on real Cognito.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertObjectMatches(await response.json(), { error: "invalid_grant" });
   });
 
@@ -90,7 +91,7 @@ describe("How long a sim Cognito hosted grant lasts", () => {
 
     // Then the client id in the body is what the request is read as, so the
     // grant completes.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("describes the security policy a custom domain was created with", async () => {

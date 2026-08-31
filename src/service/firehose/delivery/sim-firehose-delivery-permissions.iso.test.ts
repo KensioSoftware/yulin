@@ -1,5 +1,6 @@
 import { PutRecordCommand } from "@aws-sdk/client-firehose";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -46,7 +47,7 @@ describe("The Role a simulated Firehose delivery writes as", () => {
 
     // Then nothing was written, and the delivery is on the simulator's list of
     // failures with the Role and the key it tried.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
 
     const failures = simAws.firehose().getDeliveryFailures();
     assertArrayLength(failures, 1);

@@ -4,6 +4,7 @@ import {
   GetPartitionsCommand,
 } from "@aws-sdk/client-glue";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -41,7 +42,7 @@ describe("SimGlue partition batches", () => {
     );
 
     // Then all three are there and nothing is reported.
-    assertArrayLength(Errors, 0);
+    assertArrayEmpty(Errors);
     assertArrayLength(
       glue.partitionsInTable(table.databaseName, table.tableName),
       3,
@@ -128,7 +129,7 @@ describe("SimGlue partition batches", () => {
     );
 
     // Then only the third is left.
-    assertArrayLength(Errors, 0);
+    assertArrayEmpty(Errors);
 
     const { Partitions } = glue.getPartitions(
       new GetPartitionsCommand({
@@ -166,9 +167,8 @@ describe("SimGlue partition batches", () => {
     assertArrayLength(Errors, 1);
     assertArrayEquals(Errors[0].PartitionValues, ["2026-08-25"]);
     assertIdentical(Errors[0].ErrorDetail.ErrorCode, "EntityNotFoundException");
-    assertArrayLength(
+    assertArrayEmpty(
       glue.partitionsInTable(table.databaseName, table.tableName),
-      0,
     );
   });
 
@@ -188,10 +188,9 @@ describe("SimGlue partition batches", () => {
     );
 
     // Then there is nothing to report and nothing was registered.
-    assertArrayLength(Errors, 0);
-    assertArrayLength(
+    assertArrayEmpty(Errors);
+    assertArrayEmpty(
       glue.partitionsInTable(table.databaseName, table.tableName),
-      0,
     );
   });
 
@@ -234,7 +233,7 @@ describe("SimGlue partition batches", () => {
     // Then it is reported with the values it never gave, which is an empty
     // list rather than an absent one.
     assertArrayLength(Errors, 1);
-    assertArrayLength(Errors[0].PartitionValues, 0);
+    assertArrayEmpty(Errors[0].PartitionValues);
     assertIdentical(Errors[0].ErrorDetail.ErrorCode, "InvalidInputException");
   });
 });

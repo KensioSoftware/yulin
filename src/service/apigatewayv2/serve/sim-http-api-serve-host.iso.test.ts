@@ -2,7 +2,12 @@ import {
   CreateApiMappingCommand,
   CreateDomainNameCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -101,7 +106,7 @@ describe("Which hostnames a sim HTTP API answers on", () => {
 
     // Then the API refuses it before any route or authorizer sees it, with
     // the headers that tell this apart from CloudFront's own origin refusal
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
     assertIdentical(
       response.headers.get("x-amzn-errortype"),
@@ -130,7 +135,7 @@ describe("Which hostnames a sim HTTP API answers on", () => {
     // reaches the generated endpoint under a Host it does not answer on. The
     // custom domain has a published address of its own, and this record does
     // not point at it
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("serves the name through a record pointing at the domain's own endpoint", async () => {
@@ -151,7 +156,7 @@ describe("Which hostnames a sim HTTP API answers on", () => {
 
     // Then the domain's mappings serve it, which is the pair of record and
     // domain a stack fronting an API with a name of its own deploys
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.json(), "hello");
   });
 
@@ -170,7 +175,7 @@ describe("Which hostnames a sim HTTP API answers on", () => {
 
     // Then it is the same refusal a Host the API never served gets, because
     // that is what the generated hostname has become
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(
       response.headers.get("x-amzn-errortype"),
       "ForbiddenException",

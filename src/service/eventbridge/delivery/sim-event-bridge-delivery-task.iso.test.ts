@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -178,7 +179,7 @@ describe("EventBridge ECS target", () => {
       .listTasks({ input: { desiredStatus: "STOPPED" } });
 
     assertArrayLength(tasks.taskArns ?? [], 1);
-    assertArrayLength(simAws.eventBridge().deliveryFailures, 0);
+    assertArrayEmpty(simAws.eventBridge().deliveryFailures);
   });
 
   it("puts the target's container overrides in the container", async () => {
@@ -315,7 +316,7 @@ describe("EventBridge ECS target", () => {
     await putOrderEvent(simAws);
 
     // Then the delivery was made, and the task says nothing started.
-    assertArrayLength(simAws.eventBridge().deliveryFailures, 0);
+    assertArrayEmpty(simAws.eventBridge().deliveryFailures);
 
     const tasks = await simAws
       .ecs()

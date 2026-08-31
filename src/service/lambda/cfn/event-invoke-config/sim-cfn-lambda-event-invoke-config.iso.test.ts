@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertUndefined,
@@ -132,7 +132,7 @@ describe("Lambda CloudFormation event invoke config deployment", () => {
     // Then the config has gone, ahead of the function it was on.
     assertUndefined(simAws.lambda().getSimEventInvokeConfig("orders"));
     assertUndefined(simAws.lambda().getSimFunctionByName("orders"));
-    assertArrayLength(stack.skippedResourceDeletions, 0);
+    assertArrayEmpty(stack.skippedResourceDeletions);
     assertIdentical(
       stack.getResource("OrdersInvokeConfig")?.status,
       "DELETE_COMPLETE",

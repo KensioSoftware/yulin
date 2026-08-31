@@ -4,7 +4,12 @@ import {
   ImportRestApiCommand,
 } from "@aws-sdk/client-api-gateway";
 import { AddPermissionCommand } from "@aws-sdk/client-lambda";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -74,7 +79,7 @@ describe("Serving a request through an imported sim REST API", () => {
     });
     const response = await new SimAwsHttp({ simAws }).fetch(url.toString());
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "pet 42");
   });
 
@@ -186,12 +191,12 @@ describe("Serving a request through an imported sim REST API", () => {
     const refused = await http.fetch(url, {
       headers: { authorization: "Bearer expired" },
     });
-    assertIdentical(refused.status, 403);
+    assertResponseStatus(refused, 403, await describeResponse(refused));
 
     const served = await http.fetch(url, {
       headers: { authorization: "Bearer session-6" },
     });
-    assertIdentical(served.status, 200);
+    assertResponseStatus(served, 200, await describeResponse(served));
     assertIdentical(await served.text(), "pets");
   });
 });

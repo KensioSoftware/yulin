@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertArrayMinLength,
   assertIdentical,
 } from "@kensio/smartass";
@@ -266,8 +266,8 @@ describe("Linting CloudFront Functions JS2 with either linter", () => {
 
       // Then neither reports them, so the restrictions are neither firing on
       // everything nor sending a reader away from code that works
-      assertArrayLength(fromEslint, 0);
-      assertArrayLength(fromOxlint, 0);
+      assertArrayEmpty(fromEslint);
+      assertArrayEmpty(fromOxlint);
     });
   });
 });

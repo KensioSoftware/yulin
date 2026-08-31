@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
@@ -228,6 +228,6 @@ describe("reading the resources of a Terraform plan", () => {
     // Given a plan that would create nothing at all
     // When it is read
     // Then there are no resources, rather than an error
-    assertArrayLength(terraformPlanResources({}), 0);
+    assertArrayEmpty(terraformPlanResources({}));
   });
 });

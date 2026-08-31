@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import { AddPermissionCommand } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertObjectEquals,
@@ -164,7 +165,7 @@ describe("EventBridge scheduled rules", () => {
     // When three hours pass with it off, and one more with it back on.
     await simAws.clock().advanceBy({ hours: 3 });
 
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
 
     await simAws
       .eventBridge()
@@ -306,6 +307,6 @@ describe("EventBridge scheduled rules", () => {
 
     // Then it went nowhere: a scheduled rule fires on its own timing and has
     // no pattern for an event to match.
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertObjectEquals,
@@ -241,9 +242,8 @@ describe("Simulated Step Functions Map", () => {
       students: [],
       enrolled: [],
     });
-    assertArrayLength(
+    assertArrayEmpty(
       simAws.stepFunctions().inspection().iterations(executionArn),
-      0,
     );
   });
 

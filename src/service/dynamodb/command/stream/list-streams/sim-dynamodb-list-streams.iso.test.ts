@@ -5,6 +5,7 @@ import {
 import { ListStreamsCommand } from "@aws-sdk/client-dynamodb-streams";
 import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -65,7 +66,7 @@ describe("DynamoDB Streams ListStreams", () => {
       .listStreams(new ListStreamsCommand({ TableName: "invoices" }));
 
     // Then it has none, rather than the table being reported as missing.
-    assertArrayLength(output.Streams, 0);
+    assertArrayEmpty(output.Streams);
   });
 
   it("goes on listing a stream its table has switched off", async () => {

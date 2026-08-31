@@ -12,8 +12,9 @@ import {
 } from "@aws-sdk/client-lambda";
 import {
   assertArrayEquals,
-  assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -128,7 +129,7 @@ describe("Serving a sim HTTP API route backed by a Lambda version or alias", () 
     const response = await get(simAws, apiEndpoint);
 
     // Then the version behind the alias served it, rather than $LATEST
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertArrayEquals(orders.ranAs, [orders.version]);
   });
 
@@ -185,7 +186,7 @@ describe("Serving a sim HTTP API route backed by a Lambda version or alias", () 
     const response = await get(simAws, apiEndpoint);
 
     // Then that version served it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertArrayEquals(orders.ranAs, [orders.version]);
   });
 
@@ -210,7 +211,7 @@ describe("Serving a sim HTTP API route backed by a Lambda version or alias", () 
 
     // Then the call is refused, because the alias holds a policy of its own
     // and nothing was granted on it
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertArrayEquals(orders.ranAs, []);
   });
 
@@ -234,7 +235,7 @@ describe("Serving a sim HTTP API route backed by a Lambda version or alias", () 
 
     // Then the missing qualifier surfaces where a missing function does, at
     // the invocation rather than at the integration that named it
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertArrayEquals(orders.ranAs, []);
   });
 
@@ -272,7 +273,7 @@ describe("Serving a sim HTTP API route backed by a Lambda version or alias", () 
     });
 
     // Then the published version behind the alias answered, not $LATEST
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertArrayEquals(authorizer.ranAs, [authorizer.version]);
     assertArrayEquals(orders.ranAs, [orders.version]);
   });

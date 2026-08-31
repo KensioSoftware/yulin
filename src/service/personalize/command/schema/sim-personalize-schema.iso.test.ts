@@ -7,6 +7,7 @@ import {
   ListSchemasCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -136,7 +137,7 @@ describe("Personalize DeleteSchema", () => {
     const listed = await simAws
       .personalize()
       .listSchemas(new ListSchemasCommand({}));
-    assertArrayLength(listed.schemas ?? [], 0);
+    assertArrayEmpty(listed.schemas ?? []);
   });
 
   it("holds a schema a dataset still uses", async () => {

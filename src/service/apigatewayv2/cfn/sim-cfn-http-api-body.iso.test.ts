@@ -1,5 +1,10 @@
 import { GetApiCommand, GetRoutesCommand } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -56,7 +61,7 @@ describe("Deploying a sim HTTP API from an AWS::ApiGatewayV2::Api Body", () => {
 
     // Then the route the document declared served it, and the document's title
     // named the API
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       await response.text(),
       'GET /orders/{orderId} {"orderId":"YL-1"}',

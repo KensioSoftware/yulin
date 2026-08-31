@@ -8,6 +8,7 @@ import {
   type LifecycleRule,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -284,7 +285,7 @@ describe("Simulated S3 lifecycle expiry", () => {
     await simAws.clock().advanceBy({ days: 366 });
 
     // Then the whole Bucket has gone, which is the scope such a rule covers.
-    assertArrayLength(await storedKeys(simAws), 0);
+    assertArrayEmpty(await storedKeys(simAws));
   });
 
   it("selects by both object size bounds at once", async () => {

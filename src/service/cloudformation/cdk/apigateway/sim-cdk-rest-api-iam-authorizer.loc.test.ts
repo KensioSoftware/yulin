@@ -3,7 +3,12 @@ import {
   CreateUserCommand,
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -135,7 +140,7 @@ describe("Sim CDK REST API IAM authorization local integration", () => {
 
       // Then the deployed method is closed to a request carrying no identity.
       const anonymous = await fetch(url);
-      assertIdentical(anonymous.status, 403);
+      assertResponseStatus(anonymous, 403, await describeResponse(anonymous));
 
       // And a request that User signed reaches the handler, which read their
       // ARN off the identity the method's authorization put in the event.
@@ -146,7 +151,7 @@ describe("Sim CDK REST API IAM authorization local integration", () => {
         region: "eu-west-2",
       });
       const reporter = await fetch(signed.request);
-      assertIdentical(reporter.status, 200);
+      assertResponseStatus(reporter, 200, await describeResponse(reporter));
       assertIdentical(
         await reporter.text(),
         `arn:aws:iam::${accountId}:user/Reporter`,

@@ -5,6 +5,7 @@ import {
   ListEmailIdentitiesCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -271,6 +272,6 @@ describe("SimSesV2 email identities", () => {
     );
 
     // Then it is gone.
-    assertArrayLength(ses.allIdentities(), 0);
+    assertArrayEmpty(ses.allIdentities());
   });
 });

@@ -3,6 +3,7 @@ import {
   PutEventsCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -168,8 +169,8 @@ describe("EventBridge PutEvents", () => {
     // Then the entry succeeded, as it does on real AWS, and the event is gone.
     assertIdentical(output.FailedEntryCount, 0);
     assertNonNullable(output.Entries?.[0]?.EventId);
-    assertArrayLength(simAws.eventBridge().eventsOn("typo"), 0);
-    assertArrayLength(simAws.eventBridge().eventsOn("default"), 0);
+    assertArrayEmpty(simAws.eventBridge().eventsOn("typo"));
+    assertArrayEmpty(simAws.eventBridge().eventsOn("default"));
   });
 
   it("keeps events out of another Account and Region's buses", async () => {
@@ -199,6 +200,6 @@ describe("EventBridge PutEvents", () => {
       .eventsOn("default");
 
     // Then the event did not reach it.
-    assertArrayLength(elsewhere, 0);
+    assertArrayEmpty(elsewhere);
   });
 });

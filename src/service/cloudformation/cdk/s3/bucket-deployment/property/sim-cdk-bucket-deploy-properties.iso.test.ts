@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -140,8 +141,8 @@ describe("SimCdkBucketDeployProperties", () => {
     assertIdentical(deployProperties.include[0], "*.txt");
     const unfiltered = properties({});
 
-    assertArrayLength(unfiltered.exclude, 0);
-    assertArrayLength(unfiltered.include, 0);
+    assertArrayEmpty(unfiltered.exclude);
+    assertArrayEmpty(unfiltered.include);
   });
 
   it("refuses a destination Bucket name that did not resolve to a string", () => {

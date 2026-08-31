@@ -3,7 +3,12 @@ import {
   CreateUserCommand,
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertUndefined,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
@@ -107,7 +112,7 @@ describe("Calling an AWS_IAM sim HTTP API route with a signed request", () => {
     const context = (await response.json()) as SimPayload2RequestContext;
 
     // Then the signature identified them, and the handler was told who called
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get(simAwsAuthHeaderName), "sigv4");
     assertIdentical(
       context.authorizer?.iam?.userArn,
@@ -126,7 +131,7 @@ describe("Calling an AWS_IAM sim HTTP API route with a signed request", () => {
 
     // Then a sound signature is not enough: the request is authenticated but
     // not authorized
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Forbidden"}');
   });
 
@@ -145,7 +150,7 @@ describe("Calling an AWS_IAM sim HTTP API route with a signed request", () => {
 
     // Then the route admits them, and describes no caller: a NONE route
     // authorizes nobody, so there is nothing for the event to report
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertUndefined(context.authorizer);
     assertIdentical(context.accountId, "anonymous");
   });
@@ -171,7 +176,7 @@ describe("Calling an AWS_IAM sim HTTP API route with a signed request", () => {
 
     // Then the serving boundary refuses it before route authorization sees it,
     // with the capital-M body the boundary answers rather than the API's own
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(await response.text(), '{"Message":"Forbidden"}');
   });
 });

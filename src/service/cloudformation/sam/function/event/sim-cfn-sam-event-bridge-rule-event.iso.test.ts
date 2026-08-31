@@ -1,5 +1,6 @@
 import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -109,7 +110,7 @@ describe("SAM EventBridgeRule event expansion", () => {
 
     // Then only the matching event reached the function, so the rule carries
     // the pattern and the permission it was expanded with admitted the rule
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertArrayLength(received, 1);
   });
 
@@ -145,7 +146,7 @@ describe("SAM EventBridgeRule event expansion", () => {
 
     await putRate(simAws);
 
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 
   it("watches the bus the event named rather than the default one", async () => {
@@ -176,7 +177,7 @@ describe("SAM EventBridgeRule event expansion", () => {
     // When a matching event is put on the default bus, and then on that bus
     await putRate(simAws);
 
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
 
     await putRate(simAws, "rates");
 

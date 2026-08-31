@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -79,7 +80,7 @@ describe("SimDynamoDbExpressionTokeniser", () => {
     // Given an expression with nothing in it.
     // When it is tokenised, then there is nothing to read, which is left for
     // the parser to refuse in its own terms.
-    assertArrayLength(tokenise(" ".repeat(3)), 0);
+    assertArrayEmpty(tokenise(" ".repeat(3)));
   });
 
   it("refuses a placeholder marker naming nothing", () => {

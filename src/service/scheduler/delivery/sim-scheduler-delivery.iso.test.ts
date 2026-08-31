@@ -8,6 +8,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -224,7 +225,7 @@ describe("Scheduler target invocation", () => {
 
     // Then Scheduler records a successful delivery. Lambda sends its own
     // failure record and dead-letter event after the handler throws.
-    assertArrayLength(simAws.scheduler().deliveryFailures, 0);
+    assertArrayEmpty(simAws.scheduler().deliveryFailures);
 
     const failureMessages = await simAws
       .sqs()
@@ -283,7 +284,7 @@ describe("Scheduler target invocation", () => {
 
     // Then nothing was invoked, and the failure explains which role and which
     // action, since that is where it is fixed.
-    assertArrayLength(invocations, 0);
+    assertArrayEmpty(invocations);
 
     const [failure] = simAws.scheduler().deliveryFailures;
 

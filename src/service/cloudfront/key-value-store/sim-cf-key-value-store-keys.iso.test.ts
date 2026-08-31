@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -104,6 +105,6 @@ describe("Sim CloudFront key value store keys", () => {
     // Then it is empty
     assertIdentical(keys.itemCount, 0);
     assertIdentical(keys.totalSizeInBytes, 0);
-    assertArrayLength(keys.list(), 0);
+    assertArrayEmpty(keys.list());
   });
 });

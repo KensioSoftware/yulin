@@ -9,6 +9,7 @@ import {
   UpdateStateMachineCommand,
 } from "@aws-sdk/client-sfn";
 import {
+  assertArrayEmpty,
   assertArrayIncludesAll,
   assertArrayLength,
   assertIdentical,
@@ -126,7 +127,7 @@ describe("Simulated Step Functions SDK interception", () => {
     // Then each answered, and the delete left nothing behind.
     assertIdentical(described.name, "Enrolment");
     assertNonNullable(updated.updateDate);
-    assertArrayLength(listed.stateMachines ?? [], 0);
+    assertArrayEmpty(listed.stateMachines ?? []);
   });
 
   it("names the commands it routes", () => {

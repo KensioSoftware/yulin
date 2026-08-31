@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertNonNullable,
@@ -48,7 +49,7 @@ describe("SimLogsServiceWriter", () => {
 
     assertNonNullable(group);
     assertArrayLength(group.streams, 1);
-    assertArrayLength(group.streams.at(0)?.events ?? [], 0);
+    assertArrayEmpty(group.streams.at(0)?.events ?? []);
   });
 
   it("writes nothing for no lines", () => {

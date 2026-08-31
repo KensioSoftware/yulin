@@ -9,6 +9,7 @@ import {
   UnsubscribeCommand,
 } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertNonNullable,
   assertObjectMatches,
@@ -65,6 +66,6 @@ describe("SNS SDK subscription interception", () => {
     assertObjectMatches(read.Attributes, { RawMessageDelivery: "true" });
     assertArrayLength(listed.Subscriptions, 1);
     assertArrayLength(byTopic.Subscriptions, 1);
-    assertArrayLength(simSdk.simAws.sns().topicSubscriptions("orders"), 0);
+    assertArrayEmpty(simSdk.simAws.sns().topicSubscriptions("orders"));
   });
 });

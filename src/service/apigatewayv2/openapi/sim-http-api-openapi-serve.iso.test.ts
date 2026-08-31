@@ -11,6 +11,8 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -107,8 +109,8 @@ describe("Serving a sim HTTP API imported from an OpenAPI document", () => {
 
     // Then the API answered nothing until it had a stage, and then served the
     // route the document declared, with what the path template captured
-    assertIdentical(beforeStage.status, 404);
-    assertIdentical(afterStage.status, 200);
+    assertResponseStatus(beforeStage, 404, await describeResponse(beforeStage));
+    assertResponseStatus(afterStage, 200, await describeResponse(afterStage));
     assertObjectMatches((await afterStage.json()) as JSONObject, {
       routeKey: "GET /orders/{orderId}",
       pathParameters: { orderId: "42" },
@@ -169,8 +171,8 @@ describe("Serving a sim HTTP API imported from an OpenAPI document", () => {
 
     // Then the imported route is closed to a caller with no token and open to
     // one whose token the authorizer accepts
-    assertIdentical(anonymous.status, 401);
-    assertIdentical(authorized.status, 200);
+    assertResponseStatus(anonymous, 401, await describeResponse(anonymous));
+    assertResponseStatus(authorized, 200, await describeResponse(authorized));
     assertObjectMatches((await authorized.json()) as JSONObject, {
       scopes: [adminScope],
     });
@@ -235,7 +237,7 @@ describe("Serving a sim HTTP API imported from an OpenAPI document", () => {
 
     // Then the answer is 403 rather than 401: the token was accepted, and the
     // scopes the document asked for do not allow this route
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("serves a request whose body contradicts a schema the document declares", async () => {
@@ -287,6 +289,6 @@ describe("Serving a sim HTTP API imported from an OpenAPI document", () => {
 
     // Then it still reaches the handler, because HTTP APIs validate no
     // requests and the schema was ignored at import
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

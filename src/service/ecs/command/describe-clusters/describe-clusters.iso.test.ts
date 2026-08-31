@@ -3,6 +3,7 @@ import {
   DescribeClustersCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -48,7 +49,7 @@ describe("ECS DescribeClustersCommand", () => {
     // Then both reach the same cluster.
     assertArrayLength(byArn.clusters, 1);
     assertIdentical(byArn.clusters[0].clusterName, "services");
-    assertArrayLength(byArn.failures, 0);
+    assertArrayEmpty(byArn.failures);
   });
 
   it("reports a cluster that is not there as a failure", async () => {
@@ -79,7 +80,7 @@ describe("ECS DescribeClustersCommand", () => {
     );
 
     // Then it names a cluster somewhere else, so nothing is described.
-    assertArrayLength(described.clusters, 0);
+    assertArrayEmpty(described.clusters);
     assertArrayLength(described.failures, 1);
   });
 
@@ -109,8 +110,8 @@ describe("ECS DescribeClustersCommand", () => {
 
     // Then none of the three is reported, as on real ECS.
     assertArrayLength(described.clusters, 1);
-    assertArrayLength(described.clusters[0].settings, 0);
-    assertArrayLength(described.clusters[0].tags, 0);
+    assertArrayEmpty(described.clusters[0].settings);
+    assertArrayEmpty(described.clusters[0].tags);
     assertUndefined(described.clusters[0].configuration);
   });
 

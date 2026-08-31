@@ -3,7 +3,12 @@ import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimAwsLocalServer } from "../../../../../serve/index.js";
 import { TemporaryDirectory as TemporaryDirectory } from "../../../../../util/filesystem/temporary-directory.js";
 import path from "node:path";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { TestCdkProject } from "../../../../../util/filesystem/test-cdk-project.js";
 
 /**
@@ -79,12 +84,16 @@ app.synth();
 
     // Then we should be able to fetch the objects from the local sim server.
     const rootResponse = await fetch(websiteRoot);
-    assertIdentical(rootResponse.status, 200);
+    assertResponseStatus(
+      rootResponse,
+      200,
+      await describeResponse(rootResponse),
+    );
     assertStringIncludes(rootResponse.headers.get("content-type"), "text/html");
     assertStringIncludes(await rootResponse.text(), "<h1>Root</h1>");
 
     const fooResponse = await fetch(`${websiteRoot}foo/`);
-    assertIdentical(fooResponse.status, 200);
+    assertResponseStatus(fooResponse, 200, await describeResponse(fooResponse));
     assertStringIncludes(fooResponse.headers.get("content-type"), "text/html");
     assertStringIncludes(await fooResponse.text(), "<h1>Foo</h1>");
   });

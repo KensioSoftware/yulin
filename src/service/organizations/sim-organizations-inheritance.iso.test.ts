@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -189,9 +189,8 @@ describe("Simulated Organizations policy inheritance", () => {
     // Then no service control policy was applied to it at all.
     assertTrue(decision.isAllowed);
     assertFalse(decision.serviceControlPolicy.isApplied);
-    assertArrayLength(
+    assertArrayEmpty(
       organizations.serviceControlPolicySetFor(accountId).levels,
-      0,
     );
   });
 
@@ -291,7 +290,7 @@ describe("Simulated Organizations policy inheritance", () => {
 
     // When the path to an Account it never placed is asked for.
     // Then there is none, and no level filters that Account.
-    assertArrayLength(tree.pathTo(makeSimAwsAccountId()), 0);
+    assertArrayEmpty(tree.pathTo(makeSimAwsAccountId()));
   });
 
   it("gives the root and its units AWS-shaped ids", () => {

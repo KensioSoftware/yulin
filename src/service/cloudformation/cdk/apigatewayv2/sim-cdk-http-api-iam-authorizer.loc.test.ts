@@ -1,5 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -132,7 +137,7 @@ describe("Sim CDK HTTP API IAM authorizer local integration", () => {
 
       // Then the deployed route is closed to a request carrying no identity.
       const anonymous = await fetch(url);
-      assertIdentical(anonymous.status, 403);
+      assertResponseStatus(anonymous, 403, await describeResponse(anonymous));
       assertIdentical(await anonymous.text(), '{"message":"Forbidden"}');
 
       // And the allowed Role reaches the handler, which read its own ARN off
@@ -140,7 +145,7 @@ describe("Sim CDK HTTP API IAM authorizer local integration", () => {
       const reporter = await fetch(url, {
         headers: { [simAwsCallerHeaderName]: reporterArn },
       });
-      assertIdentical(reporter.status, 200);
+      assertResponseStatus(reporter, 200, await describeResponse(reporter));
       assertIdentical(await reporter.text(), reporterArn);
     } finally {
       await srv.close();

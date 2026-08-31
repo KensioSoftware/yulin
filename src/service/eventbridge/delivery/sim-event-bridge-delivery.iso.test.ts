@@ -10,6 +10,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -261,7 +262,7 @@ describe("EventBridge target delivery", () => {
       .sqs()
       .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queueUrl }));
 
-    assertArrayLength(received.Messages ?? [], 0);
+    assertArrayEmpty(received.Messages ?? []);
   });
 
   it("records a delivery a target's policy refused, and tells the caller nothing", async () => {

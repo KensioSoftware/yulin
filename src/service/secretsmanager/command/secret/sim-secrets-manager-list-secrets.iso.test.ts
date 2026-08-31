@@ -4,6 +4,7 @@ import {
   ListSecretsCommand,
 } from "@aws-sdk/client-secrets-manager";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -236,6 +237,6 @@ describe("Secrets Manager ListSecrets", () => {
 
     // Then the list is empty.
     assertNonNullable(listed.SecretList);
-    assertArrayLength(listed.SecretList, 0);
+    assertArrayEmpty(listed.SecretList);
   });
 });

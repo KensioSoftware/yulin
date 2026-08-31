@@ -3,7 +3,12 @@ import {
   AssociateWebACLCommand,
   CreateWebACLCommand,
 } from "@aws-sdk/client-wafv2";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -119,8 +124,12 @@ describe("A web ACL in front of a sim Cognito user pool's documents", () => {
 
     // Then both are refused. They are user pool endpoints, and a web ACL on a
     // pool covers every endpoint the pool serves.
-    assertIdentical(jwks.status, 403);
-    assertIdentical(configuration.status, 403);
+    assertResponseStatus(jwks, 403, await describeResponse(jwks));
+    assertResponseStatus(
+      configuration,
+      403,
+      await describeResponse(configuration),
+    );
   });
 
   it("blocks a write before the endpoint reports the methods it reads", async () => {
@@ -138,8 +147,8 @@ describe("A web ACL in front of a sim Cognito user pool's documents", () => {
     // Then the web ACL decided the blocked one first, as it sits in front of
     // the endpoint. The allowed one reaches the endpoint and is told what it
     // reads.
-    assertIdentical(blocked.status, 403);
-    assertIdentical(allowed.status, 405);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
+    assertResponseStatus(allowed, 405, await describeResponse(allowed));
     assertIdentical(allowed.headers.get("allow"), "GET, HEAD");
   });
 
@@ -154,6 +163,6 @@ describe("A web ACL in front of a sim Cognito user pool's documents", () => {
     // Then the listing is served. Real Cognito serves nothing at that path, so
     // no web ACL on AWS has an opinion about it, and it is Yulin's own view of
     // what a pool would have sent.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

@@ -2,7 +2,9 @@ import { PutMethodCommand } from "@aws-sdk/client-api-gateway";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -36,7 +38,7 @@ describe("The edges of serving a sim REST API", () => {
     );
 
     // Then the default handler answers
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "hello");
   });
 
@@ -52,7 +54,7 @@ describe("The edges of serving a sim REST API", () => {
     const response = await new SimAwsHttp({ simAws }).fetch(localUrl(restApi));
 
     // Then the root resource answers
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("answers a request naming no stage at all with Forbidden", async () => {
@@ -66,7 +68,7 @@ describe("The edges of serving a sim REST API", () => {
     );
 
     // Then there is no stage to serve it, so it is refused
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
   });
 
@@ -118,7 +120,7 @@ describe("The edges of serving a sim REST API", () => {
 
     // Then it is the same 502 an unreachable integration gets, which is what
     // real API Gateway answers for a method it cannot integrate
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("routes to nothing for an API id it never allocated", () => {
@@ -153,7 +155,7 @@ describe("The edges of serving a sim REST API", () => {
     );
 
     // Then there is nothing to serve it
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("builds a router over its own simulation where none is supplied", () => {
@@ -177,7 +179,7 @@ describe("The edges of serving a sim REST API", () => {
 
     // Then API Gateway discovers it only when it tries to invoke, as it does
     // on AWS
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("stamps the event from the real clock where no clock is supplied", async () => {
@@ -205,7 +207,7 @@ describe("The edges of serving a sim REST API", () => {
     expect(event.requestContext.requestTimeEpoch).toBeGreaterThan(0);
   });
 
-  it("sends an empty handler body as no body at all", () => {
+  it("sends an empty handler body as no body at all", async () => {
     // Given a handler answering 204 with nothing
     const builder = new SimPayload1ResponseBuilder();
 
@@ -213,7 +215,7 @@ describe("The edges of serving a sim REST API", () => {
     const response = builder.build({ statusCode: 204 });
 
     // Then the status stays valid, which it would not with an empty body
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(response.body, null);
   });
 

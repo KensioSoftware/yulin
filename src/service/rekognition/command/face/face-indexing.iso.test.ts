@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -66,7 +67,7 @@ describe("Indexing faces into a simulated Rekognition collection", () => {
     assertNonNullable(record.Face.ImageId);
     assertNonNullable(record.Face.BoundingBox);
     assertIdentical(indexed.FaceModelVersion, "7.0");
-    assertArrayLength(indexed.UnindexedFaces, 0);
+    assertArrayEmpty(indexed.UnindexedFaces);
   });
 
   it("indexes the faces the image is declared to hold, under one image id", async () => {

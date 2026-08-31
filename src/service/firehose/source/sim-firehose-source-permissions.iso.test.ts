@@ -1,5 +1,6 @@
 import { PutRecordCommand } from "@aws-sdk/client-kinesis";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -51,7 +52,7 @@ describe("The Role a simulated Firehose delivery stream reads its source as", ()
 
     // Then nothing was delivered, and the simulator holds the refusal with the
     // stream and the Role it was reading as.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
 
     const failures = simAws.firehose().getSourceFailures();
     assertArrayLength(failures, 1);
@@ -154,6 +155,6 @@ describe("The Role a simulated Firehose delivery stream reads its source as", ()
     // Then it arrived. The read is the delivery stream's own, made as its
     // source Role.
     assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 1);
-    assertArrayLength(simAws.firehose().getSourceFailures(), 0);
+    assertArrayEmpty(simAws.firehose().getSourceFailures());
   });
 });

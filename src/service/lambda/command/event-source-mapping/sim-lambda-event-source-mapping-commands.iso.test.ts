@@ -6,6 +6,7 @@ import {
 import { PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertThrowsErrorAsync,
@@ -88,7 +89,7 @@ describe("sim Lambda event source mapping commands", () => {
     );
 
     // Then nothing is listed.
-    assertArrayLength(listed.EventSourceMappings, 0);
+    assertArrayEmpty(listed.EventSourceMappings);
   });
 
   it("stops delivering once the mapping is deleted", async () => {

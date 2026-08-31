@@ -4,6 +4,7 @@ import {
   RunTaskCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -68,7 +69,7 @@ describe("ECS DescribeTasksCommand", () => {
     );
 
     // Then it is a failure entry rather than an error, as real ECS reports it.
-    assertArrayLength(described.tasks, 0);
+    assertArrayEmpty(described.tasks);
     assertArrayLength(described.failures, 1);
     assertIdentical(described.failures[0].reason, "MISSING");
     assertStringIncludes(
@@ -98,7 +99,7 @@ describe("ECS DescribeTasksCommand", () => {
     );
 
     // Then it names no task there, since a task belongs to its own cluster.
-    assertArrayLength(described.tasks, 0);
+    assertArrayEmpty(described.tasks);
     assertArrayLength(described.failures, 1);
 
     await simAws.backgroundTasksComplete();
@@ -145,7 +146,7 @@ describe("ECS DescribeTasksCommand", () => {
     );
 
     // Then it names no task, and is reported as it came.
-    assertArrayLength(described.tasks, 0);
+    assertArrayEmpty(described.tasks);
     assertArrayLength(described.failures, 1);
     assertIdentical(described.failures[0].arn, registered.taskDefinitionArn);
     assertIdentical(described.failures[0].reason, "MISSING");

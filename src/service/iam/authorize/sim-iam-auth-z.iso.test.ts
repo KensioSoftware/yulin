@@ -4,6 +4,7 @@ import {
   PutRolePolicyCommand,
 } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -65,8 +66,8 @@ describe("Sim IAM authorization", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("implicitly denies a role with only a trust policy", async () => {
@@ -103,8 +104,8 @@ describe("Sim IAM authorization", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("does not authorize from an unattached managed policy", async () => {
@@ -150,8 +151,8 @@ describe("Sim IAM authorization", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("uses account-scoped IAM state when authorizing through SimAws account services", async () => {
@@ -185,8 +186,8 @@ describe("Sim IAM authorization", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("explicit deny from an inline identity policy overrides an inline allow", async () => {

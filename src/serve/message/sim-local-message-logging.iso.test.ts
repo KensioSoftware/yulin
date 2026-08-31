@@ -6,6 +6,7 @@ import {
 import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertNonNullable,
   assertStringIncludes,
@@ -271,7 +272,7 @@ describe("Logging the messages a served environment records", () => {
     await sendEachKind(simAws);
 
     // Then nothing reached the console.
-    assertArrayLength(target.lines, 0);
+    assertArrayEmpty(target.lines);
   });
 
   it("leaves the messages recorded before it started unprinted", async () => {
@@ -289,7 +290,7 @@ describe("Logging the messages a served environment records", () => {
 
     // Then the console has the messages from here on and no replay of the
     // ones before, which the service's own record already holds.
-    assertArrayLength(target.lines, 0);
+    assertArrayEmpty(target.lines);
     assertArrayLength(simAws.sns().sentSmsMessages(), 1);
   });
 });

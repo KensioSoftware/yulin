@@ -14,7 +14,7 @@ import {
   UploadPartCopyCommand,
 } from "@aws-sdk/client-s3";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -291,7 +291,7 @@ describe("Copying an Object over the served S3 REST endpoint", () => {
     const listed = await simS3.listObjectsV2(
       new ListObjectsV2Command({ Bucket: "sealed" }),
     );
-    assertArrayLength(listed.Contents ?? [], 0);
+    assertArrayEmpty(listed.Contents ?? []);
   });
 
   it("refuses a copy into a multipart part rather than storing an empty one", async () => {

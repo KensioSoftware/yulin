@@ -1,6 +1,7 @@
 import { DetectModerationLabelsCommand } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -55,9 +56,9 @@ describe("Detecting moderation labels in a simulated image", () => {
 
     // Then it comes back clean, from the version of the model whose taxonomy
     // the labels would have come from.
-    assertArrayLength(detected.ModerationLabels, 0);
+    assertArrayEmpty(detected.ModerationLabels);
     assertIdentical(detected.ModerationModelVersion, "7.0");
-    assertArrayLength(detected.ContentTypes, 0);
+    assertArrayEmpty(detected.ContentTypes);
   });
 
   it("answers with the labels declared for an object name", async () => {
@@ -295,6 +296,6 @@ describe("Detecting moderation labels in a simulated image", () => {
 
     // Then that Region answers from its own rules, as a real Rekognition
     // endpoint answers for the Region it belongs to.
-    assertArrayLength(elsewhere.ModerationLabels, 0);
+    assertArrayEmpty(elsewhere.ModerationLabels);
   });
 });

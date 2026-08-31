@@ -11,8 +11,10 @@ import {
 } from "@aws-sdk/client-sts";
 import {
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -145,7 +147,7 @@ describe("Serving simulated STS on an endpoint URL", () => {
     });
 
     // Then it is refused, because a caller with no identity has none to report
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertStringIncludes(await response.text(), "AccessDenied");
   });
 
@@ -162,7 +164,7 @@ describe("Serving simulated STS on an endpoint URL", () => {
     });
 
     // Then it is refused as stating no operation
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(await response.text(), "MissingAction");
   });
 

@@ -1,4 +1,8 @@
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { dnsRcodes } from "../dns-rcode.js";
@@ -34,7 +38,7 @@ describe("Simulated Route53 DNS negative answers", () => {
     // Then the name is reported to exist, holding nothing of that type, with the
     // zone SOA telling a resolver how long it may cache that.
     assertIdentical(answer.rcode, dnsRcodes.noError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
     assertArrayLength(answer.authority, 1);
     assertIdentical(answer.authority[0].name, "example.test");
     assertIdentical(answer.authority[0].type, dnsRecordTypeNumber("SOA"));
@@ -54,7 +58,7 @@ describe("Simulated Route53 DNS negative answers", () => {
 
     // Then it is a name error, distinguishing it from a name with no such type.
     assertIdentical(answer.rcode, dnsRcodes.nameError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
     assertArrayLength(answer.authority, 1);
   });
 
@@ -72,8 +76,8 @@ describe("Simulated Route53 DNS negative answers", () => {
     // authoritative only for the zones it holds and cannot say the name does not
     // exist anywhere.
     assertIdentical(answer.rcode, dnsRcodes.refused);
-    assertArrayLength(answer.answers, 0);
-    assertArrayLength(answer.authority, 0);
+    assertArrayEmpty(answer.answers);
+    assertArrayEmpty(answer.authority);
   });
 
   it("refuses a query in a class other than internet", async () => {
@@ -111,7 +115,7 @@ describe("Simulated Route53 DNS negative answers", () => {
     // Then it is answered as no data rather than as an error, which is what a
     // resolver expects for a type a zone does not hold.
     assertIdentical(answer.rcode, dnsRcodes.noError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
     assertArrayLength(answer.authority, 1);
   });
 
@@ -138,7 +142,7 @@ describe("Simulated Route53 DNS negative answers", () => {
     // query is answered as no data, with the zone SOA a resolver caches that
     // against.
     assertIdentical(answer.rcode, dnsRcodes.noError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
     assertArrayLength(answer.authority, 1);
     assertIdentical(answer.authority[0].type, dnsRecordTypeNumber("SOA"));
   });
@@ -193,7 +197,7 @@ describe("Simulated Route53 DNS negative answers", () => {
 
     // Then the name exists holding nothing of that type, and nothing is chased.
     assertIdentical(answer.rcode, dnsRcodes.noError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
   });
 
   it("returns just the CNAME when it leads outside every zone", async () => {
@@ -235,7 +239,7 @@ describe("Simulated Route53 DNS negative answers", () => {
 
     // Then it is a name error with no answers at all.
     assertIdentical(answer.rcode, dnsRcodes.nameError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
   });
 
   it("gives an alias record a default TTL, having none of its own", async () => {
@@ -297,7 +301,7 @@ describe("Simulated Route53 DNS negative answers", () => {
     // Then the chase stops rather than following an absent target, and the name
     // is reported to exist holding nothing of that type.
     assertIdentical(answer.rcode, dnsRcodes.noError);
-    assertArrayLength(answer.answers, 0);
+    assertArrayEmpty(answer.answers);
   });
 
   it("takes the negative answer SOA from the zone the chase ended in", async () => {

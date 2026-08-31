@@ -1,9 +1,12 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -72,7 +75,7 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     // and rather than the Resources that had nothing to do with it.
     assertIdentical(stack.getResource("Pool")?.status, "CREATE_COMPLETE");
     assertIdentical(stack.getResource("Orders")?.status, "CREATE_COMPLETE");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
   });
 
@@ -128,8 +131,8 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     // Then the web ACL is really in front of the stage, deciding by what is
     // left of it. What the dropped rule would have blocked is served, which is
     // the cost of deploying at all and why the record of it is there.
-    assertIdentical(blocked.status, 403);
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertIdentical(await allowed.text(), "orders");
     assertIdentical(simWafIgnoredProperty(stack).path, "Rules.block-countries");
   });

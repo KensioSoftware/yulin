@@ -7,7 +7,12 @@ import {
   CreateFunctionCommand,
 } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { makeCffFunctionCodeInput } from "./function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
 
@@ -95,12 +100,20 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     const notFoundResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing.html`,
     );
-    assertIdentical(notFoundResponse.status, 404);
+    assertResponseStatus(
+      notFoundResponse,
+      404,
+      await describeResponse(notFoundResponse),
+    );
     const redirectedResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/foobar/redirectme.html`,
       { redirect: "manual" },
     );
-    assertIdentical(redirectedResponse.status, 302);
+    assertResponseStatus(
+      redirectedResponse,
+      302,
+      await describeResponse(redirectedResponse),
+    );
     assertIdentical(
       redirectedResponse.headers.get("location"),
       "https://yulin.test/redirected.html",
@@ -260,7 +273,11 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     const servedResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/foobar/something.html`,
     );
-    assertIdentical(servedResponse.status, 200);
+    assertResponseStatus(
+      servedResponse,
+      200,
+      await describeResponse(servedResponse),
+    );
     assertIdentical(
       servedResponse.headers.get("x-changed-by"),
       "foobar handler",

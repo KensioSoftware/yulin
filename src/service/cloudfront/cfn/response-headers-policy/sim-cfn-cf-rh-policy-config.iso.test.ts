@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -69,8 +70,8 @@ describe("SimCfnCfResponseHeadersPolicyConfig", () => {
     const policy = policyFrom({});
 
     // Then it has no headers either way, rather than failing to build.
-    assertArrayLength(policy.customHeaders, 0);
-    assertArrayLength(policy.headersToRemove, 0);
+    assertArrayEmpty(policy.customHeaders);
+    assertArrayEmpty(policy.headersToRemove);
   });
 
   it("reads a section with no items", () => {
@@ -81,8 +82,8 @@ describe("SimCfnCfResponseHeadersPolicyConfig", () => {
     });
 
     // Then it has no headers either way.
-    assertArrayLength(policy.customHeaders, 0);
-    assertArrayLength(policy.headersToRemove, 0);
+    assertArrayEmpty(policy.customHeaders);
+    assertArrayEmpty(policy.headersToRemove);
   });
 
   it("reads the security headers a policy sets", () => {
@@ -104,7 +105,7 @@ describe("SimCfnCfResponseHeadersPolicyConfig", () => {
     const policy = policyFrom({ SecurityHeadersConfig: {} });
 
     // Then it sets none.
-    assertArrayLength(policy.securityHeaders, 0);
+    assertArrayEmpty(policy.securityHeaders);
   });
 
   it("reads ServerTimingHeadersConfig once enabled", () => {

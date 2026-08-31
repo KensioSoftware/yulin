@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -31,7 +33,7 @@ describe("Serving the simulated Lambda control plane", () => {
 
     // Then it is refused rather than answered by the operation beside it, and
     // the refusal names the path
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
     assertStringIncludes(
       await response.text(),
@@ -52,7 +54,7 @@ describe("Serving the simulated Lambda control plane", () => {
 
     // Then the status is the one Invoke reports for a dry run, and there is no
     // payload to read, since nothing ran
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(await response.text(), "");
   });
 
@@ -69,7 +71,7 @@ describe("Serving the simulated Lambda control plane", () => {
 
     // Then the handler's result is the body, and the output members Invoke
     // reports in headers are there
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("x-amz-executed-version"), "$LATEST");
     assertObjectMatches((await response.json()) as object, { ok: true });
   });
@@ -82,7 +84,7 @@ describe("Serving the simulated Lambda control plane", () => {
     const response = await send("GET", "/2015-03-31/functions");
 
     // Then the one function the simulation holds is reported
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches((await response.json()) as object, {
       Functions: [{ FunctionName: "orders" }],
     });
@@ -110,7 +112,7 @@ describe("Serving the simulated Lambda control plane", () => {
 
     // Then the function is reported updated, and an invocation runs the
     // replacement
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches((await response.json()) as object, {
       FunctionName: "orders",
       Version: "$LATEST",
@@ -137,7 +139,7 @@ describe("Serving the simulated Lambda control plane", () => {
     );
 
     // Then the updated configuration comes back
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches((await response.json()) as object, {
       FunctionName: "orders",
       Timeout: 5,
@@ -155,7 +157,7 @@ describe("Serving the simulated Lambda control plane", () => {
     });
 
     // Then the refusal names the exception real AWS uses for it
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertIdentical(
       response.headers.get("x-amzn-errortype"),
       "SerializationException",
@@ -192,7 +194,7 @@ describe("Serving the simulated Lambda control plane", () => {
     );
 
     // Then the endpoint says so rather than answering with a server error
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
     assertStringIncludes(
       await response.text(),

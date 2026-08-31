@@ -1,5 +1,6 @@
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -78,7 +79,7 @@ async function publishedMessages(
   );
   await simAws.backgroundTasksComplete();
 
-  assertArrayLength(simAws.sns().deliveryFailures, 0);
+  assertArrayEmpty(simAws.sns().deliveryFailures);
 
   return received;
 }
@@ -111,7 +112,7 @@ describe("SAM SNS event expansion", () => {
     );
 
     // Then it did not reach the function
-    assertArrayLength(unmatched, 0);
+    assertArrayEmpty(unmatched);
 
     // And a message the policy does match does reach it
     const matched = await publishedMessages(
@@ -146,6 +147,6 @@ describe("SAM SNS event expansion", () => {
     assertUndefined(
       stack.getResource(`${samFunctionTemplateLogicalId}OrdersSnsSubscription`),
     );
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

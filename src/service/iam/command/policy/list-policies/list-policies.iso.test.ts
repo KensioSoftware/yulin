@@ -1,5 +1,6 @@
 import { CreatePolicyCommand, ListPoliciesCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -167,7 +168,7 @@ describe("IAM ListPoliciesCommand", () => {
       }),
     );
 
-    assertArrayLength(listPoliciesOutput.Policies, 0);
+    assertArrayEmpty(listPoliciesOutput.Policies);
     assertFalse(listPoliciesOutput.IsTruncated);
     assertUndefined(listPoliciesOutput.Marker);
   });
@@ -286,9 +287,9 @@ describe("IAM ListPoliciesCommand", () => {
       }),
     );
 
-    assertArrayLength(onlyAttachedOutput.Policies, 0);
+    assertArrayEmpty(onlyAttachedOutput.Policies);
     assertFalse(onlyAttachedOutput.IsTruncated);
-    assertArrayLength(permissionsBoundaryOutput.Policies, 0);
+    assertArrayEmpty(permissionsBoundaryOutput.Policies);
     assertFalse(permissionsBoundaryOutput.IsTruncated);
   });
 });

@@ -1,7 +1,7 @@
 import { PutItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
@@ -140,7 +140,7 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
 
     // Then the page carries no items and a token to carry on from, since the
     // read reached the limit rather than the end of the collection.
-    assertArrayLength(output.Items ?? [], 0);
+    assertArrayEmpty(output.Items ?? []);
     assertIdentical(output.Count, 0);
     assertIdentical(output.ScannedCount, 1);
     assertNonNullable(output.LastEvaluatedKey);

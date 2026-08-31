@@ -6,6 +6,7 @@ import {
   PublishCommand,
 } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertInstanceOf,
@@ -96,7 +97,7 @@ describe("SNS SMS IAM authorization", () => {
       assertInstanceOf(error, SimSnsAuthorizationErrorException);
     }
 
-    assertArrayLength(sns.sentSmsMessages(), 0);
+    assertArrayEmpty(sns.sentSmsMessages());
   });
 
   it("admits a caller whose policy allows the SMS actions", async () => {

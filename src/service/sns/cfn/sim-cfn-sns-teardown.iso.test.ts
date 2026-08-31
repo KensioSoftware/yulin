@@ -1,5 +1,6 @@
 import { GetTopicAttributesCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -63,7 +64,7 @@ describe("SNS CloudFormation Resource teardown", () => {
 
     // Then the topic is gone, and so is the subscription that named it.
     assertUndefined(simAws.sns().findTopic("orders"));
-    assertArrayLength(simAws.sns().topicSubscriptions("orders"), 0);
+    assertArrayEmpty(simAws.sns().topicSubscriptions("orders"));
     assertIdentical(
       stack.getResource("OrdersTopic")?.status,
       "DELETE_COMPLETE",
@@ -147,7 +148,7 @@ describe("SNS CloudFormation Resource teardown", () => {
     await stack.teardown();
 
     // Then the subscription is gone and the topic is not.
-    assertArrayLength(simAws.sns().topicSubscriptions("standing"), 0);
+    assertArrayEmpty(simAws.sns().topicSubscriptions("standing"));
     assertNonNullable(simAws.sns().findTopic("standing"));
   });
 

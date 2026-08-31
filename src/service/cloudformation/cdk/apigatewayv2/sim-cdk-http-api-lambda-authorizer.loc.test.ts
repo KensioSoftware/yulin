@@ -1,4 +1,9 @@
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -122,19 +127,19 @@ describe("Sim CDK HTTP API Lambda authorizer local integration", () => {
       // Then the deployed route is closed to a request carrying no cookie,
       // without the authorizer function being invoked at all.
       const anonymous = await fetch(url);
-      assertIdentical(anonymous.status, 401);
+      assertResponseStatus(anonymous, 401, await describeResponse(anonymous));
 
       // And closed to a cookie the deployed authorizer refuses.
       const refused = await fetch(url, {
         headers: { cookie: "session=expired" },
       });
-      assertIdentical(refused.status, 403);
+      assertResponseStatus(refused, 403, await describeResponse(refused));
 
       // And open to the one it accepts, whose context reached the handler.
       const admitted = await fetch(url, {
         headers: { cookie: "session=valid" },
       });
-      assertIdentical(admitted.status, 200);
+      assertResponseStatus(admitted, 200, await describeResponse(admitted));
       assertIdentical(await admitted.text(), "acme");
     } finally {
       await srv.close();

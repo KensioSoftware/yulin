@@ -3,7 +3,12 @@ import {
   CreateDomainNameCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -179,7 +184,7 @@ describe("A Distribution serving the hostname an HTTP API also has as a custom d
     // Then the request went through the Distribution, so it carried the
     // header the API requires. Giving the API the viewer's hostname as a
     // custom domain leaves the record deciding where that hostname goes
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.json(), "served");
   });
 
@@ -196,7 +201,7 @@ describe("A Distribution serving the hostname an HTTP API also has as a custom d
     );
 
     // Then the authorizer refuses it, since nothing added the Origin header
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Unauthorized" });
   });
 });

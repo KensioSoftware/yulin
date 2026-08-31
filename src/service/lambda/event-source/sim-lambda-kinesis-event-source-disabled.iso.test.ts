@@ -3,7 +3,7 @@ import {
   CreateEventSourceMappingCommand,
   DeleteFunctionCommand,
 } from "@aws-sdk/client-lambda";
-import { assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty, assertArrayLength } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -58,7 +58,7 @@ describe("a sim Lambda Kinesis mapping with nothing to deliver to", () => {
     await simAws.backgroundTasksComplete();
 
     // Then nothing was delivered, since a disabled mapping does not poll.
-    assertArrayLength(events, 0);
+    assertArrayEmpty(events);
   });
 
   it("delivers nothing once the function it maps to has gone", async () => {

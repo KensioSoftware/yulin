@@ -8,6 +8,7 @@ import {
   GetRoutesCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertObjectMatches,
@@ -101,7 +102,7 @@ describe("The authorizers of a sim HTTP API", () => {
     // Then the list held it, and does not any more
     assertArrayLength(listed.Items, 1);
     assertIdentical(listed.Items[0].AuthorizerId, created.AuthorizerId);
-    assertArrayLength(remaining.Items, 0);
+    assertArrayEmpty(remaining.Items);
   });
 
   it("refuses deleting an authorizer the API does not have", async () => {

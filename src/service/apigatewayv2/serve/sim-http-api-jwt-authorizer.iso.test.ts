@@ -1,4 +1,9 @@
-import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -83,7 +88,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     });
 
     // Then the handler ran, and it saw the claims the authorizer accepted
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       claims: {
         client_id: signedIn.clientId,
@@ -140,8 +145,8 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then both are read, since API Gateway strips the scheme rather than
     // requiring it
-    assertIdentical(bare.status, 200);
-    assertIdentical(lowerCase.status, 200);
+    assertResponseStatus(bare, 200, await describeResponse(bare));
+    assertResponseStatus(lowerCase, 200, await describeResponse(lowerCase));
   });
 
   it("refuses a request carrying no token", async () => {
@@ -152,7 +157,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     const response = await get(simAws, api);
 
     // Then the request is refused, and the handler never ran
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(response.headers.get("www-authenticate"), "Bearer");
     assertIdentical(await response.text(), '{"message":"Unauthorized"}');
   });
@@ -168,7 +173,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then it is refused the same way a missing token is, so a client learns
     // nothing about which check it failed
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Unauthorized"}');
   });
 
@@ -187,7 +192,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then it is refused: it is signed by a key the configured issuer never
     // published, and it names another issuer
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("refuses a token whose audience is not one the authorizer accepts", async () => {
@@ -212,7 +217,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     });
 
     // Then it is refused, with the one description AWS publishes
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(
       response.headers.get("www-authenticate"),
       'Bearer error="invalid_token", ' +
@@ -234,8 +239,8 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     const refused = await get(simAws, api, {
       authorization: `Bearer ${signedIn.accessToken}`,
     });
-    assertIdentical(accepted.status, 200);
-    assertIdentical(refused.status, 401);
+    assertResponseStatus(accepted, 200, await describeResponse(accepted));
+    assertResponseStatus(refused, 401, await describeResponse(refused));
   });
 
   it("lets a token through that claims a scope the route asks for", async () => {
@@ -248,7 +253,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     });
 
     // Then the route is reached, because one route scope matched
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a verified token that claims none of the route's scopes", async () => {
@@ -262,7 +267,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then the answer is 403 rather than 401: the token was accepted, and it
     // does not allow this route
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Forbidden"}');
   });
 
@@ -277,7 +282,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then it is accepted, because `token_use` is not checked, which is what
     // real API Gateway does. Its `aud` is the app client id, so it matches.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       claims: { aud: signedIn.clientId, token_use: "id" },
       scopes: null,
@@ -295,7 +300,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then it is refused, because an id token carries no scope claim at all.
     // Route scopes are the only thing that tells the two token types apart.
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("still accepts a token the pool was told to sign out", async () => {
@@ -315,7 +320,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then it is still accepted, because real API Gateway knows nothing about
     // the pool's issued-token store and cannot see a revocation
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses every request once the route's authorizer is deleted", async () => {
@@ -333,7 +338,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then the route stays closed rather than falling open, since there is
     // nothing left to verify the token against
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("reads the token from a query string identity source", async () => {
@@ -360,7 +365,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
     );
 
     // Then it is read from where the authorizer was told to look
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("leaves the authorizer block out of the event on an open route", async () => {
@@ -376,7 +381,7 @@ describe("Authorizing a sim HTTP API route with a JWT authorizer", () => {
 
     // Then there is no caller to describe, so the event carries no authorizer
     // block at all
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "null");
   });
 });

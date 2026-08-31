@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertTrue,
@@ -28,9 +28,9 @@ describe("SNS filter policy subjects", () => {
     // attributes are flat, so there is nothing under one.
     assertIdentical(subject.valuesAt(["type"])[0]?.text, "order");
     assertIdentical(subject.valuesAt(["amount"])[0]?.numeric, 150);
-    assertArrayLength(subject.valuesAt(["tenant"]), 0);
-    assertArrayLength(subject.valuesAt([]), 0);
-    assertArrayLength(subject.valuesAt(["type", "kind"]), 0);
+    assertArrayEmpty(subject.valuesAt(["tenant"]));
+    assertArrayEmpty(subject.valuesAt([]));
+    assertArrayEmpty(subject.valuesAt(["type", "kind"]));
     assertFalse(subject.isEmpty);
   });
 
@@ -62,9 +62,9 @@ describe("SNS filter policy subjects", () => {
     // that is not an object finds nothing.
     assertIdentical(subject.valuesAt(["customer", "tier"])[0]?.text, "gold");
     assertIdentical(subject.valuesAt(["amount"])[0]?.numeric, 150);
-    assertArrayLength(subject.valuesAt(["customer"]), 0);
-    assertArrayLength(subject.valuesAt(["amount", "currency"]), 0);
-    assertArrayLength(subject.valuesAt(["missing"]), 0);
+    assertArrayEmpty(subject.valuesAt(["customer"]));
+    assertArrayEmpty(subject.valuesAt(["amount", "currency"]));
+    assertArrayEmpty(subject.valuesAt(["missing"]));
   });
 
   it("holds nothing for a body that is not a JSON object", () => {
@@ -73,7 +73,7 @@ describe("SNS filter policy subjects", () => {
     const listed = SimSnsBodySubject.of(JSON.stringify(["order"]));
 
     // Then neither holds anything at any key, rather than failing to be read.
-    assertArrayLength(text.valuesAt(["type"]), 0);
-    assertArrayLength(listed.valuesAt(["type"]), 0);
+    assertArrayEmpty(text.valuesAt(["type"]));
+    assertArrayEmpty(listed.valuesAt(["type"]));
   });
 });

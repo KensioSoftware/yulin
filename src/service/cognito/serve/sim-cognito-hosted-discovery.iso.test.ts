@@ -1,8 +1,9 @@
 import {
-  assertIdentical,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -87,7 +88,7 @@ describe("A sim Cognito pool with a hosted domain", () => {
     });
 
     // Then it is refused, rather than sending the browser wherever it asked.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       JSON.stringify(await response.json()),
       "is not one of app client",
@@ -103,7 +104,7 @@ describe("A sim Cognito pool with a hosted domain", () => {
     const response = await logout(setUp, { client_id: setUp.clientId });
 
     // Then it says so, because that page is not simulated.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       JSON.stringify(await response.json()),
       "logout_uri is required here",
@@ -121,7 +122,7 @@ describe("A sim Cognito pool with a hosted domain", () => {
 
     // Then it is refused, because a sign-out URL means nothing without the
     // client that registered it.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       JSON.stringify(await response.json()),
       "is not an app client of user pool",

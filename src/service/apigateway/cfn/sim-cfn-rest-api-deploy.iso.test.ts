@@ -2,7 +2,9 @@ import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -59,7 +61,7 @@ describe("API Gateway REST API CloudFormation deployment", () => {
     );
 
     // Then the request reached the integration's function through the method
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       await response.text(),
       'GET /orders/{orderId} {"orderId":"YL-1"}',
@@ -88,7 +90,7 @@ describe("API Gateway REST API CloudFormation deployment", () => {
     // Then the stage is a path segment of it, and the request was served
     assertTypeString(apiUrl);
     expect(apiUrl).toContain("/live/");
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders {}");
   });
 
@@ -321,8 +323,8 @@ describe("API Gateway REST API CloudFormation deployment", () => {
 
     // Then the template deployed a method IAM decides, closed to a request
     // carrying no identity and open to the Role that was allowed it
-    assertIdentical(anonymous.status, 403);
-    assertIdentical(reporter.status, 200);
+    assertResponseStatus(anonymous, 403, await describeResponse(anonymous));
+    assertResponseStatus(reporter, 200, await describeResponse(reporter));
     assertIdentical(await reporter.text(), "GET /orders {}");
   });
 
@@ -345,7 +347,7 @@ describe("API Gateway REST API CloudFormation deployment", () => {
     );
 
     // Then it is refused rather than served
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
   });
 

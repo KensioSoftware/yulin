@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -50,7 +52,7 @@ describe("API Gateway v2 CloudFormation deployment", () => {
     );
 
     // Then the request reached the integration's function through the route
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       await response.text(),
       'GET /orders/{orderId} {"orderId":"YL-1"}',
@@ -95,8 +97,12 @@ describe("API Gateway v2 CloudFormation deployment", () => {
     const fromCdkUrl = await http.fetch(localUrl(cdkApiUrl, "orders"));
 
     // Then the amazonaws.com form and the local suffix form reach one API
-    assertIdentical(fromApiEndpoint.status, 200);
-    assertIdentical(fromCdkUrl.status, 200);
+    assertResponseStatus(
+      fromApiEndpoint,
+      200,
+      await describeResponse(fromApiEndpoint),
+    );
+    assertResponseStatus(fromCdkUrl, 200, await describeResponse(fromCdkUrl));
     assertIdentical(await fromApiEndpoint.text(), await fromCdkUrl.text());
   });
 
@@ -149,7 +155,7 @@ describe("API Gateway v2 CloudFormation deployment", () => {
     );
 
     // Then it is refused rather than served
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
   });
 
@@ -210,7 +216,7 @@ describe("API Gateway v2 CloudFormation deployment", () => {
     );
 
     // Then it reached the same function
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders {}");
   });
 
@@ -251,10 +257,10 @@ describe("API Gateway v2 CloudFormation deployment", () => {
 
     // Then the deployed limits are the ones the stage serves at, and the route
     // on the stage default is untouched by the other route's burst
-    assertIdentical(served.status, 200);
-    assertIdentical(refused.status, 429);
+    assertResponseStatus(served, 200, await describeResponse(served));
+    assertResponseStatus(refused, 429, await describeResponse(refused));
 
     const other = await http.fetch(localUrl(apiEndpoint, "/orders"));
-    assertIdentical(other.status, 200);
+    assertResponseStatus(other, 200, await describeResponse(other));
   });
 });

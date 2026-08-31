@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -74,7 +76,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then the authorizer saw the header value and the ARN of the request,
     // which names the path that was asked for rather than the template
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const [event] = seen;
     assertNonNullable(event);
     assertIdentical(event.type, "TOKEN");
@@ -105,7 +107,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then the request is refused with the body real API Gateway sends for a
     // Deny statement that matched
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       Message:
         "User is not authorized to access this resource with an explicit deny",
@@ -135,8 +137,8 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then the one the policy names is served and the other is not, because
     // the document is evaluated against the ARN of the request being made
-    assertIdentical(allowed.status, 200);
-    assertIdentical(refused.status, 403);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
+    assertResponseStatus(refused, 403, await describeResponse(refused));
     expect(await refused.json()).toStrictEqual({
       Message: "User is not authorized to access this resource",
     });
@@ -211,7 +213,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
     );
 
     // Then it is refused before the authorizer is asked anything
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(invocations, 0);
     expect(await response.json()).toStrictEqual({ message: "Unauthorized" });
   });
@@ -231,7 +233,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
     );
 
     // Then the caller is told its token was rejected, as it is on real AWS
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("answers 500 for an authorizer the API may not invoke", async () => {
@@ -254,7 +256,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
     // Then the API's own problem is a 500 rather than something the caller
     // could act on. The permission for the integration does not cover the
     // authorizer, because the two are granted on different ARNs.
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Internal server error",
     });
@@ -280,7 +282,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then the caller learns nothing about it, the way an integration failure
     // tells it nothing
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("answers 500 for a response API Gateway could not read", async () => {
@@ -299,7 +301,7 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then it is a 500, because a REST API authorizer always answers a policy
     // where an HTTP API one may answer a boolean
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
   });
 
   it("closes a method whose authorizer was deleted", async () => {
@@ -325,6 +327,6 @@ describe("Authorizing a sim REST API method with a TOKEN authorizer", () => {
 
     // Then the method stays closed, since there is nothing left to send the
     // request through
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 });

@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -60,7 +61,7 @@ describe("AWS::S3::Bucket VersioningConfiguration", () => {
     // Then the property reached the Bucket rather than being recorded as one
     // the simulation cannot act on.
     assertIdentical(status.Status, "Enabled");
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("keeps versions in a Bucket a template versioned", async () => {

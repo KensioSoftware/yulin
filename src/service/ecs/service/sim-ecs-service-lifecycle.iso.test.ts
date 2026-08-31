@@ -4,6 +4,7 @@ import {
   ListTasksCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -57,7 +58,7 @@ describe("What a simulated ECS service leaves running", () => {
       new ListTasksCommand({ serviceName: "checkout" }),
     );
 
-    assertArrayLength(after.taskArns, 0);
+    assertArrayEmpty(after.taskArns);
     assertIdentical(background.pendingTaskCount, 0);
     assertIdentical(background.dueTaskCount, 0);
 
@@ -89,7 +90,7 @@ describe("What a simulated ECS service leaves running", () => {
       .ecs()
       .listTasks(new ListTasksCommand({ serviceName: "checkout" }));
 
-    assertArrayLength(listed.taskArns, 0);
+    assertArrayEmpty(listed.taskArns);
   });
 
   it("brings nothing up for a service deleted before its tasks start", async () => {

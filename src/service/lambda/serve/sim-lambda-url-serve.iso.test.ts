@@ -2,7 +2,12 @@ import {
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
-import { assertArrayEquals, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEquals,
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -48,7 +53,7 @@ describe("Serving a sim Lambda Function URL", () => {
     );
 
     // Then the handler's status, headers and body are what the client sees.
-    assertIdentical(response.status, 201);
+    assertResponseStatus(response, 201, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "text/plain");
     assertIdentical(response.headers.get("x-greeting"), "hello");
     assertIdentical(await response.text(), "Hello from a sim Lambda");
@@ -85,7 +90,7 @@ describe("Serving a sim Lambda Function URL", () => {
     );
 
     // Then Lambda's 200 JSON inference applies.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/json");
     assertIdentical(await response.text(), '{"greeting":"hello"}');
   });
@@ -198,7 +203,7 @@ describe("Serving a sim Lambda Function URL", () => {
     );
 
     // Then the status is passed through without a body.
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(await response.text(), "");
   });
 

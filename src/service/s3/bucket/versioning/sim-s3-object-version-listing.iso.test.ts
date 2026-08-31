@@ -9,6 +9,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -111,7 +112,7 @@ describe("Listing the versions a simulated S3 Bucket holds", () => {
 
     // Then it is complete, because a page with nothing on it offers nowhere to
     // carry on from and a caller looping until completion would never stop.
-    assertArrayLength(listed.Versions ?? [], 0);
+    assertArrayEmpty(listed.Versions ?? []);
     assertFalse(listed.IsTruncated);
     assertUndefined(listed.NextKeyMarker);
   });
@@ -148,7 +149,7 @@ describe("Listing the versions a simulated S3 Bucket holds", () => {
     // Then the expiry wrote a marker over the current version rather than
     // taking the version away, which is what real S3 does on a versioned
     // Bucket. Removing the version itself is a NoncurrentVersionExpiration.
-    assertArrayLength(objects.Contents ?? [], 0);
+    assertArrayEmpty(objects.Contents ?? []);
     assertArrayLength(listed.DeleteMarkers ?? [], 1);
     const version = (listed.Versions ?? [])[0];
     assertNonNullable(version);

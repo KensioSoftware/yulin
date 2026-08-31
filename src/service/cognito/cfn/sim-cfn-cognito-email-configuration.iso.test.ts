@@ -3,7 +3,7 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertTypeString,
@@ -82,7 +82,7 @@ describe("sim CloudFormation AWS::Cognito::UserPool EmailConfiguration", () => {
 
     // Then the whole property deployed, and the verification message went
     // through SES rather than being recorded on the pool alone.
-    assertArrayLength(ignoredReasons(stack), 0);
+    assertArrayEmpty(ignoredReasons(stack));
 
     const [email] = ses.sentEmails();
     assertNonNullable(email);

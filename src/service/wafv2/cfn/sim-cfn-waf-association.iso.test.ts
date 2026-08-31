@@ -2,10 +2,12 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -180,9 +182,9 @@ describe("AWS::WAFv2::WebACLAssociation", () => {
     // Then WAF answered the first and the integration answered the second, so
     // the association the template declared is the one the stage serves
     // behind.
-    assertIdentical(blocked.status, 403);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertStringIncludes(await blocked.text(), "Request blocked by AWS WAF");
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertIdentical(await allowed.text(), "orders");
   });
 

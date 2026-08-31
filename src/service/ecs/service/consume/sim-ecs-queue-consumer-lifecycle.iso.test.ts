@@ -3,7 +3,11 @@ import {
   UpdateServiceCommand,
 } from "@aws-sdk/client-ecs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { simAwsWithConsumingService } from "../../../../../test/ecs/consuming-service-fixture.js";
@@ -116,7 +120,7 @@ describe("What a simulated ECS container's polling outlives", () => {
       );
     await simAws.backgroundTasksComplete();
 
-    assertArrayLength(batches, 0);
+    assertArrayEmpty(batches);
     assertIdentical(background.dueTaskCount, 0);
   });
 

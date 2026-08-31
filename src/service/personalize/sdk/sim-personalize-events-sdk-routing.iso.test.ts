@@ -15,6 +15,7 @@ import {
   PutUsersCommand,
 } from "@aws-sdk/client-personalize-events";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -155,7 +156,7 @@ describe("Personalize Events SDK interception", () => {
       const remaining = await client.send(new ListEventTrackersCommand({}));
 
       assertArrayLength(listed.eventTrackers ?? [], 1);
-      assertArrayLength(remaining.eventTrackers ?? [], 0);
+      assertArrayEmpty(remaining.eventTrackers ?? []);
     } finally {
       simSdk.restoreAll();
     }

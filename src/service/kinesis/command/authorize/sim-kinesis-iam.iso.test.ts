@@ -7,7 +7,7 @@ import {
   PutRecordCommand,
 } from "@aws-sdk/client-kinesis";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -139,7 +139,7 @@ describe("Authorizing simulated Kinesis requests", () => {
       .listStreams(new ListStreamsCommand({}), {
         caller: { kind: "arn", arn: role.Arn },
       });
-    assertArrayLength(listed.StreamNames, 0);
+    assertArrayEmpty(listed.StreamNames);
   });
 
   it("refuses a caller with no permission on a stream that does not exist", async () => {

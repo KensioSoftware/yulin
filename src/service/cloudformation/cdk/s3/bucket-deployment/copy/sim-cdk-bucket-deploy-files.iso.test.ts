@@ -2,7 +2,7 @@ import { symlink } from "node:fs/promises";
 import path from "node:path";
 
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -111,6 +111,6 @@ describe("simCdkBucketDeployFiles", () => {
       await temporaryDirectory.resolvePath(),
     );
 
-    assertArrayLength(relativePaths, 0);
+    assertArrayEmpty(relativePaths);
   });
 });

@@ -3,6 +3,7 @@ import {
   PutRecordCommand,
 } from "@aws-sdk/client-firehose";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -52,7 +53,7 @@ describe("Delivering simulated Firehose records into S3", () => {
     await simAws.clock().advanceBy({ seconds: 30 });
 
     // Then nothing has been delivered yet.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
 
     // When the clock passes the interval.
     await simAws.clock().advanceBy({ seconds: 31 });
@@ -167,7 +168,7 @@ describe("Delivering simulated Firehose records into S3", () => {
 
     // Then no Object was written. Real Firehose writes one per buffer, and an
     // empty interval is no buffer.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
   });
 
   it("delivers a full buffer without waiting for the interval", async () => {
@@ -218,7 +219,7 @@ describe("Delivering simulated Firehose records into S3", () => {
 
     // Then nothing was written. An Object naming a delivery stream that has
     // gone is nothing a test could expect.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
   });
 
   it("writes one Object when two records each fill the buffer", async () => {

@@ -1,4 +1,8 @@
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -44,7 +48,7 @@ describe("Serving a request through a sim REST API", () => {
     );
 
     // Then the function's response is what the client gets back
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "text/plain");
     assertIdentical(await response.text(), "orders limit 10");
   });
@@ -144,7 +148,7 @@ describe("Serving a request through a sim REST API", () => {
     );
 
     // Then the handler read it as text, since JSON is a text content type
-    assertIdentical(response.status, 201);
+    assertResponseStatus(response, 201, await describeResponse(response));
     assertIdentical(await response.text(), 'created {"total":10} base64 false');
   });
 

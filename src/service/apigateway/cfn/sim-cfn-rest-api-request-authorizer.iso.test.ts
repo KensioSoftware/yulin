@@ -1,4 +1,9 @@
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -141,8 +146,8 @@ describe("Deploying a REST API REQUEST authorizer from CloudFormation", () => {
     });
 
     // Then the deployed authorizer decided both from the request it was shown
-    assertIdentical(admitted.status, 200);
-    assertIdentical(refused.status, 401);
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
+    assertResponseStatus(refused, 401, await describeResponse(refused));
     expect(await admitted.json()).toStrictEqual({
       principalId: "acme",
       plan: "gold",

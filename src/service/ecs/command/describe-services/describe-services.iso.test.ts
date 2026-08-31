@@ -1,5 +1,6 @@
 import { DescribeServicesCommand } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -112,7 +113,7 @@ describe("ECS DescribeServicesCommand", () => {
 
     // Then it names nothing, because a service belongs to the cluster it was
     // created in.
-    assertArrayLength(described.services, 0);
+    assertArrayEmpty(described.services);
     assertArrayLength(described.failures, 1);
   });
 
@@ -134,7 +135,7 @@ describe("ECS DescribeServicesCommand", () => {
 
     // Then it names nothing here, because it names a service somewhere else on
     // real AWS.
-    assertArrayLength(described.services, 0);
+    assertArrayEmpty(described.services);
     assertArrayLength(described.failures, 1);
   });
 

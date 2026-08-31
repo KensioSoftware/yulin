@@ -1,4 +1,9 @@
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertUndefined,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -99,7 +104,7 @@ describe("Matching a served sim HTTP API request to a route", () => {
 
     // Then it is a 404 rather than a 405: an HTTP API matches a route or it
     // does not, and a method that matches no route is no match
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 
@@ -117,7 +122,7 @@ describe("Matching a served sim HTTP API request to a route", () => {
     );
 
     // Then nothing serves it
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("routes AWS's worked example through a served endpoint", async () => {

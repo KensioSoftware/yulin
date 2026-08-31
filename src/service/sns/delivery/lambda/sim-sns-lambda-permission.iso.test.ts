@@ -1,6 +1,7 @@
 import { RemovePermissionCommand } from "@aws-sdk/client-lambda";
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertNonNullable,
@@ -59,7 +60,7 @@ describe("SNS delivery to a Lambda function it may invoke", () => {
     await publishOrder(simAws, topicArn);
 
     // Then nothing was invoked, and the refusal says what to grant.
-    assertArrayLength(consumer.events, 0);
+    assertArrayEmpty(consumer.events);
 
     const failure = onlyFailure(simAws);
 
@@ -119,7 +120,7 @@ describe("SNS delivery to a Lambda function it may invoke", () => {
 
     // Then the grant does not reach it, because it names another topic as its
     // source ARN.
-    assertArrayLength(consumer.events, 0);
+    assertArrayEmpty(consumer.events);
     assertTrue(onlyFailure(simAws).wasRefused);
   });
 

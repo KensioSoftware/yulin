@@ -3,6 +3,8 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { SimCffEventAdapter } from "./sim-cff-event-adapter.js";
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
@@ -81,7 +83,7 @@ describe("query string spelling through a sim CloudFront Function", () => {
     assertIdentical(new URL(result.url).search, "?term=%E5%AE%B6&page=2");
   });
 
-  it("builds a redirect from a value the viewer encoded", () => {
+  it("builds a redirect from a value the viewer encoded", async () => {
     // Given a Function redirecting to the encoded search it was handed.
     const request = viewerRequest("?q=%E5%AE%B6");
     const event = adapter.toViewerRequestEvent(request);
@@ -100,7 +102,7 @@ describe("query string spelling through a sim CloudFront Function", () => {
     );
     assertInstanceOf(result, Response);
 
-    assertIdentical(result.status, 308);
+    assertResponseStatus(result, 308, await describeResponse(result));
     assertIdentical(
       result.headers.get("location"),
       "/liju/search/?q=%E5%AE%B6",

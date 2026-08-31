@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -29,7 +30,7 @@ describe("Simulated Route53 DNS answers", () => {
     assertIdentical(answer.answers[0].name, "api.example.test");
     assertIdentical(answer.answers[0].ttl, 120);
     assertArrayEquals([...answer.answers[0].rdata], [192, 0, 2, 10]);
-    assertArrayLength(answer.authority, 0);
+    assertArrayEmpty(answer.authority);
   });
 
   it("returns one resource record per stored value", async () => {

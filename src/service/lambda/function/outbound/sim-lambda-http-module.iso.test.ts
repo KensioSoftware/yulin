@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import type { Readable, Writable } from "node:stream";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -121,7 +122,7 @@ describe("sim Lambda HTTP transport module", () => {
     assertIdentical(await readResponse(response), '{"answered":true}');
 
     // And nothing reached the host module.
-    assertArrayLength(calls, 0);
+    assertArrayEmpty(calls);
   });
 
   it("makes the request with the scheme the module carries", async () => {

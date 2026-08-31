@@ -4,7 +4,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -70,7 +70,7 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
     const resource = stack.getResource("ReportsBucketPolicy");
     assertNonNullable(resource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("enforces a deployed Bucket policy through the Object authorizers", async () => {

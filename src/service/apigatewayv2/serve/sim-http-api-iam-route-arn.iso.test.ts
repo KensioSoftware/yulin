@@ -1,5 +1,5 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertIdentical } from "@kensio/smartass";
+import { assertResponseStatus, describeResponse } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -103,7 +103,7 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
     const response = await callAs(simAws, api, "/orders/42");
 
     // Then the wildcard covers the stage, the method and the path
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("names the default stage as $default", async () => {
@@ -116,7 +116,7 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
     const response = await callAs(simAws, api, "/orders/42");
 
     // Then the stage segment is the literal `$default`, not an empty segment
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("names the request's own method and path", async () => {
@@ -130,7 +130,7 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
 
     // Then the ARN carries the concrete method and the concrete path, so a
     // policy written the way a human writes one matches
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("is not matched by a policy naming another stage", async () => {
@@ -148,8 +148,8 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
 
     // Then only the named stage is allowed, and the path in the ARN is the one
     // left after the stage segment was taken off
-    assertIdentical(development.status, 200);
-    assertIdentical(production.status, 403);
+    assertResponseStatus(development, 200, await describeResponse(development));
+    assertResponseStatus(production, 403, await describeResponse(production));
   });
 
   it("is not matched by a policy naming a lowercase method", async () => {
@@ -163,7 +163,7 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
 
     // Then it is refused: IAM resource matching is case-sensitive, and API
     // Gateway puts an upper-case verb in the ARN
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("takes the method from the request rather than from an ANY route", async () => {
@@ -177,8 +177,8 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
     const fetched = await callAs(simAws, api, "/orders");
 
     // Then the ARN names what the client asked for, not the route key's `ANY`
-    assertIdentical(posted.status, 200);
-    assertIdentical(fetched.status, 403);
+    assertResponseStatus(posted, 200, await describeResponse(posted));
+    assertResponseStatus(fetched, 403, await describeResponse(fetched));
   });
 
   it("names a root request with an empty path", async () => {
@@ -193,7 +193,7 @@ describe("The execute-api ARN an AWS_IAM route is authorized against", () => {
 
     // Then the ARN of a root request ends with the method and an empty path,
     // which a policy has to name exactly
-    assertIdentical(root.status, 200);
-    assertIdentical(nested.status, 403);
+    assertResponseStatus(root, 200, await describeResponse(root));
+    assertResponseStatus(nested, 403, await describeResponse(nested));
   });
 });

@@ -1,5 +1,6 @@
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -49,7 +50,7 @@ describe("SAM Serverless Function expansion", () => {
     );
 
     // And nothing about the template was left unsupported
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And the function runs the source the template held inline
     const output = await simAws
@@ -222,7 +223,7 @@ describe("SAM Serverless Function expansion", () => {
       "rate for GBP",
     );
     assertArrayLength(observedEvents, 1);
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("runs the function as the execution Role it was expanded with", async () => {

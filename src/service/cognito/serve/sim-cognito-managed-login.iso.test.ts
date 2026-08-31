@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertStringNotIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -36,7 +38,7 @@ describe("The pages a sim Cognito hosted domain serves", () => {
 
     // Then it is answered with the form, carrying the parameters the request
     // arrived on so that the post of it grants what the application asked for.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "text/html; charset=utf-8",
@@ -90,7 +92,7 @@ describe("The pages a sim Cognito hosted domain serves", () => {
 
     // Then the browser goes to the app client's callback URL with a code and
     // the state the grant started with.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
 
     const callback = simCognitoRedirectedTo(response);
     assertIdentical(callback.origin + callback.pathname, simCognitoCallbackUrl);
@@ -135,7 +137,11 @@ describe("The pages a sim Cognito hosted domain serves", () => {
       redirect_uri: simCognitoCallbackUrl,
     });
 
-    assertIdentical(withoutVerifier.status, 400);
+    assertResponseStatus(
+      withoutVerifier,
+      400,
+      await describeResponse(withoutVerifier),
+    );
   });
 
   it("shows a wrong password on the form and issues no code", async () => {
@@ -152,7 +158,7 @@ describe("The pages a sim Cognito hosted domain serves", () => {
 
     // Then the form comes back saying so, with nowhere for a browser to take
     // a code from.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(
       await response.text(),
       "Incorrect username or password",
@@ -172,11 +178,17 @@ describe("The pages a sim Cognito hosted domain serves", () => {
         simCognitoGetPage(setUp, path, parameters, host),
       ),
     );
+    const describedPages = await Promise.all(
+      pages.map(async (page) => ({
+        page,
+        description: await describeResponse(page),
+      })),
+    );
 
     // Then each answers, so a browser in a local development server completes
     // the whole flow on the hostname the application already uses.
-    for (const page of pages) {
-      assertIdentical(page.status, 200);
+    for (const { page, description } of describedPages) {
+      assertResponseStatus(page, 200, description);
       assertIdentical(
         page.headers.get("content-type"),
         "text/html; charset=utf-8",

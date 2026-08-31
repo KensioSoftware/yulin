@@ -1,5 +1,6 @@
 import { ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -220,7 +221,7 @@ describe("AWS::S3::Bucket property rules", () => {
     // Then the Bucket is created, and nothing is reported: no simulated
     // command could tell either property was left out.
     assertIdentical(await bucketCount(simAws), 1);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("accepts the four properties simulated S3 acts on", async () => {
@@ -237,6 +238,6 @@ describe("AWS::S3::Bucket property rules", () => {
 
     // Then the Bucket is created with nothing left out.
     assertIdentical(await bucketCount(simAws), 1);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 });

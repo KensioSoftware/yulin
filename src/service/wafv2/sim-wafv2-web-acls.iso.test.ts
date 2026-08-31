@@ -4,6 +4,7 @@ import {
   ListWebACLsCommand,
 } from "@aws-sdk/client-wafv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -359,7 +360,7 @@ describe("SimWafV2 web ACLs", () => {
     );
 
     // Then it is gone.
-    assertArrayLength(waf.allWebAcls("REGIONAL"), 0);
+    assertArrayEmpty(waf.allWebAcls("REGIONAL"));
   });
 
   it("refuses a read of a web ACL that is not there", async () => {

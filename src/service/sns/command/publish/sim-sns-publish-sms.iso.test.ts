@@ -1,5 +1,6 @@
 import { OptInPhoneNumberCommand, PublishCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -168,6 +169,6 @@ describe("SNS publish to a phone number", () => {
 
     // Then the other Region has no record of it.
     assertArrayLength(london.sentSmsMessages(), 1);
-    assertArrayLength(simAws.sns().sentSmsMessages(), 0);
+    assertArrayEmpty(simAws.sns().sentSmsMessages());
   });
 });

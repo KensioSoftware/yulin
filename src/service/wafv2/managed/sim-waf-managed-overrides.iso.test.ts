@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -164,7 +164,7 @@ describe("SimWafV2 managed rule group overrides", () => {
     // because the group never ran over it.
     assertIdentical(inside.action, "BLOCK");
     assertIdentical(outside.action, "ALLOW");
-    assertArrayLength(outside.labels, 0);
+    assertArrayEmpty(outside.labels);
   });
 
   it("refuses an override naming a rule the group does not hold", async () => {

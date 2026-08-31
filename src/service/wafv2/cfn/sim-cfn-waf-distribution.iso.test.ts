@@ -1,10 +1,12 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -164,9 +166,9 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
 
     // Then the edge answered the first with WAF's own 403 and served the
     // second from the Origin.
-    assertIdentical(blocked.status, 403);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertStringIncludes(await blocked.text(), "Request blocked by AWS WAF");
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertIdentical(await allowed.text(), "<h1>Home</h1>");
   });
 
@@ -182,7 +184,7 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     const response = await siteResponse(simAws, stack, "/admin/index.html");
     const [ignoredProperty] = stack.ignoredProperties;
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertNonNullable(ignoredProperty);
     assertIdentical(ignoredProperty.path, "DistributionConfig.WebACLId");
     assertStringIncludes(ignoredProperty.reason, missingWebAclArn);
@@ -210,8 +212,8 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     // rule it lost is recorded, and the rule it kept still blocks.
     const blocked = await siteResponse(simAws, stack, "/admin/index.html");
 
-    assertArrayLength(stack.skippedResources, 0);
-    assertIdentical(blocked.status, 403);
+    assertArrayEmpty(stack.skippedResources);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertIdentical(stack.ignoredProperties[0]?.path, "Rules.block-countries");
   });
 

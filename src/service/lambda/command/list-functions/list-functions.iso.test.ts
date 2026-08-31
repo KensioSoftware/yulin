@@ -5,8 +5,8 @@ import {
 } from "@aws-sdk/client-lambda";
 import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -41,7 +41,7 @@ describe("Lambda ListFunctionsCommand", () => {
 
     const listed = await simLambda.listFunctions(new ListFunctionsCommand({}));
 
-    assertArrayLength(listed.Functions, 0);
+    assertArrayEmpty(listed.Functions);
   });
 
   it("lists every function created in the Account and Region", async () => {

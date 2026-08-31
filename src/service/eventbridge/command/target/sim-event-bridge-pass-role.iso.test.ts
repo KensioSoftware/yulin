@@ -5,6 +5,7 @@ import {
   type Target,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertInstanceOf,
   assertStringIncludes,
@@ -87,7 +88,7 @@ describe("passing a target role to EventBridge PutTargets", () => {
       .eventBridge()
       .listTargetsByRule(new ListTargetsByRuleCommand({ Rule: "orders" }));
 
-    assertArrayLength(listed.Targets, 0);
+    assertArrayEmpty(listed.Targets);
   });
 
   it("adds the target for a caller allowed to pass a role to EventBridge", async () => {

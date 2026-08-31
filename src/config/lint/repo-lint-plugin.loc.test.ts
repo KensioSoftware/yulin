@@ -1,4 +1,4 @@
-import { assertArrayIncludes, assertArrayLength } from "@kensio/smartass";
+import { assertArrayEmpty, assertArrayIncludes } from "@kensio/smartass";
 import { execa } from "execa";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -188,6 +188,6 @@ describe("Linting this repository with its syntax restriction plugins", () => {
 
     // Then nothing is reported, so the restrictions are not simply firing on
     // everything put in front of them
-    assertArrayLength(reported, 0);
+    assertArrayEmpty(reported);
   });
 });

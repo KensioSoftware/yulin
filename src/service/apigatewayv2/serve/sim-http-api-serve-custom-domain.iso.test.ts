@@ -10,6 +10,8 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
@@ -117,7 +119,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     );
 
     // Then nothing serves it, since the domain has no root mapping
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 
@@ -194,7 +196,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     );
 
     // Then its hostname names no simulated service at all any more
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
   });
 
   it("takes the mappings pointing at an API with the deleted API", async () => {
@@ -218,7 +220,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     // base path pointing at an API that is gone
     const domain = simAws.apiGatewayV2().findDomainName(domainName);
     expect(domain?.apiMappings.list()).toStrictEqual([]);
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("answers 404 when no route of the mapped API matches", async () => {
@@ -236,7 +238,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     );
 
     // Then the domain answers the way the generated endpoint would
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("answers 404 when the stage a mapping names has been deleted", async () => {
@@ -260,7 +262,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
 
     // Then the mapping serves nothing, and the mapping itself stays, since
     // only DeleteApi takes mappings away
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     const mappings = await simAws
       .apiGatewayV2()
       .getApiMappings(new GetApiMappingsCommand({ DomainName: domainName }));
@@ -356,7 +358,7 @@ describe("Serving a sim HTTP API on a custom domain name", () => {
     );
 
     // Then nothing serves it, the way a path no mapping claims is answered
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 });

@@ -1,4 +1,9 @@
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -65,7 +70,7 @@ describe("Authorizing a sim REST API method with a REQUEST authorizer", () => {
     );
 
     // Then the authorizer saw the request rather than one header of it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const [event] = seen;
     assertNonNullable(event);
     assertIdentical(event.type, "REQUEST");
@@ -154,8 +159,8 @@ describe("Authorizing a sim REST API method with a REQUEST authorizer", () => {
 
     // Then the request missing one of them is refused before the function is
     // asked anything, as real API Gateway refuses it
-    assertIdentical(admitted.status, 200);
-    assertIdentical(refused.status, 401);
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
+    assertResponseStatus(refused, 401, await describeResponse(refused));
     assertIdentical(invocations, 1);
     expect(await refused.json()).toStrictEqual({ message: "Unauthorized" });
   });
@@ -181,8 +186,8 @@ describe("Authorizing a sim REST API method with a REQUEST authorizer", () => {
 
     // Then the one the policy names is served and the other is not, the same
     // way a TOKEN authorizer's document is read
-    assertIdentical(allowed.status, 200);
-    assertIdentical(refused.status, 403);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
+    assertResponseStatus(refused, 403, await describeResponse(refused));
     expect(await refused.json()).toStrictEqual({
       Message: "User is not authorized to access this resource",
     });
@@ -218,7 +223,7 @@ describe("Authorizing a sim REST API method with a REQUEST authorizer", () => {
 
     // Then the handler read both the body and what the authorizer passed on,
     // since the authorizer was shown a copy of the request
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(event.body, JSON.stringify({ sku: "6" }));
     expect(event.requestContext.authorizer).toStrictEqual({
       principalId: "user-6",
@@ -246,6 +251,6 @@ describe("Authorizing a sim REST API method with a REQUEST authorizer", () => {
 
     // Then the caller is told what it presented was rejected, as it is for a
     // TOKEN authorizer
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 });

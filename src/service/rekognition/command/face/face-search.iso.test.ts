@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -78,7 +79,7 @@ describe("Searching a simulated Rekognition collection by image", () => {
     const found = await simAws.rekognition().searchFacesByImage(searching());
 
     // Then nobody is found, rather than a match being invented
-    assertArrayLength(found.FaceMatches, 0);
+    assertArrayEmpty(found.FaceMatches);
   });
 
   it("finds the face a rule names by the id it was indexed under", async () => {
@@ -146,7 +147,7 @@ describe("Searching a simulated Rekognition collection by image", () => {
       .searchFacesByImage(searching(70));
 
     // Then the threshold decides, as it does on AWS
-    assertArrayLength(strict.FaceMatches, 0);
+    assertArrayEmpty(strict.FaceMatches);
     assertArrayLength(lenient.FaceMatches, 1);
   });
 
@@ -173,7 +174,7 @@ describe("Searching a simulated Rekognition collection by image", () => {
 
     // Then the rule still says so and the search finds nobody
     const after = await rekognition.searchFacesByImage(searching());
-    assertArrayLength(after.FaceMatches, 0);
+    assertArrayEmpty(after.FaceMatches);
   });
 
   it("reports the face it searched with, from the rules for that image", async () => {

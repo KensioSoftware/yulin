@@ -3,6 +3,7 @@ import {
   GetEmailIdentityCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -184,6 +185,6 @@ describe("SimSesV2 email identity settings", () => {
     // Then the identity is there with the tag left off, rather than a request
     // failing over something nothing here is billed or grouped by.
     assertNonNullable(identity.Tags);
-    assertArrayLength(identity.Tags, 0);
+    assertArrayEmpty(identity.Tags);
   });
 });

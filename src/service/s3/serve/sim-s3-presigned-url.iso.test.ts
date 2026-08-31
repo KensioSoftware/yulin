@@ -1,6 +1,10 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -28,7 +32,7 @@ describe("Presigned simulated S3 URLs", () => {
     const response = await http.fetch(url);
 
     // Then simulated S3 serves the Object, so the signature alone was enough
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
     assertIdentical(response.headers.get("content-type"), "application/pdf");
   });
@@ -55,7 +59,7 @@ describe("Presigned simulated S3 URLs", () => {
 
     // Then simulated S3 serves the Object, having read which service the URL
     // was signed for out of its X-Amz-Credential parameter
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 
@@ -82,7 +86,7 @@ describe("Presigned simulated S3 URLs", () => {
     });
 
     // Then the URL is still routed and verified by the signature it carries
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 
@@ -109,7 +113,7 @@ describe("Presigned simulated S3 URLs", () => {
     });
 
     // Then it is stored in the simulated Bucket
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const stored = await simAws
       .s3()
       .getSimBucketByName(presignBucketName)
@@ -158,7 +162,7 @@ describe("Presigned simulated S3 URLs", () => {
     });
 
     // Then the Object is in the simulated Bucket
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const stored = await simAws
       .s3()
       .getSimBucketByName(presignBucketName)
@@ -191,7 +195,7 @@ describe("Presigned simulated S3 URLs", () => {
     const response = await http.fetch(url);
 
     // Then the Object comes back, as it does for a key of plain characters
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 
@@ -212,7 +216,7 @@ describe("Presigned simulated S3 URLs", () => {
     const response = await http.fetch(tampered);
 
     // Then it is refused: the key is signed, so it cannot be swapped
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(response.headers.get("x-sim-aws-error")).toBe(
       "SignatureDoesNotMatch",
     );
@@ -236,7 +240,7 @@ describe("Presigned simulated S3 URLs", () => {
     const response = await http.fetch(url);
 
     // Then the URL has expired, in simulated time rather than real time
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(response.headers.get("x-sim-aws-error")).toBe("AccessDenied");
     expect(response.headers.get("x-sim-aws-error-detail")).toMatch(
       /Request has expired/,
@@ -264,6 +268,6 @@ describe("Presigned simulated S3 URLs", () => {
     const response = await http.fetch(url);
 
     // Then it still works, because expiry is judged in simulated time
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

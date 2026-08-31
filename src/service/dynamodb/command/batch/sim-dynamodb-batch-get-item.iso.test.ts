@@ -4,6 +4,7 @@ import {
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -153,7 +154,7 @@ describe("DynamoDB BatchGetItemCommand", () => {
     // Then the table is still in the answer, holding nothing.
     const items = output.Responses["OrdersTable"];
     assertNonNullable(items);
-    assertArrayLength(items, 0);
+    assertArrayEmpty(items);
   });
 
   it("projects each table by its own ProjectionExpression", async () => {

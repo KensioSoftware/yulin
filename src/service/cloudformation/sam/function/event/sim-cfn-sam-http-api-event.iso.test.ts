@@ -1,8 +1,11 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -92,12 +95,12 @@ describe("SAM HttpApi event expansion", () => {
     const api = stack.getResource(samImplicitHttpApiLogicalId)
       ?.simResource as SimHttpApi;
     assertNonNullable(api);
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And a request to the path the event stated reaches the bound handler
     const response = await requestApi(simAws, api, "/rates/GBP");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET rate for GBP");
   });
 
@@ -130,7 +133,7 @@ describe("SAM HttpApi event expansion", () => {
       { method: "DELETE" },
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "DELETE rate for nothing");
   });
 
@@ -266,7 +269,7 @@ describe("SAM HttpApi event expansion", () => {
 
     const response = await requestApi(simAws, api, "/anything/at/all");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET rate for nothing");
   });
 
@@ -315,7 +318,7 @@ describe("SAM HttpApi event expansion", () => {
     const api = stack.getResource(samImplicitHttpApiLogicalId)
       ?.simResource as SimHttpApi;
     assertNonNullable(api);
-    assertArrayLength(api.routes.list(), 0);
+    assertArrayEmpty(api.routes.list());
   });
 
   it("leaves the function as it is for an event type it does not expand", async () => {
@@ -345,6 +348,6 @@ describe("SAM HttpApi event expansion", () => {
     // deployment failing over an event nothing reads
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
     assertUndefined(stack.getResource(samImplicitHttpApiLogicalId));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

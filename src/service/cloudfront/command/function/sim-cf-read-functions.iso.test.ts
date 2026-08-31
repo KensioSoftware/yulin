@@ -5,6 +5,7 @@ import {
   ListFunctionsCommand,
 } from "@aws-sdk/client-cloudfront";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -201,7 +202,7 @@ describe("CloudFront ListFunctionsCommand", () => {
 
     // Then the list is empty rather than missing.
     assertIdentical(listed.FunctionList.Quantity, 0);
-    assertArrayLength(listed.FunctionList.Items, 0);
+    assertArrayEmpty(listed.FunctionList.Items);
   });
 
   it("refuses a stage that names neither DEVELOPMENT nor LIVE", async () => {

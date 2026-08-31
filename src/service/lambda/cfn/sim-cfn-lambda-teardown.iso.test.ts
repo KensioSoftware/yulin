@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertUndefined,
@@ -144,7 +144,7 @@ describe("Lambda CloudFormation Resource teardown", () => {
     assertUndefined(simAws.lambda().getSimEventSourceMapping(mapping.uuid));
     assertUndefined(simAws.sqs().findQueue("orders"));
     assertUndefined(simAws.lambda().getSimFunctionByName("order-consumer"));
-    assertArrayLength(stack.skippedResourceDeletions, 0);
+    assertArrayEmpty(stack.skippedResourceDeletions);
     assertIdentical(
       stack.getResource("OrderConsumerMapping")?.status,
       "DELETE_COMPLETE",

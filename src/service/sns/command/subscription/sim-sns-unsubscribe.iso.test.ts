@@ -5,6 +5,7 @@ import {
   UnsubscribeCommand,
 } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertInstanceOf,
   assertNonNullable,
@@ -34,7 +35,7 @@ describe("SNS Unsubscribe", () => {
       );
 
     // Then the topic has none left, so nothing more is delivered to the queue.
-    assertArrayLength(simAws.sns().topicSubscriptions("orders"), 0);
+    assertArrayEmpty(simAws.sns().topicSubscriptions("orders"));
 
     // And the topic counts it among the ones it has had deleted, as real SNS
     // does rather than forgetting it entirely.
@@ -130,7 +131,7 @@ describe("SNS Unsubscribe", () => {
       .deleteTopic(new DeleteTopicCommand({ TopicArn: topicArn }));
 
     // Then its subscriptions go with it.
-    assertArrayLength(simAws.sns().topicSubscriptions("orders"), 0);
+    assertArrayEmpty(simAws.sns().topicSubscriptions("orders"));
 
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.sns().getSubscriptionAttributes(

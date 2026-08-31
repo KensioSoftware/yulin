@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -308,11 +308,10 @@ describe("IAM CloudFormation ManagedPolicy validation", () => {
     // Then the Managed Policy the Resource would have created is not there.
     const listOutput = await simAws.iam().listPolicies({ input: {} });
 
-    assertArrayLength(
+    assertArrayEmpty(
       listOutput.Policies.filter(
         (policy) => policy.PolicyName === "OrphanCheckPolicy",
       ),
-      0,
     );
   });
 

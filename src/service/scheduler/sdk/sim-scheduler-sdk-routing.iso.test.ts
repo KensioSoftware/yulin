@@ -11,6 +11,7 @@ import {
   UpdateScheduleCommand,
 } from "@aws-sdk/client-scheduler";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -87,7 +88,7 @@ describe("Scheduler SDK interception", () => {
 
     // Then each was handled by the simulation rather than reaching AWS.
     assertArrayLength(listed.Schedules ?? [], 1);
-    assertArrayLength(afterDelete.Schedules ?? [], 0);
+    assertArrayEmpty(afterDelete.Schedules ?? []);
   });
 
   it("routes every schedule group command", async () => {

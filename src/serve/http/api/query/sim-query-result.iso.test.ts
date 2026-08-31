@@ -1,4 +1,9 @@
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimQueryProtocol } from "./sim-query-response.js";
@@ -179,7 +184,7 @@ describe("writing a Query protocol response", () => {
     // Then it arrived in the envelope an SDK reads the output out of, under
     // the namespace this service states
     const body = await response.text();
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(
       body,
       'xmlns="https://sns.amazonaws.com/doc/2010-03-31/"',
@@ -203,7 +208,7 @@ describe("writing a Query protocol response", () => {
     const response = protocol.failure(error);
 
     // Then the SDK has the name to raise it under
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertStringIncludes(
       await response.text(),
       "<Code>NotFoundException</Code>",
@@ -216,7 +221,7 @@ describe("writing a Query protocol response", () => {
 
     // Then the failure is the receiver's rather than the sender's
     const body = await response.text();
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertStringIncludes(body, "<Type>Receiver</Type>");
     assertStringIncludes(body, "<Code>InternalFailure</Code>");
   });

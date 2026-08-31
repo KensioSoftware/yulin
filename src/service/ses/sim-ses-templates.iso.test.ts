@@ -6,6 +6,7 @@ import {
   UpdateEmailTemplateCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -244,6 +245,6 @@ describe("SimSesV2 email templates", () => {
     );
 
     // Then it is gone.
-    assertArrayLength(ses.allTemplates(), 0);
+    assertArrayEmpty(ses.allTemplates());
   });
 });

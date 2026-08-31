@@ -1,6 +1,7 @@
 import { DescribeDeliveryStreamCommand } from "@aws-sdk/client-firehose";
 import { PutRecordCommand, PutRecordsCommand } from "@aws-sdk/client-kinesis";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -173,7 +174,7 @@ describe("A simulated Firehose delivery stream reading a Kinesis stream", () => 
 
     // Then nothing was read and nothing was written. The record stays on the
     // stream for whatever else is reading it.
-    assertArrayLength(await deliveredObjectKeys(simAws, bucketName), 0);
+    assertArrayEmpty(await deliveredObjectKeys(simAws, bucketName));
   });
 
   it("reports the stream it reads and the Role it reads as", async () => {

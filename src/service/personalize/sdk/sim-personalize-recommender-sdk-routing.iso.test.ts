@@ -10,6 +10,7 @@ import {
   UpdateRecommenderCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -85,7 +86,7 @@ describe("Personalize recommender SDK interception", () => {
         "0.4",
       );
       assertArrayLength(listed.recommenders ?? [], 1);
-      assertArrayLength(remaining.recommenders ?? [], 0);
+      assertArrayEmpty(remaining.recommenders ?? []);
     } finally {
       simSdk.restoreAll();
     }

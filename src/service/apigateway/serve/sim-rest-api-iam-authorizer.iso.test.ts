@@ -1,5 +1,10 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -104,7 +109,7 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
 
     // Then the request resolved to an anonymous caller, nothing allows that
     // caller anything, and the handler never ran
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(invocations, 0);
   });
 
@@ -125,7 +130,7 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
     const response = await get(simAws, restApi, "/orders/42", reporterArn);
 
     // Then the handler ran
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "one order");
   });
 
@@ -148,8 +153,8 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
 
     // Then being allowed one method of the API leaves the other closed, since
     // the policy is evaluated against the ARN of the request being made
-    assertIdentical(allowed.status, 200);
-    assertIdentical(other.status, 403);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
+    assertResponseStatus(other, 403, await describeResponse(other));
   });
 
   it("refuses a caller whose policies allow no execute-api action", async () => {
@@ -185,7 +190,7 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
 
     // Then being a known principal is not enough, and the body is the one API
     // Gateway answers a caller its policies left short
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(
       await response.text(),
       '{"Message":"User is not authorized to access this resource"}',
@@ -219,7 +224,7 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
     const response = await get(simAws, restApi, "/orders/42", reporterArn);
 
     // Then the Deny wins, as it does in any IAM evaluation
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("describes the admitted caller in the event identity", async () => {
@@ -263,7 +268,7 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
 
     // Then nothing authorized that caller, so the identity names no principal,
     // and the fields are null rather than absent
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(context.identity, {
       accountId: null,
       caller: null,

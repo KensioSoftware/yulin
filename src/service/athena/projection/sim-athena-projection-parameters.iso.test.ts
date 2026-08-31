@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -34,7 +35,7 @@ describe("reading partition projection off a Glue table", () => {
 
     // Then nothing is projected. The switch is what turns it on.
     assertFalse(projection.enabled);
-    assertArrayLength(projection.columns, 0);
+    assertArrayEmpty(projection.columns);
   });
 
   it("reads every parameter one column carries", () => {

@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -37,19 +38,15 @@ describe("simCfnCfResponseHeadersPolicyCustomHeaders", () => {
   });
 
   it("reads a policy with no CustomHeadersConfig as adding nothing", () => {
-    assertArrayLength(
-      simCfnCfResponseHeadersPolicyCustomHeaders({}, refuse),
-      0,
-    );
+    assertArrayEmpty(simCfnCfResponseHeadersPolicyCustomHeaders({}, refuse));
   });
 
   it("reads a section with no Items as adding nothing", () => {
-    assertArrayLength(
+    assertArrayEmpty(
       simCfnCfResponseHeadersPolicyCustomHeaders(
         { CustomHeadersConfig: {} },
         refuse,
       ),
-      0,
     );
   });
 
@@ -102,10 +99,7 @@ describe("simCfnCfResponseHeadersPolicyRemoveHeaders", () => {
   });
 
   it("reads a policy with no RemoveHeadersConfig as removing nothing", () => {
-    assertArrayLength(
-      simCfnCfResponseHeadersPolicyRemoveHeaders({}, refuse),
-      0,
-    );
+    assertArrayEmpty(simCfnCfResponseHeadersPolicyRemoveHeaders({}, refuse));
   });
 
   it("refuses an item without a name", () => {

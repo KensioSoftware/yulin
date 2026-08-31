@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertThrowsError,
@@ -17,7 +18,7 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
     const variableNames = template.variableNames();
 
     // Then no variable names are returned.
-    assertArrayLength(variableNames, 0);
+    assertArrayEmpty(variableNames);
   });
 
   it("returns unique non-escaped variable names in first-seen order", () => {

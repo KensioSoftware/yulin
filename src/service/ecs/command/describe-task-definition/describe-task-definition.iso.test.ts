@@ -3,6 +3,7 @@ import {
   RegisterTaskDefinitionCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -115,7 +116,7 @@ describe("ECS DescribeTaskDefinitionCommand", () => {
     );
 
     // Then only the request that asked gets them.
-    assertArrayLength(withoutTags.tags, 0);
+    assertArrayEmpty(withoutTags.tags);
     assertArrayLength(withTags.tags, 1);
     assertIdentical(withTags.tags[0].key, "team");
   });

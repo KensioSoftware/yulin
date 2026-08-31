@@ -8,6 +8,7 @@ import {
   UpdateKeysCommand,
 } from "@aws-sdk/client-cloudfront-keyvaluestore";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -246,7 +247,7 @@ describe("CloudFront key value store data commands", () => {
 
     // Then the delete is what stands, because the deletes land last
     const listed = await data.listKeys(new ListKeysCommand({ KvsARN: kvsArn }));
-    assertArrayLength(listed.Items, 0);
+    assertArrayEmpty(listed.Items);
   });
 
   it("applies a batch that carries neither puts nor deletes", async () => {

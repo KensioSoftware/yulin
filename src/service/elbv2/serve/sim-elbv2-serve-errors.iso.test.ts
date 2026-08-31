@@ -1,4 +1,8 @@
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -42,7 +46,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
 
     // Then there is no target to send it to, which is what real ELB answers
     // 503 for
-    assertIdentical(response.status, 503);
+    assertResponseStatus(response, 503, await describeResponse(response));
     assertIdentical(response.statusText, "Service Unavailable");
   });
 
@@ -63,7 +67,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
 
     // Then the load balancer answers 502 rather than passing the handler's
     // shape on to the client, as real ELB does
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
     assertIdentical(response.statusText, "Bad Gateway");
     expect(await response.text()).toContain("502 Bad Gateway");
   });
@@ -83,7 +87,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then there is no response in it, so the load balancer answers its own
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 for a status code outside the range a response can hold", async () => {
@@ -101,7 +105,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then it is malformed for the same reason a missing one is
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 when the handler throws", async () => {
@@ -123,7 +127,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then the error stays in the function's own logs, as it does on real ELB
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 when the registered function is not there", async () => {
@@ -148,7 +152,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then the load balancer has a target and cannot invoke it
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 for a target in another Account or Region", async () => {
@@ -175,7 +179,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
 
     // Then the function is not looked for outside the target group's own
     // scope, so there is nothing to invoke
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 for a target in another Account", async () => {
@@ -202,7 +206,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
 
     // Then the function is not looked for outside the target group's own
     // Account, so there is nothing to invoke
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 for a text body that is not valid UTF-8", async () => {
@@ -223,7 +227,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
 
     // Then the invocation fails rather than the handler seeing the body
     // rewritten into replacement characters
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 413 for a request body larger than a function takes", async () => {
@@ -243,7 +247,7 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then the load balancer refuses it rather than invoking the function
-    assertIdentical(response.status, 413);
+    assertResponseStatus(response, 413, await describeResponse(response));
   });
 
   it("answers 502 for a response larger than a function may return", async () => {
@@ -268,6 +272,6 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     );
 
     // Then the response is one ELB will not send
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 });

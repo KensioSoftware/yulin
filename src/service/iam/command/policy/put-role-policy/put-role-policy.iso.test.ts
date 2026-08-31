@@ -4,7 +4,7 @@ import {
   PutRolePolicyCommand,
 } from "@aws-sdk/client-iam";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertFalse,
   assertIdentical,
   assertInstanceOf,
@@ -79,7 +79,7 @@ describe("IAM PutRolePolicyCommand", () => {
     );
 
     // Then the inline policy is not included as a managed policy.
-    assertArrayLength(listPoliciesOutput.Policies, 0);
+    assertArrayEmpty(listPoliciesOutput.Policies);
     assertFalse(listPoliciesOutput.IsTruncated);
     assertUndefined(listPoliciesOutput.Marker);
   });

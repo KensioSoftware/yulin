@@ -2,7 +2,11 @@ import {
   AddPermissionCommand,
   RemovePermissionCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -53,7 +57,7 @@ describe("Invoking a sim ELBv2 target group's function", () => {
 
     // Then the load balancer could not invoke the function and answers 502,
     // and the handler never ran
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
     assertIdentical(invocations, 0);
   });
 
@@ -84,8 +88,8 @@ describe("Invoking a sim ELBv2 target group's function", () => {
     );
 
     // Then the permission is the whole of the difference
-    assertIdentical(refused.status, 502);
-    assertIdentical(served.status, 200);
+    assertResponseStatus(refused, 502, await describeResponse(refused));
+    assertResponseStatus(served, 200, await describeResponse(served));
     expect(await served.text()).toBe("checkout");
   });
 
@@ -111,7 +115,7 @@ describe("Invoking a sim ELBv2 target group's function", () => {
     );
 
     // Then the unconditioned grant admits it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a permission naming a different target group", async () => {
@@ -138,7 +142,7 @@ describe("Invoking a sim ELBv2 target group's function", () => {
 
     // Then the source ARN of the invocation does not match the grant, so a
     // permission written for one target group does not open another
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("refuses a permission granted to a different service", async () => {
@@ -162,7 +166,7 @@ describe("Invoking a sim ELBv2 target group's function", () => {
     );
 
     // Then a grant to another service principal is no grant to this one
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("supplies the target group's Account as the source Account", async () => {
@@ -189,7 +193,7 @@ describe("Invoking a sim ELBv2 target group's function", () => {
 
     // Then the confused deputy condition the ELB documentation recommends
     // matches, because the load balancer supplies it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a permission conditioned on another Account", async () => {
@@ -215,6 +219,6 @@ describe("Invoking a sim ELBv2 target group's function", () => {
     );
 
     // Then the condition does not match what the load balancer supplied
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 });

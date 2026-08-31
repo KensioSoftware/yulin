@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-cloudformation";
 import { DescribeDeliveriesCommand } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -105,7 +106,7 @@ describe("AWS::Logs delivery Resources", () => {
 
     // Then none of them is recorded as a gap, and the delivery is there to
     // assert on.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     const described = await simAws
       .logs()

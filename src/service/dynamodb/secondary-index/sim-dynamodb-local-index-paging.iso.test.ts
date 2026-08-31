@@ -1,5 +1,6 @@
 import { ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayIncludesAll,
   assertArrayLength,
   assertIdentical,
@@ -108,7 +109,7 @@ describe("DynamoDB paging a local secondary index", () => {
       [first, second, third].flatMap((page) => orderIds(page)).join(","),
       "order-02,order-04,order-01",
     );
-    assertArrayLength(orderIds(fourth), 0);
+    assertArrayEmpty(orderIds(fourth));
     assertUndefined(fourth.LastEvaluatedKey);
   });
 

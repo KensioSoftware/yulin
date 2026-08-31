@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -48,7 +48,7 @@ describe("SAM function FunctionUrlConfig expansion", () => {
     const functionUrl = urlResource.simResource;
     assertInstanceOf(functionUrl, SimLambdaFunctionUrl);
     assertIdentical(functionUrl.invokeMode, "BUFFERED");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And a request to it runs the bound handler
     const response = await new SimAwsHttp({ simAws }).fetch(

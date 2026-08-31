@@ -1,6 +1,10 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -38,7 +42,7 @@ describe("Uploading through a presigned simulated S3 URL", () => {
 
     // Then it is refused, exactly as real S3 refuses it, and the response says
     // which client setting avoids it
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     const body = await response.text();
     expect(body).toMatch(/<Code>XAmzContentChecksumMismatch<\/Code>/);
     expect(body).toMatch(/WHEN_REQUIRED/);
@@ -59,7 +63,7 @@ describe("Uploading through a presigned simulated S3 URL", () => {
     const response = await http.fetch(url, { method: "PUT" });
 
     // Then the checksum agrees and the Object is stored
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     const stored = await simAws
       .s3()
       .getSimBucketByName(presignBucketName)

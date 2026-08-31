@@ -10,7 +10,9 @@ import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringEndsWith,
+  describeResponse,
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
@@ -67,21 +69,29 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     const okResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/foobar.html`,
     );
-    assertIdentical(okResponse.status, 200);
+    assertResponseStatus(okResponse, 200, await describeResponse(okResponse));
     assertIdentical(okResponse.headers.get("content-type"), "text/html");
     assertIdentical(await okResponse.text(), "<h1>Hello</h1>");
 
     const indexResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/`,
     );
-    assertIdentical(indexResponse.status, 200);
+    assertResponseStatus(
+      indexResponse,
+      200,
+      await describeResponse(indexResponse),
+    );
     assertIdentical(indexResponse.headers.get("content-type"), "text/html");
     assertIdentical(await indexResponse.text(), "<h1>Filesystem index</h1>");
 
     const notFoundResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/does-not-exist.json`,
     );
-    assertIdentical(notFoundResponse.status, 404);
+    assertResponseStatus(
+      notFoundResponse,
+      404,
+      await describeResponse(notFoundResponse),
+    );
     assertIdentical(notFoundResponse.headers.get("content-type"), "text/html");
     assertIdentical(
       await notFoundResponse.text(),
@@ -124,7 +134,11 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
       { redirect: "manual" },
     );
 
-    assertIdentical(redirectResponse.status, 301);
+    assertResponseStatus(
+      redirectResponse,
+      301,
+      await describeResponse(redirectResponse),
+    );
     assertIdentical(
       redirectResponse.headers.get("location"),
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1/`,
@@ -134,7 +148,11 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,
     );
 
-    assertIdentical(indexResponse.status, 200);
+    assertResponseStatus(
+      indexResponse,
+      200,
+      await describeResponse(indexResponse),
+    );
     assertStringEndsWith(indexResponse.url, "/dengji/a1/");
     assertIdentical(indexResponse.headers.get("content-type"), "text/html");
     assertIdentical(await indexResponse.text(), "<h1>A1 index</h1>");

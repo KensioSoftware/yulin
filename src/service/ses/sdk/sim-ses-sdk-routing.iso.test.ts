@@ -19,6 +19,7 @@ import {
   UpdateEmailTemplateCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludesAll,
   assertArrayLength,
@@ -153,7 +154,7 @@ describe("SES SDK interception", () => {
     assertIdentical(read.VerificationStatus, "PENDING");
     assertArrayLength(listed.EmailIdentities ?? [], 1);
     assertTrue(account.ProductionAccessEnabled);
-    assertArrayLength(afterDelete.EmailIdentities ?? [], 0);
+    assertArrayEmpty(afterDelete.EmailIdentities ?? []);
   });
 
   it("routes a template send through the intercepted client", async () => {
@@ -213,7 +214,7 @@ describe("SES SDK interception", () => {
 
     assertIdentical(read.TemplateContent?.Subject, "Welcome, {{name}}");
     assertArrayLength(listed.TemplatesMetadata ?? [], 1);
-    assertArrayLength(scoped.sesV2().allTemplates(), 0);
+    assertArrayEmpty(scoped.sesV2().allTemplates());
   });
 
   it("routes the configuration set commands through the client", async () => {
@@ -250,7 +251,7 @@ describe("SES SDK interception", () => {
       "BOUNCE",
     ]);
     assertArrayEquals(listed.ConfigurationSets ?? [], ["transactional"]);
-    assertArrayLength(scoped.sesV2().allConfigurationSets(), 0);
+    assertArrayEmpty(scoped.sesV2().allConfigurationSets());
   });
 
   it("keeps sends in one Region out of another", async () => {
@@ -283,12 +284,11 @@ describe("SES SDK interception", () => {
     );
 
     // Then the other Region has no record of it, as a real account would not.
-    assertArrayLength(
+    assertArrayEmpty(
       simSdk.simAws
         .accountRegionScope(accountId, "us-east-1")
         .sesV2()
         .sentEmails(),
-      0,
     );
     assertArrayLength(
       simSdk.simAws

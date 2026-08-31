@@ -1,6 +1,6 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -89,8 +89,8 @@ describe("SimGlueTableCfn attributes", () => {
     });
 
     // Then it has no columns, rather than failing to answer.
-    assertArrayLength(table.columns, 0);
-    assertArrayLength(table.partitionKeys, 0);
+    assertArrayEmpty(table.columns);
+    assertArrayEmpty(table.partitionKeys);
   });
 });
 

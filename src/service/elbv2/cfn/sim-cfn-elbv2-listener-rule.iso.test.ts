@@ -4,10 +4,12 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -118,9 +120,9 @@ describe("AWS::ElasticLoadBalancingV2::ListenerRule", () => {
 
     // Then the rule answers the first and the listener's default action the
     // second, which is what the same pair created through the SDK does.
-    assertIdentical(claimed.status, 200);
+    assertResponseStatus(claimed, 200, await describeResponse(claimed));
     assertIdentical(await claimed.text(), "orders");
-    assertIdentical(unclaimed.status, 404);
+    assertResponseStatus(unclaimed, 404, await describeResponse(unclaimed));
     assertIdentical(await unclaimed.text(), "no such site");
   });
 

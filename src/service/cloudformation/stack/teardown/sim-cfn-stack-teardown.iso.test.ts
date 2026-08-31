@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -48,7 +49,7 @@ describe("SimCfnStack teardown", () => {
     }
 
     // And nothing was recorded as undeletable.
-    assertArrayLength(stack.skippedResourceDeletions, 0);
+    assertArrayEmpty(stack.skippedResourceDeletions);
   });
 
   it("leaves a Resource standing until its dependents have gone", async () => {
@@ -118,7 +119,7 @@ describe("SimCfnStack teardown", () => {
     // Then the skipped Resource is delete-complete without any service being
     // asked to delete something it never made.
     assertIdentical(stack.getResource("Network")?.status, "DELETE_COMPLETE");
-    assertArrayLength(stack.skippedResourceDeletions, 0);
+    assertArrayEmpty(stack.skippedResourceDeletions);
   });
 
   it("reports Resources whose deletion nothing could carry out", async () => {

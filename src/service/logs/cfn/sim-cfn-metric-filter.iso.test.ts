@@ -6,6 +6,7 @@ import {
   PutLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -198,7 +199,7 @@ describe("AWS::Logs::MetricFilter", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the group and the filter on it went with it, as in an account.
-    assertArrayLength(simAws.logs().allLogGroups(), 0);
+    assertArrayEmpty(simAws.logs().allLogGroups());
   });
 
   it("records the properties it does not act on", async () => {

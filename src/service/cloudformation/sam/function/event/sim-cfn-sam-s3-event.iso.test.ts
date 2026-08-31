@@ -1,5 +1,6 @@
 import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -296,7 +297,7 @@ describe("SAM S3 event expansion", () => {
     assertUndefined(
       stack.getResource(`${samFunctionTemplateLogicalId}UploadS3Permission`),
     );
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("expands nothing for an event naming no Bucket", async () => {
@@ -324,6 +325,6 @@ describe("SAM S3 event expansion", () => {
     assertUndefined(
       stack.getResource(`${samFunctionTemplateLogicalId}UploadS3Permission`),
     );
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

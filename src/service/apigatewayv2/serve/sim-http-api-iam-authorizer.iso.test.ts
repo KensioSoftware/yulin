@@ -3,7 +3,9 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -95,7 +97,7 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
 
     // Then the request resolved to an anonymous caller, nothing allows that
     // caller anything, and the handler never ran
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Forbidden"}');
     assertIdentical(invocations, 0);
   });
@@ -121,7 +123,7 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
     const response = await get(simAws, api, "/orders/42", reporterArn);
 
     // Then the handler ran
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), '"one order"');
   });
 
@@ -141,7 +143,7 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
     const response = await get(simAws, api, "/orders/42", reporterArn);
 
     // Then being a known principal is not enough: nothing allows this route
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("lets an explicit Deny beat an Allow", async () => {
@@ -172,7 +174,7 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
     const response = await get(simAws, api, "/orders/42", reporterArn);
 
     // Then the Deny wins, as it does in any IAM evaluation
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("describes the admitted caller in the event", async () => {
@@ -231,8 +233,12 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
     const context = (await openRoute.json()) as SimPayload2RequestContext;
 
     // Then only the IAM route is closed, and the open one describes no caller
-    assertIdentical(protectedRoute.status, 403);
-    assertIdentical(openRoute.status, 200);
+    assertResponseStatus(
+      protectedRoute,
+      403,
+      await describeResponse(protectedRoute),
+    );
+    assertResponseStatus(openRoute, 200, await describeResponse(openRoute));
     assertUndefined(context.authorizer);
   });
 });

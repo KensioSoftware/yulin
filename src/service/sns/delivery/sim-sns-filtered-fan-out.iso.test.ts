@@ -8,6 +8,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -152,7 +153,7 @@ describe("SNS fan-out with subscription filter policies", () => {
     // Then nothing is delivered and nothing failed: a body with no keys in it
     // matches no policy.
     assertUndefined(await simSnsDeliveredMessage(simAws, queueUrl));
-    assertArrayLength(simAws.sns().deliveryFailures, 0);
+    assertArrayEmpty(simAws.sns().deliveryFailures);
   });
 
   it("stops filtering when the policy is taken off again", async () => {

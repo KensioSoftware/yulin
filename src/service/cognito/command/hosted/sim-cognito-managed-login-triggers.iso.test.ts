@@ -2,8 +2,10 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -140,7 +142,7 @@ describe("The PreAuthentication trigger a sim Cognito managed login sign-in runs
     // Then the sign-in completed, and the trigger ran once rather than on both
     // requests. The challenge response answers a sign-in already started, and
     // answering one runs the trigger no second time on the API path either.
-    assertIdentical(presented.status, 302);
+    assertResponseStatus(presented, 302, await describeResponse(presented));
     assertArrayEquals(sourcesOf(events), ["PreAuthentication_Authentication"]);
   });
 
@@ -192,7 +194,7 @@ describe("The PreAuthentication trigger a sim Cognito managed login sign-in runs
 
     // Then the browser gets the form back carrying what the handler threw,
     // which is where real managed login shows a trigger's refusal.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
 
     const page = await response.text();
     assertStringIncludes(page, "Only example.com may sign in.");

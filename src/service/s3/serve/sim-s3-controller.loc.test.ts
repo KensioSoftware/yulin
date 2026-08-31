@@ -6,8 +6,10 @@ import {
 import {
   assertBufferEqual,
   assertIdentical,
+  assertResponseStatus,
   assertStringEndsWith,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { grantPublicObjectRead } from "../bucket/sim-s3-public-read.fixture.js";
@@ -55,7 +57,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "text/html; charset=utf-8",
@@ -95,7 +97,7 @@ describe("Simulated S3 local HTTP controller", () => {
       { method: "HEAD" },
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "text/html; charset=utf-8",
@@ -134,7 +136,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://encoded-path-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/folder/hello%20world.txt`,
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "Hello from an encoded path");
   });
 
@@ -169,7 +171,7 @@ describe("Simulated S3 local HTTP controller", () => {
       { redirect: "manual" },
     );
 
-    assertIdentical(response.status, 301);
+    assertResponseStatus(response, 301, await describeResponse(response));
     assertIdentical(
       response.headers.get("location"),
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
@@ -206,7 +208,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://folder-index-follow-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringEndsWith(response.url, "/docs/");
     assertIdentical(
       response.headers.get("content-type"),
@@ -227,7 +229,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "Static website hosting is not enabled");
   });
@@ -254,7 +256,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.txt`,
     );
 
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "Object missing.txt not found");
   });
@@ -277,7 +279,7 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://wrong-region-site.s3-website.us-east-1.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(
       responseBody,
@@ -291,7 +293,7 @@ describe("Simulated S3 local HTTP controller", () => {
       { method: "POST" },
     );
 
-    assertIdentical(response.status, 405);
+    assertResponseStatus(response, 405, await describeResponse(response));
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "Method not allowed");
   });

@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
 } from "@kensio/smartass";
@@ -89,8 +89,8 @@ describe("an alarm over a metric a Powertools handler writes as EMF", () => {
       .describeAlarms(new DescribeAlarmsCommand({ AlarmNames: [alarmName] }));
 
     assertIdentical(MetricAlarms?.at(0)?.StateValue, "ALARM");
-    assertArrayLength(simAws.logs().metricPublicationFailures, 0);
-    assertArrayLength(simAws.cloudWatch().alarmActionFailures, 0);
+    assertArrayEmpty(simAws.logs().metricPublicationFailures);
+    assertArrayEmpty(simAws.cloudWatch().alarmActionFailures);
   });
 });
 

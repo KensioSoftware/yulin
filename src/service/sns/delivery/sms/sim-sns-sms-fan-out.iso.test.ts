@@ -1,5 +1,6 @@
 import { PublishCommand, UnsubscribeCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -189,6 +190,6 @@ describe("SNS fan-out to a phone number", () => {
       );
 
     // Then nothing was texted.
-    assertArrayLength(await simSnsTextedMessages(simAws), 0);
+    assertArrayEmpty(await simSnsTextedMessages(simAws));
   });
 });

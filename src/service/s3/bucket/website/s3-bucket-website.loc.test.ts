@@ -3,7 +3,12 @@ import {
   PutBucketWebsiteCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { grantPublicObjectRead } from "../sim-s3-public-read.fixture.js";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
@@ -41,7 +46,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       `http://website-disabled-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertStringIncludes(
       await response.text(),
       "Static website hosting is not enabled",
@@ -78,7 +83,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       `http://root-index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "text/html; charset=utf-8",
@@ -116,7 +121,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       `http://folder-index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "<h1>Docs index</h1>");
   });
 
@@ -153,7 +158,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       `http://error-document-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.html`,
     );
 
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-type"),
       "text/html; charset=utf-8",

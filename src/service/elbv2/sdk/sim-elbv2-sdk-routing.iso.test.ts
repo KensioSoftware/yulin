@@ -24,6 +24,7 @@ import {
   SetRulePrioritiesCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -232,6 +233,6 @@ describe("ELBv2 SDK interception", () => {
     assertArrayLength(certificates.Certificates, 2);
     assertArrayLength(rules.Rules, 2);
     assertIdentical(rules.Rules[0].Priority, "20");
-    assertArrayLength(remaining.LoadBalancers, 0);
+    assertArrayEmpty(remaining.LoadBalancers);
   });
 });

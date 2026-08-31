@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-firehose";
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertUndefined,
@@ -115,7 +116,7 @@ describe("Firehose SDK interception", () => {
     assertIdentical(batch.FailedPutCount, 0);
 
     const after = await firehose.send(new ListDeliveryStreamsCommand({}));
-    assertArrayLength(after.DeliveryStreamNames ?? [], 0);
+    assertArrayEmpty(after.DeliveryStreamNames ?? []);
   });
 
   it("names the commands it can handle", () => {

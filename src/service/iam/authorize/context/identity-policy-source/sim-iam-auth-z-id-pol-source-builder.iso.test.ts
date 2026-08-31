@@ -1,4 +1,8 @@
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
@@ -30,7 +34,7 @@ describe("SimIamAuthZIdentityPolicySourceBuilder", () => {
     const sources = policyCoordinator.build(role.arn);
 
     // Then neither missing nor document-less managed policies contribute sources.
-    assertArrayLength(sources, 0);
+    assertArrayEmpty(sources);
   });
 
   it("builds a source for an attached managed policy with a document", () => {

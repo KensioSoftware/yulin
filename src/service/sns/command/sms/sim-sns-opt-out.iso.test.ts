@@ -5,8 +5,8 @@ import {
   PublishCommand,
 } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertFalse,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -71,7 +71,7 @@ describe("SNS phone number opt-out list", () => {
       new ListPhoneNumbersOptedOutCommand({}),
     );
 
-    assertArrayLength(listed.phoneNumbers ?? [], 0);
+    assertArrayEmpty(listed.phoneNumbers ?? []);
   });
 
   it("takes an opt-in for a number that was never opted out", async () => {
@@ -86,7 +86,7 @@ describe("SNS phone number opt-out list", () => {
       new ListPhoneNumbersOptedOutCommand({}),
     );
 
-    assertArrayLength(listed.phoneNumbers ?? [], 0);
+    assertArrayEmpty(listed.phoneNumbers ?? []);
   });
 
   it("refuses a phone number that is not in E.164 form", async () => {

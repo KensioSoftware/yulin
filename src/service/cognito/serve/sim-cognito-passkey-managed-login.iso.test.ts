@@ -1,9 +1,11 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertStringNotIncludes,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -72,7 +74,7 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
     // Then the browser went back to the application with a code, and the code
     // exchanged for the tokens a password sign-in would have earned.
     assertIdentical(redirect.searchParams.get("state"), "csrf-token");
-    assertIdentical(posted.status, 302);
+    assertResponseStatus(posted, 302, await describeResponse(posted));
     assertTypeString(tokens["access_token"]);
     assertTypeString(tokens["id_token"]);
     assertIdentical(tokens["token_type"], "Bearer");
@@ -101,7 +103,7 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
     // address resolved to the user the challenge was issued for, so the
     // sign-in finished and the code exchanged for tokens.
     assertIdentical(simCognitoPasskeyUsernameIn(page), simCognitoHostedAddress);
-    assertIdentical(posted.status, 302);
+    assertResponseStatus(posted, 302, await describeResponse(posted));
     assertTypeString(tokens["access_token"]);
     assertTypeString(tokens["id_token"]);
   });
@@ -142,7 +144,7 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
 
     // Then it is asked for the passkey rather than signed in, so knowing a
     // username is not enough to reach the application with a code.
-    assertIdentical(asked.status, 200);
+    assertResponseStatus(asked, 200, await describeResponse(asked));
     assertIdentical(asked.headers.get("location"), null);
     assertStringIncludes(await asked.text(), "Present your passkey");
   });
@@ -179,7 +181,7 @@ describe("Signing in with a passkey at sim Cognito managed login", () => {
 
     // Then the signature is what settles it, and the browser is answered with
     // the form rather than a code.
-    assertIdentical(posted.status, 200);
+    assertResponseStatus(posted, 200, await describeResponse(posted));
     assertStringIncludes(
       await posted.text(),
       "challenge this user pool did not",

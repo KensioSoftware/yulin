@@ -1,6 +1,6 @@
 import { ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -80,6 +80,6 @@ describe("DynamoDB ScanCommand unsimulated input", () => {
     );
 
     // Then it is let through.
-    assertArrayLength(output.Items ?? [], 0);
+    assertArrayEmpty(output.Items ?? []);
   });
 });

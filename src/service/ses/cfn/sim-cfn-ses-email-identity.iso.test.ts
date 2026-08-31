@@ -1,6 +1,7 @@
 import { DeleteStackCommand } from "@aws-sdk/client-cloudformation";
 import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -201,7 +202,7 @@ describe("AWS::SES::EmailIdentity", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the identity went with it.
-    assertArrayLength(simAws.sesV2().allIdentities(), 0);
+    assertArrayEmpty(simAws.sesV2().allIdentities());
   });
 
   it("refuses a Resource with no EmailIdentity", async () => {

@@ -2,7 +2,11 @@ import {
   CreateApiCommand,
   CreateStageCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -30,7 +34,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
 
     // Then it is a plain Forbidden, which is what real API Gateway answers for
     // a stage that is not there
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Forbidden" });
   });
 
@@ -49,7 +53,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
 
     // Then it is the message real API Gateway is well known for, misleading
     // wording and all
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Missing Authentication Token",
     });
@@ -70,7 +74,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
     );
 
     // Then nothing matched, so the same answer comes back
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Missing Authentication Token",
     });
@@ -90,7 +94,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
     );
 
     // Then it is refused
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("answers 502 where the API may not invoke the function", async () => {
@@ -108,7 +112,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
 
     // Then it is the 502 real API Gateway answers, with the reason left in its
     // own logs
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
     expect(await response.json()).toStrictEqual({
       message: "Internal server error",
     });
@@ -130,7 +134,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
     // Then it is a 502, because a REST API proxy integration takes one shape
     // only. Payload format 2.0 is the lenient one, and a handler relying on
     // that behaves differently here for the same reason it does on AWS
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers 502 where the handler throws", async () => {
@@ -151,7 +155,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
     );
 
     // Then the error stays in the function's logs and the client gets a 502
-    assertIdentical(response.status, 502);
+    assertResponseStatus(response, 502, await describeResponse(response));
   });
 
   it("answers an API id nothing allocated with the HTTP API's own answer", async () => {
@@ -167,7 +171,7 @@ describe("What a sim REST API answers when nothing serves the request", () => {
 
     // Then the HTTP API controller answers, since neither service allocated
     // the id and that is what the endpoint answered before REST APIs existed
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("keeps a REST API and an HTTP API apart on one simulation", async () => {
@@ -202,10 +206,18 @@ describe("What a sim REST API answers when nothing serves the request", () => {
 
     // Then each reaches its own service, though both endpoints share the
     // execute-api hostname shape
-    assertIdentical(restResponse.status, 200);
+    assertResponseStatus(
+      restResponse,
+      200,
+      await describeResponse(restResponse),
+    );
     assertIdentical(await restResponse.text(), "rest");
     // The HTTP API has no route for the path, which is its own 404 rather than
     // anything the REST API would have said
-    assertIdentical(httpResponse.status, 404);
+    assertResponseStatus(
+      httpResponse,
+      404,
+      await describeResponse(httpResponse),
+    );
   });
 });

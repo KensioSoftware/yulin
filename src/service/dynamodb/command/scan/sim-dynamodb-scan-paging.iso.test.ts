@@ -4,6 +4,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -141,7 +142,7 @@ describe("DynamoDB ScanCommand paging", () => {
     // Then it still hands out a token, and the next page is empty with no
     // token of its own. Real DynamoDB cannot know the table is exhausted
     // without looking past the last item.
-    assertArrayLength(next.Items ?? [], 0);
+    assertArrayEmpty(next.Items ?? []);
     assertUndefined(next.LastEvaluatedKey);
   });
 

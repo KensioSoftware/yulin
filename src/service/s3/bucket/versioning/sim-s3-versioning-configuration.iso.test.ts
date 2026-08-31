@@ -10,6 +10,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -211,7 +212,7 @@ describe("Configuring versioning on a simulated S3 Bucket", () => {
 
     // Then the null id removes the Object, because that is the id real S3
     // gives it, and any other id names a version that was never there.
-    assertArrayLength(emptied.Contents ?? [], 0);
+    assertArrayEmpty(emptied.Contents ?? []);
     assertArrayLength(kept.Contents ?? [], 1);
   });
 

@@ -2,7 +2,7 @@
 import { CreateStackCommand } from "@aws-sdk/client-cloudformation";
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -80,7 +80,7 @@ describe("CloudFormation CreateStackCommand with a YAML TemplateBody", () => {
     // Then the SAM function was expanded into a Lambda function that runs,
     // the way it is when the same template arrives as JSON.
     assertIdentical(stack.getResource("Rates")?.type, "AWS::Lambda::Function");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     const output = await simAws
       .lambda()

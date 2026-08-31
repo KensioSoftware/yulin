@@ -2,6 +2,8 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -108,7 +110,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     const response = await get(simAws, api, { cookie: goodCookie });
 
     // Then the handler ran, and it saw the context the authorizer returned
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       tenant: "acme",
       plan: "pro",
@@ -134,7 +136,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
 
     // Then the authorizer ran with its own function's environment, the way
     // the integration behind it does
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       region: "eu-west-2",
       functionName: "session-authorizer",
@@ -167,7 +169,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     const response = await get(simAws, api, { cookie: badCookie });
 
     // Then the request is forbidden and the integration never ran
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Forbidden"}');
     assertIdentical(invocations, 0);
   });
@@ -186,9 +188,9 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
 
     // Then IAM's reading of the document decides, and the context still
     // reaches the handler
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertObjectMatches(await allowed.json(), { tenant: "acme" });
-    assertIdentical(denied.status, 403);
+    assertResponseStatus(denied, 403, await describeResponse(denied));
   });
 
   it("refuses a policy allowing some other route", async () => {
@@ -216,7 +218,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     const response = await get(simAws, api, { cookie: goodCookie });
 
     // Then the policy does not reach this route, so the request is refused
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("answers 401 for the one message that asks for one", async () => {
@@ -231,7 +233,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
 
     // Then the request is unauthorized rather than forbidden, which is the
     // only way an authorizer produces a 401
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Unauthorized"}');
   });
 
@@ -247,7 +249,7 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
 
     // Then the handler ran, and the authorizer block is there with nothing in
     // it rather than missing, so a handler can still tell what admitted it
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "null");
   });
 
@@ -275,9 +277,9 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
 
     // Then the authorizer saw both values, and the request missing one was
     // refused without the function being invoked a second time
-    assertIdentical(both.status, 200);
+    assertResponseStatus(both, 200, await describeResponse(both));
     assertObjectMatches(await both.json(), { seen: [goodCookie, "acme"] });
-    assertIdentical(missing.status, 401);
+    assertResponseStatus(missing, 401, await describeResponse(missing));
     assertIdentical(invocations, 1);
   });
 
@@ -295,6 +297,6 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     const response = await get(simAws, api, { cookie: goodCookie });
 
     // Then the route stays closed rather than falling open
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 });

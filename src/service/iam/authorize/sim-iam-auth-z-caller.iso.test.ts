@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -25,7 +26,7 @@ describe("Sim IAM authorization caller", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("implicitly denies an anonymous caller without a resource-policy allow", () => {
@@ -46,8 +47,8 @@ describe("Sim IAM authorization caller", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("allows an anonymous caller through a wildcard resource policy", () => {
@@ -80,7 +81,7 @@ describe("Sim IAM authorization caller", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isDenied);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("does not match the account root principal for an anonymous caller", () => {
@@ -111,7 +112,7 @@ describe("Sim IAM authorization caller", () => {
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
     assertTrue(decision.isImplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
   });
 
   it("applies an explicit resource-policy deny to an anonymous caller", () => {
@@ -169,7 +170,7 @@ describe("Sim IAM authorization caller", () => {
     assertIdentical(decision.value, SimIamPolicyDecisionValue.Allow);
     assertTrue(decision.isAllowed);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("does not give another account root implicit access", () => {
@@ -187,7 +188,7 @@ describe("Sim IAM authorization caller", () => {
     assertTrue(decision.isDenied);
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 });

@@ -5,6 +5,7 @@ import {
   PutSuppressedDestinationCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -126,7 +127,7 @@ describe("SimSesV2 suppression list", () => {
     );
 
     // Then the list is empty and the second removal was no failure.
-    assertArrayLength(ses.suppressedDestinations(), 0);
+    assertArrayEmpty(ses.suppressedDestinations());
   });
 
   it("lists the addresses on the list, filtered by reason", async () => {
@@ -213,7 +214,7 @@ describe("SimSesV2 suppression list", () => {
     // When the list is read with no request at all.
     const listed = await ses.listSuppressedDestinations();
 
-    assertArrayLength(listed.SuppressedDestinationSummaries, 0);
+    assertArrayEmpty(listed.SuppressedDestinationSummaries);
   });
 });
 

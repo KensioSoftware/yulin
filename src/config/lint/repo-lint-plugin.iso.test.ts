@@ -1,4 +1,8 @@
-import { assertArrayIncludes, assertArrayLength } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayIncludes,
+  assertArrayLength,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { repoLintPlugin, repoSyntaxRestrictions } from "./repo-lint-plugin.js";
@@ -26,7 +30,7 @@ describe("This repository's own lint plugin", () => {
 
     // Then every one of them is a rule. A restriction that stops being a rule
     // stops being enforced, and nothing else would say so.
-    assertArrayLength(missing, 0);
+    assertArrayEmpty(missing);
     assertArrayLength(own, 3);
   });
 

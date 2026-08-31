@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-acm";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -169,7 +170,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
     const listOutput = await simAcm.listCertificates(
       new ListCertificatesCommand(),
     );
-    assertArrayLength(listOutput.CertificateSummaryList, 0);
+    assertArrayEmpty(listOutput.CertificateSummaryList);
   });
 
   it("lets an explicit Deny override an Allow without allocating a Certificate", async () => {
@@ -279,7 +280,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
     const listOutput = await simAcm.listCertificates(
       new ListCertificatesCommand(),
     );
-    assertArrayLength(listOutput.CertificateSummaryList, 0);
+    assertArrayEmpty(listOutput.CertificateSummaryList);
   });
 
   it("uses allow-all authorization when SimAcm is instantiated directly", async () => {

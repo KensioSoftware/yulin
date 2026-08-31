@@ -5,6 +5,7 @@ import {
   RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -126,10 +127,7 @@ describe("sim Cognito MFA challenge", () => {
     assertUndefined(
       challenged.ChallengeParameters["CODE_DELIVERY_DELIVERY_MEDIUM"],
     );
-    assertArrayLength(
-      setUp.cognito.userPool(setUp.userPoolId).sentMessages(),
-      0,
-    );
+    assertArrayEmpty(setUp.cognito.userPool(setUp.userPoolId).sentMessages());
   });
 
   it("signs the user in when the app's code is sent back", async () => {

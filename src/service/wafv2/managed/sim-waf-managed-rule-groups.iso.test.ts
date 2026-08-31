@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -72,7 +73,7 @@ describe("SimWafV2 AWS managed rule groups", () => {
     // whole reason for covering these groups: a stack that turns them on
     // deploys, and its own traffic is not blocked by the rules it turned on.
     assertIdentical(decision.action, "ALLOW");
-    assertArrayLength(decision.labels, 0);
+    assertArrayEmpty(decision.labels);
   });
 
   it("evaluates a group's rules in the order AWS documents", async () => {

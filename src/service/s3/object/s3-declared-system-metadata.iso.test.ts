@@ -1,4 +1,4 @@
-import { assertArrayLength, assertObjectEquals } from "@kensio/smartass";
+import { assertArrayEmpty, assertObjectEquals } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3BucketSystemMetadata } from "../bucket/sim-s3-bucket-system-metadata.js";
 import { SimS3DeclaredSystemMetadata } from "./s3-declared-system-metadata.js";
@@ -56,7 +56,7 @@ describe("SimS3DeclaredSystemMetadata", () => {
     const headers = declared.headersForObjectKey("js/app.js");
 
     // Then nothing is declared about it, so it is served as it is on disk.
-    assertArrayLength(Object.keys(headers), 0);
+    assertArrayEmpty(Object.keys(headers));
   });
 
   it("declares every system metadata header a deployment can set", () => {
@@ -121,7 +121,7 @@ describe("SimS3DeclaredSystemMetadata", () => {
     const headers = declared.headersForObjectKey("index.html");
 
     // Then the Object is left to be described by its file extension alone.
-    assertArrayLength(Object.keys(headers), 0);
+    assertArrayEmpty(Object.keys(headers));
   });
 
   it("inherits what the Bucket was already told", () => {
@@ -256,7 +256,7 @@ describe("SimS3DeclaredSystemMetadata", () => {
     // Then nothing is inherited for it. Either deployment's rule would take it,
     // and a page served as brotli it is not is worse than a page served as the
     // file on disk, which is what a mount does without any of this.
-    assertArrayLength(Object.keys(headers), 0);
+    assertArrayEmpty(Object.keys(headers));
   });
 
   it("inherits a declaration made after the mount was set up", () => {

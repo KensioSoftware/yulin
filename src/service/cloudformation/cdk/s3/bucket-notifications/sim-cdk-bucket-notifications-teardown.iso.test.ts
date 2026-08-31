@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -28,7 +29,7 @@ describe("CDK Bucket notifications teardown", () => {
 
     // Then the configuration is off the Bucket, as the CDK provider function
     // takes it off on its own Delete event.
-    assertArrayLength(bucket.getNotifications().lambdaNotifications, 0);
+    assertArrayEmpty(bucket.getNotifications().lambdaNotifications);
     assertIdentical(
       stack.getResource("BucketNotifications")?.status,
       "DELETE_COMPLETE",

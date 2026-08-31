@@ -5,8 +5,8 @@ import {
   PutLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -125,7 +125,7 @@ describe("SimLogs GetLogEvents", () => {
       third.events?.map((event) => event.message),
       ["line 5"],
     );
-    assertArrayLength(past.events ?? [], 0);
+    assertArrayEmpty(past.events ?? []);
     assertIdentical(past.nextForwardToken, third.nextForwardToken);
   });
 

@@ -1,10 +1,13 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertResponseStatus,
   assertTrue,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -89,12 +92,12 @@ describe("SAM Serverless Api expansion", () => {
       stack.getResource(samRestApiTemplateStageLogicalId)?.type,
       "AWS::ApiGateway::Stage",
     );
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And the method the event declared against it is served from that stage
     const response = await requestApi(simAws, stack, "/orders/YL-1");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders/{orderId} prod");
   });
 
@@ -157,7 +160,7 @@ describe("SAM Serverless Api expansion", () => {
     // And it serves the API's methods under its own path segment
     const response = await requestApi(simAws, stack, "/orders/YL-1", "live");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders/{orderId} live");
   });
 
@@ -188,7 +191,7 @@ describe("SAM Serverless Api expansion", () => {
       "orders-dev",
     );
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET /orders/{orderId} orders-dev");
   });
 

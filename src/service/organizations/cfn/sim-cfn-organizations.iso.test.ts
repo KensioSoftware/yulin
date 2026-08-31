@@ -1,12 +1,13 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
-  assertThrowsErrorAsync,
   assertStringIncludes,
   assertStringLength,
   assertStringStartsWith,
+  assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -240,6 +241,6 @@ describe("Simulated Organizations from CloudFormation", () => {
       });
 
     assertTrue(decision.isAllowed);
-    assertArrayLength(decision.serviceControlPolicy.denyStatements, 0);
+    assertArrayEmpty(decision.serviceControlPolicy.denyStatements);
   });
 });

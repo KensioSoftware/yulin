@@ -1,8 +1,10 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -76,7 +78,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
 
     // Then the browser is told, rather than the error being sent to a redirect
     // URI nothing has vouched for.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       await refusedBody(response),
       "is not an app client of user pool",
@@ -95,7 +97,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
 
     // Then it is refused in the browser, because that URI is exactly what
     // cannot be trusted.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       await refusedBody(response),
       "is not one of app client",
@@ -114,7 +116,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
 
     // Then the error goes to the callback URL with the state, as real Cognito
     // sends one once the client and redirect URI are known to be good.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
     const error = redirectedError(response);
     assertIdentical(error.get("error"), "unauthorized_client");
     assertIdentical(error.get("state"), "csrf-token");
@@ -211,7 +213,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     const response = await authorize(setUp, authorizeParameters(setUp));
 
     // Then it is refused rather than taking over the user it did not create.
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     assertStringIncludes(
       await refusedBody(response),
       "is not the Google user this sign-in is for",
@@ -228,7 +230,7 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     const response = await authorize(setUp, withoutProvider);
 
     // Then the browser is asked who is signing in, rather than being refused.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), 'name="password"');
     assertIdentical(unused, "Google");
   });
@@ -305,9 +307,9 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     // Then each is refused, saying what the domain does serve. The authorize
     // endpoint takes the post of the sign-in form it serves as well as the
     // get an application sends the browser on.
-    assertIdentical(missing.status, 404);
+    assertResponseStatus(missing, 404, await describeResponse(missing));
     assertStringIncludes(await refusedBody(missing), "/oauth2/authorize");
-    assertIdentical(deleted.status, 405);
+    assertResponseStatus(deleted, 405, await describeResponse(deleted));
     assertIdentical(deleted.headers.get("allow"), "GET, POST");
   });
 });

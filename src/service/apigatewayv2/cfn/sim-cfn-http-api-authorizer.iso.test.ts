@@ -2,8 +2,10 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectMatches,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -77,8 +79,8 @@ describe("Deploying an AWS::ApiGatewayV2::Authorizer", () => {
 
     // Then the deployed route is closed to anyone without a token, and the
     // handler saw the claims of the one that was accepted
-    assertIdentical(refused.status, 401);
-    assertIdentical(admitted.status, 200);
+    assertResponseStatus(refused, 401, await describeResponse(refused));
+    assertResponseStatus(admitted, 200, await describeResponse(admitted));
     assertIdentical(await admitted.text(), "access");
   });
 

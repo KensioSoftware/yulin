@@ -1,5 +1,10 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -54,7 +59,7 @@ describe("What a simulated ECS container answering a request may do", () => {
 
     // Then the write was denied, naming the Role the deployed container would
     // have been running as.
-    assertIdentical(response.status, 500);
+    assertResponseStatus(response, 500, await describeResponse(response));
     assertStringIncludes(await response.text(), "ssm:PutParameter");
   });
 

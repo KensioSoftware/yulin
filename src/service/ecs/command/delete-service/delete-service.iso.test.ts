@@ -6,6 +6,7 @@ import {
   UpdateServiceCommand,
 } from "@aws-sdk/client-ecs";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -53,7 +54,7 @@ describe("ECS DeleteServiceCommand", () => {
       new ListTasksCommand({ serviceName: "checkout" }),
     );
 
-    assertArrayLength(after.taskArns, 0);
+    assertArrayEmpty(after.taskArns);
 
     // And each stopped task says the service being deleted stopped it.
     const stopped = await ecs.describeTasks(
@@ -126,7 +127,7 @@ describe("ECS DeleteServiceCommand", () => {
     // Then it is still there as INACTIVE, so something holding its ARN can find
     // out what became of it.
     assertIdentical(described.services?.[0]?.status, "INACTIVE");
-    assertArrayLength(described.failures, 0);
+    assertArrayEmpty(described.failures);
   });
 
   it("frees the name a deleted service had", async () => {

@@ -11,6 +11,7 @@ import {
   SetAlarmStateCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludesAll,
   assertArrayLength,
@@ -187,6 +188,6 @@ describe("CloudWatch SDK interception", () => {
     // Then every operation reached the simulator.
     assertIdentical(described.MetricAlarms?.at(0)?.StateValue, "ALARM");
     assertArrayLength(history.AlarmHistoryItems ?? [], 1);
-    assertArrayLength(afterDelete.MetricAlarms ?? [], 0);
+    assertArrayEmpty(afterDelete.MetricAlarms ?? []);
   });
 });

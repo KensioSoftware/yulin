@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -102,7 +103,7 @@ describe("Detecting on a simulated Rekognition sample image", () => {
 
     // Then it is still clean: it has a hash rule of its own, and a hash rule
     // wins over the default.
-    assertArrayLength(labels, 0);
+    assertArrayEmpty(labels);
   });
 
   it("answers with the faces each face sample was declared to hold", async () => {
@@ -132,7 +133,7 @@ describe("Detecting on a simulated Rekognition sample image", () => {
 
     // Then moderation answers from its own rules, which report a clean image
     // until a test says otherwise.
-    assertArrayLength(labels, 0);
+    assertArrayEmpty(labels);
   });
 
   it("is overridden by a rule registered for the same image", async () => {
@@ -150,7 +151,7 @@ describe("Detecting on a simulated Rekognition sample image", () => {
 
     // Then the test's rule answers. The built-in rules are ordinary hash
     // rules, so registering one for the same image replaces it.
-    assertArrayLength(labels, 0);
+    assertArrayEmpty(labels);
   });
 
   it("ships the built-in rules with every Account and Region", async () => {

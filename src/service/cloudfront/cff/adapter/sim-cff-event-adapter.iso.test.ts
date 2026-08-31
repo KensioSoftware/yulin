@@ -4,10 +4,12 @@ import {
   assertArrayIncludesAll,
   assertIdentical,
   assertInstanceOf,
-  assertObjectMatches,
-  assertTrue,
   assertObjectHasProperty,
+  assertObjectMatches,
+  assertResponseStatus,
+  assertTrue,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import {
   cloudFrontRequestFactory,
@@ -77,7 +79,7 @@ describe("sim CFF event structure adapter", () => {
       assertIdentical(url.pathname, "/new/path");
     });
 
-    it("converts CFF Response to native Response", () => {
+    it("converts CFF Response to native Response", async () => {
       const originalRequest = new Request("https://example.test/test");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 403,
@@ -91,13 +93,13 @@ describe("sim CFF event structure adapter", () => {
       );
 
       assertInstanceOf(result, Response);
-      assertIdentical(result.status, 403);
+      assertResponseStatus(result, 403, await describeResponse(result));
       assertIdentical(result.headers.get("x-custom-header"), "blocked");
     });
   });
 
   describe("fromViewerResponseResult", () => {
-    it("converts CFF Response to native Response", () => {
+    it("converts CFF Response to native Response", async () => {
       const originalResponse = new Response("Original body");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
@@ -111,7 +113,7 @@ describe("sim CFF event structure adapter", () => {
       );
 
       assertInstanceOf(result, Response);
-      assertIdentical(result.status, 200);
+      assertResponseStatus(result, 200, await describeResponse(result));
       assertIdentical(result.headers.get("content-type"), "application/json");
     });
   });

@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -71,7 +73,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
     });
 
     // Then the browser is sent on to the page that takes the code.
-    assertIdentical(asked.status, 303);
+    assertResponseStatus(asked, 303, await describeResponse(asked));
     assertIdentical(
       simCognitoRedirectedTo(asked).pathname,
       "/confirmForgotPassword",
@@ -85,7 +87,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
       password: newPassword,
     });
 
-    assertIdentical(reset.status, 303);
+    assertResponseStatus(reset, 303, await describeResponse(reset));
     assertIdentical(
       simCognitoRedirectedTo(reset).pathname,
       "/oauth2/authorize",
@@ -99,7 +101,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
       password: newPassword,
     });
 
-    assertIdentical(signedIn.status, 302);
+    assertResponseStatus(signedIn, 302, await describeResponse(signedIn));
 
     const callback = simCognitoRedirectedTo(signedIn);
 
@@ -131,7 +133,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
     });
 
     // Then the sign-in form comes back saying so.
-    assertIdentical(refused.status, 200);
+    assertResponseStatus(refused, 200, await describeResponse(refused));
     assertStringIncludes(
       await refused.text(),
       "Incorrect username or password",
@@ -158,7 +160,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
 
     // Then the form comes back with the refusal, and the old password still
     // signs the user in.
-    assertIdentical(refused.status, 200);
+    assertResponseStatus(refused, 200, await describeResponse(refused));
     assertStringIncludes(await refused.text(), "Invalid verification code");
 
     const signedIn = await simCognitoPostForm(setUp, "/oauth2/authorize", {
@@ -167,7 +169,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
       password: simCognitoLocalPassword,
     });
 
-    assertIdentical(signedIn.status, 302);
+    assertResponseStatus(signedIn, 302, await describeResponse(signedIn));
   });
 
   it("shows a password the pool's policy turns down on the form", async () => {
@@ -189,7 +191,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
     });
 
     // Then the form comes back with the rule the password broke.
-    assertIdentical(refused.status, 200);
+    assertResponseStatus(refused, 200, await describeResponse(refused));
     assertStringIncludes(await refused.text(), "Password not long enough");
   });
 
@@ -206,7 +208,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
 
     // Then the browser goes on to the code page, as it does for a user that
     // is really there.
-    assertIdentical(asked.status, 303);
+    assertResponseStatus(asked, 303, await describeResponse(asked));
     assertIdentical(
       simCognitoRedirectedTo(asked).pathname,
       "/confirmForgotPassword",
@@ -226,7 +228,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
 
     // Then the form comes back saying so, as real Cognito does under that
     // setting.
-    assertIdentical(asked.status, 200);
+    assertResponseStatus(asked, 200, await describeResponse(asked));
     assertStringIncludes(await asked.text(), "User does not exist");
   });
 
@@ -251,13 +253,13 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
     // to the next step.
     const askingBody = await asking.text();
 
-    assertIdentical(asking.status, 200);
+    assertResponseStatus(asking, 200, await describeResponse(asking));
     assertStringIncludes(askingBody, 'name="username"');
     assertStringIncludes(askingBody, 'value="csrf-token"');
 
     const resettingBody = await resetting.text();
 
-    assertIdentical(resetting.status, 200);
+    assertResponseStatus(resetting, 200, await describeResponse(resetting));
     assertStringIncludes(resettingBody, 'name="code"');
     assertStringIncludes(resettingBody, 'name="password"');
     assertStringIncludes(resettingBody, 'value="csrf-token"');
@@ -278,7 +280,7 @@ describe("Resetting a password through the pages a sim Cognito domain serves", (
     });
 
     // Then the form comes back with what real Cognito refuses this with.
-    assertIdentical(refused.status, 200);
+    assertResponseStatus(refused, 200, await describeResponse(refused));
     assertStringIncludes(
       await refused.text(),
       "no registered/verified email or phone_number",

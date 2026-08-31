@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -180,7 +180,7 @@ describe("EventBridge IAM authorization", () => {
 
     // Then the allowed entry was not delivered either, so a refused request
     // leaves nothing behind.
-    assertArrayLength(simAws.eventBridge().eventsOn("orders"), 0);
+    assertArrayEmpty(simAws.eventBridge().eventsOn("orders"));
   });
 
   it("refuses deleting the default bus with the permission error first", async () => {

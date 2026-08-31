@@ -4,7 +4,7 @@ import {
   GetShardIteratorCommand,
   PutRecordCommand,
 } from "@aws-sdk/client-kinesis";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import { assertArrayEmpty, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimFixedClock } from "../../../util/clock/sim-clock.js";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -73,7 +73,7 @@ describe("Simulated Kinesis retention", () => {
     await simAws.clock().advanceBy({ hours: 25 });
 
     // Then it has gone from a trim horizon read.
-    assertArrayLength(await readFromTrimHorizon(simAws), 0);
+    assertArrayEmpty(await readFromTrimHorizon(simAws));
   });
 
   it("keeps a record put after the ones the window outlived", async () => {

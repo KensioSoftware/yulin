@@ -8,6 +8,7 @@ import {
   RequestCertificateCommand,
 } from "@aws-sdk/client-acm";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -56,7 +57,7 @@ describe("simulated ACM SDK Command routing", () => {
       }),
     );
     const listAfterDelete = await client.send(new ListCertificatesCommand({}));
-    assertArrayLength(listAfterDelete.CertificateSummaryList, 0);
+    assertArrayEmpty(listAfterDelete.CertificateSummaryList);
   });
 
   it("shares certificate state with direct sim ACM use", async () => {

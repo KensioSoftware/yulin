@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-cloudfront";
 import { faker } from "@faker-js/faker";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertNonNullable,
   assertObjectEquals,
@@ -136,7 +137,7 @@ describe("CloudFront redundant Origins", () => {
     ]);
 
     // Then neither is called a repeat of the other.
-    assertArrayLength(distribution.redundantOrigins, 0);
+    assertArrayEmpty(distribution.redundantOrigins);
   });
 
   it("reads an Origin path written empty as no Origin path", async () => {
@@ -207,7 +208,7 @@ describe("CloudFront redundant Origins", () => {
     ]);
 
     // Then neither is called a repeat of the other.
-    assertArrayLength(distribution.redundantOrigins, 0);
+    assertArrayEmpty(distribution.redundantOrigins);
   });
 
   it("forgets a repeat an update did away with", async () => {
@@ -239,6 +240,6 @@ describe("CloudFront redundant Origins", () => {
       created.Distribution.Id,
     );
     assertNonNullable(distribution);
-    assertArrayLength(distribution.redundantOrigins, 0);
+    assertArrayEmpty(distribution.redundantOrigins);
   });
 });

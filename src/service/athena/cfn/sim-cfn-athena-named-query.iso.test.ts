@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -55,7 +56,7 @@ describe("AWS::Athena::NamedQuery", () => {
 
     // Then nothing was skipped, and the query is readable through the SDK in
     // the workgroup the Ref resolved to.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     const namedQueryId = stack.outputs.get("QueryRef")?.value;
 
@@ -185,7 +186,7 @@ describe("AWS::Athena::NamedQuery", () => {
 
     // Then both went with it, and the workgroup deleted without the stack
     // having to ask for a recursive delete.
-    assertArrayLength(simAws.athena().namedQueries(), 0);
+    assertArrayEmpty(simAws.athena().namedQueries());
     assertUndefined(simAws.athena().findWorkGroup("rainlytics"));
   });
 

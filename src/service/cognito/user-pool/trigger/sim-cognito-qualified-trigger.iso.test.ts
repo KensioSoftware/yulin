@@ -4,8 +4,8 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -120,6 +120,6 @@ describe("A simulated Cognito user pool trigger naming a Lambda alias", () => {
       error.message,
       "names no simulated Lambda function version or alias",
     );
-    assertArrayLength(pool.trigger.ranAs, 0);
+    assertArrayEmpty(pool.trigger.ranAs);
   });
 });

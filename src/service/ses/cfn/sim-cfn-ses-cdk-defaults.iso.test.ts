@@ -3,6 +3,7 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -148,6 +149,6 @@ describe("CDK-synthesised SES resources", () => {
       identity.MailFromAttributes?.MailFromDomain,
       "mail.example.com",
     );
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 });

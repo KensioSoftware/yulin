@@ -1,4 +1,9 @@
-import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -81,7 +86,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then the handler ran, and the token's own claims reached it under
     // `claims`, which is where a REST API puts them
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       claims: {
         client_id: signedIn.clientId,
@@ -117,7 +122,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     // Then it is accepted, since a method asking for no scope tells the two
     // token types apart by nothing, and the groups arrive as one string,
     // rendered the way Go prints a slice
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       claims: { token_use: "id", "cognito:groups": "[Admins Readers]" },
     });
@@ -137,8 +142,8 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then both are read, since API Gateway strips the scheme rather than
     // requiring it
-    assertIdentical(upperCase.status, 200);
-    assertIdentical(lowerCase.status, 200);
+    assertResponseStatus(upperCase, 200, await describeResponse(upperCase));
+    assertResponseStatus(lowerCase, 200, await describeResponse(lowerCase));
   });
 
   it("refuses a request carrying no token", async () => {
@@ -149,7 +154,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     const response = await get(simAws, restApi);
 
     // Then the request is refused, and the handler never ran
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Unauthorized"}');
   });
 
@@ -164,7 +169,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then it is refused the same way a missing token is, so a client learns
     // nothing about which check it failed
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
     assertIdentical(await response.text(), '{"message":"Unauthorized"}');
   });
 
@@ -183,7 +188,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then it is refused: it is signed by a key no named pool published, and
     // it names another issuer
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("refuses a token signed by a key the pool never published", async () => {
@@ -202,7 +207,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     });
 
     // Then it is refused, because the signature is checked rather than read
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("expires an already-issued token when the clock advances", async () => {
@@ -219,8 +224,8 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     const expired = await get(simAws, restApi, {
       authorization: signedIn.accessToken,
     });
-    assertIdentical(accepted.status, 200);
-    assertIdentical(expired.status, 401);
+    assertResponseStatus(accepted, 200, await describeResponse(accepted));
+    assertResponseStatus(expired, 401, await describeResponse(expired));
   });
 
   it("lets a token through that claims a scope the method asks for", async () => {
@@ -233,7 +238,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     });
 
     // Then the method is reached, because one method scope matched
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a verified token claiming none of the method's scopes", async () => {
@@ -247,7 +252,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then the answer is 403 rather than 401: the token was accepted, and it
     // does not allow this method
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       Message: "User is not authorized to access this resource",
     });
@@ -264,7 +269,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then it is refused, because an id token carries no scope claim at all.
     // Method scopes are the only thing that tells the two token types apart.
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("refuses every request once the method's authorizer is deleted", async () => {
@@ -285,7 +290,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then the method stays closed rather than falling open, since there is
     // nothing left to verify the token against
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("refuses every token when the named pool is gone", async () => {
@@ -302,7 +307,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
 
     // Then it is refused, because a pool that is gone publishes nothing to
     // check the signature against
-    assertIdentical(response.status, 401);
+    assertResponseStatus(response, 401, await describeResponse(response));
   });
 
   it("admits a token from any one of the pools the authorizer names", async () => {
@@ -332,7 +337,7 @@ describe("Authorizing a sim REST API method with a Cognito authorizer", () => {
     });
 
     // Then it is admitted, since any one of the named pools is enough
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       claims: { iss: second.issuerUrl, username: "grace" },
     });

@@ -1,8 +1,11 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -18,9 +21,7 @@ import {
 } from "../sim-cfn-sam-function-template.factory.js";
 import { samImplicitRestApiLogicalId } from "./sim-cfn-sam-implicit-rest-api.js";
 
-/**
- * The stage the implicit API publishes under, which is the one SAM names.
- */
+/** The stage the implicit API publishes under, which is the one SAM names. */
 const implicitStageName = "Prod";
 
 /**
@@ -45,9 +46,7 @@ function ratesHandler(request: RatesRequest): SimCfnTemplateValueRecord {
   };
 }
 
-/**
- * The implicit API the stack deployed, under the logical ID SAM gives it.
- */
+/** The implicit API the stack deployed, under the logical ID SAM gives it. */
 function implicitApi(stack: SimCfnDeployedStack): SimRestApi {
   const api = stack.getResource(samImplicitRestApiLogicalId)
     ?.simResource as SimRestApi;
@@ -100,12 +99,12 @@ describe("SAM Api event expansion", () => {
 
     // Then the event made an API the Stack holds under the SAM name for it
     const api = implicitApi(stack);
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And a request to the path the event stated reaches the bound handler
     const response = await requestApi(simAws, api, "/rates/GBP");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET rate for GBP");
   });
 
@@ -133,7 +132,7 @@ describe("SAM Api event expansion", () => {
       method: "DELETE",
     });
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "DELETE rate for nothing");
   });
 
@@ -216,7 +215,7 @@ describe("SAM Api event expansion", () => {
 
     const response = await requestApi(simAws, api, "/");
 
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "GET rate for nothing");
   });
 
@@ -343,7 +342,7 @@ describe("SAM Api event expansion", () => {
 
     const response = await requestApi(simAws, implicitApi(stack), "/rates");
 
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
   });
 
   it("leaves the function alone for an event naming an API by nothing", async () => {
@@ -375,7 +374,7 @@ describe("SAM Api event expansion", () => {
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
     assertUndefined(stack.getResource(samImplicitRestApiLogicalId));
     assertUndefined(stack.getResource("RatesGetMethod"));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 
   it("leaves the function alone for an event stating no path", async () => {
@@ -395,6 +394,6 @@ describe("SAM Api event expansion", () => {
     // Then the function deployed with nothing in front of it
     assertNonNullable(stack.getResource(samFunctionTemplateLogicalId));
     assertUndefined(stack.getResource(samImplicitRestApiLogicalId));
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
   });
 });

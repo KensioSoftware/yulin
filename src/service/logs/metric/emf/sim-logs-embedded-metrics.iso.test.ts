@@ -8,8 +8,8 @@ import {
   PutLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertUndefined,
 } from "@kensio/smartass";
@@ -163,7 +163,7 @@ describe("Embedded Metric Format in simulated CloudWatch Logs", () => {
     // Then the write took it and nothing was recorded. A log line here is a
     // log line, and a user who wanted metrics would have reached CloudWatch
     // Logs through a SimAws scope.
-    assertArrayLength(simLogs.metricPublicationFailures, 0);
+    assertArrayEmpty(simLogs.metricPublicationFailures);
   });
 
   it("stamps from the write where the document carries no timestamp", async () => {

@@ -8,7 +8,11 @@ import {
   AddPermissionCommand,
   CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { serveSimAws } from "../../../serve/index.js";
@@ -87,7 +91,7 @@ describe("Serving a sim HTTP API on localhost", () => {
       );
 
       // Then the function handled the real HTTP request
-      assertIdentical(response.status, 200);
+      assertResponseStatus(response, 200, await describeResponse(response));
       assertIdentical(response.headers.get("content-type"), "text/plain");
       assertIdentical(await response.text(), "orders limit 10");
     } finally {

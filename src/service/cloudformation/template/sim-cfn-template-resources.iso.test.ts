@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertObjectMatches,
@@ -14,7 +15,7 @@ describe("SimCfnTemplate", () => {
       },
     });
 
-    assertArrayLength(template.resourceTemplates(), 0);
+    assertArrayEmpty(template.resourceTemplates());
   });
 
   it("returns CloudFormation Resource template records", () => {

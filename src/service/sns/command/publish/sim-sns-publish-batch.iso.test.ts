@@ -1,5 +1,6 @@
 import { PublishBatchCommand } from "@aws-sdk/client-sns";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -47,7 +48,7 @@ describe("SNS publish batch", () => {
       published.Successful?.map((entry) => entry.Id),
       ["entry-0", "entry-1", "entry-2"],
     );
-    assertArrayLength(published.Failed, 0);
+    assertArrayEmpty(published.Failed);
 
     const messageIds = new Set(
       published.Successful.map((entry) => entry.MessageId),

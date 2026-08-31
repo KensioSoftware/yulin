@@ -7,8 +7,10 @@ import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  describeResponse,
 } from "@kensio/smartass";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
@@ -105,19 +107,31 @@ describe("sim CloudFront local server", () => {
     const assetsResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/object.json`,
     );
-    assertIdentical(assetsResponse.status, 200);
+    assertResponseStatus(
+      assetsResponse,
+      200,
+      await describeResponse(assetsResponse),
+    );
     assertIdentical(await assetsResponse.text(), '{"something":"A"}');
 
     const assetsFooResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/foo/object.json`,
     );
-    assertIdentical(assetsFooResponse.status, 200);
+    assertResponseStatus(
+      assetsFooResponse,
+      200,
+      await describeResponse(assetsFooResponse),
+    );
     assertIdentical(await assetsFooResponse.text(), '{"something":"foo-B"}');
 
     const missingResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing/object.json`,
     );
-    assertIdentical(missingResponse.status, 404);
+    assertResponseStatus(
+      missingResponse,
+      404,
+      await describeResponse(missingResponse),
+    );
   });
 
   it("serves a static site with a root object and an error page", async () => {
@@ -192,14 +206,22 @@ describe("sim CloudFront local server", () => {
     const homeResponse = await fetch(`${siteUrl}/`);
 
     // Then the home page is served.
-    assertIdentical(homeResponse.status, 200);
+    assertResponseStatus(
+      homeResponse,
+      200,
+      await describeResponse(homeResponse),
+    );
     assertIdentical(await homeResponse.text(), "<h1>Home</h1>");
 
     // And when a page that does not exist is requested.
     const missingResponse = await fetch(`${siteUrl}/nowhere`);
 
     // Then the site's own error page is served, not the simulator's.
-    assertIdentical(missingResponse.status, 404);
+    assertResponseStatus(
+      missingResponse,
+      404,
+      await describeResponse(missingResponse),
+    );
     assertIdentical(await missingResponse.text(), "<h1>Not found</h1>");
   });
 

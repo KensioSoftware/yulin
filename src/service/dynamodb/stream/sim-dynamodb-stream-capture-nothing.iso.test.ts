@@ -5,6 +5,7 @@ import {
   TransactWriteItemsCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -150,7 +151,7 @@ describe("DynamoDB stream capture of what did not happen", () => {
     );
 
     // Then nothing was removed, so there is no removal to report.
-    assertArrayLength(capturedBy(table), 0);
+    assertArrayEmpty(capturedBy(table));
   });
 
   it("captures nothing for the items a deleted table was holding", async () => {

@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -78,7 +79,7 @@ describe("simulated Personalize recommenders", () => {
 
     const solutions = await personalize.listSolutions({ input: {} });
 
-    assertArrayLength(solutions.solutions, 0);
+    assertArrayEmpty(solutions.solutions);
   });
 
   it("records the exploration configuration and reports it back", async () => {
@@ -215,7 +216,7 @@ describe("simulated Personalize recommenders", () => {
 
     const groups = await personalize.listDatasetGroups({ input: {} });
 
-    assertArrayLength(groups.datasetGroups, 0);
+    assertArrayEmpty(groups.datasetGroups);
     assertUndefined(personalize.findRecommender("top-picks"));
   });
 

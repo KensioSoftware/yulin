@@ -1,4 +1,8 @@
-import { assertArrayLength, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertStringIncludes,
+} from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
 import { SimLambdaEnvironmentConflicts } from "./sim-lambda-environment-conflicts.js";
 import { simLambdaEnvironmentFactory } from "./sim-lambda-environment.factory.js";
@@ -66,7 +70,7 @@ describe("sim Lambda environment conflicts", () => {
 
       // Then nothing is reported: a module-scope read gets the right value
       // anyway, so there is no mismatch to explain.
-      assertArrayLength(warnings, 0);
+      assertArrayEmpty(warnings);
     } finally {
       delete process.env["YULIN_AGREES"];
     }
@@ -87,7 +91,7 @@ describe("sim Lambda environment conflicts", () => {
     });
 
     // Then there is nothing to report.
-    assertArrayLength(warnings, 0);
+    assertArrayEmpty(warnings);
   });
 
   it("warns when another function declares the name differently", () => {
@@ -130,7 +134,7 @@ describe("sim Lambda environment conflicts", () => {
     });
 
     // Then there is nothing to report.
-    assertArrayLength(warnings, 0);
+    assertArrayEmpty(warnings);
   });
 
   it("stays quiet when another function declares nothing in common", () => {
@@ -150,7 +154,7 @@ describe("sim Lambda environment conflicts", () => {
     });
 
     // Then there is nothing to report.
-    assertArrayLength(warnings, 0);
+    assertArrayEmpty(warnings);
   });
 
   it("reports each variable name only once", () => {

@@ -8,6 +8,8 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -72,7 +74,7 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
 
     // Then the verification message is listed, with everything about it a
     // reader needs during local development.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/json");
 
     const code = simAws
@@ -108,7 +110,7 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
     );
 
     // Then the listing is empty rather than missing.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectEquals(await response.json(), { messages: [] });
   });
 
@@ -129,9 +131,9 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
 
     // Then the HEAD answers the headers with no body, and the write is
     // refused.
-    assertIdentical(headed.status, 200);
+    assertResponseStatus(headed, 200, await describeResponse(headed));
     assertIdentical(await headed.text(), "");
-    assertIdentical(posted.status, 405);
+    assertResponseStatus(posted, 405, await describeResponse(posted));
   });
 
   it("reports a pool it does not serve as not found", async () => {
@@ -144,7 +146,7 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
     );
 
     // Then the endpoint reports it as not found, as it does for the JWKS.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("reports a path below the listing as not found", async () => {
@@ -162,7 +164,11 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
 
     // Then neither is served: there is no endpoint for one message, and the
     // two published documents sit under .well-known and nowhere else.
-    assertIdentical(belowListing.status, 404);
-    assertIdentical(jwks.status, 404);
+    assertResponseStatus(
+      belowListing,
+      404,
+      await describeResponse(belowListing),
+    );
+    assertResponseStatus(jwks, 404, await describeResponse(jwks));
   });
 });

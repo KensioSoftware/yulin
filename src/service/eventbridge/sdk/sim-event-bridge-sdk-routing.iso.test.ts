@@ -18,6 +18,7 @@ import {
   TestEventPatternCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -131,7 +132,7 @@ describe("EventBridge SDK interception", () => {
     assertIdentical(disabled.State, "DISABLED");
     assertArrayLength(listed.Rules ?? [], 1);
     assertTrue(tested.Result);
-    assertArrayLength(afterDelete.Rules ?? [], 0);
+    assertArrayEmpty(afterDelete.Rules ?? []);
   });
 
   it("routes every target Command through the intercepted client", async () => {
@@ -174,6 +175,6 @@ describe("EventBridge SDK interception", () => {
     assertArrayLength(listed.Targets ?? [], 1);
     assertArrayEquals(byTarget.RuleNames ?? [], ["orders"]);
     assertIdentical(removed.FailedEntryCount, 0);
-    assertArrayLength(afterRemove.Targets ?? [], 0);
+    assertArrayEmpty(afterRemove.Targets ?? []);
   });
 });

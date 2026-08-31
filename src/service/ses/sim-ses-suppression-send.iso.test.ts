@@ -7,6 +7,7 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -120,7 +121,7 @@ describe("SimSesV2 sending to a suppressed address", () => {
 
     // Then nothing is held back. The reasons have to match, which is the part
     // of the suppression rules most easily got wrong.
-    assertArrayLength(ses.sentEmails()[0]?.suppressedRecipients, 0);
+    assertArrayEmpty(ses.sentEmails()[0]?.suppressedRecipients);
   });
 
   it("delivers to a listed address once the account stops suppressing", async () => {
@@ -138,7 +139,7 @@ describe("SimSesV2 sending to a suppressed address", () => {
     // Then the address stays on the list and the message is held back from
     // nobody.
     assertArrayLength(ses.suppressedDestinations(), 1);
-    assertArrayLength(ses.sentEmails()[0]?.suppressedRecipients, 0);
+    assertArrayEmpty(ses.sentEmails()[0]?.suppressedRecipients);
   });
 
   it("matches a recipient against the list without regard to case", async () => {
@@ -198,7 +199,7 @@ describe("SimSesV2 sending to a suppressed address", () => {
     const [email] = ses.sentEmails();
 
     assertNonNullable(email);
-    assertArrayLength(email.suppressedRecipients, 0);
+    assertArrayEmpty(email.suppressedRecipients);
     assertFalse(email.isFullySuppressed);
   });
 });
@@ -245,7 +246,7 @@ describe("SimSesV2 account suppression attributes", () => {
     await ses.putAccountSuppressionAttributes();
     const account = await ses.getAccount(new GetAccountCommand({}));
 
-    assertArrayLength(account.SuppressionAttributes?.SuppressedReasons, 0);
+    assertArrayEmpty(account.SuppressionAttributes?.SuppressedReasons);
   });
 
   it("refuses a reason real SES has no name for", async () => {

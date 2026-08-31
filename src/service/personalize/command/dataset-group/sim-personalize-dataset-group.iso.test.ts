@@ -5,6 +5,7 @@ import {
   ListDatasetGroupsCommand,
 } from "@aws-sdk/client-personalize";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -261,6 +262,6 @@ describe("Personalize DeleteDatasetGroup", () => {
     const listed = await simAws
       .personalize()
       .listDatasetGroups(new ListDatasetGroupsCommand({}));
-    assertArrayLength(listed.datasetGroups ?? [], 0);
+    assertArrayEmpty(listed.datasetGroups ?? []);
   });
 });

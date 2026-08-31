@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-personalize";
 import { GetRecommendationsCommand } from "@aws-sdk/client-personalize-runtime";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -151,6 +151,6 @@ describe("Personalize declared results", () => {
       .getRecommendations(
         new GetRecommendationsCommand({ campaignArn, itemId: "entry-1042" }),
       );
-    assertArrayLength(recommended.itemList ?? [], 0);
+    assertArrayEmpty(recommended.itemList ?? []);
   });
 });

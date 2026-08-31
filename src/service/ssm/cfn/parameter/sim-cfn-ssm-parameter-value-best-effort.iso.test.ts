@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -62,7 +62,7 @@ function readValue(simAws: SimAws): string {
 function parameterRecord(stack: SimCfnDeployedStack): SimCfnIgnoredProperty {
   const [ignored, ...rest] = stack.ignoredProperties;
   assertNonNullable(ignored, "a recorded template Parameter");
-  assertArrayLength(rest, 0, "no second record");
+  assertArrayEmpty(rest, "no second record");
 
   return ignored;
 }

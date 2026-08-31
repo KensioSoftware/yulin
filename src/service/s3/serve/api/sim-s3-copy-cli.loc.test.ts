@@ -14,6 +14,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertStringIncludes,
@@ -190,7 +191,7 @@ describe("Moving an Object between simulated Buckets with the aws CLI", () => {
 
     // And the source is empty, which is the half of the move that made the
     // first half worth checking
-    assertArrayLength(await stored("inbox", "moved.pdf"), 0);
+    assertArrayEmpty(await stored("inbox", "moved.pdf"));
   });
 
   it("copies a file to and from a key holding a space", async () => {
@@ -246,6 +247,6 @@ describe("Moving an Object between simulated Buckets with the aws CLI", () => {
     );
     assertDefined(read.Body, "the moved Object body");
     assertIdentical(await bodyText(read.Body), report);
-    assertArrayLength(await stored("inbox", "2025/q4/report.pdf"), 0);
+    assertArrayEmpty(await stored("inbox", "2025/q4/report.pdf"));
   });
 });

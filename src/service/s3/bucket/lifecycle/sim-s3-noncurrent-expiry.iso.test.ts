@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import type { LifecycleRule } from "@aws-sdk/client-s3";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
@@ -264,7 +265,7 @@ describe("S3 NoncurrentVersionExpiration", () => {
       new ListObjectVersionsCommand({ Bucket: bucketName }),
     );
 
-    assertArrayLength(listed.DeleteMarkers ?? [], 0);
+    assertArrayEmpty(listed.DeleteMarkers ?? []);
     assertArrayEquals(await listedVersions(s3), [current]);
   });
 
@@ -295,8 +296,8 @@ describe("S3 NoncurrentVersionExpiration", () => {
       new ListObjectVersionsCommand({ Bucket: bucketName }),
     );
 
-    assertArrayLength(listed.Versions ?? [], 0);
-    assertArrayLength(listed.DeleteMarkers ?? [], 0);
+    assertArrayEmpty(listed.Versions ?? []);
+    assertArrayEmpty(listed.DeleteMarkers ?? []);
   });
 
   it("keeps a delete marker with a version still under it", async () => {

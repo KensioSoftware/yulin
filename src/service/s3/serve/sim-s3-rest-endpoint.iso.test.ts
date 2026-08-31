@@ -6,7 +6,12 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,7 +34,7 @@ describe("The simulated S3 REST endpoint", () => {
 
     // Then the request is anonymous, and anonymous holds nothing: the REST
     // endpoint is the API, not the public website endpoint
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.text()).toMatch(/<Code>AccessDenied<\/Code>/);
   });
 
@@ -48,7 +53,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(url, { method: "PUT", body: "nope" });
 
     // Then IAM refuses it: presigning grants no more than the signer holds
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.text()).toMatch(/s3:PutObject/);
   });
 
@@ -65,7 +70,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(url);
 
     // Then the XML document the AWS SDK reads its error code out of comes back
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/xml");
     expect(await response.text()).toMatch(/<Code>NoSuchKey<\/Code>/);
   });
@@ -87,7 +92,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(url, { method: "HEAD" });
 
     // Then its size comes back with no body, as real S3 answers a HEAD
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("content-length"),
       String(presignObjectBody.length),
@@ -112,7 +117,7 @@ describe("The simulated S3 REST endpoint", () => {
 
     // Then the response carries the entity tag and last-modified time real S3
     // sends, which is what lets a client revalidate rather than re-download
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(
       response.headers.get("etag"),
       `"${createHash("md5").update(presignObjectBody).digest("hex")}"`,
@@ -138,7 +143,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(url, { method: "DELETE" });
 
     // Then S3 answers with no content, and the Object has gone
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(await response.text(), "");
 
     const readBack = await http.fetch(
@@ -151,7 +156,7 @@ describe("The simulated S3 REST endpoint", () => {
         { expiresIn: 900 },
       ),
     );
-    assertIdentical(readBack.status, 404);
+    assertResponseStatus(readBack, 404, await describeResponse(readBack));
   });
 
   it("refuses a DELETE its signer cannot perform", async () => {
@@ -172,7 +177,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(url, { method: "DELETE" });
 
     // Then IAM refuses it, and the Object is still there
-    assertIdentical(response.status, 403);
+    assertResponseStatus(response, 403, await describeResponse(response));
     expect(await response.text()).toMatch(/s3:DeleteObject/);
   });
 
@@ -184,7 +189,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch(objectUrl, { method: "POST" });
 
     // Then the gap is reported rather than answered with something plausible
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
     expect(await response.text()).toMatch(/does not serve POST/);
   });
 
@@ -198,7 +203,7 @@ describe("The simulated S3 REST endpoint", () => {
     );
 
     // Then it is refused: only Object requests are served over HTTP
-    assertIdentical(response.status, 501);
+    assertResponseStatus(response, 501, await describeResponse(response));
     expect(await response.text()).toMatch(/Bucket operations are not served/);
   });
 
@@ -212,7 +217,7 @@ describe("The simulated S3 REST endpoint", () => {
     );
 
     // Then the Bucket is reported missing before anything else is decided
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.text()).toMatch(/absent not found/);
   });
 
@@ -226,7 +231,7 @@ describe("The simulated S3 REST endpoint", () => {
     );
 
     // Then it is the caller's mistake, not the simulator's
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     expect(await response.text()).toMatch(/not valid percent-encoding/);
   });
 
@@ -238,7 +243,7 @@ describe("The simulated S3 REST endpoint", () => {
     const response = await http.fetch("http://s3.eu-west-2.sim-aws.localhost/");
 
     // Then there is no Bucket to serve from
-    assertIdentical(response.status, 400);
+    assertResponseStatus(response, 400, await describeResponse(response));
     expect(await response.text()).toMatch(/Missing S3 Bucket name/);
   });
 
@@ -287,7 +292,7 @@ describe("The simulated S3 REST endpoint", () => {
 
     // Then the headers S3 was given come back with the bytes, so a client can
     // decode what it is sent
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-encoding"), "br");
     assertIdentical(response.headers.get("content-type"), "text/plain");
     assertIdentical(
@@ -315,7 +320,7 @@ describe("The simulated S3 REST endpoint", () => {
 
     // Then the Bucket is found in the path, and the Object is served
     expect(new URL(url).hostname).toBe("s3.eu-west-2.sim-aws.localhost");
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), presignObjectBody);
   });
 });

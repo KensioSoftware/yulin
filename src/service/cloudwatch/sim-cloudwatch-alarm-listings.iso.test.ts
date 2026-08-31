@@ -6,6 +6,7 @@ import {
   SetAlarmStateCommand,
 } from "@aws-sdk/client-cloudwatch";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludes,
   assertArrayLength,
@@ -115,7 +116,7 @@ describe("SimCloudWatch alarm listings", () => {
       paging.MetricAlarms?.map((one) => one.AlarmName),
       ["paged"],
     );
-    assertArrayLength(before.AlarmHistoryItems ?? [], 0);
+    assertArrayEmpty(before.AlarmHistoryItems ?? []);
     assertArrayLength(including.AlarmHistoryItems ?? [], 1);
   });
 
@@ -269,7 +270,7 @@ describe("SimCloudWatch alarm listings", () => {
     // Then the filter selects rather than being ignored, so a request for a
     // kind that is not recorded gets nothing instead of everything.
     assertArrayLength(updates.AlarmHistoryItems ?? [], 1);
-    assertArrayLength(configuration.AlarmHistoryItems ?? [], 0);
+    assertArrayEmpty(configuration.AlarmHistoryItems ?? []);
   });
 
   it("records nothing when a state is forced to the one it is already in", async () => {

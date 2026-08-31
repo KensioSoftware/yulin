@@ -8,7 +8,12 @@ import {
   AddPermissionCommand,
   CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -42,7 +47,7 @@ describe("Serving a request through a sim HTTP API", () => {
     );
 
     // Then the function's response is what the client gets back
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "text/plain");
     assertIdentical(await response.text(), "orders limit 10");
   });
@@ -62,7 +67,7 @@ describe("Serving a request through a sim HTTP API", () => {
 
     // Then the whole object is the response body, because without a status
     // code there is no structured response for API Gateway to read
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/json");
     assertIdentical(await response.text(), '{"body":"hi"}');
   });
@@ -86,7 +91,7 @@ describe("Serving a request through a sim HTTP API", () => {
     );
 
     // Then the handler received it as text and its response comes back
-    assertIdentical(response.status, 201);
+    assertResponseStatus(response, 201, await describeResponse(response));
     assertIdentical(await response.text(), '{"sku":"YL-1"}');
   });
 
@@ -111,7 +116,7 @@ describe("Serving a request through a sim HTTP API", () => {
 
     // Then each one is a set-cookie header on the response, and a 204 carries
     // no body
-    assertIdentical(response.status, 204);
+    assertResponseStatus(response, 204, await describeResponse(response));
     assertIdentical(
       response.headers.getSetCookie().join(" | "),
       "session=abc; Path=/ | theme=dark",

@@ -1,10 +1,13 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertResponseStatus,
   assertStringIncludes,
   assertTrue,
   assertTypeString,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -69,7 +72,7 @@ describe("An association naming a web ACL that is not here", () => {
     // Then the stage deployed and serves, unprotected, and the association is
     // the only Resource that went missing. An association is the only Resource
     // carrying that reference, so nothing else goes with it.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), "orders");
     assertStringIncludes(skippedReason(stack), absent);
   });
@@ -158,7 +161,7 @@ describe("An association naming a web ACL that is not here", () => {
 
     // Then the pool is protected by what the web ACL still holds. A dropped
     // rule is not a reason to leave the pool with nothing in front of it.
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertTrue(simAws.wafV2().protection().protects(poolArn));
   });
 });

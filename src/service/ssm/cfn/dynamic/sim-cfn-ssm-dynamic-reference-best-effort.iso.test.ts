@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -59,7 +59,7 @@ function dynamicReferenceRecord(stack: SimCfnDeployedStack): {
     property.reason.includes("{{resolve:"),
   );
   assertNonNullable(ignored, "a recorded dynamic reference");
-  assertArrayLength(rest, 0, "no second recorded dynamic reference");
+  assertArrayEmpty(rest, "no second recorded dynamic reference");
 
   return { path: ignored.path, reason: ignored.reason };
 }
@@ -168,6 +168,6 @@ describe("SSM CloudFormation dynamic references the simulation cannot answer", (
 
     // Then the reference is untouched and nothing is recorded about it.
     assertIdentical(readValue(simAws), "{{resolve:vault:/myapp/token}}");
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 });

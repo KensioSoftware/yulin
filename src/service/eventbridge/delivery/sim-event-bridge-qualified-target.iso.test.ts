@@ -4,8 +4,8 @@ import {
   PutTargetsCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertNonNullable,
   assertStringIncludes,
 } from "@kensio/smartass";
@@ -66,7 +66,7 @@ describe("An EventBridge rule target naming a Lambda alias", () => {
 
     // Then the version behind the alias ran, rather than `$LATEST`.
     assertArrayEquals(fulfilment.ranAs, [fulfilment.version]);
-    assertArrayLength(simAws.eventBridge().deliveryFailures, 0);
+    assertArrayEmpty(simAws.eventBridge().deliveryFailures);
   });
 
   it("reports a target naming no version or alias", async () => {
@@ -86,7 +86,7 @@ describe("An EventBridge rule target naming a Lambda alias", () => {
     // Then nothing ran, and the failure says the qualifier reaches nothing.
     // Real EventBridge checks no target at `PutTargets` time, so this is where
     // a rule pointing at nothing is found, as it is for a missing function.
-    assertArrayLength(fulfilment.ranAs, 0);
+    assertArrayEmpty(fulfilment.ranAs);
 
     const [failure] = simAws.eventBridge().deliveryFailures;
 

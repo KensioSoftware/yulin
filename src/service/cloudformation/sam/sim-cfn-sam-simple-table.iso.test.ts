@@ -5,6 +5,7 @@ import {
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -75,7 +76,7 @@ describe("SAM Serverless SimpleTable expansion", () => {
     const tableResource = stack.getResource("Rates");
     assertNonNullable(tableResource);
     assertIdentical(tableResource.type, "AWS::DynamoDB::Table");
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
 
     // And the key it named is the table's partition key, billed on demand
     const table = await describeTable(simAws);

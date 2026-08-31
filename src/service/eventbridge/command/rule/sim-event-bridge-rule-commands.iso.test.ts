@@ -10,8 +10,8 @@ import {
   PutRuleCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -122,7 +122,7 @@ describe("EventBridge rule commands", () => {
     const [receipt] = simAws.eventBridge().receiptsOn("orders");
 
     assertArrayEquals(receipt?.matchedRuleNames, ["watcher"]);
-    assertArrayLength(simAws.eventBridge().receiptsOn("default"), 0);
+    assertArrayEmpty(simAws.eventBridge().receiptsOn("default"));
   });
 
   it("takes an event that matches no rule, and matches nothing", async () => {
@@ -141,7 +141,7 @@ describe("EventBridge rule commands", () => {
     // Then the bus took it and no rule matched, as a bus does on real AWS.
     const [receipt] = simAws.eventBridge().receiptsOn("default");
 
-    assertArrayLength(receipt?.matchedRuleNames ?? [], 0);
+    assertArrayEmpty(receipt?.matchedRuleNames ?? []);
   });
 
   it("stops matching while a rule is disabled", async () => {
@@ -166,7 +166,7 @@ describe("EventBridge rule commands", () => {
     // Then only the second event matched, and the first is not replayed.
     const receipts = simAws.eventBridge().receiptsOn("default");
 
-    assertArrayLength(receipts[0]?.matchedRuleNames ?? [], 0);
+    assertArrayEmpty(receipts[0]?.matchedRuleNames ?? []);
     assertArrayEquals(receipts[1]?.matchedRuleNames, ["watcher"]);
   });
 

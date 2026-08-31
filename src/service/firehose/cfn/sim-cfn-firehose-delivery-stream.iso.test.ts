@@ -1,4 +1,5 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -204,10 +205,7 @@ describe("deployed AWS::KinesisFirehose::DeliveryStream Resources", () => {
 
     // Then nothing reached the Bucket, and the delivery was refused as that
     // Role rather than as anyone else.
-    assertArrayLength(
-      await deliveredObjectKeys(simAws, orderArchiveBucketName),
-      0,
-    );
+    assertArrayEmpty(await deliveredObjectKeys(simAws, orderArchiveBucketName));
 
     const failures = simAws.firehose().getDeliveryFailures();
     assertArrayLength(failures, 1);

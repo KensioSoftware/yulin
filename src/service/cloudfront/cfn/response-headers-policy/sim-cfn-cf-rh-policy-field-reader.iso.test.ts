@@ -1,5 +1,5 @@
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertStringIncludes,
   assertThrowsError,
@@ -113,8 +113,8 @@ describe("sim-cfn-cf-rh-policy-field-reader", () => {
   it("reads no Items from an absent section, or a section without them", () => {
     // Given a section that is not there at all, and one present but empty:
     // CloudFormation allows both, and each means the section adds nothing.
-    assertArrayLength(sectionItems({}, "Section", refuse), 0);
-    assertArrayLength(sectionItems({ Section: {} }, "Section", refuse), 0);
+    assertArrayEmpty(sectionItems({}, "Section", refuse));
+    assertArrayEmpty(sectionItems({ Section: {} }, "Section", refuse));
   });
 
   it("refuses Items that are not an array", () => {

@@ -6,8 +6,10 @@ import {
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertUndefined,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -128,9 +130,9 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
 
     // Then the blocked request gets 403 with WAF's body, and the allowed one
     // gets the sign-in form the endpoint serves.
-    assertIdentical(blocked.status, 403);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertStringIncludes(await blocked.text(), "Request blocked by AWS WAF");
-    assertIdentical(allowed.status, 200);
+    assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertStringIncludes(await allowed.text(), 'name="username"');
   });
 
@@ -153,7 +155,7 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     );
 
     // Then it is turned away and the pool gained no user.
-    assertIdentical(blocked.status, 403);
+    assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertIdentical(pool.userCount, 0);
     assertUndefined(pool.findUser(simCognitoLocalUsername));
   });
@@ -173,11 +175,11 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
 
     // Then every one of them is blocked, because the web ACL is in front of
     // the domain rather than in front of one page of it.
-    assertIdentical(token.status, 403);
-    assertIdentical(logout.status, 403);
-    assertIdentical(forgot.status, 403);
-    assertIdentical(reset.status, 403);
-    assertIdentical(confirm.status, 403);
+    assertResponseStatus(token, 403, await describeResponse(token));
+    assertResponseStatus(logout, 403, await describeResponse(logout));
+    assertResponseStatus(forgot, 403, await describeResponse(forgot));
+    assertResponseStatus(reset, 403, await describeResponse(reset));
+    assertResponseStatus(confirm, 403, await describeResponse(confirm));
   });
 
   it("matches nothing on the body of a hosted domain request", async () => {
@@ -211,7 +213,7 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     // Then the rule never sees it. Cognito forwards the headers and the path
     // of a managed login request to AWS WAF and none of its body, so the
     // sign-up runs and the user is in the pool.
-    assertIdentical(response.status, 303);
+    assertResponseStatus(response, 303, await describeResponse(response));
     assertNonNullable(pool.findUser(simCognitoLocalUsername));
   });
 
@@ -249,7 +251,7 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     // request header with `x-amzn-waf-` and no endpoint a pool serves reads
     // one. A REST API stage is where an inserted header is observable, since
     // the integration hands the headers to the function behind the method.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), 'name="username"');
   });
 
@@ -263,6 +265,6 @@ describe("A web ACL in front of a sim Cognito hosted domain", () => {
     });
 
     // Then it is served, because nothing is there to turn it away.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

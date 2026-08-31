@@ -1,7 +1,7 @@
 import { DeleteStackCommand } from "@aws-sdk/client-cloudformation";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
-  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertNonNullable,
@@ -82,7 +82,7 @@ describe("AWS::SES::ConfigurationSet", () => {
       .sesV2()
       .findConfigurationSet("transactional");
 
-    assertArrayLength(stack.skippedResources, 0);
+    assertArrayEmpty(stack.skippedResources);
     assertNonNullable(configurationSet);
     assertArrayEquals(configurationSet.suppressedReasons, [
       "BOUNCE",
@@ -165,7 +165,7 @@ describe("AWS::SES::ConfigurationSet", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the set went with it.
-    assertArrayLength(simAws.sesV2().allConfigurationSets(), 0);
+    assertArrayEmpty(simAws.sesV2().allConfigurationSets());
   });
 
   it("refuses a suppression reason SES has no meaning for", async () => {
@@ -248,7 +248,7 @@ describe("AWS::SES::ConfigurationSet property types", () => {
       .findConfigurationSet("transactional");
 
     assertNonNullable(configurationSet);
-    assertArrayLength(configurationSet.suppressedReasons, 0);
+    assertArrayEmpty(configurationSet.suppressedReasons);
     assertIdentical(configurationSet.deliveryOptions.tlsPolicy, "OPTIONAL");
     assertUndefined(configurationSet.deliveryOptions.maxDeliverySeconds);
   });

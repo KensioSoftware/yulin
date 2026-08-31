@@ -10,6 +10,7 @@ import {
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludes,
   assertArrayLength,
@@ -256,7 +257,7 @@ describe("SimCloudWatch alarm actions", () => {
 
     // Then it still evaluated and changed state, and told nobody.
     assertIdentical(simAws.cloudWatch().allAlarms().at(0)?.state, "ALARM");
-    assertArrayLength(await alertsOn(simAws, queueUrl), 0);
+    assertArrayEmpty(await alertsOn(simAws, queueUrl));
   });
 
   it("fires actions for a state forced with SetAlarmState", async () => {

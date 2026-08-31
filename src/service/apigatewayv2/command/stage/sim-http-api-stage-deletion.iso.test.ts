@@ -2,7 +2,11 @@ import {
   DeleteStageCommand,
   GetStagesCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../../serve/http/sim-aws-http.js";
@@ -43,11 +47,11 @@ describe("Sim API Gateway v2 DeleteStage", () => {
     // still served from the stage that is left
     const http = new SimAwsHttp({ simAws });
     const deleted = await http.fetch(localUrl(api.apiEndpoint, "/dev/pets"));
-    assertIdentical(deleted.status, 404);
+    assertResponseStatus(deleted, 404, await describeResponse(deleted));
     expect(await deleted.json()).toStrictEqual({ message: "Not Found" });
 
     const kept = await http.fetch(localUrl(api.apiEndpoint, "/pets"));
-    assertIdentical(kept.status, 200);
+    assertResponseStatus(kept, 200, await describeResponse(kept));
     const event = (await kept.json()) as SimPayload2Event;
     assertIdentical(event.requestContext.stage, "$default");
 
@@ -81,7 +85,7 @@ describe("Sim API Gateway v2 DeleteStage", () => {
     const response = await new SimAwsHttp({ simAws }).fetch(
       localUrl(api.apiEndpoint, "/"),
     );
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("refuses a stage name the API does not have", async () => {

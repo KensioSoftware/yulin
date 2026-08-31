@@ -6,7 +6,7 @@ import {
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
   assertTrue,
@@ -84,7 +84,7 @@ describe("Cognito CloudFormation user pool MFA", () => {
     const clientId = stack.outputs.get("ClientId")?.value;
     assertTypeString(userPoolId);
     assertTypeString(clientId);
-    assertArrayLength(stack.ignoredProperties, 0);
+    assertArrayEmpty(stack.ignoredProperties);
 
     // And the pool reports the setting the template asked for, with the factor
     // behind it, which real CloudFormation configures in a second call once

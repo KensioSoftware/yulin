@@ -4,12 +4,13 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertInstanceOf,
-  assertTrue,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -62,7 +63,7 @@ describe("SimSesV2 verified identities and the sandbox", () => {
     assertInstanceOf(error, SimSesMessageRejected);
     assertStringIncludes(error.message, "Email address is not verified");
     assertStringIncludes(error.message, "hello@example.com");
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("names the region in the way SES writes it", async () => {

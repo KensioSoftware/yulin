@@ -3,7 +3,11 @@ import {
   DeleteRouteCommand,
   GetRoutesCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../../serve/http/sim-aws-http.js";
@@ -60,11 +64,11 @@ describe("Sim API Gateway v2 DeleteRoute", () => {
     // gets, and the other route still serves
     const http = new SimAwsHttp({ simAws });
     const deleted = await http.fetch(localUrl(api.apiEndpoint, "/pets"));
-    assertIdentical(deleted.status, 404);
+    assertResponseStatus(deleted, 404, await describeResponse(deleted));
     expect(await deleted.json()).toStrictEqual({ message: "Not Found" });
 
     const kept = await http.fetch(localUrl(api.apiEndpoint, "/orders"));
-    assertIdentical(kept.status, 200);
+    assertResponseStatus(kept, 200, await describeResponse(kept));
     const event = (await kept.json()) as SimPayload2Event;
     assertIdentical(event.routeKey, "GET /orders");
 

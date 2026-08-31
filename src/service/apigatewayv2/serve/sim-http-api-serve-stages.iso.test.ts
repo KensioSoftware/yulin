@@ -1,4 +1,9 @@
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertUndefined,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -115,7 +120,7 @@ describe("Serving a sim HTTP API from a named stage", () => {
 
     // Then there is nothing to serve it, even though the API has a catch-all
     // route
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     expect(await response.json()).toStrictEqual({ message: "Not Found" });
   });
 

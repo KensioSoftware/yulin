@@ -3,7 +3,12 @@ import {
   AdminInitiateAuthCommand,
   AdminSetUserPasswordCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { assertIdentical, assertTypeString } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertTypeString,
+  describeResponse,
+} from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
@@ -142,7 +147,7 @@ describe("Sim CDK REST API Cognito authorizer local integration", () => {
 
       // Then the deployed method is closed to a request carrying no token.
       const anonymous = await fetch(url);
-      assertIdentical(anonymous.status, 401);
+      assertResponseStatus(anonymous, 401, await describeResponse(anonymous));
       assertIdentical(await anonymous.text(), '{"message":"Unauthorized"}');
 
       // And the id token from that sign-in reaches the handler, which read
@@ -150,7 +155,7 @@ describe("Sim CDK REST API Cognito authorizer local integration", () => {
       const authorized = await fetch(url, {
         headers: { authorization: idToken },
       });
-      assertIdentical(authorized.status, 200);
+      assertResponseStatus(authorized, 200, await describeResponse(authorized));
       assertIdentical(await authorized.text(), "ada");
 
       // And advancing the simulation's clock past the token's expiry closes
@@ -160,7 +165,7 @@ describe("Sim CDK REST API Cognito authorizer local integration", () => {
       const expired = await fetch(url, {
         headers: { authorization: idToken },
       });
-      assertIdentical(expired.status, 401);
+      assertResponseStatus(expired, 401, await describeResponse(expired));
     } finally {
       await srv.close();
     }

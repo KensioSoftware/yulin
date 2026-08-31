@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -58,7 +59,7 @@ describe("sim IAM authorization resourced-based", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("does not authorize from a resource policy with a non-matching principal", async () => {
@@ -107,8 +108,8 @@ describe("sim IAM authorization resourced-based", () => {
     assertTrue(decision.isImplicitDeny);
     assertFalse(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.allowStatements);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 
   it("lets an explicit deny in a resource policy override an identity allow", async () => {
@@ -223,6 +224,6 @@ describe("sim IAM authorization resourced-based", () => {
     assertTrue(decision.isAllowed);
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayEmpty(decision.explicitDenyStatements);
   });
 });

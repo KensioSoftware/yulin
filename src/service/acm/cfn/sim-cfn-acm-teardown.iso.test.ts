@@ -1,4 +1,4 @@
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import { assertArrayEmpty, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { ListCertificatesCommand } from "@aws-sdk/client-acm";
 
@@ -34,7 +34,7 @@ describe("ACM CloudFormation Resource teardown", () => {
       .acm()
       .listCertificates(new ListCertificatesCommand());
 
-    assertArrayLength(listed.CertificateSummaryList, 0);
+    assertArrayEmpty(listed.CertificateSummaryList);
     assertIdentical(
       stack.getResource("SiteCertificate")?.status,
       "DELETE_COMPLETE",

@@ -162,6 +162,7 @@ describe("A sim Lambda verifying a Cognito token", () => {
     })) as FetchedDocument;
 
     // Then the simulated pool answered with the keys it signs its tokens with.
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- this is data returned by the Lambda, not a Fetch Response
     assertIdentical(read.status, 200);
     assertObjectEquals(
       read.body,
@@ -180,6 +181,7 @@ describe("A sim Lambda verifying a Cognito token", () => {
     })) as FetchedDocument;
 
     // Then the same document is served whichever client asked for it.
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- this is data returned by the Lambda, not a Fetch Response
     assertIdentical(read.status, 200);
     assertObjectEquals(
       read.body,
@@ -200,10 +202,12 @@ describe("A sim Lambda verifying a Cognito token", () => {
 
     // Then the JWKS URI it advertises is one the same handler can go on to
     // fetch, which is the whole point of discovering it.
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- this is data returned by the Lambda, not a Fetch Response
     assertIdentical(read.status, 200);
     const discovered = (await invokedWith(setUp, {
       url: jwksUri,
     })) as FetchedDocument;
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- this is data returned by the Lambda, not a Fetch Response
     assertIdentical(discovered.status, 200);
   });
 

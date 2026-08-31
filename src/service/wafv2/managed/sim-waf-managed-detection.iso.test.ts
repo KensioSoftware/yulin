@@ -1,7 +1,7 @@
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayIncludes,
-  assertArrayLength,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -69,8 +69,8 @@ describe("AWS managed rule detection", () => {
 
     // Then no rule in either group claimed it. That is the test these groups
     // are usually in a test suite for.
-    assertArrayLength(core(request, body), 0);
-    assertArrayLength(known(request, body), 0);
+    assertArrayEmpty(core(request, body));
+    assertArrayEmpty(known(request, body));
   });
 
   it("restricts a query string to 2,048 bytes", async () => {
@@ -88,7 +88,7 @@ describe("AWS managed rule detection", () => {
 
     // Then the limit itself is allowed and a byte more is not. AWS documents
     // the figure, so this rule matches where the AWS rule matches.
-    assertArrayLength(atLimit, 0);
+    assertArrayEmpty(atLimit);
     assertArrayEquals(overLimit, ["SizeRestrictions_QueryString"]);
   });
 
@@ -103,7 +103,7 @@ describe("AWS managed rule detection", () => {
     // When a cookie header of exactly the limit is evaluated, and one a byte
     // over it.
     // Then the limit itself is allowed and a byte more is not.
-    assertArrayLength(core(cookie(10_240)), 0);
+    assertArrayEmpty(core(cookie(10_240)));
     assertArrayEquals(core(cookie(10_241)), ["SizeRestrictions_Cookie_Header"]);
   });
 
@@ -117,7 +117,7 @@ describe("AWS managed rule detection", () => {
     // When a body of exactly the limit is evaluated, and one a byte over it.
     // Then the limit itself is allowed and a byte more is not, whether or not
     // WAF read that far into it.
-    assertArrayLength(core(upload, new Uint8Array(8192)), 0);
+    assertArrayEmpty(core(upload, new Uint8Array(8192)));
     assertArrayEquals(core(upload, new Uint8Array(8193)), [
       "SizeRestrictions_Body",
     ]);
@@ -131,7 +131,7 @@ describe("AWS managed rule detection", () => {
 
     // When a path of exactly the limit is evaluated, and one a byte over it.
     // Then the limit itself is allowed and a byte more is not.
-    assertArrayLength(core(path(1024)), 0);
+    assertArrayEmpty(core(path(1024)));
     assertArrayEquals(core(path(1025)), ["SizeRestrictions_URIPath"]);
   });
 
@@ -194,7 +194,7 @@ describe("AWS managed rule detection", () => {
     // AWS-facing hostname, so the suffix every simulated endpoint is served
     // under does not make it block everything.
     assertArrayEquals(local, ["Host_Localhost_Header"]);
-    assertArrayLength(simulated, 0);
+    assertArrayEmpty(simulated);
   });
 
   it("claims a request that reaches for the instance metadata", async () => {
@@ -274,7 +274,7 @@ describe("AWS managed rule detection", () => {
     // Then the extension is what decided, rather than the letters it starts
     // with.
     assertArrayEquals(restricted, ["RestrictedExtensions_URIPath"]);
-    assertArrayLength(image, 0);
+    assertArrayEmpty(image);
   });
 
   it("claims a request for a directory that is not meant to be served", async () => {
@@ -319,6 +319,6 @@ describe("AWS managed rule detection", () => {
     // published, and blocking it here would send somebody off to work around a
     // rule that does not exist.
     assertArrayEquals(exposed, ["AdminProtection_URIPath"]);
-    assertArrayLength(own, 0);
+    assertArrayEmpty(own);
   });
 });

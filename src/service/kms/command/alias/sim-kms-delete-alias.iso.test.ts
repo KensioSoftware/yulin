@@ -6,10 +6,10 @@ import {
   ListAliasesCommand,
 } from "@aws-sdk/client-kms";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertIdentical,
-  assertNonNullable,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -59,7 +59,7 @@ describe("KMS DeleteAliasCommand", () => {
     assertIdentical(described.KeyMetadata.KeyState, "Enabled");
 
     const listed = await simKms.listAliases(new ListAliasesCommand({}));
-    assertArrayLength(listed.Aliases, 0);
+    assertArrayEmpty(listed.Aliases);
   });
 
   it("frees the alias name for another key", async () => {

@@ -1,4 +1,4 @@
-import { assertArrayLength, assertObjectMatches } from "@kensio/smartass";
+import { assertArrayEmpty, assertObjectMatches } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
@@ -34,6 +34,6 @@ describe("Parameter Store values outside a simulation", () => {
     });
 
     // And nothing is recorded, since no substitution was made.
-    assertArrayLength(template.parameters.ignoredProperties, 0);
+    assertArrayEmpty(template.parameters.ignoredProperties);
   });
 });

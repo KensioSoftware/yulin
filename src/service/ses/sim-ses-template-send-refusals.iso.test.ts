@@ -3,7 +3,7 @@ import {
   SendEmailCommand,
 } from "@aws-sdk/client-sesv2";
 import {
-  assertArrayLength,
+  assertArrayEmpty,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -55,7 +55,7 @@ describe("SimSesV2 template send refusals", () => {
     // Then it fails rather than sending an empty message, and nothing is
     // recorded.
     assertInstanceOf(error, SimSesNotFoundException);
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("refuses template data that is not JSON", async () => {
@@ -191,7 +191,7 @@ describe("SimSesV2 template send refusals", () => {
     // Then it is refused rather than rendering one and recording the other,
     // which would file the message under a template it never came from.
     assertInstanceOf(error, SimSesUnsupportedOperationException);
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 
   it("refuses attachments on a template send", async () => {

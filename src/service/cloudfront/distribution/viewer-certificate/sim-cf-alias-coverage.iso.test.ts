@@ -1,5 +1,9 @@
 import { describe, it } from "vitest";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 
 import { SimCloudFrontAliasCoverage } from "./sim-cf-alias-coverage.js";
 
@@ -9,7 +13,7 @@ describe("SimCloudFrontAliasCoverage", () => {
     const coverage = new SimCloudFrontAliasCoverage(["example.test"]);
 
     // When that domain name is used as an alias, then it is covered.
-    assertArrayLength(coverage.uncovered(["example.test"]), 0);
+    assertArrayEmpty(coverage.uncovered(["example.test"]));
   });
 
   it("covers a subject alternative name", () => {
@@ -20,10 +24,7 @@ describe("SimCloudFrontAliasCoverage", () => {
     ]);
 
     // When both names are used as aliases, then both are covered.
-    assertArrayLength(
-      coverage.uncovered(["example.test", "www.example.test"]),
-      0,
-    );
+    assertArrayEmpty(coverage.uncovered(["example.test", "www.example.test"]));
   });
 
   it("covers one label with a wildcard", () => {
@@ -31,7 +32,7 @@ describe("SimCloudFrontAliasCoverage", () => {
     const coverage = new SimCloudFrontAliasCoverage(["*.example.test"]);
 
     // When a single-label subdomain is used as an alias, then it is covered.
-    assertArrayLength(coverage.uncovered(["www.example.test"]), 0);
+    assertArrayEmpty(coverage.uncovered(["www.example.test"]));
   });
 
   it("does not cover the apex with a wildcard", () => {
@@ -58,7 +59,7 @@ describe("SimCloudFrontAliasCoverage", () => {
     const coverage = new SimCloudFrontAliasCoverage(["Example.Test."]);
 
     // When the alias differs only in case and trailing dot, it is covered.
-    assertArrayLength(coverage.uncovered(["example.test"]), 0);
+    assertArrayEmpty(coverage.uncovered(["example.test"]));
   });
 
   it("reports every uncovered alias", () => {

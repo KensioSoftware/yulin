@@ -4,6 +4,7 @@ import {
   type SendEmailCommandInput,
 } from "@aws-sdk/client-sesv2";
 import {
+  assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
   assertFalse,
@@ -226,7 +227,7 @@ describe("SimSesV2 SendEmail", () => {
 
     // Then nothing was recorded, so a test asserting no message went out is
     // not fooled by one SES never accepted.
-    assertArrayLength(ses.sentEmails(), 0);
+    assertArrayEmpty(ses.sentEmails());
   });
 });
 

@@ -9,7 +9,11 @@ import {
   PutBucketNotificationConfigurationCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -186,6 +190,6 @@ describe("Notifying a simulated Lambda function of a copied Object", () => {
 
     // Then nothing was delivered, because real S3 keeps a copy and a put
     // apart.
-    assertArrayLength(received, 0);
+    assertArrayEmpty(received);
   });
 });

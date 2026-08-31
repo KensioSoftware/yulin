@@ -1,8 +1,10 @@
 import {
   assertIdentical,
   assertInstanceOf,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
@@ -77,7 +79,7 @@ export function handler(event) {
       new Response(),
     );
 
-    assertIdentical(result.status, 201);
+    assertResponseStatus(result, 201, await describeResponse(result));
     assertIdentical(result.statusText, "Created");
     assertIdentical(result.headers.get("x-test"), "loaded-from-module");
   });

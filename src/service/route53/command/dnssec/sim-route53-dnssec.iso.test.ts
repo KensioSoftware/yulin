@@ -10,6 +10,7 @@ import {
   GetDNSSECCommand,
 } from "@aws-sdk/client-route-53";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -152,7 +153,7 @@ describe("Route53 DNSSEC", () => {
 
     // Then it says so rather than failing.
     assertIdentical(dnssec.Status?.ServeSignature, "NOT_SIGNING");
-    assertArrayLength(dnssec.KeySigningKeys ?? [], 0);
+    assertArrayEmpty(dnssec.KeySigningKeys ?? []);
   });
 
   it("stops signing when DNSSEC is disabled", async () => {
@@ -198,7 +199,7 @@ describe("Route53 DNSSEC", () => {
       .route53()
       .getDnssec(new GetDNSSECCommand({ HostedZoneId: fixture.hostedZoneId }));
 
-    assertArrayLength(dnssec.KeySigningKeys ?? [], 0);
+    assertArrayEmpty(dnssec.KeySigningKeys ?? []);
   });
 
   it("activates a key signing key created inactive", async () => {

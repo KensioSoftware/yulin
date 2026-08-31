@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -66,7 +68,7 @@ describe("The sim Cognito managed login session cookie", () => {
 
     // Then the response carries the session cookie real managed login sets,
     // scoped to the domain and held for the hour Cognito gives one.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
 
     const header = response.headers.get("set-cookie");
     assertNonNullable(header);
@@ -105,7 +107,7 @@ describe("The sim Cognito managed login session cookie", () => {
 
     // Then it goes straight back to the callback with a code, rather than
     // being shown the sign-in form.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
 
     const location = response.headers.get("location");
     assertNonNullable(location);
@@ -139,7 +141,7 @@ describe("The sim Cognito managed login session cookie", () => {
     );
 
     // Then the cookie is taken out of the browser.
-    assertIdentical(signedOut.status, 302);
+    assertResponseStatus(signedOut, 302, await describeResponse(signedOut));
 
     const header = signedOut.headers.get("set-cookie");
     assertNonNullable(header);
@@ -157,7 +159,7 @@ describe("The sim Cognito managed login session cookie", () => {
       { headers: { cookie: `cognito=${session}` } },
     );
 
-    assertIdentical(afterwards.status, 200);
+    assertResponseStatus(afterwards, 200, await describeResponse(afterwards));
     assertStringIncludes(await afterwards.text(), 'name="password"');
   });
 
@@ -179,7 +181,7 @@ describe("The sim Cognito managed login session cookie", () => {
     );
 
     // Then it is shown the sign-in form.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertStringIncludes(await response.text(), 'name="password"');
   });
 
@@ -211,7 +213,7 @@ describe("The sim Cognito managed login session cookie", () => {
     );
 
     // Then the session is still read, and it signs the browser in.
-    assertIdentical(response.status, 302);
+    assertResponseStatus(response, 302, await describeResponse(response));
 
     const location = response.headers.get("location");
     assertNonNullable(location);

@@ -7,6 +7,8 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertObjectMatches,
+  assertResponseStatus,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -42,7 +44,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then the pool answers with the keys it signs its tokens with.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(response.headers.get("content-type"), "application/json");
     assertObjectEquals(
       await response.json(),
@@ -65,7 +67,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     // Then the issuer and the JWKS URI are ones a client can go on to fetch,
     // which means the local hostname rather than the real AWS one.
     const issuer = `http://cognito-idp.eu-west-2.sim-aws.localhost/${userPoolId}`;
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
     assertObjectMatches(await response.json(), {
       issuer,
       jwks_uri: `${issuer}/.well-known/jwks.json`,
@@ -91,7 +93,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then the pool is found by id alone.
-    assertIdentical(response.status, 200);
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 
   it("reports an unknown pool id as not found", async () => {
@@ -106,7 +108,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then the endpoint reports it as not found.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertObjectEquals(await response.json(), {
       message: "User pool eu-west-2_aBcDeFgHi does not exist.",
     });
@@ -125,7 +127,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then the pool is not found there, because a pool id names its region.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("reports any other path on the endpoint as not found", async () => {
@@ -146,8 +148,8 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
 
     // Then neither is served: the Cognito API itself is reached through SimSdk
     // rather than over HTTP.
-    assertIdentical(wellKnown.status, 404);
-    assertIdentical(apiPath.status, 404);
+    assertResponseStatus(wellKnown, 404, await describeResponse(wellKnown));
+    assertResponseStatus(apiPath, 404, await describeResponse(apiPath));
   });
 
   it("reports a path below an endpoint as not found", async () => {
@@ -164,7 +166,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
 
     // Then it is not served, rather than treated as the JWKS path with
     // something after it.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 
   it("answers only the methods a document is read with", async () => {
@@ -183,11 +185,11 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     const headed = await simAwsHttp.fetch(jwksUrl, { method: "HEAD" });
 
     // Then the write is refused, and says what the endpoint does answer.
-    assertIdentical(posted.status, 405);
+    assertResponseStatus(posted, 405, await describeResponse(posted));
     assertIdentical(posted.headers.get("allow"), "GET, HEAD");
 
     // And the HEAD answers the headers a GET would, with no document.
-    assertIdentical(headed.status, 200);
+    assertResponseStatus(headed, 200, await describeResponse(headed));
     assertIdentical(headed.headers.get("content-type"), "application/json");
     const jwks = simAws.cognitoIdentityProvider().userPool(userPoolId).jwks();
     const jwksLength = Buffer.byteLength(JSON.stringify(jwks));
@@ -208,7 +210,7 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then there is no endpoint there, rather than a pool with no name.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertObjectEquals(await response.json(), {
       message: "No simulated Cognito endpoint at //.well-known/jwks.json",
     });
@@ -230,6 +232,6 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     );
 
     // Then the endpoint no longer answers for it.
-    assertIdentical(response.status, 404);
+    assertResponseStatus(response, 404, await describeResponse(response));
   });
 });
