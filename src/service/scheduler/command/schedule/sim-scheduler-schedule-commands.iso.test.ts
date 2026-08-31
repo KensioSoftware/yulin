@@ -93,6 +93,62 @@ describe("Scheduler schedule commands", () => {
     );
   });
 
+  it("round-trips retry and dead-letter settings through create and update", async () => {
+    // Given a schedule with zero retries and a dead-letter queue.
+    const simAws = new SimAws();
+    const deadLetterArn =
+      "arn:aws:sqs:us-east-1:888888888888:schedule-failures";
+
+    await simAws.scheduler().createSchedule(
+      new CreateScheduleCommand(
+        schedule({
+          Target: {
+            Arn: functionArn,
+            RoleArn: roleArn,
+            DeadLetterConfig: { Arn: deadLetterArn },
+            RetryPolicy: {
+              MaximumEventAgeInSeconds: 60,
+              MaximumRetryAttempts: 0,
+            },
+          },
+        }),
+      ),
+    );
+
+    // When the policy is read and then replaced by an update.
+    const created = await simAws
+      .scheduler()
+      .getSchedule(new GetScheduleCommand({ Name: "nightly-report" }));
+
+    await simAws.scheduler().updateSchedule(
+      new UpdateScheduleCommand(
+        schedule({
+          Target: {
+            Arn: functionArn,
+            RoleArn: roleArn,
+            DeadLetterConfig: { Arn: deadLetterArn },
+            RetryPolicy: { MaximumRetryAttempts: 2 },
+          },
+        }),
+      ),
+    );
+    const updated = await simAws
+      .scheduler()
+      .getSchedule(new GetScheduleCommand({ Name: "nightly-report" }));
+
+    // Then zero was preserved, and the update reports only its new settings.
+    assertNonNullable(created.Target);
+    assertNonNullable(created.Target.DeadLetterConfig);
+    assertNonNullable(created.Target.RetryPolicy);
+    assertNonNullable(updated.Target);
+    assertNonNullable(updated.Target.RetryPolicy);
+    assertIdentical(created.Target.DeadLetterConfig.Arn, deadLetterArn);
+    assertIdentical(created.Target.RetryPolicy.MaximumRetryAttempts, 0);
+    assertIdentical(created.Target.RetryPolicy.MaximumEventAgeInSeconds, 60);
+    assertIdentical(updated.Target.RetryPolicy.MaximumRetryAttempts, 2);
+    assertUndefined(updated.Target.RetryPolicy.MaximumEventAgeInSeconds);
+  });
+
   it("refuses to create a schedule that already exists", async () => {
     // Given a schedule that has been created.
     const simAws = new SimAws();

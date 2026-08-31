@@ -145,6 +145,16 @@ to it. Telling a reader which one it was saves the whole diagnosis.
 Scheduler has completed its delivery once Lambda accepts the event. Lambda then owns handler errors,
 event invoke retries, destinations and the function's dead-letter queue.
 
+`SimSchedulerDeliveryAttempt` owns failures before a target accepts the request. An explicit retry
+policy schedules another attempt on `BackgroundScheduler` after one second, then two, four and so
+on. It stops at the configured retry limit or event age. A missing target or an IAM refusal is
+permanent and skips retries because the same request cannot change that answer.
+
+`SimSchedulerDeadLetterQueue` sends an abandoned target's original input to the configured standard
+SQS queue. It assumes the same execution role and requires `sqs:SendMessage` on the queue. The SQS
+message attributes carry Scheduler's error and invocation details. A missing queue or failed
+authorization is kept in `deliveryFailures`, while a successful send leaves no inspection failure.
+
 `SimAwsSchedulerDeliveryTargets` assumes the role in the role's own Account and reaches the target in
 the target's, which need not be the same one. A `SimScheduler` built outside SimAws gets
 `SimSchedulerNoDeliveryTargets`, which records every invocation as a failure saying why there was
@@ -185,7 +195,7 @@ service's error type catches this refusal with the rest.
 
 ## Divergences
 
-Five, all deliberate.
+Six, all deliberate.
 
 A schedule group is **`ACTIVE` or gone**. Real Scheduler holds a group in `DELETING` while the
 schedules in it are removed, and reaching that state needs a deletion that takes time. Deleting a
@@ -207,3 +217,7 @@ assert on something that is not the schedule.
 A target with no `Input` receives an **empty JSON object**. AWS documents that for a Lambda target
 and says nothing about it for a queue or a topic, so the same answer is used for all three rather
 than inventing a different one per service.
+
+Retry backoff is a **deterministic power-of-two sequence**, beginning at one second. Real Scheduler
+documents exponential backoff without publishing the delays. A fixed sequence lets a test move the
+simulated clock to the next attempt exactly.

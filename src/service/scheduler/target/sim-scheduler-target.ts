@@ -4,6 +4,14 @@ import {
   SimSchedulerValidationException,
 } from "../error/sim-scheduler.error.js";
 import { SimSchedulerTargetArn } from "./sim-scheduler-target-arn.js";
+import {
+  SimSchedulerDeadLetterConfig,
+  type SimSchedulerDeadLetterConfigInput,
+} from "./sim-scheduler-dead-letter-config.js";
+import {
+  SimSchedulerRetryPolicy,
+  type SimSchedulerRetryPolicyInput,
+} from "./sim-scheduler-retry-policy.js";
 
 /**
  * The longest role ARN AWS takes, and the shape one has to be.
@@ -18,6 +26,8 @@ interface SimSchedulerRequestedTarget {
   readonly RoleArn?: string | undefined;
   readonly Input?: string | undefined;
   readonly EcsParameters?: unknown;
+  readonly DeadLetterConfig?: SimSchedulerDeadLetterConfigInput | undefined;
+  readonly RetryPolicy?: SimSchedulerRetryPolicyInput | undefined;
 }
 
 interface SimSchedulerTargetProperties {
@@ -25,6 +35,8 @@ interface SimSchedulerTargetProperties {
   readonly roleArn: string;
   readonly input: string | undefined;
   readonly task: SimEcsTargetTask | undefined;
+  readonly deadLetterConfig: SimSchedulerDeadLetterConfig | undefined;
+  readonly retryPolicy: SimSchedulerRetryPolicy | undefined;
 }
 
 /**
@@ -66,12 +78,16 @@ export class SimSchedulerTarget {
    * what the task overrides instead.
    */
   public readonly task: SimEcsTargetTask | undefined;
+  public readonly deadLetterConfig: SimSchedulerDeadLetterConfig | undefined;
+  public readonly retryPolicy: SimSchedulerRetryPolicy | undefined;
 
   private constructor(properties: SimSchedulerTargetProperties) {
     this.arn = properties.arn;
     this.roleArn = properties.roleArn;
     this.input = properties.input;
     this.task = properties.task;
+    this.deadLetterConfig = properties.deadLetterConfig;
+    this.retryPolicy = properties.retryPolicy;
   }
 
   /**
@@ -91,6 +107,14 @@ export class SimSchedulerTarget {
       roleArn: this.roleArnIn(target.RoleArn),
       input: target.Input,
       task: this.taskIn(arn, target),
+      deadLetterConfig:
+        target.DeadLetterConfig === undefined
+          ? undefined
+          : SimSchedulerDeadLetterConfig.of(target.DeadLetterConfig),
+      retryPolicy:
+        target.RetryPolicy === undefined
+          ? undefined
+          : SimSchedulerRetryPolicy.of(target.RetryPolicy),
     });
   }
 

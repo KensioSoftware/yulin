@@ -21,7 +21,10 @@ export {
 } from "./target/sim-scheduler-target-arn.js";
 export {
   simSchedulerServicePrincipal,
+  type SimSchedulerDeadLetterRequest,
+  type SimSchedulerDeliveryRequest,
   type SimSchedulerDeliveryTargets,
+  type SimSchedulerExhaustedRetryCondition,
 } from "./delivery/sim-scheduler-delivery.js";
 export {
   SimSchedulerDeliveryFailure,

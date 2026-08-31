@@ -12,13 +12,22 @@ export interface SimSchedulerRequestTarget {
   readonly Arn?: string | undefined;
   readonly RoleArn?: string | undefined;
   readonly Input?: string | undefined;
-  readonly DeadLetterConfig?: unknown;
-  readonly RetryPolicy?: unknown;
+  readonly DeadLetterConfig?: SimSchedulerDeadLetterConfig | undefined;
+  readonly RetryPolicy?: SimSchedulerRetryPolicy | undefined;
   readonly EcsParameters?: SimEcsTargetParametersType | undefined;
   readonly EventBridgeParameters?: unknown;
   readonly KinesisParameters?: unknown;
   readonly SageMakerPipelineParameters?: unknown;
   readonly SqsParameters?: unknown;
+}
+
+export interface SimSchedulerDeadLetterConfig {
+  readonly Arn?: string | undefined;
+}
+
+export interface SimSchedulerRetryPolicy {
+  readonly MaximumEventAgeInSeconds?: number | undefined;
+  readonly MaximumRetryAttempts?: number | undefined;
 }
 
 /**

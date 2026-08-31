@@ -1,5 +1,6 @@
 import { SimSchedulerTargetNotFound } from "../error/sim-scheduler-delivery.error.js";
 import type {
+  SimSchedulerDeadLetterRequest,
   SimSchedulerDeliveryRequest,
   SimSchedulerDeliveryTargets,
 } from "./sim-scheduler-delivery.js";
@@ -23,6 +24,19 @@ export class SimSchedulerNoDeliveryTargets implements SimSchedulerDeliveryTarget
         `This simulated Scheduler has no targets to invoke, so ` +
           `${request.schedule.target.arn.value} was not reached. Reach ` +
           `Scheduler through SimAws for a schedule that invokes.`,
+      ),
+    );
+  }
+
+  /**
+   * Refuse a dead-letter delivery for the same reason as a target delivery.
+   */
+  deadLetter(request: SimSchedulerDeadLetterRequest): Promise<void> {
+    return Promise.reject(
+      new SimSchedulerTargetNotFound(
+        `This simulated Scheduler has no queues to dead-letter ` +
+          `${request.delivery.schedule.arn} to. Reach Scheduler through ` +
+          `SimAws for a schedule that invokes.`,
       ),
     );
   }

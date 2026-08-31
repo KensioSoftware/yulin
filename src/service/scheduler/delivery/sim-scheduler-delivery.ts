@@ -34,6 +34,22 @@ export interface SimSchedulerDeliveryTargets {
    * Invoke a schedule's target, refusing if its execution role may not.
    */
   deliver(request: SimSchedulerDeliveryRequest): Promise<void>;
+
+  /**
+   * Send an invocation Scheduler has stopped trying to its dead-letter queue.
+   */
+  deadLetter(request: SimSchedulerDeadLetterRequest): Promise<void>;
+}
+
+export type SimSchedulerExhaustedRetryCondition =
+  | "MaximumEventAgeInSeconds"
+  | "MaximumRetryAttempts";
+
+export interface SimSchedulerDeadLetterRequest {
+  readonly delivery: SimSchedulerDeliveryRequest;
+  readonly error: unknown;
+  readonly retryAttempts: number;
+  readonly exhaustedCondition?: SimSchedulerExhaustedRetryCondition | undefined;
 }
 
 /**

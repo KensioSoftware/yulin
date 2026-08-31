@@ -144,27 +144,43 @@ describe("Scheduler schedule validation", () => {
     assertStringIncludes(notARole.message, "is not an IAM role ARN");
   });
 
-  it("refuses the target properties it does not model", async () => {
-    // Given targets asking for behaviour that is not simulated.
-    const withDlq = await refusedSchedule({
+  it("validates the retry policy limits", async () => {
+    // Given retry settings immediately outside Scheduler's accepted ranges.
+    const young = await refusedSchedule({
       Target: {
         Arn: functionArn,
         RoleArn: roleArn,
-        DeadLetterConfig: { Arn: "arn:aws:sqs:us-east-1:888888888888:dead" },
+        RetryPolicy: { MaximumEventAgeInSeconds: 59 },
       },
     });
-    const withRetry = await refusedSchedule({
+    const many = await refusedSchedule({
       Target: {
         Arn: functionArn,
         RoleArn: roleArn,
-        RetryPolicy: { MaximumRetryAttempts: 3 },
+        RetryPolicy: { MaximumRetryAttempts: 186 },
       },
     });
 
-    // Then each is refused rather than dropped, since a dead letter queue that
-    // is never written to is worse than one that was refused.
-    assertInstanceOf(withDlq, SimSchedulerUnsimulatedInputException);
-    assertInstanceOf(withRetry, SimSchedulerUnsimulatedInputException);
+    // Then each is a request validation failure with its limit named.
+    assertInstanceOf(young, SimSchedulerValidationException);
+    assertStringIncludes(young.message, "between 60 and 86400");
+    assertInstanceOf(many, SimSchedulerValidationException);
+    assertStringIncludes(many.message, "between 0 and 185");
+  });
+
+  it("requires a standard SQS dead-letter queue ARN", async () => {
+    const error = await refusedSchedule({
+      Target: {
+        Arn: functionArn,
+        RoleArn: roleArn,
+        DeadLetterConfig: {
+          Arn: "arn:aws:sqs:us-east-1:888888888888:dead.fifo",
+        },
+      },
+    });
+
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "standard SQS queue ARN");
   });
 
   it("refuses a start and end date rather than ignoring the window", async () => {

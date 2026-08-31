@@ -244,6 +244,33 @@ Lambda accepts the asynchronous invocation, its event invoke config applies. Han
 Lambda's retry, destination and function dead-letter queue settings and do not appear in
 `deliveryFailures`.
 
+### Retrying and dead-lettering a delivery
+
+Set `Target.RetryPolicy` to retry a failure that may clear. `MaximumRetryAttempts` is the number of
+attempts after the first one and accepts 0 through 185. `MaximumEventAgeInSeconds` accepts 60 through
+86,400. If the policy leaves either member out, its effective value is 185 attempts or 86,400
+seconds. `GetSchedule` still reports the policy as it was written.
+
+Retries use the simulation's clock. The first retry is due one second after the failed attempt. Each
+following delay doubles to 2, 4, 8 seconds and so on. A retry does not run while the clock stands
+still. `advanceBy(...)` runs every retry that becomes due in the interval and settles their work
+before it returns.
+
+Scheduler does not retry a failure that cannot clear by trying the same request. A missing target,
+a missing execution role, an execution role that does not trust Scheduler and an IAM denial are
+permanent failures. They are abandoned after the initial attempt.
+
+Set `Target.DeadLetterConfig.Arn` to a standard SQS queue ARN to keep an input that Scheduler abandons.
+The execution role needs `sqs:SendMessage` on this queue as well as permission to invoke the target.
+The message body is the target's original `Input`. Its string message attributes follow Scheduler's
+shape and include the error, schedule ARN, target ARN, scheduled time and retry count.
+`EXHAUSTED_RETRY_CONDITION` is `MaximumRetryAttempts` or `MaximumEventAgeInSeconds` for an exhausted
+retryable failure. A permanent failure leaves that attribute out.
+
+A successful DLQ send does not add an entry to `deliveryFailures`, since the configured destination
+received the input. A missing queue or denied `sqs:SendMessage` is recorded there instead. This keeps
+a misconfigured DLQ visible to a test.
+
 ### One-time schedules and what happens after
 
 An `at(...)` schedule fires once and then stops. By default it stays in the Account afterwards, which
@@ -769,6 +796,8 @@ Resources of the same stack.
 - ECS targets, running a simulated task as the execution role, with the task definition and
   `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
 - `ActionAfterCompletion`, and `deliveryFailures` for invocations that did not happen.
+- Target retry policies driven by simulated time, and standard SQS dead-letter queues carrying the
+  original input and Scheduler diagnostic attributes.
 - `CreateScheduleGroup`, `GetScheduleGroup`, `DeleteScheduleGroup` and `ListScheduleGroups`, over
   the `default` group every account and region starts with and any group created beside it.
 - `AWS::Scheduler::Schedule` and `AWS::Scheduler::ScheduleGroup` deployed from a CloudFormation
@@ -785,10 +814,12 @@ Resources of the same stack.
   of it, and a simulation left alone in real time never fires however long it is left.
 - Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time, and its
   promise is at-least-once.
-- Scheduler attempts each target delivery once. Target `RetryPolicy` and `DeadLetterConfig` are
-  unsupported. A failure before target acceptance is recorded in `deliveryFailures` and is never
-  redelivered. A Lambda handler failure uses Lambda's asynchronous retry, destination and function
-  dead-letter queue settings.
+- Retry delays are deterministic powers of two seconds. Real Scheduler uses exponential backoff
+  without publishing an exact sequence. The fixed sequence lets a test advance to a known retry
+  instant.
+- Delivery retries cover failures before the target accepts the request. A Lambda handler failure
+  happens after Lambda accepts its asynchronous invocation and uses Lambda's retry, destination and
+  function dead-letter queue settings instead.
 - A schedule group carries no tags. `CreateScheduleGroup` refuses `Tags`, since the simulation
   stores them nowhere. A template's `Tags` are recorded as an ignored property and the group still
   deploys.
@@ -805,9 +836,10 @@ Resources of the same stack.
 - Targets are Lambda, SQS, SNS and ECS. The universal target
   (`arn:aws:scheduler:::aws-sdk:<service>:<action>`) and every other target service are refused when
   the schedule is created, ahead of the first due instant.
-- A target `DeadLetterConfig`, `RetryPolicy`, `EventBridgeParameters`, `KinesisParameters`,
-  `SageMakerPipelineParameters` and `SqsParameters` are refused outright, as is `EcsParameters` on a
-  target whose ARN names something other than an ECS cluster.
+- A target `EventBridgeParameters`, `KinesisParameters`, `SageMakerPipelineParameters` and
+  `SqsParameters` are refused outright, as is `EcsParameters` on a target whose ARN names something
+  other than an ECS cluster. A `DeadLetterConfig` must name a standard SQS queue because simulated
+  SQS does not support FIFO queues.
 - An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
   `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
   there is no placement and no network here for them to apply to. Anything else it can carry, such
@@ -817,5 +849,5 @@ Resources of the same stack.
   on an ECS target, where every other target type takes any text.
 - A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
   for each of them, in this process and one after another.
-- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Nothing here retries, so it has
-  no request to make idempotent.
+- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Schedule management requests
+  are not retried, so the token has no request to make idempotent.

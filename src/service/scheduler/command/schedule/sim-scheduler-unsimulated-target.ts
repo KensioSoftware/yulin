@@ -14,12 +14,6 @@ function unsimulatedTargetProperties(
 ): readonly (readonly [string, unknown, string])[] {
   return [
     [
-      "DeadLetterConfig",
-      target.DeadLetterConfig,
-      "a failed invocation is recorded rather than sent on",
-    ],
-    ["RetryPolicy", target.RetryPolicy, "an invocation is attempted once"],
-    [
       "EventBridgeParameters",
       target.EventBridgeParameters,
       "an event bus is not a simulated target",
