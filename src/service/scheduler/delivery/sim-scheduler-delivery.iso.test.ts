@@ -1,4 +1,5 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { PutFunctionEventInvokeConfigCommand } from "@aws-sdk/client-lambda";
 import { CreateScheduleCommand } from "@aws-sdk/client-scheduler";
 import { CreateTopicCommand, SubscribeCommand } from "@aws-sdk/client-sns";
 import {
@@ -10,6 +11,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -168,6 +170,90 @@ describe("Scheduler target invocation", () => {
       .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queue.QueueUrl }));
 
     assertArrayLength(received.Messages ?? [], 1);
+  });
+
+  it("leaves a failing handler to Lambda's asynchronous invocation", async () => {
+    // Given a failing function whose Lambda config sends the exhausted event
+    // and its failure record to separate queues.
+    const simAws = await simulationWithRole({
+      Effect: "Allow",
+      Action: "lambda:InvokeFunction",
+      Resource: functionArn,
+    });
+    const failures = await simAws
+      .sqs()
+      .createQueue(new CreateQueueCommand({ QueueName: "lambda-failures" }));
+    const deadLetters = await simAws
+      .sqs()
+      .createQueue(
+        new CreateQueueCommand({ QueueName: "lambda-dead-letters" }),
+      );
+
+    await simAws.lambda().createFunction({
+      input: {
+        FunctionName: "reconcile",
+        Role: "arn:aws:iam::888888888888:role/ReconcileRole",
+        DeadLetterConfig: {
+          TargetArn: "arn:aws:sqs:us-east-1:888888888888:lambda-dead-letters",
+        },
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => {
+            throw new Error("reconciliation failed");
+          }),
+        },
+      },
+    });
+    await simAws.lambda().putFunctionEventInvokeConfig(
+      new PutFunctionEventInvokeConfigCommand({
+        FunctionName: "reconcile",
+        MaximumRetryAttempts: 0,
+        DestinationConfig: {
+          OnFailure: {
+            Destination: "arn:aws:sqs:us-east-1:888888888888:lambda-failures",
+          },
+        },
+      }),
+    );
+
+    // When a schedule invokes it with an event.
+    await scheduleFor(simAws, {
+      Arn: functionArn,
+      RoleArn: roleArn,
+      Input: JSON.stringify({ report: "nightly" }),
+    });
+
+    // Then Scheduler records a successful delivery. Lambda sends its own
+    // failure record and dead-letter event after the handler throws.
+    assertArrayLength(simAws.scheduler().deliveryFailures, 0);
+
+    const failureMessages = await simAws
+      .sqs()
+      .receiveMessage(
+        new ReceiveMessageCommand({ QueueUrl: failures.QueueUrl }),
+      );
+    const [failureMessage] = failureMessages.Messages ?? [];
+    assertNonNullable(failureMessage?.Body, "a Lambda failure record arrived");
+    const failureRecord = JSON.parse(failureMessage.Body) as {
+      readonly requestContext: {
+        readonly approximateInvokeCount: number;
+        readonly condition: string;
+      };
+      readonly requestPayload: object;
+    };
+    assertIdentical(failureRecord.requestContext.approximateInvokeCount, 1);
+    assertIdentical(failureRecord.requestContext.condition, "RetriesExhausted");
+    assertObjectEquals(failureRecord.requestPayload, { report: "nightly" });
+
+    const deadLetterMessages = await simAws
+      .sqs()
+      .receiveMessage(
+        new ReceiveMessageCommand({ QueueUrl: deadLetters.QueueUrl }),
+      );
+    assertArrayLength(deadLetterMessages.Messages ?? [], 1);
+    assertIdentical(
+      deadLetterMessages.Messages?.[0]?.Body,
+      '{"report":"nightly"}',
+    );
   });
 
   it("does not invoke when the role may not, and says why", async () => {

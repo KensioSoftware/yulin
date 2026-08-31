@@ -59,10 +59,19 @@ export class SimSchedulerDeliveryFunction {
       );
     }
 
-    // Invoked directly rather than through an Invoke command, because the
-    // schedule is already inside the background task standing for the
-    // asynchronous invocation real Scheduler makes, and because a handler
-    // failure has to reach the delivery outcome rather than being swallowed.
-    await simFunction.invoke(simSchedulerDeliveryDocument(delivery.request));
+    // Scheduler waits for Lambda to accept the event. Lambda owns everything
+    // after acceptance, including handler errors, retries and destinations.
+    await this.scope.lambda().invoke(
+      {
+        input: {
+          FunctionName: targetArn.value,
+          InvocationType: "Event",
+          Payload: JSON.stringify(
+            simSchedulerDeliveryDocument(delivery.request),
+          ),
+        },
+      },
+      { caller: delivery.caller },
+    );
   }
 }
