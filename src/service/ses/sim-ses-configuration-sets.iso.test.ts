@@ -46,6 +46,7 @@ describe("simulated SES configuration sets", () => {
     // Then each group is there to assert on, which is the whole point of
     // holding a set that nothing here routes an event to.
     assertNonNullable(configurationSet);
+    assertNonNullable(configurationSet.suppressedReasons);
     assertArrayEquals(configurationSet.suppressedReasons, [
       "BOUNCE",
       "COMPLAINT",
@@ -64,16 +65,37 @@ describe("simulated SES configuration sets", () => {
       new CreateConfigurationSetCommand({ ConfigurationSetName: "bare" }),
     );
 
-    // Then sending is on, TLS is optional, reputation metrics are off and no
-    // reason is suppressed, which is what a real set defaults to.
+    // Then sending is on, TLS is optional, reputation metrics are off and
+    // suppression falls back to the account, as a real set defaults to.
     const configurationSet = ses.findConfigurationSet("bare");
 
     assertNonNullable(configurationSet);
     assertTrue(configurationSet.sendingEnabled);
     assertIdentical(configurationSet.deliveryOptions.tlsPolicy, "OPTIONAL");
     assertFalse(configurationSet.reputationOptions.reputationMetricsEnabled);
-    assertArrayEmpty(configurationSet.suppressedReasons);
+    assertUndefined(configurationSet.suppressedReasons);
     assertUndefined(configurationSet.deliveryOptions.sendingPoolName);
+  });
+
+  it("keeps an explicit empty suppression override", async () => {
+    // Given a set with suppression options present and no active reasons.
+    const ses = new SimAws().sesV2();
+
+    await ses.createConfigurationSet(
+      new CreateConfigurationSetCommand({
+        ConfigurationSetName: "no-feedback-suppression",
+        SuppressionOptions: { SuppressedReasons: [] },
+      }),
+    );
+
+    // Then the empty override stays distinct from an absent option group.
+    const configurationSet = ses.findConfigurationSet(
+      "no-feedback-suppression",
+    );
+
+    assertNonNullable(configurationSet);
+    assertNonNullable(configurationSet.suppressedReasons);
+    assertArrayEmpty(configurationSet.suppressedReasons);
   });
 
   it("reports every option group back from GetConfigurationSet", async () => {
@@ -95,7 +117,7 @@ describe("simulated SES configuration sets", () => {
     assertTrue(read.ReputationOptions?.ReputationMetricsEnabled);
   });
 
-  it("answers the defaults it applied rather than leaving them out", async () => {
+  it("reports applied defaults and keeps absent suppression options out", async () => {
     // Given a set declaring nothing but its name.
     const ses = new SimAws().sesV2();
 
@@ -108,10 +130,11 @@ describe("simulated SES configuration sets", () => {
       new GetConfigurationSetCommand({ ConfigurationSetName: "bare" }),
     );
 
-    // Then the groups the set never declared are still reported, as real SES
-    // reports them.
+    // Then applied defaults are reported, while the absent suppression group
+    // remains absent so feedback can fall back to the account reasons.
     assertTrue(read.SendingOptions?.SendingEnabled);
     assertIdentical(read.DeliveryOptions?.TlsPolicy, "OPTIONAL");
+    assertUndefined(read.SuppressionOptions);
   });
 
   it("lists the sets by name, in the order they were made", async () => {

@@ -84,6 +84,7 @@ describe("AWS::SES::ConfigurationSet", () => {
 
     assertArrayEmpty(stack.skippedResources);
     assertNonNullable(configurationSet);
+    assertNonNullable(configurationSet.suppressedReasons);
     assertArrayEquals(configurationSet.suppressedReasons, [
       "BOUNCE",
       "COMPLAINT",
@@ -241,13 +242,14 @@ describe("AWS::SES::ConfigurationSet property types", () => {
       DeliveryOptions: {},
     });
 
-    // Then the set reads as one declaring no group at all, with the defaults
-    // real SES applies.
+    // Then the empty suppression group remains an explicit override, while
+    // the empty delivery group uses the real SES defaults.
     const configurationSet = simAws
       .sesV2()
       .findConfigurationSet("transactional");
 
     assertNonNullable(configurationSet);
+    assertNonNullable(configurationSet.suppressedReasons);
     assertArrayEmpty(configurationSet.suppressedReasons);
     assertIdentical(configurationSet.deliveryOptions.tlsPolicy, "OPTIONAL");
     assertUndefined(configurationSet.deliveryOptions.maxDeliverySeconds);

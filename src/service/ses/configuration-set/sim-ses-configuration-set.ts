@@ -41,7 +41,7 @@ export interface SimSesConfigurationSetReputationOptions {
  * Everything a configuration set holds apart from its name.
  */
 export interface SimSesConfigurationSetOptions {
-  readonly suppressedReasons: readonly SimSesSuppressedReason[];
+  readonly suppressedReasons: readonly SimSesSuppressedReason[] | undefined;
   readonly sendingEnabled: boolean;
   readonly deliveryOptions: SimSesConfigurationSetDeliveryOptions;
   readonly reputationOptions: SimSesConfigurationSetReputationOptions;
@@ -59,11 +59,9 @@ interface SimSesConfigurationSetProperties {
  * A configuration set is a named group of settings a send can be made under,
  * covering suppression, whether sending is on, how the message is handed on
  * and whether reputation metrics are published. None of it changes what a
- * message says, which is why this is state to read back rather than behaviour
- * to reproduce.
- *
- * Sending is the exception, and it is left to the work that attaches a set to
- * a send. Here the switch is recorded and acted on by nothing.
+ * message says. The sending switch controls acceptance, and the suppression
+ * reasons control feedback. Delivery and reputation options remain state for
+ * a test to read back.
  */
 export class SimSesConfigurationSet {
   public readonly configurationSetName: string;
@@ -73,11 +71,14 @@ export class SimSesConfigurationSet {
   /**
    * The reasons that would put a recipient on the account suppression list.
    *
-   * Empty where the set declares no `SuppressionOptions`. Real SES falls back
-   * to the account setting there, and this simulation has no account
-   * suppression list to fall back to.
+   * Undefined where the set declares no `SuppressionOptions`, which makes a
+   * send fall back to the account setting. An empty list is an explicit
+   * override that disables suppression for feedback recorded for a message
+   * sent through this set.
    */
-  public readonly suppressedReasons: readonly SimSesSuppressedReason[];
+  public readonly suppressedReasons:
+    | readonly SimSesSuppressedReason[]
+    | undefined;
 
   /** Whether SES would accept a send made through this set. */
   public readonly sendingEnabled: boolean;

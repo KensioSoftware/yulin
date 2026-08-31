@@ -15,8 +15,9 @@ interface SimSesSuppressionProperties {
  * SES operation grows by a method with each one added, and the suppression
  * commands are the part of the API a reader can take in on their own.
  *
- * Real SES fills this list from hard bounces and complaints. Nothing bounces
- * here, so every address on it was put there by a caller.
+ * Real SES fills this list from hard bounces and complaints. A test supplies
+ * that feedback explicitly, and callers may also manage entries through the
+ * suppression commands.
  */
 export abstract class SimSesSuppression {
   protected readonly commands: SimSesCommands;

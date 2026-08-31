@@ -108,3 +108,14 @@ export class SimSesSendingPausedException extends SimSesError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * A feedback event that cannot belong to the recorded message it names.
+ *
+ * This is a simulator diagnostic rather than an AWS error. A test supplies
+ * feedback through `recordFeedback`, and the error is raised at that call so
+ * an unrelated message or recipient cannot alter the suppression list.
+ */
+export class SimSesFeedbackError extends SimSesError {
+  public override readonly name = "SimSesFeedbackError";
+}

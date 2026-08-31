@@ -8,6 +8,7 @@ import { SimSesBadRequestException } from "../../error/sim-ses.error.js";
 import type {
   SimCreateConfigurationSetCommandInput,
   SimSesDeliveryOptions,
+  SimSesSuppressionOptions,
 } from "./configuration-set.command.js";
 
 /** What real SES uses where a set declares no TLS policy. */
@@ -25,15 +26,13 @@ const tlsPolicies = new Set(["REQUIRE", "OPTIONAL"]);
  * refuses.
  *
  * A set declaring none of these gets the defaults real SES applies: sending
- * on, no suppression reasons, optional TLS and no reputation metrics.
+ * on, account-level suppression, optional TLS and no reputation metrics.
  */
 export function readSimSesConfigurationSetOptions(
   input: SimCreateConfigurationSetCommandInput,
 ): SimSesConfigurationSetOptions {
   return {
-    suppressedReasons: readSuppressedReasons(
-      input.SuppressionOptions?.SuppressedReasons,
-    ),
+    suppressedReasons: readSuppressedReasons(input.SuppressionOptions),
     sendingEnabled: input.SendingOptions?.SendingEnabled ?? true,
     deliveryOptions: readDeliveryOptions(input.DeliveryOptions),
     reputationOptions: {
@@ -46,18 +45,18 @@ export function readSimSesConfigurationSetOptions(
 /**
  * The suppression reasons a set names, refusing one SES has no meaning for.
  *
- * An absent `SuppressionOptions` leaves this empty. Real SES falls back to the
- * account-level setting there, and this simulation has no account suppression
- * list to fall back to.
+ * An absent `SuppressionOptions` returns undefined, which preserves the
+ * account-level fallback. A present group with no reasons returns an empty
+ * override and disables suppression for messages sent through the set.
  */
 function readSuppressedReasons(
-  reasons: readonly string[] | undefined,
-): readonly SimSesSuppressedReason[] {
-  if (reasons === undefined) {
-    return [];
+  options: SimSesSuppressionOptions | undefined,
+): readonly SimSesSuppressedReason[] | undefined {
+  if (options === undefined) {
+    return undefined;
   }
 
-  return reasons.map((reason) => {
+  return (options.SuppressedReasons ?? []).map((reason) => {
     if (!isSuppressedReason(reason)) {
       throw new SimSesBadRequestException(
         `1 validation error detected: Value '${reason}' at ` +

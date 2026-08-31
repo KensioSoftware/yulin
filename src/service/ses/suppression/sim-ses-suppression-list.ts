@@ -5,10 +5,10 @@ import type { SimSesSuppressionReason } from "./sim-ses-suppression-reason.js";
 /**
  * The account-level suppression list of one simulated SES scope.
  *
- * Real SES fills this from hard bounces and complaints. Nothing bounces here,
- * so every address on it was put there by a caller, which is the point: an
- * application's own support tooling and operations scripts have somewhere to
- * run.
+ * Real SES fills this from hard bounces and complaints. A test supplies those
+ * events through the simulator's feedback operation. The ordinary suppression
+ * commands also manage the same entries, giving application support tooling
+ * and operations scripts somewhere to run.
  *
  * The list is region scoped, as identities and sends are. An address
  * suppressed in one region says nothing about another.

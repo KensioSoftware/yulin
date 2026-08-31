@@ -3,8 +3,9 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 /**
  * What a suppression list entry says, in the shape the SES v2 API reports it.
  *
- * `Attributes` is left out. It describes the bounce or complaint SES put the
- * address on the list for, and nothing bounces here.
+ * `Attributes` is left out. Real SES uses it for details of the feedback event
+ * that put the address on the list. Explicit simulator feedback records the
+ * reason and time only.
  */
 export interface SimSesSuppressedDestinationDetail {
   readonly EmailAddress: string;
