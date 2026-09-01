@@ -3306,11 +3306,45 @@ const stack = await simAws.cloudFormation().deployTemplate({
         Type: "AWS::SQS::Queue",
         Properties: { QueueName: "orders-dlq" },
       },
+      OrdersRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "OrdersRole",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+          Policies: [
+            {
+              PolicyName: "SendFailedOrders",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: [
+                  {
+                    Effect: "Allow",
+                    Action: "sqs:SendMessage",
+                    Resource: [
+                      { "Fn::GetAtt": ["OrderFailures", "Arn"] },
+                      { "Fn::GetAtt": ["OrderDeadLetters", "Arn"] },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
       OrdersFunction: {
         Type: "AWS::Lambda::Function",
         Properties: {
           FunctionName: "orders",
-          Role: "arn:aws:iam::111111111111:role/OrdersRole",
+          Role: { "Fn::GetAtt": ["OrdersRole", "Arn"] },
           Handler: "index.handler",
           Runtime: "nodejs22.x",
           Code: {
