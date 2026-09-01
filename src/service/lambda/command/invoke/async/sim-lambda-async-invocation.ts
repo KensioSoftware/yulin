@@ -11,6 +11,7 @@ import {
   SimLambdaAsyncOutcomeDelivery,
   simLambdaSuccessOutcome,
 } from "./sim-lambda-async-outcome.js";
+import { simLambdaHandlerAttempt } from "./sim-lambda-handler-attempt.js";
 
 interface SimLambdaAsyncInvocationProperties {
   readonly simFunction: SimLambdaFunction;
@@ -44,23 +45,24 @@ export class SimLambdaAsyncInvocation {
    * Accept the invocation and let it run behind the caller.
    */
   start(): void {
-    this.properties.background.schedule(async () => {
-      await this.attempt();
-    });
+    this.properties.background.schedule(() => this.attempt());
   }
 
   private async attempt(): Promise<void> {
     const { simFunction, event } = this.properties;
     this.attemptCount += 1;
 
-    try {
-      await this.outcomes.deliver(
-        simLambdaSuccessOutcome(await simFunction.invoke(event)),
-        this.attemptCount,
-      );
-    } catch (error) {
-      await this.failed(error);
+    const attempt = await simLambdaHandlerAttempt(simFunction, event);
+
+    if (!attempt.succeeded) {
+      await this.failed(attempt.error);
+      return;
     }
+
+    await this.outcomes.deliver(
+      simLambdaSuccessOutcome(attempt.result),
+      this.attemptCount,
+    );
   }
 
   /**
@@ -77,11 +79,10 @@ export class SimLambdaAsyncInvocation {
 
     background.scheduleAt(
       simLambdaRetryDueTime(background.now(), this.attemptCount),
-      async () => {
-        await (simLambdaEventTooOld(this.startedAt, background.now(), settings)
+      () =>
+        simLambdaEventTooOld(this.startedAt, background.now(), settings)
           ? this.abandon(error, "EventAgeExceeded")
-          : this.attempt());
-      },
+          : this.attempt(),
     );
   }
 

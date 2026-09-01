@@ -190,6 +190,37 @@ describe("Scheduler target invocation", () => {
         new CreateQueueCommand({ QueueName: "lambda-dead-letters" }),
       );
 
+    await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ReconcileRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ReconcileRole",
+        PolicyName: "SendFailures",
+        PolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Action: "sqs:SendMessage",
+            Resource: [
+              "arn:aws:sqs:us-east-1:888888888888:lambda-failures",
+              "arn:aws:sqs:us-east-1:888888888888:lambda-dead-letters",
+            ],
+          },
+        }),
+      }),
+    );
+
     await simAws.lambda().createFunction({
       input: {
         FunctionName: "reconcile",

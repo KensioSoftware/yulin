@@ -754,6 +754,13 @@ deploying.
 still there first, since deleting a function takes its configs with it and a Stack that reached the
 function first would otherwise fail a deletion over work it had already done.
 
+`destination/sim-aws-lambda-destinations.ts` sends each result through the ordinary simulated
+operation for the target service, with the source function's execution role as the caller. SQS
+checks `sqs:SendMessage`, SNS checks `sns:Publish`, EventBridge checks `events:PutEvents`, and Lambda
+checks `lambda:InvokeFunction`. The Lambda destination is invoked with `InvocationType: "Event"`,
+so delivery finishes once that invocation is accepted. A failed authorization rejects the
+background delivery before the target changes.
+
 ### Versions and aliases
 
 `cfn/version/` publishes `AWS::Lambda::Version` through `PublishVersion`, and `cfn/alias/` creates

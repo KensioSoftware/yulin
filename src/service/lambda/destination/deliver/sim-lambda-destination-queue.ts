@@ -23,11 +23,12 @@ export class SimLambdaDestinationQueue {
 
     // Sent through the ordinary SendMessage path, so what arrives is the same
     // thing an SDK caller would have sent.
-    await send.scope
-      .sqs()
-      .sendMessage(
-        { input: { QueueUrl: queue.arn.url, MessageBody: send.body } },
-        { sourceArn: send.sourceFunctionArn },
-      );
+    await send.scope.sqs().sendMessage(
+      { input: { QueueUrl: queue.arn.url, MessageBody: send.body } },
+      {
+        caller: { kind: "arn", arn: send.sourceFunctionRoleArn },
+        sourceArn: send.sourceFunctionArn,
+      },
+    );
   }
 }

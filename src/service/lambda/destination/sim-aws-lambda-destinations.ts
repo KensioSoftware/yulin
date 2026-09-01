@@ -24,12 +24,10 @@ interface SimAwsLambdaDestinationsProperties {
  * built: reaching another service while this one is being constructed is a
  * cycle with no bottom to it.
  *
- * Real Lambda delivers under the function's own execution role, and delivers
- * nothing when that role cannot write to the destination. The permission is
- * left unchecked here, so a delivery is made as the destination Account's own
- * root. A record that silently goes nowhere is the harder failure to find, and
- * a destination needs no resource policy on real AWS either, so nothing about
- * the destination itself has to be set up for a record to arrive.
+ * Every delivery uses the source function's execution Role as its caller. The
+ * destination service applies its ordinary IAM checks to that Role before it
+ * changes any state.
+ * @see https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html
  */
 export class SimAwsLambdaDestinations implements SimLambdaDestinationTargets {
   private readonly simAws: SimAws;
@@ -76,6 +74,7 @@ export class SimAwsLambdaDestinations implements SimLambdaDestinationTargets {
       arn: request.targetArn,
       body: JSON.stringify(request.payload),
       sourceFunctionArn: request.sourceFunctionArn,
+      sourceFunctionRoleArn: request.sourceFunctionRoleArn,
     };
 
     await (request.targetArn.service === "sqs"
@@ -91,6 +90,7 @@ export class SimAwsLambdaDestinations implements SimLambdaDestinationTargets {
       arn: request.destinationArn,
       body: JSON.stringify(request.record),
       sourceFunctionArn: request.sourceFunctionArn,
+      sourceFunctionRoleArn: request.sourceFunctionRoleArn,
     };
   }
 

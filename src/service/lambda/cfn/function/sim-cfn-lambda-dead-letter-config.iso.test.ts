@@ -54,6 +54,26 @@ async function deployOrders(
           Properties: {
             RoleName: "OrdersRole",
             AssumeRolePolicyDocument: assumeRolePolicyDocument,
+            Policies: [
+              {
+                PolicyName: "SendDeadLetters",
+                PolicyDocument: {
+                  Version: "2012-10-17",
+                  Statement: [
+                    {
+                      Effect: "Allow",
+                      Action: "sqs:SendMessage",
+                      Resource: ordersQueueArn,
+                    },
+                    {
+                      Effect: "Allow",
+                      Action: "sns:Publish",
+                      Resource: ordersTopicArn,
+                    },
+                  ],
+                },
+              },
+            ],
           },
         },
         OrdersFunction: {

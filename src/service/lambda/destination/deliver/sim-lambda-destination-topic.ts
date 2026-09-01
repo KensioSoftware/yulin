@@ -21,11 +21,12 @@ export class SimLambdaDestinationTopic {
       );
     }
 
-    await send.scope
-      .sns()
-      .publish(
-        { input: { TopicArn: topic.arn.value, Message: send.body } },
-        { sourceArn: send.sourceFunctionArn },
-      );
+    await send.scope.sns().publish(
+      { input: { TopicArn: topic.arn.value, Message: send.body } },
+      {
+        caller: { kind: "arn", arn: send.sourceFunctionRoleArn },
+        sourceArn: send.sourceFunctionArn,
+      },
+    );
   }
 }

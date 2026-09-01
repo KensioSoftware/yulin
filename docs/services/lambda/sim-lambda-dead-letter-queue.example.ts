@@ -2,26 +2,59 @@
  * A simulated Lambda function with a dead-letter queue.
  */
 
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
 
-const simAws = new SimAws();
+const simAws = new SimAws({ defaultAccountId: "111111111111" });
+const iam = simAws.iam();
 const lambda = simAws.lambda();
 const sqs = simAws.sqs();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders-dlq`;
 
 const created = await sqs.createQueue(
   new CreateQueueCommand({ QueueName: "orders-dlq" }),
 );
 
+const role = await iam.createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+const roleArn = role.Role.Arn;
+
+await iam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersRole",
+    PolicyName: "SendFailedOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sqs:SendMessage",
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
 await lambda.createFunction(
   new CreateFunctionCommand({
     FunctionName: "orders",
-    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Role: roleArn,
     DeadLetterConfig: {
-      TargetArn: "arn:aws:sqs:us-east-1:888888888888:orders-dlq",
+      TargetArn: queueArn,
     },
     Code: {
       ZipFile: makeLambdaZipFileInput(() => {

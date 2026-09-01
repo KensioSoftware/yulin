@@ -21,18 +21,21 @@ export class SimLambdaDestinationBus {
         ? "Success"
         : "Failure";
 
-    await scope.eventBridge().putEvents({
-      input: {
-        Entries: [
-          {
-            Source: "lambda",
-            DetailType: `Lambda Function Invocation Result - ${outcome}`,
-            Detail: JSON.stringify(request.record),
-            EventBusName: request.destinationArn.eventBusName,
-            Resources: [request.sourceFunctionArn],
-          },
-        ],
+    await scope.eventBridge().putEvents(
+      {
+        input: {
+          Entries: [
+            {
+              Source: "lambda",
+              DetailType: `Lambda Function Invocation Result - ${outcome}`,
+              Detail: JSON.stringify(request.record),
+              EventBusName: request.destinationArn.eventBusName,
+              Resources: [request.sourceFunctionArn],
+            },
+          ],
+        },
       },
-    });
+      { caller: { kind: "arn", arn: request.sourceFunctionRoleArn } },
+    );
   }
 }

@@ -13,4 +13,7 @@ export interface SimLambdaDestinationSend {
    * The function this came from, supplied to IAM as `aws:SourceArn`.
    */
   readonly sourceFunctionArn: string;
+
+  /** The execution Role Lambda uses to send the document. */
+  readonly sourceFunctionRoleArn: string;
 }
