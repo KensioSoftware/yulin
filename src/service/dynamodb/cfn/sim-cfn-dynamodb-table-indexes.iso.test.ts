@@ -160,11 +160,10 @@ describe("DynamoDB CloudFormation Table secondary indexes", () => {
     const describedTable = await simAws
       .dynamoDb()
       .describeTable(new DescribeTableCommand({ TableName: "orders" }));
-    assertArrayLength(describedTable.Table?.GlobalSecondaryIndexes, 1);
-    assertIdentical(
-      describedTable.Table.GlobalSecondaryIndexes[0].IndexName,
-      "byFirst",
-    );
+    const indexes = describedTable.Table?.GlobalSecondaryIndexes;
+
+    assertArrayLength(indexes, 1);
+    assertIdentical(indexes[0].IndexName, "byFirst");
 
     const stored = await simAws.dynamoDb().getItem(
       new GetItemCommand({
