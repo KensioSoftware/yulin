@@ -1,17 +1,26 @@
 import {
   DescribeTableCommand,
+  GetItemCommand,
   PutItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  DescribeStacksCommand,
+  UpdateStackCommand,
+} from "@aws-sdk/client-cloudformation";
+import {
   assertArrayLength,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { jsonStringify } from "../../../util/type-guard/json.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { simCfnDynamoDbIndexedTableResourceFactory } from "./table/sim-cfn-dynamodb-indexed-table-resource.factory.js";
 import { simCfnDynamoDbTableResourceFactory } from "./table/sim-cfn-dynamodb-table-resource.factory.js";
 
@@ -56,6 +65,121 @@ async function deployIndexedOrders(simAws: SimAws): Promise<void> {
 }
 
 describe("DynamoDB CloudFormation Table secondary indexes", () => {
+  it("refuses an update that creates two global secondary indexes", async () => {
+    // Given a deployed table with one index and an item stored in it.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+    const initialTable = simCfnDynamoDbTableResourceFactory.make({
+      tableName: "orders",
+      partitionKeyName: "orderId",
+      properties: {
+        AttributeDefinitions: [
+          { AttributeName: "orderId", AttributeType: "S" },
+          { AttributeName: "first", AttributeType: "S" },
+        ],
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: "byFirst",
+            KeySchema: [{ AttributeName: "first", KeyType: "HASH" }],
+            Projection: { ProjectionType: "ALL" },
+          },
+        ],
+      },
+    });
+    const stack = await cloudFormation.deployTemplate({
+      stackName: "orders-stack",
+      template: { Resources: { OrdersTable: initialTable } },
+    });
+    await stack.waitForDeployComplete();
+    await simAws.backgroundTasksComplete();
+    await simAws.dynamoDb().putItem(
+      new PutItemCommand({
+        TableName: "orders",
+        Item: {
+          orderId: { S: "order-1" },
+          first: { S: "one" },
+          second: { S: "two" },
+          third: { S: "three" },
+        },
+      }),
+    );
+    const tableBeforeUpdate = simAws.dynamoDb().findTable("orders");
+
+    // When one CloudFormation update adds two indexes.
+    const updatedTable = simCfnDynamoDbTableResourceFactory.make({
+      tableName: "orders",
+      partitionKeyName: "orderId",
+      properties: {
+        AttributeDefinitions: [
+          { AttributeName: "orderId", AttributeType: "S" },
+          { AttributeName: "first", AttributeType: "S" },
+          { AttributeName: "second", AttributeType: "S" },
+          { AttributeName: "third", AttributeType: "S" },
+        ],
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: "byFirst",
+            KeySchema: [{ AttributeName: "first", KeyType: "HASH" }],
+            Projection: { ProjectionType: "ALL" },
+          },
+          {
+            IndexName: "bySecond",
+            KeySchema: [{ AttributeName: "second", KeyType: "HASH" }],
+            Projection: { ProjectionType: "ALL" },
+          },
+          {
+            IndexName: "byThird",
+            KeySchema: [{ AttributeName: "third", KeyType: "HASH" }],
+            Projection: { ProjectionType: "ALL" },
+          },
+        ],
+      },
+    });
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "orders-stack",
+        TemplateBody: jsonStringify({
+          Resources: { OrdersTable: updatedTable },
+        }),
+      }),
+    );
+    const error = await assertThrowsErrorAsync(async () => {
+      await cloudFormation.waitForStackUpdateComplete("orders-stack");
+    });
+
+    // Then DynamoDB refuses the update before the table changes.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertIdentical(error.name, "ValidationException");
+    assertIdentical(error.$metadata.httpStatusCode, 400);
+    assertIdentical(
+      error.message,
+      "Cannot perform more than one GSI creation or deletion in a single update",
+    );
+    assertIdentical(simAws.dynamoDb().findTable("orders"), tableBeforeUpdate);
+
+    const describedTable = await simAws
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: "orders" }));
+    assertArrayLength(describedTable.Table?.GlobalSecondaryIndexes, 1);
+    assertIdentical(
+      describedTable.Table.GlobalSecondaryIndexes[0].IndexName,
+      "byFirst",
+    );
+
+    const stored = await simAws.dynamoDb().getItem(
+      new GetItemCommand({
+        TableName: "orders",
+        Key: { orderId: { S: "order-1" } },
+      }),
+    );
+    assertIdentical(stored.Item?.["third"]?.S, "three");
+
+    const describedStack = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({ StackName: "orders-stack" }),
+    );
+    assertIdentical(describedStack.Stacks?.[0]?.StackStatus, "UPDATE_FAILED");
+  });
+
   it("describes the indexes a template declares", async () => {
     // Given a template declaring a global and a local secondary index.
     const simAws = new SimAws();

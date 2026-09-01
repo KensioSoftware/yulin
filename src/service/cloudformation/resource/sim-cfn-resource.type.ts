@@ -103,3 +103,15 @@ export interface SimCloudFormationResourceDeleteContext {
   /** The principal the teardown runs as, as creation carries it. */
   readonly caller?: SimAwsCaller | undefined;
 }
+
+/**
+ * The two resolved Resource definitions available to update validation.
+ */
+export interface SimCloudFormationResourceUpdateContext {
+  readonly simAws: SimAws;
+  readonly currentResources: ReadonlyMap<string, SimCfnResource>;
+  readonly updatedResources: ReadonlyMap<string, SimCfnResource>;
+  readonly currentResolvedProperties: SimCfnTemplateValueRecord;
+  readonly updatedResolvedProperties: SimCfnTemplateValueRecord;
+  readonly caller?: SimAwsCaller | undefined;
+}

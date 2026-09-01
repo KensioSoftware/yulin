@@ -4,11 +4,13 @@ import type {
   SimCloudFormationResourceCreateContext,
   SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCloudFormationResourceUpdateContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimDynamoDb } from "../sim-dynamodb.js";
 import { SimCfnDynamoDbGlobalTableCreator } from "./global-table/sim-cfn-dynamodb-global-table-creator.js";
 import { SimCfnDynamoDbTableCreator } from "./table/sim-cfn-dynamodb-table-creator.js";
 import { SimCfnDynamoDbResourceDeleter } from "./sim-cfn-dynamodb-resource-deleter.js";
+import { SimCfnDynamoDbTableUpdateValidator } from "./table/sim-cfn-dynamodb-table-update-validator.js";
 
 interface SimDynamoDbCfnResourceFactoryProperties {
   readonly dynamoDb: SimDynamoDb;
@@ -83,5 +85,26 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
       resource,
       simCfnResourceCallerOptions(context.caller),
     );
+  }
+
+  /**
+   * Validate a DynamoDB Resource replacement before its table is deleted.
+   */
+  assertUpdateAllowed(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+    context: SimCloudFormationResourceUpdateContext,
+  ): void {
+    if (resourceTypeName !== "Table") {
+      return;
+    }
+
+    new SimCfnDynamoDbTableUpdateValidator({
+      currentResource: current,
+      updatedResource: updated,
+      currentProperties: context.currentResolvedProperties,
+      updatedProperties: context.updatedResolvedProperties,
+    }).assertAllowed();
   }
 }
