@@ -23,7 +23,9 @@ familiar CloudFormation/CDK outputs.
 - `sim-cloudformation.ts` is the main service object for one account/region scope.
 - `index.ts` exports the public CloudFormation simulator API.
 - `command/` contains AWS SDK-style command handlers such as `CreateStack`, `DescribeStacks`,
-  `UpdateStack` and `DeleteStack`.
+  `UpdateStack` and `DeleteStack`, and the five change set commands.
+- `changeset/` contains the change sets one `SimCloudFormation` holds, what executing one would do
+  to a Stack, and running it.
 - `deploy/` contains convenience helpers for deploying already-parsed templates or synthesized
   template files.
 - `template/` contains template body validation, template value parsing, intrinsic-function nodes,
@@ -517,6 +519,30 @@ resource holds, and it is recorded in the usage docs rather than hidden. Two thi
 - `UpdateReplacePolicy` is not read. Retaining the old resource would leave it holding the name its
   replacement needs, and CDK marks buckets and tables `Retain` as a matter of course, so honouring
   it would fail every such update.
+
+## Change sets
+
+A change set holds the difference an update would make. `SimCfnChangeSet` holds the template it was
+created from and the changes it reports, and `SimCfnChangeSets` is the registry one
+`SimCloudFormation` keeps them in. `SimCfnChangeSetCommands` assembles the five command handlers over
+that registry. That keeps them out of `SimCloudFormation` alongside the Stack commands, which had
+already reached its line limit.
+
+`simCfnChangeSetChanges` reports the comparison an update applies. It reads
+`simCfnStackReplacedLogicalIds`. A change set and the update it becomes therefore agree about what
+changed. Every `Modify` it reports carries `Replacement: True`, because a changed resource is
+replaced here.
+
+`simCfnChangeSetStack` decides which Stack the change set is held against. A `CREATE` change set
+constructs a `SimCfnStack` and leaves it undeployed, in the `REVIEW_IN_PROGRESS` status
+`SimCfnStackDeploymentLifecycle` starts in. A Stack in review therefore needs no state of its own.
+The lifecycle already models a Stack that has been described and left undeployed.
+
+`runSimCfnChangeSet` executes one. A `CREATE` change set deploys its Stack and an `UPDATE` change set
+applies its template, both through the machinery an SDK caller reaches. It then schedules a
+background task that waits for the Stack operation and records `EXECUTE_COMPLETE` or `EXECUTE_FAILED`
+on the change set. The failure itself stays on the Stack. That is where the error is held and where
+it is rethrown to whoever waits for the operation.
 
 ## Resource deployment loop
 

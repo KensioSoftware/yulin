@@ -53,6 +53,44 @@ export class SimCloudFormationAuthorization {
     this.authorize("cloudformation:DeleteStack", stackName, caller);
   }
 
+  /**
+   * Ensure the caller may create a change set against the named Stack.
+   */
+  createChangeSet(stackName: string | undefined, caller?: SimAwsCaller): void {
+    this.authorize("cloudformation:CreateChangeSet", stackName, caller);
+  }
+
+  /**
+   * Ensure the caller may describe a change set against the named Stack.
+   */
+  describeChangeSet(
+    stackName: string | undefined,
+    caller?: SimAwsCaller,
+  ): void {
+    this.authorize("cloudformation:DescribeChangeSet", stackName, caller);
+  }
+
+  /**
+   * Ensure the caller may execute a change set against the named Stack.
+   */
+  executeChangeSet(stackName: string | undefined, caller?: SimAwsCaller): void {
+    this.authorize("cloudformation:ExecuteChangeSet", stackName, caller);
+  }
+
+  /**
+   * Ensure the caller may delete a change set against the named Stack.
+   */
+  deleteChangeSet(stackName: string | undefined, caller?: SimAwsCaller): void {
+    this.authorize("cloudformation:DeleteChangeSet", stackName, caller);
+  }
+
+  /**
+   * Ensure the caller may list the change sets against the named Stack.
+   */
+  listChangeSets(stackName: string | undefined, caller?: SimAwsCaller): void {
+    this.authorize("cloudformation:ListChangeSets", stackName, caller);
+  }
+
   private authorize(
     action: string,
     stackName: string | undefined,

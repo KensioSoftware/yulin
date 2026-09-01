@@ -324,6 +324,117 @@ where the update got to. There is no rollback to the previous template.
 `StackStatusReason`. Dealing with the cause and sending `UpdateStackCommand` again applies the rest
 of the change.
 
+## Deploying through a change set
+
+A change set says what a template would do to a stack before anything happens to it. `cdk deploy`
+goes through one by default, and so does any deployment script that wants to see what an update will
+touch. Simulated CloudFormation serves `CreateChangeSetCommand`, `DescribeChangeSetCommand`,
+`ExecuteChangeSetCommand`, `DeleteChangeSetCommand` and `ListChangeSetsCommand`.
+
+```typescript sim-cloudformation-change-set
+/**
+ * Deploying a simulated CloudFormation Stack through a change set.
+ */
+
+import {
+  CreateChangeSetCommand,
+  DescribeChangeSetCommand,
+  ExecuteChangeSetCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+const templateBody = JSON.stringify({
+  Resources: {
+    ReportsBucket: {
+      Type: "AWS::S3::Bucket",
+      Properties: { BucketName: "change-set-reports" },
+    },
+  },
+});
+
+// A CREATE change set brings the Stack into being in REVIEW_IN_PROGRESS,
+// holding no created Resources.
+await simCfn.createChangeSet(
+  new CreateChangeSetCommand({
+    StackName: "reports-stack",
+    ChangeSetName: "reports-create",
+    ChangeSetType: "CREATE",
+    TemplateBody: templateBody,
+  }),
+);
+
+// Describing it says what executing it would do. Nothing is deployed yet.
+const described = await simCfn.describeChangeSet(
+  new DescribeChangeSetCommand({
+    StackName: "reports-stack",
+    ChangeSetName: "reports-create",
+  }),
+);
+
+// [{ Action: "Add", LogicalResourceId: "ReportsBucket" }]
+console.log(
+  described.Changes?.map((change) => ({
+    Action: change.ResourceChange.Action,
+    LogicalResourceId: change.ResourceChange.LogicalResourceId,
+  })),
+);
+
+// Executing it deploys the template.
+await simCfn.executeChangeSet(
+  new ExecuteChangeSetCommand({
+    StackName: "reports-stack",
+    ChangeSetName: "reports-create",
+  }),
+);
+await simCfn.waitForStackDeployComplete("reports-stack");
+
+console.log(simAws.s3().getSimBucketByName("change-set-reports"));
+```
+
+`ChangeSetType: CREATE` creates the stack in `REVIEW_IN_PROGRESS` and creates none of its resources.
+`DescribeStacksCommand` reports the stack from that point on, and executing the change set is what
+deploys it. The default, `ChangeSetType: UPDATE`, works out the change against a stack that is
+already deployed and leaves it exactly as it is until the change set is executed.
+
+`CreateChangeSetCommand` returns the change set ARN as `Id`. Every command naming a change set takes
+either that ARN on its own or the change set name together with `StackName`, the way CloudFormation
+takes them.
+
+### What a change set reports
+
+`DescribeChangeSetCommand` answers with one `Changes` entry per resource, each carrying a
+`ResourceChange` with its `Action`, `LogicalResourceId`, `ResourceType` and `Replacement`. A resource
+only the new template has is an `Add`, one only the stack has is a `Remove`, and one both have whose
+template entry changed is a `Modify`.
+
+Every `Modify` carries `Replacement: "True"`. Simulated CloudFormation replaces a changed resource
+rather than updating it in place, and it replaces everything naming a replaced resource as well, so a
+change set reports each of those as a modification too. See
+[changed resources are replaced](#changed-resources-are-replaced) for what that costs.
+
+A change set describing a template the stack already holds is `FAILED`, carrying the reason
+CloudFormation gives, and refuses to execute. That is the same no-op rule an update follows, so a
+template that only moves an output still has something to execute.
+
+### Executing a change set
+
+`executeChangeSet(...)` returns once the stack operation has started, as `createStack(...)` and
+`updateStack(...)` do. Follow it with `waitForStackDeployComplete(...)` for a `CREATE` change set or
+`waitForStackUpdateComplete(...)` for an `UPDATE` one.
+
+The change set reports its own execution through `ExecutionStatus`. It reads `AVAILABLE` before,
+`EXECUTE_IN_PROGRESS` while the stack operation runs, and `EXECUTE_COMPLETE` or `EXECUTE_FAILED`
+after. Every other executable change set against the same stack becomes `OBSOLETE`, because each was
+worked out against a stack the execution has moved on.
+
+`DeleteChangeSetCommand` takes a change set away without executing it, and a change set name that is
+not there is a success rather than an error. `ListChangeSetsCommand` reports the ones a stack still
+holds, in the order they were created.
+
 ## Deleting a stack
 
 `DeleteStackCommand` deletes the resources a stack created, in the reverse of the order they were
@@ -3489,6 +3600,8 @@ Sim CloudFormation currently supports:
 
 - `CreateStackCommand`, `DescribeStacksCommand`, `UpdateStackCommand` and `DeleteStackCommand`,
   taking a `TemplateBody` written as JSON or as YAML with short-form intrinsic tags
+- `CreateChangeSetCommand`, `DescribeChangeSetCommand`, `ExecuteChangeSetCommand`,
+  `DeleteChangeSetCommand` and `ListChangeSetsCommand`, for both `CREATE` and `UPDATE` change sets
 - Waiting for simulated stack deployment, update and deletion completion
 - The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
@@ -3589,9 +3702,10 @@ Each service's own docs describe what its resource types support.
   changed resource is still replaced and loses what it holds, the same as any other update.
 - Yulin never synthesizes a CDK app. It watches the synthesized output template. A change to the app
   itself reaches the stack once something has run `cdk synth` over it.
-- A stack update applies a whole template directly. Change sets are outside the simulation, so
-  `CreateChangeSetCommand` and `ExecuteChangeSetCommand` have nothing behind them, and neither does
-  drift detection.
+- A change set reports every `Modify` as `Replacement: True`, because a changed resource is replaced
+  rather than updated in place. `ChangeSetType: IMPORT` is refused, and so is a `CREATE` change set
+  naming a stack that is already there, where CloudFormation allows a second one against a stack
+  still in review. Drift detection is outside the simulation.
 - A failed stack update is not rolled back to the template the stack was deployed from. The stack is
   left in `UPDATE_FAILED` holding whatever the update managed.
 - `UpdateStackCommand` reads `StackName`, `TemplateBody` and `Parameters`. `UsePreviousTemplate` and

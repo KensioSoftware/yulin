@@ -49,7 +49,6 @@ export class SimCfnStack implements SimCfnDeployedStack {
   public readonly deletion: SimCfnStackDeletionLifecycle;
   public readonly stackName: SimCloudFormationStackName;
   public readonly resourceMap: Map<string, SimCfnResource>;
-  public template: CfnTemplateBodyRecord;
   public outputs = new Map<string, SimCfnStackOutput>();
 
   private readonly background: BackgroundScheduler;
@@ -76,7 +75,6 @@ export class SimCfnStack implements SimCfnDeployedStack {
     this.stackName = stackName;
     this.stackOutputs = new SimCfnStackOutputs({ stackName, exports });
     this.cfnTemplate = template;
-    this.template = this.cfnTemplate.template;
     this.resourceMap = makeSimCfnStackResourceMap({
       accountRegionScope,
       background,
@@ -100,7 +98,8 @@ export class SimCfnStack implements SimCfnDeployedStack {
       background,
       stackName,
       runDeployment: async (): Promise<void> => {
-        await this.createResources();
+        await this.operations.createAll(this.resourceMap);
+        this.resolveOutputs();
       },
     });
     this.updating = new SimCfnStackUpdateLifecycle({ background, stackName });
@@ -122,21 +121,27 @@ export class SimCfnStack implements SimCfnDeployedStack {
     return this.operationStatus.status;
   }
 
+  /** The parsed template this Stack is deployed from. */
+  public get currentTemplate(): SimCfnTemplate {
+    return this.cfnTemplate;
+  }
+
+  /** The template body this Stack is deployed from. */
+  public get template(): CfnTemplateBodyRecord {
+    return this.cfnTemplate.template;
+  }
+
   /** The error the operation the status reports failed with, if it failed. */
   public get error(): Error | undefined {
     return this.operationStatus.error;
   }
 
-  /**
-   * Start deploying this simulated Stack into simulated AWS.
-   */
+  /** Start deploying this simulated Stack into simulated AWS. */
   async deploy(): Promise<void> {
     await this.lifecycle.deploy();
   }
 
-  /**
-   * Wait for the scheduled deployment task to finish.
-   */
+  /** Wait for the scheduled deployment task to finish. */
   async waitForDeployComplete(): Promise<void> {
     await this.lifecycle.waitForComplete();
   }
@@ -179,7 +184,6 @@ export class SimCfnStack implements SimCfnDeployedStack {
     this.operations.useUpdate(properties);
 
     this.cfnTemplate = template;
-    this.template = template.template;
 
     await this.updating.update(async (): Promise<void> => {
       await updater.apply();
@@ -187,9 +191,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
     });
   }
 
-  /**
-   * Wait for the scheduled Stack update to finish.
-   */
+  /** Wait for the scheduled Stack update to finish. */
   async waitForUpdateComplete(): Promise<void> {
     await this.updating.waitForComplete();
   }
@@ -206,9 +208,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
     await this.deletion.delete(properties);
   }
 
-  /**
-   * Wait for the scheduled Stack deletion to finish.
-   */
+  /** Wait for the scheduled Stack deletion to finish. */
   async waitForDeleteComplete(): Promise<void> {
     await this.deletion.waitForComplete();
   }
@@ -278,11 +278,6 @@ export class SimCfnStack implements SimCfnDeployedStack {
 
   private get report(): SimCfnStackResourceReport {
     return new SimCfnStackResourceReport(this.resourceMap, this.cfnTemplate);
-  }
-
-  private async createResources(): Promise<void> {
-    await this.operations.createAll(this.resourceMap);
-    this.resolveOutputs();
   }
 
   private resolveOutputs(): void {

@@ -16,9 +16,7 @@ import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
 } from "./create-stack.command.js";
-import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
-import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
-import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
+import { simCfnCommandTemplate } from "../../template/sim-cfn-command-template.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
@@ -109,23 +107,14 @@ export class CreateStackCommandHandler implements CommandHandler<
       );
     }
 
-    const parameters = SimCfnParameters.fromInput(command.input, {
+    const template = simCfnCommandTemplate({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
       stackName,
-      parameterStore: makeSimCfnParameterStore({
-        simAws: this.simAws,
-        accountRegionScope: this.accountRegionScope,
-      }),
+      templateBody: command.input.TemplateBody,
+      input: command.input,
+      exports: this.exports,
     });
-
-    const template = SimCfnTemplate.fromTemplateBody(
-      command.input.TemplateBody,
-      {
-        stackName,
-        parameters,
-        accountRegionScope: this.accountRegionScope,
-        exports: this.exports,
-      },
-    );
 
     const stack = new SimCfnStack({
       simAws: this.simAws,

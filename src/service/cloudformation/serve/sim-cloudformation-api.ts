@@ -6,6 +6,7 @@ import {
   queryMembers,
 } from "../../../serve/http/api/query/sim-query-result.js";
 import type { SimQueryFields } from "../../../serve/http/api/query/sim-query-request.js";
+import { simCfnChangeSetQueryOperations } from "./sim-cloudformation-change-set-api.js";
 
 /**
  * The XML namespace real CloudFormation stamps on every response it sends.
@@ -26,9 +27,10 @@ const stackOutputMembers = [
 /**
  * Serve the CloudFormation Query API to a client given an endpoint URL.
  *
- * The operations served are the four simulated CloudFormation implements:
- * `CreateStack`, `UpdateStack`, `DeleteStack` and `DescribeStacks`. Anything
- * else is refused as `NotImplemented`.
+ * The operations served are the Stack operations simulated CloudFormation
+ * implements, `CreateStack`, `UpdateStack`, `DeleteStack` and `DescribeStacks`,
+ * together with the five change set operations. Anything else is refused as
+ * `NotImplemented`.
  */
 export function simCloudFormationApiEndpoint(
   simAws: SimAws,
@@ -43,6 +45,7 @@ export function simCloudFormationApiEndpoint(
 
 function simCloudFormationQueryOperations(): SimQueryOperations {
   return new Map([
+    ...simCfnChangeSetQueryOperations(),
     [
       "CreateStack",
       {
