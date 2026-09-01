@@ -53,6 +53,19 @@ export function ordersTemplate(
         Properties: {
           RoleName: "OrdersRole",
           AssumeRolePolicyDocument: assumeRolePolicyDocument,
+          Policies: [
+            {
+              PolicyName: "SendOrderFailures",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: {
+                  Effect: "Allow",
+                  Action: "sqs:SendMessage",
+                  Resource: ordersFailuresQueueArn,
+                },
+              },
+            },
+          ],
         },
       },
       OrdersFunction: {

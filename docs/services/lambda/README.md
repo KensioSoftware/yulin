@@ -946,6 +946,19 @@ results go. An invocation that fails its last attempt is sent to the `OnFailure`
 one whose handler returns is sent to `OnSuccess`. A destination ARN can name a simulated SQS queue,
 SNS topic, EventBridge event bus or Lambda function.
 
+The source function's execution role must allow the operation that writes to the destination:
+
+| Destination           | Required action         |
+| --------------------- | ----------------------- |
+| SQS queue             | `sqs:SendMessage`       |
+| SNS topic             | `sns:Publish`           |
+| EventBridge event bus | `events:PutEvents`      |
+| Lambda function       | `lambda:InvokeFunction` |
+
+Simulated Lambda calls the destination service with that role as its caller. A denied delivery
+rejects the background task without changing the destination. A Lambda destination is invoked
+asynchronously, so the delivery succeeds once the target invocation has been accepted.
+
 ```typescript sim-lambda-async-destinations
 /**
  * Asynchronous invocation retries and an OnFailure destination.
@@ -956,6 +969,7 @@ import {
   InvokeCommand,
   PutFunctionEventInvokeConfigCommand,
 } from "@aws-sdk/client-lambda";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 
 import { SimAws } from "@kensio/yulin";
@@ -964,19 +978,51 @@ import {
   type SimLambdaDestinationRecord,
 } from "@kensio/yulin/lambda";
 
-const simAws = new SimAws();
+const simAws = new SimAws({ defaultAccountId: "111111111111" });
+const iam = simAws.iam();
 const lambda = simAws.lambda();
 const sqs = simAws.sqs();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:order-failures`;
 
 const created = await sqs.createQueue(
   new CreateQueueCommand({ QueueName: "order-failures" }),
+);
+
+const role = await iam.createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+const roleArn = role.Role.Arn;
+
+await iam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersRole",
+    PolicyName: "SendFailedOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sqs:SendMessage",
+        Resource: queueArn,
+      },
+    }),
+  }),
 );
 
 const attempts: string[] = [];
 await lambda.createFunction(
   new CreateFunctionCommand({
     FunctionName: "orders",
-    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Role: roleArn,
     Code: {
       ZipFile: makeLambdaZipFileInput((event: { id: number }) => {
         attempts.push(`tried order ${event.id}`);
@@ -992,7 +1038,7 @@ await lambda.putFunctionEventInvokeConfig(
     MaximumRetryAttempts: 1,
     DestinationConfig: {
       OnFailure: {
-        Destination: "arn:aws:sqs:us-east-1:888888888888:order-failures",
+        Destination: queueArn,
       },
     },
   }),
@@ -1041,33 +1087,67 @@ a config of its own, and an invocation of a qualifier with no config of its own 
 `DeadLetterConfig` is the older way to keep a failed asynchronous invocation, and simulated Lambda
 takes it on `CreateFunction` and `UpdateFunctionConfiguration`. Its `TargetArn` names a simulated
 SQS queue or SNS topic, which receives the event as it was invoked rather than the destination
-record around it.
+record around it. The execution role needs `sqs:SendMessage` for a queue or `sns:Publish` for a
+topic. A denied delivery rejects the background task and leaves the target unchanged.
 
 ```typescript sim-lambda-dead-letter-queue
 /**
  * A simulated Lambda function with a dead-letter queue.
  */
 
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
 
-const simAws = new SimAws();
+const simAws = new SimAws({ defaultAccountId: "111111111111" });
+const iam = simAws.iam();
 const lambda = simAws.lambda();
 const sqs = simAws.sqs();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders-dlq`;
 
 const created = await sqs.createQueue(
   new CreateQueueCommand({ QueueName: "orders-dlq" }),
 );
 
+const role = await iam.createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+const roleArn = role.Role.Arn;
+
+await iam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrdersRole",
+    PolicyName: "SendFailedOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sqs:SendMessage",
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
 await lambda.createFunction(
   new CreateFunctionCommand({
     FunctionName: "orders",
-    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Role: roleArn,
     DeadLetterConfig: {
-      TargetArn: "arn:aws:sqs:us-east-1:888888888888:orders-dlq",
+      TargetArn: queueArn,
     },
     Code: {
       ZipFile: makeLambdaZipFileInput(() => {
@@ -3531,7 +3611,8 @@ Sim Lambda currently supports:
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
 - Asynchronous invocation retries on the simulated clock, and `OnSuccess`/`OnFailure` destinations
   written with `PutFunctionEventInvokeConfigCommand`, delivering the AWS destination record to a
-  simulated SQS queue, SNS topic, EventBridge event bus or Lambda function
+  simulated SQS queue, SNS topic, EventBridge event bus or Lambda function after authorizing the
+  target operation against the source function's execution role
 - `GetFunctionEventInvokeConfigCommand`, `UpdateFunctionEventInvokeConfigCommand`,
   `DeleteFunctionEventInvokeConfigCommand` and `ListFunctionEventInvokeConfigsCommand`, each taking
   a `Qualifier` for a version's or an alias's own config
@@ -3609,10 +3690,6 @@ Current documented limitations:
   settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
   `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`. `ListFunctions` leaves out
   `Marker`/`MaxItems` paging and `MasterRegion`.
-- A destination is delivered to without checking that the function's execution role may write to it.
-  Real Lambda delivers under that role and drops the record where the role cannot, which would be
-  silent, so simulated Lambda delivers instead. Nothing else about the destination has to be set up,
-  since a destination needs no resource policy on real AWS either.
 - SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function` are left out. A
   SAM application declaring either deploys a function with the default retries, no destinations and
   no dead-letter target. The `AWS::Lambda::EventInvokeConfig` Resource and the `DeadLetterConfig`

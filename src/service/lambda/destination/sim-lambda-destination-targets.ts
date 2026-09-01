@@ -14,6 +14,9 @@ export interface SimLambdaDestinationDeliveryRequest {
    * delivery is attributed to.
    */
   readonly sourceFunctionArn: string;
+
+  /** The execution Role Lambda uses to deliver this record. */
+  readonly sourceFunctionRoleArn: string;
 }
 
 /**
@@ -27,6 +30,7 @@ export interface SimLambdaDeadLetterRequest {
   readonly targetArn: SimLambdaDestinationArn;
   readonly payload: unknown;
   readonly sourceFunctionArn: string;
+  readonly sourceFunctionRoleArn: string;
 }
 
 /**

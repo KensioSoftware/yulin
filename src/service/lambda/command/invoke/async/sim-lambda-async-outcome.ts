@@ -104,6 +104,7 @@ export class SimLambdaAsyncOutcomeDelivery {
     await destinations.deliver({
       destinationArn: SimLambdaDestinationArn.of(destination),
       sourceFunctionArn: simFunction.arn,
+      sourceFunctionRoleArn: simFunction.roleArn,
       record: makeSimLambdaDestinationRecord({
         requestId: this.requestId,
         functionArn: simFunction.arn,
@@ -131,6 +132,7 @@ export class SimLambdaAsyncOutcomeDelivery {
       targetArn: SimLambdaDestinationArn.of(settings.deadLetterArn),
       payload: event,
       sourceFunctionArn: simFunction.arn,
+      sourceFunctionRoleArn: simFunction.roleArn,
     });
   }
 }

@@ -8,6 +8,8 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -74,7 +76,10 @@ async function ruleToQueue(
 describe("Lambda asynchronous invocation destinations", () => {
   it("sends a record to an OnFailure queue once the retries are exhausted", async () => {
     // Given a failing function sending its failures to a queue.
-    const { simAws } = await simAwsWithAsyncFunction();
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["sqs:SendMessage"],
+      roleResource: simLambdaQueueArn("failures"),
+    });
     const queueUrl = await makeQueue(simAws, "failures");
     await putEventInvokeConfig(simAws, {
       MaximumRetryAttempts: 1,
@@ -99,8 +104,11 @@ describe("Lambda asynchronous invocation destinations", () => {
 
   it("sends a record to an OnSuccess topic when the handler returns", async () => {
     // Given a function that works, publishing its successes to a topic.
+    const topicArn = "arn:aws:sns:us-east-1:888888888888:results";
     const { simAws } = await simAwsWithAsyncFunction({
       failuresBeforeSuccess: 0,
+      roleActions: ["sns:Publish"],
+      roleResource: topicArn,
     });
     const created = await simAws
       .sns()
@@ -127,7 +135,12 @@ describe("Lambda asynchronous invocation destinations", () => {
 
   it("invokes a function destination with the record", async () => {
     // Given a failing function sending its failures to another function.
-    const { simAws } = await simAwsWithAsyncFunction();
+    const destinationArn =
+      "arn:aws:lambda:us-east-1:888888888888:function:repairs";
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["lambda:InvokeFunction"],
+      roleResource: destinationArn,
+    });
     const handled: unknown[] = [];
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
@@ -143,7 +156,7 @@ describe("Lambda asynchronous invocation destinations", () => {
     );
     await putEventInvokeConfig(simAws, {
       MaximumRetryAttempts: 0,
-      OnFailure: "arn:aws:lambda:us-east-1:888888888888:function:repairs",
+      OnFailure: destinationArn,
     });
 
     // When the failing function is invoked asynchronously.
@@ -158,12 +171,16 @@ describe("Lambda asynchronous invocation destinations", () => {
   it("puts a record on an event bus destination", async () => {
     // Given a failing function sending its failures to the default bus, and a
     // rule carrying what lands there on to a queue.
-    const { simAws } = await simAwsWithAsyncFunction();
+    const busArn = "arn:aws:events:us-east-1:888888888888:event-bus/default";
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["events:PutEvents"],
+      roleResource: busArn,
+    });
     const queueUrl = await makeQueue(simAws, "results-queue");
     await ruleToQueue(simAws, queueUrl, "results-queue");
     await putEventInvokeConfig(simAws, {
       MaximumRetryAttempts: 0,
-      OnFailure: "arn:aws:events:us-east-1:888888888888:event-bus/default",
+      OnFailure: busArn,
     });
 
     // When the function is invoked asynchronously.
@@ -223,5 +240,123 @@ describe("Lambda asynchronous invocation destinations", () => {
     const record = await receivedRecord(simAws, queueUrl);
     assertIdentical(record.requestContext.condition, "EventAgeExceeded");
     assertUndefined(record.responseContext);
+  });
+
+  it("refuses a queue destination the execution role may not send to", async () => {
+    // Given a failing function whose execution Role cannot send to its queue
+    // destination.
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["lambda:GetFunction"],
+    });
+    const queueUrl = await makeQueue(simAws, "failures");
+    await putEventInvokeConfig(simAws, {
+      MaximumRetryAttempts: 0,
+      OnFailure: simLambdaQueueArn("failures"),
+    });
+
+    // When its failure record is delivered.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and the queue remains empty.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "sqs:SendMessage");
+    assertStringIncludes(error.message, simLambdaQueueArn("failures"));
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
+  });
+
+  it("refuses a topic destination the execution role may not publish to", async () => {
+    // Given a successful function whose execution Role cannot publish to its
+    // topic destination.
+    const { simAws } = await simAwsWithAsyncFunction({
+      failuresBeforeSuccess: 0,
+      roleActions: ["lambda:GetFunction"],
+    });
+    const created = await simAws
+      .sns()
+      .createTopic(new CreateTopicCommand({ Name: "results" }));
+    assertNonNullable(created.TopicArn, "CreateTopic answered with an ARN");
+    const { queueUrl } = await simSnsSubscribedQueue(
+      simAws,
+      "results-queue",
+      created.TopicArn,
+    );
+    await putEventInvokeConfig(simAws, { OnSuccess: created.TopicArn });
+
+    // When its success record is delivered.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and the subscriber receives nothing.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "sns:Publish");
+    assertStringIncludes(error.message, created.TopicArn);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
+  });
+
+  it("refuses an event bus destination the execution role may not put to", async () => {
+    // Given a failing function whose execution Role cannot put events on its
+    // bus destination.
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["lambda:GetFunction"],
+    });
+    const queueUrl = await makeQueue(simAws, "results-queue");
+    await ruleToQueue(simAws, queueUrl, "results-queue");
+    const busArn = "arn:aws:events:us-east-1:888888888888:event-bus/default";
+    await putEventInvokeConfig(simAws, {
+      MaximumRetryAttempts: 0,
+      OnFailure: busArn,
+    });
+
+    // When its failure record is delivered.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and no rule receives an event.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "events:PutEvents");
+    assertStringIncludes(error.message, busArn);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
+  });
+
+  it("refuses a function destination the execution role may not invoke", async () => {
+    // Given a failing function whose execution Role cannot invoke its function
+    // destination.
+    const { simAws } = await simAwsWithAsyncFunction({
+      roleActions: ["lambda:GetFunction"],
+    });
+    const handled: unknown[] = [];
+    const destinationArn =
+      "arn:aws:lambda:us-east-1:888888888888:function:repairs";
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "repairs",
+        Role: "arn:aws:iam::888888888888:role/RepairsRole",
+        Code: {
+          ZipFile: makeLambdaZipFileInput((event: unknown) => {
+            handled.push(event);
+            return null;
+          }),
+        },
+      }),
+    );
+    await putEventInvokeConfig(simAws, {
+      MaximumRetryAttempts: 0,
+      OnFailure: destinationArn,
+    });
+
+    // When its failure record is delivered.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and the destination does not run.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "lambda:InvokeFunction");
+    assertStringIncludes(error.message, destinationArn);
+    assertArrayEmpty(handled);
   });
 });

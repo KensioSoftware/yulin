@@ -3,12 +3,14 @@ import {
   GetFunctionCommand,
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
+import { CreateTopicCommand } from "@aws-sdk/client-sns";
 import {
   assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -24,14 +26,21 @@ import {
   simLambdaAsyncFunctionName,
   simLambdaQueueArn,
 } from "../../../../../../test/lambda/async-destination-fixture.js";
+import {
+  simSnsDeliveredMessage,
+  simSnsSubscribedQueue,
+} from "../../../../../../test/sns/subscription-fixture.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../../index.js";
 
 describe("Lambda dead-letter config", () => {
   it("sends the invoked event to a dead-letter queue when every attempt fails", async () => {
     // Given a failing function with a dead-letter queue.
+    const deadLetterArn = simLambdaQueueArn("orders-dlq");
     const { simAws } = await simAwsWithAsyncFunction({
       deadLetterTargetArn: simLambdaQueueArn("orders-dlq"),
+      roleActions: ["sqs:SendMessage"],
+      roleResource: deadLetterArn,
     });
     const queueUrl = await makeQueue(simAws, "orders-dlq");
     await putEventInvokeConfig(simAws, { MaximumRetryAttempts: 0 });
@@ -44,6 +53,89 @@ describe("Lambda dead-letter config", () => {
     const [body] = await receivedBodies(simAws, queueUrl);
     assertNonNullable(body, "the dead-letter queue received the event");
     assertObjectEquals(JSON.parse(body) as object, { id: 7 });
+  });
+
+  it("publishes the invoked event to an allowed dead-letter topic", async () => {
+    // Given a failing function whose execution Role may publish to its
+    // dead-letter topic.
+    const topicArn = "arn:aws:sns:us-east-1:888888888888:orders-failures";
+    const { simAws } = await simAwsWithAsyncFunction({
+      deadLetterTargetArn: topicArn,
+      roleActions: ["sns:Publish"],
+      roleResource: topicArn,
+    });
+    const created = await simAws
+      .sns()
+      .createTopic(new CreateTopicCommand({ Name: "orders-failures" }));
+    assertIdentical(created.TopicArn, topicArn);
+    const { queueUrl } = await simSnsSubscribedQueue(
+      simAws,
+      "dead-letter-subscriber",
+      topicArn,
+    );
+    await putEventInvokeConfig(simAws, { MaximumRetryAttempts: 0 });
+
+    // When every invocation attempt fails.
+    await invokeAsyncAndSettle(simAws);
+
+    // Then the topic publishes the original event to its subscriber.
+    const body = await simSnsDeliveredMessage(simAws, queueUrl);
+    assertNonNullable(body, "the topic delivered a message");
+    const envelope = JSON.parse(body) as { readonly Message: string };
+    assertObjectEquals(JSON.parse(envelope.Message) as object, { id: 7 });
+  });
+
+  it("refuses a dead-letter queue the execution role may not send to", async () => {
+    // Given a failing function whose execution Role cannot send to its
+    // dead-letter queue.
+    const deadLetterArn = simLambdaQueueArn("orders-dlq");
+    const { simAws } = await simAwsWithAsyncFunction({
+      deadLetterTargetArn: deadLetterArn,
+      roleActions: ["lambda:GetFunction"],
+    });
+    const queueUrl = await makeQueue(simAws, "orders-dlq");
+    await putEventInvokeConfig(simAws, { MaximumRetryAttempts: 0 });
+
+    // When every invocation attempt fails.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and the queue remains empty.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "sqs:SendMessage");
+    assertStringIncludes(error.message, deadLetterArn);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
+  });
+
+  it("refuses a dead-letter topic the execution role may not publish to", async () => {
+    // Given a failing function whose execution Role cannot publish to its
+    // dead-letter topic.
+    const topicArn = "arn:aws:sns:us-east-1:888888888888:orders-failures";
+    const { simAws } = await simAwsWithAsyncFunction({
+      deadLetterTargetArn: topicArn,
+      roleActions: ["lambda:GetFunction"],
+    });
+    await simAws
+      .sns()
+      .createTopic(new CreateTopicCommand({ Name: "orders-failures" }));
+    const { queueUrl } = await simSnsSubscribedQueue(
+      simAws,
+      "dead-letter-subscriber",
+      topicArn,
+    );
+    await putEventInvokeConfig(simAws, { MaximumRetryAttempts: 0 });
+
+    // When every invocation attempt fails.
+    const error = await assertThrowsErrorAsync(async () => {
+      await invokeAsyncAndSettle(simAws);
+    });
+
+    // Then IAM refuses the execution Role and the subscriber receives nothing.
+    assertStringIncludes(error.message, "role/OrdersRole");
+    assertStringIncludes(error.message, "sns:Publish");
+    assertStringIncludes(error.message, topicArn);
+    assertArrayEmpty(await receivedBodies(simAws, queueUrl));
   });
 
   it("leaves the dead-letter queue empty when a retry succeeds", async () => {

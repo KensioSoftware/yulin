@@ -17,12 +17,20 @@ import { CreateQueueCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
 import { assertNonNullable } from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
+import { simIamRoleWithPolicyFactory } from "../../src/service/iam/role/sim-iam-role-with-policy.factory.js";
 import type { SimLambdaDestinationRecord } from "../../src/service/lambda/destination/sim-lambda-destination-record.js";
 import { makeLambdaZipFileInput } from "../../src/service/lambda/index.js";
 
 export const simLambdaAsyncFunctionName = "orders";
 export const simLambdaAsyncFunctionArn =
   "arn:aws:lambda:us-east-1:888888888888:function:orders";
+
+export const simLambdaDestinationActions = [
+  "sqs:SendMessage",
+  "sns:Publish",
+  "events:PutEvents",
+  "lambda:InvokeFunction",
+] as const;
 
 /**
  * The ARN of a queue of a name in the default Account and Region.
@@ -46,6 +54,8 @@ interface SimLambdaAsyncFunctionProperties {
    */
   readonly failuresBeforeSuccess?: number | undefined;
   readonly deadLetterTargetArn?: string | undefined;
+  readonly roleActions?: readonly string[] | undefined;
+  readonly roleResource?: string | undefined;
 }
 
 /**
@@ -57,11 +67,20 @@ export async function simAwsWithAsyncFunction(
   const { failuresBeforeSuccess = Infinity } = properties;
   const simAws = new SimAws();
   let attempts = 0;
+  const executionRole = await simIamRoleWithPolicyFactory.make(
+    {
+      roleName: "OrdersRole",
+      policyName: "DestinationDelivery",
+      actions: properties.roleActions ?? simLambdaDestinationActions,
+      resource: properties.roleResource ?? "*",
+    },
+    simAws,
+  );
 
   await simAws.lambda().createFunction(
     new CreateFunctionCommand({
       FunctionName: simLambdaAsyncFunctionName,
-      Role: "arn:aws:iam::888888888888:role/OrdersRole",
+      Role: executionRole.Arn,
       DeadLetterConfig:
         properties.deadLetterTargetArn === undefined
           ? undefined
