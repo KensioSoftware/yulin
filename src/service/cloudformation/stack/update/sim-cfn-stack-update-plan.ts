@@ -6,6 +6,11 @@ interface SimCfnStackUpdatePlanProperties {
   readonly updated: ReadonlyMap<string, SimCfnResource>;
 }
 
+export interface SimCfnStackResourceReplacement {
+  readonly current: SimCfnResource;
+  readonly updated: SimCfnResource;
+}
+
 /**
  * What an update has to do to a Stack's Resources, worked out before any of it
  * happens.
@@ -20,6 +25,9 @@ interface SimCfnStackUpdatePlanProperties {
  * simCfnStackReplacedLogicalIds decides what changed.
  */
 export class SimCfnStackUpdatePlan {
+  /** The current and updated halves of each Resource replacement. */
+  public readonly replacements: readonly SimCfnStackResourceReplacement[];
+
   /**
    * The deployed Resources to delete: the ones the new template drops, and the
    * deployed halves of the ones it replaces.
@@ -32,13 +40,28 @@ export class SimCfnStackUpdatePlan {
    */
   public readonly creations: readonly SimCfnResource[];
 
-  private readonly updated: ReadonlyMap<string, SimCfnResource>;
+  public readonly updated: ReadonlyMap<string, SimCfnResource>;
 
   constructor(properties: SimCfnStackUpdatePlanProperties) {
     const { current, updated } = properties;
     const replaced = simCfnStackReplacedLogicalIds({ current, updated });
 
     this.updated = updated;
+    this.replacements = replaced
+      .values()
+      .map((logicalId) => {
+        const currentResource = current.get(logicalId);
+        const updatedResource = updated.get(logicalId);
+
+        if (currentResource === undefined || updatedResource === undefined) {
+          throw new Error(
+            `CloudFormation replacement ${logicalId} is missing one of its Resource definitions`,
+          );
+        }
+
+        return { current: currentResource, updated: updatedResource };
+      })
+      .toArray();
 
     // Both lists are worked out now rather than on demand, because the Stack's
     // Resource map is the current one and applying the plan changes it.

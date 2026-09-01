@@ -3,6 +3,7 @@ import type {
   SimCloudFormationResourceCreateContext,
   SimCloudFormationResourceDeleteContext,
 } from "../sim-cfn-resource.js";
+import type { SimCloudFormationResourceUpdateContext } from "../sim-cfn-resource.type.js";
 
 export interface SimCfnServiceResourceFactory {
   create(
@@ -29,6 +30,20 @@ export interface SimCfnServiceResourceFactory {
     resource: SimCfnResource,
     context: SimCloudFormationResourceDeleteContext,
   ): Promise<void>;
+
+  /**
+   * Refuse an invalid replacement before CloudFormation deletes anything.
+   *
+   * Most simulated Resource types have no update-specific validation. A
+   * service can implement this hook when an update carries constraints that a
+   * create request cannot check.
+   */
+  assertUpdateAllowed?(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+    context: SimCloudFormationResourceUpdateContext,
+  ): Promise<void> | void;
 }
 
 export interface SimCloudFormationParsedResourceType {

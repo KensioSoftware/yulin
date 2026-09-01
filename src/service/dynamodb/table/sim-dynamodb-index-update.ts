@@ -112,8 +112,7 @@ export class SimDynamoDbIndexUpdate {
 
     if (created.length + deleted.length > 1) {
       throw new SimDynamoDbValidationException(
-        "You can create or delete only one global secondary index per " +
-          "UpdateTable operation",
+        "Cannot perform more than one GSI creation or deletion in a single update",
       );
     }
 

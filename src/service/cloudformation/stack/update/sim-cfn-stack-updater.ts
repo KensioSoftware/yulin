@@ -81,6 +81,12 @@ export class SimCfnStackUpdater {
     const { resources, operations } = this.properties;
     const { plan } = this;
 
+    await operations.assertUpdatesAllowed(
+      resources,
+      plan.updated,
+      plan.replacements,
+    );
+
     await operations.delete(resources, plan.deletions);
 
     plan.applyTo(resources);

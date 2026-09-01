@@ -11,6 +11,8 @@ import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-crea
 import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
 import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
 import { SimCfnStackUpdater } from "./update/sim-cfn-stack-updater.js";
+import type { SimCfnStackResourceReplacement } from "./update/sim-cfn-stack-update-plan.js";
+import { SimCfnResourceUpdateValidator } from "../resource/update/sim-cfn-resource-update-validator.js";
 import type { SimCloudFormationStackName } from "./sim-cfn-stack.js";
 
 interface SimCfnStackUpdateProperties {
@@ -141,6 +143,29 @@ export class SimCfnStackResourceOperations {
     deleting: readonly SimCfnResource[],
   ): Promise<void> {
     await this.deleter(resources).delete(deleting);
+  }
+
+  /**
+   * Validate every Resource replacement before the update changes the Stack.
+   */
+  async assertUpdatesAllowed(
+    currentResources: ReadonlyMap<string, SimCfnResource>,
+    updatedResources: ReadonlyMap<string, SimCfnResource>,
+    replacements: readonly SimCfnStackResourceReplacement[],
+  ): Promise<void> {
+    await Promise.all(
+      replacements.map(async ({ current, updated }) => {
+        await new SimCfnResourceUpdateValidator({
+          current,
+          updated,
+        }).assertAllowed({
+          simAws: this.simAws,
+          currentResources,
+          updatedResources,
+          caller: this.caller,
+        });
+      }),
+    );
   }
 
   /**

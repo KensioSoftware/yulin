@@ -96,10 +96,9 @@ describe("DynamoDB UpdateTableCommand validation", () => {
     });
 
     assertInstanceOf(error, SimDynamoDbValidationException);
-    assertStringIncludes(
+    assertIdentical(
       error.message,
-      "You can create or delete only one global secondary index per " +
-        "UpdateTable operation",
+      "Cannot perform more than one GSI creation or deletion in a single update",
     );
   });
 

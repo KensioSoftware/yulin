@@ -4,6 +4,7 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import {
@@ -34,6 +35,56 @@ const parameterisedTemplate = {
 };
 
 describe("simulated CloudFormation Stack update", () => {
+  it("updates a skipped unsupported Resource", async () => {
+    // Given a Stack with a Resource the simulator skips.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "instance-stack",
+        TemplateBody: jsonStringify({
+          Resources: {
+            TestInstance: {
+              Type: "AWS::EC2::Instance",
+              Properties: { InstanceType: "t3.micro" },
+            },
+          },
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackDeployComplete("instance-stack");
+
+    // When the unsupported Resource changes.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "instance-stack",
+        TemplateBody: jsonStringify({
+          Resources: {
+            TestInstance: {
+              Type: "AWS::EC2::Instance",
+              Properties: { InstanceType: "t3.small" },
+            },
+          },
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("instance-stack");
+
+    // Then validation skips the Resource as creation does.
+    const stack = cloudFormation.getStackByName("instance-stack");
+    assertNonNullable(stack);
+    assertIdentical(stack.status, "UPDATE_COMPLETE");
+
+    const resource = stack.getResource("TestInstance");
+    assertNonNullable(resource);
+    assertTrue(resource.skipped);
+    assertIdentical(
+      resource.skippedReason,
+      "Unsupported sim CloudFormation Resource service EC2",
+    );
+  });
+
   it("leaves a Resource the new template does not change alone", async () => {
     // Given a deployed Stack of two Buckets.
     const simAws = new SimAws();
