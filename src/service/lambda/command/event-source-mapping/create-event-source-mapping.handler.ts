@@ -144,6 +144,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
       start: input.start,
       enabled: input.enabled,
       functionResponseTypes: input.functionResponseTypes,
+      streamRetryLimits: input.streamRetryLimits,
       createdAt: this.properties.background.now(),
     });
 

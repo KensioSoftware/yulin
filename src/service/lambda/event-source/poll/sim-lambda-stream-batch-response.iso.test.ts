@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 
 import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaStreamBatchResponse } from "./sim-lambda-stream-batch-response.js";
+import type { SimLambdaStreamRecordTime } from "./sim-lambda-stream-record-times.js";
 
 /**
  * Where the mapping read this batch from, which is where a batch that failed
@@ -14,9 +15,13 @@ const readFrom: SimLambdaEventSourceStreamPosition = {
 };
 
 /**
- * The sequence numbers one batch carried, in stream order.
+ * The records one batch carried, in stream order.
  */
-const records: readonly string[] = ["100", "200", "300"];
+const records: readonly SimLambdaStreamRecordTime[] = [
+  { sequenceNumber: "100", at: undefined },
+  { sequenceNumber: "200", at: undefined },
+  { sequenceNumber: "300", at: undefined },
+];
 
 /**
  * The sequence number the next read starts at, or the iterator it starts from
@@ -129,7 +134,7 @@ describe("sim Lambda stream batch responses", () => {
     const response = new SimLambdaStreamBatchResponse(true);
 
     // When the function threw rather than returning anything.
-    const outcome = response.failed();
+    const outcome = response.failed(records);
 
     // Then the batch is read again from where it was.
     assertIdentical(

@@ -4,6 +4,7 @@ import { describe, it } from "vitest";
 import { BackgroundTasks } from "../../../../../util/background/background.js";
 import type { SimLambdaFunctionLookup } from "../../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-mapping.js";
+import { SimLambdaStreamRetryLimits } from "../../sim-lambda-stream-retry-limits.js";
 import { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type {
   SimLambdaKinesisStreamBatch,
@@ -24,6 +25,7 @@ const mapping = {
   batchSize: 10,
   reportsBatchItemFailures: false,
   start: { position: "TRIM_HORIZON" },
+  streamRetryLimits: new SimLambdaStreamRetryLimits(),
 } as unknown as SimLambdaEventSourceMapping;
 
 const functions = {

@@ -11,7 +11,7 @@ import type {
 import { PollSchedule } from "../../../../util/background/poll-schedule.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamCheckpoint } from "./sim-lambda-stream-checkpoint.js";
-import { SimLambdaStreamRetryBackoff } from "./sim-lambda-stream-retry-backoff.js";
+import { SimLambdaStreamRetry } from "./sim-lambda-stream-retry.js";
 
 interface SimLambdaStreamProgressProperties {
   readonly mapping: SimLambdaEventSourceMapping;
@@ -32,17 +32,22 @@ interface SimLambdaStreamProgressProperties {
  */
 export class SimLambdaStreamProgress {
   private readonly checkpoint: SimLambdaStreamCheckpoint;
-  private readonly backoff = new SimLambdaStreamRetryBackoff();
+  private readonly retry: SimLambdaStreamRetry;
   private readonly schedule: PollSchedule;
 
   constructor(properties: SimLambdaStreamProgressProperties) {
     // A stream mapping is refused at creation unless it names a starting
     // position, so one that has got this far without one is the simulator
     // having gone wrong rather than a request having been wrong.
-    const { start } = properties.mapping;
+    const { start, streamRetryLimits } = properties.mapping;
     assertDefined(start, "stream mapping start position");
+    assertDefined(streamRetryLimits, "stream mapping retry limits");
 
     this.checkpoint = new SimLambdaStreamCheckpoint(start);
+    this.retry = new SimLambdaStreamRetry({
+      limits: streamRetryLimits,
+      clock: properties.background,
+    });
     this.schedule = new PollSchedule(properties);
   }
 
@@ -88,10 +93,13 @@ export class SimLambdaStreamProgress {
   }
 
   /**
-   * Move past a batch the function took, and read on.
+   * Move past a batch that is finished with, and read on.
+   *
+   * A batch the function took is finished with, and so is one the mapping has
+   * given up on.
    */
   handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
-    this.backoff.reset();
+    this.retry.reset();
     this.checkpoint.advanceTo(batch.next);
 
     if (!batch.drained) {
@@ -106,22 +114,25 @@ export class SimLambdaStreamProgress {
    * what AWS does when a stream mapping's error handling runs out. Parking the
    * shard instead would be a simulator invention.
    *
-   * A report naming a record moves the checkpoint before the wait, so what goes
-   * over again is the batch from that record on. The attempts are still counted
-   * against the same limit: a batch that keeps failing partway through has as
-   * many tries as one that keeps failing whole.
+   * A batch runs out either by having had its retries or by every record left
+   * in it being older than the mapping will carry. Records that aged out of the
+   * front of a batch are left behind, and the ones behind them go over again,
+   * so a mapping given a record age keeps working through its shard rather than
+   * stalling on the oldest record on it.
    */
   failed(
     outcome: SimLambdaStreamBatchOutcome,
     batch: SimLambdaEventSourceStreamProgressBatch,
   ): void {
-    if (this.backoff.isExhausted) {
+    const again = this.retry.after(outcome, this.checkpoint.position);
+
+    if (again === undefined) {
       this.handled(batch);
 
       return;
     }
 
-    this.checkpoint.retry(outcome);
-    this.schedule.afterSeconds(this.backoff.nextSeconds());
+    this.checkpoint.advanceTo(again.position);
+    this.schedule.afterSeconds(again.afterSeconds);
   }
 }

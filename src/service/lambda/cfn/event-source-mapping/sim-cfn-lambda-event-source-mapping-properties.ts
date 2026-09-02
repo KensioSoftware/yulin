@@ -78,6 +78,16 @@ export class SimCfnLambdaEventSourceMappingProperties {
         this.properties["MaximumBatchingWindowInSeconds"],
         "MaximumBatchingWindowInSeconds",
       ),
+      MaximumRetryAttempts: this.parser.optionalNumber(
+        this.resource,
+        this.properties["MaximumRetryAttempts"],
+        "MaximumRetryAttempts",
+      ),
+      MaximumRecordAgeInSeconds: this.parser.optionalNumber(
+        this.resource,
+        this.properties["MaximumRecordAgeInSeconds"],
+        "MaximumRecordAgeInSeconds",
+      ),
       StartingPosition: this.parser.optionalString(
         this.resource,
         this.properties["StartingPosition"],

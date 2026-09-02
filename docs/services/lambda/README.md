@@ -1841,15 +1841,152 @@ Advancing the simulation's clock is what hands the batch over again:
 await simAws.clock().advanceBy({ seconds: 30 });
 ```
 
-The batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, so six deliveries in all.
-Then it is discarded and the mapping carries on with the stream, as AWS does once a stream mapping's
-error handling has run out.
+A mapping that asks for no limit of its own delivers the batch again five times, after 1, 2, 4, 8
+and 16 seconds, so six deliveries in all. Then it is discarded and the mapping carries on with the
+stream, as AWS does once a stream mapping's error handling has run out.
 
-Both the cadence and the number of attempts are simulator constraints rather than AWS behaviour. AWS
-documents no delay between attempts and retries until the records age out of the stream, a day
-later. A delay of zero here would fall due at the instant the clock already reads. A handler that
-always throws would then leave `advanceBy` with work falling due forever, and waiting out a
-simulated day is the same problem with more steps.
+The delays are a simulator constraint. AWS documents no delay between attempts. A delay of zero here
+would fall due at the instant the clock already reads, and a handler that always throws would leave
+`advanceBy` with work falling due forever. The growing delay is also what lets a test walk through
+the attempts by advancing the clock.
+
+The five attempts are a cap on a mapping that named neither of the limits below. AWS retries until
+the records age out of the stream, a day later, and waiting out a simulated day is the same hang
+with more steps.
+
+### Limiting the retries and the record age
+
+`MaximumRetryAttempts` and `MaximumRecordAgeInSeconds` govern the same failed-batch lifecycle, and a
+stream mapping keeps both. `MaximumRetryAttempts: 0` makes one delivery and no retries, and a
+positive value allows that many retries after the first delivery. `MaximumRecordAgeInSeconds`
+discards a record once the next attempt would fall past that age. Lambda's `-1` means no limit
+(that is what a mapping naming neither reports back).
+
+```typescript sim-lambda-stream-retry-limits
+/**
+ * Giving up on a stream batch once its retries have run out.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaDynamoDbStreamEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+const { TableDescription } = await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "orders",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    },
+  }),
+);
+
+const streamArn = TableDescription?.LatestStreamArn;
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderProjectorRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderProjectorRole",
+    PolicyName: "ReadOrdersStream",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: [
+            "dynamodb:DescribeStream",
+            "dynamodb:GetRecords",
+            "dynamodb:GetShardIterator",
+          ],
+          Resource: streamArn,
+        },
+        { Effect: "Allow", Action: "dynamodb:ListStreams", Resource: "*" },
+      ],
+    }),
+  }),
+);
+
+// The handler never gets through the batch, so the retries are what decide
+// how many times it is given one.
+const deliveries: SimLambdaDynamoDbStreamEvent[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-projector",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: SimLambdaDynamoDbStreamEvent): undefined => {
+          deliveries.push(event);
+
+          throw new Error("Projector could not handle the batch");
+        },
+      ),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: streamArn,
+    FunctionName: "order-projector",
+    StartingPosition: "TRIM_HORIZON",
+    MaximumRetryAttempts: 2,
+    MaximumRecordAgeInSeconds: 120,
+  }),
+);
+
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "orders",
+    Item: { orderId: { S: "order-1" }, total: { N: "42" } },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+// The two retries fall due 1 and 2 seconds after the deliveries they follow.
+await simAws.clock().advanceBy({ seconds: 30 });
+
+console.log(deliveries.length); // 3
+```
+
+Records age out of the front of a batch, since a batch is in stream order. A batch whose oldest
+records are past the age goes over again from the first record that is still young enough, and the
+shard keeps moving. A batch that has had its retries, or whose records have all aged out, is
+discarded, and the mapping reads on from behind it.
+
+`GetEventSourceMapping` and `ListEventSourceMappings` report both values, and
+`AWS::Lambda::EventSourceMapping` takes both in a template. A value outside Lambda's range (`-1` to
+10,000 retries, `-1` to 604,800 seconds) is a `ValidationException`. A queue mapping takes neither,
+because a message the handler never takes is left to the queue's own redrive policy.
 
 ### Reporting individual record failures
 
@@ -1883,7 +2020,7 @@ why a stream consumer has to be idempotent.
 
 So a report naming only the last record of a batch delivers that record again. A report naming the
 first record delivers the whole batch again. The redelivery is a retry like any other. It waits out
-the same backoff, counts against the same five attempts, and what is left is discarded when they run
+the same backoff, counts against the same retries, and what is left is discarded when they run
 out.
 
 A report naming a sequence number that was not in the batch delivers the whole batch again, as real
@@ -2253,6 +2390,8 @@ AWS managed policy and CDK's own grant give a stream consumer. A role missing on
 handler names a record by its `sequenceNumber`, and the mapping goes back to the lowest one the
 report names, so that record and everything after it on that shard is delivered again. A failing
 batch blocks its own shard and no other.
+[`MaximumRetryAttempts` and `MaximumRecordAgeInSeconds`](#limiting-the-retries-and-the-record-age)
+work the same way here, and each shard counts its own attempts.
 
 A mapping naming an enhanced fan-out consumer ARN is refused, since consumers are unsimulated.
 `AWS::Lambda::EventSourceMapping` deploys a Kinesis mapping the same way it deploys a DynamoDB one.
@@ -3781,6 +3920,8 @@ Sim Lambda currently supports:
   DynamoDB stream and Kinesis events and honouring `BatchSize`
 - `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, and `"AT_TIMESTAMP"` on a
   Kinesis one, with a failing batch blocking its shard until it is through or discarded
+- `MaximumRetryAttempts` and `MaximumRecordAgeInSeconds` on a stream mapping, ending the retries at
+  a quota or at a record age
 - Every shard of a Kinesis stream read by a processor of its own, as real Lambda reads one
 - `FunctionResponseTypes: ["ReportBatchItemFailures"]` on a queue mapping, returning only the
   message ids the handler reported, and on a stream mapping, rewinding to the lowest sequence number
@@ -3928,15 +4069,15 @@ Current documented limitations:
   it stands.
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
   Kinesis enhanced fan-out consumers are refused outright, and so are `FilterCriteria`,
-  `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
-  `ParallelizationFactor`, `TumblingWindowInSeconds` and the other mapping inputs this simulation
-  has no behaviour for.
-- A stream batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, and then discarded.
-  AWS documents no delay between attempts and retries until the records age out. Both differences
-  are deliberate. A delay of zero falls due at the instant the clock already reads, and a handler
-  that always throws would leave `advanceBy` with work falling due forever. A batch item failure
-  report counts against the same five attempts, and never starts them again for the records it
-  rewound to.
+  `ScalingConfig`, `DestinationConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
+  `TumblingWindowInSeconds` and the other mapping inputs this simulation has no behaviour for.
+- A failed stream batch waits 1, 2, 4, 8 and 16 seconds between attempts, where AWS documents no
+  delay. That is deliberate. A delay of zero falls due at the instant the clock already reads, and a
+  handler that always throws would leave `advanceBy` with work falling due forever. A mapping that
+  names neither `MaximumRetryAttempts` nor `MaximumRecordAgeInSeconds` gets five retries and then
+  discards the batch, where AWS goes on until the records age out a day later. A batch item failure
+  report counts against the same retries, and never starts them again for the records it rewound
+  to.
 - A handler writing into the table whose stream invoked it is refused with
   `SimLambdaStreamCascadeError` rather than being delivered its own writes forever. Real Lambda runs
   that loop.

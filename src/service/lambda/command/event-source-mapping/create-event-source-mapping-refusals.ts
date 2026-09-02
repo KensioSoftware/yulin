@@ -20,11 +20,6 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
       "of attempts is discarded rather than sent anywhere",
   ],
   [
-    "MaximumRetryAttempts",
-    "the number of times a stream batch is delivered again is fixed",
-  ],
-  ["MaximumRecordAgeInSeconds", "record ages are not simulated"],
-  [
     "BisectBatchOnFunctionError",
     "batch bisection is not simulated, so a failing stream batch is retried " +
       "whole",
@@ -54,7 +49,8 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
  *
  * `StartingPosition` is not among them, because whether a source has one is the
  * source's own rule: a stream is refused without it and a queue is refused with
- * it.
+ * it. The two failed-batch limits are left out for the same reason: a stream
+ * mapping keeps them and a queue mapping is refused for naming one.
  */
 const unsupportedEventSourceInputs: ReadonlySet<string> = new Set([
   "Topics",

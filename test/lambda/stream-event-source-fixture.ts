@@ -138,6 +138,8 @@ interface StreamEventSourceOptions {
   readonly batchSize?: number;
   readonly startingPosition?: EventSourcePosition;
   readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
+  readonly maximumRetryAttempts?: number;
+  readonly maximumRecordAgeInSeconds?: number;
 }
 
 /**
@@ -170,6 +172,12 @@ export async function simAwsWithStreamEventSource(
       ...(options.batchSize !== undefined && { BatchSize: options.batchSize }),
       ...(options.functionResponseTypes !== undefined && {
         FunctionResponseTypes: [...options.functionResponseTypes],
+      }),
+      ...(options.maximumRetryAttempts !== undefined && {
+        MaximumRetryAttempts: options.maximumRetryAttempts,
+      }),
+      ...(options.maximumRecordAgeInSeconds !== undefined && {
+        MaximumRecordAgeInSeconds: options.maximumRecordAgeInSeconds,
       }),
     }),
   );

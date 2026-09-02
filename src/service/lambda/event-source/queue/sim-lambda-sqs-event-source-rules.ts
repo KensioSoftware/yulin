@@ -1,4 +1,5 @@
 import { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
+import { SimLambdaNoRetryLimits } from "../sim-lambda-event-source-retry-limits.js";
 import { SimLambdaNoStartingPosition } from "../sim-lambda-event-source-starting-position.js";
 
 /**
@@ -34,4 +35,14 @@ export const sqsBatchRules = new SimLambdaEventSourceBatchRules({
  */
 export const sqsStartingPositionRules = new SimLambdaNoStartingPosition(
   "a queue",
+);
+
+/**
+ * A queue keeps its own count of how often a message has been received, so
+ * neither of Lambda's failed-batch limits is a queue mapping's to keep.
+ */
+export const sqsRetryLimitRules = new SimLambdaNoRetryLimits(
+  "a queue",
+  "a message the function never handles is left to the queue's own redrive " +
+    "policy",
 );

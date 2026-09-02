@@ -1,4 +1,11 @@
 import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
+import type { SimLambdaStreamRecordTime } from "./sim-lambda-stream-record-times.js";
+
+interface SimLambdaStreamBatchOutcomeProperties {
+  readonly isHandled: boolean;
+  readonly records: readonly SimLambdaStreamRecordTime[];
+  readonly rewindTo?: string | undefined;
+}
 
 /**
  * What became of one batch of stream records handed to a function.
@@ -8,37 +15,81 @@ import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-ev
  * batch does not split. The mapping holds one place on the shard, so the answer
  * is one place: either the batch is finished with, or reading goes back to a
  * record and everything from there is delivered again.
+ *
+ * The batch's own records travel with the answer, because what happens to a
+ * batch that failed depends on them: they carry the names it can be sent back
+ * to and the instants its records are aged from.
  */
 export class SimLambdaStreamBatchOutcome {
   public readonly isHandled: boolean;
 
+  /**
+   * The records the batch carried, in stream order.
+   */
+  public readonly records: readonly SimLambdaStreamRecordTime[];
+
   private readonly rewindTo: string | undefined;
 
-  private constructor(isHandled: boolean, rewindTo: string | undefined) {
-    this.isHandled = isHandled;
-    this.rewindTo = rewindTo;
+  private constructor(properties: SimLambdaStreamBatchOutcomeProperties) {
+    this.isHandled = properties.isHandled;
+    this.records = properties.records;
+    this.rewindTo = properties.rewindTo;
   }
 
   /**
    * A batch the function took in full.
    */
-  static handled(): SimLambdaStreamBatchOutcome {
-    return new SimLambdaStreamBatchOutcome(true, undefined);
+  static handled(
+    records: readonly SimLambdaStreamRecordTime[],
+  ): SimLambdaStreamBatchOutcome {
+    return new SimLambdaStreamBatchOutcome({ isHandled: true, records });
   }
 
   /**
    * A batch the function did not take, which is read again from where it was.
    */
-  static failed(): SimLambdaStreamBatchOutcome {
-    return new SimLambdaStreamBatchOutcome(false, undefined);
+  static failed(
+    records: readonly SimLambdaStreamRecordTime[],
+  ): SimLambdaStreamBatchOutcome {
+    return new SimLambdaStreamBatchOutcome({ isHandled: false, records });
   }
 
   /**
    * A batch the function reported failing partway through, which is read again
    * from the record it named.
    */
-  static failedFrom(sequenceNumber: string): SimLambdaStreamBatchOutcome {
-    return new SimLambdaStreamBatchOutcome(false, sequenceNumber);
+  static failedFrom(
+    records: readonly SimLambdaStreamRecordTime[],
+    sequenceNumber: string,
+  ): SimLambdaStreamBatchOutcome {
+    return new SimLambdaStreamBatchOutcome({
+      isHandled: false,
+      records,
+      rewindTo: sequenceNumber,
+    });
+  }
+
+  /**
+   * Where in the batch the next delivery starts, as a position in the records
+   * the batch carried.
+   *
+   * A batch that failed whole starts at the first record. One the function
+   * reported on starts at the record it named, which the batch response has
+   * already checked was in the batch, so a name that is not there is the whole
+   * batch again rather than a guess.
+   */
+  get retryIndex(): number {
+    const sequenceNumber = this.rewindTo;
+
+    if (sequenceNumber === undefined) {
+      return 0;
+    }
+
+    const index = this.records.findIndex(
+      (record) => record.sequenceNumber === sequenceNumber,
+    );
+
+    return index === -1 ? 0 : index;
   }
 
   /**

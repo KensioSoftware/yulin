@@ -1,10 +1,12 @@
 import { SimLambdaInvalidParameterValueException } from "../../../error/sim-lambda.error.js";
 import type { SimLambdaEventSourceBatchRules } from "../../sim-lambda-event-source-batch-rules.js";
+import type { SimLambdaEventSourceRetryLimitRules } from "../../sim-lambda-event-source-retry-limits.js";
 import { SimLambdaEventSourcePollingPermission } from "../../sim-lambda-event-source-polling-permission.js";
 import type { SimLambdaEventSourceStartingPositionRules } from "../../sim-lambda-event-source-starting-position.js";
 import {
   kinesisStreamBatchRules,
   kinesisStreamPollingOperations,
+  kinesisStreamRetryLimitRules,
   kinesisStreamStartingPositionRules,
 } from "./sim-lambda-kinesis-event-source-rules.js";
 
@@ -105,6 +107,13 @@ export class SimLambdaKinesisEventSourceArn {
    */
   get startingPositionRules(): SimLambdaEventSourceStartingPositionRules {
     return kinesisStreamStartingPositionRules;
+  }
+
+  /**
+   * The failed-batch limits a mapping on this stream may be created with.
+   */
+  get retryLimitRules(): SimLambdaEventSourceRetryLimitRules {
+    return kinesisStreamRetryLimitRules;
   }
 
   /**
