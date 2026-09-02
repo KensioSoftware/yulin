@@ -1,5 +1,5 @@
 import type { Brand } from "../../../util/brand.type.js";
-import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+import { SimRealClock } from "../../../util/clock/sim-clock.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
@@ -12,6 +12,7 @@ import type { SimS3ObjectVersion } from "./versioning/sim-s3-object-version.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
 import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
+import { SimS3BucketEncryption } from "./encryption/sim-s3-bucket-encryption.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
@@ -20,32 +21,9 @@ import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
 import type { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
+import type { SimS3BucketProperties } from "./sim-s3-bucket-properties.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
-
-interface SimS3BucketProperties {
-  readonly bucketName: SimS3BucketName | string;
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly storage?: SimS3BucketStorage;
-  readonly website?: SimS3BucketWebsite;
-  readonly policy?: SimIamPolicyDocument | undefined;
-  readonly publicAccessBlock?: SimS3PublicAccessBlock;
-  readonly notifications?: SimS3NotificationConfiguration;
-  readonly lifecycle?: SimS3LifecycleConfiguration;
-  /**
-   * The simulation's sense of time, which is what a lifecycle rule is measured
-   * against. A Bucket made outside a simulated environment has none to be
-   * given, and runs on the host clock.
-   */
-  readonly clock?: SimClock;
-  /**
-   * When the Bucket came into being, in simulated time.
-   *
-   * Real S3 reports this on every Bucket a listing returns, and the `aws` CLI
-   * reads it from each entry, so a Bucket without one cannot be listed.
-   */
-  readonly creationDate?: Date;
-}
 
 /**
  * Simulated S3 Bucket.
@@ -61,6 +39,7 @@ export class SimS3Bucket {
   private policy: SimIamPolicyDocument | undefined;
   private publicAccessBlock: SimS3PublicAccessBlock;
   private notifications: SimS3NotificationConfiguration;
+  private encryption: SimS3BucketEncryption;
 
   constructor(properties: SimS3BucketProperties) {
     const {
@@ -72,6 +51,7 @@ export class SimS3Bucket {
       publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
       notifications = SimS3NotificationConfiguration.empty(),
       lifecycle = SimS3LifecycleConfiguration.empty(),
+      encryption = SimS3BucketEncryption.default(),
       clock = new SimRealClock(),
       creationDate = clock.now(),
     } = properties;
@@ -85,6 +65,7 @@ export class SimS3Bucket {
     this.policy = policy;
     this.publicAccessBlock = publicAccessBlock;
     this.notifications = notifications;
+    this.encryption = encryption;
     this.creationDate = creationDate;
   }
 
@@ -246,9 +227,7 @@ export class SimS3Bucket {
     this.notifications = notifications;
   }
 
-  /**
-   * Get this Bucket's event notification configuration.
-   */
+  /** Get this Bucket's event notification configuration. */
   getNotifications(): SimS3NotificationConfiguration {
     return this.notifications;
   }
@@ -278,6 +257,26 @@ export class SimS3Bucket {
    */
   deleteLifecycle(): void {
     this.objects.deleteLifecycle();
+  }
+
+  /** Replace this Bucket's default encryption configuration. */
+  configureEncryption(encryption: SimS3BucketEncryption): void {
+    this.encryption = encryption;
+  }
+
+  /** Get this Bucket's default encryption configuration. */
+  getEncryption(): SimS3BucketEncryption {
+    return this.encryption;
+  }
+
+  /**
+   * Put this Bucket back to the encryption every Bucket has.
+   *
+   * Real S3 DeleteBucketEncryption leaves the Bucket SSE-S3 encrypted rather
+   * than unencrypted, because there is no such thing as an unencrypted Bucket.
+   */
+  deleteEncryption(): void {
+    this.encryption = SimS3BucketEncryption.default();
   }
 
   /**

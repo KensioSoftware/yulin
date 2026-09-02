@@ -1,6 +1,7 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3ObjectLock } from "../lock/sim-s3-object-lock.js";
 import type { SimS3Object } from "../../object/s3-object.js";
+import type { SimS3StorageClass } from "../../object/s3-storage-class.js";
 import { simS3NullVersionId } from "./sim-s3-bucket-versioning.js";
 
 interface SimS3ObjectVersionProperties {
@@ -39,7 +40,7 @@ export class SimS3ObjectVersion {
   private displaced: Date | undefined;
 
   private readonly createdAt: Date;
-  private readonly stored: SimS3Object | undefined;
+  private stored: SimS3Object | undefined;
 
   constructor(properties: SimS3ObjectVersionProperties) {
     this.versionId = properties.versionId;
@@ -61,6 +62,17 @@ export class SimS3ObjectVersion {
       createdAt: object.lastModified,
       object,
     });
+  }
+
+  /**
+   * Move the Object this version holds into another storage class.
+   *
+   * A lifecycle rule transitions a noncurrent version where it lies, so the
+   * class is recorded on the version rather than derived on each read of it. A
+   * delete marker holds no Object and transitions nowhere.
+   */
+  transitionTo(storageClass: SimS3StorageClass): void {
+    this.stored = this.stored?.withStorageClass(storageClass);
   }
 
   /**

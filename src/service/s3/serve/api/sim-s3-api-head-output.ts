@@ -25,6 +25,10 @@ export function simS3HeadObjectResponse(
       bodyLength: (output["ContentLength"] as number | undefined) ?? 0,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,
+      storageClass: output["StorageClass"] as string | undefined,
+      serverSideEncryption: output["ServerSideEncryption"] as
+        | string
+        | undefined,
     }),
   });
 }

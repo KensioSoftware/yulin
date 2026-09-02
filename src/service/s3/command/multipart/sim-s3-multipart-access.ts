@@ -11,7 +11,7 @@ import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { SimS3NoSuchUpload } from "../../error/sim-s3.error.js";
+import { SimS3NoSuchUpload } from "../../error/sim-s3-upload.error.js";
 import type { SimS3MultipartUpload } from "../../upload/sim-s3-multipart-upload.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";

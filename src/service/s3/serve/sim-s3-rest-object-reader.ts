@@ -46,6 +46,8 @@ export class SimS3RestObjectReader {
       etag: output.ETag,
       lastModified: output.LastModified,
       contentRange: output.ContentRange,
+      storageClass: output.StorageClass,
+      serverSideEncryption: output.ServerSideEncryption,
     });
 
     if (head) {

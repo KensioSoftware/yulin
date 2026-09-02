@@ -2,6 +2,7 @@
  * The AWS::S3::Bucket properties this simulation acts on.
  */
 export const simulatedPropertyNames: ReadonlySet<string> = new Set([
+  "BucketEncryption",
   "BucketName",
   "LifecycleConfiguration",
   "ObjectLockConfiguration",
@@ -15,16 +16,11 @@ export const simulatedPropertyNames: ReadonlySet<string> = new Set([
 /**
  * Real AWS::S3::Bucket properties this simulation reads and does nothing with.
  *
- * Nothing this simulator models can tell the difference. There is no simulated
- * KMS and Object bytes are stored as they arrive, so an encrypted Bucket and an
- * unencrypted one answer every simulated command identically, and no simulated
- * service reads a Bucket tag. So these are not recorded as ignored either: a
- * report of differences that make no difference is one nobody can read.
+ * Nothing this simulator models can tell the difference. No simulated service
+ * reads a Bucket tag, so this is not recorded as ignored either: a report of
+ * differences that make no difference is one nobody can read.
  */
-export const inertPropertyNames: ReadonlySet<string> = new Set([
-  "BucketEncryption",
-  "Tags",
-]);
+export const inertPropertyNames: ReadonlySet<string> = new Set(["Tags"]);
 
 import type {
   SimCfnSkippedPropertyRule,
@@ -65,7 +61,8 @@ export const unsimulatedPropertyReasons: SimCfnSkippedPropertyRules = new Map<
   ],
   [
     "IntelligentTieringConfigurations",
-    "storage classes are not simulated, so nothing transitions between them",
+    "Objects are not moved between storage classes by access pattern, and " +
+      "only a lifecycle rule transitions one",
   ],
   ["InventoryConfigurations", "Bucket inventory reports are not simulated"],
   ["LoggingConfiguration", "server access logging is not simulated"],

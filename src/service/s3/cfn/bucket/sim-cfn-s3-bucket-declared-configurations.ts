@@ -1,6 +1,7 @@
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimS3 } from "../../sim-s3.js";
+import { SimCfnS3BucketEncryption } from "./encryption/sim-cfn-s3-bucket-encryption.js";
 import { SimCfnS3BucketLifecycleConfiguration } from "./lifecycle/sim-cfn-s3-bucket-lifecycle-configuration.js";
 import { SimCfnS3BucketObjectLockConfiguration } from "./lock/sim-cfn-s3-bucket-object-lock-configuration.js";
 import { SimCfnS3BucketPublicAccessConfiguration } from "./public-access/sim-cfn-s3-bucket-public-access-configuration.js";
@@ -19,7 +20,7 @@ interface SimCfnS3BucketDeclaredConfigurationsProperties {
  * The AWS::S3::Bucket properties that are read straight off the Resource and
  * handed to a command.
  *
- * Five properties with one shape between them. Each is read from the Resource,
+ * Six properties with one shape between them. Each is read from the Resource,
  * left alone where the Resource omitted it, and otherwise applied through the
  * command an SDK caller would reach, so a template and an SDK caller are
  * validated identically. The event notification configuration is the one that
@@ -45,46 +46,47 @@ export class SimCfnS3BucketDeclaredConfigurations {
    * Apply the website configuration the Resource declares.
    */
   async applyWebsite(): Promise<void> {
-    const WebsiteConfiguration = this.read(SimCfnS3BucketWebsiteConfiguration);
-
-    if (WebsiteConfiguration !== undefined) {
-      await this.simS3.putBucketWebsite(
-        { input: { Bucket: this.bucketName, WebsiteConfiguration } },
-        this.options,
-      );
-    }
+    await this.applyDeclared(
+      SimCfnS3BucketWebsiteConfiguration,
+      async (WebsiteConfiguration) => {
+        await this.simS3.putBucketWebsite(
+          { input: { Bucket: this.bucketName, WebsiteConfiguration } },
+          this.options,
+        );
+      },
+    );
   }
 
   /**
    * Apply the Block Public Access settings the Resource declares.
    */
   async applyPublicAccess(): Promise<void> {
-    const PublicAccessBlockConfiguration = this.read(
+    await this.applyDeclared(
       SimCfnS3BucketPublicAccessConfiguration,
+      async (PublicAccessBlockConfiguration) => {
+        await this.simS3.putPublicAccessBlock(
+          {
+            input: { Bucket: this.bucketName, PublicAccessBlockConfiguration },
+          },
+          this.options,
+        );
+      },
     );
-
-    if (PublicAccessBlockConfiguration !== undefined) {
-      await this.simS3.putPublicAccessBlock(
-        { input: { Bucket: this.bucketName, PublicAccessBlockConfiguration } },
-        this.options,
-      );
-    }
   }
 
   /**
    * Apply the versioning configuration the Resource declares.
    */
   async applyVersioning(): Promise<void> {
-    const VersioningConfiguration = this.read(
+    await this.applyDeclared(
       SimCfnS3BucketVersioningConfiguration,
+      async (VersioningConfiguration) => {
+        await this.simS3.putBucketVersioning(
+          { input: { Bucket: this.bucketName, VersioningConfiguration } },
+          this.options,
+        );
+      },
     );
-
-    if (VersioningConfiguration !== undefined) {
-      await this.simS3.putBucketVersioning(
-        { input: { Bucket: this.bucketName, VersioningConfiguration } },
-        this.options,
-      );
-    }
   }
 
   /**
@@ -96,31 +98,71 @@ export class SimCfnS3BucketDeclaredConfigurations {
    * the words an SDK caller is refused in.
    */
   async applyObjectLock(): Promise<void> {
-    const ObjectLockConfiguration = this.read(
+    await this.applyDeclared(
       SimCfnS3BucketObjectLockConfiguration,
+      async (ObjectLockConfiguration) => {
+        await this.simS3.putObjectLockConfiguration(
+          { input: { Bucket: this.bucketName, ObjectLockConfiguration } },
+          this.options,
+        );
+      },
     );
-
-    if (ObjectLockConfiguration !== undefined) {
-      await this.simS3.putObjectLockConfiguration(
-        { input: { Bucket: this.bucketName, ObjectLockConfiguration } },
-        this.options,
-      );
-    }
   }
 
   /**
    * Apply the lifecycle rules the Resource declares.
    */
   async applyLifecycle(): Promise<void> {
-    const LifecycleConfiguration = this.read(
+    await this.applyDeclared(
       SimCfnS3BucketLifecycleConfiguration,
+      async (LifecycleConfiguration) => {
+        await this.simS3.putBucketLifecycleConfiguration(
+          { input: { Bucket: this.bucketName, LifecycleConfiguration } },
+          this.options,
+        );
+      },
     );
+  }
 
-    if (LifecycleConfiguration !== undefined) {
-      await this.simS3.putBucketLifecycleConfiguration(
-        { input: { Bucket: this.bucketName, LifecycleConfiguration } },
-        this.options,
-      );
+  /**
+   * Apply the default encryption the Resource declares.
+   */
+  async applyEncryption(): Promise<void> {
+    await this.applyDeclared(
+      SimCfnS3BucketEncryption,
+      async (ServerSideEncryptionConfiguration) => {
+        await this.simS3.putBucketEncryption(
+          {
+            input: {
+              Bucket: this.bucketName,
+              ServerSideEncryptionConfiguration,
+            },
+          },
+          this.options,
+        );
+      },
+    );
+  }
+
+  /**
+   * Apply one declared property, or leave the Bucket alone where the Resource
+   * omitted it.
+   *
+   * The one absence check for all six of them lives here. Each property is
+   * otherwise the same shape: read it off the Resource, and hand it to the
+   * command an SDK caller would reach.
+   */
+  private async applyDeclared<T>(
+    Reader: new (
+      logicalId: string,
+      properties: SimCfnTemplateValueRecord,
+    ) => { read(): T | undefined },
+    apply: (declared: T) => Promise<void>,
+  ): Promise<void> {
+    const declared = this.read(Reader);
+
+    if (declared !== undefined) {
+      await apply(declared);
     }
   }
 

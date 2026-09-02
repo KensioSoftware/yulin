@@ -1,5 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
+import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
 
 /**
  * Minimal structural sim S3 CreateMultipartUpload command.
@@ -14,7 +15,8 @@ export interface SimCreateMultipartUploadCommand {
  * This is the request that says what the Object will be, so it carries the same
  * metadata members a `PutObject` does. None of the Object's bytes arrive here.
  */
-export interface SimCreateMultipartUploadCommandInput extends SimS3ObjectWriteMetadata {
+export interface SimCreateMultipartUploadCommandInput
+  extends SimS3ObjectWriteMetadata, SimS3ObjectWriteStorage {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
 }
@@ -26,6 +28,8 @@ export interface SimCreateMultipartUploadCommandInput extends SimS3ObjectWriteMe
  */
 export interface SimCreateMultipartUploadCommandOutput {
   readonly Bucket?: string;
+  /** The encryption S3 will stamp on the Object the upload completes into. */
+  readonly ServerSideEncryption?: string | undefined;
   readonly Key?: string;
   readonly UploadId?: string;
   readonly $metadata: SimResponseMetadata;

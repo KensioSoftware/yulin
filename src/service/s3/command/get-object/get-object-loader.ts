@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
+import { simS3ObjectStorageReport } from "../../object/s3-object-storage-report.js";
 import {
   simS3ContentRange,
   simS3ReadObjectRange,
@@ -66,6 +67,7 @@ export class GetObjectLoader {
       LastModified: object.lastModified,
       ContentLength: body.length,
       ...(read.versionId !== undefined && { VersionId: read.versionId }),
+      ...simS3ObjectStorageReport(object),
       ...read.lock?.reported,
       ...(range !== undefined && {
         ContentRange: simS3ContentRange(range, size),

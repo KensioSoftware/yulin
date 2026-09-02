@@ -1,6 +1,7 @@
 import type { SimS3BucketVersions } from "../versioning/sim-s3-bucket-versions.js";
 import type { SimS3ObjectVersion } from "../versioning/sim-s3-object-version.js";
 import type { SimS3LifecycleConfiguration } from "./sim-s3-lifecycle-configuration.js";
+import { simS3TransitionedVersionClass } from "./sim-s3-lifecycle-transition.js";
 
 /**
  * One pass over what a Bucket's rules have expired in its version history.
@@ -57,6 +58,7 @@ export class SimS3NoncurrentSweep {
     for (const [index, version] of held.entries()) {
       if (index === 0 || !this.expires(version, index - 1)) {
         kept.push(version);
+        this.transition(version, index - 1);
         continue;
       }
 
@@ -85,6 +87,34 @@ export class SimS3NoncurrentSweep {
       this.lifecycle.expiresDeleteMarker(marker.key)
     ) {
       versions.removeExpired(marker.key, marker.versionId);
+    }
+  }
+
+  /**
+   * Move a surviving noncurrent version into the class the rules have
+   * transitioned it to.
+   *
+   * The current version and a delete marker are left alone. Neither is
+   * something a `NoncurrentVersionTransitions` rule reaches.
+   */
+  private transition(version: SimS3ObjectVersion, ahead: number): void {
+    if (ahead < 0 || version.isDeleteMarker) {
+      return;
+    }
+
+    const storageClass = simS3TransitionedVersionClass(
+      this.lifecycle.enabledRules,
+      {
+        key: version.key,
+        size: version.object.body.length,
+        noncurrentSince: version.noncurrentSince,
+        newerVersionsAhead: ahead,
+      },
+      this.now,
+    );
+
+    if (storageClass !== undefined) {
+      version.transitionTo(storageClass);
     }
   }
 

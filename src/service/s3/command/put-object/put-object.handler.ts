@@ -85,7 +85,10 @@ export class PutObjectCommandHandler implements CommandHandler<
 
     const caller = this.authorizer.authorize(bucket, Key, options);
 
-    const object = this.objectBuilder.build(command);
+    const object = this.objectBuilder.build(
+      command,
+      bucket.getEncryption().algorithm,
+    );
     const version = await bucket.putObject(object);
     const versionId = version?.versionId;
 
@@ -102,6 +105,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     return {
       ETag: simS3QuotedETag(object.etag),
       ...(versionId !== undefined && { VersionId: versionId }),
+      ServerSideEncryption: object.serverSideEncryption,
       $metadata: {},
     };
   }

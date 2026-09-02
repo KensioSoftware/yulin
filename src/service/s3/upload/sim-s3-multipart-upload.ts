@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimS3ObjectMetadata } from "../object/s3-object.js";
+import type { SimS3ServerSideEncryption } from "../object/s3-server-side-encryption.js";
+import {
+  simS3DefaultStorageClass,
+  type SimS3StorageClass,
+} from "../object/s3-storage-class.js";
 
 export type SimS3UploadId = Brand<string, "SimS3UploadId">;
 
@@ -32,6 +37,12 @@ interface SimS3MultipartUploadProperties {
   readonly key: string;
   readonly metadata: SimS3ObjectMetadata;
   readonly initiated: Date;
+  /**
+   * Where and how the completed Object will be stored. Real S3 takes both at
+   * `CreateMultipartUpload`, alongside the metadata, rather than at completion.
+   */
+  readonly storageClass?: SimS3StorageClass;
+  readonly serverSideEncryption?: SimS3ServerSideEncryption | undefined;
 }
 
 /**
@@ -52,6 +63,8 @@ export class SimS3MultipartUpload {
   public readonly key: string;
   public readonly metadata: SimS3ObjectMetadata;
   public readonly initiated: Date;
+  public readonly storageClass: SimS3StorageClass;
+  public readonly serverSideEncryption: SimS3ServerSideEncryption | undefined;
 
   private readonly parts = new Map<number, SimS3UploadPart>();
 
@@ -60,6 +73,8 @@ export class SimS3MultipartUpload {
     this.key = properties.key;
     this.metadata = properties.metadata;
     this.initiated = new Date(properties.initiated);
+    this.storageClass = properties.storageClass ?? simS3DefaultStorageClass;
+    this.serverSideEncryption = properties.serverSideEncryption;
   }
 
   /**

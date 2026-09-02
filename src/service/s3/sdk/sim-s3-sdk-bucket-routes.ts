@@ -127,6 +127,30 @@ export function simS3SdkBucketRoutes(
         ),
     ],
     [
+      "PutBucketEncryptionCommand",
+      async (command, context): Promise<unknown> =>
+        await simS3.putBucketEncryption(
+          command as simS3Commands.SimPutBucketEncryptionCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "GetBucketEncryptionCommand",
+      async (command, context): Promise<unknown> =>
+        await simS3.getBucketEncryption(
+          command as simS3Commands.SimGetBucketEncryptionCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "DeleteBucketEncryptionCommand",
+      async (command, context): Promise<unknown> =>
+        await simS3.deleteBucketEncryption(
+          command as simS3Commands.SimDeleteBucketEncryptionCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
       "PutBucketWebsiteCommand",
       async (command, context): Promise<unknown> =>
         await simS3.putBucketWebsite(

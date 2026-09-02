@@ -1,6 +1,11 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimS3Object } from "../../object/s3-object.js";
+import type { SimS3ServerSideEncryption } from "../../object/s3-server-side-encryption.js";
 import { simS3WriteMetadata } from "../../object/s3-write-metadata.js";
+import {
+  simS3WriteEncryption,
+  simS3WriteStorageClass,
+} from "../../object/s3-write-storage.js";
 import type { SimCopyObjectCommandInput } from "./copy-object.command.js";
 
 interface CopyObjectBuilderProperties {
@@ -34,12 +39,19 @@ export class CopyObjectBuilder {
    * its own to carry. An Object uploaded in parts keeps the multipart ETag it
    * was given, and real S3 rewrites a copy of one as a single part. The copy's
    * ETag is therefore the plain digest of its bytes.
+   *
+   * The storage class and the encryption come from the request and the
+   * destination Bucket. Real S3 stores a copy in the default class where the
+   * request names none, whatever class the source was in.
    */
   build(
     input: SimCopyObjectCommandInput,
     key: string,
     source: SimS3Object,
+    destinationEncryption: SimS3ServerSideEncryption,
   ): SimS3Object {
+    const storageClass = simS3WriteStorageClass(input, "CopyObjectCommand");
+
     return new SimS3Object({
       key,
       body: Buffer.from(source.body),
@@ -48,6 +60,12 @@ export class CopyObjectBuilder {
           ? simS3WriteMetadata(input)
           : source.metadata,
       lastModified: this.clock.now(),
+      ...(storageClass !== undefined && { storageClass }),
+      serverSideEncryption: simS3WriteEncryption(
+        input,
+        destinationEncryption,
+        "CopyObjectCommand",
+      ),
     });
   }
 }

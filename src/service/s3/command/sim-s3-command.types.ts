@@ -60,9 +60,21 @@ export type {
   SimS3LifecycleRule,
 } from "./put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
 export type {
+  SimDeleteBucketEncryptionCommand,
+  SimDeleteBucketEncryptionCommandOutput,
+} from "./delete-bucket-encryption/delete-bucket-encryption.command.js";
+export type {
+  SimGetBucketEncryptionCommand,
+  SimGetBucketEncryptionCommandOutput,
+} from "./get-bucket-encryption/get-bucket-encryption.command.js";
+export type {
   SimGetBucketVersioningCommand,
   SimGetBucketVersioningCommandOutput,
 } from "./get-bucket-versioning/get-bucket-versioning.command.js";
+export type {
+  SimPutBucketEncryptionCommand,
+  SimPutBucketEncryptionCommandOutput,
+} from "./put-bucket-encryption/put-bucket-encryption.command.js";
 export type {
   SimPutBucketVersioningCommand,
   SimPutBucketVersioningCommandOutput,

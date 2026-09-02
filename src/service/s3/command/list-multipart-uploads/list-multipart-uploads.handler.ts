@@ -1,6 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import { simS3DefaultStorageClass } from "../../object/s3-object-summary.js";
 import {
   SimS3MultipartAccess,
   type SimS3MultipartAccessProperties,
@@ -54,7 +53,7 @@ export class ListMultipartUploadsCommandHandler implements CommandHandler<
               Key: upload.key,
               UploadId: upload.uploadId,
               Initiated: upload.initiated,
-              StorageClass: simS3DefaultStorageClass,
+              StorageClass: upload.storageClass,
             })),
       IsTruncated: false,
       $metadata: {},

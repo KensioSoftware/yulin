@@ -2256,12 +2256,149 @@ Bucket ACLs and Object ownership settings are left out, and stay that way by cho
 defaults to Bucket owner enforced on new Buckets, which disables ACLs, and AWS recommends keeping
 them disabled in favour of policies.
 
+## Storage classes
+
+Every Object is in a storage class. A write names one and the Object stays there until a lifecycle
+rule moves it. `PutObject`, `CopyObject` and `CreateMultipartUpload` all take a `StorageClass`, and
+both list operations, `GetObject` and `HeadObject` report where the Object ended up.
+
+```typescript sim-s3-storage-class
+/**
+ * Writing a simulated S3 Object into an archival storage class.
+ */
+
+import {
+  CreateBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.region("eu-west-2").s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "archive" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "archive",
+    Key: "ledgers/2026.csv",
+    Body: "a,b",
+    StorageClass: "GLACIER",
+  }),
+);
+
+const listing = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "archive" }),
+);
+const head = await simS3.headObject(
+  new HeadObjectCommand({ Bucket: "archive", Key: "ledgers/2026.csv" }),
+);
+
+// GLACIER, from the listing and from the Object itself.
+console.log(listing.Contents?.[0]?.StorageClass, head.StorageClass);
+```
+
+A write naming a class S3 has no such class for is refused with `InvalidStorageClass`, before
+anything is stored. The classes taken are `STANDARD`, `REDUCED_REDUNDANCY`, `STANDARD_IA`,
+`ONEZONE_IA`, `INTELLIGENT_TIERING`, `GLACIER_IR`, `GLACIER`, `DEEP_ARCHIVE`, `EXPRESS_ONEZONE`,
+`OUTPOSTS` and `SNOW`.
+
+A listing always reports a class, and a read reports one only for an Object outside `STANDARD`. That
+is how real S3 answers, and it is why `GetObject.StorageClass` is undefined for most Objects. A copy
+is stored in the class the copy names rather than the source's, and an upload in parts takes its
+class at `CreateMultipartUpload` rather than at the completion.
+
+Where the Object is changes nothing about reading it. Real S3 refuses a read of an archived Object
+until `RestoreObject` has brought it back, and sim S3 serves every Object whatever class it is in.
+See [Limitations](#limitations).
+
+## Default encryption
+
+Every Bucket is encrypted, and every Object written into one reports the algorithm it was stored
+under. Nothing is actually encrypted here. The bytes are stored as they arrive and the ETag stays
+the MD5 of them, which is what real S3 reports for an SSE-S3 Object too. What this gives a test is
+the answer S3 gives about an Object, so code that reads `ServerSideEncryption` or the
+`x-amz-server-side-encryption` header has something to read.
+
+```typescript sim-s3-bucket-encryption
+/**
+ * Configuring a simulated S3 Bucket's default encryption.
+ */
+
+import {
+  CreateBucketCommand,
+  GetBucketEncryptionCommand,
+  GetObjectCommand,
+  PutBucketEncryptionCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.region("eu-west-2").s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "documents" }));
+
+await simS3.putBucketEncryption(
+  new PutBucketEncryptionCommand({
+    Bucket: "documents",
+    ServerSideEncryptionConfiguration: {
+      Rules: [
+        { ApplyServerSideEncryptionByDefault: { SSEAlgorithm: "aws:kms" } },
+      ],
+    },
+  }),
+);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "documents",
+    Key: "contracts/one.pdf",
+    Body: "one",
+  }),
+);
+
+const configured = await simS3.getBucketEncryption(
+  new GetBucketEncryptionCommand({ Bucket: "documents" }),
+);
+const read = await simS3.getObject(
+  new GetObjectCommand({ Bucket: "documents", Key: "contracts/one.pdf" }),
+);
+
+// aws:kms, from the Bucket's configuration and from the Object it stamped.
+console.log(
+  configured.ServerSideEncryptionConfiguration?.Rules?.[0]
+    ?.ApplyServerSideEncryptionByDefault?.SSEAlgorithm,
+  read.ServerSideEncryption,
+);
+```
+
+A write names its own algorithm, the Bucket's configuration answers for a write that names none, and
+a Bucket nobody has configured is `AES256`. Real S3 has encrypted every new Object that way since
+January 2023, and `GetBucketEncryption` answers for an unconfigured Bucket with the same `AES256`
+rule rather than an error. `DeleteBucketEncryption` puts a Bucket back to that rule, since there is
+no such thing as an unencrypted Bucket.
+
+`AES256`, `aws:kms` and `aws:kms:dsse` are taken, and anything else is refused with
+`InvalidArgument`. The Objects already in a Bucket keep what they were written with when its
+configuration changes.
+
+An Object that reached a Bucket without a write reports no encryption at all. That covers the files
+a mounted directory serves and the ones a CDK `BucketDeployment` publishes, since neither went
+through `PutObject` to be stamped by one.
+
+An `AWS::S3::Bucket` `BucketEncryption` property is applied as the request is. CloudFormation states
+the rule under `ServerSideEncryptionByDefault` where the request states
+`ApplyServerSideEncryptionByDefault`, and the Resource translates that one name.
+
 ## Lifecycle configuration
 
 Sim S3 stores a Bucket's lifecycle rules and acts on them. An `Expiration` rule removes the Objects
-it selects once simulated time passes the boundary, a `NoncurrentVersionExpiration` rule bounds the
-history a versioned Bucket keeps, and an `AbortIncompleteMultipartUpload` rule discards uploads that
-were started and left unfinished.
+it selects once simulated time passes the boundary, a `Transitions` rule moves them between storage
+classes, a `NoncurrentVersionExpiration` rule bounds the history a versioned Bucket keeps, and an
+`AbortIncompleteMultipartUpload` rule discards uploads that were started and left unfinished.
 
 Retention is otherwise the one property of a log or a backup Bucket a test cannot demonstrate.
 Reading the rules back off a deployed Bucket says the rules arrived. Putting an Object, moving the
@@ -2421,6 +2558,77 @@ A noncurrent version is removed from the Bucket's history, and a `GetObject` nam
 answers `NoSuchVersion` afterwards. The current version is beyond every rule of this kind, however
 old it is.
 
+### Transitioning between storage classes
+
+A `Transitions` rule moves the Objects it selects into another storage class as the clock passes the
+days it names. A rule listing several walks an Object down them, and the last transition reached is
+where the Object is. `NoncurrentVersionTransitions` does the same for the versions a write has
+displaced, counted from the moment each stopped being current.
+
+```typescript sim-s3-lifecycle-transition
+/**
+ * Moving simulated S3 Objects between storage classes on a lifecycle rule.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutBucketLifecycleConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.region("eu-west-2").s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "logs" }));
+await simS3.putBucketLifecycleConfiguration(
+  new PutBucketLifecycleConfigurationCommand({
+    Bucket: "logs",
+    LifecycleConfiguration: {
+      Rules: [
+        {
+          ID: "cool-then-freeze",
+          Status: "Enabled",
+          Filter: { Prefix: "raw/" },
+          Transitions: [
+            { Days: 30, StorageClass: "STANDARD_IA" },
+            { Days: 90, StorageClass: "GLACIER" },
+          ],
+        },
+      ],
+    },
+  }),
+);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "logs",
+    Key: "raw/2026-08-24.gz",
+    Body: "one raw log line",
+  }),
+);
+
+await simAws.clock().advanceBy({ days: 90 });
+
+const listing = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "logs", Prefix: "raw/" }),
+);
+
+// GLACIER, the last transition the clock reached.
+console.log(listing.Contents?.[0]?.StorageClass);
+```
+
+A transition is worked out when the Bucket is read, as an expiry is, so what a listing or a read
+reports is where the rules put the Object at that instant. The bytes stay where they are. Moving the
+clock back afterwards moves the Object back, and an expiry that has already happened stays done. The
+expiry deleted something on the way past, and a transition changed only what S3 says about the
+Object.
+
+A rule naming a class S3 has no such class for is refused with `InvalidStorageClass` where the
+configuration is stored, before it reaches any Object. An `Expiration` on the same rule still expires
+at its own age, whatever the transitions have done in the meantime.
+
 ### What a rule selects
 
 A rule selects Objects by its `Filter`, or by the older top-level `Prefix`. A rule with no scope at
@@ -2519,22 +2727,23 @@ carried across as the template stated it.
 
 `LifecycleConfiguration` is one of the properties simulated S3 acts on. It stays out of
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
-The three actions it enforces are `Expiration`, whether the template flattened it onto the rule or
-not, `NoncurrentVersionExpiration`, in either of its two spellings, and
-`AbortIncompleteMultipartUpload`. A `Transitions` rule is stored and read back and goes no further. Which Objects an enforced action reaches is decided by the fields listed under
-[What a rule selects](#what-a-rule-selects).
+The actions it enforces are `Expiration`, whether the template flattened it onto the rule or not,
+`Transitions` and `NoncurrentVersionTransitions`, `NoncurrentVersionExpiration`, in either of its
+two spellings, and `AbortIncompleteMultipartUpload`. Which Objects an enforced action reaches is
+decided by the fields listed under [What a rule selects](#what-a-rule-selects).
 
 ### Limitations
 
-No Object moves between storage classes. Storage classes are left out of the simulator entirely. A
-`Transitions` rule is stored and read back and goes no further.
+Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object, and
+`s3:LifecycleTransition` when one moves an Object. Both event families are among the ones sim S3
+leaves out. An expiry and a transition here are silent.
 
-Real S3 raises `s3:LifecycleExpiration:Delete` when a rule removes an Object. That event family is
-among the ones sim S3 leaves out. An expiry here is silent.
+A transition changes the class an Object reads back in and nothing else. Real S3 also takes an
+Object in an archival class out of reach until `RestoreObject` has brought it back, and sim S3
+serves every Object whatever class a rule has moved it to.
 
-`NoncurrentVersionTransitions` is stored and unread, alongside `Transitions`, because storage classes
-are left out. An `Expiration` rule on a versioned Bucket writes a delete marker over the current
-version and leaves the version itself where it is, which is what real S3 does, and a
+An `Expiration` rule on a versioned Bucket writes a delete marker over the current version and
+leaves the version itself where it is, which is what real S3 does, and a
 `NoncurrentVersionExpiration` rule is what then removes it. See
 [Object versioning](#object-versioning).
 
@@ -3427,8 +3636,8 @@ Sim S3 currently supports:
   removable on its own
 - `PutBucketWebsiteCommand`, for static website hosting
 - `PutBucketLifecycleConfigurationCommand`, `GetBucketLifecycleConfigurationCommand` and
-  `DeleteBucketLifecycleCommand`, storing a Bucket's lifecycle rules and handing them back without
-  expiring or transitioning any Object against them
+  `DeleteBucketLifecycleCommand`, storing a Bucket's lifecycle rules and expiring, transitioning and
+  abandoning against them in simulated time
 - `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
   sim IAM alongside identity policies
 - The `AWS::S3::Bucket` and `AWS::S3::BucketPolicy` CloudFormation resources
@@ -3440,6 +3649,11 @@ Sim S3 currently supports:
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
 - Object system metadata set by a `PutObjectCommand` and returned on a read, over every endpoint
   that serves an Object
+- Object storage classes, named on a write and moved by a lifecycle rule, reported on a listing and
+  on a read
+- `PutBucketEncryptionCommand`, `GetBucketEncryptionCommand` and `DeleteBucketEncryptionCommand`,
+  and the `BucketEncryption` property of an `AWS::S3::Bucket`, deciding the algorithm an Object
+  reports
 - Bucket website index documents, error documents, trailing-slash redirects, redirect-all
   configuration, and routing-rule redirects
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
@@ -3457,12 +3671,13 @@ needs them to model the requested behaviour.
 
 These apply across the page. The sections above each list what is specific to them.
 
-- A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are
-  left out, and every Object is in that one.
+- A storage class says where S3 keeps an Object and nothing else. Every Object is readable whatever
+  class it is in, `RestoreObject` is left out, and nothing costs or takes longer in one class than
+  another. See [Storage classes](#storage-classes).
 - `EncodingType` is ignored on a listing, and keys come back unencoded.
-- Object tags, ACLs, replication and server-side encryption are left out. A lifecycle rule expires
-  Objects and abandons uploads, and transitions nothing between storage classes. See
-  [Lifecycle configuration](#lifecycle-configuration).
+- Object tags, ACLs and replication are left out. Server-side encryption is reported and never
+  applied, and an `aws:kms` Object names no key, because there is no simulated KMS behind it. See
+  [Default encryption](#default-encryption).
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend in place of putting Objects.
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving

@@ -1,5 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
+import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
 
 /**
  * Minimal structural sim S3 CopyObject command.
@@ -15,7 +16,8 @@ export interface SimCopyObjectCommand {
  * apply to the destination Object under `MetadataDirective: REPLACE`. Under
  * the default `COPY` they are ignored, as real S3 ignores them.
  */
-export interface SimCopyObjectCommandInput extends SimS3ObjectWriteMetadata {
+export interface SimCopyObjectCommandInput
+  extends SimS3ObjectWriteMetadata, SimS3ObjectWriteStorage {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   /** The source Object, as `sourceBucket/sourceKey`, URL-encoded. */
@@ -34,6 +36,8 @@ export interface SimCopyObjectCommandInput extends SimS3ObjectWriteMetadata {
 export interface SimCopyObjectCommandOutput {
   readonly CopyObjectResult?: SimCopyObjectResult;
   readonly VersionId?: string | undefined;
+  /** The encryption S3 stamped on the copy it stored. */
+  readonly ServerSideEncryption?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

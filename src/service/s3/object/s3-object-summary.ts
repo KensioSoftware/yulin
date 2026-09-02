@@ -1,15 +1,6 @@
 import { simS3QuotedETag } from "./s3-object-etag.js";
 import type { SimS3Object } from "./s3-object.js";
-
-/**
- * The storage class S3 reports for an Object nobody asked to store elsewhere.
- *
- * Storage classes are not simulated, and this is the one real S3 puts an Object
- * in unless told otherwise. It is reported rather than omitted because a
- * listing that leaves it out reads as an Object of unknown class, which is a
- * different thing from a Standard one.
- */
-export const simS3DefaultStorageClass = "STANDARD";
+import type { SimS3StorageClass } from "./s3-storage-class.js";
 
 /**
  * One Object as a listing describes it.
@@ -23,7 +14,7 @@ export interface SimS3ObjectSummary {
   readonly Size?: number;
   readonly ETag?: string;
   readonly LastModified?: Date;
-  readonly StorageClass?: string;
+  readonly StorageClass?: SimS3StorageClass;
 }
 
 /**
@@ -39,7 +30,7 @@ export function simS3ObjectSummary(object: SimS3Object): SimS3ObjectSummary {
     Size: object.body.length,
     ETag: simS3QuotedETag(object.etag),
     LastModified: object.lastModified,
-    StorageClass: simS3DefaultStorageClass,
+    StorageClass: object.storageClass,
   };
 }
 
