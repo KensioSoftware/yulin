@@ -33,8 +33,8 @@ export class SimCfnResourceDeletionState {
   }
 
   /**
-   * Whether this Resource was left in simulated AWS because its DeletionPolicy
-   * says to keep it.
+   * Whether this Resource was left in simulated AWS because a policy attribute
+   * or the DeleteStack call said to keep it.
    */
   public get retained(): boolean {
     return this.#status === "DELETE_SKIPPED";
@@ -107,7 +107,7 @@ export class SimCfnResourceDeletionState {
   }
 
   /**
-   * Mark this Resource as kept because its DeletionPolicy is Retain.
+   * Mark this Resource as kept in simulated AWS.
    *
    * DELETE_SKIPPED is the status CloudFormation itself reports for a retained
    * Resource, and it counts as terminal so the rest of the teardown carries on

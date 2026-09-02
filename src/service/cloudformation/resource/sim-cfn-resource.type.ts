@@ -9,6 +9,7 @@ import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "./sim-cfn-resource.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
+import type { SimCfnResourceRetention } from "./delete/sim-cfn-resource-retention.js";
 
 export interface SimCloudFormationResourceProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -103,6 +104,13 @@ export interface SimCloudFormationResourceDeleteContext {
 
   /** The principal the teardown runs as, as creation carries it. */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * Which of the Resources this operation is deleting it has to leave in
+   * simulated AWS. An omitted retention reads each Resource's DeletionPolicy,
+   * which is what a Stack teardown asked for nothing else does.
+   */
+  readonly retention?: SimCfnResourceRetention | undefined;
 }
 
 /**

@@ -13,7 +13,9 @@ interface SimCfnStackDeletionLifecycleProperties {
    * stays outside this class, while status, error and completion handling stay
    * inside it.
    */
-  readonly runTeardown: () => Promise<void>;
+  readonly runTeardown: (
+    properties: SimCfnStackDeleteProperties,
+  ) => Promise<void>;
 }
 
 export interface SimCfnStackDeleteProperties {
@@ -24,6 +26,13 @@ export interface SimCfnStackDeleteProperties {
    * lifecycle only says when the name is free rather than freeing it.
    */
   readonly onDeleteComplete?: (() => void) | undefined;
+
+  /**
+   * Resources to leave in simulated AWS, named by logical ID or CDK construct
+   * ID. What DeleteStack RetainResources asks for, and it overrides whatever
+   * the Resource's own DeletionPolicy says.
+   */
+  readonly retainResources?: readonly string[] | undefined;
 }
 
 /**
@@ -39,7 +48,9 @@ export interface SimCfnStackDeleteProperties {
  */
 export class SimCfnStackDeletionLifecycle {
   private readonly background: BackgroundScheduler;
-  private readonly runTeardown: () => Promise<void>;
+  private readonly runTeardown: (
+    properties: SimCfnStackDeleteProperties,
+  ) => Promise<void>;
   #status: SimCloudFormationStackStatus | undefined;
 
   private completePromise: Promise<void> | undefined;
@@ -98,7 +109,9 @@ export class SimCfnStackDeletionLifecycle {
     await scheduler.sequence();
 
     this.completePromise = scheduler.schedule({
-      operation: this.runTeardown,
+      operation: async (): Promise<void> => {
+        await this.runTeardown(properties);
+      },
       onSuccess: () => {
         this.#status = "DELETE_COMPLETE";
         properties.onDeleteComplete?.();

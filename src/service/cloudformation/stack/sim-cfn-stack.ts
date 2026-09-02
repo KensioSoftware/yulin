@@ -109,8 +109,10 @@ export class SimCfnStack implements SimCfnDeployedStack {
     this.updating = new SimCfnStackUpdateLifecycle({ background, stackName });
     this.deletion = new SimCfnStackDeletionLifecycle({
       background,
-      runTeardown: async (): Promise<void> => {
-        await this.teardown();
+      runTeardown: async (
+        deleteProperties: SimCfnStackDeleteProperties,
+      ): Promise<void> => {
+        await this.teardown(deleteProperties);
       },
     });
     this.operationStatus = new SimCfnStackOperationStatus({
@@ -207,9 +209,22 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * before the Resources have gone. The optional onDeleteComplete callback runs
    * once the teardown has finished successfully, which is when the Stack name
    * becomes free to use again.
+   *
+   * Resources named in retainResources are checked against the Stack before
+   * the teardown is scheduled. A caller naming one the Stack does not have is
+   * refused there, where a check in the background would only fail the
+   * deletion.
+   *
+   * The names are copied as the request is accepted. The teardown runs in the
+   * background, and a caller holding the array it passed could otherwise change
+   * which Resources are kept after the Stack agreed to keep them.
    */
   async delete(properties: SimCfnStackDeleteProperties = {}): Promise<void> {
-    await this.deletion.delete(properties);
+    const retainResources = [...(properties.retainResources ?? [])];
+
+    this.operations.assertRetainable(this.resourceMap, retainResources);
+
+    await this.deletion.delete({ ...properties, retainResources });
   }
 
   /** Wait for the scheduled Stack deletion to finish. */
@@ -224,8 +239,11 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * The Resource half of deleting a Stack, without the Stack-level status or
    * the Stack name release that delete() puts on top of it.
    */
-  async teardown(): Promise<void> {
-    await this.operations.deleteAll(this.resourceMap);
+  async teardown(properties: SimCfnStackDeleteProperties = {}): Promise<void> {
+    await this.operations.deleteAll(
+      this.resourceMap,
+      properties.retainResources,
+    );
     this.stackOutputs.release();
   }
 
@@ -270,9 +288,12 @@ export class SimCfnStack implements SimCfnDeployedStack {
     return this.report.deletionSkipped;
   }
 
-  /** Resources a teardown left in simulated AWS, as their policy says to. */
+  /**
+   * Resources left in simulated AWS, whether a teardown stepped over them or
+   * an update replaced them and kept the deployed one.
+   */
   public get retainedResources(): readonly SimCfnResource[] {
-    return this.report.retained;
+    return [...this.report.retained, ...this.operations.retainedResources];
   }
 
   /** Every property or Parameter that did not reach simulated AWS as written. */

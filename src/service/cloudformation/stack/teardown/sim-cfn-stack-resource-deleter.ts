@@ -1,6 +1,7 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
+import type { SimCfnResourceRetention } from "../../resource/delete/sim-cfn-resource-retention.js";
 import { SimCfnStackPendingDeletions } from "./sim-cfn-stack-pending-deletions.js";
 import { SimCfnStackResourceBatchDeleter } from "./sim-cfn-stack-resource-batch-deleter.js";
 
@@ -9,6 +10,9 @@ interface SimCfnStackResourceDeleterProperties {
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly stackName: string;
   readonly caller?: SimAwsCaller | undefined;
+
+  /** Which of the Resources being deleted are to be left in simulated AWS. */
+  readonly retention?: SimCfnResourceRetention | undefined;
 }
 
 /**
@@ -32,7 +36,7 @@ export class SimCfnStackResourceDeleter {
   private readonly batchDeleter: SimCfnStackResourceBatchDeleter;
 
   constructor(properties: SimCfnStackResourceDeleterProperties) {
-    const { simAws, resources, stackName, caller } = properties;
+    const { simAws, resources, stackName, caller, retention } = properties;
 
     this.resources = resources;
     this.stackName = stackName;
@@ -40,6 +44,7 @@ export class SimCfnStackResourceDeleter {
       simAws,
       resources,
       caller,
+      retention,
     });
   }
 

@@ -374,15 +374,91 @@ Two things follow from replacement:
 - A resource naming a replaced resource is replaced too, all the way up the dependency chain, and
   nothing is left pointing at a resource that has gone. Real CloudFormation hands the dependent the
   new physical name and leaves it standing.
-- `UpdateReplacePolicy` is not read. Honouring `Retain` would leave the old resource holding the
-  name the replacement needs, and CDK marks buckets and tables with it as a matter of course, so
-  every such update would fail. The old resource is deleted whatever the policy says.
+- A resource declared with `UpdateReplacePolicy: Retain` is kept, and the replacement is created
+  beside it. See [`UpdateReplacePolicy`](#updatereplacepolicy) below.
 
 A failed update leaves the stack in `UPDATE_FAILED` with the reason on it, and leaves the resources
 where the update got to. There is no rollback to the previous template.
 `waitForStackUpdateComplete(...)` rethrows the error, and `DescribeStacksCommand` reports it as
 `StackStatusReason`. Dealing with the cause and sending `UpdateStackCommand` again applies the rest
 of the change.
+
+### `UpdateReplacePolicy`
+
+A resource declared with `UpdateReplacePolicy: Retain` is left in simulated AWS when an update
+replaces it. The stack stops tracking it, the replacement takes over its logical ID, and the kept
+resource is reported on the stack the way a retained resource is after a teardown.
+
+```typescript sim-cloudformation-update-replace-policy
+/**
+ * Keeping a Resource an update replaces.
+ */
+
+import {
+  CreateStackCommand,
+  UpdateStackCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+function reportsTemplate(bucketName: string): string {
+  return JSON.stringify({
+    Resources: {
+      ReportsBucket: {
+        Type: "AWS::S3::Bucket",
+        UpdateReplacePolicy: "Retain",
+        Properties: { BucketName: bucketName },
+      },
+    },
+  });
+}
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "reports",
+    TemplateBody: reportsTemplate("reports-2025"),
+  }),
+);
+await simCfn.waitForStackDeployComplete("reports");
+
+// Renaming the bucket replaces it.
+await simCfn.updateStack(
+  new UpdateStackCommand({
+    StackName: "reports",
+    TemplateBody: reportsTemplate("reports-2026"),
+  }),
+);
+await simCfn.waitForStackUpdateComplete("reports");
+
+// The bucket the update replaced is still in simulated S3.
+console.log(simAws.s3().getSimBucketByName("reports-2025"));
+
+// And so is the one created in its place.
+console.log(simAws.s3().getSimBucketByName("reports-2026"));
+
+// The stack reports what it kept.
+const stack = simCfn.getStackByName("reports");
+console.log(stack?.retainedResources.map((resource) => resource.logicalId));
+```
+
+The attribute is read from the template being applied, which is where CloudFormation reads it. An
+update that adds `UpdateReplacePolicy: Retain` keeps the resource it replaces, and one that drops
+the attribute deletes it.
+
+`DeletionPolicy` has no say in this. CloudFormation reads `DeletionPolicy` for a resource an update
+drops from the template, and `UpdateReplacePolicy` for one it replaces. A bucket marked only with
+`DeletionPolicy: Retain` still goes when its replacement is created. `Snapshot` is treated as
+`Delete`, because no simulated service takes snapshots.
+
+The kept resource holds the name it was created with. Real CloudFormation gives the replacement a
+fresh random name, while simulated CloudFormation generates the same name for the same stack name
+and logical ID every time (see
+[names CloudFormation generates](#names-cloudformation-generates)). A replacement whose name the
+template leaves to CloudFormation therefore asks for a name the kept resource still holds, and fails
+to create. Name the replacement in the template, as the example above does, to have both.
 
 ## Deploying through a change set
 
@@ -590,6 +666,77 @@ Retained resources are readable from the stack:
 ```typescript
 console.log(stack.retainedResources.map((resource) => resource.logicalId));
 ```
+
+### `RetainResources`
+
+`DeleteStackCommand` takes `RetainResources`, naming resources to leave in simulated AWS. Each one
+is kept whatever its own `DeletionPolicy` says, and the stack deletes around it and reaches
+`DELETE_COMPLETE`.
+
+```typescript sim-cloudformation-retain-resources
+/**
+ * Keeping named Resources when a Stack is deleted.
+ */
+
+import {
+  CreateStackCommand,
+  DeleteStackCommand,
+} from "@aws-sdk/client-cloudformation";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "reports-stack",
+    TemplateBody: JSON.stringify({
+      Resources: {
+        ReportsBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "reports" },
+        },
+        ArchiveBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "archive" },
+        },
+      },
+    }),
+  }),
+);
+await simCfn.waitForStackDeployComplete("reports-stack");
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "reports",
+    Key: "january.csv",
+    Body: "reported",
+  }),
+);
+
+await simCfn.deleteStack(
+  new DeleteStackCommand({
+    StackName: "reports-stack",
+    RetainResources: ["ReportsBucket"],
+  }),
+);
+await simCfn.waitForStackDeleteComplete("reports-stack");
+
+// The named bucket is still in simulated S3, with the object it held.
+console.log(simAws.s3().getSimBucketByName("reports"));
+
+// The bucket the call did not name has gone.
+console.log(simAws.s3().getSimBucketByName("archive"));
+```
+
+Keeping a bucket that holds objects is one reason to reach for this. S3 refuses to delete such a
+bucket, which fails the whole teardown, and naming it here steps over it.
+
+A name the stack has no resource for is refused with a `ValidationError`, as CloudFormation refuses
+one. A CDK construct ID resolves here as well as a logical ID, the same way `stack.getResource(...)`
+takes either.
 
 ## Parameters
 
@@ -3878,7 +4025,9 @@ Sim CloudFormation currently supports:
 - Waiting for simulated stack deployment, update and deletion completion
 - Stack IDs in the CloudFormation ARN shape, accepted by `DescribeStacksCommand` in place of a stack
   name, and still describing a stack once it has been deleted
-- The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
+- The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`, and
+  `UpdateReplacePolicy`, for `Retain`
+- `RetainResources` on `DeleteStackCommand`, naming resources a teardown leaves in simulated AWS
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
 - `deployTemplateFile(...)` for template files, written as JSON or as YAML with short-form
@@ -3996,13 +4145,16 @@ Each service's own docs describe what its resource types support.
   creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
   same way an unsupported resource type is on create, and the stack still deletes with that resource
   left behind.
-- `DeletionPolicy` is read for `Retain` and `RetainExceptOnCreate` only. `Snapshot` is treated as
-  `Delete`, because no simulated service takes snapshots.
-- `UpdateReplacePolicy` is not read. A replaced resource is deleted whatever it says, for the reason
-  given under [changed resources are replaced](#changed-resources-are-replaced).
-- `DeleteStackCommand` reads only `StackName`. `RetainResources`, `DeletionMode`, `RoleARN` and
-  `ClientRequestToken` are not read, so a stack left in `DELETE_FAILED` cannot be forced through the
-  way `FORCE_DELETE_STACK` forces it in AWS.
+- `DeletionPolicy` is read for `Retain` and `RetainExceptOnCreate` only, and `UpdateReplacePolicy`
+  for `Retain` only. `Snapshot` is treated as `Delete` in both, because no simulated service takes
+  snapshots.
+- A resource kept by `UpdateReplacePolicy: Retain` holds the name it was created with, and a
+  replacement whose name the template leaves to CloudFormation asks for that same name and fails to
+  create. Real CloudFormation gives the replacement a fresh random name. See
+  [`UpdateReplacePolicy`](#updatereplacepolicy).
+- `DeleteStackCommand` reads `StackName` and `RetainResources`. `DeletionMode`, `RoleARN` and
+  `ClientRequestToken` are not read, and a stack left in `DELETE_FAILED` cannot be forced through
+  the way `FORCE_DELETE_STACK` forces it in AWS.
 - A deleted stack stays describable by its stack ID for as long as the simulation lives. Real
   CloudFormation drops it after 90 days. `DescribeStacks` with no `StackName` lists the live stacks
   in both, and `ListStacks` is unsupported, so there is no way to find a deleted stack whose ID you

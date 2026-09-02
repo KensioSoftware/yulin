@@ -84,6 +84,23 @@ export class SimCfnStackUpdatePlan {
   }
 
   /**
+   * For each logical ID the update is replacing, whether the definition taking
+   * its place says to keep the deployed Resource.
+   *
+   * The new half answers it because CloudFormation reads UpdateReplacePolicy
+   * off the template it is applying. An update that adds the attribute keeps
+   * the Resource it replaces, and one that drops it deletes that Resource.
+   */
+  replacementRetentions(): ReadonlyMap<string, boolean> {
+    return new Map(
+      this.replacements.map(({ current, updated }) => [
+        current.logicalId,
+        updated.retainedOnReplace,
+      ]),
+    );
+  }
+
+  /**
    * Whether the update changes any Resource at all.
    *
    * A template that only changes something else, such as an Output, still

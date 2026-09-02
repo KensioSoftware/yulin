@@ -147,6 +147,27 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
   }
 
   /**
+   * The UpdateReplacePolicy attribute from the Resource template, if it has
+   * one.
+   */
+  public get updateReplacePolicy(): string | undefined {
+    return this.resourceTemplateReader.updateReplacePolicy();
+  }
+
+  /**
+   * Whether an update that replaces this Resource should leave the deployed one
+   * where it is.
+   *
+   * UpdateReplacePolicy decides this on its own. CloudFormation does not fall
+   * back to DeletionPolicy for a Resource it is replacing. A Resource kept on
+   * teardown still goes when its replacement is created, unless it says
+   * otherwise here.
+   */
+  public get retainedOnReplace(): boolean {
+    return this.updateReplacePolicy === "Retain";
+  }
+
+  /**
    * The value returned when this Resource is referenced via { "Ref": logicalId }.
    *
    * Mirroring CloudFormation, Resource Ref behavior is Resource-type specific.

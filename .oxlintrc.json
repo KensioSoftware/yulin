@@ -757,6 +757,19 @@
       }
     },
     {
+      // The simulated CloudFormation Stack. Its length tracks the size of the
+      // surface a Stack exposes rather than the complexity of anything in it:
+      // identity, template, three operation lifecycles, Resources, Outputs and
+      // the Resource reports, nearly every one of them a doc comment and a
+      // line of delegation to the collaborator that owns the work. Splitting
+      // that surface would only move the delegations somewhere the caller has
+      // to go looking for them.
+      "files": ["src/service/cloudformation/stack/sim-cfn-stack.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", 350]
+      }
+    },
+    {
       // The CloudFormation service facade. As with the IAM one below, it
       // carries one method per SDK command CloudFormation handles, each a doc
       // comment and a line or two of delegation. The Stack commands and the

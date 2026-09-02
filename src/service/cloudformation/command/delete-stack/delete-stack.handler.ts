@@ -57,6 +57,10 @@ export class DeleteStackCommandHandler implements CommandHandler<
    *
    * The Stack itself is kept once its name has gone, so DescribeStacks can
    * still answer for it by Stack ID, as CloudFormation does for 90 days.
+   *
+   * RetainResources names Resources to leave behind. They stay in simulated AWS
+   * and are reported as retained on the deleted Stack, and the Stack still
+   * reaches DELETE_COMPLETE around them.
    */
   async handle(
     command: SimDeleteStackCommand,
@@ -77,6 +81,7 @@ export class DeleteStackCommandHandler implements CommandHandler<
     }
 
     await stack.delete({
+      retainResources: command.input.RetainResources,
       onDeleteComplete: (): void => {
         this.stacks.delete(stackName);
         this.deleted.record(stack);

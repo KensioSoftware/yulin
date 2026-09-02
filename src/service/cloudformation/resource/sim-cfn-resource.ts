@@ -181,8 +181,8 @@ export class SimCfnResource<
   }
 
   /**
-   * Whether this Resource was left in simulated AWS by a Stack teardown,
-   * because its DeletionPolicy says to keep it.
+   * Whether this Resource was left in simulated AWS rather than deleted,
+   * because a policy or the caller said to keep it.
    */
   public get retained(): boolean {
     return this.deletionState.retained;
@@ -191,20 +191,11 @@ export class SimCfnResource<
   /**
    * Start deleting this Resource from simulated AWS.
    *
-   * A Resource whose DeletionPolicy retains it never reaches the delete
-   * operation. CloudFormation leaves it where it is and reports it as
-   * DELETE_SKIPPED, so the Stack can finish deleting around it.
-   *
    * The actual work is delegated to SimCfnResourceDeleteOperation, for the same
-   * reason creation is.
+   * reason creation is. That includes deciding whether to delete the Resource
+   * at all, since a retained Resource is a deletion outcome like any other.
    */
   delete(context: SimCloudFormationResourceDeleteContext): Promise<void> {
-    if (this.retainedOnDelete) {
-      this.deletionState.markDeleteRetained();
-
-      return Promise.resolve();
-    }
-
     return new SimCfnResourceDeleteOperation({
       background: this.background,
       resource: this,
@@ -273,6 +264,14 @@ export class SimCfnResource<
    */
   markDeleteComplete(): void {
     this.deletionState.markDeleteComplete();
+  }
+
+  /**
+   * Mark this Resource as left in simulated AWS rather than deleted, because a
+   * policy or the DeleteStack call said to keep it.
+   */
+  markDeleteRetained(): void {
+    this.deletionState.markDeleteRetained();
   }
 
   /**

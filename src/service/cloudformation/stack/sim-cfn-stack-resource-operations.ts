@@ -6,6 +6,8 @@ import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js";
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
+import { SimCfnResourceRetention } from "../resource/delete/sim-cfn-resource-retention.js";
+import { simCfnStackRetainedLogicalIds } from "./teardown/sim-cfn-stack-retained-logical-ids.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
 import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
@@ -62,6 +64,16 @@ export class SimCfnStackResourceOperations {
   private readonly resourceOrder: SimCfnResourceOrder | undefined;
   private cdkOutContext: SimCdkOutContext | undefined;
   private caller: SimAwsCaller | undefined;
+
+  /**
+   * Resources an update kept in simulated AWS.
+   *
+   * They are held here because the Stack cannot hold them. A replaced Resource
+   * gives its logical ID up to the Resource created in its place as soon as the
+   * update applies. A teardown's retained Resources are still on the Stack, and
+   * are read off it.
+   */
+  private readonly retainedByUpdates: SimCfnResource[] = [];
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {
     const {
@@ -125,13 +137,42 @@ export class SimCfnStackResourceOperations {
     await this.creator(resources).create(creating);
   }
 
+  /** Resources an update kept in simulated AWS. */
+  public get retainedResources(): readonly SimCfnResource[] {
+    return this.retainedByUpdates;
+  }
+
   /**
-   * Delete every Resource in the given Stack Resource map.
+   * Refuse a teardown that names a Resource the Stack does not have, before
+   * anything is deleted.
+   */
+  assertRetainable(
+    resources: ReadonlyMap<string, SimCfnResource>,
+    retainResources: readonly string[] | undefined,
+  ): void {
+    this.teardownRetention(resources, retainResources);
+  }
+
+  /**
+   * Delete every Resource in the given Stack Resource map, apart from any the
+   * teardown named as ones to keep.
    */
   async deleteAll(
     resources: ReadonlyMap<string, SimCfnResource>,
+    retainResources?: readonly string[],
   ): Promise<void> {
-    await this.deleter(resources).deleteAll();
+    await this.deleter(
+      resources,
+      this.teardownRetention(resources, retainResources),
+    ).deleteAll();
+  }
+
+  /**
+   * Take a record of the Resources an update kept, which the Stack is about to
+   * stop holding.
+   */
+  recordRetained(resources: readonly SimCfnResource[]): void {
+    this.retainedByUpdates.push(...resources);
   }
 
   /**
@@ -141,8 +182,9 @@ export class SimCfnStackResourceOperations {
   async delete(
     resources: ReadonlyMap<string, SimCfnResource>,
     deleting: readonly SimCfnResource[],
+    retention?: SimCfnResourceRetention,
   ): Promise<void> {
-    await this.deleter(resources).delete(deleting);
+    await this.deleter(resources, retention).delete(deleting);
   }
 
   /**
@@ -184,6 +226,23 @@ export class SimCfnStackResourceOperations {
     });
   }
 
+  /**
+   * What a teardown of these Resources is to leave behind: the ones it named,
+   * and the ones their own DeletionPolicy keeps.
+   */
+  private teardownRetention(
+    resources: ReadonlyMap<string, SimCfnResource>,
+    retainResources: readonly string[] | undefined,
+  ): SimCfnResourceRetention {
+    return new SimCfnResourceRetention({
+      named: simCfnStackRetainedLogicalIds({
+        stackName: this.stackName,
+        resources,
+        retainResources,
+      }),
+    });
+  }
+
   private async publishAssets(): Promise<void> {
     await new SimCdkAssetsPublisher({
       simAws: this.simAws,
@@ -210,12 +269,14 @@ export class SimCfnStackResourceOperations {
 
   private deleter(
     resources: ReadonlyMap<string, SimCfnResource>,
+    retention: SimCfnResourceRetention | undefined,
   ): SimCfnStackResourceDeleter {
     return new SimCfnStackResourceDeleter({
       simAws: this.simAws,
       resources,
       stackName: this.stackName,
       caller: this.caller,
+      retention,
     });
   }
 }

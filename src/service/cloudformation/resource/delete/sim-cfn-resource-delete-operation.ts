@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../sim-cfn-resource.js";
 import type { SimCloudFormationResourceDeleteContext } from "../sim-cfn-resource.type.js";
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceDeleter } from "./sim-cfn-resource-deleter.js";
+import { SimCfnResourceRetention } from "./sim-cfn-resource-retention.js";
 import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
 
 interface SimCfnResourceDeleteOperationProperties<T extends object> {
@@ -42,8 +43,20 @@ export class SimCfnResourceDeleteOperation<T extends object = object> {
    * while the Resource itself is updated through CloudFormation delete states:
    * in progress before scheduling, complete after the deleter returns, skipped
    * if nothing can delete the Resource type, or failed if the deleter throws.
+   *
+   * A Resource the operation's retention keeps never reaches the deleter at
+   * all. CloudFormation leaves it where it is and reports it as DELETE_SKIPPED,
+   * so the Stack can finish deleting around it.
    */
   run(context: SimCloudFormationResourceDeleteContext): Promise<void> {
+    const retention = context.retention ?? new SimCfnResourceRetention();
+
+    if (retention.retains(this.resource)) {
+      this.resource.markDeleteRetained();
+
+      return Promise.resolve();
+    }
+
     this.resource.markDeleteInProgress();
 
     return new Promise<void>((resolve, reject) => {
