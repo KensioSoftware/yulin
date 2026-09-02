@@ -1,5 +1,6 @@
 import { Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
+import type { SimLambdaOutput } from "../../logging/sim-lambda-output.js";
 import {
   simLambdaNoOutputSink,
   type SimLambdaOutputSink,
@@ -25,14 +26,20 @@ import {
  * standard output to standard output and standard error to standard error, and
  * recorded to the sink the code was given, which is what puts a handler's
  * output in its log group. Forwarding to the host is a tee rather than a
- * redirect: real Lambda sends output to CloudWatch Logs and nowhere else, but
- * a test tool that swallowed it would make a failing test harder to debug than
- * it is with none of this.
+ * redirect. Real Lambda sends output to CloudWatch Logs and nowhere else, and a
+ * test tool that swallowed it would make a failing test harder to debug than it
+ * is with none of this.
  * The sandbox's own console is built over these streams too, so a handler's
  * output arrives there whether it printed through the console or wrote to the
  * stream itself, instead of one of the two disappearing. The host stream is
  * read per write, so a test that starts capturing host output after the
  * function has cold-started still sees what the handler writes.
+ *
+ * A simulated Lambda told to capture only (see `SimLambdaOutput`) drops the
+ * forwarding and carries on recording. Those settings are read per write as
+ * well, so a sandbox that has already cold started follows a change. A stream
+ * built without them forwards everything, which is what a function with
+ * nowhere to record its output needs.
  */
 export class SimLambdaVmOutputStream extends Writable {
   #sink: SimLambdaOutputSink = simLambdaNoOutputSink;
@@ -49,7 +56,10 @@ export class SimLambdaVmOutputStream extends Writable {
    */
   readonly #decoder = new StringDecoder("utf8");
 
-  constructor(private readonly hostStream: () => NodeJS.WritableStream) {
+  constructor(
+    private readonly hostStream: () => NodeJS.WritableStream,
+    private readonly output?: SimLambdaOutput,
+  ) {
     super();
   }
 
@@ -75,7 +85,11 @@ export class SimLambdaVmOutputStream extends Writable {
     done: (error?: Error) => void,
   ): void {
     this.#sink.write(this.#decoder.write(chunk));
-    this.hostStream().write(chunk);
+
+    if (this.output?.reachesHost() ?? true) {
+      this.hostStream().write(chunk);
+    }
+
     done();
   }
 }

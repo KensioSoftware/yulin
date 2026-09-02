@@ -1,6 +1,12 @@
-import { assertArrayEquals, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayEmpty,
+  assertArrayEquals,
+  assertIdentical,
+  assertTrue,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import {
   SimLambdaProcessOutput,
@@ -68,6 +74,13 @@ function watchedGlobals(): {
 }
 
 /**
+ * Output settings left at their default, for a test that is not about them.
+ */
+function teeing(): SimLambdaOutput {
+  return new SimLambdaOutput();
+}
+
+/**
  * Resolve after a real pause, so a test can interleave two runs and prove they
  * do not record into each other's sink.
  */
@@ -85,7 +98,7 @@ describe("sim Lambda process output", () => {
     const sink = new RecordingSink();
 
     // When a run prints.
-    await output.run(sink, async () => {
+    await output.run(sink, teeing(), async () => {
       globals.console.log("INFO handling order-1");
       await Promise.resolve();
     });
@@ -102,7 +115,7 @@ describe("sim Lambda process output", () => {
     const sink = new RecordingSink();
 
     // When a run prints one line through it.
-    await output.run(sink, async () => {
+    await output.run(sink, teeing(), async () => {
       globals.console.error("ERROR order has no items");
       await Promise.resolve();
     });
@@ -119,7 +132,7 @@ describe("sim Lambda process output", () => {
     const sink = new RecordingSink();
 
     // When a run writes to a stream itself.
-    await output.run(sink, async () => {
+    await output.run(sink, teeing(), async () => {
       globals.stdout.write("no newline");
       globals.stderr.write(Buffer.from("bytes\n"));
       await Promise.resolve();
@@ -139,7 +152,7 @@ describe("sim Lambda process output", () => {
     const bytes = Buffer.from("玉\n");
 
     // When a run writes it a byte at a time.
-    await output.run(sink, async () => {
+    await output.run(sink, teeing(), async () => {
       globals.stdout.write(bytes.subarray(0, 1));
       globals.stdout.write(bytes.subarray(1));
       await Promise.resolve();
@@ -149,13 +162,94 @@ describe("sim Lambda process output", () => {
     assertIdentical(sink.recorded.join(""), "玉\n");
   });
 
+  it("keeps a printed line off the host console when capturing only", async () => {
+    // Given a simulated Lambda told to record its functions' output and stop
+    // there, as a suite drowning in Powertools metric documents does.
+    const { globals, stdout } = watchedGlobals();
+    const output = new SimLambdaProcessOutput(() => globals);
+    const sink = new RecordingSink();
+    const settings = new SimLambdaOutput();
+
+    settings.captureOnly();
+
+    // When a run prints.
+    await output.run(sink, settings, async () => {
+      globals.console.log("INFO handling order-1");
+      await Promise.resolve();
+    });
+
+    // Then the line was recorded, and the host console was left alone.
+    assertArrayEquals(sink.recorded, ["INFO handling order-1\n"]);
+    assertArrayEmpty(stdout.written);
+  });
+
+  it("keeps a stream write off the host stream when capturing only", async () => {
+    // Given a run whose simulated Lambda is capturing only. Powertools'
+    // metrics writes to the stream directly rather than through the console.
+    const { globals, stdout } = watchedGlobals();
+    const output = new SimLambdaProcessOutput(() => globals);
+    const sink = new RecordingSink();
+    const settings = new SimLambdaOutput();
+
+    settings.captureOnly();
+
+    // When the run writes to standard output.
+    const accepted = await output.run(sink, settings, () =>
+      Promise.resolve(globals.stdout.write("EMF document\n")),
+    );
+
+    // Then the write was recorded and reported as accepted, and the host
+    // stream never saw it. Code awaiting a drain carries on.
+    assertArrayEquals(sink.recorded, ["EMF document\n"]);
+    assertArrayEmpty(stdout.written);
+    assertTrue(accepted);
+  });
+
+  it("prints what the test run itself writes while capturing only", async () => {
+    // Given a run that has installed the patches under capture-only settings.
+    const { globals, stdout } = watchedGlobals();
+    const output = new SimLambdaProcessOutput(() => globals);
+    const settings = new SimLambdaOutput();
+
+    settings.captureOnly();
+    await output.run(new RecordingSink(), settings, () => Promise.resolve());
+
+    // When the rest of the test run prints.
+    globals.console.log("a line from the test");
+
+    // Then it reached the host console. The settings cover what a function
+    // prints, and the test run's own output is not a function's.
+    assertArrayEquals(stdout.written, ["a line from the test\n"]);
+  });
+
+  it("follows settings changed while an invocation is in flight", async () => {
+    // Given a run printing on either side of a change to the settings.
+    const { globals, stdout } = watchedGlobals();
+    const output = new SimLambdaProcessOutput(() => globals);
+    const sink = new RecordingSink();
+    const settings = new SimLambdaOutput();
+
+    // When the settings change part way through it.
+    await output.run(sink, settings, async () => {
+      globals.console.log("before");
+      settings.captureOnly();
+      await Promise.resolve();
+      globals.console.log("after");
+    });
+
+    // Then both lines were recorded and only the first was printed. The
+    // settings are read as each line is written.
+    assertArrayEquals(sink.recorded, ["before\n", "after\n"]);
+    assertArrayEquals(stdout.written, ["before\n"]);
+  });
+
   it("leaves output made outside a run alone", async () => {
     // Given a run that has installed the patches.
     const { globals, stdout } = watchedGlobals();
     const output = new SimLambdaProcessOutput(() => globals);
     const sink = new RecordingSink();
 
-    await output.run(sink, () => Promise.resolve());
+    await output.run(sink, teeing(), () => Promise.resolve());
 
     // When the rest of the test run prints.
     globals.console.log("a line from the test");
@@ -175,12 +269,12 @@ describe("sim Lambda process output", () => {
 
     // When both print on either side of a pause.
     await Promise.all([
-      output.run(orders, async () => {
+      output.run(orders, teeing(), async () => {
         globals.console.log("order-1");
         await tick(20);
         globals.console.log("order-2");
       }),
-      output.run(invoices, async () => {
+      output.run(invoices, teeing(), async () => {
         await tick(10);
         globals.console.log("invoice-1");
       }),

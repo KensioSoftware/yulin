@@ -33,6 +33,7 @@ import type { SimCloudWatchServiceWriter } from "../cloudwatch/write/sim-cloudwa
 import type { SimLogsServiceWriter } from "../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "./function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
+import { SimLambdaOutput } from "./function/logging/sim-lambda-output.js";
 import { SimLambdaEventInvokeConfigStore } from "./function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import {
   type SimLambdaDestinationTargets,
@@ -103,6 +104,16 @@ export class SimLambdaCommands {
   public readonly aliasStore = new SimLambdaFunctionAliasStore({
     versions: this.versionStore,
   });
+  /**
+   * Where this simulated Lambda's functions send what they print, besides
+   * their own log groups.
+   *
+   * Shared across every function so that one setting covers a simulation with
+   * several of them, and read as each line is written so that a function that
+   * has already cold started follows a change.
+   */
+  public readonly output = new SimLambdaOutput();
+
   public readonly functionLookup: SimLambdaFunctionLookup;
   public readonly eventInvokeConfigStore: SimLambdaEventInvokeConfigStore;
   public readonly functions: SimLambdaFunctionCommands;
@@ -219,6 +230,7 @@ export class SimLambdaCommands {
       containerImages,
       vmSdkModuleProvider,
       logs,
+      output: this.output,
       metrics,
       outboundHttp,
     });
