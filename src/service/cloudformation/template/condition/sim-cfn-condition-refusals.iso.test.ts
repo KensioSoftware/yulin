@@ -238,9 +238,73 @@ describe("SimCfnTemplate Conditions refusals", () => {
     );
   });
 
-  it("refuses Fn::If inside the Conditions section", () => {
-    // Given a Condition built from Fn::If, which needs the very Conditions
-    // being evaluated.
+  it("refuses a Condition whose Fn::If closes a cycle", () => {
+    // Given two Conditions each choosing a branch by the other.
+    const conditions = {
+      IsProd: {
+        "Fn::If": ["IsNotProd", { Condition: "IsNotProd" }, falseCondition()],
+      },
+      IsNotProd: {
+        "Fn::If": ["IsProd", { Condition: "IsProd" }, falseCondition()],
+      },
+    };
+
+    // When the Conditions are evaluated.
+    const error = assertThrowsError(() => {
+      evaluateWith(conditions);
+    });
+
+    // Then the cycle is named rather than recursing.
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack conditions-stack Condition IsProd refers to " +
+        "itself through IsProd -> IsNotProd -> IsProd",
+    );
+  });
+
+  it("refuses an Fn::If that does not carry three values", () => {
+    // Given an Fn::If with no false branch.
+    const conditions = {
+      IsProd: { "Fn::If": ["IsStaging", falseCondition()] },
+    };
+
+    // When the Conditions are evaluated.
+    const error = assertThrowsError(() => {
+      evaluateWith(conditions);
+    });
+
+    // Then the shape is refused.
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack conditions-stack Condition IsProd Fn::If " +
+        "must be a list of a Condition name and two conditions",
+    );
+  });
+
+  it("refuses an Fn::If Condition name that is not a string", () => {
+    // Given an Fn::If choosing by a Parameter rather than by a Condition name.
+    const conditions = {
+      IsProd: {
+        "Fn::If": [{ Ref: "EnvName" }, falseCondition(), falseCondition()],
+      },
+    };
+
+    // When the Conditions are evaluated.
+    const error = assertThrowsError(() => {
+      evaluateWith(conditions);
+    });
+
+    // Then the shape is refused.
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack conditions-stack Condition IsProd Fn::If " +
+        "Condition name must be a string",
+    );
+  });
+
+  it("refuses Fn::If as a value an Fn::Equals compares", () => {
+    // Given an Fn::Equals reading an Fn::If, which CloudFormation allows only
+    // a Ref or an Fn::FindInMap inside.
     const conditions = {
       IsProd: {
         "Fn::Equals": [{ "Fn::If": ["IsProd", "a", "b"] }, "a"],
@@ -295,6 +359,13 @@ function evaluateWith(conditions: Record<string, SimCfnTemplateValue>): void {
     },
     parameters: SimCfnParameters.fromValues({ EnvName: "prod" }),
   }).conditions();
+}
+
+/**
+ * A condition that is false whatever the Stack's Parameters say.
+ */
+function falseCondition(): SimCfnTemplateValue {
+  return { "Fn::Equals": ["never", "always"] };
 }
 
 /**

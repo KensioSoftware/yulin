@@ -52,6 +52,45 @@ describe("SimCfnStack Resource Condition", () => {
     assertIdentical(simAws.s3().getSimBucketByName("site")?.bucketName, "site");
   });
 
+  it("creates a Resource gated by a Condition built from Fn::If", async () => {
+    // Given a Stack whose Backups Bucket is gated by a Condition that chooses
+    // between two other conditions.
+    const simAws = new SimAws();
+
+    // When it is deployed with a Parameter value the chosen branch agrees with.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "resource-condition-stack",
+      template: {
+        Parameters: { EnvName: { Type: "String" } },
+        Conditions: {
+          IsProd: { "Fn::Equals": [{ Ref: "EnvName" }, "prod"] },
+          IsBackedUp: {
+            "Fn::If": [
+              "IsProd",
+              { "Fn::Equals": ["nightly", "nightly"] },
+              { "Fn::Equals": ["never", "nightly"] },
+            ],
+          },
+        },
+        Resources: {
+          Backups: {
+            Type: "AWS::S3::Bucket",
+            Condition: "IsBackedUp",
+            Properties: { BucketName: "site-backups" },
+          },
+        },
+      },
+      parameters: { EnvName: "prod" },
+    });
+
+    // Then the Bucket the Fn::If gated is created.
+    assertNonNullable(stack.getResource("Backups"), "Backups Resource");
+    assertIdentical(
+      simAws.s3().getSimBucketByName("site-backups")?.bucketName,
+      "site-backups",
+    );
+  });
+
   it("refuses a Resource naming a Condition the template does not define", async () => {
     // Given a Resource whose Condition is not in the Conditions section.
     const simAws = new SimAws();
